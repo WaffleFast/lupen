@@ -1,0 +1,42 @@
+Lupen Roadmap
+
+Immediate next steps:
+1. Keep v1.1 untouched as stable backup.
+2. Continue UI fixes and gameplay polish in v1.2.
+3. Create GitHub repository.
+4. Upload v1.2 as the active development version.
+5. Make small commits after each working change.
+
+Short-term polish:
+- Tidy final UI issues.
+- Improve mobile/small-screen scaling.
+- Balance XP progression.
+- Balance trade margins and cargo quantities.
+- Balance bounty rewards and bot difficulty.
+- Add more ships.
+- Add more guns and attachments.
+- Add more visual reward moments.
+
+Project structure later:
+- Split app.js into smaller files once GitHub/version control is active.
+- Suggested folders:
+  - js/data
+  - js/systems
+  - js/ui
+  - js/tutorial
+  - js/core
+
+Online version:
+- Host a static browser version first.
+- Share private test link with brothers.
+- Keep save data local at first.
+
+Future multiplayer:
+- Pilot names/accounts.
+- Online presence.
+- Local/sector chat.
+- Show player location/node.
+- Friends/guild system.
+- Leaderboards.
+- Co-op bounties.
+- Shared economy/events.

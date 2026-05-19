@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lupen</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="stars"></div>
+
+  <main class="screen">
+
+    <section id="startScreen" class="card active">
+      <h1>LUPEN</h1>
+      <p class="subtitle">Trade. Survive. Evolve.</p>
+
+      <div class="menu">
+        <button onclick="showScreen('createScreen')">Create Account</button>
+        <button onclick="showScreen('loginScreen')">Login</button>
+      </div>
+    </section>
+
+    <section id="createScreen" class="card">
+      <h2>Create Account</h2>
+      <input id="createEmail" type="email" placeholder="Email address (optional)" />
+      <input id="createUsername" type="text" placeholder="Pilot name (optional)" />
+      <input id="createPassword" type="password" placeholder="Password (not required in prototype)" />
+      <input id="createConfirm" type="password" placeholder="Confirm password (not required in prototype)" />
+
+      <button onclick="createAccount()">Create Account</button>
+      <button class="secondary back-gap" onclick="showScreen('startScreen')">Back</button>
+      <p id="createMessage" class="message"></p>
+    </section>
+
+    <section id="loginScreen" class="card">
+      <h2>Login</h2>
+      <input id="loginUser" type="text" placeholder="Pilot name (optional)" />
+      <input id="loginPassword" type="password" placeholder="Password (not required in prototype)" />
+
+      <button onclick="login()">Login</button>
+      <button class="secondary back-gap" onclick="showScreen('startScreen')">Back</button>
+      <p id="loginMessage" class="message"></p>
+    </section>
+
+    <section id="gameScreen" class="hub-screen">
+      <div class="hub-overlay">
+        <button class="logout-btn" onclick="logout()">Logout</button>
+
+        <div class="hub-header">
+          <p>LOCATION:</p>
+          <h2 id="hubLocationTitle">ASTERON PRIME</h2>
+        </div>
+
+        <button class="hub-launch-btn" onclick="launchShip()">Launch Ship</button>
+
+        <div class="hub-actions">
+          <button onclick="openMarketplace()">Trade Terminal</button>
+          <button id="bountyBoardHubBtn" onclick="openBountyBoard()">Bounty Board<span id="bountyRewardBadge" class="hub-action-badge">Reward Ready</span></button>
+          <button onclick="openStore()">Store</button>
+          <button onclick="openHangar()">Hangar</button>
+          <button onclick="openPilotProfile()">Pilot</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="marketScreen" class="market-screen">
+      <div class="market-header">
+        <div>
+          <p>TRADE TERMINAL</p>
+          <h2 id="marketLocationTitle">ASTERON PRIME</h2>
+        </div>
+        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+      </div>
+
+      <div class="market-terminal trade-terminal-layout">
+        <div class="trade-terminal-summary">
+          <div class="terminal-card terminal-card-wide">
+            <h3>Station Exchange</h3>
+            <p id="marketFlavorText">
+              Buy low, sell high. Local prices and stock change by planet.
+            </p>
+          </div>
+
+          <div class="terminal-card market-wallet terminal-card-compact">
+            <div class="credits-line">
+              <span>Credits</span>
+              <strong><span class="credit-icon">CR</span><span id="creditsText">1,000</span></strong>
+            </div>
+            <div>
+              <span>Cargo</span>
+              <strong id="cargoText">0 / 100</strong>
+            </div>
+          </div>
+
+          <div class="terminal-card terminal-card-wide">
+            <h3>Your Hold</h3>
+            <div id="marketCargoSummary" class="market-cargo-summary">Empty</div>
+          </div>
+        </div>
+
+        <section class="market-list-panel trade-terminal-panel">
+          <div class="market-list-header phase-one-market-header">
+            <span>Station Trades</span>
+            <span id="marketCycleText">Market shifts in 10:00.</span>
+          </div>
+          <div id="marketGoods" class="market-goods"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="bountyScreen" class="market-screen bounty-screen">
+      <div class="market-header">
+        <div>
+          <p>BOUNTY BOARD</p>
+          <h2 id="bountyLocationTitle">SECTOR CONTRACTS</h2>
+        </div>
+        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+      </div>
+
+      <div class="bounty-top-strip">
+        <div class="bounty-strip-card">
+          <span>Daily Contracts</span>
+          <strong id="bountyAvailableText">0 / 3</strong>
+        </div>
+        <div class="bounty-strip-card">
+          <span>Credits</span>
+          <strong><span class="credit-icon">CR</span><span id="bountyCreditsText">0</span></strong>
+        </div>
+        <div class="bounty-strip-note">Hunt hostile targets, earn combat pay, and chase rare drops across dangerous sector lanes.</div>
+      </div>
+
+      <div class="bounty-board-layout bounty-board-layout-refined">
+        <section class="bounty-contract-panel">
+          <div class="modern-store-panel-header bounty-panel-header">
+            <span>Available Bounties</span>
+            <em>Resets daily</em>
+          </div>
+          <div id="bountyContractGrid" class="bounty-contract-grid"></div>
+        </section>
+
+        <aside class="bounty-detail-panel">
+          <div class="modern-store-panel-header">
+            <span>Selected Contract</span>
+          </div>
+          <div id="bountyDetailPanel" class="bounty-detail-body"></div>
+        </aside>
+      </div>
+    </section>
+
+
+    <section id="pilotProfileScreen" class="market-screen pilot-profile-screen">
+      <div class="market-header">
+        <div>
+          <p>PILOT PROFILE</p>
+          <h2 id="profilePilotTitle">PILOT PROFILE</h2>
+        </div>
+        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+      </div>
+
+      <div id="pilotProfileBody" class="pilot-profile-body">
+        <div class="terminal-empty-state">Loading pilot progression...</div>
+      </div>
+    </section>
+
+
+    <section id="storeScreen" class="hangar-screen hangar-prestige">
+      <div class="hangar-header prestige-header store-header-row">
+        <div>
+          <p>STATION STORE</p>
+          <h2 id="storeLocationTitle">ASTERON PRIME</h2>
+          <span class="hangar-subtitle">Standard guns and attachments, plus one daily unique offer.</span>
+        </div>
+        <div class="store-header-actions">
+          <div class="credits-line store-credits-inline">
+            <span>Credits</span>
+            <strong><span class="credit-icon">CR</span><span id="storeCreditsText">1,000</span></strong>
+          </div>
+          <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+        </div>
+      </div>
+
+      <div class="modern-store-topbar">
+        <div id="storeFilterBar" class="store-filter-bar"></div>
+      </div>
+
+      <div class="modern-store-layout">
+        <div class="modern-store-catalog-panel">
+          <div class="modern-store-panel-header store-catalog-header">
+            <span>Catalogue</span>
+            <div id="storeQualityBar" class="store-quality-row store-quality-row-compact"></div>
+          </div>
+          <div id="storeCatalogGrid" class="store-catalog-grid"></div>
+        </div>
+
+        <div class="modern-store-detail-panel">
+          <div class="modern-store-panel-header">
+            <span>Item Detail</span>
+          </div>
+          <div id="storeDetailPanel" class="store-detail-panel-body"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="hangarScreen" class="hangar-screen hangar-prestige">
+      <div class="hangar-header prestige-header">
+        <div>
+          <p>HANGAR BAY</p>
+          <h2 id="hangarShipTitle">LF-1 Origin</h2>
+          <span id="hangarShipSubtitle" class="hangar-subtitle">Equipped Hull</span>
+        </div>
+        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+      </div>
+
+      <div class="hangar-tabs prestige-tabs simplified-hangar-tabs">
+        <button id="hangarOverviewTab" data-tutorial-target="hangarLoadout" onclick="showHangarSection('overview')">Loadout</button>
+        <button id="hangarOwnedTab" onclick="showHangarSection('owned')">Fleet</button>
+        <button id="hangarShipyardTab" data-tutorial-target="vesselExchange" onclick="showHangarSection('shipyard')">Vessel Exchange</button>
+        <button id="hangarVaultTab" onclick="showHangarSection('vault')">Vault</button>
+      </div>
+
+      <div id="hangarOverviewSection" class="hangar-section active">
+        <div class="integrated-hangar-grid">
+          <aside class="hangar-info-panel integrated-stats-panel">
+            <div class="panel-kicker">Current Hull</div>
+            <h3 id="overviewShipName">LF-1 Origin</h3>
+            <div id="overviewStats" class="overview-stat-grid"></div>
+            <div id="overviewRepairPanel" class="overview-repair compact-repair-panel"></div>
+          </aside>
+
+          <main class="hangar-loadout-stage hangar-loadout-stage-scalable hangar-orbit-loadout">
+            <div class="loadout-stage-header">
+              <span>Equipped Loadout</span>
+              <div class="loadout-title-cluster">
+                <small>Active Vessel</small>
+                <strong id="overviewNameplate">LF-1 Origin</strong>
+              </div>
+            </div>
+
+            <div class="orbit-loadout-arena">
+              <section class="orbit-rail orbit-rail-left">
+                <div class="loadout-bank-title compact-bank-title">
+                  <span>Guns</span>
+                  <small id="gunSlotSummary">0/0</small>
+                </div>
+                <div id="installedGuns" class="orbit-slot-rail gun-slot-grid"></div>
+              </section>
+
+              <div class="orbit-ship-stage">
+                <div class="orbit-halo orbit-halo-outer"></div>
+                <div class="orbit-halo orbit-halo-inner"></div>
+                <img id="overviewShipImage" src="assets/ships/lupen-origin.png" alt="Equipped ship">
+                <div class="ship-effect-anchor ship-effect-blue"></div>
+              </div>
+
+              <section class="orbit-rail orbit-rail-right">
+                <div class="loadout-bank-title compact-bank-title">
+                  <span>Equip</span>
+                  <small id="attachmentSlotSummary">0/0</small>
+                </div>
+                <div id="installedAttachments" class="orbit-slot-rail attachment-slot-grid"></div>
+              </section>
+            </div>
+
+            <div class="loadout-stage-footer">
+              <span>Click installed systems to unequip</span>
+              <span>Effect-ready slots</span>
+            </div>
+          </main>
+
+          <aside class="hangar-info-panel integrated-equipment-panel equipment-drawer-panel">
+            <div class="equipment-panel-header">
+              <div>
+                <div class="panel-kicker">Available Equipment</div>
+                <small>Click to equip into the current vessel</small>
+              </div>
+              <div class="equipment-count-chip" id="equipmentInventoryCount">0 items</div>
+            </div>
+
+            <div class="equipment-drawer">
+              <div class="available-equipment-block">
+                <div class="mini-panel-title">
+                  <span>Guns</span>
+                  <small id="gunInventoryCount">0 available</small>
+                </div>
+                <div id="gunInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid"></div>
+              </div>
+
+              <div class="available-equipment-block">
+                <div class="mini-panel-title">
+                  <span>Equipment</span>
+                  <small id="attachmentInventoryCount">0 available</small>
+                </div>
+                <div id="attachmentInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid"></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <div id="hangarOwnedSection" class="hangar-section">
+        <div class="hangar-section-title compact-title fleet-title-row">
+          <div>
+            <h3>Fleet</h3>
+            <p>Browse owned vessels, compare builds and activate your current ship.</p>
+          </div>
+          <div class="fleet-count-pill"><strong id="fleetCountText">0</strong> owned</div>
+        </div>
+
+        <div class="fleet-layout">
+          <div class="fleet-gallery-panel">
+            <div class="modern-store-panel-header">
+              <span>Owned Vessels</span>
+              <small>Click a ship to inspect</small>
+            </div>
+            <div id="ownedShipsList" class="fleet-card-grid"></div>
+          </div>
+
+          <aside class="fleet-detail-panel">
+            <div class="modern-store-panel-header">
+              <span>Ship Detail</span>
+              <small id="fleetDetailStatus">Active</small>
+            </div>
+            <div id="fleetDetailPanel" class="fleet-detail-body"></div>
+          </aside>
+        </div>
+      </div>
+
+      <div id="hangarShipyardSection" class="hangar-section">
+        <div class="hangar-section-title compact-title shipyard-title-row fleet-title-row">
+          <div>
+            <h3>Vessel Exchange</h3>
+            <p>Purchase new hulls. Your loadout decides how each vessel performs.</p>
+          </div>
+          <div class="shipyard-credit-pill">CR <strong id="shipyardCreditText">0</strong></div>
+        </div>
+
+        <div class="shipyard-layout vessel-exchange-layout">
+          <div class="shipyard-catalog-panel fleet-gallery-panel">
+            <div class="modern-store-panel-header"><span>Available Vessels</span><small>Zone 1</small></div>
+            <div id="shipShop" class="shipyard-grid vessel-card-grid"></div>
+          </div>
+
+          <div class="shipyard-detail-panel fleet-detail-panel">
+            <div class="modern-store-panel-header">
+              <span>Hull Detail</span>
+              <small id="shipyardDetailStatus">Available</small>
+            </div>
+            <div id="shipyardDetailPanel" class="shipyard-detail-body fleet-detail-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="hangarVaultSection" class="hangar-section">
+        <div class="hangar-section-title compact-title">
+          <h3>Vault</h3>
+          <p>Browse owned guns, attachments and Lupen Cores kept in station storage.</p>
+        </div>
+
+        <div class="vault-layout">
+          <div class="vault-main-panel">
+            <div class="modern-store-panel-header vault-filter-header">
+              <div id="vaultFilterBar" class="vault-filter-row"></div>
+            </div>
+            <div id="vaultCatalogGrid" class="vault-catalog-grid"></div>
+          </div>
+
+          <div class="vault-detail-panel">
+            <div class="modern-store-panel-header">
+              <span>Item Detail</span>
+            </div>
+            <div id="vaultDetailPanel" class="vault-detail-panel-body"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="spaceScreen" class="space-screen">
+      <button
+        id="planetLandBtn"
+        class="clickable-planet"
+        onclick="landOnPlanet()"
+        aria-label="Land on planet">
+      </button>
+
+      <div id="asteroidField" class="asteroid-field" aria-label="Asteroids"></div>
+
+      <div id="laserLayer" class="laser-layer" aria-hidden="true"></div>
+
+      <div id="explosionLayer" class="explosion-layer" aria-hidden="true"></div>
+
+      <div id="inventoryDrawer" class="inventory-drawer" aria-label="Inventory drawer">
+        <div class="inventory-drawer-head">
+          <div>
+            <span class="drawer-kicker">Inventory</span>
+            <strong id="inventoryDrawerCount">0 items</strong>
+          </div>
+          <div id="inventoryDrawerFilters" class="inventory-drawer-filters">
+            <button id="inventoryFilterCargo" onclick="setInventoryDrawerFilter('cargo')">Cargo</button>
+            <button id="inventoryFilterEquipment" onclick="setInventoryDrawerFilter('equipment')">Equipment</button>
+            <button id="inventoryFilterEquipped" onclick="setInventoryDrawerFilter('equipped')">Loadout</button>
+          </div>
+        </div>
+        <div class="inventory-drawer-body">
+          <div id="inventoryDrawerGrid" class="inventory-drawer-grid"></div>
+          <div id="inventoryDrawerDetail" class="inventory-drawer-detail"></div>
+        </div>
+      </div>
+
+      <div id="nodeNameTag" class="node-name-tag">ASTERON PRIME ORBIT</div>
+
+      <div id="sectorMap" class="sector-map">
+        <div class="map-title">SECTOR MAP</div>
+        <div class="sector-scan-panel">
+          <div class="sector-scan-title">SCAN</div>
+          <div class="sector-scan-actions">
+            <button id="sectorScanAlliesBtn" class="sector-scan-btn scan-ally-btn" onclick="scanSector('ally')"><span>Allies</span></button>
+            <button id="sectorScanBotsBtn" class="sector-scan-btn scan-bot-btn" onclick="scanSector('bot')"><span>Bots</span></button>
+            <button id="sectorScanEnemiesBtn" class="sector-scan-btn scan-enemy-btn" onclick="scanSector('enemy')"><span>Enemies</span></button>
+          </div>
+          <div id="sectorScanStatus" class="sector-scan-status">Scanners ready</div>
+        </div>
+        <button class="close-map-btn" onclick="closeSectorMap()">×</button>
+        <svg id="sectorSvg" class="sector-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+
+      <div id="objectActionPanel" class="object-action-panel central-engage-panel">
+        <button id="objectEngageBtn" class="engage-action" onclick="toggleTargetEngagement()">ENGAGE</button>
+      </div>
+
+      <div class="space-combat-hud compact-hud command-hud">
+        <div class="vertical-stats">
+          <div class="stat-col">
+            <div id="jumpValue" class="stat-value">100</div>
+            <div class="stat-meter"><div id="jumpFill" class="stat-fill jump-fill"></div></div>
+            <button id="jumpBtn" class="stat-btn" onclick="openSectorMap()">JUMP</button>
+          </div>
+
+          <div class="stat-col">
+            <div id="hullValue" class="stat-value">800</div>
+            <div class="stat-meter"><div id="hullFill" class="stat-fill hull-fill"></div></div>
+            <button class="stat-btn static-btn">HULL</button>
+          </div>
+
+          <div class="stat-col">
+            <div id="shieldValue" class="stat-value">0</div>
+            <div class="stat-meter"><div id="shieldFill" class="stat-fill shield-fill"></div></div>
+            <button id="shieldBtn" class="stat-btn static-btn" type="button">SHIELD</button>
+          </div>
+        </div>
+
+        <div class="ship-display-panel ship-display-panel-action">
+          <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image">
+          <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
+          <button id="shipInventoryBtn" class="ship-inventory-btn" onclick="toggleShipInventoryDrawer(event)">LOADOUT</button>
+        </div>
+
+        <div class="hud-command-console">
+          <div class="hud-command-tabs">
+            <button id="chatDockBtn" class="active" onclick="openHudPanel('chat')">CHAT</button>
+            <button id="objectivesDockBtn" onclick="openHudPanel('objectives')">OBJECTIVES</button>
+            <button id="activityDockBtn" onclick="openHudPanel('activity')">ACTIVITY</button>
+          </div>
+
+          <div id="hudInlinePanel" class="hud-inline-panel compact-tabs-panel">
+            <div id="chatPanel" class="hud-panel comms-panel active">
+              <div class="chat-panel-top">
+                <div class="chat-channel-tabs" aria-label="Chat channels">
+                  <button class="active" type="button">Local</button>
+                  <button class="locked" type="button" title="Future channel">Guild</button>
+                  <button class="locked" type="button" title="Future channel">Sector</button>
+                </div>
+              </div>
+              <div id="localChatFeed" class="local-chat-feed"></div>
+              <div class="local-chat-input-row">
+                <input id="localChatInput" type="text" maxlength="120" placeholder="Type message..." onkeydown="handleLocalChatKey(event)" />
+                <button onclick="sendLocalChatMessage()">Send</button>
+              </div>
+            </div>
+
+            <div id="inventoryPanel" class="hud-panel cargo-panel inventory-panel-minimal">
+              <div class="inventory-hud inventory-overhaul-hud inventory-hud-minimal">
+                <div class="hud-panel-header compact-header inventory-mini-header">
+                  <h3>Inventory</h3>
+                  <span id="inventoryItemCountText">0 items</span>
+                </div>
+                <div id="itemInventorySummary" class="inventory-card-grid inventory-card-grid-minimal">
+                  <div class="cargo-empty">No items collected yet.</div>
+                </div>
+              </div>
+            </div>
+
+            <div id="objectivesPanel" class="hud-panel objectives-panel">
+              <div class="objective-panel-layout">
+                <div class="activity-objective-block">
+                  <div class="hud-panel-header compact-header">
+                    <h3>Active Objective</h3>
+                  </div>
+                  <div id="activeObjectiveSummary" class="objective-hud-summary">
+                    <div class="objective-empty">No active objective.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="activityPanel" class="hud-panel activity-panel">
+              <div class="activity-log-block activity-log-only-block">
+                <div class="hud-panel-header compact-header">
+                  <h3>Activity Log</h3>
+                </div>
+                <div id="activityLogFeed" class="activity-log-feed">
+                  <div class="activity-log-item muted">Awaiting sector activity.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+
+    <div id="tutorialOverlay" class="tutorial-overlay" aria-live="polite">
+      <div id="tutorialSpotlight" class="tutorial-spotlight" aria-hidden="true"></div>
+      <aside class="tutorial-card">
+        <div class="tutorial-card-top">
+          <span id="tutorialStepLabel">Starter Pilot Programme</span>
+</div>
+        <h3 id="tutorialTitle">Welcome Pilot</h3>
+        <p id="tutorialText">Follow the starter route to learn trading, loadout and bounties.</p>
+        <div id="tutorialProgress" class="tutorial-progress"></div>
+        <div class="tutorial-actions">
+          <button id="tutorialBackBtn" type="button" onclick="previousTutorialStep()">Back</button>
+          <button id="tutorialNextBtn" type="button" onclick="advanceTutorialManually()">Next</button>
+        </div>
+      </aside>
+    </div>
+
+  </body>
+</html>

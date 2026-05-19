@@ -1,0 +1,7 @@
+v1.2 - Working development copy
+Status: Active working version.
+Purpose: Make changes here, not in v1.1.
+
+Initial setup:
+- Renamed Assets folder to lowercase assets for safer web hosting.
+- Current structure kept mostly intact to avoid breaking working prototype.
