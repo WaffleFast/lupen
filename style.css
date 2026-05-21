@@ -19755,6 +19755,104 @@ input::placeholder {
   font-size: 0.62rem;
 }
 
+/* ===== Objective readability and tutorial framing pass ===== */
+.objective-bounty-icon.image {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 90, 125, 0.22), transparent 64%),
+    rgba(52, 5, 18, 0.62);
+}
+
+.objective-bounty-icon.image img {
+  width: 86%;
+  height: 86%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(255, 93, 125, 0.42));
+}
+
+.tutorial-card.tutorial-card-positioned {
+  width: min(342px, calc(100vw - 44px)) !important;
+  max-height: calc(100vh - 44px) !important;
+  overflow-y: auto;
+}
+
+.tutorial-spotlight {
+  box-shadow:
+    0 0 0 9999px rgba(0, 4, 12, 0.16),
+    0 0 0 4px rgba(255, 220, 95, 0.18),
+    0 0 34px rgba(255, 220, 95, 0.58),
+    0 0 58px rgba(255, 79, 178, 0.22) !important;
+}
+
+.tutorial-overlay.active::before {
+  background: rgba(0, 4, 12, 0.055) !important;
+}
+
+#sectorSvg .objective-route-step {
+  stroke: #ffd65c !important;
+  stroke-width: 0.56 !important;
+  stroke-opacity: 0.96 !important;
+  filter: drop-shadow(0 0 5px rgba(255, 214, 92, 0.78));
+}
+
+#sectorSvg .svg-current-ring {
+  stroke: #7fdfff !important;
+  stroke-width: 0.38 !important;
+  filter: drop-shadow(0 0 7px rgba(127, 223, 255, 0.9));
+}
+
+#sectorSvg .svg-player-node .svg-current-ring {
+  animation: mapPlayerPulse 1.65s ease-in-out infinite;
+}
+
+#sectorSvg .svg-objective-target-ring,
+#sectorSvg .objective-target-ring {
+  fill: none;
+  stroke: #ff4fb2 !important;
+  stroke-width: 0.34 !important;
+  stroke-dasharray: 1.2 0.7;
+  filter: drop-shadow(0 0 7px rgba(255, 79, 178, 0.82));
+  animation: mapObjectivePulse 1.35s ease-in-out infinite;
+}
+
+#sectorSvg .objective-target-pointer {
+  fill: #ff4fb2;
+  filter: drop-shadow(0 0 5px rgba(255, 79, 178, 0.8));
+}
+
+#sectorSvg .objective-target-label {
+  fill: #ffe8a3;
+  font-size: 1.25px;
+  font-weight: 900;
+  letter-spacing: 0.12px;
+  text-anchor: middle;
+  text-transform: uppercase;
+  paint-order: stroke;
+  stroke: rgba(0, 5, 13, 0.92);
+  stroke-width: 0.46px;
+}
+
+#sectorSvg .svg-space-node.objective-target-node {
+  fill: #ffd65c !important;
+  stroke: #ff4fb2 !important;
+  stroke-width: 0.26 !important;
+}
+
+#sectorSvg .svg-objective-path-node .svg-space-node:not(.objective-target-node) {
+  fill: #ffe8a3 !important;
+  opacity: 1 !important;
+}
+
+@keyframes mapPlayerPulse {
+  0%, 100% { stroke-width: 0.36; opacity: 0.82; }
+  50% { stroke-width: 0.58; opacity: 1; }
+}
+
+@keyframes mapObjectivePulse {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+
 
 
 

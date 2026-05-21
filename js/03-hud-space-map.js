@@ -1076,6 +1076,42 @@ function renderSectorMap() {
   updateSectorScanPanel();
 }
 
+function getActiveObjectiveTargetNode() {
+  const objective = typeof getActiveObjective === "function" ? getActiveObjective() : null;
+  if (!objective) return null;
+
+  if (objective.type === "trade" && typeof getTradeObjectiveTargetNode === "function") {
+    return getTradeObjectiveTargetNode(objective);
+  }
+
+  if (objective.type === "bounty") {
+    if (objective.status === "readyToClaim" || objective.kills >= objective.killsRequired) {
+      return getNearestPlanetNode(currentNode);
+    }
+    return getNearestActiveBountyBotNode(currentNode) || getNearestBountyAreaNode(currentNode, objective.targetArea);
+  }
+
+  return null;
+}
+
+function getActiveObjectiveRouteNodes() {
+  return typeof getObjectiveRoutePath === "function" ? getObjectiveRoutePath() : [];
+}
+
+function getActiveObjectiveMapLabel() {
+  const objective = typeof getActiveObjective === "function" ? getActiveObjective() : null;
+  if (!objective) return "";
+  if (objective.type === "trade") {
+    const target = getActiveObjectiveTargetNode();
+    return target ? `Objective: ${target}` : "Trade objective";
+  }
+  if (objective.type === "bounty") {
+    if (objective.status === "readyToClaim" || objective.kills >= objective.killsRequired) return "Claim reward";
+    return "Bounty target";
+  }
+  return "Objective";
+}
+
 
 function getSectorScanRemainingMs(targetTime) {
   return Math.max(0, Math.ceil((Number(targetTime || 0) - Date.now()) / 1000));
@@ -1362,6 +1398,7 @@ function getRouteTone(node, targetNode) {
 
 function drawRoutes(svg) {
   const drawnRoutes = new Set();
+  const objectivePath = getActiveObjectiveRouteNodes();
 
   Object.entries(sectorNodes).forEach(([name, node]) => {
     node.connects.forEach(target => {
@@ -1377,34 +1414,71 @@ function drawRoutes(svg) {
       line.setAttribute("y2", targetNode.y);
       const isAvailableRoute = name === currentNode || target === currentNode;
       const isPlannedTradeRoute = isLineOnActiveTradeRoute(name, target);
+      const isObjectiveStep = objectivePath.some((nodeName, index) => {
+        const nextNode = objectivePath[index + 1];
+        return (nodeName === name && nextNode === target) || (nodeName === target && nextNode === name);
+      });
       const routeTone = getRouteTone(node, targetNode);
-      line.setAttribute("class", `svg-route ${isAvailableRoute ? "available" : ""} ${isPlannedTradeRoute ? "planned-trade-route" : ""} ${routeTone}`);
+      line.setAttribute("class", `svg-route ${isAvailableRoute ? "available" : ""} ${isPlannedTradeRoute ? "planned-trade-route" : ""} ${isObjectiveStep ? "objective-route-step" : ""} ${routeTone}`);
       svg.appendChild(line);
     });
   });
 }
 
 function drawNodes(svg) {
+  const objectiveTarget = getActiveObjectiveTargetNode();
+  const objectiveRoute = getActiveObjectiveRouteNodes();
   Object.entries(sectorNodes).forEach(([name, node]) => {
     const isCurrent = name === currentNode;
     const canJump = sectorNodes[currentNode].connects.includes(name);
+    const isObjectiveTarget = objectiveTarget === name;
+    const isObjectivePath = objectiveRoute.includes(name);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
     group.style.cursor = canJump || isCurrent ? "pointer" : "not-allowed";
     group.onclick = () => jumpToNode(name);
+    group.setAttribute("class", `${isCurrent ? "svg-player-node" : ""} ${isObjectiveTarget ? "svg-objective-target-node" : ""} ${isObjectivePath ? "svg-objective-path-node" : ""}`);
 
     if (node.type === "planet") {
-      drawPlanetNode(group, name, node, isCurrent, canJump);
+      drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget);
     } else {
-      drawSpaceNode(group, node, isCurrent, canJump);
+      drawSpaceNode(group, node, isCurrent, canJump, isObjectiveTarget);
     }
 
     svg.appendChild(group);
   });
 }
 
-function drawPlanetNode(group, name, node, isCurrent, canJump) {
+function drawObjectiveTargetMarker(group, node) {
+  const marker = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  marker.setAttribute("class", "svg-objective-target-marker");
+
+  const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  ring.setAttribute("cx", node.x);
+  ring.setAttribute("cy", node.y);
+  ring.setAttribute("r", 4.35);
+  ring.setAttribute("class", "objective-target-ring");
+  marker.appendChild(ring);
+
+  const pointer = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  pointer.setAttribute("d", `M ${node.x} ${node.y - 6.4} l 1.7 -2.4 h -3.4 z`);
+  pointer.setAttribute("class", "objective-target-pointer");
+  marker.appendChild(pointer);
+
+  const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  label.setAttribute("x", node.x);
+  label.setAttribute("y", node.y - 7.7);
+  label.setAttribute("class", "objective-target-label");
+  label.textContent = getActiveObjectiveMapLabel();
+  marker.appendChild(label);
+
+  group.appendChild(marker);
+}
+
+function drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget = false) {
   const isPlanned = isNodeOnActiveTradeRoute(name);
+  if (isObjectiveTarget && !isCurrent) drawObjectiveTargetMarker(group, node);
+
   const glow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   glow.setAttribute("cx", node.x);
   glow.setAttribute("cy", node.y);
@@ -1424,7 +1498,7 @@ function drawPlanetNode(group, name, node, isCurrent, canJump) {
   ring.setAttribute("cx", node.x);
   ring.setAttribute("cy", node.y);
   ring.setAttribute("r", isCurrent ? 3.5 : 3.0);
-  ring.setAttribute("class", isCurrent ? "svg-current-ring" : isPlanned ? "svg-planned-trade-ring" : "svg-planet-ring");
+  ring.setAttribute("class", isCurrent ? "svg-current-ring" : isObjectiveTarget ? "svg-objective-target-ring" : isPlanned ? "svg-planned-trade-ring" : "svg-planet-ring");
   group.appendChild(ring);
 
   const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -1442,14 +1516,16 @@ function drawPlanetNode(group, name, node, isCurrent, canJump) {
   group.appendChild(hit);
 }
 
-function drawSpaceNode(group, node, isCurrent, canJump) {
+function drawSpaceNode(group, node, isCurrent, canJump, isObjectiveTarget = false) {
   const nodeName = Object.keys(sectorNodes).find(name => sectorNodes[name] === node);
   const isPlanned = isNodeOnActiveTradeRoute(nodeName);
+  if (isObjectiveTarget && !isCurrent) drawObjectiveTargetMarker(group, node);
+
   const star = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   star.setAttribute("cx", node.x);
   star.setAttribute("cy", node.y);
   star.setAttribute("r", node.route === "safe" ? 0.72 : 0.82);
-  star.setAttribute("class", `svg-space-node ${node.route || "safe"} ${node.danger === "hostile" ? "hostile" : "safe"} ${isPlanned ? "planned-trade-node" : ""} ${!canJump && !isCurrent ? "locked" : ""}`);
+  star.setAttribute("class", `svg-space-node ${node.route || "safe"} ${node.danger === "hostile" ? "hostile" : "safe"} ${isPlanned ? "planned-trade-node" : ""} ${isObjectiveTarget ? "objective-target-node" : ""} ${!canJump && !isCurrent ? "locked" : ""}`);
   group.appendChild(star);
 
   if (isCurrent) {

@@ -706,6 +706,64 @@ function getTutorialTargetElement() {
   return findTutorialTarget(step?.target);
 }
 
+function positionTutorialCard(step, target) {
+  const overlay = document.getElementById("tutorialOverlay");
+  const card = document.querySelector(".tutorial-card");
+  if (!overlay || !card || !step || step.intro || step.outro) {
+    if (card) {
+      card.classList.remove("tutorial-card-positioned");
+      card.style.left = "";
+      card.style.right = "";
+      card.style.top = "";
+      card.style.bottom = "";
+      card.style.transform = "";
+    }
+    return;
+  }
+
+  card.classList.add("tutorial-card-positioned");
+  const margin = 22;
+  const cardRect = card.getBoundingClientRect();
+  const width = Math.min(cardRect.width || 342, window.innerWidth - (margin * 2));
+  const height = Math.min(cardRect.height || 220, window.innerHeight - (margin * 2));
+  let left = window.innerWidth - width - margin;
+  let top = margin;
+
+  if (step.place === "left") {
+    left = margin;
+  } else if (step.place === "bottom") {
+    left = (window.innerWidth - width) / 2;
+    top = window.innerHeight - height - margin;
+  } else if (target) {
+    const rect = target.getBoundingClientRect();
+    const targetIsLarge = rect.width > window.innerWidth * 0.5 || rect.height > window.innerHeight * 0.45;
+    if (!targetIsLarge) {
+      left = rect.left < window.innerWidth / 2 ? window.innerWidth - width - margin : margin;
+      top = rect.top < window.innerHeight / 2 ? margin : window.innerHeight - height - margin;
+
+      const overlapsTarget = () => {
+        const right = left + width;
+        const bottom = top + height;
+        return left < rect.right + 14 && right > rect.left - 14 && top < rect.bottom + 14 && bottom > rect.top - 14;
+      };
+
+      if (overlapsTarget()) {
+        const below = rect.bottom + 16;
+        const above = rect.top - height - 16;
+        top = below + height <= window.innerHeight - margin ? below : Math.max(margin, above);
+      }
+    }
+  }
+
+  left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+  top = Math.max(margin, Math.min(top, window.innerHeight - height - margin));
+  card.style.left = `${Math.round(left)}px`;
+  card.style.right = "auto";
+  card.style.top = `${Math.round(top)}px`;
+  card.style.bottom = "auto";
+  card.style.transform = "none";
+}
+
 function isTutorialClickAllowed(event) {
   if (!tutorialState.active) return true;
 
@@ -903,6 +961,7 @@ function renderStarterTutorial() {
   if (back) back.disabled = tutorialState.stepIndex <= 0;
 
   highlightTutorialTarget(step);
+  positionTutorialCard(step, getTutorialTargetElement());
 }
 
 function renderPilotProfileIfActive() {

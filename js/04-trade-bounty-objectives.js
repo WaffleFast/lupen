@@ -940,6 +940,11 @@ function getBountyContract(contractId) {
   return dailyBountyContracts.find(contract => contract.id === contractId);
 }
 
+function getBountyObjectiveIcon(objective) {
+  const contract = objective?.contractId ? getBountyContract(objective.contractId) : null;
+  return objective?.icon || contract?.icon || "assets/bounties/raider-sweep.png";
+}
+
 function getBountyStatusLabel(contract) {
   if (contract.status === "readyToClaim") return "COMPLETE";
   if (activeObjective?.type === "bounty" && activeObjective.contractId === contract.id) {
@@ -1076,6 +1081,7 @@ function createBountyObjective(contract) {
     kills: contract.progress || 0,
     reward: contract.reward,
     lootChance: contract.lootChance,
+    icon: contract.icon || "assets/bounties/raider-sweep.png",
     createdAt: Date.now(),
     status: "active"
   };
@@ -1469,13 +1475,14 @@ function renderObjectiveHud() {
   }
 
   if (objective.type === "bounty") {
+    const icon = getBountyObjectiveIcon(objective);
     panel.innerHTML = `
       <div class="objective-hud-card bounty-objective-card">
         <div class="objective-hud-top">
           <span class="objective-type-pill bounty-pill">Bounty</span>
         </div>
         <div class="objective-main-row">
-          <div class="objective-bounty-icon">!</div>
+          <div class="objective-bounty-icon image"><img src="${icon}" alt=""></div>
           <div class="objective-copy">
             <strong>${objective.title}</strong>
             <span>${objective.targetLabel}</span>
