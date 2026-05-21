@@ -23,10 +23,10 @@
 
     <section id="createScreen" class="card">
       <h2>Create Account</h2>
-      <input id="createEmail" type="email" placeholder="Email address (optional)" />
-      <input id="createUsername" type="text" placeholder="Pilot name (optional)" />
-      <input id="createPassword" type="password" placeholder="Password (not required in prototype)" />
-      <input id="createConfirm" type="password" placeholder="Confirm password (not required in prototype)" />
+      <input id="createEmail" type="email" placeholder="Email address" required />
+      <input id="createUsername" type="text" placeholder="Pilot name" required />
+      <input id="createPassword" type="password" placeholder="Password" required />
+      <input id="createConfirm" type="password" placeholder="Confirm password" required />
 
       <button onclick="createAccount()">Create Account</button>
       <button class="secondary back-gap" onclick="showScreen('startScreen')">Back</button>
@@ -35,8 +35,8 @@
 
     <section id="loginScreen" class="card">
       <h2>Login</h2>
-      <input id="loginUser" type="text" placeholder="Pilot name (optional)" />
-      <input id="loginPassword" type="password" placeholder="Password (not required in prototype)" />
+      <input id="loginUser" type="text" placeholder="Pilot name or email" required />
+      <input id="loginPassword" type="password" placeholder="Password" required />
 
       <button onclick="login()">Login</button>
       <button class="secondary back-gap" onclick="showScreen('startScreen')">Back</button>
@@ -134,7 +134,7 @@
         <section class="bounty-contract-panel">
           <div class="modern-store-panel-header bounty-panel-header">
             <span>Available Bounties</span>
-            <em>Resets daily</em>
+            <em id="bountyResetCountdown">Resets in --:--:--</em>
           </div>
           <div id="bountyContractGrid" class="bounty-contract-grid"></div>
         </section>
@@ -358,6 +358,18 @@
           <p>Browse owned guns, attachments and Lupen Cores kept in station storage.</p>
         </div>
 
+        <div class="save-transfer-panel">
+          <div>
+            <strong>Save Backup</strong>
+            <span id="saveTransferStatus">Export this pilot before testing on another browser or device.</span>
+          </div>
+          <div class="save-transfer-actions">
+            <button onclick="exportSaveFile()">Export Save</button>
+            <button onclick="document.getElementById('saveImportInput').click()">Import Save</button>
+            <input id="saveImportInput" type="file" accept="application/json,.json" onchange="importSaveFile(event)" hidden>
+          </div>
+        </div>
+
         <div class="vault-layout">
           <div class="vault-main-panel">
             <div class="modern-store-panel-header vault-filter-header">
@@ -521,7 +533,14 @@
 
   </main>
 
-  <script src="app.js"></script>
+  <script src="js/01-core-state.js"></script>
+  <script src="js/02-account-navigation.js"></script>
+  <script src="js/03-hud-space-map.js"></script>
+  <script src="js/04-trade-bounty-objectives.js"></script>
+  <script src="js/05-hangar-store.js"></script>
+  <script src="js/06-combat.js"></script>
+  <script src="js/07-save-load.js"></script>
+  <script src="js/08-tutorial.js"></script>
 
     <div id="tutorialOverlay" class="tutorial-overlay" aria-live="polite">
       <div id="tutorialSpotlight" class="tutorial-spotlight" aria-hidden="true"></div>

@@ -6306,6 +6306,72 @@ input::placeholder {
   align-items: stretch;
 }
 
+.save-transfer-panel {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(127, 223, 255, 0.18);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(127, 223, 255, 0.08), rgba(101, 240, 160, 0.05)),
+    rgba(2, 10, 22, 0.74);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.save-transfer-panel strong,
+.save-transfer-panel span {
+  display: block;
+}
+
+.save-transfer-panel strong {
+  color: #83e9ff;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.save-transfer-panel span {
+  margin-top: 3px;
+  color: #b9d7f4;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.save-transfer-panel span[data-tone="success"] {
+  color: #65f0a0;
+}
+
+.save-transfer-panel span[data-tone="error"] {
+  color: #ff8fa7;
+}
+
+.save-transfer-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.save-transfer-actions button {
+  min-height: 32px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .save-transfer-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .save-transfer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .vault-main-panel,
 .vault-detail-panel {
   min-height: 500px;
@@ -7555,6 +7621,32 @@ input::placeholder {
 .accepted-trade-control {
   border-top: 1px solid rgba(90, 190, 255, 0.14);
   padding-top: 10px;
+}
+
+.trade-lockin-prompt {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(101, 240, 160, 0.34);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(101, 240, 160, 0.12), rgba(127, 223, 255, 0.06)),
+    rgba(2, 10, 18, 0.82);
+  color: #dfffea;
+}
+
+.trade-lockin-prompt strong {
+  color: #65f0a0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.trade-lockin-prompt span {
+  color: #b9d7f4;
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .accepted-route-note,
@@ -9307,10 +9399,20 @@ input::placeholder {
 }
 
 .bounty-panel-header em {
-  color: #8fa8c7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 211, 107, 0.34);
+  border-radius: 999px;
+  background: rgba(58, 40, 8, 0.32);
+  color: #ffd36b;
   font-style: normal;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
+  font-weight: 900;
   letter-spacing: 0.08em;
+  text-shadow: 0 0 10px rgba(255, 190, 75, 0.34);
   text-transform: uppercase;
 }
 
@@ -9346,7 +9448,18 @@ input::placeholder {
 }
 
 .bounty-contract-card.completed {
-  opacity: 0.55;
+  opacity: 0.76;
+  border-color: rgba(101, 240, 160, 0.42);
+  background:
+    radial-gradient(circle at 8% 16%, rgba(101, 240, 160, 0.12), transparent 36%),
+    rgba(5, 14, 26, 0.78);
+}
+
+.bounty-contract-card.completed .bounty-card-status {
+  border-color: rgba(101, 240, 160, 0.48);
+  background: rgba(18, 58, 38, 0.64);
+  color: #65f0a0;
+  box-shadow: 0 0 14px rgba(101, 240, 160, 0.16);
 }
 
 .bounty-card-icon,
@@ -9641,6 +9754,11 @@ input::placeholder {
   background: linear-gradient(135deg, rgba(255, 210, 84, 0.1), rgba(0, 160, 255, 0.04));
   border-radius: 13px;
   padding: 12px;
+}
+
+.bounty-detail-hero.completed {
+  border: 1px solid rgba(101, 240, 160, 0.34);
+  background: linear-gradient(135deg, rgba(101, 240, 160, 0.08), rgba(0, 160, 255, 0.03));
 }
 
 .bounty-claim-btn {
@@ -10314,6 +10432,13 @@ input::placeholder {
   border-color: rgba(110, 135, 160, 0.55);
 }
 
+.sector-scan-btn.cooldown {
+  color: #ffd36b;
+  border-color: rgba(255, 211, 107, 0.42);
+  background: linear-gradient(180deg, rgba(50, 34, 9, 0.96), rgba(8, 13, 24, 0.96));
+  text-shadow: 0 0 8px rgba(255, 190, 75, 0.32);
+}
+
 .scan-ally-btn {
   border-color: rgba(103, 242, 160, 0.5);
 }
@@ -10343,9 +10468,9 @@ input::placeholder {
 
 .sector-scan-status {
   grid-area: status;
-  color: #b9d8ee;
+  color: #d8ecff;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0.5px;
   white-space: nowrap;
   text-align: right;
@@ -11104,6 +11229,45 @@ input::placeholder {
 .bounty-board-layout-refined .bounty-panel-header em {
   line-height: 1;
   align-self: center;
+  min-width: 150px;
+  text-align: right;
+}
+
+.bounty-complete-note {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid rgba(101, 240, 160, 0.36);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(101, 240, 160, 0.14), rgba(127, 223, 255, 0.06)),
+    rgba(2, 12, 18, 0.78);
+  color: #dfffea;
+}
+
+.bounty-complete-note strong {
+  color: #65f0a0;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bounty-complete-note span {
+  color: #b9d7f4;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.bounty-complete-note.claimed {
+  border-color: rgba(127, 223, 255, 0.22);
+  background:
+    linear-gradient(90deg, rgba(101, 240, 160, 0.1), rgba(2, 10, 22, 0.72)),
+    rgba(2, 10, 22, 0.72);
+}
+
+.bounty-complete-note.claimed strong {
+  color: #65f0a0;
 }
 
 .bounty-board-layout-refined .bounty-contract-grid {
@@ -11304,15 +11468,37 @@ input::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 211, 107, 0.28);
+  border-radius: 999px;
+  background: rgba(58, 40, 8, 0.22);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(163, 228, 255, 0.92);
+  color: #ffd36b;
+  text-shadow: 0 0 10px rgba(255, 190, 75, 0.28);
 }
 
 .store-daily-pill {
   display: none !important;
+}
+
+#marketCycleText {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 211, 107, 0.28);
+  border-radius: 999px;
+  background: rgba(58, 40, 8, 0.22);
+  color: #ffd36b;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 10px rgba(255, 190, 75, 0.28);
+  text-transform: uppercase;
 }
 
 .store-quality-unique .store-detail-visual {
@@ -14600,6 +14786,24 @@ input::placeholder {
   font-size: 12px;
 }
 
+.fleet-swap-actions {
+  grid-template-columns: 1.2fr 1fr !important;
+  align-self: end;
+}
+
+.fleet-swap-actions .fleet-primary-swap {
+  border-color: rgba(101, 240, 160, 0.42);
+  background: linear-gradient(135deg, #1d7b5d, #0b4535);
+  color: #eafff4;
+  box-shadow: 0 0 18px rgba(101, 240, 160, 0.12);
+}
+
+.fleet-swap-actions .fleet-primary-swap:disabled {
+  background: rgba(18, 58, 38, 0.58);
+  color: #65f0a0;
+  box-shadow: none;
+}
+
 /* Override earlier larger Fleet stat style when screen height is tight */
 @media (max-height: 780px) {
   #hangarOwnedSection {
@@ -15848,8 +16052,8 @@ input::placeholder {
 
 /* ===== Sector map zone-label watermark pass ===== */
 #sectorSvg .svg-zone-label {
-  opacity: 0.42;
-  filter: drop-shadow(0 0 10px rgba(255, 120, 65, 0.20));
+  opacity: 0.52;
+  filter: drop-shadow(0 0 12px rgba(255, 120, 65, 0.18));
 }
 
 #sectorSvg .svg-zone-label.zone-combat {
@@ -15857,8 +16061,7 @@ input::placeholder {
 }
 
 #sectorSvg .svg-zone-icon {
-  font-size: 2.45px;
-  opacity: 0.75;
+  display: none;
 }
 
 #sectorSvg .svg-zone-name {
@@ -15879,6 +16082,15 @@ input::placeholder {
 #sectorSvg .svg-current-ring,
 #sectorSvg .svg-planet-label {
   opacity: 1;
+}
+
+#sectorSvg .combat-route {
+  stroke-width: 0.22;
+}
+
+#sectorSvg .svg-node.combat,
+#sectorSvg .svg-space-node.combat {
+  opacity: 0.88;
 }
 
 
@@ -18893,6 +19105,559 @@ input::placeholder {
   box-shadow:
     0 0 0 3px rgba(127, 223, 255, 0.16),
     0 0 34px rgba(127, 223, 255, 0.48) !important;
+}
+
+/* ===== Vessel Exchange readable card pass ===== */
+#hangarShipyardSection .shipyard-title-row {
+  align-items: center;
+}
+
+#hangarShipyardSection .shipyard-title-row p {
+  max-width: 540px;
+}
+
+#hangarShipyardSection .modern-store-panel-header {
+  min-height: 38px;
+}
+
+.vessel-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)) !important;
+  gap: 12px !important;
+  padding: 4px 8px 6px 0 !important;
+}
+
+.vessel-exchange-card {
+  min-height: 202px !important;
+  padding: 11px !important;
+  display: grid !important;
+  grid-template-rows: 78px auto auto auto !important;
+  align-content: start !important;
+  gap: 6px !important;
+}
+
+.vessel-exchange-card .fleet-card-badge {
+  top: 10px;
+  right: 10px;
+}
+
+.vessel-exchange-card .fleet-card-image-wrap {
+  height: 78px !important;
+  margin: 0 !important;
+}
+
+.vessel-exchange-card .fleet-card-image-wrap img {
+  max-height: 78px !important;
+}
+
+.vessel-exchange-card .fleet-card-name {
+  min-height: 19px;
+  margin: 0 !important;
+  font-size: 15px !important;
+  line-height: 1.05 !important;
+}
+
+.vessel-exchange-card .fleet-card-role {
+  min-height: 22px !important;
+  margin: 0 !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vessel-exchange-card .fleet-card-mini-stats {
+  margin: 0 !important;
+  gap: 5px !important;
+}
+
+.vessel-exchange-card .fleet-card-mini-stats span {
+  min-width: 0;
+  min-height: 31px;
+  padding: 4px 3px !important;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.vessel-exchange-card .fleet-card-mini-stats em {
+  color: rgba(154, 204, 232, 0.76);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.vessel-exchange-card .fleet-card-mini-stats strong {
+  color: #f7fbff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.vessel-exchange-card .fleet-card-slots {
+  display: none !important;
+}
+
+.ship-slot-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ship-slot-bank {
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px;
+  border: 1px solid rgba(127, 223, 255, 0.15);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(127, 223, 255, 0.08), transparent 58%),
+    rgba(3, 12, 25, 0.72);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 4px;
+}
+
+.ship-slot-bank span {
+  color: rgba(154, 204, 232, 0.76);
+  font-size: 7.5px;
+  font-weight: 900;
+  letter-spacing: 0.75px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.ship-slot-bank strong {
+  color: #f7fbff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.ship-slot-pips {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 3px;
+  min-width: 0;
+  margin-top: 1px;
+}
+
+.ship-slot-pip {
+  flex: 1 1 8px;
+  max-width: 14px;
+  height: 7px;
+  border-radius: 3px;
+  border: 1px solid rgba(127, 223, 255, 0.24);
+  background: rgba(2, 10, 22, 0.92);
+}
+
+.ship-slot-pip.filled {
+  background: linear-gradient(180deg, #7fdfff, #1f75c7);
+  border-color: rgba(127, 223, 255, 0.72);
+  box-shadow: 0 0 8px rgba(127, 223, 255, 0.18);
+}
+
+.equip-bank .ship-slot-pip.filled {
+  background: linear-gradient(180deg, #5cffab, #168a61);
+  border-color: rgba(92, 255, 171, 0.58);
+  box-shadow: 0 0 8px rgba(92, 255, 171, 0.16);
+}
+
+#shipyardDetailPanel {
+  padding: 12px !important;
+}
+
+#shipyardDetailPanel .fleet-detail-hero {
+  height: 94px !important;
+  min-height: 94px !important;
+  max-height: 94px !important;
+}
+
+#shipyardDetailPanel .fleet-detail-hero img {
+  max-height: 82px !important;
+}
+
+#shipyardDetailPanel .shipyard-stat-grid,
+#shipyardDetailPanel .fleet-detail-stats.shipyard-stat-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+#shipyardDetailPanel .fleet-stat-chip,
+#shipyardDetailPanel .fleet-detail-stats .fleet-stat-chip {
+  min-height: 41px !important;
+}
+
+#shipyardDetailPanel .fleet-stat-chip.slots-stat {
+  display: none !important;
+}
+
+.shipyard-capacity-panel {
+  margin-top: 7px;
+  padding: 9px;
+  border: 1px solid rgba(127, 223, 255, 0.16);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(127, 223, 255, 0.10), transparent 50%),
+    rgba(3, 12, 25, 0.72);
+}
+
+#shipyardDetailPanel .shipyard-capacity-panel {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 7px !important;
+}
+
+.shipyard-capacity-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 7px;
+}
+
+#shipyardDetailPanel .shipyard-capacity-heading {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.shipyard-capacity-heading span {
+  color: #83e9ff;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.shipyard-capacity-heading strong {
+  color: rgba(230, 245, 255, 0.88);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+#shipyardDetailPanel .ship-slot-bank {
+  min-height: 34px;
+  padding: 5px;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-rows: 1fr;
+  align-items: center;
+}
+
+#shipyardDetailPanel .ship-slot-bank span {
+  font-size: 8px;
+}
+
+#shipyardDetailPanel .ship-slot-bank strong {
+  font-size: 13px;
+}
+
+#shipyardDetailPanel .ship-slot-pip {
+  height: 6px;
+}
+
+#shipyardDetailPanel .ship-slot-pips {
+  grid-column: auto;
+  margin-top: 0;
+  margin-left: 3px;
+}
+
+.vessel-exchange-card[data-tutorial-target="firstShipCard"].tutorial-highlight-target,
+.vessel-exchange-card.tutorial-required-ship {
+  border-color: rgba(127, 223, 255, 1) !important;
+  box-shadow:
+    0 0 0 3px rgba(127, 223, 255, 0.16),
+    0 0 30px rgba(127, 223, 255, 0.42) !important;
+}
+
+.vessel-exchange-card.tutorial-required-ship::after {
+  bottom: 8px !important;
+  right: 8px !important;
+}
+
+@media (max-height: 760px) {
+  .vessel-exchange-card {
+    min-height: 198px !important;
+    grid-template-rows: 64px auto auto auto !important;
+    gap: 5px !important;
+  }
+
+  .vessel-exchange-card .fleet-card-image-wrap {
+    height: 64px !important;
+  }
+
+  .vessel-exchange-card .fleet-card-image-wrap img {
+    max-height: 64px !important;
+  }
+
+  .vessel-exchange-card .fleet-card-role {
+    min-height: 18px !important;
+    -webkit-line-clamp: 1;
+  }
+
+  .ship-slot-bank {
+    min-height: 42px;
+    padding: 5px;
+  }
+
+  .ship-slot-pip {
+    flex-basis: 7px;
+    height: 6px;
+  }
+
+  #shipyardDetailPanel .fleet-detail-hero {
+    height: 68px !important;
+    min-height: 68px !important;
+    max-height: 68px !important;
+  }
+
+  #shipyardDetailPanel .fleet-detail-hero img {
+    max-height: 58px !important;
+  }
+
+  .shipyard-capacity-panel {
+    margin-top: 4px;
+    padding: 5px !important;
+  }
+
+  #shipyardDetailPanel .fleet-stat-chip,
+  #shipyardDetailPanel .fleet-detail-stats .fleet-stat-chip {
+    min-height: 31px !important;
+  }
+
+  #shipyardDetailPanel .shipyard-primary-action button {
+    min-height: 30px !important;
+  }
+
+  #shipyardDetailPanel .ship-slot-bank {
+    min-height: 28px;
+  }
+}
+
+/* ===== Fleet selector and scalable hardpoint polish ===== */
+.fleet-selector-card {
+  min-height: 156px !important;
+  padding: 11px !important;
+  display: grid !important;
+  grid-template-rows: 82px auto auto !important;
+  align-content: start !important;
+  gap: 6px !important;
+}
+
+.fleet-selector-card .fleet-card-image-wrap {
+  height: 82px !important;
+  margin: 0 !important;
+}
+
+.fleet-selector-card .fleet-card-image-wrap img {
+  max-height: 82px !important;
+}
+
+.fleet-selector-card .fleet-card-name {
+  margin: 0 !important;
+}
+
+.fleet-selector-card .fleet-card-role {
+  min-height: 24px !important;
+  margin: 0 !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.fleet-selector-card .fleet-card-mini-stats,
+.fleet-selector-card .fleet-card-slots {
+  display: none !important;
+}
+
+.fleet-detail-body {
+  grid-template-rows: 110px auto auto auto !important;
+  gap: 8px !important;
+}
+
+#hangarOwnedSection .fleet-detail-hero {
+  min-height: 0;
+}
+
+#hangarOwnedSection .fleet-detail-hero img {
+  max-height: 100px !important;
+}
+
+#hangarOwnedSection .fleet-detail-stats {
+  gap: 6px !important;
+}
+
+#hangarOwnedSection .fleet-detail-stats .fleet-stat-chip {
+  min-height: 42px !important;
+  padding: 6px !important;
+}
+
+#hangarOwnedSection .fleet-capacity-panel {
+  padding: 7px !important;
+}
+
+.fleet-capacity-panel {
+  margin-top: 0;
+}
+
+.fleet-capacity-panel .shipyard-capacity-heading strong {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ship-slot-bank strong {
+  min-width: 2ch;
+  text-align: right;
+}
+
+.ship-slot-pips {
+  overflow: hidden;
+}
+
+.ship-slot-pip.condensed {
+  flex-basis: 6px;
+  max-width: 10px;
+}
+
+.vessel-exchange-card {
+  min-height: 214px !important;
+  grid-template-rows: 78px auto auto minmax(46px, auto) !important;
+}
+
+.vessel-exchange-card .ship-slot-bank {
+  min-height: 44px;
+}
+
+.vessel-exchange-card .ship-slot-bank span {
+  font-size: 7px;
+}
+
+.vessel-exchange-card .ship-slot-bank strong {
+  font-size: 12px;
+}
+
+.vessel-exchange-card .ship-slot-pips {
+  gap: 2px;
+}
+
+@media (max-height: 760px) {
+  .fleet-selector-card {
+    min-height: 140px !important;
+    grid-template-rows: 68px auto auto !important;
+  }
+
+  .fleet-selector-card .fleet-card-image-wrap {
+    height: 68px !important;
+  }
+
+  .fleet-selector-card .fleet-card-image-wrap img {
+    max-height: 68px !important;
+  }
+
+  .vessel-exchange-card {
+    min-height: 204px !important;
+    grid-template-rows: 62px auto auto minmax(44px, auto) !important;
+  }
+
+  .vessel-exchange-card .ship-slot-bank {
+    min-height: 41px;
+  }
+}
+
+/* ===== Bounty Board contained layout ===== */
+.bounty-screen.active {
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.bounty-screen .market-header,
+.bounty-screen .bounty-top-strip {
+  margin-bottom: 0 !important;
+}
+
+.bounty-board-layout-refined {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.bounty-board-layout-refined .bounty-contract-panel,
+.bounty-board-layout-refined .bounty-detail-panel {
+  min-height: 0 !important;
+}
+
+.bounty-board-layout-refined .bounty-contract-grid {
+  height: 100% !important;
+  min-height: 0 !important;
+  grid-template-rows: repeat(3, minmax(0, 1fr)) !important;
+  overflow-y: auto !important;
+}
+
+.bounty-board-layout-refined .bounty-contract-card {
+  min-height: 0 !important;
+}
+
+/* ===== Bounty Board generated icon pass ===== */
+.bounty-board-layout-refined .bounty-contract-card {
+  grid-template-columns: 52px minmax(0, 1fr) 76px 74px 96px !important;
+  gap: 6px 10px !important;
+}
+
+.bounty-card-icon,
+.bounty-detail-icon {
+  overflow: hidden;
+  background: rgba(5, 10, 20, 0.92) !important;
+}
+
+.bounty-board-layout-refined .bounty-card-icon {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 12px !important;
+  border-color: rgba(255, 93, 125, 0.58) !important;
+}
+
+.bounty-card-icon img,
+.bounty-detail-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.bounty-board-layout-refined .bounty-card-status {
+  grid-column: 2 / 6 !important;
+}
+
+.bounty-card-threat {
+  justify-self: end;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 210, 84, 0.24);
+  border-radius: 999px;
+  color: rgba(255, 224, 145, 0.94);
+  background: rgba(80, 48, 8, 0.18);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.bounty-board-layout-refined .bounty-card-objective {
+  align-self: center;
+}
+
+.bounty-board-layout-refined .bounty-detail-icon {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  border-color: rgba(127, 223, 255, 0.56) !important;
 }
 
 
