@@ -722,6 +722,19 @@ function isTutorialClickAllowed(event) {
 
   const step = getCurrentTutorialStep();
   if (
+    event.target.closest?.(".hangar-tabs button") ||
+    event.target.closest?.(".screen-back-btn") ||
+    event.target.closest?.(".hub-actions button") ||
+    event.target.closest?.(".bounty-detail-actions button") ||
+    event.target.closest?.("#jumpBtn") ||
+    event.target.closest?.("#sectorMap") ||
+    event.target.closest?.(".sector-scan-btn") ||
+    event.target.closest?.("#objectEngageBtn") ||
+    event.target.closest?.("#objectActionPanel") ||
+    event.target.closest?.(".enemy-bot-target")
+  ) return true;
+
+  if (
     ["land-destination", "open-map-return-bounty", "return-to-planet-after-bounty", "land-after-bounty"].includes(step?.id) &&
     event.target.closest?.("#planetLandBtn")
   ) return true;

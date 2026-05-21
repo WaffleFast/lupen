@@ -300,6 +300,92 @@ function loadGame() {
   }
 }
 
+function isDebugToolsEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("debug") || localStorage.getItem("lupenDebugTools") === "true";
+}
+
+function refreshDebugToolsUI(message = "") {
+  const status = document.getElementById("debugToolsStatus");
+  if (status) status.textContent = message;
+  if (typeof updateHudDock === "function") updateHudDock();
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  if (typeof renderHangar === "function") renderHangar();
+  if (typeof renderBountyBoard === "function") renderBountyBoard();
+  if (typeof renderStore === "function") renderStore();
+  if (typeof renderTradeTerminal === "function") renderTradeTerminal();
+  saveGame();
+}
+
+function ensureDebugToolsPanel() {
+  if (!isDebugToolsEnabled() || document.getElementById("debugToolsPanel")) return;
+
+  const panel = document.createElement("div");
+  panel.id = "debugToolsPanel";
+  panel.className = "debug-tools-panel";
+  panel.innerHTML = `
+    <strong>Debug Tools</strong>
+    <div class="debug-tools-grid">
+      <button type="button" onclick="debugSkipTutorial()">Skip Tutorial</button>
+      <button type="button" onclick="debugGrantStarter()">Starter Ship</button>
+      <button type="button" onclick="debugGrantCredits()">+50K CR</button>
+      <button type="button" onclick="debugOpenBounty()">Bounty Board</button>
+      <button type="button" onclick="debugResetSave()">Reset Save</button>
+    </div>
+    <span id="debugToolsStatus"></span>
+  `;
+  document.body.appendChild(panel);
+}
+
+function debugSkipTutorial() {
+  if (typeof finishStarterTutorial === "function") {
+    finishStarterTutorial();
+  } else {
+    tutorialState.active = false;
+    tutorialState.completed = true;
+    if (typeof saveTutorialState === "function") saveTutorialState();
+    if (typeof clearTutorialHighlight === "function") clearTutorialHighlight();
+  }
+  refreshDebugToolsUI("Tutorial complete.");
+}
+
+function debugGrantStarter() {
+  if (!ownedShips.includes("lupenOrigin")) ownedShips.push("lupenOrigin");
+  currentShipId = "lupenOrigin";
+  selectedHangarShipId = "lupenOrigin";
+  selectedFleetShipId = "lupenOrigin";
+  selectedShipyardShipId = "lupenOrigin";
+  shipLoadouts.lupenOrigin = normalizeShipLoadout(shipLoadouts.lupenOrigin, "lupenOrigin");
+  if (typeof grantStarterShipKit === "function") grantStarterShipKit();
+  if (typeof applyShipStats === "function") applyShipStats(true);
+  jumpCharge = jumpMax;
+  credits = Math.max(credits, 10000);
+  if (typeof addHudToast === "function") addHudToast("Debug starter ship ready.");
+  refreshDebugToolsUI("Starter ship ready.");
+}
+
+function debugGrantCredits() {
+  credits += 50000;
+  if (typeof addHudToast === "function") addHudToast("Debug credits added.");
+  refreshDebugToolsUI("Added CR 50,000.");
+}
+
+function debugOpenBounty() {
+  if (typeof hasActiveShip === "function" && !hasActiveShip()) debugGrantStarter();
+  if (tutorialState?.active && typeof finishStarterTutorial === "function") finishStarterTutorial();
+  if (typeof openBountyBoard === "function") openBountyBoard();
+  refreshDebugToolsUI("Opened Bounty Board.");
+}
+
+function debugResetSave() {
+  if (!confirm("Reset this browser save and reload Lupen?")) return;
+  localStorage.removeItem(STORAGE_GAME_KEY);
+  localStorage.removeItem(STORAGE_ACCOUNT_KEY);
+  localStorage.removeItem("lupenStarterPilotTutorial");
+  localStorage.removeItem(STORAGE_VAULT_RESET_KEY);
+  window.location.reload();
+}
+
 window.onload = function () {
   loadGame();
 
@@ -319,6 +405,7 @@ window.onload = function () {
   startHostileBotAttacks();
   if (stationVaultWasClearedThisSession) saveGame();
   showScreen("startScreen");
+  ensureDebugToolsPanel();
 };
 
 window.addEventListener("pagehide", saveGameBeforeLeave);

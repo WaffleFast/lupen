@@ -18878,8 +18878,10 @@ input::placeholder {
   grid-template-rows: auto auto auto auto auto !important;
   align-content: start !important;
   gap: 7px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
+  padding: 0 4px 10px 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
 }
 
 .bounty-board-layout-refined .bounty-detail-hero {
@@ -18940,13 +18942,18 @@ input::placeholder {
   display: grid;
   gap: 7px;
   grid-template-columns: 1fr;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding-top: 4px;
+  background: linear-gradient(180deg, rgba(1, 8, 18, 0), rgba(1, 8, 18, 0.94) 30%);
 }
 
 .bounty-board-layout-refined .bounty-accept-btn,
 .bounty-board-layout-refined .bounty-claim-btn,
 .bounty-board-layout-refined .bounty-cancel-btn,
 .bounty-detail-actions button {
-  min-height: 34px !important;
+  min-height: 40px !important;
   margin-top: 0 !important;
   padding: 7px 10px !important;
   border-radius: 10px !important;
@@ -19658,6 +19665,94 @@ input::placeholder {
   height: 46px !important;
   min-width: 46px !important;
   border-color: rgba(127, 223, 255, 0.56) !important;
+}
+
+/* ===== Tutorial high-contrast highlight + debug tools ===== */
+.tutorial-spotlight {
+  border-color: rgba(255, 220, 95, 1) !important;
+  box-shadow:
+    0 0 0 9999px rgba(0, 4, 12, 0.26),
+    0 0 0 4px rgba(255, 220, 95, 0.22),
+    0 0 34px rgba(255, 220, 95, 0.62),
+    0 0 58px rgba(255, 79, 178, 0.24) !important;
+}
+
+.tutorial-highlight-target,
+#planetLandBtn.tutorial-highlight-target,
+#jumpBtn.tutorial-highlight-target,
+#sectorScanBotsBtn.tutorial-highlight-target,
+#sectorScanAlliesBtn.tutorial-highlight-target,
+#sectorScanEnemiesBtn.tutorial-highlight-target,
+#sectorSvg.tutorial-highlight-target,
+#objectEngageBtn.tutorial-highlight-target,
+#objectActionPanel.tutorial-highlight-target,
+.enemy-bot-target.tutorial-highlight-target,
+.bounty-claim-btn.tutorial-highlight-target,
+#bountyRewardOverlay button.tutorial-highlight-target,
+.reward-overlay button.tutorial-highlight-target,
+.buy-ship-action.tutorial-highlight-target,
+.store-catalog-card.tutorial-highlight-target,
+.store-detail-buy-action.tutorial-highlight-target,
+.hangar-equipment-card.tutorial-highlight-target {
+  border-color: rgba(255, 220, 95, 1) !important;
+  outline: 2px solid rgba(255, 79, 178, 0.74) !important;
+  outline-offset: 3px !important;
+  box-shadow:
+    0 0 0 4px rgba(255, 220, 95, 0.2),
+    0 0 22px rgba(255, 220, 95, 0.82),
+    0 0 42px rgba(255, 79, 178, 0.38) !important;
+}
+
+.debug-tools-panel {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 2000;
+  width: min(280px, calc(100vw - 28px));
+  padding: 10px;
+  border: 1px solid rgba(255, 220, 95, 0.42);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(35, 22, 6, 0.96), rgba(2, 8, 18, 0.96));
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.46), 0 0 28px rgba(255, 220, 95, 0.14);
+  color: #ffe8a3;
+}
+
+.debug-tools-panel strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.debug-tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.debug-tools-grid button {
+  min-height: 30px;
+  padding: 6px 7px;
+  border-radius: 8px;
+  border-color: rgba(255, 220, 95, 0.34);
+  background: rgba(68, 45, 10, 0.72);
+  color: #fff4c6;
+  font-size: 0.64rem;
+}
+
+.debug-tools-grid button:last-child {
+  grid-column: 1 / -1;
+}
+
+.debug-tools-panel span {
+  display: block;
+  min-height: 14px;
+  margin-top: 7px;
+  color: rgba(255, 232, 163, 0.78);
+  font-size: 0.62rem;
 }
 
 
