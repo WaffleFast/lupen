@@ -344,45 +344,147 @@ function openPilotProfile() {
 }
 
 
-function createAccount() {
+function setAccountMessage(element, text) {
+  if (element) element.textContent = text;
+}
+
+function getSupabaseUnavailableMessage() {
+  return "Online accounts are unavailable. Check your connection and try again.";
+}
+
+function getAuthErrorMessage(error, fallback) {
+  const message = String(error?.message || "");
+  if (!message) return fallback;
+  if (/already registered|already exists|user already/i.test(message)) return "An account already exists for this email.";
+  if (/invalid login|invalid credentials/i.test(message)) return "Email or password is incorrect.";
+  if (/email not confirmed/i.test(message)) return "Confirm your email before logging in.";
+  if (/duplicate key|profiles_pilot_name_lower_unique/i.test(message)) return "That pilot name is already taken.";
+  return message;
+}
+
+function rememberSupabaseAccount(user, profile) {
+  localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({
+    id: user.id,
+    email: user.email,
+    username: profile.pilot_name,
+    pilot_name: profile.pilot_name,
+    homePlanet,
+    updatedAt: new Date().toISOString(),
+    supabaseLogin: true
+  }));
+}
+
+async function loadSupabaseProfile(client, user) {
+  const { data, error } = await client
+    .from("profiles")
+    .select("id,pilot_name,last_seen")
+    .eq("id", user.id)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function createSupabaseProfile(client, user, pilotName) {
+  const { data, error } = await client
+    .from("profiles")
+    .insert({
+      id: user.id,
+      pilot_name: pilotName,
+      last_seen: new Date().toISOString()
+    })
+    .select("id,pilot_name,last_seen")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function touchSupabaseProfile(client, user) {
+  const { data, error } = await client
+    .from("profiles")
+    .update({ last_seen: new Date().toISOString() })
+    .eq("id", user.id)
+    .select("id,pilot_name,last_seen")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function createAccount() {
   const email = document.getElementById("createEmail")?.value.trim() || "";
-  const username = document.getElementById("createUsername")?.value.trim() || "";
+  const pilotName = document.getElementById("createUsername")?.value.trim() || "";
   const password = document.getElementById("createPassword")?.value || "";
   const confirmPassword = document.getElementById("createConfirm")?.value || "";
   const message = document.getElementById("createMessage");
   const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   if (!emailLooksValid) {
-    if (message) message.textContent = "Enter a valid email address.";
+    setAccountMessage(message, "Enter a valid email address.");
     return;
   }
 
-  if (username.length < 3) {
-    if (message) message.textContent = "Pilot name must be at least 3 characters.";
+  if (pilotName.length < 3) {
+    setAccountMessage(message, "Pilot name must be at least 3 characters.");
     return;
   }
 
   if (password.length < 6) {
-    if (message) message.textContent = "Password must be at least 6 characters.";
+    setAccountMessage(message, "Password must be at least 6 characters.");
     return;
   }
 
   if (password !== confirmPassword) {
-    if (message) message.textContent = "Passwords do not match.";
+    setAccountMessage(message, "Passwords do not match.");
     return;
   }
 
-  if (message) message.textContent = "";
+  const client = getSupabaseClient();
+  if (!client) {
+    setAccountMessage(message, getSupabaseUnavailableMessage());
+    return;
+  }
 
-  // Prototype mode: store local-only account details for testing.
-  localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({
+  setAccountMessage(message, "Creating account...");
+
+  const { data: authData, error: signUpError } = await client.auth.signUp({
     email,
-    username,
     password,
-    homePlanet,
-    createdAt: new Date().toISOString(),
-    prototypeLogin: true
-  }));
+    options: {
+      data: {
+        pilot_name: pilotName
+      }
+    }
+  });
+
+  if (signUpError) {
+    setAccountMessage(message, getAuthErrorMessage(signUpError, "Account creation failed."));
+    return;
+  }
+
+  const user = authData?.user;
+  if (!user) {
+    setAccountMessage(message, "Account creation did not return a user. Please try again.");
+    return;
+  }
+
+  localStorage.setItem("lupenPendingPilotName", pilotName);
+
+  if (!authData.session) {
+    setAccountMessage(message, "Account created. Check your email to confirm it, then log in.");
+    return;
+  }
+
+  let profile;
+  try {
+    profile = await createSupabaseProfile(client, user, pilotName);
+    localStorage.removeItem("lupenPendingPilotName");
+    rememberSupabaseAccount(user, profile);
+  } catch (error) {
+    setAccountMessage(message, getAuthErrorMessage(error, "Account created, but pilot profile setup failed."));
+    return;
+  }
 
   resetToNoShipStarterState();
   saveGame();
@@ -399,28 +501,73 @@ function createAccount() {
   setTimeout(renderStarterTutorial, 120);
 }
 
-function login() {
-  const user = document.getElementById("loginUser")?.value.trim() || "";
+async function login() {
+  const email = document.getElementById("loginUser")?.value.trim() || "";
   const password = document.getElementById("loginPassword")?.value || "";
   const message = document.getElementById("loginMessage");
-  const saved = safeParseLocalStorage(STORAGE_ACCOUNT_KEY);
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  if (!user) {
-    if (message) message.textContent = "Enter your pilot name or email.";
+  if (!emailLooksValid) {
+    setAccountMessage(message, "Enter a valid email address.");
     return;
   }
 
   if (!password) {
-    if (message) message.textContent = "Enter your password.";
+    setAccountMessage(message, "Enter your password.");
     return;
   }
 
-  if (!saved || (user !== saved.username && user !== saved.email) || password !== saved.password) {
-    if (message) message.textContent = "Pilot name/email or password is incorrect.";
+  const client = getSupabaseClient();
+  if (!client) {
+    setAccountMessage(message, getSupabaseUnavailableMessage());
     return;
   }
 
-  if (message) message.textContent = "";
+  setAccountMessage(message, "Logging in...");
+
+  const { data: authData, error: signInError } = await client.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (signInError) {
+    setAccountMessage(message, getAuthErrorMessage(signInError, "Login failed."));
+    return;
+  }
+
+  const user = authData?.user;
+  if (!user) {
+    setAccountMessage(message, "Login did not return a user. Please try again.");
+    return;
+  }
+
+  let profile;
+  try {
+    profile = await loadSupabaseProfile(client, user);
+  } catch (error) {
+    const pendingPilotName = localStorage.getItem("lupenPendingPilotName") || user.user_metadata?.pilot_name || "";
+    if (pendingPilotName.length >= 3) {
+      try {
+        profile = await createSupabaseProfile(client, user, pendingPilotName);
+        localStorage.removeItem("lupenPendingPilotName");
+      } catch (profileError) {
+        setAccountMessage(message, getAuthErrorMessage(profileError, "Login succeeded, but profile setup failed."));
+        return;
+      }
+    } else {
+      setAccountMessage(message, "Login succeeded, but no pilot profile was found.");
+      return;
+    }
+  }
+
+  try {
+    profile = await touchSupabaseProfile(client, user);
+  } catch (error) {
+    console.warn("Unable to update profile last_seen.", error);
+  }
+
+  rememberSupabaseAccount(user, profile);
+  setAccountMessage(message, "");
 
   tutorialState.active = false;
   saveTutorialState();
@@ -429,7 +576,12 @@ function login() {
   enterHubFromLogin();
 }
 
-function logout() {
+async function logout() {
+  const client = getSupabaseClient();
+  if (client) {
+    const { error } = await client.auth.signOut();
+    if (error) console.warn("Supabase sign out failed.", error);
+  }
   disengageTarget(true);
   tutorialState.active = false;
   saveTutorialState();
