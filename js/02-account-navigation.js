@@ -949,6 +949,7 @@ function launchShip() {
 
   if (launchingFromPlanet) {
     jumpCharge = 0;
+    if (typeof playPlanetLaunchSound === "function") playPlanetLaunchSound();
   }
 
   showScreen("spaceScreen");

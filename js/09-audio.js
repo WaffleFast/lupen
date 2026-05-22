@@ -2,15 +2,16 @@
 
 const LUPEN_AUDIO_ASSETS = {
   jumpArrive: "assets/audio/lupen_jump_drive_whoosh.wav",
+  planetLaunch: "assets/audio/lupen_planet_launch_rocket_takeoff.wav",
   planetLand: "assets/audio/lupen_planet_land_touchdown.wav",
-  enemyDestroyed: "assets/audio/lupen_enemy_ship_destroyed_blast.wav",
-  shipDestroyed: "assets/audio/lupen_player_ship_destroyed_heavy_blast.wav",
-  laserLight: "assets/audio/lupen_weapon_light_autocannon.wav",
-  laserHeavy: "assets/audio/lupen_weapon_heavy_mass_driver.wav",
-  enemyWeapon: "assets/audio/lupen_weapon_enemy_burst.wav",
+  enemyDestroyed: "assets/audio/lupen_enemy_ship_destroyed_debris_explosion.wav",
+  shipDestroyed: "assets/audio/lupen_player_ship_destroyed_chain_boom.wav",
+  laserLight: "assets/audio/lupen_gun_light_ballistic_report.wav",
+  laserHeavy: "assets/audio/lupen_gun_heavy_ballistic_report.wav",
+  enemyWeapon: "assets/audio/lupen_enemy_gun_ballistic_report.wav",
   shieldHit: "assets/audio/lupen_shield_hit_energy_crack.wav",
   hullHit: "assets/audio/lupen_hull_hit_metal_impact.wav",
-  hitMarker: "assets/audio/lupen_weapon_hit_marker_impact.wav",
+  hitMarker: "assets/audio/lupen_weapon_hit_explosive_impact.wav",
   rewardClaim: "assets/audio/lupen_reward_claim_low_dark_extended.wav",
   uiConfirm: "assets/audio/lupen_ui_confirm_low_click.wav",
   uiDeny: "assets/audio/lupen_ui_deny_low_click.wav"
@@ -94,10 +95,18 @@ function playAudioAsset(name, options = {}) {
     });
   };
 
+  window.playPlanetLaunchSound = function playPlanetLaunchSound() {
+    playAudioAsset("planetLaunch", {
+      volume: 0.54,
+      cooldownMs: 1200,
+      allowOverlap: false
+    });
+  };
+
   window.playPlayerLaserPulse = function playPlayerLaserPulseAsset() {
     playAudioAsset(getCurrentWeaponAudioAsset(), {
-      volume: 0.4,
-      cooldownMs: 45,
+      volume: 0.46,
+      cooldownMs: 70,
       allowOverlap: true,
       fallback: fallbackPlayerLaserPulse
     });
@@ -105,8 +114,8 @@ function playAudioAsset(name, options = {}) {
 
   window.playEnemyLaserPulse = function playEnemyLaserPulseAsset() {
     playAudioAsset("enemyWeapon", {
-      volume: 0.34,
-      cooldownMs: 55,
+      volume: 0.4,
+      cooldownMs: 70,
       allowOverlap: true,
       fallback: fallbackEnemyLaserPulse
     });
@@ -114,8 +123,8 @@ function playAudioAsset(name, options = {}) {
 
   window.playWeaponHitMarkerSound = function playWeaponHitMarkerSound() {
     playAudioAsset("hitMarker", {
-      volume: 0.26,
-      cooldownMs: 55,
+      volume: 0.44,
+      cooldownMs: 90,
       allowOverlap: true
     });
   };
