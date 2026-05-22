@@ -358,6 +358,7 @@ function getAuthErrorMessage(error, fallback) {
   if (/already registered|already exists|user already/i.test(message)) return "An account already exists for this email.";
   if (/invalid login|invalid credentials/i.test(message)) return "Email or password is incorrect.";
   if (/email not confirmed/i.test(message)) return "Confirm your email before logging in.";
+  if (/rate limit|email rate limit|too many/i.test(message)) return "Too many account emails have been requested. Please wait a while and try again.";
   if (/duplicate key|profiles_pilot_name_lower_unique/i.test(message)) return "That pilot name is already taken.";
   return message;
 }
@@ -473,6 +474,7 @@ async function createAccount() {
   const { data: authData, error: signUpError } = signUpResponse;
 
   if (signUpError) {
+    console.warn("Supabase signUp failed.", signUpError);
     setAccountMessage(message, getAuthErrorMessage(signUpError, "Account creation failed."));
     return;
   }
