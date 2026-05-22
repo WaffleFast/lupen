@@ -192,6 +192,7 @@ function performAttackCycle() {
 
   if (target.hp <= 0) {
     showExplosionAtTarget(target);
+    if (typeof playEnemyShipDestroyedSound === "function") playEnemyShipDestroyedSound();
     target.alive = false;
     const destroyedType = engagedTarget?.type;
 
@@ -215,6 +216,8 @@ function performAttackCycle() {
 
     disengageTarget(true);
     autoCollapseTargetPanel();
+  } else if (typeof playWeaponHitMarkerSound === "function") {
+    playWeaponHitMarkerSound();
   }
 
   updateAsteroidUI();

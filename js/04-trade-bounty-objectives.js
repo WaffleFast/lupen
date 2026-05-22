@@ -1233,6 +1233,7 @@ function claimBountyReward(contractId) {
   awardBountyXpOnClaim(contract);
   addActivityLog(`Bounty reward claimed: ${contract.title}. +CR ${formatNumber(reward)}. ${bonusText}`);
   tutorialEvent("claimedBountyReward");
+  if (typeof playRewardClaimSound === "function") playRewardClaimSound();
   showBountyRewardOverlay(contract.title, reward, bonusDrops);
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "continue-after-bounty-reward") {
     setTimeout(renderStarterTutorial, 80);

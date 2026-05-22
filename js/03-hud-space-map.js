@@ -926,16 +926,22 @@ function applyDamageToPlayer(totalDamage) {
 
   const previousHull = hull;
   let remainingDamage = getMitigatedIncomingDamage(totalDamage);
+  let shieldDamage = 0;
+  let hullDamage = 0;
 
   if (shield > 0) {
-    const shieldDamage = Math.min(shield, remainingDamage);
+    shieldDamage = Math.min(shield, remainingDamage);
     shield = Math.max(0, shield - shieldDamage);
     remainingDamage -= shieldDamage;
   }
 
   if (remainingDamage > 0) {
+    hullDamage = Math.min(hull, remainingDamage);
     hull = Math.max(0, hull - remainingDamage);
   }
+
+  if (shieldDamage > 0 && typeof playShieldHitSound === "function") playShieldHitSound();
+  if (hullDamage > 0 && typeof playHullHitSound === "function") playHullHitSound();
 
   if (hull <= 0 && previousHull > 0) {
     handleShipDisabled();
@@ -975,6 +981,7 @@ function summarizeCargoLoss(lostCargo) {
 }
 
 function handleShipDisabled() {
+  if (typeof playPlayerShipDestroyedSound === "function") playPlayerShipDestroyedSound();
   hull = 0;
   shield = 0;
   stopShieldRegen();

@@ -977,6 +977,7 @@ function landOnPlanet() {
 
   const tutorialStepId = getCurrentTutorialStep()?.id;
 
+  if (typeof playLandingSound === "function") playLandingSound();
   lastPlanetNode = currentNode;
   closeSectorMap();
   disengageTarget(true);
