@@ -485,14 +485,49 @@ function getTradeContractUnitAllowance(good, origin, destination) {
   const shipCargo = getShipStats().cargo || 100;
   const rarity = (commodityInfo[good]?.rarity || "Common").toLowerCase();
 
-  // Station-backed trade contracts should usually reward bigger cargo bays.
-  // Rare goods can still be smaller than common bulk freight, but not so small that cargo upgrades feel pointless.
-  const rarityCap = rarity === "exotic" ? 0.80 : rarity === "rare" ? 0.92 : rarity === "industrial" ? 1.05 : 1.18;
+  // Station-backed trade contracts should reward bigger cargo bays.
+  // Common and industrial freight are deliberately bulkier than rare goods.
+  const rarityCap = rarity === "exotic" ? 1.10 : rarity === "rare" ? 1.35 : rarity === "industrial" ? 1.85 : 2.25;
   const hash = marketHash(`${getMarketCycle()}:${origin}:${destination}:${good}:allowance`);
-  const swing = 0.85 + ((hash % 41) / 100); // 85% to 125% of rarity-adjusted ship cargo
-  const minimumUsefulContract = Math.ceil(shipCargo * 0.70);
+  const swing = 0.9 + ((hash % 41) / 100); // 90% to 130% of rarity-adjusted ship cargo
+  const minimumUsefulContract = Math.ceil(shipCargo * (rarity === "common" ? 1.15 : rarity === "industrial" ? 0.95 : 0.65));
 
   return Math.max(1, minimumUsefulContract, Math.floor(shipCargo * rarityCap * swing));
+}
+
+function getTradeRouteChoiceScore(route) {
+  const jumps = Math.max(1, getTradeRouteJumpCount(route));
+  const rarity = (commodityInfo[route.good]?.rarity || "Common").toLowerCase();
+  const rarityWeight = rarity === "exotic" ? 0.78 : rarity === "rare" ? 0.88 : rarity === "industrial" ? 1.04 : 1.12;
+  const bulkScore = Math.sqrt(Math.max(1, Number(route.maxUnits || 1))) * Number(route.profitPerUnit || 0) * rarityWeight;
+  const totalScore = Number(route.potentialProfit || 0) * 0.72;
+  const efficiencyScore = (Number(route.potentialProfit || 0) / jumps) * 0.18;
+  return Math.round(totalScore + bulkScore + efficiencyScore);
+}
+
+function getTradeRouteDifferenceScore(route, picked) {
+  if (!picked.length) return 999999;
+
+  return Math.max(...picked.map(existing => {
+    let score = 0;
+    if (existing.good !== route.good) score += 90;
+    if (existing.destination !== route.destination) score += 60;
+    if (existing.origin !== route.origin) score += 25;
+
+    const unitGap = Math.abs(Number(existing.maxUnits || 0) - Number(route.maxUnits || 0));
+    const marginGap = Math.abs(Number(existing.profitPerUnit || 0) - Number(route.profitPerUnit || 0));
+    const profitGap = Math.abs(Number(existing.potentialProfit || 0) - Number(route.potentialProfit || 0));
+
+    score += Math.min(45, unitGap / 3);
+    score += Math.min(45, marginGap * 2);
+    score += Math.min(55, profitGap / 45);
+    return score;
+  }));
+}
+
+function isTradeRouteMeaningfullyDifferent(route, picked) {
+  if (!picked.length) return true;
+  return getTradeRouteDifferenceScore(route, picked) >= 95;
 }
 
 function buildStationTradeContracts(origin = currentNode) {
@@ -511,6 +546,7 @@ function buildStationTradeContracts(origin = currentNode) {
       const affordable = Math.max(0, Math.floor(credits / buyPrice));
       const maxUnits = Math.max(0, Math.min(contractAllowance, affordable || contractAllowance, usableCargo));
       const potentialProfit = profitPerUnit * Math.max(1, maxUnits);
+      const jumps = Math.max(1, getTradeRouteJumpCount({ origin, destination }));
 
       routes.push({
         good,
@@ -521,13 +557,16 @@ function buildStationTradeContracts(origin = currentNode) {
         profitPerUnit,
         maxUnits,
         potentialProfit,
+        jumps,
         currentOrigin: true,
-        stationBacked: marketSellPrice < sellPrice
+        stationBacked: marketSellPrice < sellPrice,
+        choiceScore: getTradeRouteChoiceScore({ good, origin, destination, profitPerUnit, maxUnits, potentialProfit })
       });
     });
   });
 
   return routes.sort((a, b) => {
+    if (b.choiceScore !== a.choiceScore) return b.choiceScore - a.choiceScore;
     if (b.potentialProfit !== a.potentialProfit) return b.potentialProfit - a.potentialProfit;
     if (b.profitPerUnit !== a.profitPerUnit) return b.profitPerUnit - a.profitPerUnit;
     return a.good.localeCompare(b.good);
@@ -539,19 +578,30 @@ function getCurrentTradeContracts() {
   const stationRoutes = buildStationTradeContracts(currentNode);
   const picked = [];
   const usedGoods = new Set();
+  const usedDestinations = new Set();
 
   stationRoutes.forEach(route => {
     if (picked.length >= maxVisibleTrades) return;
     if (usedGoods.has(route.good)) return;
+    if (usedDestinations.has(route.destination)) return;
     picked.push(route);
     usedGoods.add(route.good);
+    usedDestinations.add(route.destination);
   });
 
   stationRoutes.forEach(route => {
     if (picked.length >= maxVisibleTrades) return;
-    if (picked.some(existing => existing.good === route.good && existing.destination === route.destination)) return;
+    if (!isTradeRouteMeaningfullyDifferent(route, picked)) return;
     picked.push(route);
   });
+
+  if (picked.length < maxVisibleTrades) {
+    stationRoutes.forEach(route => {
+      if (picked.length >= maxVisibleTrades) return;
+      if (picked.some(existing => existing.good === route.good && existing.destination === route.destination)) return;
+      picked.push(route);
+    });
+  }
 
   return picked;
 }
@@ -1611,8 +1661,6 @@ function renderTradeQuantityControls(good, mode, maxValue, defaultValue = 0, act
           oninput="syncTradeInput('${escapedGood}', '${mode}')"
         />
         <button class="trade-step-btn" onclick="adjustTradeQuantity('${escapedGood}', '${mode}', 1)" ${max <= 0 ? "disabled" : ""}>+</button>
-        <button class="trade-quick-btn trade-amount-btn" onclick="setTradeQuantityPercent('${escapedGood}', '${mode}', 0.25)" ${max <= 0 ? "disabled" : ""}>25%</button>
-        <button class="trade-quick-btn trade-amount-btn" onclick="setTradeQuantityPercent('${escapedGood}', '${mode}', 0.5)" ${max <= 0 ? "disabled" : ""}>50%</button>
         <button class="trade-quick-btn trade-amount-btn trade-max-btn" onclick="setTradeMax('${escapedGood}', '${mode}')" ${max <= 0 ? "disabled" : ""}>Max</button>
         <button id="${mode}Action-${id}" class="trade-primary-action" onclick="${actionFn}('${escapedGood}')" ${value <= 0 || max <= 0 ? "disabled" : ""}>${actionLabel}</button>
       </div>

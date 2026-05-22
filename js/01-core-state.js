@@ -179,40 +179,40 @@ let marketStock = createInitialMarketStock();
 function createInitialMarketStock() {
   return {
     "Virella": {
-      "Iron": 280,
-      "Copper": 220,
-      "Cobalt": 95,
-      "Titanium": 80,
-      "Crystal Shards": 60,
-      "Xenon Gas": 44,
-      "Iridium": 28,
-      "Platinum": 20,
-      "Uranium": 12,
-      "Dark Matter Residue": 5
+      "Iron": 920,
+      "Copper": 760,
+      "Cobalt": 420,
+      "Titanium": 360,
+      "Crystal Shards": 260,
+      "Xenon Gas": 190,
+      "Iridium": 96,
+      "Platinum": 72,
+      "Uranium": 46,
+      "Dark Matter Residue": 18
     },
     "Asteron Prime": {
-      "Iron": 190,
-      "Copper": 160,
-      "Cobalt": 130,
-      "Titanium": 115,
-      "Crystal Shards": 92,
-      "Xenon Gas": 62,
-      "Iridium": 36,
-      "Platinum": 24,
-      "Uranium": 18,
-      "Dark Matter Residue": 7
+      "Iron": 720,
+      "Copper": 640,
+      "Cobalt": 520,
+      "Titanium": 470,
+      "Crystal Shards": 340,
+      "Xenon Gas": 230,
+      "Iridium": 118,
+      "Platinum": 82,
+      "Uranium": 64,
+      "Dark Matter Residue": 22
     },
     "Nyxara": {
-      "Iron": 110,
-      "Copper": 100,
-      "Cobalt": 90,
-      "Titanium": 65,
-      "Crystal Shards": 42,
-      "Xenon Gas": 88,
-      "Iridium": 50,
-      "Platinum": 38,
-      "Uranium": 30,
-      "Dark Matter Residue": 10
+      "Iron": 520,
+      "Copper": 480,
+      "Cobalt": 390,
+      "Titanium": 330,
+      "Crystal Shards": 230,
+      "Xenon Gas": 310,
+      "Iridium": 135,
+      "Platinum": 105,
+      "Uranium": 84,
+      "Dark Matter Residue": 28
     }
   };
 }
