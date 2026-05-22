@@ -585,6 +585,14 @@ async function login() {
   }
 
   rememberSupabaseAccount(user, profile);
+
+  try {
+    const loadedCloudSave = typeof loadGameFromSupabase === "function" ? await loadGameFromSupabase() : false;
+    if (loadedCloudSave) console.info("Loaded Supabase player save.");
+  } catch (error) {
+    console.warn("Unable to load Supabase player save. Continuing with local save.", error);
+  }
+
   setAccountMessage(message, "");
 
   tutorialState.active = false;

@@ -73,7 +73,65 @@ function buildSaveState(options = {}) {
 }
 
 function saveGame(options = {}) {
-  localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify(buildSaveState(options)));
+  const state = buildSaveState(options);
+  localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify(state));
+  queueSupabaseSave(state);
+}
+
+async function getAuthenticatedSupabaseUser() {
+  const client = typeof getSupabaseClient === "function" ? getSupabaseClient() : null;
+  if (!client) return null;
+
+  const { data, error } = await client.auth.getUser();
+  if (error) {
+    console.warn("Unable to read Supabase user for save sync.", error);
+    return null;
+  }
+
+  return data?.user ? { client, user: data.user } : null;
+}
+
+function queueSupabaseSave(state) {
+  if (!state || !window.lupenSupabase) return;
+  saveGameToSupabase(state).catch(error => {
+    console.warn("Supabase save failed. Local save is still intact.", error);
+  });
+}
+
+async function saveGameToSupabase(state = buildSaveState()) {
+  const auth = await getAuthenticatedSupabaseUser();
+  if (!auth) return false;
+
+  const { error } = await auth.client
+    .from("player_saves")
+    .upsert({
+      user_id: auth.user.id,
+      save_data: state,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "user_id" });
+
+  if (error) throw error;
+  return true;
+}
+
+async function loadGameFromSupabase() {
+  const auth = await getAuthenticatedSupabaseUser();
+  if (!auth) return false;
+
+  const { data, error } = await auth.client
+    .from("player_saves")
+    .select("save_data")
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.save_data) return false;
+
+  const applied = applyLoadedGameState(data.save_data);
+  if (applied) {
+    localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify(buildSaveState({ leaveSave: false })));
+  }
+  return applied;
 }
 
 function buildSaveExportPayload() {
@@ -184,9 +242,9 @@ function saveGameBeforeLeave() {
   }
 }
 
-function loadGame() {
-  const saved = migrateSavedGame(safeParseLocalStorage(STORAGE_GAME_KEY));
-  if (!saved) return;
+function applyLoadedGameState(rawSaved) {
+  const saved = migrateSavedGame(rawSaved);
+  if (!saved) return false;
 
   credits = saved.credits ?? credits;
   playerProgress = normalizePlayerProgress(saved.playerProgress || playerProgress);
@@ -298,6 +356,12 @@ function loadGame() {
   if (shield < shieldMax) {
     scheduleShieldRegen();
   }
+
+  return true;
+}
+
+function loadGame() {
+  return applyLoadedGameState(safeParseLocalStorage(STORAGE_GAME_KEY));
 }
 
 function isDebugToolsEnabled() {
