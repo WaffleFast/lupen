@@ -1,27 +1,46 @@
 /* WAV audio asset layer with generated WebAudio fallbacks. */
 
 const LUPEN_AUDIO_ASSETS = {
-  jumpArrive: "assets/audio/lupen_jump_drive_whoosh.wav",
-  planetLaunch: "assets/audio/lupen_planet_launch_rocket_takeoff.wav",
-  planetLand: "assets/audio/lupen_planet_land_touchdown.wav",
-  enemyDestroyed: "assets/audio/lupen_enemy_ship_destroyed_debris_explosion.wav",
-  shipDestroyed: "assets/audio/lupen_player_ship_destroyed_chain_boom.wav",
-  laserLight: "assets/audio/lupen_gun_light_ballistic_report.wav",
-  laserHeavy: "assets/audio/lupen_gun_heavy_ballistic_report.wav",
-  enemyWeapon: "assets/audio/lupen_enemy_gun_ballistic_report.wav",
-  shieldHit: "assets/audio/lupen_shield_hit_energy_crack.wav",
-  hullHit: "assets/audio/lupen_hull_hit_metal_impact.wav",
-  hitMarker: "assets/audio/lupen_weapon_hit_explosive_impact.wav",
-  rewardClaim: "assets/audio/lupen_reward_claim_low_dark_extended.wav",
-  uiConfirm: "assets/audio/lupen_ui_confirm_low_click.wav",
-  uiDeny: "assets/audio/lupen_ui_deny_low_click.wav"
+  jumpArrive: "assets/audio/hyper.wav",
+  planetLaunch: "assets/audio/burner.wav",
+  planetLand: "assets/audio/planet/land.wav",
+  enemyDestroyed: "assets/audio/explosion.wav",
+  shipDestroyed: "assets/audio/boom.wav",
+  laserLight: [
+    "assets/audio/gun.wav",
+    "assets/audio/guns/MK1 Fury.wav",
+    "assets/audio/guns/V1 Blaster.wav"
+  ],
+  laserHeavy: [
+    "assets/audio/guns/Xen Silenus.wav",
+    "assets/audio/guns/K14 Cannon.wav",
+    "assets/audio/guns/MK1 Sunburst.wav"
+  ],
+  enemyWeapon: [
+    "assets/audio/efire/g0.wav",
+    "assets/audio/efire/g1.wav"
+  ],
+  shieldHit: "assets/audio/shield.wav",
+  hullHit: [
+    "assets/audio/impacts/i3.wav",
+    "assets/audio/impacts/i4.wav"
+  ],
+  hitMarker: [
+    "assets/audio/impacts/i1.wav",
+    "assets/audio/impacts/i2.wav",
+    "assets/audio/impacts/i5.wav"
+  ],
+  rewardClaim: "assets/audio/namepress.wav",
+  uiConfirm: "assets/audio/namepress.wav",
+  uiDeny: "assets/audio/planet/back.wav"
 };
 
 const lupenAudioLastPlayed = {};
 const lupenAudioSingleInstances = {};
 
 function playAudioAsset(name, options = {}) {
-  const src = LUPEN_AUDIO_ASSETS[name];
+  const entry = LUPEN_AUDIO_ASSETS[name];
+  const src = Array.isArray(entry) ? entry[Math.floor(Math.random() * entry.length)] : entry;
   const {
     volume = 0.35,
     cooldownMs = 0,
