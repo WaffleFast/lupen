@@ -261,12 +261,11 @@ function renderPilotProfile() {
       </div>
 
       <div class="pilot-future-card">
-        <div class="profile-tree-head"><span>Future Pilot Systems</span><strong>Later</strong></div>
+        <div class="profile-tree-head"><span>Online Pilot Systems</span><strong>Later</strong></div>
         <div class="future-profile-grid">
-          <div><strong>Guild</strong><small>Guild tag, rank, allies and rivals.</small></div>
-          <div><strong>Skill Tree</strong><small>Combat perks, trade bonuses and ship specialisation.</small></div>
-          <div><strong>Public Stats</strong><small>Search pilots, view vessels, compare records.</small></div>
-          <div><strong>Leaderboards</strong><small>Bounties, profit, kills and seasonal standings.</small></div>
+          <div><strong>Guilds</strong><small>Create or join guilds, build alliances, and compete with rival groups.</small></div>
+          <div><strong>Player Stats</strong><small>Search pilots and view public profile records, ships, combat level, trade progress, and bounty history.</small></div>
+          <div><strong>Leaderboards</strong><small>Compare pilots by bounties, trade profit, combat progress, cargo moved, and seasonal rankings.</small></div>
         </div>
       </div>
     </section>
