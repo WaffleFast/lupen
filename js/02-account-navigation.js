@@ -362,6 +362,14 @@ function getAuthErrorMessage(error, fallback) {
   return message;
 }
 
+function shouldLogSupabaseAuthDebug() {
+  return ["localhost", "127.0.0.1"].includes(window.location.hostname) || new URLSearchParams(window.location.search).has("debug");
+}
+
+function logSupabaseAuthDebug(label, payload) {
+  if (shouldLogSupabaseAuthDebug()) console.log(`[Lupen Auth] ${label}`, payload);
+}
+
 function rememberSupabaseAccount(user, profile) {
   localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({
     id: user.id,
@@ -385,17 +393,20 @@ async function loadSupabaseProfile(client, user) {
   return data;
 }
 
-async function createSupabaseProfile(client, user, pilotName) {
-  const { data, error } = await client
+async function upsertSupabaseProfile(client, user, pilotName) {
+  const response = await client
     .from("profiles")
-    .insert({
+    .upsert({
       id: user.id,
       pilot_name: pilotName,
       last_seen: new Date().toISOString()
-    })
+    }, { onConflict: "id" })
     .select("id,pilot_name,last_seen")
     .single();
 
+  logSupabaseAuthDebug("profile upsert response", response);
+
+  const { data, error } = response;
   if (error) throw error;
   return data;
 }
@@ -448,7 +459,7 @@ async function createAccount() {
 
   setAccountMessage(message, "Creating account...");
 
-  const { data: authData, error: signUpError } = await client.auth.signUp({
+  const signUpResponse = await client.auth.signUp({
     email,
     password,
     options: {
@@ -457,34 +468,39 @@ async function createAccount() {
       }
     }
   });
+  logSupabaseAuthDebug("signUp response", signUpResponse);
+
+  const { data: authData, error: signUpError } = signUpResponse;
 
   if (signUpError) {
     setAccountMessage(message, getAuthErrorMessage(signUpError, "Account creation failed."));
     return;
   }
 
-  const user = authData?.user;
+  const user = authData?.user || authData?.session?.user;
   if (!user) {
-    setAccountMessage(message, "Account creation did not return a user. Please try again.");
+    setAccountMessage(message, "Account created. Please check your email to confirm your account, then log in.");
     return;
   }
 
   localStorage.setItem("lupenPendingPilotName", pilotName);
 
-  if (!authData.session) {
-    setAccountMessage(message, "Account created. Check your email to confirm it, then log in.");
+  let profile;
+  try {
+    profile = await upsertSupabaseProfile(client, user, pilotName);
+  } catch (error) {
+    setAccountMessage(message, error?.message || "Account created, but pilot profile setup failed.");
     return;
   }
 
-  let profile;
-  try {
-    profile = await createSupabaseProfile(client, user, pilotName);
-    localStorage.removeItem("lupenPendingPilotName");
-    rememberSupabaseAccount(user, profile);
-  } catch (error) {
-    setAccountMessage(message, getAuthErrorMessage(error, "Account created, but pilot profile setup failed."));
+  localStorage.removeItem("lupenPendingPilotName");
+
+  if (!authData.session) {
+    setAccountMessage(message, "Account created. Please check your email to confirm your account, then log in.");
     return;
   }
+
+  rememberSupabaseAccount(user, profile);
 
   resetToNoShipStarterState();
   saveGame();
@@ -548,14 +564,14 @@ async function login() {
     const pendingPilotName = localStorage.getItem("lupenPendingPilotName") || user.user_metadata?.pilot_name || "";
     if (pendingPilotName.length >= 3) {
       try {
-        profile = await createSupabaseProfile(client, user, pendingPilotName);
+        profile = await upsertSupabaseProfile(client, user, pendingPilotName);
         localStorage.removeItem("lupenPendingPilotName");
       } catch (profileError) {
-        setAccountMessage(message, getAuthErrorMessage(profileError, "Login succeeded, but profile setup failed."));
+        setAccountMessage(message, profileError?.message || "Login succeeded, but profile setup failed.");
         return;
       }
     } else {
-      setAccountMessage(message, "Login succeeded, but no pilot profile was found.");
+      setAccountMessage(message, "Login succeeded, but no pilot profile was found. Please create the account again with a pilot name.");
       return;
     }
   }
