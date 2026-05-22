@@ -1,15 +1,16 @@
 /* WAV audio asset layer with generated WebAudio fallbacks. */
 
 const LUPEN_AUDIO_ASSETS = {
-  jumpArrive: "assets/audio/lupen_jump_hyper_arrive_low_extended.wav",
-  planetLand: "assets/audio/lupen_planet_land_low_heavy_extended.wav",
-  enemyDestroyed: "assets/audio/lupen_enemy_ship_destroyed_low_explosion.wav",
-  shipDestroyed: "assets/audio/lupen_ship_destroyed_low_boom_extended.wav",
-  laserLight: "assets/audio/lupen_laser_light_low_plasma_extended.wav",
-  laserHeavy: "assets/audio/lupen_laser_heavy_low_cannon_extended.wav",
-  shieldHit: "assets/audio/lupen_shield_hit_low_extended.wav",
-  hullHit: "assets/audio/lupen_hull_hit_low_metal_extended.wav",
-  hitMarker: "assets/audio/lupen_weapon_hit_marker_low_extended.wav",
+  jumpArrive: "assets/audio/lupen_jump_drive_whoosh.wav",
+  planetLand: "assets/audio/lupen_planet_land_touchdown.wav",
+  enemyDestroyed: "assets/audio/lupen_enemy_ship_destroyed_blast.wav",
+  shipDestroyed: "assets/audio/lupen_player_ship_destroyed_heavy_blast.wav",
+  laserLight: "assets/audio/lupen_weapon_light_autocannon.wav",
+  laserHeavy: "assets/audio/lupen_weapon_heavy_mass_driver.wav",
+  enemyWeapon: "assets/audio/lupen_weapon_enemy_burst.wav",
+  shieldHit: "assets/audio/lupen_shield_hit_energy_crack.wav",
+  hullHit: "assets/audio/lupen_hull_hit_metal_impact.wav",
+  hitMarker: "assets/audio/lupen_weapon_hit_marker_impact.wav",
   rewardClaim: "assets/audio/lupen_reward_claim_low_dark_extended.wav",
   uiConfirm: "assets/audio/lupen_ui_confirm_low_click.wav",
   uiDeny: "assets/audio/lupen_ui_deny_low_click.wav"
@@ -78,7 +79,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playJumpSound = function playJumpSoundAsset() {
     playAudioAsset("jumpArrive", {
-      volume: 0.48,
+      volume: 0.5,
       cooldownMs: 650,
       allowOverlap: false,
       fallback: fallbackJumpSound
@@ -87,7 +88,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playLandingSound = function playLandingSound() {
     playAudioAsset("planetLand", {
-      volume: 0.46,
+      volume: 0.5,
       cooldownMs: 800,
       allowOverlap: false
     });
@@ -95,7 +96,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playPlayerLaserPulse = function playPlayerLaserPulseAsset() {
     playAudioAsset(getCurrentWeaponAudioAsset(), {
-      volume: 0.34,
+      volume: 0.4,
       cooldownMs: 45,
       allowOverlap: true,
       fallback: fallbackPlayerLaserPulse
@@ -103,8 +104,8 @@ function playAudioAsset(name, options = {}) {
   };
 
   window.playEnemyLaserPulse = function playEnemyLaserPulseAsset() {
-    playAudioAsset("laserLight", {
-      volume: 0.3,
+    playAudioAsset("enemyWeapon", {
+      volume: 0.34,
       cooldownMs: 55,
       allowOverlap: true,
       fallback: fallbackEnemyLaserPulse
@@ -113,7 +114,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playWeaponHitMarkerSound = function playWeaponHitMarkerSound() {
     playAudioAsset("hitMarker", {
-      volume: 0.23,
+      volume: 0.26,
       cooldownMs: 55,
       allowOverlap: true
     });
@@ -121,7 +122,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playShieldHitSound = function playShieldHitSound() {
     playAudioAsset("shieldHit", {
-      volume: 0.36,
+      volume: 0.4,
       cooldownMs: 90,
       allowOverlap: true
     });
@@ -129,7 +130,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playHullHitSound = function playHullHitSound() {
     playAudioAsset("hullHit", {
-      volume: 0.38,
+      volume: 0.42,
       cooldownMs: 120,
       allowOverlap: true
     });
@@ -137,7 +138,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playEnemyShipDestroyedSound = function playEnemyShipDestroyedSound() {
     playAudioAsset("enemyDestroyed", {
-      volume: 0.5,
+      volume: 0.55,
       cooldownMs: 420,
       allowOverlap: false
     });
@@ -145,7 +146,7 @@ function playAudioAsset(name, options = {}) {
 
   window.playPlayerShipDestroyedSound = function playPlayerShipDestroyedSound() {
     playAudioAsset("shipDestroyed", {
-      volume: 0.62,
+      volume: 0.66,
       cooldownMs: 1000,
       allowOverlap: false
     });
