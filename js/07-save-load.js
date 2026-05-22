@@ -78,6 +78,21 @@ function saveGame(options = {}) {
   queueSupabaseSave(state);
 }
 
+function setSaveStatus(state) {
+  const indicator = document.getElementById("saveStatusIndicator");
+  if (!indicator) return;
+
+  const labels = {
+    saving: "Saving...",
+    local: "Saved locally",
+    cloud: "Saved to cloud",
+    "cloud-failed": "Cloud save failed - local save kept"
+  };
+
+  indicator.textContent = labels[state] || labels.local;
+  indicator.dataset.state = state || "local";
+}
+
 async function getAuthenticatedSupabaseUser() {
   const client = typeof getSupabaseClient === "function" ? getSupabaseClient() : null;
   if (!client) return null;
@@ -92,9 +107,17 @@ async function getAuthenticatedSupabaseUser() {
 }
 
 function queueSupabaseSave(state) {
-  if (!state || !window.lupenSupabase) return;
-  saveGameToSupabase(state).catch(error => {
+  if (!state || !window.lupenSupabase) {
+    setSaveStatus("local");
+    return;
+  }
+
+  setSaveStatus("saving");
+  saveGameToSupabase(state).then(saved => {
+    setSaveStatus(saved ? "cloud" : "local");
+  }).catch(error => {
     console.warn("Supabase save failed. Local save is still intact.", error);
+    setSaveStatus("cloud-failed");
   });
 }
 
@@ -102,10 +125,14 @@ async function saveGameToSupabase(state = buildSaveState()) {
   const auth = await getAuthenticatedSupabaseUser();
   if (!auth) return false;
 
-  const { error } = await auth.client
+  return saveGameStateToSupabaseForUser(auth.client, auth.user, state);
+}
+
+async function saveGameStateToSupabaseForUser(client, user, state) {
+  const { error } = await client
     .from("player_saves")
     .upsert({
-      user_id: auth.user.id,
+      user_id: user.id,
       save_data: state,
       updated_at: new Date().toISOString()
     }, { onConflict: "user_id" });
@@ -116,7 +143,7 @@ async function saveGameToSupabase(state = buildSaveState()) {
 
 async function loadGameFromSupabase() {
   const auth = await getAuthenticatedSupabaseUser();
-  if (!auth) return false;
+  if (!auth) return { loaded: false, exists: false, reason: "not_authenticated" };
 
   const { data, error } = await auth.client
     .from("player_saves")
@@ -125,13 +152,87 @@ async function loadGameFromSupabase() {
     .maybeSingle();
 
   if (error) throw error;
-  if (!data?.save_data) return false;
+  if (!data?.save_data) return { loaded: false, exists: false, reason: "missing" };
 
   const applied = applyLoadedGameState(data.save_data);
   if (applied) {
     localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify(buildSaveState({ leaveSave: false })));
   }
-  return applied;
+  return { loaded: applied, exists: true, reason: applied ? "loaded" : "invalid" };
+}
+
+function getLocalSavePayloadForCloudMigration() {
+  return migrateSavedGame(safeParseLocalStorage(STORAGE_GAME_KEY));
+}
+
+function hasMeaningfulLocalSave(saved = getLocalSavePayloadForCloudMigration()) {
+  if (!saved) return false;
+
+  const ownedShipIds = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : [];
+  const hasNonStarterShip = ownedShipIds.some(shipId => shipId !== "lupenOrigin");
+  const hasOnlyDefaultStarterShip = ownedShipIds.length === 1 && ownedShipIds[0] === "lupenOrigin";
+  const progressTotals = saved.playerProgress?.totals || {};
+  const hasProgressTotals = Object.values(progressTotals).some(value => Number(value || 0) > 0);
+  const hasCombatXp = Number(saved.playerProgress?.combatXp || 0) > 0;
+  const hasCargo = saved.cargo && mineralKeys.some(mineral => Number(saved.cargo[mineral] || 0) > 0);
+  const hasInventory = Array.isArray(saved.inventoryItems) && saved.inventoryItems.length > 0;
+  const hasOwnedGuns = saved.ownedGuns && Object.values(saved.ownedGuns).some(count => Number(count || 0) > 0);
+  const hasOwnedAttachments = saved.ownedAttachments && Object.values(saved.ownedAttachments).some(count => Number(count || 0) > 0);
+  const hasTradeOrBounty = Boolean(saved.activeTradeRoute || saved.activeObjective);
+  const hasDifferentCredits = Number(saved.credits || 0) !== 10000;
+
+  return Boolean(
+    hasNonStarterShip ||
+    (!hasOnlyDefaultStarterShip && ownedShipIds.length > 0) ||
+    hasProgressTotals ||
+    hasCombatXp ||
+    hasCargo ||
+    hasInventory ||
+    hasOwnedGuns ||
+    hasOwnedAttachments ||
+    hasTradeOrBounty ||
+    hasDifferentCredits
+  );
+}
+
+async function uploadLocalSavePayloadToSupabase(localSavePayload) {
+  const auth = await getAuthenticatedSupabaseUser();
+  if (!auth || !localSavePayload) return false;
+  await saveGameStateToSupabaseForUser(auth.client, auth.user, localSavePayload);
+  return true;
+}
+
+function promptUploadLocalSaveToSupabase() {
+  return new Promise(resolve => {
+    let overlay = document.getElementById("localSaveMigrationOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "localSaveMigrationOverlay";
+      overlay.className = "reward-overlay local-save-migration-overlay";
+      document.body.appendChild(overlay);
+    }
+
+    overlay.innerHTML = `
+      <div class="reward-modal local-save-migration-modal">
+        <div class="reward-kicker">Cloud Save</div>
+        <h2>Local progress found</h2>
+        <p>Upload this save to your account?</p>
+        <div class="reward-modal-actions">
+          <button id="uploadLocalSaveBtn" type="button">Upload Local Save</button>
+          <button id="skipLocalSaveUploadBtn" class="secondary" type="button">Continue Without Uploading</button>
+        </div>
+      </div>
+    `;
+
+    const close = decision => {
+      overlay.classList.remove("active");
+      resolve(decision);
+    };
+
+    overlay.querySelector("#uploadLocalSaveBtn")?.addEventListener("click", () => close("upload"), { once: true });
+    overlay.querySelector("#skipLocalSaveUploadBtn")?.addEventListener("click", () => close("skip"), { once: true });
+    requestAnimationFrame(() => overlay.classList.add("active"));
+  });
 }
 
 function buildSaveExportPayload() {

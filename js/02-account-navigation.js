@@ -586,11 +586,39 @@ async function login() {
 
   rememberSupabaseAccount(user, profile);
 
+  let cloudSaveResult = { loaded: false, exists: false, reason: "unavailable" };
   try {
-    const loadedCloudSave = typeof loadGameFromSupabase === "function" ? await loadGameFromSupabase() : false;
-    if (loadedCloudSave) console.info("Loaded Supabase player save.");
+    cloudSaveResult = typeof loadGameFromSupabase === "function" ? await loadGameFromSupabase() : cloudSaveResult;
+    if (cloudSaveResult.loaded) console.info("Loaded Supabase player save.");
+    if (!cloudSaveResult.exists) console.info("No Supabase player save found for this account.");
   } catch (error) {
     console.warn("Unable to load Supabase player save. Continuing with local save.", error);
+    cloudSaveResult = { loaded: false, exists: false, reason: "error" };
+  }
+
+  if (!cloudSaveResult.exists) {
+    const localSavePayload = typeof getLocalSavePayloadForCloudMigration === "function" ? getLocalSavePayloadForCloudMigration() : null;
+    const hasLocalProgress = typeof hasMeaningfulLocalSave === "function" ? hasMeaningfulLocalSave(localSavePayload) : false;
+
+    console.info("Local-to-cloud save migration check.", {
+      cloudSaveExists: cloudSaveResult.exists,
+      cloudSaveReason: cloudSaveResult.reason,
+      hasLocalProgress
+    });
+
+    if (hasLocalProgress && typeof promptUploadLocalSaveToSupabase === "function") {
+      const decision = await promptUploadLocalSaveToSupabase();
+      console.info("Local-to-cloud save migration decision.", decision);
+
+      if (decision === "upload") {
+        try {
+          await uploadLocalSavePayloadToSupabase(localSavePayload);
+          console.info("Uploaded local save payload to Supabase.");
+        } catch (error) {
+          console.warn("Unable to upload local save payload to Supabase. Continuing locally.", error);
+        }
+      }
+    }
   }
 
   setAccountMessage(message, "");

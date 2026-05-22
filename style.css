@@ -212,6 +212,39 @@ input::placeholder {
   color: #d9e6ff;
 }
 
+.save-status-indicator {
+  position: fixed;
+  right: 18px;
+  bottom: 16px;
+  z-index: 220;
+  max-width: min(280px, calc(100vw - 36px));
+  padding: 6px 10px;
+  border: 1px solid rgba(127, 223, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(1, 8, 18, 0.72);
+  color: rgba(203, 225, 242, 0.78);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.save-status-indicator[data-state="saving"] {
+  border-color: rgba(255, 220, 95, 0.38);
+  color: rgba(255, 232, 163, 0.88);
+}
+
+.save-status-indicator[data-state="cloud"] {
+  border-color: rgba(52, 229, 154, 0.34);
+  color: rgba(159, 255, 205, 0.88);
+}
+
+.save-status-indicator[data-state="cloud-failed"] {
+  border-color: rgba(255, 118, 132, 0.46);
+  color: rgba(255, 198, 207, 0.92);
+}
+
 /* Marketplace */
 
 .market-screen {
@@ -19753,6 +19786,22 @@ input::placeholder {
   margin-top: 7px;
   color: rgba(255, 232, 163, 0.78);
   font-size: 0.62rem;
+}
+
+.local-save-migration-modal .reward-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.local-save-migration-modal .reward-modal-actions button {
+  min-height: 42px;
+}
+
+@media (max-width: 640px) {
+  .local-save-migration-modal .reward-modal-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ===== Objective readability and tutorial framing pass ===== */
