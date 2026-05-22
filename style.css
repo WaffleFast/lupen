@@ -20036,3 +20036,21 @@ input::placeholder {
     min-width: 0;
   }
 }
+
+.inventory-item-card.quality-refined,
+.inventory-item-frame.quality-refined,
+.broker-item-card.quality-refined,
+.broker-item-frame.quality-refined,
+.inventory-icon-card.quality-refined,
+.equipment-slot.quality-refined,
+.inventory-drawer-card.quality-refined,
+.equipped-orbit-slot.quality-refined,
+.hangar-tooltip-card.quality-refined,
+.store-catalog-card.quality-refined,
+.store-quality-refined .store-detail-visual {
+  border-color: rgba(50, 210, 125, 0.58);
+}
+
+.store-quality-pill.quality-refined.active {
+  border-color: rgba(50, 210, 125, 0.9);
+}

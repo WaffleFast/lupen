@@ -176,7 +176,7 @@ function getVaultEntryStats(entry) {
   if (item.kind === "gun") {
     const gun = GUNS[item.key];
     if (gun) {
-      stats.push({ label: "Attack", value: formatNumber(getStoreGunAttack(item, entry.quality)) });
+      stats.push(...getWeaponLayerStatRows(gun, entry.quality).slice(0, 3));
     }
   } else if (item.kind === "attachment") {
     stats.push({ label: "Effect", value: getStoreAttachmentEffectText(item, entry.quality) });
@@ -191,7 +191,7 @@ function getVaultEntryStats(entry) {
     stats.push({ label: "Use", value: corePurpose[entry.quality] || "Upgrade core" });
   }
 
-  return stats.slice(0, 3);
+  return stats.slice(0, item.kind === "gun" ? 4 : 3);
 }
 
 
@@ -392,6 +392,7 @@ function renderHangarOverview() {
     overviewStats.innerHTML = `
       <div class="hangar-stat-card hull-stat featured-stat"><span>Hull</span><strong>${formatNumber(Math.floor(hull))}/${formatNumber(hullMax)}</strong></div>
       <div class="hangar-stat-card shield-stat"><span>Shield</span><strong>${formatNumber(stats.shield)}</strong></div>
+      <div class="hangar-stat-card hull-stat"><span>Armour</span><strong>${formatNumber(stats.armor)}</strong></div>
       <div class="hangar-stat-card cargo-stat"><span>Cargo</span><strong>${formatNumber(stats.cargo)}</strong></div>
       <div class="hangar-stat-card jump-stat"><span>Jump</span><strong>${formatNumber(stats.jumpRecharge)}</strong></div>
       <div class="hangar-stat-card evasion-stat"><span>Evasion</span><strong>${formatEvasion(stats.evasion)}</strong></div>
@@ -570,6 +571,7 @@ function renderFleetDetail() {
     <div class="fleet-detail-stats">
       ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
       ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
+      ${renderFleetStatChip("Armour", formatNumber(stats.armor), "hull-stat")}
       ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
       ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
       ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
@@ -663,11 +665,14 @@ function renderHangarEditor() {
     <div><strong>Cargo:</strong> ${formatNumber(stats.cargo)}</div>
     <div><strong>Hull:</strong> ${formatNumber(stats.hull)}</div>
     <div><strong>Shield:</strong> ${formatNumber(stats.shield)}</div>
+    <div><strong>Armour:</strong> ${formatNumber(stats.armor)}</div>
     <div><strong>Jump Recharge:</strong> ${formatNumber(stats.jumpRecharge)}</div>
     <div><strong>Evasion:</strong> ${formatEvasion(stats.evasion)}</div>
     <div><strong>Active Weapon:</strong> ${weapon.name}</div>
-    <div><strong>Damage:</strong> ${formatNumber(weapon.damage)}</div>
-    <div><strong>Speed:</strong> ${(weapon.speed / 1000).toFixed(2)}s</div>
+    <div><strong>Shield Damage:</strong> ${formatNumber(weapon.damageLayers.shield)}</div>
+    <div><strong>Armour Damage:</strong> ${formatNumber(weapon.damageLayers.armor)}</div>
+    <div><strong>Hull Damage:</strong> ${formatNumber(weapon.damageLayers.hull)}</div>
+    <div><strong>Fire Rate:</strong> ${weapon.fireRate.toFixed(1)}/s</div>
     <div><strong>Credits:</strong> ${formatNumber(credits)}</div>
     ${renderRepairSummary(selectedHangarShipId)}
   `;
@@ -859,13 +864,7 @@ function getEquipmentTooltipHtml(entry, categoryKey) {
   const statRows = [];
 
   if (isGun) {
-    const attack = Math.round((definition.damage || 0) * getItemStatMultiplier(quality));
-    const cycle = `${((definition.speed || 1000) / 1000).toFixed(2)}s`;
-    const dps = definition.speed ? Math.round(attack / (definition.speed / 1000)) : attack;
-
-    statRows.push({ label: "ATK", value: formatNumber(attack) });
-    statRows.push({ label: "Cycle", value: cycle });
-    statRows.push({ label: "DPS", value: formatNumber(dps) });
+    statRows.push(...getWeaponLayerStatRows(definition, quality));
   } else {
     const effect = getScaledAttachmentEffect(entry.key, quality);
     Object.entries(effect).forEach(([effectKey, value]) => {
@@ -1073,6 +1072,7 @@ function renderGunShop() {
   Object.entries(GUNS).forEach(([key, item]) => {
     const canAfford = credits >= item.price;
     const owned = ownedGuns[key] || 0;
+    const damage = getGunDamageForQuality(item, "standard");
 
     const card = document.createElement("div");
     card.className = "equipment-card";
@@ -1081,7 +1081,8 @@ function renderGunShop() {
       <div class="equipment-card-meta">
         <h4>${item.name}</h4>
         <p>${item.description}</p>
-        <p>${formatNumber(item.damage)} dmg / ${(item.speed / 1000).toFixed(2)}s fire cycle</p>
+        <p>Shield ${formatNumber(damage.shield)} / Armour ${formatNumber(damage.armor)} / Hull ${formatNumber(damage.hull)}</p>
+        <p>Fire Rate: ${getGunFireRateText(item)}</p>
         <p>Owned: ${formatNumber(owned)}</p>
         <p>Price: CR ${formatNumber(item.price)}</p>
       </div>
@@ -1116,6 +1117,7 @@ function renderShipyardStatPills(shipId) {
   return `
     ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
     ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
+    ${renderFleetStatChip("Armour", formatNumber(stats.armor), "hull-stat")}
     ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
     ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
     ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
@@ -1212,6 +1214,7 @@ function renderShipShop() {
       <div class="fleet-card-mini-stats">
         <span><em>Cargo</em><strong>${formatNumber(stats.cargo)}</strong></span>
         <span><em>Hull</em><strong>${formatNumber(stats.hull)}</strong></span>
+        <span><em>Armour</em><strong>${formatNumber(stats.armor)}</strong></span>
         <span><em>Evade</em><strong>${formatEvasion(stats.evasion)}</strong></span>
       </div>
       ${renderShipSlotSummary(ship.id)}
@@ -1297,11 +1300,11 @@ function getDailyStoreItem(baseItems) {
   return {
     ...base,
     id: `daily:${base.kind}:${base.key}`,
-    fixedQuality: "unique",
-    storeTier: "Daily Unique",
+    fixedQuality: "refined",
+    storeTier: "Daily Refined",
     dailyStock: true,
-    basePrice: Math.max(1, Math.round(base.basePrice * (ITEM_QUALITY_BUY_MULTIPLIERS.unique || 2.5))),
-    description: `${base.description} Unique daily stock. Resets every 24 hours.`
+    basePrice: Math.max(1, Math.round(base.basePrice * (ITEM_QUALITY_BUY_MULTIPLIERS.refined || 2.5))),
+    description: `${base.description} Refined daily stock. Resets every 24 hours.`
   };
 }
 
@@ -1347,6 +1350,7 @@ function getStoreCatalogItems() {
   const items = [];
 
   Object.entries(GUNS).forEach(([key, item]) => {
+    const damageRows = getWeaponLayerStatRows(item, "standard");
     items.push({
       id: `gun:${key}`,
       kind: "gun",
@@ -1358,11 +1362,7 @@ function getStoreCatalogItems() {
       basePrice: item.price,
       qualityEnabled: false,
       storeTier: "Core Stock",
-      stats: [
-        { label: "Attack", value: formatNumber(item.damage) },
-        { label: "Cycle", value: `${(item.speed / 1000).toFixed(2)}s` },
-        { label: "Type", value: "Standard Weapon" }
-      ]
+      stats: damageRows
     });
   });
 
@@ -1462,7 +1462,35 @@ function getItemStatMultiplier(quality = "standard") {
 function getStoreGunAttack(item, quality = "standard") {
   const gun = GUNS[item?.key];
   if (!gun) return 0;
-  return Math.round(gun.damage * getItemStatMultiplier(quality));
+  const damage = getGunDamageForQuality(gun, quality);
+  return Math.round((damage.shield + damage.armor + damage.hull) / 3);
+}
+
+function getGunDamageForQuality(gun, quality = "standard") {
+  const multiplier = getItemStatMultiplier(quality);
+  const base = typeof getWeaponLayerDamage === "function"
+    ? getWeaponLayerDamage(gun)
+    : { shield: Number(gun?.damage || 0), armor: Number(gun?.damage || 0), hull: Number(gun?.damage || 0) };
+  return {
+    shield: Math.max(1, Math.round(base.shield * multiplier)),
+    armor: Math.max(1, Math.round(base.armor * multiplier)),
+    hull: Math.max(1, Math.round(base.hull * multiplier))
+  };
+}
+
+function getGunFireRateText(gun) {
+  const fireRate = Number(gun?.fireRate || (gun?.speed ? 1000 / gun.speed : 0));
+  return `${fireRate.toFixed(1)}/s`;
+}
+
+function getWeaponLayerStatRows(gun, quality = "standard") {
+  const damage = getGunDamageForQuality(gun, quality);
+  return [
+    { label: "Shield", value: formatNumber(damage.shield) },
+    { label: "Armour", value: formatNumber(damage.armor) },
+    { label: "Hull", value: formatNumber(damage.hull) },
+    { label: "Fire Rate", value: getGunFireRateText(gun) }
+  ];
 }
 
 function getStoreAttachmentEffectText(item, quality = "standard") {
@@ -1487,7 +1515,8 @@ function getInventoryEffectLine(entry) {
   if (!entry) return "";
   const quality = entry.quality || "standard";
   if (entry.kind === "gun" && GUNS[entry.key]) {
-    return `ATK ${formatNumber(getStoreGunAttack({ key: entry.key }, quality))}`;
+    const damage = getGunDamageForQuality(GUNS[entry.key], quality);
+    return `S ${formatNumber(damage.shield)} / A ${formatNumber(damage.armor)} / H ${formatNumber(damage.hull)}`;
   }
   if (entry.kind === "attachment" && attachments[entry.key]) {
     return getStoreAttachmentEffectText({ key: entry.key }, quality);
@@ -1504,10 +1533,7 @@ function getStoreDetailStats(item, quality = "standard") {
   if (item.kind === "gun") {
     const gun = GUNS[item.key];
     if (!gun) return [];
-    return [
-      { label: "Attack", value: formatNumber(getStoreGunAttack(item, quality)) },
-      { label: "Cycle", value: `${(gun.speed / 1000).toFixed(2)}s` }
-    ];
+    return getWeaponLayerStatRows(gun, quality);
   }
 
   if (item.kind === "attachment") {

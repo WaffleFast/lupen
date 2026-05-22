@@ -92,7 +92,8 @@ function playAudioAsset(name, options = {}) {
     const weapon = typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null;
     const name = String(weapon?.name || "").toLowerCase();
     const damage = Number(weapon?.damage || 0);
-    return name.includes("heavy") || damage >= 60 ? "laserHeavy" : "laserLight";
+    const style = String(weapon?.fireStyle || "").toLowerCase();
+    return name.includes("heavy") || style === "heavy" || style === "sniper" || damage >= 16 ? "laserHeavy" : "laserLight";
   }
 
   window.playAudioAsset = playAudioAsset;

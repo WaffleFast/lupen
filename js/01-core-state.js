@@ -281,6 +281,7 @@ const SHIPS = {
     price: 0,
     hull: 1000,
     shield: 125,
+    armor: 12,
     cargo: 150,
     jumpRecharge: 11,
     evasion: 0.10,
@@ -297,6 +298,7 @@ const SHIPS = {
     price: 12000,
     hull: 1300,
     shield: 135,
+    armor: 18,
     cargo: 260,
     jumpRecharge: 8,
     evasion: 0.05,
@@ -313,6 +315,7 @@ const SHIPS = {
     price: 10000,
     hull: 900,
     shield: 130,
+    armor: 10,
     cargo: 100,
     jumpRecharge: 15,
     evasion: 0.28,
@@ -329,6 +332,7 @@ const SHIPS = {
     price: 18000,
     hull: 850,
     shield: 115,
+    armor: 8,
     cargo: 190,
     jumpRecharge: 18,
     evasion: 34,
@@ -345,6 +349,7 @@ const SHIPS = {
     price: 26000,
     hull: 1450,
     shield: 220,
+    armor: 20,
     cargo: 140,
     jumpRecharge: 10,
     evasion: 14,
@@ -361,6 +366,7 @@ const SHIPS = {
     price: 34000,
     hull: 1200,
     shield: 170,
+    armor: 25,
     cargo: 90,
     jumpRecharge: 12,
     evasion: 20,
@@ -407,24 +413,14 @@ const attachments = {
   }
 };
 
-const GUNS = {
-  pulseLaser: {
-    name: "Pulse Laser",
-    image: "assets/guns/pulse-laser.png",
-    description: "Reliable rapid-fire starter laser weapon.",
-    price: 380,
-    damage: 42,
-    speed: 1000
-  },
-  heavyPulseLaser: {
-    name: "Heavy Pulse Laser",
-    image: "assets/guns/heavy-pulse-laser.png",
-    description: "Higher damage pulse platform with slower firing cadence.",
-    price: 620,
-    damage: 68,
-    speed: 1600
-  }
-};
+const GUNS = Object.fromEntries(
+  Object.keys(WEAPON_FAMILIES || {}).map(familyId => [familyId, createWeaponCatalogDefinition(familyId)])
+);
+
+// Legacy weapon keys stay resolvable for old saves and existing localStorage loadouts.
+GUNS.heavyPulseLaser = { ...createWeaponCatalogDefinition("heavyLance"), key: "heavyPulseLaser", familyId: "heavyLance" };
+GUNS.pulseRelay = { ...createWeaponCatalogDefinition("pulseLaser"), key: "pulseRelay", familyId: "pulseLaser", name: "Pulse Relay" };
+GUNS.targetingArray = { ...createWeaponCatalogDefinition("voidRail"), key: "targetingArray", familyId: "voidRail", name: "Targeting Array" };
 
 let currentNode = "Asteron Prime";
 let lastPlanetNode = "Asteron Prime";
@@ -667,15 +663,11 @@ function isAtPlanetNode() {
   return sectorNodes[currentNode]?.type === "planet";
 }
 
-const ITEM_QUALITY_ORDER = ["standard", "unique", "elite", "legendary", "godlike"];
-const ITEM_QUALITY_LABELS = {
-  standard: "Standard",
-  unique: "Unique",
-  advanced: "Advanced",
-  elite: "Elite",
-  legendary: "Legendary",
-  godlike: "Godlike"
-};
+const ITEM_QUALITY_ORDER = Object.keys(ITEM_RARITIES || { standard: true, refined: true, advanced: true, elite: true, legendary: true, godlike: true });
+const ITEM_QUALITY_LABELS = Object.fromEntries(
+  Object.entries(ITEM_RARITIES || {}).map(([id, rarity]) => [id, rarity.name])
+);
+ITEM_QUALITY_LABELS.unique = "Refined";
 
 const itemDefinitions = {
   lupenCore: { name: "Lupen Core", shortLabel: "LC", category: "Core", icon: "assets/items/lupen-core.png", core: true, sellValue: 1500 },
@@ -684,17 +676,25 @@ const itemDefinitions = {
   jumpDrive: { name: "Jump Drive", shortLabel: "JD", category: "Attachment", icon: "assets/attachments/jump-drive.png", sellValue: 260 },
   shieldBooster: { name: "Shield Booster", shortLabel: "SB", category: "Attachment", icon: "assets/attachments/shield-booster.png", sellValue: 250 },
   evasionMatrix: { name: "Evasion Matrix", shortLabel: "EM", category: "Attachment", icon: "assets/attachments/evasion-matrix.png", sellValue: 280 },
-  pulseLaser: { name: "Pulse Laser", shortLabel: "PL", category: "Weapon", icon: "assets/guns/pulse-laser.png", sellValue: 180 },
-  heavyPulseLaser: { name: "Heavy Pulse Laser", shortLabel: "HL", category: "Weapon", icon: "assets/guns/heavy-pulse-laser.png", sellValue: 360 },
-
   /* legacy item keys kept for old local saves */
-  pulseRelay: { name: "Pulse Relay", shortLabel: "PR", category: "Weapon", icon: "assets/guns/pulse-laser.png", sellValue: 170 },
   shieldMatrix: { name: "Shield Matrix", shortLabel: "SM", category: "Attachment", icon: "assets/attachments/shield-booster.png", sellValue: 230 },
   hullPlating: { name: "Hull Plating", shortLabel: "HP", category: "Attachment", icon: "assets/attachments/hull-booster.png", sellValue: 220 },
-  targetingArray: { name: "Targeting Array", shortLabel: "TA", category: "Weapon", icon: "assets/guns/heavy-pulse-laser.png", sellValue: 330 }
+  pulseRelay: { name: "Pulse Relay", shortLabel: "PR", category: "Weapon", icon: "assets/weapons/pulse-laser.png", sellValue: 170 },
+  targetingArray: { name: "Targeting Array", shortLabel: "TA", category: "Weapon", icon: "assets/weapons/void-rail.png", sellValue: 330 }
 };
 
-const botDropPool = ["cargoPod", "hullBooster", "jumpDrive", "shieldBooster", "evasionMatrix", "pulseLaser", "heavyPulseLaser"];
+Object.entries(GUNS).forEach(([key, gun]) => {
+  if (!gun || itemDefinitions[key]) return;
+  itemDefinitions[key] = {
+    name: gun.name,
+    shortLabel: gun.name.split(" ").map(part => part[0]).join("").slice(0, 3).toUpperCase(),
+    category: "Weapon",
+    icon: gun.image,
+    sellValue: Math.max(150, Math.round((gun.price || 400) * 0.46))
+  };
+});
+
+const botDropPool = ["cargoPod", "hullBooster", "jumpDrive", "shieldBooster", "evasionMatrix", "pulseLaser", "repeater", "ionBlaster", "meltCannon", "ripperGun", "heavyLance", "voidRail"];
 
 let inventoryItems = [];
 let storeFilter = "all";
@@ -705,14 +705,15 @@ let hangarVaultFilter = "all";
 let selectedVaultGroupKey = null;
 
 function titleCaseQuality(value) {
-  return ITEM_QUALITY_LABELS[value] || "Standard";
+  const normalized = typeof normalizeRarityId === "function" ? normalizeRarityId(value) : value;
+  return ITEM_QUALITY_LABELS[normalized] || "Standard";
 }
 
 function pickWeightedQuality() {
   const roll = Math.random();
   if (roll < 0.62) return "standard";
-  if (roll < 0.87) return "unique";
-  if (roll < 0.968) return "elite";
+  if (roll < 0.87) return "refined";
+  if (roll < 0.968) return "advanced";
   if (roll < 0.996) return "legendary";
   return "godlike";
 }
@@ -727,7 +728,8 @@ function pickCoreQuality() {
 function pickBotLootKey() {
   const roll = Math.random();
   if (roll < 0.06) return "lupenCore";
-  if (roll < 0.23) return "heavyPulseLaser";
+  if (roll < 0.16) return "heavyLance";
+  if (roll < 0.23) return "ripperGun";
   if (roll < 0.38) return "shieldBooster";
   if (roll < 0.52) return "evasionMatrix";
   if (roll < 0.64) return "jumpDrive";
@@ -751,14 +753,14 @@ function createInventoryDrop(itemKey, forcedQuality = null) {
 function pickStarterMapDropQuality() {
   const roll = Math.random();
   if (roll < 0.09) return "standard";
-  if (roll < 0.115) return "unique";
-  if (roll < 0.12) return "elite";
+  if (roll < 0.115) return "refined";
+  if (roll < 0.12) return "advanced";
   return null;
 }
 
 function generateBotLootItems() {
   // Map 1 bot equipment drops are deliberately rare.
-  // Standard and Unique are possible, Elite is very slim, Legendary/Godlike are not available here.
+  // Standard and Refined are possible, Advanced is very slim, Legendary/Godlike are not available here.
   const quality = pickStarterMapDropQuality();
   if (!quality) return [];
 
@@ -770,8 +772,7 @@ function normalizeInventoryItems(items) {
   return items
     .map((item, index) => {
       if (!item || !itemDefinitions[item.key]) return null;
-      const legacyQuality = item.quality === "advanced" || item.quality === "refined" ? "unique" : item.quality;
-      const quality = ITEM_QUALITY_ORDER.includes(legacyQuality) ? legacyQuality : "standard";
+      const quality = typeof normalizeRarityId === "function" ? normalizeRarityId(item.quality) : (ITEM_QUALITY_ORDER.includes(item.quality) ? item.quality : "standard");
       return {
         id: item.id || `item-restored-${index}-${Date.now()}`,
         key: item.key,
@@ -822,7 +823,9 @@ function groupInventoryItems(items) {
 
 const ITEM_QUALITY_SELL_MULTIPLIERS = {
   standard: 1,
+  refined: 2,
   unique: 2,
+  advanced: 3.2,
   elite: 5,
   legendary: 15,
   godlike: 45
@@ -830,7 +833,9 @@ const ITEM_QUALITY_SELL_MULTIPLIERS = {
 
 const ITEM_QUALITY_BUY_MULTIPLIERS = {
   standard: 1,
+  refined: 2.5,
   unique: 2.5,
+  advanced: 5.2,
   elite: 9,
   legendary: 28,
   godlike: 90
@@ -838,11 +843,8 @@ const ITEM_QUALITY_BUY_MULTIPLIERS = {
 
 
 const ITEM_QUALITY_STAT_MULTIPLIERS = {
-  standard: 1,
-  unique: 1.14,
-  elite: 1.32,
-  legendary: 1.58,
-  godlike: 1.95
+  ...Object.fromEntries(Object.entries(ITEM_RARITIES || {}).map(([id, rarity]) => [id, rarity.statMultiplier])),
+  unique: ITEM_RARITIES?.refined?.statMultiplier || 1.08
 };
 
 function getInventoryItemSellValue(key, quality = "standard") {
@@ -983,6 +985,7 @@ let jumpTimer = null;
 
 let hull = 800;
 let hullMax = 800;
+let armor = 0;
 let evasion = 10;
 let shield = 100;
 let shieldMax = 100;
@@ -1000,7 +1003,9 @@ const ASTEROID_RESPAWN_MS = 10000;
 const ASTEROID_BASE_HP = 294;
 const HOSTILE_BOT_MOVE_MS = 10000;
 const HOSTILE_BOT_RESPAWN_MS = 10000;
-const HOSTILE_BOT_BASE_HP = 900;
+const HOSTILE_BOT_BASE_HP = 240;
+const HOSTILE_BOT_BASE_SHIELD = 60;
+const HOSTILE_BOT_BASE_ARMOR = 12;
 const HOSTILE_BOT_ATTACK_MS = 3000;
 const HOSTILE_BOT_DAMAGE = 4;
 const HULL_REPAIR_COST_PER_POINT = 2;
@@ -1040,8 +1045,13 @@ function createInitialHostileBots() {
       id: `manta-bot-${index + 1}`,
       name: `Manta Bot ${index + 1}`,
       node: spaceNodes[(index + 1) % spaceNodes.length],
-      hp: HOSTILE_BOT_BASE_HP,
-      maxHp: HOSTILE_BOT_BASE_HP,
+      shield: HOSTILE_BOT_BASE_SHIELD,
+      shieldMax: HOSTILE_BOT_BASE_SHIELD,
+      armor: HOSTILE_BOT_BASE_ARMOR,
+      hull: HOSTILE_BOT_BASE_HP,
+      hullMax: HOSTILE_BOT_BASE_HP,
+      hp: HOSTILE_BOT_BASE_SHIELD + HOSTILE_BOT_BASE_HP,
+      maxHp: HOSTILE_BOT_BASE_SHIELD + HOSTILE_BOT_BASE_HP,
       alive: true,
       x: pos.x,
       y: pos.y,

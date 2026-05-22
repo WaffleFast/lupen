@@ -329,6 +329,7 @@ function renderLoadoutSlotDetail() {
       <div class="inventory-detail-stats">
         <span>Hull <strong>${formatNumber(hullMax)}</strong></span>
         <span>Shield <strong>${formatNumber(shieldMax)}</strong></span>
+        <span>Armour <strong>${formatNumber(armor)}</strong></span>
         <span>Cargo <strong>${formatNumber(cargoCapacity())}</strong></span>
         <span>Jump Speed <strong>${formatNumber(ship.baseJumpRecharge || 0)}</strong></span>
         <span>Evasion <strong>${formatEvasion(evasion)}</strong></span>
@@ -361,7 +362,7 @@ function renderLoadoutSlotDetail() {
   const name = definition.name || item?.name || key;
   const icon = definition.icon || item?.image || "";
   const statText = kind === "gun" && GUNS[key]
-    ? `Attack ${formatNumber(getStoreGunAttack({ key }, quality))}`
+    ? getInventoryEffectLine({ key, quality, kind })
     : kind === "attachment" && attachments[key]
       ? getStoreAttachmentEffectText({ key }, quality)
       : getInventoryEffectLine({ key, quality, kind });
@@ -472,7 +473,7 @@ function renderInventoryDrawerDetail(entry) {
   const gun = GUNS[entry.key];
   const attachment = attachments[entry.key];
   const statText = isGun && gun
-    ? `Attack ${formatNumber(getStoreGunAttack({ key: entry.key }, entry.quality))}`
+    ? getInventoryEffectLine(entry)
     : isAttachment && attachment
       ? getStoreAttachmentEffectText({ key: entry.key }, entry.quality)
       : itemDef.core
@@ -936,8 +937,10 @@ function applyDamageToPlayer(totalDamage) {
   }
 
   if (remainingDamage > 0) {
-    hullDamage = Math.min(hull, remainingDamage);
-    hull = Math.max(0, hull - remainingDamage);
+    const armorReduction = Math.min(Number(armor || 0), 75) / 100;
+    const reducedHullDamage = Math.max(1, Math.round(remainingDamage * (1 - armorReduction)));
+    hullDamage = Math.min(hull, reducedHullDamage);
+    hull = Math.max(0, hull - reducedHullDamage);
   }
 
   if (shieldDamage > 0 && typeof playShieldHitSound === "function") playShieldHitSound();

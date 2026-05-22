@@ -91,6 +91,9 @@ function pulseLaserBurstToTarget(target) {
   const dy = endY - startY;
   const length = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  const weapon = typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null;
+  const projectileColor = weapon?.projectileColor || "#7fd6ff";
+  const beamHeight = weapon?.fireStyle === "heavy" ? 5 : weapon?.fireStyle === "sniper" ? 2 : weapon?.fireStyle === "rapid" ? 2 : 3;
 
   const makeBeam = (offsetY = 0, delay = 0) => {
     const beam = document.createElement("div");
@@ -98,6 +101,9 @@ function pulseLaserBurstToTarget(target) {
     beam.style.left = `${startX}px`;
     beam.style.top = `${startY + offsetY}px`;
     beam.style.width = `${length}px`;
+    beam.style.height = `${beamHeight}px`;
+    beam.style.background = `linear-gradient(90deg, transparent, ${projectileColor}, #ffffff, ${projectileColor}, transparent)`;
+    beam.style.boxShadow = `0 0 12px ${projectileColor}`;
     beam.style.transform = `rotate(${angle}deg)`;
     beam.style.animationDelay = `${delay}ms`;
     layer.appendChild(beam);
@@ -178,6 +184,65 @@ function showExplosionAtTarget(target) {
   setTimeout(() => blast.remove(), 650);
 }
 
+function normalizeTargetCombatLayers(target) {
+  if (!target) return target;
+
+  const fallbackMaxHp = Math.max(1, Number(target.maxHp || target.hp || HOSTILE_BOT_BASE_HP || 1));
+  if (!Number.isFinite(Number(target.shieldMax))) {
+    target.shieldMax = Math.max(0, Number(target.shield || 0));
+  }
+  if (!Number.isFinite(Number(target.shield))) {
+    target.shield = Math.max(0, Number(target.shieldMax || 0));
+  }
+  if (!Number.isFinite(Number(target.hullMax)) || Number(target.hullMax) <= 0) {
+    target.hullMax = Math.max(1, fallbackMaxHp - Number(target.shieldMax || 0));
+  }
+  if (!Number.isFinite(Number(target.hull))) {
+    target.hull = Math.min(Number(target.hullMax), Math.max(0, Number(target.hp || target.hullMax)));
+  }
+  if (!Number.isFinite(Number(target.armor))) {
+    target.armor = 0;
+  }
+
+  target.maxHp = Math.max(1, Number(target.shieldMax || 0) + Number(target.hullMax || 0));
+  target.hp = Math.max(0, Number(target.shield || 0) + Number(target.hull || 0));
+  return target;
+}
+
+function syncTargetHpFromLayers(target) {
+  if (!target) return;
+  target.shield = Math.max(0, Math.round(Number(target.shield || 0)));
+  target.hull = Math.max(0, Math.round(Number(target.hull || 0)));
+  target.hp = Math.max(0, target.shield + target.hull);
+  target.maxHp = Math.max(1, Math.round(Number(target.shieldMax || 0) + Number(target.hullMax || target.maxHp || 1)));
+}
+
+function applyWeaponDamageToTarget(target, weapon) {
+  normalizeTargetCombatLayers(target);
+
+  const accuracy = Number(weapon.accuracy || 100);
+  if (Math.random() * 100 > accuracy) {
+    return { hit: false, layer: "miss", amount: 0 };
+  }
+
+  const damage = weapon.damageLayers || { shield: Number(weapon.damage || 0), armor: Number(weapon.damage || 0), hull: Number(weapon.damage || 0) };
+
+  if (target.shield > 0) {
+    const shieldDamage = Math.max(1, Math.round(Number(damage.shield || 1)));
+    const applied = Math.min(target.shield, shieldDamage);
+    target.shield -= applied;
+    syncTargetHpFromLayers(target);
+    return { hit: true, layer: "shield", amount: applied };
+  }
+
+  const reduction = Math.min(Number(target.armor || 0), 75) / 100;
+  const finalHullDamage = Math.max(1, Math.round(Number(damage.hull || 1) * (1 - reduction)));
+  const applied = Math.min(target.hull, finalHullDamage);
+  target.hull -= applied;
+  syncTargetHpFromLayers(target);
+  return { hit: true, layer: "hull", amount: applied };
+}
+
 function performAttackCycle() {
   const target = getEngagedTargetEntity();
 
@@ -188,7 +253,8 @@ function performAttackCycle() {
 
   pulseLaserBurstToTarget(target);
   playPlayerLaserPulse();
-  target.hp = Math.max(0, target.hp - getEquippedWeapon().damage);
+  const weapon = getEquippedWeapon();
+  const result = applyWeaponDamageToTarget(target, weapon);
 
   if (target.hp <= 0) {
     showExplosionAtTarget(target);
@@ -218,7 +284,7 @@ function performAttackCycle() {
 
     disengageTarget(true);
     autoCollapseTargetPanel();
-  } else if (typeof playWeaponHitMarkerSound === "function") {
+  } else if (result.hit && typeof playWeaponHitMarkerSound === "function") {
     setTimeout(playWeaponHitMarkerSound, 130);
   }
 
@@ -306,6 +372,7 @@ function separateVisibleTargets(targets) {
 function renderTargetButton(target, options = {}) {
   const field = document.getElementById("asteroidField");
   if (!field) return;
+  normalizeTargetCombatLayers(target);
 
   const btn = document.createElement("button");
   btn.className = `${options.className || "asteroid-target"} visible`;
@@ -573,7 +640,12 @@ function respawnHostileBot(botId) {
 
   const spaceNodes = getHostileBotNodes();
   bot.node = spaceNodes[Math.floor(Math.random() * spaceNodes.length)];
-  bot.maxHp = HOSTILE_BOT_BASE_HP;
+  bot.shield = HOSTILE_BOT_BASE_SHIELD;
+  bot.shieldMax = HOSTILE_BOT_BASE_SHIELD;
+  bot.armor = HOSTILE_BOT_BASE_ARMOR;
+  bot.hull = HOSTILE_BOT_BASE_HP;
+  bot.hullMax = HOSTILE_BOT_BASE_HP;
+  bot.maxHp = bot.shieldMax + bot.hullMax;
   bot.hp = bot.maxHp;
   bot.alive = true;
   bot.x = Math.floor(Math.random() * 52) + 34;

@@ -682,9 +682,12 @@ function getCurrentShip() {
     price: 0,
     hull: 0,
     shield: 0,
+    armor: 0,
     cargo: 0,
     jumpRecharge: 0,
+    speed: 0,
     evasion: 0,
+    weaponSlots: 0,
     gunSlots: 0,
     attachmentSlots: 0
   };
@@ -697,11 +700,12 @@ function getAttachmentSlotLimit(shipId = currentShipId) {
 
 function getGunSlotLimit(shipId = currentShipId) {
   const ship = SHIPS[shipId];
-  return ship ? (ship.gunSlots ?? 1) : 0;
+  return ship ? (ship.weaponSlots ?? ship.gunSlots ?? 1) : 0;
 }
 
 function makeLoadoutEntry(key, quality = "standard") {
-  return { key, quality: ITEM_QUALITY_ORDER.includes(quality) ? quality : "standard" };
+  const normalizedQuality = typeof normalizeRarityId === "function" ? normalizeRarityId(quality) : quality;
+  return { key, quality: ITEM_QUALITY_ORDER.includes(normalizedQuality) ? normalizedQuality : "standard" };
 }
 
 function getEquipmentKey(entry) {
@@ -709,7 +713,9 @@ function getEquipmentKey(entry) {
 }
 
 function getEquipmentQuality(entry) {
-  return typeof entry === "string" ? "standard" : (ITEM_QUALITY_ORDER.includes(entry?.quality) ? entry.quality : "standard");
+  if (typeof entry === "string") return "standard";
+  const normalizedQuality = typeof normalizeRarityId === "function" ? normalizeRarityId(entry?.quality) : entry?.quality;
+  return ITEM_QUALITY_ORDER.includes(normalizedQuality) ? normalizedQuality : "standard";
 }
 
 function isAttachmentEntry(entry) {
@@ -768,16 +774,21 @@ function getShipLoadout(shipId = selectedHangarShipId) {
 function getShipStats(shipId = currentShipId) {
   const ship = SHIPS[shipId];
   if (!ship) {
-    return { cargo: 0, hull: 0, shield: 0, jumpRecharge: 0, evasion: 0 };
+    return { cargo: 0, hull: 0, hullMax: 0, shield: 0, shieldMax: 0, shieldRegen: 0, armor: 0, speed: 0, jumpRecharge: 0, evasion: 0, weaponSlots: 0, attachmentSlots: 0 };
   }
   const loadout = getShipLoadout(shipId);
 
   const stats = {
     cargo: Number(ship.baseCargo ?? ship.cargo ?? 0),
     hull: Number(ship.baseHull ?? ship.hull ?? 0),
+    armor: Number(ship.baseArmor ?? ship.armor ?? 0),
     shield: Number(ship.baseShield ?? ship.shield ?? 0),
+    shieldRegen: Number(ship.baseShieldRegen ?? ship.shieldRegen ?? SHIELD_REGEN_RATE ?? 0),
     jumpRecharge: Number(ship.baseJumpRecharge ?? ship.jumpRecharge ?? 0),
-    evasion: Number(ship.baseEvasion ?? ship.evasion ?? 0)
+    speed: Number(ship.baseSpeed ?? ship.speed ?? ship.jumpRecharge ?? 0),
+    evasion: Number(ship.baseEvasion ?? ship.evasion ?? 0),
+    weaponSlots: getGunSlotLimit(shipId),
+    attachmentSlots: getAttachmentSlotLimit(shipId)
   };
 
   loadout.attachments.forEach(entry => {
@@ -796,8 +807,13 @@ function getShipStats(shipId = currentShipId) {
 
   stats.cargo = Math.max(0, Math.round(stats.cargo));
   stats.hull = Math.max(0, Math.round(stats.hull));
+  stats.hullMax = stats.hull;
   stats.shield = Math.max(0, Math.round(stats.shield));
+  stats.shieldMax = stats.shield;
+  stats.shieldRegen = Math.max(0, Math.round(stats.shieldRegen));
+  stats.armor = Math.max(0, Math.round(stats.armor));
   stats.jumpRecharge = Math.max(0, Math.round(stats.jumpRecharge));
+  stats.speed = Math.max(0, Math.round(stats.speed));
   stats.evasion = Math.max(0, Math.min(40, Math.round(stats.evasion)));
   return stats;
 }
@@ -812,6 +828,20 @@ function getEvasionDamageReduction() {
 
 function getMitigatedIncomingDamage(totalDamage) {
   return Math.max(0, Math.round(totalDamage * (1 - getEvasionDamageReduction())));
+}
+
+function getWeaponLayerDamage(gun) {
+  if (!gun) return { shield: 0, armor: 0, hull: 0 };
+  if (gun.damage && typeof gun.damage === "object") {
+    return {
+      shield: Math.max(1, Number(gun.damage.shield || 0)),
+      armor: Math.max(1, Number(gun.damage.armor || gun.damage.armour || 0)),
+      hull: Math.max(1, Number(gun.damage.hull || 0))
+    };
+  }
+
+  const legacyDamage = Math.max(1, Number(gun.damage || gun.legacyDamage || 0));
+  return { shield: legacyDamage, armor: legacyDamage, hull: legacyDamage };
 }
 
 function getEquippedWeapon(shipId = currentShipId) {
@@ -829,13 +859,31 @@ function getEquippedWeapon(shipId = currentShipId) {
     return {
       name: "Unarmed",
       damage: 0,
+      damageLayers: { shield: 0, armor: 0, hull: 0 },
       speed: 1600,
+      fireRate: 0,
+      accuracy: 0,
+      range: 0,
+      projectileColor: "#7fd6ff",
+      fireStyle: "pulse",
       count: 0
     };
   }
 
-  const damage = equippedGuns.reduce((sum, item) => sum + Math.round(item.gun.damage * getItemStatMultiplier(item.quality)), 0);
+  const damageLayers = equippedGuns.reduce((sum, item) => {
+    const multiplier = getItemStatMultiplier(item.quality);
+    const base = getWeaponLayerDamage(item.gun);
+    sum.shield += Math.round(base.shield * multiplier);
+    sum.armor += Math.round(base.armor * multiplier);
+    sum.hull += Math.round(base.hull * multiplier);
+    return sum;
+  }, { shield: 0, armor: 0, hull: 0 });
+  const damage = Math.round((damageLayers.shield + damageLayers.armor + damageLayers.hull) / 3);
   const speed = Math.max(...equippedGuns.map(item => item.gun.speed));
+  const fireRate = Number((1000 / speed).toFixed(2));
+  const accuracy = Math.round(equippedGuns.reduce((sum, item) => sum + Number(item.gun.accuracy || 90), 0) / equippedGuns.length);
+  const range = Math.max(...equippedGuns.map(item => Number(item.gun.range || 0)));
+  const primaryGun = equippedGuns[0]?.gun || {};
   const counts = {};
 
   equippedGuns.forEach(item => {
@@ -850,7 +898,13 @@ function getEquippedWeapon(shipId = currentShipId) {
   return {
     name,
     damage,
+    damageLayers,
     speed,
+    fireRate,
+    accuracy,
+    range,
+    projectileColor: primaryGun.projectileColor || "#7fd6ff",
+    fireStyle: primaryGun.fireStyle || "pulse",
     count: equippedGuns.length
   };
 }
@@ -912,6 +966,7 @@ function applyShipStats(refill = false) {
   const stats = getShipStats();
   hullMax = stats.hull;
   shieldMax = stats.shield;
+  armor = stats.armor;
   evasion = stats.evasion;
   shieldEnabled = true;
 

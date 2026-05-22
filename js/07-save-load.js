@@ -53,6 +53,7 @@ function buildSaveState(options = {}) {
     selectedFleetShipId,
     currentShipId,
     ownedShips,
+    armor,
     hull,
     shield,
     shieldEnabled,
@@ -409,6 +410,7 @@ function applyLoadedGameState(rawSaved) {
   }
 
   hull = Number.isFinite(Number(saved.hull)) ? Number(saved.hull) : hull;
+  armor = Number.isFinite(Number(saved.armor)) ? Number(saved.armor) : armor;
   shield = Number.isFinite(Number(saved.shield)) ? Number(saved.shield) : shield;
   shieldEnabled = true;
   jumpCharge = Number.isFinite(Number(saved.jumpCharge)) ? Number(saved.jumpCharge) : jumpCharge;
@@ -493,6 +495,7 @@ function ensureDebugToolsPanel() {
     <div class="debug-tools-grid">
       <button type="button" onclick="debugSkipTutorial()">Skip Tutorial</button>
       <button type="button" onclick="debugGrantStarter()">Starter Ship</button>
+      <button type="button" onclick="debugGrantDemoWeapons()">Demo Weapons</button>
       <button type="button" onclick="debugGrantCredits()">+50K CR</button>
       <button type="button" onclick="debugOpenBounty()">Bounty Board</button>
       <button type="button" onclick="debugResetSave()">Reset Save</button>
@@ -533,6 +536,30 @@ function debugGrantCredits() {
   credits += 50000;
   if (typeof addHudToast === "function") addHudToast("Debug credits added.");
   refreshDebugToolsUI("Added CR 50,000.");
+}
+
+function debugGrantDemoWeapons() {
+  const demoWeapons = [
+    createWeaponItem("pulseLaser", "standard"),
+    createWeaponItem("repeater", "standard"),
+    createWeaponItem("ionBlaster", "refined"),
+    createWeaponItem("ripperGun", "advanced")
+  ].filter(Boolean);
+
+  demoWeapons.forEach(item => {
+    if (item.rarityId === "standard") {
+      ownedGuns[item.familyId] = (ownedGuns[item.familyId] || 0) + 1;
+    } else {
+      inventoryItems.push({
+        id: item.uid,
+        key: item.familyId,
+        quality: item.rarityId
+      });
+    }
+  });
+
+  if (typeof addHudToast === "function") addHudToast("Debug demo weapons added.");
+  refreshDebugToolsUI("Added demo weapons.");
 }
 
 function debugOpenBounty() {
