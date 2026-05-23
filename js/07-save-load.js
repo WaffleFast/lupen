@@ -69,6 +69,7 @@ function buildSaveState(options = {}) {
     dailyBountyContracts,
     selectedBountyContractId,
     storeDailyPurchases,
+    upgradeMaterials,
     playerProgress
   };
 }
@@ -350,6 +351,7 @@ function applyLoadedGameState(rawSaved) {
 
   credits = saved.credits ?? credits;
   playerProgress = normalizePlayerProgress(saved.playerProgress || playerProgress);
+  upgradeMaterials = normalizeUpgradeMaterials(saved.upgradeMaterials);
   cargoCostBasis = saved.cargoCostBasis ?? cargoCostBasis;
 
   ownedShips = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : ownedShips;
@@ -496,6 +498,7 @@ function ensureDebugToolsPanel() {
       <button type="button" onclick="debugSkipTutorial()">Skip Tutorial</button>
       <button type="button" onclick="debugGrantStarter()">Starter Ship</button>
       <button type="button" onclick="debugGrantDemoWeapons()">Demo Weapons</button>
+      <button type="button" onclick="debugGrantLupenCore()">Lupen Core</button>
       <button type="button" onclick="debugGrantCredits()">+50K CR</button>
       <button type="button" onclick="debugOpenBounty()">Bounty Board</button>
       <button type="button" onclick="debugResetSave()">Reset Save</button>
@@ -536,6 +539,12 @@ function debugGrantCredits() {
   credits += 50000;
   if (typeof addHudToast === "function") addHudToast("Debug credits added.");
   refreshDebugToolsUI("Added CR 50,000.");
+}
+
+function debugGrantLupenCore() {
+  inventoryItems.push(createInventoryDrop("lupenCore"));
+  if (typeof addHudToast === "function") addHudToast("Debug Lupen Core added.");
+  refreshDebugToolsUI("Added 1 Lupen Core.");
 }
 
 function debugGrantDemoWeapons() {

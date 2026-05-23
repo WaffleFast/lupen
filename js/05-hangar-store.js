@@ -89,7 +89,7 @@ function buildVaultEntries() {
 
   (inventoryItems || []).forEach(item => {
     if (!item || !itemDefinitions[item.key]) return;
-    const entry = ensureEntry(item.key, item.quality || "standard");
+    const entry = ensureEntry(item.key, item.key === "lupenCore" ? LUPEN_CORE_QUALITY : (item.quality || "standard"));
     if (!entry) return;
     entry.count += 1;
     entry.storedCount += 1;
@@ -144,6 +144,115 @@ function getSelectedVaultEntry() {
   return entries.find(entry => entry.groupKey === selectedVaultGroupKey) || null;
 }
 
+function getNextItemQuality(quality = "standard") {
+  if (quality === LUPEN_CORE_QUALITY) return null;
+  const normalized = typeof normalizeRarityId === "function" ? normalizeRarityId(quality) : quality;
+  const index = ITEM_QUALITY_ORDER.indexOf(normalized);
+  if (index < 0 || index >= ITEM_QUALITY_ORDER.length - 1) return null;
+  return ITEM_QUALITY_ORDER[index + 1];
+}
+
+function getLupenCoreCount() {
+  return inventoryItems.filter(item => item.key === "lupenCore").length;
+}
+
+function getUpgradeCoreCost(fromQuality = "standard") {
+  const nextQuality = getNextItemQuality(fromQuality);
+  const costByNextQuality = {
+    refined: 1,
+    advanced: 2,
+    elite: 3,
+    legendary: 5,
+    godlike: 8
+  };
+  return nextQuality ? (costByNextQuality[nextQuality] || 1) : 0;
+}
+
+function removeLupenCores(quantity) {
+  let remaining = Math.max(0, Number(quantity) || 0);
+  if (remaining <= 0) return 0;
+
+  const kept = [];
+  inventoryItems.forEach(item => {
+    if (remaining > 0 && item.key === "lupenCore") {
+      remaining -= 1;
+      return;
+    }
+    kept.push(item);
+  });
+
+  inventoryItems = kept;
+  return quantity - remaining;
+}
+
+function findEquippedLoadoutEntry(key, quality, categoryKey) {
+  const loadoutKind = categoryKey === "guns" ? "guns" : "attachments";
+  for (const [shipId, loadout] of Object.entries(shipLoadouts || {})) {
+    const list = loadout?.[loadoutKind] || [];
+    const index = list.findIndex(entry => getEquipmentKey(entry) === key && getEquipmentQuality(entry) === quality);
+    if (index >= 0) return { shipId, list, index };
+  }
+  return null;
+}
+
+function upgradeSelectedVaultItem() {
+  const entry = getSelectedVaultEntry();
+  if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return;
+
+  const nextQuality = getNextItemQuality(entry.quality);
+  if (!nextQuality) {
+    alert("This item is already Godlike.");
+    return;
+  }
+
+  const coreCost = getUpgradeCoreCost(entry.quality);
+  if (getLupenCoreCount() < coreCost) {
+    alert(`Not enough Lupen Cores. This upgrade needs ${formatNumber(coreCost)}.`);
+    return;
+  }
+
+  const isGun = entry.categoryKey === "guns";
+  let upgraded = false;
+
+  if (entry.quality === "standard") {
+    const store = isGun ? ownedGuns : ownedAttachments;
+    if ((store[entry.key] || 0) > 0) {
+      store[entry.key] -= 1;
+      inventoryItems.push({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: entry.key, quality: nextQuality });
+      upgraded = true;
+    }
+  } else if (removeOneInventoryItem(entry.key, entry.quality)) {
+    inventoryItems.push({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: entry.key, quality: nextQuality });
+    upgraded = true;
+  }
+
+  if (!upgraded) {
+    const equipped = findEquippedLoadoutEntry(entry.key, entry.quality, entry.categoryKey);
+    if (equipped) {
+      equipped.list[equipped.index] = makeLoadoutEntry(entry.key, nextQuality);
+      upgraded = true;
+      if (!isGun && equipped.shipId === currentShipId) applyShipStats(false);
+      if (isGun && equipped.shipId === currentShipId && engageTimer) {
+        clearInterval(engageTimer);
+        engageTimer = null;
+      }
+    }
+  }
+
+  if (!upgraded) {
+    alert("No upgradeable copy is available.");
+    return;
+  }
+
+  removeLupenCores(coreCost);
+  selectedVaultGroupKey = `${entry.key}__${nextQuality}`;
+  addActivityLog(`${entry.name} upgraded to ${titleCaseQuality(nextQuality)} using ${formatNumber(coreCost)} Lupen Core${coreCost === 1 ? "" : "s"}.`);
+  renderHangarVault();
+  renderHangarOverview();
+  updateHudDock();
+  saveGame();
+}
+
 function renderVaultFilters() {
   const bar = document.getElementById("vaultFilterBar");
   if (!bar) return;
@@ -181,14 +290,8 @@ function getVaultEntryStats(entry) {
   } else if (item.kind === "attachment") {
     stats.push({ label: "Effect", value: getStoreAttachmentEffectText(item, entry.quality) });
   } else if (item.kind === "core") {
-    const corePurpose = {
-      standard: "Base upgrade",
-      unique: "Improved upgrade",
-      elite: "High-grade upgrade",
-      legendary: "Rare upgrade",
-      godlike: "Top-tier upgrade"
-    };
-    stats.push({ label: "Use", value: corePurpose[entry.quality] || "Upgrade core" });
+    stats.push({ label: "Tier", value: "God-tier" });
+    stats.push({ label: "Use", value: "Upgrade equipment" });
   }
 
   return stats.slice(0, item.kind === "gun" ? 4 : 3);
@@ -208,7 +311,7 @@ function getVaultTooltipHtml(entry) {
   const qualityLabel = titleCaseQuality(quality);
   const statRows = [
     { label: "Owned", value: formatNumber(entry.count || 0) },
-    { label: "Type", value: "Core" },
+    { label: "Tier", value: "God-tier" },
     { label: "Use", value: "Upgrade" }
   ];
   const statHtml = statRows.map(row => `
@@ -278,6 +381,26 @@ function renderVaultDetail() {
   }
 
   const stats = getVaultEntryStats(entry);
+  const canUpgrade = ["guns", "attachments"].includes(entry.categoryKey);
+  const upgradePanel = canUpgrade ? `
+    <div class="vault-upgrade-panel">
+      <div>
+        <span>Upgrade Forge</span>
+        <strong>Level and quality upgrades are handled in the Forge</strong>
+      </div>
+      <button type="button" onclick="openUpgradeForgeFromVault('${escapeJsString(entry.groupKey)}')">
+        Open Forge
+      </button>
+    </div>
+  ` : entry.categoryKey === "cores" ? `
+    <div class="vault-upgrade-panel passive">
+      <div>
+        <span>Lupen Cores</span>
+        <strong>Used to upgrade guns and equipment</strong>
+      </div>
+    </div>
+  ` : "";
+
   panel.innerHTML = `
     <div class="store-detail-shell store-quality-${entry.quality} compact-store-detail simplified-store-detail vault-detail-shell">
       <div class="store-detail-visual quality-${entry.quality}">
@@ -294,6 +417,7 @@ function renderVaultDetail() {
           </div>
         `).join("")}
       </div>
+      ${upgradePanel}
     </div>
   `;
 }
@@ -818,7 +942,7 @@ function getInventoryEntriesForCategory(categoryKey) {
 
   (inventoryItems || []).forEach(item => {
     if (!item || !itemDefinitions[item.key]) return;
-    addEntry(item.key, item.quality || "standard", 1, "inventory");
+    addEntry(item.key, item.key === "lupenCore" ? LUPEN_CORE_QUALITY : (item.quality || "standard"), 1, "inventory");
   });
 
   return Array.from(grouped.values()).sort((a, b) => {
@@ -1070,6 +1194,7 @@ function renderGunShop() {
   box.innerHTML = "";
 
   Object.entries(GUNS).forEach(([key, item]) => {
+    if (item.hiddenFromStore) return;
     const canAfford = credits >= item.price;
     const owned = ownedGuns[key] || 0;
     const damage = getGunDamageForQuality(item, "standard");
@@ -1350,6 +1475,7 @@ function getStoreCatalogItems() {
   const items = [];
 
   Object.entries(GUNS).forEach(([key, item]) => {
+    if (item.hiddenFromStore) return;
     const damageRows = getWeaponLayerStatRows(item, "standard");
     items.push({
       id: `gun:${key}`,
@@ -1944,15 +2070,17 @@ function equipAttachmentFromInventory(key, quality = "standard", source = "owned
     return;
   }
 
+  let level = 1;
   if (source === "owned" && quality === "standard") {
     if ((ownedAttachments[key] || 0) <= 0) return;
     ownedAttachments[key] -= 1;
   } else {
     const removed = removeOneInventoryItem(key, quality);
     if (!removed) return;
+    level = Math.max(1, Number(removed.level || 1));
   }
 
-  loadout.attachments.push(makeLoadoutEntry(key, quality));
+  loadout.attachments.push(makeLeveledLoadoutEntry(key, quality, level));
 
   if (selectedHangarShipId === currentShipId) {
     applyShipStats(true);
@@ -1974,14 +2102,16 @@ function removeAttachment(index) {
   if (removed) {
     const key = getEquipmentKey(removed);
     const quality = getEquipmentQuality(removed);
+    const level = getEquipmentLevel(removed);
 
-    if (quality === "standard") {
+    if (quality === "standard" && level <= 1) {
       ownedAttachments[key] = (ownedAttachments[key] || 0) + 1;
     } else {
       inventoryItems.push({
         id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         key,
-        quality
+        quality,
+        level
       });
     }
   }
@@ -2006,15 +2136,17 @@ function equipGunFromInventory(key, quality = "standard", source = "owned") {
     return;
   }
 
+  let level = 1;
   if (source === "owned" && quality === "standard") {
     if ((ownedGuns[key] || 0) <= 0) return;
     ownedGuns[key] -= 1;
   } else {
     const removed = removeOneInventoryItem(key, quality);
     if (!removed) return;
+    level = Math.max(1, Number(removed.level || 1));
   }
 
-  loadout.guns.push(makeLoadoutEntry(key, quality));
+  loadout.guns.push(makeLeveledLoadoutEntry(key, quality, level));
 
   if (engageTimer && selectedHangarShipId === currentShipId) {
     clearInterval(engageTimer);
@@ -2035,14 +2167,16 @@ function removeGun(index) {
   if (removed) {
     const key = getEquipmentKey(removed);
     const quality = getEquipmentQuality(removed);
+    const level = getEquipmentLevel(removed);
 
-    if (quality === "standard") {
+    if (quality === "standard" && level <= 1) {
       ownedGuns[key] = (ownedGuns[key] || 0) + 1;
     } else {
       inventoryItems.push({
         id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         key,
-        quality
+        quality,
+        level
       });
     }
   }

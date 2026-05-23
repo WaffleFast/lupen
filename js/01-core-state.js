@@ -2,7 +2,7 @@
 const STORAGE_GAME_KEY = "lupenGameState";
 const STORAGE_VAULT_RESET_KEY = "lupenVaultClearedForIntegratedHangarV2";
 const SAVE_SCHEMA_ID = "lupen-single-player-save";
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 const SAVE_EXPORT_VERSION = 1;
 
 const mineralKeys = ["Iron", "Copper", "Cobalt", "Titanium", "Crystal Shards", "Xenon Gas", "Iridium", "Platinum", "Uranium", "Dark Matter Residue"];
@@ -265,6 +265,8 @@ function migrateSavedGame(saved) {
       : migrated.homePlanet;
   }
 
+  migrated.upgradeMaterials = normalizeUpgradeMaterials(migrated.upgradeMaterials);
+
   migrated.saveVersion = SAVE_VERSION;
   migrated.migratedFromVersion = fromVersion === SAVE_VERSION ? migrated.migratedFromVersion : fromVersion;
   return migrated;
@@ -418,9 +420,9 @@ const GUNS = Object.fromEntries(
 );
 
 // Legacy weapon keys stay resolvable for old saves and existing localStorage loadouts.
-GUNS.heavyPulseLaser = { ...createWeaponCatalogDefinition("heavyLance"), key: "heavyPulseLaser", familyId: "heavyLance" };
-GUNS.pulseRelay = { ...createWeaponCatalogDefinition("pulseLaser"), key: "pulseRelay", familyId: "pulseLaser", name: "Pulse Relay" };
-GUNS.targetingArray = { ...createWeaponCatalogDefinition("voidRail"), key: "targetingArray", familyId: "voidRail", name: "Targeting Array" };
+GUNS.heavyPulseLaser = { ...createWeaponCatalogDefinition("heavyLance"), key: "heavyPulseLaser", familyId: "heavyLance", hiddenFromStore: true };
+GUNS.pulseRelay = { ...createWeaponCatalogDefinition("pulseLaser"), key: "pulseRelay", familyId: "pulseLaser", name: "Pulse Relay", hiddenFromStore: true };
+GUNS.targetingArray = { ...createWeaponCatalogDefinition("voidRail"), key: "targetingArray", familyId: "voidRail", name: "Targeting Array", hiddenFromStore: true };
 
 let currentNode = "Asteron Prime";
 let lastPlanetNode = "Asteron Prime";
@@ -668,6 +670,46 @@ const ITEM_QUALITY_LABELS = Object.fromEntries(
   Object.entries(ITEM_RARITIES || {}).map(([id, rarity]) => [id, rarity.name])
 );
 ITEM_QUALITY_LABELS.unique = "Refined";
+const LUPEN_CORE_QUALITY = "core";
+const FUTURE_ASTEROID_LUPEN_CORE_DROP_CHANCE = 1 / 5000;
+const MAX_ITEM_LEVEL = 15;
+
+const upgradeMaterialDefinitions = {
+  weaponParts: {
+    name: "Weapon Upgrade Parts",
+    shortLabel: "WP",
+    icon: "assets/items/weapon-upgrade-parts.svg",
+    description: "Common weapon components used to raise gun levels."
+  },
+  equipmentModules: {
+    name: "Equipment Upgrade Modules",
+    shortLabel: "EM",
+    icon: "assets/items/equipment-upgrade-modules.svg",
+    description: "Modular systems used to tune ship equipment."
+  },
+  techFragments: {
+    name: "Tech Fragments",
+    shortLabel: "TF",
+    icon: "assets/items/tech-fragments.svg",
+    description: "Refined fragments used to stabilise higher upgrades."
+  }
+};
+
+function createDefaultUpgradeMaterials() {
+  return {
+    weaponParts: 260,
+    equipmentModules: 120,
+    techFragments: 420
+  };
+}
+
+function normalizeUpgradeMaterials(materials) {
+  const defaults = createDefaultUpgradeMaterials();
+  const safe = materials && typeof materials === "object" ? materials : {};
+  return Object.fromEntries(
+    Object.keys(defaults).map(key => [key, Math.max(0, Math.floor(Number(safe[key] ?? defaults[key] ?? 0)))])
+  );
+}
 
 const itemDefinitions = {
   lupenCore: { name: "Lupen Core", shortLabel: "LC", category: "Core", icon: "assets/items/lupen-core.png", core: true, sellValue: 1500 },
@@ -697,14 +739,21 @@ Object.entries(GUNS).forEach(([key, gun]) => {
 const botDropPool = ["cargoPod", "hullBooster", "jumpDrive", "shieldBooster", "evasionMatrix", "pulseLaser", "repeater", "ionBlaster", "meltCannon", "ripperGun", "heavyLance", "voidRail"];
 
 let inventoryItems = [];
+let upgradeMaterials = createDefaultUpgradeMaterials();
 let storeFilter = "all";
 let selectedStoreItemId = null;
 let selectedStoreQuality = "standard";
 let storeDailyPurchases = {};
 let hangarVaultFilter = "all";
 let selectedVaultGroupKey = null;
+let selectedForgeItemId = null;
+let forgeUpgradeMode = "quality";
+let forgeMaterialAllocations = {};
+let forgeUseLupenCore = false;
+let forgeAnimating = false;
 
 function titleCaseQuality(value) {
+  if (value === LUPEN_CORE_QUALITY) return "Lupen Core";
   const normalized = typeof normalizeRarityId === "function" ? normalizeRarityId(value) : value;
   return ITEM_QUALITY_LABELS[normalized] || "Standard";
 }
@@ -718,18 +767,11 @@ function pickWeightedQuality() {
   return "godlike";
 }
 
-function pickCoreQuality() {
-  const roll = Math.random();
-  if (roll < 0.62) return "elite";
-  if (roll < 0.92) return "legendary";
-  return "godlike";
-}
-
 function pickBotLootKey() {
   const roll = Math.random();
-  if (roll < 0.06) return "lupenCore";
-  if (roll < 0.16) return "heavyLance";
-  if (roll < 0.23) return "ripperGun";
+  // Lupen Cores are reserved for future asteroid/material zones and should be extraordinarily rare there.
+  if (roll < 0.10) return "heavyLance";
+  if (roll < 0.17) return "ripperGun";
   if (roll < 0.38) return "shieldBooster";
   if (roll < 0.52) return "evasionMatrix";
   if (roll < 0.64) return "jumpDrive";
@@ -739,14 +781,15 @@ function pickBotLootKey() {
 }
 
 function pickItemQuality(itemKey) {
-  return itemKey === "lupenCore" ? pickCoreQuality() : pickWeightedQuality();
+  return itemKey === "lupenCore" ? LUPEN_CORE_QUALITY : pickWeightedQuality();
 }
 
 function createInventoryDrop(itemKey, forcedQuality = null) {
   return {
     id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     key: itemKey,
-    quality: forcedQuality || pickItemQuality(itemKey)
+    quality: itemKey === "lupenCore" ? LUPEN_CORE_QUALITY : (forcedQuality || pickItemQuality(itemKey)),
+    level: itemKey === "lupenCore" ? undefined : 1
   };
 }
 
@@ -772,11 +815,14 @@ function normalizeInventoryItems(items) {
   return items
     .map((item, index) => {
       if (!item || !itemDefinitions[item.key]) return null;
-      const quality = typeof normalizeRarityId === "function" ? normalizeRarityId(item.quality) : (ITEM_QUALITY_ORDER.includes(item.quality) ? item.quality : "standard");
+      const quality = item.key === "lupenCore"
+        ? LUPEN_CORE_QUALITY
+        : (typeof normalizeRarityId === "function" ? normalizeRarityId(item.quality) : (ITEM_QUALITY_ORDER.includes(item.quality) ? item.quality : "standard"));
       return {
         id: item.id || `item-restored-${index}-${Date.now()}`,
         key: item.key,
-        quality
+        quality,
+        level: item.key === "lupenCore" ? undefined : Math.min(MAX_ITEM_LEVEL, Math.max(1, Math.floor(Number(item.level || 1))))
       };
     })
     .filter(Boolean);
@@ -800,11 +846,12 @@ function groupInventoryItems(items) {
   (items || []).forEach(item => {
     const definition = itemDefinitions[item.key];
     if (!definition) return;
-    const groupKey = `${item.key}__${item.quality}`;
+    const displayQuality = item.key === "lupenCore" ? LUPEN_CORE_QUALITY : item.quality;
+    const groupKey = `${item.key}__${displayQuality}`;
     if (!grouped.has(groupKey)) {
       grouped.set(groupKey, {
         key: item.key,
-        quality: item.quality,
+        quality: displayQuality,
         count: 0,
         name: definition.name,
         shortLabel: definition.shortLabel,

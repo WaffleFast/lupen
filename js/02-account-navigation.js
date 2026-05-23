@@ -705,7 +705,7 @@ function getGunSlotLimit(shipId = currentShipId) {
 
 function makeLoadoutEntry(key, quality = "standard") {
   const normalizedQuality = typeof normalizeRarityId === "function" ? normalizeRarityId(quality) : quality;
-  return { key, quality: ITEM_QUALITY_ORDER.includes(normalizedQuality) ? normalizedQuality : "standard" };
+  return { key, quality: ITEM_QUALITY_ORDER.includes(normalizedQuality) ? normalizedQuality : "standard", level: 1 };
 }
 
 function getEquipmentKey(entry) {
@@ -718,6 +718,18 @@ function getEquipmentQuality(entry) {
   return ITEM_QUALITY_ORDER.includes(normalizedQuality) ? normalizedQuality : "standard";
 }
 
+function getEquipmentLevel(entry) {
+  if (typeof entry === "string") return 1;
+  return Math.min(MAX_ITEM_LEVEL, Math.max(1, Math.floor(Number(entry?.level || 1))));
+}
+
+function makeLeveledLoadoutEntry(key, quality = "standard", level = 1) {
+  return {
+    ...makeLoadoutEntry(key, quality),
+    level: Math.min(MAX_ITEM_LEVEL, Math.max(1, Math.floor(Number(level || 1))))
+  };
+}
+
 function isAttachmentEntry(entry) {
   return Boolean(attachments[getEquipmentKey(entry)]);
 }
@@ -726,9 +738,13 @@ function isGunEntry(entry) {
   return Boolean(GUNS[getEquipmentKey(entry)]);
 }
 
-function getScaledAttachmentEffect(key, quality = "standard") {
+function getItemLevelMultiplier(level = 1) {
+  return 1 + Math.max(0, Math.min(MAX_ITEM_LEVEL, Math.floor(Number(level || 1))) - 1) * 0.045;
+}
+
+function getScaledAttachmentEffect(key, quality = "standard", level = 1) {
   const attachment = attachments[key];
-  const multiplier = getItemStatMultiplier(quality);
+  const multiplier = getItemStatMultiplier(quality) * getItemLevelMultiplier(level);
   const effect = { cargo: 0, hull: 0, shield: 0, jumpRecharge: 0, evasion: 0 };
 
   if (!attachment) return effect;
@@ -745,22 +761,22 @@ function normalizeShipLoadout(loadout, shipId) {
 
   if (Array.isArray(loadout)) {
     return {
-      attachments: loadout.filter(isAttachmentEntry).map(entry => makeLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry))),
-      guns: ship.defaultGun ? [makeLoadoutEntry(ship.defaultGun, "standard")] : []
+      attachments: loadout.filter(isAttachmentEntry).map(entry => makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry))),
+      guns: ship.defaultGun ? [makeLeveledLoadoutEntry(ship.defaultGun, "standard", 1)] : []
     };
   }
 
   const normalized = {
     attachments: Array.isArray(loadout?.attachments)
-      ? loadout.attachments.filter(isAttachmentEntry).map(entry => makeLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry)))
+      ? loadout.attachments.filter(isAttachmentEntry).map(entry => makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry)))
       : [],
     guns: Array.isArray(loadout?.guns)
-      ? loadout.guns.filter(isGunEntry).map(entry => makeLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry)))
+      ? loadout.guns.filter(isGunEntry).map(entry => makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry)))
       : []
   };
 
   if (loadout === undefined || loadout === null) {
-    normalized.guns = ship.defaultGun ? [makeLoadoutEntry(ship.defaultGun, "standard")] : [];
+    normalized.guns = ship.defaultGun ? [makeLeveledLoadoutEntry(ship.defaultGun, "standard", 1)] : [];
   }
 
   return normalized;
@@ -794,10 +810,11 @@ function getShipStats(shipId = currentShipId) {
   loadout.attachments.forEach(entry => {
     const key = getEquipmentKey(entry);
     const quality = getEquipmentQuality(entry);
+    const level = getEquipmentLevel(entry);
     const attachment = attachments[key];
     if (!attachment) return;
 
-    const effect = getScaledAttachmentEffect(key, quality);
+    const effect = getScaledAttachmentEffect(key, quality, level);
     stats.cargo += Number(effect.cargo || 0);
     stats.hull += Number(effect.hull || 0);
     stats.shield += Number(effect.shield || 0);
@@ -850,8 +867,9 @@ function getEquippedWeapon(shipId = currentShipId) {
     .map(entry => {
       const key = getEquipmentKey(entry);
       const quality = getEquipmentQuality(entry);
+      const level = getEquipmentLevel(entry);
       const gun = GUNS[key];
-      return gun ? { key, quality, gun } : null;
+      return gun ? { key, quality, level, gun } : null;
     })
     .filter(Boolean);
 
@@ -871,7 +889,7 @@ function getEquippedWeapon(shipId = currentShipId) {
   }
 
   const damageLayers = equippedGuns.reduce((sum, item) => {
-    const multiplier = getItemStatMultiplier(item.quality);
+    const multiplier = getItemStatMultiplier(item.quality) * getItemLevelMultiplier(item.level);
     const base = getWeaponLayerDamage(item.gun);
     sum.shield += Math.round(base.shield * multiplier);
     sum.armor += Math.round(base.armor * multiplier);
@@ -887,7 +905,8 @@ function getEquippedWeapon(shipId = currentShipId) {
   const counts = {};
 
   equippedGuns.forEach(item => {
-    const label = item.quality === "standard" ? item.gun.name : `${titleCaseQuality(item.quality)} ${item.gun.name}`;
+    const qualityLabel = item.quality === "standard" ? item.gun.name : `${titleCaseQuality(item.quality)} ${item.gun.name}`;
+    const label = item.level > 1 ? `${qualityLabel} Lv ${item.level}` : qualityLabel;
     counts[label] = (counts[label] || 0) + 1;
   });
 
@@ -1092,6 +1111,23 @@ function openHangar() {
   renderHangar();
   showScreen("hangarScreen");
   showHangarSection(hasActiveShip() ? "overview" : "shipyard");
+}
+
+function openUpgradeForge(options = {}) {
+  if (!sectorNodes[currentNode] || sectorNodes[currentNode].type !== "planet") {
+    currentNode = lastPlanetNode || "Asteron Prime";
+  }
+
+  if (options.selectedItemId) selectedForgeItemId = options.selectedItemId;
+  if (typeof renderUpgradeForge === "function") renderUpgradeForge();
+  showScreen("upgradeForgeScreen");
+}
+
+function openUpgradeForgeFromVault(groupKey = selectedVaultGroupKey) {
+  if (groupKey && typeof getForgeItemIdFromVaultGroup === "function") {
+    selectedForgeItemId = getForgeItemIdFromVaultGroup(groupKey);
+  }
+  openUpgradeForge({ selectedItemId: selectedForgeItemId });
 }
 
 function returnToHub() {
