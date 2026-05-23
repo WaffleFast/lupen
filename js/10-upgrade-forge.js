@@ -184,7 +184,31 @@ function selectForgeItem(itemId) {
   selectedForgeItemId = itemId;
   forgeMaterialAllocations = {};
   forgeUseLupenCore = false;
+  forgeInventoryPickerOpen = false;
   renderUpgradeForge();
+}
+
+function openForgeInventoryPicker() {
+  forgeInventoryPickerOpen = true;
+  renderUpgradeForge();
+}
+
+function closeForgeInventoryPicker() {
+  forgeInventoryPickerOpen = false;
+  renderUpgradeForge();
+}
+
+function setForgeInventoryPickerFilter(filter = "all") {
+  forgeInventoryPickerFilter = ["all", "weapons", "equipment", "equipped", "vault"].includes(filter) ? filter : "all";
+  renderUpgradeForge();
+}
+
+function getForgePickerItems(items) {
+  if (forgeInventoryPickerFilter === "weapons") return items.filter(item => item.categoryKey === "guns");
+  if (forgeInventoryPickerFilter === "equipment") return items.filter(item => item.categoryKey === "attachments");
+  if (forgeInventoryPickerFilter === "equipped") return items.filter(item => item.source === "equipped");
+  if (forgeInventoryPickerFilter === "vault") return items.filter(item => item.source !== "equipped");
+  return items;
 }
 
 function getForgeNextQuality(quality) {
@@ -418,7 +442,13 @@ function renderForgeInventoryStrip(items) {
     return;
   }
 
-  strip.innerHTML = items.slice(0, 10).map(item => {
+  const selectedItem = getForgeSelectedItem();
+  const previewItems = [
+    ...(selectedItem ? [selectedItem] : []),
+    ...items.filter(item => item.id !== selectedItem?.id)
+  ].slice(0, 6);
+
+  strip.innerHTML = previewItems.map(item => {
     const definition = getForgeItemDefinition(item.key);
     const selected = item.id === selectedForgeItemId;
     return `
@@ -429,6 +459,56 @@ function renderForgeInventoryStrip(items) {
       </button>
     `;
   }).join("");
+}
+
+function renderForgeInventoryPicker(items) {
+  const picker = document.getElementById("forgeInventoryPicker");
+  const filters = document.getElementById("forgePickerFilters");
+  const grid = document.getElementById("forgePickerGrid");
+  if (!picker || !filters || !grid) return;
+
+  picker.classList.toggle("active", forgeInventoryPickerOpen);
+  picker.setAttribute("aria-hidden", forgeInventoryPickerOpen ? "false" : "true");
+
+  const counts = {
+    all: items.length,
+    weapons: items.filter(item => item.categoryKey === "guns").length,
+    equipment: items.filter(item => item.categoryKey === "attachments").length,
+    equipped: items.filter(item => item.source === "equipped").length,
+    vault: items.filter(item => item.source !== "equipped").length
+  };
+  const filterList = [
+    ["all", "All"],
+    ["weapons", "Weapons"],
+    ["equipment", "Equipment"],
+    ["equipped", "Equipped"],
+    ["vault", "Vault"]
+  ];
+
+  filters.innerHTML = filterList.map(([key, label]) => `
+    <button type="button" class="${forgeInventoryPickerFilter === key ? "active" : ""}" onclick="setForgeInventoryPickerFilter('${key}')">
+      ${label} <span>${formatNumber(counts[key] || 0)}</span>
+    </button>
+  `).join("");
+
+  const visibleItems = getForgePickerItems(items);
+  grid.innerHTML = visibleItems.length ? visibleItems.map(item => {
+    const definition = getForgeItemDefinition(item.key);
+    const selected = item.id === selectedForgeItemId;
+    const sourceLabel = item.source === "equipped" ? "Equipped" : item.source === "owned" ? `Vault x${formatNumber(item.count)}` : "Vault";
+    const stats = getForgeItemStatRows(item).slice(0, 3);
+    return `
+      <button type="button" class="forge-picker-card quality-${item.quality} ${selected ? "selected" : ""}" onclick="selectForgeItem('${escapeJsString(item.id)}')">
+        <img src="${escapeHtml(definition.image)}" alt="${escapeHtml(definition.name)}">
+        <div>
+          <span>${sourceLabel} / ${definition.typeLabel}</span>
+          <strong>${escapeHtml(getForgeItemDisplayName(item))}</strong>
+          <small>Lv ${getForgeItemLevel(item)} / ${titleCaseQuality(item.quality)}</small>
+          <em>${stats.map(row => `${row.label} ${row.value}`).join(" / ")}</em>
+        </div>
+      </button>
+    `;
+  }).join("") : `<div class="terminal-empty-state">No items match this filter.</div>`;
 }
 
 function renderForgeChamber(item, requirements) {
@@ -540,6 +620,7 @@ function renderUpgradeForge() {
 
   renderForgeSelectedPanel(item, requirements);
   renderForgeInventoryStrip(items);
+  renderForgeInventoryPicker(items);
   renderForgeChamber(item, requirements);
   renderForgeMaterials(item, requirements);
   renderForgeSummary(item, requirements);

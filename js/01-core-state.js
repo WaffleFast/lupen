@@ -744,6 +744,8 @@ let forgeUpgradeMode = "quality";
 let forgeMaterialAllocations = {};
 let forgeUseLupenCore = false;
 let forgeAnimating = false;
+let forgeInventoryPickerOpen = false;
+let forgeInventoryPickerFilter = "all";
 
 function titleCaseQuality(value) {
   if (value === LUPEN_CORE_QUALITY) return "Lupen Core";

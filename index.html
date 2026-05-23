@@ -186,8 +186,8 @@
           <div class="modern-store-panel-header"><span>Selected Item</span></div>
           <div id="forgeSelectedPanel" class="forge-selected-body"></div>
           <div class="forge-inventory-head">
-            <span>Inventory</span>
-            <button type="button" onclick="openHangar(); showHangarSection('vault')">Vault</button>
+            <span>Recent Items</span>
+            <button type="button" onclick="openForgeInventoryPicker()">Select Item</button>
           </div>
           <div id="forgeInventoryStrip" class="forge-inventory-strip"></div>
         </aside>
@@ -231,6 +231,20 @@
         <button type="button" onclick="autoFillForgeMaterials()">Auto Fill</button>
         <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Start Upgrade</button>
       </div>
+
+      <div id="forgeInventoryPicker" class="forge-inventory-picker" aria-hidden="true">
+        <div class="forge-picker-panel">
+          <div class="forge-picker-head">
+            <div>
+              <span>Forge Inventory</span>
+              <strong>Select an item to enhance</strong>
+            </div>
+            <button type="button" onclick="closeForgeInventoryPicker()">Close</button>
+          </div>
+          <div id="forgePickerFilters" class="forge-picker-filters"></div>
+          <div id="forgePickerGrid" class="forge-picker-grid"></div>
+        </div>
+      </div>
     </section>
 
 
@@ -239,7 +253,7 @@
         <div>
           <p>STATION STORE</p>
           <h2 id="storeLocationTitle">ASTERON PRIME</h2>
-          <span class="hangar-subtitle">Standard guns and attachments, plus one daily unique offer.</span>
+          <span class="hangar-subtitle">Standard guns and attachments, plus Lupen Core catalyst stock.</span>
         </div>
         <div class="store-header-actions">
           <div class="credits-line store-credits-inline">

@@ -1416,20 +1416,19 @@ function getDailyStoreSeed() {
 }
 
 function getDailyStoreItem(baseItems) {
-  const candidates = baseItems.filter(item => (item.kind === "gun" || item.kind === "attachment") && !item.dailyStock);
-  if (!candidates.length) return null;
-
-  const seed = getDailyStoreSeed();
-  const base = candidates[seed % candidates.length];
-
   return {
-    ...base,
-    id: `daily:${base.kind}:${base.key}`,
-    fixedQuality: "refined",
-    storeTier: "Daily Refined",
+    id: "daily:core:lupenCore",
+    kind: "core",
+    key: "lupenCore",
+    name: "Lupen Core",
+    category: "cores",
+    image: "assets/items/lupen-core.png",
+    fixedQuality: LUPEN_CORE_QUALITY,
+    storeTier: "Catalyst Stock",
     dailyStock: true,
-    basePrice: Math.max(1, Math.round(base.basePrice * (ITEM_QUALITY_BUY_MULTIPLIERS.refined || 2.5))),
-    description: `${base.description} Refined daily stock. Resets every 24 hours.`
+    stockLimit: 250,
+    basePrice: 0,
+    description: "God-tier catalyst used by the Forge to support quality upgrades."
   };
 }
 
@@ -1442,6 +1441,7 @@ function getStoreDailyPurchaseCount(item) {
 
 function getStoreStockLimit(item) {
   if (!item) return Infinity;
+  if (Number.isFinite(Number(item.stockLimit))) return Math.max(0, Number(item.stockLimit));
   return item.dailyStock ? 1 : Infinity;
 }
 
@@ -1669,15 +1669,9 @@ function getStoreDetailStats(item, quality = "standard") {
   }
 
   if (item.kind === "core") {
-    const valueMap = {
-      standard: "Entry upgrade core",
-      unique: "Stabilised upgrade core",
-      elite: "High-grade upgrade core",
-      legendary: "Rare premium upgrade core",
-      godlike: "Top-tier endgame core"
-    };
     return [
-      { label: "Use", value: valueMap[quality] || "Upgrade core" }
+      { label: "Tier", value: "God-tier catalyst" },
+      { label: "Use", value: "Forge quality upgrades" }
     ];
   }
 
