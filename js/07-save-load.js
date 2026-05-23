@@ -442,7 +442,7 @@ function applyLoadedGameState(rawSaved) {
   lootByNode = {};
   inventoryItems = normalizeInventoryItems(saved.inventoryItems ?? inventoryItems);
   trimPrototypeInventoryItems();
-  stationVaultWasClearedThisSession = clearStationVaultForShipyardIfNeeded();
+  stationVaultWasClearedThisSession = clearStationVaultForShipyardIfNeeded(saved);
   marketStock = saved.marketStock ?? marketStock;
 
   if (saved.cargo) {

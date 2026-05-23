@@ -385,7 +385,7 @@ function renderVaultDetail() {
   const upgradePanel = canUpgrade ? `
     <div class="vault-upgrade-panel">
       <div>
-        <span>Upgrade Forge</span>
+        <span>Station Forge</span>
         <strong>Level and quality upgrades are handled in the Forge</strong>
       </div>
       <button type="button" onclick="openUpgradeForgeFromVault('${escapeJsString(entry.groupKey)}')">

@@ -686,20 +686,13 @@ const upgradeMaterialDefinitions = {
     shortLabel: "EM",
     icon: "assets/items/equipment-upgrade-modules.svg",
     description: "Modular systems used to tune ship equipment."
-  },
-  techFragments: {
-    name: "Tech Fragments",
-    shortLabel: "TF",
-    icon: "assets/items/tech-fragments.svg",
-    description: "Refined fragments used to stabilise higher upgrades."
   }
 };
 
 function createDefaultUpgradeMaterials() {
   return {
     weaponParts: 260,
-    equipmentModules: 120,
-    techFragments: 420
+    equipmentModules: 120
   };
 }
 
@@ -1074,7 +1067,7 @@ let lootByNode = {};
 
 function createInitialAsteroids() {
   // Asteroids are intentionally disabled in Map 1.
-  // They will return in later maps as the source of Weapon Parts, Tech Fragments and Lupen Core progression.
+  // They will return in later maps as the source of weapon/equipment parts and rare Lupen Core progression.
   return [];
 }
 

@@ -1,4 +1,4 @@
-/* Upgrade Forge */
+/* Forge */
 
 const FORGE_MODE_LABELS = {
   level: "Upgrade Level",
@@ -201,8 +201,7 @@ function getForgeRequirements(item, mode = forgeUpgradeMode) {
     const base = 30 + level * 18;
     return {
       materials: {
-        [isWeapon ? "weaponParts" : "equipmentModules"]: base,
-        techFragments: 18 + level * 8
+        [isWeapon ? "weaponParts" : "equipmentModules"]: base
       },
       credits: 450 + level * 220,
       canUpgrade: true,
@@ -216,8 +215,7 @@ function getForgeRequirements(item, mode = forgeUpgradeMode) {
   const tierIndex = Math.max(1, ITEM_QUALITY_ORDER.indexOf(nextQuality));
   return {
     materials: {
-      [isWeapon ? "weaponParts" : "equipmentModules"]: 80 + tierIndex * 70,
-      techFragments: 100 + tierIndex * 90
+      [isWeapon ? "weaponParts" : "equipmentModules"]: 120 + tierIndex * 110
     },
     credits: 1200 + tierIndex * 850 + level * 120,
     canUpgrade: true,

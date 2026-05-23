@@ -749,8 +749,10 @@ function maybeMoveAsteroid() {
   });
 }
 
-function clearStationVaultForShipyardIfNeeded() {
+function clearStationVaultForShipyardIfNeeded(saved = null) {
   if (localStorage.getItem(STORAGE_VAULT_RESET_KEY) === "true") return false;
+  const saveVersion = Number(saved?.migratedFromVersion || saved?.saveVersion || SAVE_VERSION);
+  if (saveVersion >= 2) return false;
 
   inventoryItems = [];
   Object.keys(ownedAttachments || {}).forEach(key => { ownedAttachments[key] = 0; });
