@@ -979,6 +979,7 @@ function ensureDailyBounties() {
       killsRequired: Number(contract.killsRequired || template.killsRequired || 1),
       reward: Number(contract.reward || template.reward || 0),
       lootChance: Number(contract.lootChance ?? template.lootChance ?? 0),
+      materialReward: contract.materialReward || template.materialReward || null,
       progress: Math.max(0, Number(contract.progress || 0)),
       status: ["available", "active", "readyToClaim", "completed"].includes(contract.status) ? contract.status : "available"
     };
@@ -1131,10 +1132,34 @@ function createBountyObjective(contract) {
     kills: contract.progress || 0,
     reward: contract.reward,
     lootChance: contract.lootChance,
+    materialReward: contract.materialReward || null,
     icon: contract.icon || "assets/bounties/raider-sweep.png",
     createdAt: Date.now(),
     status: "active"
   };
+}
+
+function generateBountyMaterialRewards(contract) {
+  const rule = contract?.materialReward;
+  if (!rule || Math.random() >= Number(rule.chance || 0)) return [];
+  const materialKey = rule.altMaterialKey && Math.random() < 0.5 ? rule.altMaterialKey : rule.materialKey;
+  const definition = upgradeMaterialDefinitions?.[materialKey];
+  if (!definition) return [];
+
+  const min = Math.max(1, Math.floor(Number(rule.min || 1)));
+  const max = Math.max(min, Math.floor(Number(rule.max || min)));
+  const quantity = min + Math.floor(Math.random() * (max - min + 1));
+  upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+  upgradeMaterials[materialKey] = Math.max(0, Number(upgradeMaterials[materialKey] || 0)) + quantity;
+
+  return [{
+    rewardType: "material",
+    key: materialKey,
+    quantity,
+    name: definition.name,
+    icon: definition.icon,
+    quality: "refined"
+  }];
 }
 
 function acceptBountyContract(contractId) {
@@ -1220,6 +1245,8 @@ function claimBountyReward(contractId) {
       showItemFoundBurst(bonusDrops);
     }
   }
+  const materialDrops = generateBountyMaterialRewards(contract);
+  bonusDrops = [...bonusDrops, ...materialDrops];
 
   const bonusText = bonusDrops.length ? summarizeInventoryItems(bonusDrops) : "No bonus loot recovered.";
   contract.status = "completed";
@@ -1255,6 +1282,9 @@ function showBountyRewardOverlay(title, reward, bonusDrops = []) {
 
   const lootMarkup = bonusDrops.length
     ? bonusDrops.map(item => {
+        if (item.rewardType === "material") {
+          return `<div class="reward-loot-card quality-${item.quality || "refined"}"><img src="${item.icon || "assets/items/weapon-upgrade-parts.png"}" alt="${item.name || item.key}"><span>${escapeHtml(item.name || item.key)} x${formatNumber(item.quantity || 1)}</span></div>`;
+        }
         const definition = itemDefinitions[item.key] || {};
         return `<div class="reward-loot-card quality-${item.quality}"><img src="${definition.icon || "assets/items/lupen-core.png"}" alt="${definition.name || item.key}"><span>${titleCaseQuality(item.quality)} ${definition.name || item.key}</span></div>`;
       }).join("")

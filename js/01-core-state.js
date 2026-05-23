@@ -539,6 +539,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     killsRequired: 3,
     reward: 1200,
     lootChance: 0.18,
+    materialReward: { chance: 0.28, materialKey: "weaponParts", min: 1, max: 1 },
     description: "Clear raiders from any hostile node in the upper combat zone."
   },
   {
@@ -553,6 +554,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     killsRequired: 3,
     reward: 1500,
     lootChance: 0.22,
+    materialReward: { chance: 0.28, materialKey: "equipmentModules", min: 1, max: 1 },
     description: "Suppress bots across the lower hostile lanes threatening station traffic."
   },
   {
@@ -567,6 +569,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     killsRequired: 2,
     reward: 1800,
     lootChance: 0.28,
+    materialReward: { chance: 0.38, materialKey: "weaponParts", altMaterialKey: "equipmentModules", min: 1, max: 2 },
     description: "Intercept roaming hostile bots anywhere in combat space."
   }
 ];
@@ -678,21 +681,21 @@ const upgradeMaterialDefinitions = {
   weaponParts: {
     name: "Weapon Upgrade Parts",
     shortLabel: "WP",
-    icon: "assets/items/weapon-upgrade-parts.svg",
-    description: "Common weapon components used to raise gun levels."
+    icon: "assets/items/weapon-upgrade-parts.png",
+    description: "Rare weapon components used to raise gun levels."
   },
   equipmentModules: {
     name: "Equipment Upgrade Modules",
     shortLabel: "EM",
-    icon: "assets/items/equipment-upgrade-modules.svg",
-    description: "Modular systems used to tune ship equipment."
+    icon: "assets/items/equipment-upgrade-modules.png",
+    description: "Rare modules used to tune ship equipment."
   }
 };
 
 function createDefaultUpgradeMaterials() {
   return {
-    weaponParts: 260,
-    equipmentModules: 120
+    weaponParts: 6,
+    equipmentModules: 4
   };
 }
 
@@ -826,6 +829,11 @@ function normalizeInventoryItems(items) {
 function summarizeInventoryItems(items) {
   const grouped = {};
   (items || []).forEach(item => {
+    if (item.rewardType === "material") {
+      const label = item.name || upgradeMaterialDefinitions[item.key]?.name || item.key;
+      grouped[label] = (grouped[label] || 0) + Math.max(1, Number(item.quantity || 1));
+      return;
+    }
     const definition = itemDefinitions[item.key];
     if (!definition) return;
     const label = `${titleCaseQuality(item.quality)} ${definition.name}`;

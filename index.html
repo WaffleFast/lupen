@@ -183,13 +183,11 @@
 
       <div class="upgrade-forge-layout">
         <aside class="forge-panel forge-selected-panel">
-          <div class="modern-store-panel-header"><span>Selected Item</span></div>
-          <div id="forgeSelectedPanel" class="forge-selected-body"></div>
-          <div class="forge-inventory-head">
-            <span>Recent Items</span>
+          <div class="modern-store-panel-header">
+            <span>Item Slot</span>
             <button type="button" onclick="openForgeInventoryPicker()">Select Item</button>
           </div>
-          <div id="forgeInventoryStrip" class="forge-inventory-strip"></div>
+          <div id="forgeSelectedPanel" class="forge-selected-body"></div>
         </aside>
 
         <main class="forge-panel forge-chamber-panel">
@@ -206,7 +204,6 @@
             <img id="forgePreviewImage" src="assets/weapons/pulse-laser.png" alt="Selected item">
           </div>
           <div id="forgeStatePreview" class="forge-state-preview"></div>
-          <div id="forgeQualityLadder" class="forge-quality-ladder"></div>
           <div class="forge-mode-switch">
             <button id="forgeLevelModeBtn" type="button" onclick="setForgeMode('level')">Upgrade Level<span>Increase item level</span></button>
             <button id="forgeQualityModeBtn" type="button" onclick="setForgeMode('quality')">Upgrade Quality<span>Advance to next tier</span></button>
@@ -215,8 +212,7 @@
 
         <aside class="forge-panel forge-materials-panel">
           <div class="modern-store-panel-header">
-            <span>Upgrade Materials</span>
-            <button type="button" onclick="autoFillForgeMaterials()">Auto Fill</button>
+            <span>Upgrade Slot</span>
           </div>
           <div id="forgeMaterialsList" class="forge-materials-list"></div>
           <div id="forgeCorePanel" class="forge-core-panel"></div>
@@ -228,7 +224,6 @@
         <div><span>Est. Outcome</span><strong id="forgeOutcomeText">Select item</strong><small id="forgePowerText">Power increase --</small></div>
         <div><span>Est. Cost</span><strong><span class="credit-icon">CR</span><span id="forgeCostText">0</span></strong></div>
         <button type="button" onclick="previewForgeUpgrade()">Preview</button>
-        <button type="button" onclick="autoFillForgeMaterials()">Auto Fill</button>
         <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Start Upgrade</button>
       </div>
 
