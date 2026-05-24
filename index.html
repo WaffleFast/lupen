@@ -45,7 +45,9 @@
 
     <section id="gameScreen" class="hub-screen">
       <div class="hub-overlay">
-        <button class="logout-btn" onclick="logout()">Logout</button>
+        <button class="logout-btn hub-image-button hub-logout-button" onclick="logout()" aria-label="Logout">
+          <img src="assets/hub/logout-icon.png" alt="" />
+        </button>
         <div id="saveStatusIndicator" class="save-status-indicator" data-state="local">Saved locally</div>
 
         <div class="hub-header">
@@ -53,15 +55,36 @@
           <h2 id="hubLocationTitle">ASTERON PRIME</h2>
         </div>
 
-        <button class="hub-launch-btn" onclick="launchShip()">Launch Ship</button>
+        <button class="hub-launch-btn hub-image-button" onclick="launchShip()" aria-label="Launch Ship">
+          <img src="assets/hub/launch-ship-icon.png" alt="" />
+        </button>
 
         <div class="hub-actions">
-          <button onclick="openMarketplace()">Trade Terminal</button>
-          <button id="bountyBoardHubBtn" onclick="openBountyBoard()">Bounty Board<span id="bountyRewardBadge" class="hub-action-badge">Reward Ready</span></button>
-          <button onclick="openStore()">Store</button>
-          <button onclick="openHangar()">Hangar</button>
-          <button onclick="openUpgradeForge()">Forge</button>
-          <button onclick="openPilotProfile()">Pilot</button>
+          <button class="hub-image-button hub-action-button" onclick="openMarketplace()" aria-label="Trade Terminal">
+            <img src="assets/hub/trade-terminal-icon.png" alt="" />
+            <span>Trade<br />Terminal</span>
+          </button>
+          <button class="hub-image-button hub-action-button" id="bountyBoardHubBtn" onclick="openBountyBoard()" aria-label="Bounty Board">
+            <img src="assets/hub/bounty-board-icon.png" alt="" />
+            <span>Bounty Board</span>
+            <span id="bountyRewardBadge" class="hub-action-badge">Reward Ready</span>
+          </button>
+          <button class="hub-image-button hub-action-button" onclick="openStore()" aria-label="Store">
+            <img src="assets/hub/store-icon.png" alt="" />
+            <span>Store</span>
+          </button>
+          <button class="hub-image-button hub-action-button" onclick="openHangar()" aria-label="Hangar">
+            <img src="assets/hub/hangar-icon.png" alt="" />
+            <span>Hangar</span>
+          </button>
+          <button class="hub-image-button hub-action-button" onclick="openUpgradeForge()" aria-label="Forge">
+            <img src="assets/hub/forge-icon.png" alt="" />
+            <span>Forge</span>
+          </button>
+          <button class="hub-image-button hub-action-button" onclick="openPilotProfile()" aria-label="Pilot">
+            <img src="assets/hub/pilot-icon.png" alt="" />
+            <span>Pilot</span>
+          </button>
         </div>
       </div>
     </section>

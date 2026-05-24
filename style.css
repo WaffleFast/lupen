@@ -21562,3 +21562,263 @@ input::placeholder {
 .store-catalog-card.quality-core .store-card-stock {
   color: #76ffc6;
 }
+
+/* ===== Planet Landing Hub PNG pass ===== */
+.hub-screen {
+  width: 100%;
+  max-width: none;
+  height: calc(100dvh - 24px);
+  max-height: calc(100dvh - 24px);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  background: transparent;
+}
+
+.hub-screen.active {
+  display: grid;
+  place-items: center;
+}
+
+.hub-overlay {
+  position: relative;
+  inset: auto;
+  width: min(100%, calc((100dvh - 24px) * 16 / 9));
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  display: block;
+  overflow: hidden;
+  background: url("assets/hub/core-planet-main-screen.png") center / contain no-repeat;
+}
+
+.hub-header {
+  position: absolute;
+  top: 6.5%;
+  left: 50%;
+  width: 48%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.hub-header p {
+  margin: 0 0 8px;
+  color: #39d8ff;
+  font-size: 15px;
+  letter-spacing: 8px;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(0, 198, 255, 0.7);
+}
+
+.hub-header h2 {
+  margin: 0;
+  font-size: 44px;
+  line-height: 0.95;
+  letter-spacing: 8px;
+  color: #f5f9ff;
+  text-shadow: 0 0 18px rgba(95, 210, 255, 0.55), 0 4px 18px rgba(0, 0, 0, 0.9);
+}
+
+.hub-image-button {
+  position: absolute;
+  width: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #f3f8ff;
+  overflow: visible;
+}
+
+.logout-btn.hub-image-button,
+.hub-launch-btn.hub-image-button,
+.hub-actions .hub-action-button {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hub-image-button img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  transition: filter 140ms ease, transform 140ms ease;
+}
+
+.hub-image-button > span:not(.hub-action-badge) {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 84%;
+  text-align: center;
+  text-transform: uppercase;
+  color: #f7fbff;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  line-height: 1.08;
+  text-shadow: 0 0 14px rgba(80, 210, 255, 0.78), 0 2px 8px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
+.hub-image-button:hover,
+.hub-image-button:focus-visible {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hub-image-button:hover img,
+.hub-image-button:focus-visible img {
+  filter: brightness(1.12) saturate(1.08) drop-shadow(0 0 10px rgba(0, 198, 255, 0.42));
+}
+
+.hub-logout-button {
+  top: 5.7%;
+  right: 3.3%;
+  width: 9%;
+  height: 6.8%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 !important;
+}
+
+.hub-launch-btn {
+  top: 39.2%;
+  left: 50%;
+  width: 32%;
+  height: 13.5%;
+  min-width: 0;
+  max-width: none;
+  min-height: 0;
+  padding: 0 !important;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+.hub-launch-btn:hover,
+.hub-launch-btn:focus-visible {
+  transform: translateX(-50%) translateY(-0.6%);
+}
+
+.hub-actions {
+  position: absolute;
+  left: 4.7%;
+  right: 4.7%;
+  bottom: 5.6%;
+  height: 15.8%;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1.5%;
+  margin: 0;
+}
+
+.hub-actions .hub-action-button {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0 !important;
+  font-size: inherit;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: filter 140ms ease, transform 140ms ease;
+}
+
+.hub-actions .hub-action-button::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 12% 9% 9%;
+  border-radius: 8px;
+  background: radial-gradient(circle at 50% 35%, rgba(74, 213, 255, 0.12), rgba(74, 213, 255, 0) 64%);
+  border: 1px solid rgba(95, 218, 255, 0);
+  box-shadow: 0 0 0 rgba(0, 198, 255, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.hub-actions .hub-action-button img {
+  z-index: 2;
+  inset: 15% auto auto 50%;
+  width: 25%;
+  height: 34%;
+  transform: translateX(-50%);
+  object-fit: contain;
+}
+
+.hub-actions .hub-action-button:hover,
+.hub-actions .hub-action-button:focus-visible {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: translateY(-1.4%);
+}
+
+.hub-actions .hub-action-button:hover::before,
+.hub-actions .hub-action-button:focus-visible::before,
+.hub-actions .hub-action-button.reward-ready::before {
+  border-color: rgba(95, 218, 255, 0.24);
+  box-shadow: 0 0 18px rgba(0, 198, 255, 0.18);
+  opacity: 1;
+}
+
+.hub-actions .hub-action-button:hover img,
+.hub-actions .hub-action-button:focus-visible img {
+  transform: translateX(-50%) scale(1.035);
+}
+
+.hub-actions .hub-action-button > span:not(.hub-action-badge) {
+  z-index: 3;
+  bottom: 16%;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.hub-action-badge {
+  z-index: 2;
+  top: 10px !important;
+  right: 50% !important;
+  transform: translateX(50%);
+}
+
+.hub-actions button.reward-ready {
+  padding-top: 0 !important;
+}
+
+@media (max-width: 900px), (max-height: 620px) {
+  .hub-header p {
+    margin-bottom: 5px;
+    font-size: 11px;
+    letter-spacing: 5px;
+  }
+
+  .hub-header h2 {
+    font-size: 28px;
+    letter-spacing: 5px;
+  }
+
+  .hub-launch-btn > span:not(.hub-action-badge) {
+    font-size: 19px;
+    letter-spacing: 2px;
+  }
+
+  .hub-actions .hub-action-button img {
+    top: 14%;
+    width: 23%;
+    height: 32%;
+  }
+
+  .hub-actions .hub-action-button > span:not(.hub-action-badge) {
+    bottom: 12%;
+    font-size: 10px;
+    letter-spacing: 0.6px;
+  }
+}
