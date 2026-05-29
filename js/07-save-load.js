@@ -14,7 +14,7 @@ function isPlayerUnderAttackForLeaveSave() {
   const node = sectorNodes[currentNode];
   if (!node || node.type === "planet") return false;
 
-  const hostileBotPresent = hostileBots.some(bot => bot.alive && bot.node === currentNode);
+  const hostileBotPresent = hostileBots.some(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode && (bot.faction !== "erebus" || bot.aggroState === "hostile"));
   const hostileBotEngaged = engagedTarget?.type === "hostileBot" && engageTimer;
   return Boolean(hostileBotPresent || hostileBotEngaged || getMultiplayerUnderAttackState());
 }
@@ -65,6 +65,7 @@ function buildSaveState(options = {}) {
     marketStock,
     activeTradeRoute,
     activeObjective,
+    activeBountyId,
     dailyBountyDate,
     dailyBountyContracts,
     selectedBountyContractId,
@@ -373,6 +374,7 @@ function applyLoadedGameState(rawSaved) {
   dailyBountyDate = saved.dailyBountyDate || dailyBountyDate;
   dailyBountyContracts = Array.isArray(saved.dailyBountyContracts) ? saved.dailyBountyContracts : dailyBountyContracts;
   selectedBountyContractId = saved.selectedBountyContractId || selectedBountyContractId;
+  activeBountyId = saved.activeBountyId || activeBountyId;
   storeDailyPurchases = saved.storeDailyPurchases && typeof saved.storeDailyPurchases === "object" ? saved.storeDailyPurchases : storeDailyPurchases;
   pruneStoreDailyPurchases();
   ensureDailyBounties();
@@ -382,12 +384,17 @@ function applyLoadedGameState(rawSaved) {
       ...saved.activeObjective,
       targetArea: savedArea,
       targetLabel: saved.activeObjective.targetLabel || getBountyAreaLabel(savedArea),
+      targetBotType: saved.activeObjective.targetBotType || getBountyContract(saved.activeObjective.contractId)?.targetBotType || null,
+      targetBotLabel: saved.activeObjective.targetBotLabel || getBountyContract(saved.activeObjective.contractId)?.targetBotLabel || "Hostile Bot",
       targetNode: undefined,
       kills: Number(saved.activeObjective.kills || 0),
       killsRequired: Number(saved.activeObjective.killsRequired || 1),
-      reward: Number(saved.activeObjective.reward || 0),
+      reward: typeof saved.activeObjective.reward === "object" ? saved.activeObjective.reward : (getBountyContract(saved.activeObjective.contractId)?.reward || {}),
+      timed: Boolean(saved.activeObjective.timed || getBountyContract(saved.activeObjective.contractId)?.timed),
+      expiresAt: saved.activeObjective.expiresAt || getBountyContract(saved.activeObjective.contractId)?.expiresAt || null,
       status: saved.activeObjective.status || "active"
     };
+    activeBountyId = activeObjective.contractId;
     if (activeObjective.kills >= activeObjective.killsRequired && activeObjective.status !== "readyToClaim") {
       activeObjective.status = "readyToClaim";
       const claimContract = getBountyContract(activeObjective.contractId);
@@ -420,26 +427,41 @@ function applyLoadedGameState(rawSaved) {
   const loadedStats = getShipStats(currentShipId);
   if (!Number.isFinite(hull) || hull <= 0 || !Number.isFinite(hullMax) || hullMax <= 0) hull = loadedStats.hull;
   if (!Number.isFinite(shield) || shield < 0 || !Number.isFinite(shieldMax) || shieldMax < 0) shield = loadedStats.shield;
-  // Map 1 has no asteroids; old saved asteroid targets are ignored.
-  asteroids = [];
+  asteroids = normalizeAsteroidCollection(saved.asteroids);
 
   if (Array.isArray(saved.hostileBots) && saved.hostileBots.length) {
     const defaultBots = createInitialHostileBots();
     hostileBots = defaultBots.map((defaultBot, index) => {
       const savedBot = saved.hostileBots[index] || {};
+      const canRestoreSavedErebus = savedBot.faction === "erebus" && EREBUS_BOT_TYPES[savedBot.botType];
+      const restoredNode = savedBot.currentNodeId || savedBot.node;
+      const nodeId = canRestoreSavedErebus && isAllowedErebusBotNode(restoredNode) ? restoredNode : defaultBot.currentNodeId;
       return {
         ...defaultBot,
-        ...savedBot,
-        attackingUntil: 0,
-        node: sectorNodes[savedBot.node] && sectorNodes[savedBot.node].danger === "hostile" ? savedBot.node : defaultBot.node,
-        image: MANTA_BOT_ASSET,
-      attackingUntil: 0
+        ...(canRestoreSavedErebus ? savedBot : {}),
+        botType: canRestoreSavedErebus ? savedBot.botType : defaultBot.botType,
+        name: canRestoreSavedErebus ? (savedBot.name || savedBot.displayName || defaultBot.name) : defaultBot.name,
+        displayName: canRestoreSavedErebus ? (savedBot.displayName || savedBot.name || defaultBot.displayName) : defaultBot.displayName,
+        className: canRestoreSavedErebus ? (savedBot.className || defaultBot.className) : defaultBot.className,
+        classRole: canRestoreSavedErebus ? (savedBot.classRole || defaultBot.classRole) : defaultBot.classRole,
+        damage: Number(canRestoreSavedErebus ? (savedBot.damage || defaultBot.damage) : defaultBot.damage),
+        currentNodeId: nodeId,
+        node: nodeId,
+        faction: "erebus",
+        allegiance: "hostile_neutral",
+        aggroState: canRestoreSavedErebus && ["neutral", "hostile", "returning", "defeated"].includes(savedBot.aggroState) ? savedBot.aggroState : defaultBot.aggroState,
+        aggroUntil: canRestoreSavedErebus ? (savedBot.aggroUntil || null) : null,
+        targetPlayerId: canRestoreSavedErebus ? (savedBot.targetPlayerId || null) : null,
+        lastMovedAt: Number(canRestoreSavedErebus ? (savedBot.lastMovedAt || defaultBot.lastMovedAt) : defaultBot.lastMovedAt),
+        moveIntervalMs: Number(canRestoreSavedErebus ? (savedBot.moveIntervalMs || defaultBot.moveIntervalMs) : defaultBot.moveIntervalMs),
+        image: canRestoreSavedErebus ? (savedBot.image || defaultBot.image) : defaultBot.image,
+        attackingUntil: 0
       };
     });
+    hostileBots = enforceErebusSpawnCaps(hostileBots);
   }
 
-  // Starter map no longer uses asteroid salvage; old loose salvage is cleared.
-  lootByNode = {};
+  lootByNode = saved.lootByNode && typeof saved.lootByNode === "object" ? saved.lootByNode : {};
   inventoryItems = normalizeInventoryItems(saved.inventoryItems ?? inventoryItems);
   trimPrototypeInventoryItems();
   stationVaultWasClearedThisSession = clearStationVaultForShipyardIfNeeded(saved);
@@ -542,9 +564,9 @@ function debugGrantCredits() {
 }
 
 function debugGrantLupenCore() {
-  inventoryItems.push(createInventoryDrop("lupenCore"));
-  if (typeof addHudToast === "function") addHudToast("Debug Lupen Core added.");
-  refreshDebugToolsUI("Added 1 Lupen Core.");
+  const added = addInventoryItem(createInventoryDrop("lupenCore"));
+  if (typeof addHudToast === "function") addHudToast(added ? "Debug Lupen Core added." : INVENTORY_FULL_MESSAGE);
+  refreshDebugToolsUI(added ? "Added 1 Lupen Core." : "Inventory full.");
 }
 
 function debugGrantDemoWeapons() {
@@ -557,9 +579,9 @@ function debugGrantDemoWeapons() {
 
   demoWeapons.forEach(item => {
     if (item.rarityId === "standard") {
-      ownedGuns[item.familyId] = (ownedGuns[item.familyId] || 0) + 1;
+      if (canAddInventoryItems(1)) ownedGuns[item.familyId] = (ownedGuns[item.familyId] || 0) + 1;
     } else {
-      inventoryItems.push({
+      addInventoryItem({
         id: item.uid,
         key: item.familyId,
         quality: item.rarityId

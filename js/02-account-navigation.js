@@ -162,9 +162,13 @@ function showItemFoundBurst(items = []) {
 
 function renderShipMiniProgress(combat) {
   return `
-    <div class="ship-mini-level"><span>LEVEL</span><strong>${combat.level}</strong></div>
-    <div class="ship-mini-bars single">
-      <div class="ship-mini-bar" title="Combat Level ${combat.level}: ${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP to next level"><i style="height:${combat.percent}%"></i><span>XP</span></div>
+    <div class="level-badge ship-mini-level"><span>LEVEL</span><strong>${combat.level}</strong></div>
+    <div class="xp-row">
+      <span>XP</span>
+      <span>${formatNumber(combat.current)} / ${formatNumber(combat.next)}</span>
+    </div>
+    <div class="xp-bar" title="Combat Level ${combat.level}: ${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP to next level">
+      <div class="xp-fill" style="width:${combat.percent}%"></div>
     </div>
   `;
 }
@@ -196,12 +200,39 @@ function renderSkillProfileCard(title, info, meta, icon) {
   `;
 }
 
-function renderPilotStatCard(label, value, meta = "", statClass = "") {
+const PILOT_UI_ASSETS = {
+  pilotBadge: "assets/ui/pilot/pilot-badge.png",
+  botsDestroyed: "assets/ui/pilot/bots-destroyed.png",
+  bounties: "assets/ui/pilot/bounties.png",
+  tradeProfit: "assets/ui/pilot/trade-profit.png",
+  cargoSold: "assets/ui/pilot/cargo-sold.png",
+  currentVessel: "assets/ui/pilot/current-vessel.png",
+  combatProgress: "assets/ui/pilot/combat-progress.png",
+  onlineGuilds: "assets/ui/pilot/online-guilds.png",
+  playerStats: "assets/ui/pilot/player-stats.png",
+  leaderboards: "assets/ui/pilot/leaderboards.png"
+};
+
+function renderPilotStatCard(label, value, meta = "", statClass = "", icon = "") {
   return `
     <div class="pilot-stat-card ${statClass}">
-      <span>${label}</span>
-      <strong>${value}</strong>
-      ${meta ? `<small>${meta}</small>` : ""}
+      ${icon ? `<img class="pilot-stat-icon" src="${icon}" alt="" />` : ""}
+      <div>
+        <span>${label}</span>
+        <strong>${value}</strong>
+        ${meta ? `<small>${meta}</small>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderFuturePilotCard(title, text, icon) {
+  return `
+    <div class="future-pilot-card">
+      <img src="${icon}" alt="" />
+      <strong>${title}</strong>
+      <small>${text}</small>
+      <em aria-label="Locked">LOCKED</em>
     </div>
   `;
 }
@@ -211,13 +242,12 @@ function renderPilotStatCard(label, value, meta = "", statClass = "") {
 
 function renderPilotProfile() {
   const combat = getCombatLevelInfo();
-  const zoneEarned = getCombatZoneEarned();
   const nextBotXp = getCombatXpPerBot();
   const totals = playerProgress.totals || {};
   const ship = getCurrentShip();
-  const stats = getShipStats(currentShipId);
   const loadout = getShipLoadout(currentShipId);
-  const weapon = getEquippedWeapon(currentShipId);
+  const gunLimit = getGunSlotLimit(currentShipId);
+  const attachmentLimit = getAttachmentSlotLimit(currentShipId);
 
   const title = document.getElementById("profilePilotTitle");
   const body = document.getElementById("pilotProfileBody");
@@ -228,10 +258,14 @@ function renderPilotProfile() {
 
   body.innerHTML = `
     <section class="pilot-dashboard-hero">
+      <div class="pilot-badge-frame">
+        <img src="${PILOT_UI_ASSETS.pilotBadge}" alt="" />
+      </div>
+
       <div class="pilot-identity-block">
         <span class="drawer-kicker">Pilot Record</span>
         <strong>${getPilotName()}</strong>
-        <small>Combat Level ${combat.level} / ${ship.name}</small>
+        <small><img src="${PILOT_UI_ASSETS.combatProgress}" alt="" /> Combat Level ${combat.level} / ${ship.name}</small>
       </div>
 
       <div class="pilot-level-block">
@@ -246,26 +280,34 @@ function renderPilotProfile() {
     </section>
 
     <section class="pilot-dashboard-grid">
-      ${renderPilotStatCard("Bots Destroyed", formatNumber(totals.botsDestroyed || 0), `Next bot +${formatNumber(nextBotXp)} XP`, "combat-stat")}
-      ${renderPilotStatCard("Bounties Claimed", formatNumber(totals.bountiesClaimed || 0), "Daily contracts", "bounty-stat")}
-      ${renderPilotStatCard("Trade Profit", `CR ${formatNumber(totals.tradeProfit || 0)}`, `${formatNumber(totals.tradesCompleted || 0)} trades completed`, "profit-stat")}
-      ${renderPilotStatCard("Cargo Sold", formatNumber(totals.cargoSold || 0), "Units moved", "cargo-stat")}
-      ${renderPilotStatCard("Ships Owned", formatNumber(ownedShips.length), "Fleet size", "fleet-stat")}
-      ${renderPilotStatCard("Current Vessel", ship.name, `${loadout.guns.length}/${getGunSlotLimit(currentShipId)} guns / ${loadout.attachments.length}/${getAttachmentSlotLimit(currentShipId)} equip`, "ship-stat")}
+      ${renderPilotStatCard("Bots Destroyed", formatNumber(totals.botsDestroyed || 0), `Next bot +${formatNumber(nextBotXp)} XP`, "combat-stat", PILOT_UI_ASSETS.botsDestroyed)}
+      ${renderPilotStatCard("Bounties Claimed", formatNumber(totals.bountiesClaimed || 0), "Daily contracts", "bounty-stat", PILOT_UI_ASSETS.bounties)}
+      ${renderPilotStatCard("Trade Profit", `CR ${formatNumber(totals.tradeProfit || 0)}`, `${formatNumber(totals.tradesCompleted || 0)} trades completed`, "profit-stat", PILOT_UI_ASSETS.tradeProfit)}
+      ${renderPilotStatCard("Cargo Sold", formatNumber(totals.cargoSold || 0), "Units moved", "cargo-stat", PILOT_UI_ASSETS.cargoSold)}
+      ${renderPilotStatCard("Ships Owned", formatNumber(ownedShips.length), "Fleet size", "fleet-stat", PILOT_UI_ASSETS.currentVessel)}
+      ${renderPilotStatCard("Current Vessel", ship.name, `${loadout.guns.length}/${gunLimit} guns / ${loadout.attachments.length}/${attachmentLimit} equip`, "ship-stat", PILOT_UI_ASSETS.currentVessel)}
     </section>
 
     <section class="pilot-profile-lower">
       <div class="pilot-progression-card">
         <div class="profile-tree-head"><span>Combat Progress</span><strong>Map 1</strong></div>
-        ${renderSkillProfileCard("Combat", combat, `Level progress: ${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP / total combat XP: ${formatNumber(combat.total)} / next bot kill: +${formatNumber(nextBotXp)} XP`, "XP")}
+        <div class="pilot-combat-progress-panel">
+          <img src="${PILOT_UI_ASSETS.combatProgress}" alt="" />
+          <div>
+            <strong>Combat Level ${combat.level}</strong>
+            <em>${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP</em>
+            <div class="profile-xp-track"><i style="width:${combat.percent}%"></i></div>
+            <p>Level progress: ${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP / total combat XP: ${formatNumber(combat.total)} / next bot kill: <b>+${formatNumber(nextBotXp)} XP</b></p>
+          </div>
+        </div>
       </div>
 
       <div class="pilot-future-card">
         <div class="profile-tree-head"><span>Online Pilot Systems</span><strong>Later</strong></div>
         <div class="future-profile-grid">
-          <div><strong>Guilds</strong><small>Create or join guilds, build alliances, and compete with rival groups.</small></div>
-          <div><strong>Player Stats</strong><small>Search pilots and view public profile records, ships, combat level, trade progress, and bounty history.</small></div>
-          <div><strong>Leaderboards</strong><small>Compare pilots by bounties, trade profit, combat progress, cargo moved, and seasonal rankings.</small></div>
+          ${renderFuturePilotCard("Guilds", "Create or join guilds, build alliances, and compete with rival groups.", PILOT_UI_ASSETS.onlineGuilds)}
+          ${renderFuturePilotCard("Player Stats", "Search pilots and view public profile records, ships, combat level, trade progress, cargo moved, and bounty history.", PILOT_UI_ASSETS.playerStats)}
+          ${renderFuturePilotCard("Leaderboards", "Compare pilots by bounties, trade profit, combat progress, cargo moved, and seasonal rankings.", PILOT_UI_ASSETS.leaderboards)}
         </div>
       </div>
     </section>
@@ -301,6 +343,7 @@ function resetToNoShipStarterState() {
   dailyBountyDate = null;
   dailyBountyContracts = [];
   selectedBountyContractId = null;
+  activeBountyId = null;
 
   storeDailyPurchases = {};
   marketStock = {};
@@ -968,7 +1011,7 @@ function showHangarSection(sectionName) {
   }
 
   if (sectionName === "shipyard") {
-    if (tutorialState?.active && ["open-vessel-exchange-first-ship", "buy-first-ship"].includes(getCurrentTutorialStep()?.id) && !hasActiveShip()) {
+    if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && !hasActiveShip()) {
       selectedShipyardShipId = "lupenOrigin";
     }
     tutorialEvent("openedVesselExchange");
@@ -1119,8 +1162,15 @@ function openUpgradeForge(options = {}) {
   }
 
   if (options.selectedItemId) selectedForgeItemId = options.selectedItemId;
-  if (typeof renderUpgradeForge === "function") renderUpgradeForge();
   showScreen("upgradeForgeScreen");
+  try {
+    if (typeof renderUpgradeForge === "function") renderUpgradeForge();
+  } catch (error) {
+    console.error("Unable to render Upgrade Forge", error);
+    const status = document.getElementById("forgeChamberStatus");
+    if (status) status.textContent = "Forge systems recalibrating";
+  }
+  tutorialEvent("openedForge");
 }
 
 function openUpgradeForgeFromVault(groupKey = selectedVaultGroupKey) {

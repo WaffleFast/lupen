@@ -1,0 +1,569 @@
+/* Orbit HUD reference mockup overrides. Loaded after style.css on purpose. */
+.screen:has(#spaceScreen.active) {
+  padding: 12px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.space-screen.player-orbit-screen {
+  width: min(calc(100vw - 24px), calc((100dvh - 24px) * 16 / 9), 1180px) !important;
+  max-width: 1180px !important;
+  height: min(calc((100vw - 24px) * 9 / 16), calc(100dvh - 24px), 665px) !important;
+  max-height: 665px !important;
+  min-height: 0 !important;
+  container-type: size;
+  border: 1px solid rgba(0, 190, 245, 0.84) !important;
+  border-radius: 26px !important;
+  filter: contrast(1.06) saturate(1.04);
+  background:
+    radial-gradient(circle at 88% 12%, rgba(0, 133, 240, 0.16), transparent 13%),
+    linear-gradient(180deg, rgba(0, 4, 10, 0.04), rgba(0, 3, 8, 0.12)),
+    url("space-screen-background.png") center / cover no-repeat !important;
+  box-shadow:
+    0 0 14px rgba(0, 135, 205, 0.18),
+    inset 0 0 0 1px rgba(0, 190, 245, 0.46),
+    inset 0 0 18px rgba(0, 120, 190, 0.08) !important;
+}
+
+.space-screen.player-orbit-screen.empty-node {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(0, 133, 240, 0.12), transparent 13%),
+    linear-gradient(180deg, rgba(0, 4, 10, 0.04), rgba(0, 3, 8, 0.12)),
+    url("space-empty.png") center / cover no-repeat !important;
+}
+
+.player-orbit-screen .player-hud-frame {
+  inset: 0 !important;
+  border: 0 !important;
+  border-radius: 26px !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 168, 222, 0.42) !important;
+}
+
+.player-orbit-screen .player-hud-frame::before,
+.player-orbit-screen .player-hud-frame::after {
+  display: block !important;
+  content: "" !important;
+  position: absolute !important;
+  left: 16px !important;
+  right: 16px !important;
+  width: auto !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, rgba(0, 168, 222, 0.52), transparent) !important;
+  box-shadow: none !important;
+}
+
+.player-orbit-screen .player-hud-frame::before {
+  top: 0 !important;
+}
+
+.player-orbit-screen .player-hud-frame::after {
+  bottom: 0 !important;
+}
+
+.player-orbit-screen .orbit-header {
+  top: 2.75cqh !important;
+  left: 2.85cqw !important;
+  width: min(44cqw, 520px) !important;
+  height: 4.45cqh !important;
+}
+
+.player-orbit-screen .orbit-header-trim {
+  display: none !important;
+}
+
+.player-orbit-screen .node-name-tag.orbit-location {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  font-family: "Arial Black", Arial, sans-serif !important;
+  font-size: clamp(20px, 1.85cqw, 31px) !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  letter-spacing: 6px !important;
+  color: #eaf7ff !important;
+  text-shadow:
+    0 0 2px rgba(255, 255, 255, 0.88),
+    0 0 8px rgba(79, 176, 255, 0.76),
+    0 0 15px rgba(79, 176, 255, 0.28) !important;
+}
+
+.player-orbit-screen #planetLandBtn.clickable-planet {
+  top: 4.75cqh !important;
+  right: 4.3cqw !important;
+  width: 8.95cqw !important;
+  height: 15.9cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+  left: 1.8cqw !important;
+  right: 1.45cqw !important;
+  bottom: 3.3cqh !important;
+  height: clamp(148px, 27cqh, 180px) !important;
+  min-height: clamp(148px, 27cqh, 180px) !important;
+  max-height: clamp(148px, 27cqh, 180px) !important;
+  grid-template-columns: 25.2cqw 23cqw minmax(0, 1fr) !important;
+  gap: 1.05cqw !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-panel,
+.player-orbit-screen .player-bottom-hud .ship-display-panel,
+.player-orbit-screen .player-bottom-hud .hud-command-console,
+.player-orbit-screen .player-bottom-hud .vertical-stats {
+  height: clamp(148px, 27cqh, 180px) !important;
+  min-height: clamp(148px, 27cqh, 180px) !important;
+  max-height: clamp(148px, 27cqh, 180px) !important;
+  border: 1px solid rgba(0, 190, 245, 0.92) !important;
+  border-radius: 0 !important;
+  clip-path: polygon(15px 0, calc(100% - 24px) 0, 100% 24px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 16px 100%, 0 calc(100% - 20px), 0 17px) !important;
+  background:
+    linear-gradient(180deg, rgba(2, 16, 30, 0.78), rgba(0, 7, 16, 0.86)),
+    radial-gradient(circle at 50% 0%, rgba(0, 135, 210, 0.12), transparent 55%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 190, 245, 0.24),
+    inset 0 0 18px rgba(0, 120, 190, 0.08),
+    0 0 8px rgba(0, 129, 200, 0.12) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .status-panel.vertical-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  padding: 2cqh 1.25cqw 2.05cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-col {
+  display: grid !important;
+  grid-template-rows: 2.35cqh 2.05cqh minmax(62px, 1fr) 4cqh !important;
+  justify-items: center !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 0 0.65cqw;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-col + .stat-col {
+  border-left: 1px solid rgba(92, 179, 226, 0.34);
+}
+
+.player-orbit-screen .player-bottom-hud .stat-value {
+  min-height: 0 !important;
+  font-family: "Arial Black", Arial, sans-serif !important;
+  font-size: clamp(13px, 1.08cqw, 18px) !important;
+  line-height: 1 !important;
+  color: #ffffff !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-name {
+  font-size: clamp(12px, 0.95cqw, 16px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #bfe8ff;
+  text-shadow: 0 0 7px rgba(78, 178, 255, 0.7);
+}
+
+.player-orbit-screen .player-bottom-hud .stat-meter {
+  width: clamp(28px, 2.9cqw, 34px) !important;
+  height: 13cqh !important;
+  max-height: 13cqh !important;
+  flex: none !important;
+  border-radius: 3px !important;
+  border: 1px solid rgba(0, 150, 225, 0.72) !important;
+  background: rgba(0, 5, 12, 0.92) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-fill {
+  border-radius: 2px !important;
+  opacity: 1 !important;
+  background-size: 100% 10px !important;
+  background-position: bottom !important;
+}
+
+.player-orbit-screen .player-bottom-hud .jump-fill {
+  background-image: repeating-linear-gradient(to top, #ee2730 0 8px, #840812 8px 10px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hull-fill {
+  background-image: repeating-linear-gradient(to top, #e5bf25 0 8px, #746007 8px 10px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .shield-fill {
+  background-image: repeating-linear-gradient(to top, #009ce6 0 8px, #004683 8px 10px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-label {
+  width: 7.1cqw !important;
+  height: 4cqh !important;
+  min-height: 4cqh !important;
+  flex: none !important;
+  border: 1px solid rgba(0, 180, 245, 0.95) !important;
+  border-radius: 3px !important;
+  background: linear-gradient(180deg, rgba(2, 27, 48, 0.72), rgba(0, 10, 23, 0.84)) !important;
+  box-shadow: inset 0 0 10px rgba(0, 150, 225, 0.1), 0 0 5px rgba(0, 140, 215, 0.12) !important;
+  font-family: "Arial Black", Arial, sans-serif !important;
+  font-size: clamp(10px, 0.9cqw, 14px) !important;
+  letter-spacing: 1.5px !important;
+}
+
+.player-orbit-screen .player-bottom-hud #jumpBtn.stat-label,
+.player-orbit-screen .player-bottom-hud .jump-action {
+  background: linear-gradient(180deg, rgba(2, 27, 48, 0.72), rgba(0, 10, 23, 0.84)) !important;
+  border-color: rgba(0, 180, 245, 0.95) !important;
+  color: #eef9ff !important;
+  box-shadow: inset 0 0 14px rgba(0, 150, 225, 0.1), 0 0 8px rgba(0, 140, 215, 0.12) !important;
+}
+
+.player-orbit-screen .player-bottom-hud #jumpBtn.stat-label:hover {
+  background: linear-gradient(180deg, rgba(2, 47, 78, 0.78), rgba(0, 14, 30, 0.88)) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-label img {
+  display: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action {
+  grid-template-columns: minmax(0, 1fr) 4.65cqw !important;
+  grid-template-rows: minmax(0, 9.35cqh) 2.55cqh 1.45cqh 5.45cqh !important;
+  gap: 0.75cqh 0.9cqw !important;
+  padding: 2.3cqh 1.4cqw 2cqh !important;
+}
+
+.player-orbit-screen .ship-card-main {
+  min-height: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .active-player-ship,
+.player-orbit-screen .player-bottom-hud .hud-ship-image {
+  max-width: 6.25cqw !important;
+  max-height: 11.4cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .level-badge {
+  width: 4.65cqw !important;
+  height: 7cqh !important;
+  border: 1px solid rgba(0, 178, 238, 0.9) !important;
+  border-radius: 5px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .level-badge span {
+  font-size: clamp(10px, 0.84cqw, 14px) !important;
+  color: #6ae7ff !important;
+}
+
+.player-orbit-screen .player-bottom-hud .level-badge strong {
+  font-size: clamp(22px, 1.9cqw, 32px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .xp-row {
+  font-size: clamp(12px, 0.9cqw, 15px) !important;
+  font-weight: 900 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .xp-bar {
+  height: 1.05cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-storage-button {
+  height: 5.45cqh !important;
+  min-height: 5.45cqh !important;
+  border-radius: 3px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-storage-button span {
+  display: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-storage-button strong {
+  font-size: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-storage-button strong::before {
+  content: "INVENTORY";
+  font-family: "Arial Black", Arial, sans-serif !important;
+  font-size: clamp(14px, 1.2cqw, 20px) !important;
+  letter-spacing: 3px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-panel.hud-command-console {
+  grid-template-rows: 5.1cqh minmax(0, 1fr) !important;
+  gap: 0 !important;
+  padding: 1.25cqh 1.05cqw 2cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 1cqw !important;
+  height: 5.1cqh !important;
+  border-bottom: 1px solid rgba(130, 194, 230, 0.44) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-tab {
+  height: 4.35cqh !important;
+  min-height: 4.35cqh !important;
+  background: transparent !important;
+  font-family: "Arial Black", Arial, sans-serif !important;
+  font-size: clamp(12px, 0.9cqw, 15px) !important;
+  letter-spacing: 2px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-tab img {
+  display: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-tab.active,
+.player-orbit-screen .player-bottom-hud .info-tab:hover {
+  border-color: rgba(0, 183, 255, 0.95) !important;
+  background: linear-gradient(180deg, rgba(2, 43, 70, 0.66), rgba(2, 14, 29, 0.26)) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objectives-panel,
+.player-orbit-screen .player-bottom-hud .activity-panel,
+.player-orbit-screen .player-bottom-hud .comms-panel {
+  padding-top: 2.7cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-panel-header.compact-header h3,
+.player-orbit-screen .player-bottom-hud .activity-objective-block h3 {
+  margin: 0 0 12px !important;
+  font-family: "Arial Black", Arial, sans-serif !important;
+  font-size: clamp(14px, 1.13cqw, 19px) !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-hud-summary,
+.player-orbit-screen .player-bottom-hud .local-chat-feed,
+.player-orbit-screen .player-bottom-hud .activity-log-feed {
+  min-height: 10.8cqh !important;
+  height: 10.8cqh !important;
+  border: 1px dashed rgba(111, 174, 224, 0.48) !important;
+  border-radius: 6px !important;
+  background: rgba(0, 7, 17, 0.34) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-empty,
+.player-orbit-screen .player-bottom-hud .cargo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  color: #c6e7ff !important;
+  font-size: clamp(15px, 1.25cqw, 21px) !important;
+  font-weight: 400 !important;
+}
+
+.space-screen.player-orbit-screen .player-bottom-hud button#jumpBtn.stat-btn.stat-label.jump-action {
+  background: linear-gradient(180deg, rgba(2, 27, 48, 0.72), rgba(0, 10, 23, 0.84)) !important;
+  background-image: linear-gradient(180deg, rgba(2, 27, 48, 0.72), rgba(0, 10, 23, 0.84)) !important;
+  border-color: rgba(0, 180, 245, 0.95) !important;
+  color: #eef9ff !important;
+  border-radius: 3px !important;
+  box-shadow: inset 0 0 10px rgba(0, 150, 225, 0.1), 0 0 5px rgba(0, 140, 215, 0.12) !important;
+}
+
+.space-screen.player-orbit-screen .player-bottom-hud button#jumpBtn.stat-btn.stat-label.jump-action:hover {
+  background: linear-gradient(180deg, rgba(2, 47, 78, 0.78), rgba(0, 14, 30, 0.88)) !important;
+  background-image: linear-gradient(180deg, rgba(2, 47, 78, 0.78), rgba(0, 14, 30, 0.88)) !important;
+  border-color: rgba(75, 220, 255, 1) !important;
+}
+
+/* Final in-space HUD scale pass. Keep this after the reference mockup rules. */
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+  left: 1.8cqw !important;
+  right: 1.15cqw !important;
+  bottom: 1.45cqh !important;
+  height: clamp(124px, 21.5cqh, 142px) !important;
+  min-height: clamp(124px, 21.5cqh, 142px) !important;
+  max-height: clamp(124px, 21.5cqh, 142px) !important;
+  grid-template-columns: clamp(220px, 21.2cqw, 255px) clamp(185px, 17.8cqw, 215px) minmax(0, 1fr) !important;
+  gap: 0.85cqw !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-panel,
+.player-orbit-screen .player-bottom-hud .ship-display-panel,
+.player-orbit-screen .player-bottom-hud .hud-command-console,
+.player-orbit-screen .player-bottom-hud .vertical-stats {
+  height: clamp(124px, 21.5cqh, 142px) !important;
+  min-height: clamp(124px, 21.5cqh, 142px) !important;
+  max-height: clamp(124px, 21.5cqh, 142px) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 190, 245, 0.2),
+    inset 0 0 13px rgba(0, 120, 190, 0.065),
+    0 0 6px rgba(0, 129, 200, 0.1) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .status-panel.vertical-stats {
+  padding: 1.25cqh 0.95cqw 1.1cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-col {
+  grid-template-rows: 13px minmax(66px, 1fr) 22px !important;
+  gap: 4px !important;
+  padding: 0 0.45cqw !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-value {
+  font-size: clamp(10px, 0.78cqw, 12px) !important;
+  letter-spacing: 0.25px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-meter {
+  width: clamp(20px, 1.9cqw, 23px) !important;
+  height: clamp(68px, 10.9cqh, 73px) !important;
+  max-height: clamp(68px, 10.9cqh, 73px) !important;
+  border-radius: 3px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-fill {
+  background-size: 100% 8px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-label {
+  width: clamp(62px, 5.8cqw, 70px) !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  padding: 0 5px !important;
+  font-size: clamp(8px, 0.7cqw, 9px) !important;
+  letter-spacing: 0.75px !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.62) !important;
+}
+
+.space-screen.player-orbit-screen .player-bottom-hud button#jumpBtn.stat-btn.stat-label.jump-action,
+.player-orbit-screen .player-bottom-hud .jump-action {
+  background: linear-gradient(180deg, #ff3150, #b70820) !important;
+  background-image: linear-gradient(180deg, #ff3150, #b70820) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 7px rgba(230, 23, 58, 0.28) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hull-action {
+  background: linear-gradient(180deg, #f2ca2a, #9c760c) !important;
+  background-image: linear-gradient(180deg, #f2ca2a, #9c760c) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 0 7px rgba(229, 191, 37, 0.22) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .shield-action {
+  background: linear-gradient(180deg, #13bfff, #056dbb) !important;
+  background-image: linear-gradient(180deg, #13bfff, #056dbb) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 7px rgba(0, 156, 230, 0.24) !important;
+}
+
+.space-screen.player-orbit-screen .player-bottom-hud button#jumpBtn.stat-btn.stat-label.jump-action:hover,
+.player-orbit-screen .player-bottom-hud .stat-label:hover {
+  filter: brightness(1.12) !important;
+}
+
+.space-screen.player-orbit-screen .player-bottom-hud button#jumpBtn.stat-btn.stat-label.jump-action:hover,
+.player-orbit-screen .player-bottom-hud .jump-action:hover {
+  background: linear-gradient(180deg, #ff4a64, #c90b25) !important;
+  background-image: linear-gradient(180deg, #ff4a64, #c90b25) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hull-action:hover {
+  background: linear-gradient(180deg, #ffd94a, #ad8311) !important;
+  background-image: linear-gradient(180deg, #ffd94a, #ad8311) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .shield-action:hover {
+  background: linear-gradient(180deg, #37ceff, #0879cb) !important;
+  background-image: linear-gradient(180deg, #37ceff, #0879cb) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action {
+  grid-template-columns: minmax(0, 1fr) 42px !important;
+  grid-template-rows: minmax(0, 52px) 13px 5px 27px !important;
+  gap: 4px 0.75cqw !important;
+  padding: 1.3cqh 1cqw 1.2cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .active-player-ship,
+.player-orbit-screen .player-bottom-hud .hud-ship-image {
+  max-width: clamp(54px, 5.3cqw, 64px) !important;
+  max-height: clamp(46px, 7.9cqh, 54px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .level-badge {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 4px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .level-badge span {
+  font-size: 7px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .level-badge strong {
+  font-size: 20px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .xp-row {
+  font-size: clamp(8px, 0.74cqw, 9.5px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .xp-bar {
+  height: 5px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-storage-button {
+  height: 27px !important;
+  min-height: 27px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-storage-button strong::before {
+  font-size: clamp(10px, 0.9cqw, 12px) !important;
+  letter-spacing: 2px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-panel.hud-command-console {
+  grid-template-rows: 26px minmax(0, 1fr) !important;
+  padding: 0.9cqh 0.9cqw 1cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-tabs {
+  height: 26px !important;
+  gap: 0.75cqw !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-tab {
+  height: 23px !important;
+  min-height: 23px !important;
+  font-size: clamp(9px, 0.74cqw, 10.5px) !important;
+  letter-spacing: 1.3px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objectives-panel,
+.player-orbit-screen .player-bottom-hud .activity-panel,
+.player-orbit-screen .player-bottom-hud .comms-panel {
+  padding-top: 1.35cqh !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-panel-header.compact-header h3,
+.player-orbit-screen .player-bottom-hud .activity-objective-block h3 {
+  margin: 0 0 6px !important;
+  font-size: clamp(11px, 0.92cqw, 13px) !important;
+  letter-spacing: 1.4px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-hud-summary,
+.player-orbit-screen .player-bottom-hud .local-chat-feed,
+.player-orbit-screen .player-bottom-hud .activity-log-feed {
+  min-height: clamp(40px, 7.2cqh, 48px) !important;
+  height: clamp(40px, 7.2cqh, 48px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-empty,
+.player-orbit-screen .player-bottom-hud .cargo-empty {
+  font-size: clamp(11px, 0.88cqw, 13px) !important;
+}
+
+.player-orbit-screen #chatPanel.comms-panel.active {
+  grid-template-rows: 17px minmax(34px, 1fr) 27px !important;
+  gap: 4px !important;
+  padding-top: 0.75cqh !important;
+}
+
+.player-orbit-screen .local-chat-input-row input,
+.player-orbit-screen .local-chat-input-row button {
+  height: 26px !important;
+  min-height: 26px !important;
+  font-size: 10px !important;
+}

@@ -4,7 +4,6 @@ let inventoryDrawerFilter = "equipment";
 let selectedInventoryDetailId = null;
 let selectedLoadoutDetail = null;
 const INVENTORY_DRAWER_MAX_CARDS = 12;
-const PROTOTYPE_STARTING_INVENTORY_ITEMS = 4;
 
 function openHudPanel(panelName) {
   if (panelName === "sector") panelName = "objectives";
@@ -52,13 +51,39 @@ function toggleShipInventoryDrawer(event = null) {
 
     renderInventoryDrawer();
   }
+
+  updateShipStorageHud();
+}
+
+function openShipStorageDrawer(filter = "equipment", event = null) {
+  if (event?.stopPropagation) event.stopPropagation();
+
+  const drawer = document.getElementById("inventoryDrawer");
+  if (!drawer) return;
+
+  const normalizedFilter = filter === "cargo" ? "cargo" : "equipment";
+  const wasActive = drawer.classList.contains("active");
+  const wasSameFilter = inventoryDrawerFilter === normalizedFilter;
+
+  inventoryDrawerFilter = normalizedFilter;
+  selectedInventoryDetailId = null;
+
+  if (wasActive && wasSameFilter) {
+    closeShipInventoryDrawer();
+    return;
+  }
+
+  drawer.classList.add("active");
+  renderInventoryDrawer();
+  updateShipStorageHud();
 }
 
 document.addEventListener("click", event => {
   const drawer = document.getElementById("inventoryDrawer");
   if (!drawer || !drawer.classList.contains("active")) return;
 
-  const clickedDrawer = drawer.contains(event.target);
+  const eventPath = typeof event.composedPath === "function" ? event.composedPath() : [];
+  const clickedDrawer = drawer.contains(event.target) || eventPath.includes(drawer);
   const clickedInventoryButton = event.target.closest?.("#shipInventoryBtn");
   const clickedModal = event.target.closest?.(".sector-map, .market-screen, .hangar-screen, .store-screen, .bounty-screen, .pilot-profile-screen");
 
@@ -69,6 +94,25 @@ document.addEventListener("click", event => {
 
 function closeHudPanel() {
   openHudPanel("chat");
+}
+
+function updateShipStorageHud() {
+  const inventoryButton = document.getElementById("shipInventoryBtn");
+  const inventorySlots = document.getElementById("hudInventorySlots");
+  const drawer = document.getElementById("inventoryDrawer");
+  const groupedItems = groupInventoryItems(inventoryItems);
+  const totalInventoryItems = getCarriedInventoryItemCount();
+
+  if (inventorySlots) {
+    inventorySlots.textContent = `${formatNumber(totalInventoryItems)}/${formatNumber(MAX_CARRIED_INVENTORY_ITEMS)} items`;
+  }
+
+  const drawerActive = !!drawer && drawer.classList.contains("active");
+
+  if (inventoryButton) {
+    inventoryButton.classList.toggle("active", drawerActive && inventoryDrawerFilter === "equipment");
+    inventoryButton.classList.toggle("has-alert", totalInventoryItems > 0 || groupedItems.length > 0);
+  }
 }
 
 function getInventoryEntryId(entry) {
@@ -214,10 +258,11 @@ function buildInventoryDrawerEntries() {
 }
 
 function setInventoryDrawerFilter(filter) {
-  inventoryDrawerFilter = filter;
+  inventoryDrawerFilter = filter === "cargo" ? "cargo" : "equipment";
   selectedInventoryDetailId = null;
   selectedLoadoutDetail = null;
   renderInventoryDrawer();
+  updateShipStorageHud();
 }
 
 function selectInventoryDrawerItem(id) {
@@ -404,15 +449,15 @@ function renderInventoryDrawer() {
 
   const entries = getFilteredInventoryEntries();
   const totalCargo = cargoUsed();
-  const itemCount = inventoryItems.length + Object.values(ownedAttachments || {}).reduce((a, b) => a + (b || 0), 0) + Object.values(ownedGuns || {}).reduce((a, b) => a + (b || 0), 0);
+  const itemCount = getCarriedInventoryItemCount();
 
   if (count) {
-    count.textContent = `${formatNumber(totalCargo)} cargo / ${formatNumber(itemCount)} items`;
+    count.textContent = `${formatNumber(totalCargo)} cargo / ${formatNumber(itemCount)} of ${formatNumber(MAX_CARRIED_INVENTORY_ITEMS)} items`;
   }
 
   if (!entries.length) {
     grid.innerHTML = `<div class="inventory-drawer-empty">Nothing to show.</div>`;
-    detail.innerHTML = `<div class="inventory-detail-empty">Select cargo or equipment to view actions.</div>`;
+    detail.innerHTML = `<div class="inventory-detail-empty">Select cargo or equipment to inspect.</div>`;
     return;
   }
 
@@ -458,11 +503,6 @@ function renderInventoryDrawerDetail(entry) {
         <span>Held <strong>${formatNumber(entry.quantity)}</strong></span>
         <span>Avg Cost <strong>${unitBasis ? `CR ${formatNumber(Math.round(unitBasis))}` : "--"}</strong></span>
       </div>
-      <div class="inventory-detail-actions">
-        <button onclick="jettisonCargo('${escapeJsString(entry.key)}', 1); renderInventoryDrawer();">Drop 1</button>
-        <button onclick="jettisonCargo('${escapeJsString(entry.key)}', 10); renderInventoryDrawer();">Drop 10</button>
-        <button class="danger-lite" onclick="jettisonCargo('${escapeJsString(entry.key)}', 'all'); renderInventoryDrawer();">Drop All</button>
-      </div>
     `;
     return;
   }
@@ -479,10 +519,6 @@ function renderInventoryDrawerDetail(entry) {
       : itemDef.core
         ? "Upgrade material"
         : "Owned item";
-  const canEquip = entry.source !== "equipped" && (isGun || isAttachment);
-  const canUnequip = entry.source === "equipped" && (isGun || isAttachment);
-  const canDrop = entry.source !== "equipped";
-
   detail.innerHTML = `
     <div class="inventory-detail-title">
       <img src="${entry.icon}" alt="${entry.name}">
@@ -492,11 +528,6 @@ function renderInventoryDrawerDetail(entry) {
       <span>Owned <strong>${formatNumber(entry.quantity)}</strong></span>
       <span>${statText}</span>
       ${entry.equipped ? `<span>Equipped <strong>${formatNumber(entry.equipped)}</strong></span>` : ""}
-    </div>
-    <div class="inventory-detail-actions">
-      ${canEquip ? `<button onclick="equipInventoryItemToCurrentShip('${escapeJsString(entry.key)}', '${escapeJsString(entry.quality)}', '${escapeJsString(entry.source)}')">Equip</button>` : ""}
-      ${canUnequip ? `<button onclick="unequipCurrentShipItem('${escapeJsString(entry.key)}', '${escapeJsString(entry.quality)}', '${escapeJsString(entry.kind)}')">Unequip</button>` : ""}
-      ${canDrop ? `<button class="danger-lite" onclick="dropInventoryItemGroup('${escapeJsString(entry.key)}', '${escapeJsString(entry.quality)}', '${escapeJsString(entry.source)}')">Drop</button>` : `<button disabled>Unequip first</button>`}
     </div>
   `;
 }
@@ -559,13 +590,18 @@ function unequipCurrentShipItem(key, quality = "standard", kind = "attachment") 
     return;
   }
 
+  if (!canAddInventoryItems(1)) {
+    alert(INVENTORY_FULL_MESSAGE);
+    return;
+  }
+
   list.splice(index, 1);
 
   if (quality === "standard") {
     if (kind === "gun") ownedGuns[key] = (ownedGuns[key] || 0) + 1;
     else ownedAttachments[key] = (ownedAttachments[key] || 0) + 1;
   } else {
-    inventoryItems.push({
+    addInventoryItem({
       id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       key,
       quality
@@ -723,7 +759,7 @@ function updateObjectActionPanel(forceVisible = false) {
 
   if (!panel || !actionBtn) return;
 
-  const isRelevant = target && target.node === currentNode && target.alive;
+  const isRelevant = target && (target.currentNodeId || target.node) === currentNode && target.alive;
 
   if (!isRelevant) {
     panel.classList.remove("visible");
@@ -764,12 +800,15 @@ function updateHudDock() {
     inventoryBtn.classList.toggle("has-alert", usedCargo > 0 || groupedItems.length > 0);
   }
 
+  updateShipStorageHud();
+
   if (cargoCapacityText) {
     cargoCapacityText.textContent = `${formatNumber(usedCargo)} / ${formatNumber(maxCargo)}`;
   }
 
   if (inventoryItemCountText) {
-    inventoryItemCountText.textContent = `${formatNumber(inventoryItems.length)} item${inventoryItems.length === 1 ? "" : "s"}`;
+    const itemCount = getCarriedInventoryItemCount();
+    inventoryItemCountText.textContent = `${formatNumber(itemCount)}/${formatNumber(MAX_CARRIED_INVENTORY_ITEMS)} items`;
   }
 
   if (itemInventorySummary) {
@@ -1057,10 +1096,10 @@ function toggleShield() {
 /* Sector Map */
 
 function openSectorMap() {
-  tutorialEvent("openedSectorMap");
   if (jumpCharge < jumpMax) return;
   document.getElementById("sectorMap").classList.add("active");
   renderSectorMap();
+  tutorialEvent("openedSectorMap");
   if (tutorialState.active && [
     "make-jump",
     "scan-for-bots",
@@ -1143,22 +1182,31 @@ function hasSectorScanCooldownsActive() {
 function getBotScanSignals() {
   const grouped = new Map();
   hostileBots
-    .filter(bot => bot.alive && sectorNodes[bot.node])
+    .filter(bot => bot.alive && sectorNodes[bot.currentNodeId || bot.node])
     .forEach(bot => {
-      if (!grouped.has(bot.node)) {
-        const node = sectorNodes[bot.node];
-        grouped.set(bot.node, {
+      const nodeId = bot.currentNodeId || bot.node;
+      if (!grouped.has(nodeId)) {
+        const node = sectorNodes[nodeId];
+        grouped.set(nodeId, {
           type: "bot",
-          node: bot.node,
+          node: nodeId,
           x: node.x,
           y: node.y,
           count: 0,
-          names: []
+          names: [],
+          classes: [],
+          threats: [],
+          aggroStates: [],
+          images: []
         });
       }
-      const signal = grouped.get(bot.node);
+      const signal = grouped.get(nodeId);
       signal.count += 1;
-      signal.names.push(bot.name);
+      signal.names.push(bot.displayName || bot.name);
+      signal.classes.push(bot.className || "Bot");
+      signal.threats.push(bot.threat || "Medium");
+      signal.aggroStates.push(bot.aggroState || "neutral");
+      signal.images.push(bot.image || "");
     });
 
   return Array.from(grouped.values());
@@ -1316,6 +1364,11 @@ function drawSectorScanMarkers(svg) {
     const marker = document.createElementNS("http://www.w3.org/2000/svg", "g");
     marker.setAttribute("class", `svg-scan-marker scan-${type}`);
     marker.setAttribute("data-node", signal.node || "");
+    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    title.textContent = signal.names?.length
+      ? `${signal.node}: ${signal.names.map((name, index) => `${name} / ${signal.classes?.[index] || "Bot"} / ${signal.threats?.[index] || "Medium"} / ${signal.aggroStates?.[index] || "neutral"}`).join(", ")}`
+      : `${signal.node || "Unknown signal"}`;
+    marker.appendChild(title);
 
     const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     pulse.setAttribute("cx", signal.x);

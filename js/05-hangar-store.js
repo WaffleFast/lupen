@@ -48,7 +48,7 @@ function getEquippedVaultCounts() {
 function buildVaultEntries() {
   ensureInventoryObjects();
   const grouped = new Map();
-  const equippedCounts = new Map();
+  const equippedCounts = getEquippedVaultCounts();
 
   function ensureEntry(key, quality = "standard") {
     const definition = itemDefinitions[key];
@@ -285,16 +285,16 @@ function getVaultEntryStats(entry) {
   if (item.kind === "gun") {
     const gun = GUNS[item.key];
     if (gun) {
-      stats.push(...getWeaponLayerStatRows(gun, entry.quality).slice(0, 3));
+      stats.push(...getWeaponPurchaseStatRows(gun, entry.quality));
     }
   } else if (item.kind === "attachment") {
-    stats.push({ label: "Effect", value: getStoreAttachmentEffectText(item, entry.quality) });
+    stats.push(...getAttachmentPurchaseStatRows(item, entry.quality));
   } else if (item.kind === "core") {
     stats.push({ label: "Tier", value: "God-tier" });
     stats.push({ label: "Use", value: "Upgrade equipment" });
   }
 
-  return stats.slice(0, item.kind === "gun" ? 4 : 3);
+  return stats.slice(0, item.kind === "gun" ? 5 : 3);
 }
 
 
@@ -486,7 +486,6 @@ function renderHangarOverview() {
 
   const ship = getCurrentShip();
   const stats = getShipStats(currentShipId);
-  const loadout = getShipLoadout(currentShipId);
   const missingHull = Math.max(0, hullMax - hull);
   const repairCost = getRepairCost();
   const repairDisabled = missingHull <= 0 || credits < repairCost;
@@ -510,9 +509,6 @@ function renderHangarOverview() {
   if (overviewNameplate) overviewNameplate.textContent = ship.name;
 
   if (overviewStats) {
-    const gunLimit = getGunSlotLimit(currentShipId);
-    const equipmentLimit = getAttachmentSlotLimit(currentShipId);
-
     overviewStats.innerHTML = `
       <div class="hangar-stat-card hull-stat featured-stat"><span>Hull</span><strong>${formatNumber(Math.floor(hull))}/${formatNumber(hullMax)}</strong></div>
       <div class="hangar-stat-card shield-stat"><span>Shield</span><strong>${formatNumber(stats.shield)}</strong></div>
@@ -520,13 +516,6 @@ function renderHangarOverview() {
       <div class="hangar-stat-card cargo-stat"><span>Cargo</span><strong>${formatNumber(stats.cargo)}</strong></div>
       <div class="hangar-stat-card jump-stat"><span>Jump</span><strong>${formatNumber(stats.jumpRecharge)}</strong></div>
       <div class="hangar-stat-card evasion-stat"><span>Evasion</span><strong>${formatEvasion(stats.evasion)}</strong></div>
-      <div class="hangar-stat-card slot-split-card">
-        <span>Loadout Capacity</span>
-        <div class="slot-mini-grid">
-          <div><small>Guns</small><strong>${loadout.guns.length}/${gunLimit}</strong></div>
-          <div><small>Equip</small><strong>${loadout.attachments.length}/${equipmentLimit}</strong></div>
-        </div>
-      </div>
     `;
   }
 
@@ -641,6 +630,7 @@ function renderOwnedShips() {
 
     const isEquipped = currentShipId === shipId;
     const isSelected = selectedFleetShipId === shipId;
+    const stats = getShipStats(shipId);
 
     const card = document.createElement("button");
     card.className = `fleet-ship-card fleet-selector-card ${isSelected ? "selected" : ""} ${isEquipped ? "active" : ""}`;
@@ -652,6 +642,12 @@ function renderOwnedShips() {
       </div>
       <div class="fleet-card-name">${ship.name}</div>
       <div class="fleet-card-role">${ship.roleSubtitle || getShipRole(shipId)}</div>
+      <div class="fleet-card-mini-stats">
+        <span>Hull ${formatNumber(stats.hull)}</span>
+        <span>Shield ${formatNumber(stats.shield)}</span>
+        <span>Cargo ${formatNumber(stats.cargo)}</span>
+      </div>
+      <div class="fleet-card-slots compact-fleet-slots">${renderShipSlotSummary(shipId, "usage")}</div>
     `;
 
     box.appendChild(card);
@@ -814,6 +810,41 @@ function setSlotRailDensity(box, limit) {
   box.classList.toggle("very-many-slots", limit >= 14);
 }
 
+function updateLoadoutSlotSummaries() {
+  const loadout = getShipLoadout(selectedHangarShipId);
+  const gunLimit = getGunSlotLimit(selectedHangarShipId);
+  const attachmentLimit = getAttachmentSlotLimit(selectedHangarShipId);
+  const gunCount = loadout.guns.filter(Boolean).length;
+  const attachmentCount = loadout.attachments.filter(Boolean).length;
+  const gunText = `${gunCount}/${gunLimit}`;
+  const attachmentText = `${attachmentCount}/${attachmentLimit}`;
+  const totalText = `${gunCount + attachmentCount}/${gunLimit + attachmentLimit}`;
+
+  const summaries = {
+    gunSlotSummary: gunText,
+    gunSlotSummaryMirror: gunText,
+    attachmentSlotSummary: attachmentText,
+    attachmentSlotSummaryMirror: attachmentText,
+    totalSlotSummary: totalText
+  };
+
+  Object.entries(summaries).forEach(([id, text]) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = text;
+  });
+
+  const pipSummaries = {
+    gunSlotPipsMirror: renderSlotPips(gunLimit, gunCount),
+    attachmentSlotPipsMirror: renderSlotPips(attachmentLimit, attachmentCount),
+    totalSlotPips: renderSlotPips(gunLimit + attachmentLimit, gunCount + attachmentCount)
+  };
+
+  Object.entries(pipSummaries).forEach(([id, html]) => {
+    const node = document.getElementById(id);
+    if (node) node.innerHTML = html;
+  });
+}
+
 
 function getEquippedTooltipEntry(key, quality, categoryKey) {
   const isGun = categoryKey === "guns";
@@ -837,8 +868,7 @@ function renderInstalledAttachments() {
   const loadout = getShipLoadout(selectedHangarShipId);
   const limit = getAttachmentSlotLimit(selectedHangarShipId);
   setSlotRailDensity(box, limit);
-  const summary = document.getElementById("attachmentSlotSummary");
-  if (summary) summary.textContent = `${loadout.attachments.filter(Boolean).length}/${limit}`;
+  updateLoadoutSlotSummaries();
 
   box.innerHTML = "";
 
@@ -850,6 +880,7 @@ function renderInstalledAttachments() {
 
     const slot = document.createElement("button");
     slot.className = `equipment-slot scalable-loadout-slot ${item ? "filled" : "empty"} quality-${quality}`;
+    slot.dataset.slotIndex = String(i + 1).padStart(2, "0");
     slot.disabled = !item;
     slot.onclick = () => removeAttachment(i);
 
@@ -877,8 +908,7 @@ function renderInstalledGuns() {
   const loadout = getShipLoadout(selectedHangarShipId);
   const limit = getGunSlotLimit(selectedHangarShipId);
   setSlotRailDensity(box, limit);
-  const summary = document.getElementById("gunSlotSummary");
-  if (summary) summary.textContent = `${loadout.guns.filter(Boolean).length}/${limit}`;
+  updateLoadoutSlotSummaries();
 
   box.innerHTML = "";
 
@@ -890,6 +920,7 @@ function renderInstalledGuns() {
 
     const slot = document.createElement("button");
     slot.className = `equipment-slot scalable-loadout-slot ${item ? "filled" : "empty"} quality-${quality}`;
+    slot.dataset.slotIndex = String(i + 1).padStart(2, "0");
     slot.disabled = !item;
     slot.onclick = () => removeGun(i);
 
@@ -988,7 +1019,7 @@ function getEquipmentTooltipHtml(entry, categoryKey) {
   const statRows = [];
 
   if (isGun) {
-    statRows.push(...getWeaponLayerStatRows(definition, quality));
+    statRows.push(...getWeaponPurchaseStatRows(definition, quality));
   } else {
     const effect = getScaledAttachmentEffect(entry.key, quality);
     Object.entries(effect).forEach(([effectKey, value]) => {
@@ -1197,7 +1228,7 @@ function renderGunShop() {
     if (item.hiddenFromStore) return;
     const canAfford = credits >= item.price;
     const owned = ownedGuns[key] || 0;
-    const damage = getGunDamageForQuality(item, "standard");
+    const statRows = getWeaponPurchaseStatRows(item, "standard");
 
     const card = document.createElement("div");
     card.className = "equipment-card";
@@ -1206,8 +1237,7 @@ function renderGunShop() {
       <div class="equipment-card-meta">
         <h4>${item.name}</h4>
         <p>${item.description}</p>
-        <p>Shield ${formatNumber(damage.shield)} / Armour ${formatNumber(damage.armor)} / Hull ${formatNumber(damage.hull)}</p>
-        <p>Fire Rate: ${getGunFireRateText(item)}</p>
+        <p>${statRows.map(row => `${row.label}: ${row.value}`).join(" / ")}</p>
         <p>Owned: ${formatNumber(owned)}</p>
         <p>Price: CR ${formatNumber(item.price)}</p>
       </div>
@@ -1321,7 +1351,6 @@ function renderShipShop() {
     const owned = ownedShips.includes(ship.id);
     const equipped = currentShipId === ship.id;
     const selected = selectedShipyardShipId === ship.id;
-    const stats = getShipStats(ship.id);
 
     const card = document.createElement("button");
     const isTutorialRequiredShip = tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && ship.id === "lupenOrigin";
@@ -1336,13 +1365,6 @@ function renderShipShop() {
       </div>
       <div class="fleet-card-name">${ship.name}</div>
       <div class="fleet-card-role">${ship.roleSubtitle || "Available hull"}</div>
-      <div class="fleet-card-mini-stats">
-        <span><em>Cargo</em><strong>${formatNumber(stats.cargo)}</strong></span>
-        <span><em>Hull</em><strong>${formatNumber(stats.hull)}</strong></span>
-        <span><em>Armour</em><strong>${formatNumber(stats.armor)}</strong></span>
-        <span><em>Evade</em><strong>${formatEvasion(stats.evasion)}</strong></span>
-      </div>
-      ${renderShipSlotSummary(ship.id)}
     `;
     box.appendChild(card);
   });
@@ -1453,7 +1475,7 @@ function getStoreStockRemaining(item) {
 
 function getStoreStockLabel(item) {
   const remaining = getStoreStockRemaining(item);
-  return Number.isFinite(remaining) ? `${remaining} available` : "Unlimited stock";
+  return Number.isFinite(remaining) ? `${remaining} in stock` : "Unlimited stock";
 }
 
 function recordStorePurchase(item) {
@@ -1476,7 +1498,6 @@ function getStoreCatalogItems() {
 
   Object.entries(GUNS).forEach(([key, item]) => {
     if (item.hiddenFromStore) return;
-    const damageRows = getWeaponLayerStatRows(item, "standard");
     items.push({
       id: `gun:${key}`,
       kind: "gun",
@@ -1488,21 +1509,11 @@ function getStoreCatalogItems() {
       basePrice: item.price,
       qualityEnabled: false,
       storeTier: "Core Stock",
-      stats: damageRows
+      stats: getWeaponPurchaseStatRows(item, "standard")
     });
   });
 
   Object.entries(attachments).forEach(([key, item]) => {
-    const effectText = Object.entries(item.effect || {}).map(([effectKey, value]) => {
-      const label = effectKey === "jumpRecharge"
-        ? "Jump Speed"
-        : effectKey === "evasion"
-          ? "Evasion"
-          : effectKey.charAt(0).toUpperCase() + effectKey.slice(1);
-      const suffix = effectKey === "evasion" ? "%" : "";
-      return `+${value}${suffix} ${label}`;
-    }).join(" / ");
-
     items.push({
       id: `attachment:${key}`,
       kind: "attachment",
@@ -1514,10 +1525,7 @@ function getStoreCatalogItems() {
       basePrice: item.price,
       qualityEnabled: false,
       storeTier: "Core Stock",
-      stats: [
-        { label: "Effect", value: effectText || item.description },
-        { label: "Type", value: "Standard Attachment" }
-      ]
+      stats: getAttachmentPurchaseStatRows({ key }, "standard")
     });
   });
 
@@ -1609,13 +1617,22 @@ function getGunFireRateText(gun) {
   return `${fireRate.toFixed(1)}/s`;
 }
 
-function getWeaponLayerStatRows(gun, quality = "standard") {
-  const damage = getGunDamageForQuality(gun, quality);
+function getGunFireRateValue(gun) {
+  return Number(gun?.fireRate || (gun?.speed ? 1000 / gun.speed : 0)) || 0;
+}
+
+function getWeaponPurchaseDamage(gun, quality = "standard") {
+  return getStoreGunAttack({ key: gun?.key || gun?.familyId }, quality);
+}
+
+function getWeaponPurchaseStatRows(gun, quality = "standard") {
+  const damage = getWeaponPurchaseDamage(gun, quality);
+  const fireRate = getGunFireRateValue(gun);
+  const dps = damage * fireRate;
   return [
-    { label: "Shield", value: formatNumber(damage.shield) },
-    { label: "Armour", value: formatNumber(damage.armor) },
-    { label: "Hull", value: formatNumber(damage.hull) },
-    { label: "Fire Rate", value: getGunFireRateText(gun) }
+    { label: "Damage", value: formatNumber(damage) },
+    { label: "Fire Rate", value: getGunFireRateText(gun) },
+    { label: "DPS", value: fireRate > 0 ? dps.toFixed(1) : "0.0" }
   ];
 }
 
@@ -1636,13 +1653,45 @@ function getStoreAttachmentEffectText(item, quality = "standard") {
   return effects.join(" / ") || attachment.description || "";
 }
 
+function formatAttachmentEffectValue(effectKey, value) {
+  const numeric = Number(value) || 0;
+  if (effectKey === "evasion") return `+${formatNumber(numeric)}%`;
+  if (effectKey === "jumpRecharge") return `+${formatNumber(numeric)}`;
+  return `+${formatNumber(numeric)}`;
+}
+
+function getAttachmentPurchaseStatRows(item, quality = "standard") {
+  const attachment = attachments[item?.key];
+  if (!attachment) return [];
+  const multiplier = getItemStatMultiplier(quality);
+  const effectLabels = {
+    cargo: "Cargo",
+    hull: "Hull",
+    shield: "Shield",
+    evasion: "Evasion",
+    jumpRecharge: "Jump Range",
+    recharge: "Recharge",
+    cooldown: "Cooldown",
+    mass: "Mass"
+  };
+
+  return Object.entries(attachment.effect || {}).map(([effectKey, value]) => {
+    const scaled = Math.max(1, Math.round(Number(value || 0) * multiplier));
+    const label = effectLabels[effectKey] || effectKey.charAt(0).toUpperCase() + effectKey.slice(1);
+    const displayValue = effectKey === "cooldown"
+      ? `-${formatNumber(scaled)}%`
+      : formatAttachmentEffectValue(effectKey, scaled);
+    return { label, value: displayValue };
+  });
+}
+
 
 function getInventoryEffectLine(entry) {
   if (!entry) return "";
   const quality = entry.quality || "standard";
   if (entry.kind === "gun" && GUNS[entry.key]) {
-    const damage = getGunDamageForQuality(GUNS[entry.key], quality);
-    return `S ${formatNumber(damage.shield)} / A ${formatNumber(damage.armor)} / H ${formatNumber(damage.hull)}`;
+    const rows = getWeaponPurchaseStatRows(GUNS[entry.key], quality);
+    return rows.map(row => `${row.label} ${row.value}`).join(" / ");
   }
   if (entry.kind === "attachment" && attachments[entry.key]) {
     return getStoreAttachmentEffectText({ key: entry.key }, quality);
@@ -1659,13 +1708,11 @@ function getStoreDetailStats(item, quality = "standard") {
   if (item.kind === "gun") {
     const gun = GUNS[item.key];
     if (!gun) return [];
-    return getWeaponLayerStatRows(gun, quality);
+    return getWeaponPurchaseStatRows(gun, quality).filter(stat => stat.label !== "DPS");
   }
 
   if (item.kind === "attachment") {
-    return [
-      { label: "Effect", value: getStoreAttachmentEffectText(item, quality) }
-    ];
+    return getAttachmentPurchaseStatRows(item, quality);
   }
 
   if (item.kind === "core") {
@@ -1791,20 +1838,25 @@ function renderStoreCatalog() {
   grid.innerHTML = items.map(item => {
     const quality = getStoreItemDisplayQuality(item);
     const price = getStorePrice(item, quality);
+    const ownedCount = item.kind === "ship"
+      ? (ownedShips.includes(item.key) ? 1 : 0)
+      : item.kind === "core"
+        ? getStoreItemInventoryCount(item, quality)
+        : getStoreOwnedReadyCount(item) + getStoreItemInventoryCount(item, quality);
     let status = "";
 
     if (item.kind === "ship") {
       status = currentShipId === item.key ? "Equipped" : (ownedShips.includes(item.key) ? "Owned" : "");
     } else if (item.kind === "core") {
-      const invCount = getStoreItemInventoryCount(item, quality);
-      status = invCount > 0 ? `x${invCount}` : "";
+      status = ownedCount > 0 ? `Owned x${formatNumber(ownedCount)}` : "";
     } else {
-      const totalOwned = getStoreOwnedReadyCount(item) + getStoreItemInventoryCount(item, quality);
-      status = totalOwned > 0 ? `x${totalOwned}` : "";
+      status = ownedCount > 0 ? `Owned x${formatNumber(ownedCount)}` : "";
     }
 
     const stockLabel = getStoreStockLabel(item);
     const soldOut = getStoreStockRemaining(item) === 0;
+    const categoryLabel = getStoreCardCategoryLabel(item, quality);
+    const priceLabel = item.kind === "core" ? "Upgrade Material" : (soldOut ? "Sold Out" : `CR ${formatNumber(price)}`);
 
     return `
       <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} quality-${quality}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
@@ -1813,11 +1865,26 @@ function renderStoreCatalog() {
           <img src="${item.image}" alt="${item.name}">
         </div>
         <div class="store-card-name">${item.name}</div>
-        <div class="store-card-sub">${item.storeTier || item.category}</div>
+        <div class="store-card-sub">${categoryLabel}</div>
         <div class="store-card-stock">${stockLabel}</div>
-        <div class="store-card-price">${soldOut ? "Sold Out" : `CR ${formatNumber(price)}`}</div>
+        <div class="store-card-price">${priceLabel}</div>
       </button>`;
   }).join("");
+}
+
+function getStoreCardCategoryLabel(item, quality = "standard") {
+  if (!item) return "";
+  if (item.kind === "gun") return "Gun";
+  if (item.kind === "attachment") return "Attachment";
+  if (item.kind === "core") return "Legendary Catalyst";
+  if (item.kind === "ship") return "Ship";
+  return item.category || "";
+}
+
+function getStoreDetailKicker(item, quality = "standard") {
+  if (!item) return "";
+  if (item.kind === "core") return "Legendary Catalyst";
+  return `${getStoreCardCategoryLabel(item, quality)} / ${titleCaseQuality(quality)}`;
 }
 
 function renderStoreDetail() {
@@ -1862,7 +1929,9 @@ function renderStoreDetail() {
   let buyButton = "";
   let sellButton = "";
 
-  if (item.kind === "ship") {
+  if (item.kind === "core") {
+    buyButton = `<button class="store-detail-buy-action store-core-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="openUpgradeForge()">Open Upgrade Bay</button>`;
+  } else if (item.kind === "ship") {
     if (currentShipId === item.key) {
       buyButton = `<button disabled>Equipped</button>`;
     } else if (ownedShips.includes(item.key)) {
@@ -1882,21 +1951,23 @@ function renderStoreDetail() {
 
   const ownershipLine = item.kind === "ship"
     ? (ownedShips.includes(item.key) ? (currentShipId === item.key ? "Currently equipped" : "Owned in hangar") : "Not owned")
-    : (totalOwned > 0 ? `${formatNumber(totalOwned)} owned` : "Not owned");
+    : (totalOwned > 0 ? `Owned / x${formatNumber(totalOwned)}` : "Not owned");
 
   panel.innerHTML = `
     <div class="store-detail-shell store-quality-${quality} compact-store-detail simplified-store-detail">
-      <div class="store-detail-visual quality-${quality}">
-        <img src="${item.image}" alt="${item.name}">
+      <div class="store-detail-content">
+        <div class="store-detail-visual quality-${quality}">
+          <img src="${item.image}" alt="${item.name}">
+        </div>
+
+        <div class="store-detail-kicker">${getStoreDetailKicker(item, quality)}</div>
+        <div class="store-detail-title">${item.name}</div>
+        <div class="store-detail-desc">${item.description}</div>
+        <div class="store-detail-owned-line">${ownershipLine} / ${getStoreStockLabel(item)}</div>
+        ${detailStatsHtml}
       </div>
 
-      <div class="store-detail-kicker">${item.storeTier || item.category} / ${titleCaseQuality(quality)}</div>
-      <div class="store-detail-title">${item.name}</div>
-      <div class="store-detail-desc">${item.description}</div>
-      <div class="store-detail-owned-line">${ownershipLine} / ${getStoreStockLabel(item)}</div>
-      ${detailStatsHtml}
-
-      <div class="store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
+      <div class="store-buy-footer store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
         ${buyButton}
         ${sellButton}
       </div>
@@ -1906,6 +1977,10 @@ function renderStoreDetail() {
 function storeBuySelected() {
   const item = getStoreSelectedItem();
   if (!item) return;
+  if (item.kind === "core") {
+    openUpgradeForge();
+    return;
+  }
   const quality = getStoreItemDisplayQuality(item);
   const price = getStorePrice(item, quality);
   if (getStoreStockRemaining(item) <= 0) {
@@ -1925,12 +2000,20 @@ function storeBuySelected() {
 
   if (item.kind === "attachment") {
     if (quality === "standard") {
+      if (!canAddInventoryItems(1)) {
+        alert(INVENTORY_FULL_MESSAGE);
+        return;
+      }
       buyAttachment(item.key);
       recordStorePurchase(item);
       tutorialEvent("boughtEquipment");
     } else {
+      if (!canAddInventoryItems(1)) {
+        alert(INVENTORY_FULL_MESSAGE);
+        return;
+      }
       credits -= price;
-      inventoryItems.push({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
+      addInventoryItem({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
       recordStorePurchase(item);
       renderStore();
       saveGame();
@@ -1941,12 +2024,20 @@ function storeBuySelected() {
 
   if (item.kind === "gun") {
     if (quality === "standard") {
+      if (!canAddInventoryItems(1)) {
+        alert(INVENTORY_FULL_MESSAGE);
+        return;
+      }
       buyGun(item.key);
       recordStorePurchase(item);
       tutorialEvent("boughtEquipment");
     } else {
+      if (!canAddInventoryItems(1)) {
+        alert(INVENTORY_FULL_MESSAGE);
+        return;
+      }
       credits -= price;
-      inventoryItems.push({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
+      addInventoryItem({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
       recordStorePurchase(item);
       renderStore();
       saveGame();
@@ -1956,8 +2047,12 @@ function storeBuySelected() {
   }
 
   if (item.kind === "core") {
+    if (!canAddInventoryItems(1)) {
+      alert(INVENTORY_FULL_MESSAGE);
+      return;
+    }
     credits -= price;
-    inventoryItems.push({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
+    addInventoryItem({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
     recordStorePurchase(item);
     renderStore();
     saveGame();
@@ -2016,6 +2111,11 @@ function buyAttachment(key) {
   const item = attachments[key];
   if (!item) return;
 
+  if (!canAddInventoryItems(1)) {
+    alert(INVENTORY_FULL_MESSAGE);
+    return;
+  }
+
   if (credits < item.price) {
     alert("Not enough credits.");
     return;
@@ -2036,6 +2136,11 @@ function buyAttachment(key) {
 function buyGun(key) {
   const item = GUNS[key];
   if (!item) return;
+
+  if (!canAddInventoryItems(1)) {
+    alert(INVENTORY_FULL_MESSAGE);
+    return;
+  }
 
   if (credits < item.price) {
     alert("Not enough credits.");
@@ -2091,6 +2196,11 @@ function equipAttachmentFromInventory(key, quality = "standard", source = "owned
 
 function removeAttachment(index) {
   const loadout = getShipLoadout(selectedHangarShipId);
+  if (!canAddInventoryItems(1)) {
+    alert(INVENTORY_FULL_MESSAGE);
+    return;
+  }
+
   const [removed] = loadout.attachments.splice(index, 1);
 
   if (removed) {
@@ -2101,7 +2211,7 @@ function removeAttachment(index) {
     if (quality === "standard" && level <= 1) {
       ownedAttachments[key] = (ownedAttachments[key] || 0) + 1;
     } else {
-      inventoryItems.push({
+      addInventoryItem({
         id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         key,
         quality,
@@ -2156,6 +2266,11 @@ function equipGunFromInventory(key, quality = "standard", source = "owned") {
 
 function removeGun(index) {
   const loadout = getShipLoadout(selectedHangarShipId);
+  if (!canAddInventoryItems(1)) {
+    alert(INVENTORY_FULL_MESSAGE);
+    return;
+  }
+
   const [removed] = loadout.guns.splice(index, 1);
 
   if (removed) {
@@ -2166,7 +2281,7 @@ function removeGun(index) {
     if (quality === "standard" && level <= 1) {
       ownedGuns[key] = (ownedGuns[key] || 0) + 1;
     } else {
-      inventoryItems.push({
+      addInventoryItem({
         id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         key,
         quality,

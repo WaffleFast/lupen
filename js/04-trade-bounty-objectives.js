@@ -81,7 +81,7 @@ function updateTradeTimerDisplay() {
   const seconds = getNextMarketRefreshSeconds();
   const minutes = Math.floor(seconds / 60);
   const remainder = String(seconds % 60).padStart(2, "0");
-  cycleText.textContent = `Market shifts in ${minutes}:${remainder}`;
+  cycleText.textContent = `Prices refresh in: ${minutes}:${remainder}`;
 }
 
 function startTradeTerminalTimer() {
@@ -93,7 +93,7 @@ function startTradeTerminalTimer() {
     const cycle = getMarketCycle();
     if (cycle !== renderedMarketCycle && document.getElementById("marketScreen")?.classList.contains("active")) {
       renderedMarketCycle = cycle;
-      renderMarketplace();
+      updateTradeTimerDisplay();
     }
   }, 1000);
 }
@@ -134,12 +134,57 @@ function getDynamicMarketPrices(location = currentNode) {
   return prices;
 }
 
+function getMapOneMarketPrice(good, planet) {
+  return planetMarkets[planet]?.[good] || 0;
+}
+
+function getCurrentMarketPlanet() {
+  if (MAP_ONE_MARKET_PLANETS.includes(currentNode)) return currentNode;
+  if (MAP_ONE_MARKET_PLANETS.includes(lastPlanetNode)) return lastPlanetNode;
+  return "Asteron Prime";
+}
+
+function getOrderedMapOneMarketPlanets(currentPlanet = getCurrentMarketPlanet()) {
+  if (!MAP_ONE_MARKET_PLANETS.includes(currentPlanet)) return MAP_ONE_MARKET_PLANETS;
+  return [currentPlanet, ...MAP_ONE_MARKET_PLANETS.filter(planet => planet !== currentPlanet)];
+}
+
+function normalizeMarketBuilderState() {
+  const currentPlanet = getCurrentMarketPlanet();
+  if (activeTradeRoute?.marketTrade && MAP_ONE_TRADE_RESOURCES.includes(activeTradeRoute.good)) {
+    selectedMarketResource = activeTradeRoute.good;
+  }
+  const activeMarketTrade = activeTradeRoute?.marketTrade && activeTradeRoute.good === selectedMarketResource
+    ? activeTradeRoute
+    : null;
+
+  if (!MAP_ONE_TRADE_RESOURCES.includes(selectedMarketResource)) {
+    selectedMarketResource = "Crystal Shards";
+  }
+
+  if (activeMarketTrade?.destination && MAP_ONE_MARKET_PLANETS.includes(activeMarketTrade.destination)) {
+    selectedMarketTargetPlanet = activeMarketTrade.destination;
+  } else if (!MAP_ONE_MARKET_PLANETS.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === currentPlanet) {
+    selectedMarketTargetPlanet = MAP_ONE_MARKET_PLANETS.find(planet => planet !== currentPlanet) || "Nyxara";
+  }
+
+  const maxBuy = getMarketMaxBuyQuantity(selectedMarketResource, currentPlanet);
+  selectedMarketQuantity = clampNumber(selectedMarketQuantity || 1, 1, Math.max(1, maxBuy || getShipStats().cargo || 1));
+}
+
+function getMarketMaxBuyQuantity(good = selectedMarketResource, planet = getCurrentMarketPlanet()) {
+  const price = getMapOneMarketPrice(good, planet);
+  const maxAffordable = price > 0 ? Math.floor(credits / price) : 0;
+  const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
+  return Math.max(0, Math.min(maxAffordable, freeCargo));
+}
+
 function getCommodityBuyPrice(good, location = currentNode) {
   return getDynamicMarketPrices(location)[good] || 1;
 }
 
 function getCommoditySellPrice(good, location = currentNode) {
-  return Math.max(1, Math.floor(getCommodityBuyPrice(good, location) * 0.72));
+  return getCommodityBuyPrice(good, location);
 }
 
 function getActiveTradePricing(good) {
@@ -165,8 +210,7 @@ function getEffectiveSellPrice(good, location = currentNode) {
 }
 
 function setTradeTerminalTab(tabName) {
-  // Legacy-safe shim: the Trade Terminal is now contracts-first.
-  activeTradeTerminalTab = "contracts";
+  activeTradeTerminalTab = "market";
   renderMarketplace();
 }
 
@@ -190,14 +234,233 @@ function renderMarketplace() {
 
   if (!goodsBox) return;
   goodsBox.innerHTML = "";
-  renderTradeContractsTerminal(market, stock, goodsBox);
+
+  const listHeaderLabel = document.querySelector(".phase-one-market-header span:first-child");
+  if (listHeaderLabel) {
+    listHeaderLabel.textContent = "Market Board";
+  }
+  renderMapOneMarketTerminal(goodsBox);
+}
+
+function renderMapOneMarketTerminal(goodsBox) {
+  normalizeMarketBuilderState();
+
+  const currentPlanet = getCurrentMarketPlanet();
+  const orderedMarketPlanets = getOrderedMapOneMarketPlanets(currentPlanet);
+  const resource = selectedMarketResource;
+  const targetPlanet = selectedMarketTargetPlanet;
+  const quantity = selectedMarketQuantity;
+  const buyPrice = getMapOneMarketPrice(resource, currentPlanet);
+  const estimatedSellPrice = getMapOneMarketPrice(resource, targetPlanet);
+  const totalCost = buyPrice * quantity;
+  const estimatedRevenue = estimatedSellPrice * quantity;
+  const estimatedProfit = estimatedRevenue - totalCost;
+  const profitMargin = totalCost > 0 ? Math.round((estimatedProfit / totalCost) * 100) : 0;
+  const cargoSpaceUsed = quantity;
+  const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
+  const held = cargo[resource] || 0;
+  const atTargetWithCargo = held > 0 && currentPlanet === targetPlanet;
+  const maxBuy = getMarketMaxBuyQuantity(resource, currentPlanet);
+  const canBuy = quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
+  const info = commodityInfo[resource] || {};
+
+  goodsBox.innerHTML = `
+    <div class="map-one-market-terminal">
+      <div class="market-board-panel">
+        <div class="market-board-table-wrap">
+          <table class="market-board-table">
+            <thead>
+              <tr>
+                <th>Resource</th>
+                ${orderedMarketPlanets.map(planet => `<th>${planet}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${MAP_ONE_TRADE_RESOURCES.map(good => {
+                const rowInfo = commodityInfo[good] || {};
+                return `
+                  <tr class="${good === resource ? "selected-market-row" : ""}" onclick="setMarketResource('${escapeJsString(good)}')">
+                    <td>
+                      <div class="market-resource-cell">
+                        <span class="commodity-icon market-board-icon">
+                          <img src="${rowInfo.icon || getCommodityImage(good)}" alt="${good}" class="commodity-icon-img">
+                        </span>
+                        <strong>${good}</strong>
+                      </div>
+                    </td>
+                    ${orderedMarketPlanets.map(planet => `
+                      <td class="${planet === currentPlanet ? "current-market-planet" : ""}">CR ${formatNumber(getMapOneMarketPrice(good, planet))}</td>
+                    `).join("")}
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside class="market-builder-panel ${getCommodityRarityClass(resource)}">
+        <div class="trade-panel-kicker">Trade Builder</div>
+        <div class="market-builder-selected">
+          <span class="commodity-icon market-builder-icon">
+            <img src="${info.icon || getCommodityImage(resource)}" alt="${resource}" class="commodity-icon-img">
+          </span>
+          <div>
+            <h3>${resource}</h3>
+            <p>${currentPlanet} &gt; ${targetPlanet}</p>
+          </div>
+        </div>
+
+        <div class="market-builder-controls">
+          <label>
+            <span>Target Planet</span>
+            <select class="market-target-select" onchange="setMarketTargetPlanet(this.value)">
+              ${MAP_ONE_MARKET_PLANETS.filter(planet => planet !== currentPlanet || planet === targetPlanet).map(planet => `<option value="${planet}" ${planet === targetPlanet ? "selected" : ""}>${planet}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            <span>Buy Amount</span>
+            <div class="market-amount-control">
+              <strong>${formatNumber(quantity)} units</strong>
+              <button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
+              <button class="trade-primary-action" onclick="buyMarketCargo()" ${canBuy ? "" : "disabled"}>Buy Cargo</button>
+            </div>
+          </label>
+        </div>
+
+        <div class="market-builder-summary">
+          <div><span>Total Cost</span><strong>CR ${formatNumber(totalCost)}</strong></div>
+          <div class="profit-summary-card"><span>Estimated Profit</span><strong class="${estimatedProfit >= 0 ? "profit-good" : "profit-bad"}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>
+        </div>
+
+        ${held > 0 ? `<div class="market-builder-actions has-sell">
+          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()">${atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
+        </div>` : ""}
+      </aside>
+    </div>
+  `;
+}
+
+function setMarketResource(good) {
+  if (!MAP_ONE_TRADE_RESOURCES.includes(good)) return;
+  selectedMarketResource = good;
+  tutorialEvent("selectedMarketResource");
+  renderMarketplace();
+}
+
+function setMarketTargetPlanet(planet) {
+  if (!MAP_ONE_MARKET_PLANETS.includes(planet)) return;
+  selectedMarketTargetPlanet = planet;
+  tutorialEvent("selectedMarketTarget");
+  renderMarketplace();
+}
+
+function syncMarketQuantity(value) {
+  selectedMarketQuantity = clampNumber(value, 1, 999999);
+  tutorialEvent("selectedBuyAmount");
+  renderMarketplace();
+}
+
+function adjustMarketQuantity(delta) {
+  normalizeMarketBuilderState();
+  const maxBuy = getMarketMaxBuyQuantity();
+  selectedMarketQuantity = clampNumber((selectedMarketQuantity || 1) + delta, 1, Math.max(1, maxBuy));
+  tutorialEvent("selectedBuyAmount");
+  renderMarketplace();
+}
+
+function setMarketQuantityMax() {
+  selectedMarketQuantity = Math.max(1, getMarketMaxBuyQuantity());
+  tutorialEvent("selectedBuyAmount");
+  renderMarketplace();
+}
+
+function buyMarketCargo() {
+  normalizeMarketBuilderState();
+
+  const currentPlanet = getCurrentMarketPlanet();
+  const good = selectedMarketResource;
+  const quantity = selectedMarketQuantity;
+  const price = getMapOneMarketPrice(good, currentPlanet);
+  const totalCost = price * quantity;
+  const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
+
+  if (quantity <= 0 || !price || credits < totalCost || freeCargo < quantity) {
+    alert("Check quantity, credits and cargo space before buying.");
+    return;
+  }
+
+  const previousHeld = cargo[good] || 0;
+  const previousBasis = cargoCostBasis[good] || price;
+
+  credits -= totalCost;
+  cargo[good] += quantity;
+  cargoCostBasis[good] = Math.round(((previousHeld * previousBasis) + totalCost) / Math.max(1, previousHeld + quantity));
+  setActiveTradeObjective({
+    id: `market-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+    good,
+    origin: currentPlanet,
+    destination: selectedMarketTargetPlanet,
+    buyPrice: price,
+    sellPrice: getMapOneMarketPrice(good, selectedMarketTargetPlanet),
+    profitPerUnit: getMapOneMarketPrice(good, selectedMarketTargetPlanet) - price,
+    maxUnits: quantity,
+    purchasedUnits: quantity,
+    realizedProfit: 0,
+    marketTrade: true
+  });
+
+  tutorialEvent("boughtTradeCargo");
+  saveGame();
+  renderMarketplace();
+  updateCargoSummary();
+  updateSpaceHUD();
+  renderObjectiveHud();
+  if (document.getElementById("sectorMap")?.classList.contains("active")) renderSectorMap();
+}
+
+function sellMarketCargo() {
+  normalizeMarketBuilderState();
+  const good = selectedMarketResource;
+  const held = cargo[good] || 0;
+  if (held <= 0) {
+    alert(`You have no ${good} in cargo.`);
+    return;
+  }
+
+  const currentPlanet = getCurrentMarketPlanet();
+  const price = getEffectiveSellPrice(good, currentPlanet);
+  const unitCost = cargoCostBasis[good] || getEffectiveBuyPrice(good, currentPlanet) || price;
+  const saleRevenue = price * held;
+  const tradeProfit = held * (price - unitCost);
+
+  cargo[good] = 0;
+  credits += saleRevenue;
+  delete cargoCostBasis[good];
+  playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + held;
+
+  const activeTrade = getActiveTradePricing(good);
+  if (activeTrade && currentPlanet === activeTrade.destination) {
+    updateActiveTradeProgress({
+      realizedProfit: Math.max(0, Number(activeTrade.realizedProfit || 0)) + Math.max(0, tradeProfit)
+    });
+  }
+
+  showTradeResultBurst({ good, quantity: held, profit: tradeProfit, revenue: saleRevenue });
+  showTradeMiniFloat({ profit: tradeProfit });
+  completeActiveTradeIfReady(good);
+  tutorialEvent("soldTradeCargo");
+  saveGame();
+  renderMarketplace();
+  updateCargoSummary();
+  updateSpaceHUD();
 }
 
 function renderBuyCommodities(market, stock, goodsBox) {
   goodsBox.innerHTML = `<div class="trade-commodity-grid"></div>`;
   const grid = goodsBox.querySelector(".trade-commodity-grid");
 
-  mineralKeys.forEach(good => {
+  MAP_ONE_TRADE_RESOURCES.forEach(good => {
     const buyPrice = market[good];
     const info = commodityInfo[good];
     const availableCargo = getShipStats().cargo - cargoUsed();
@@ -536,7 +799,7 @@ function buildStationTradeContracts(origin = currentNode) {
   const usableCargo = freeCargo || getShipStats().cargo;
   const routes = [];
 
-  mineralKeys.forEach(good => {
+  MAP_ONE_TRADE_RESOURCES.forEach(good => {
     destinations.forEach(destination => {
       const buyPrice = getCommodityBuyPrice(good, origin);
       const marketSellPrice = getCommoditySellPrice(good, destination);
@@ -622,7 +885,6 @@ function acceptTradeRoute(good, origin, destination) {
   selectedStationTradeRoute = null;
   activeTradeTerminalTab = "contracts";
   addActivityLog(`Trade route accepted: buy ${formatNumber(acceptedRoute.maxUnits || 0)} ${good} at ${origin} to lock in the run.`);
-  tutorialEvent("acceptedTrade");
   saveGame();
   renderMarketplace();
   updateSpaceHUD();
@@ -707,7 +969,6 @@ function selectStationTradeRoute(good, origin, destination) {
   }
 
   selectedStationTradeRoute = route;
-  tutorialEvent("selectedTrade");
   renderMarketplace();
 }
 
@@ -925,6 +1186,7 @@ function completeActiveTradeIfReady(good) {
 }
 
 let bountyResetCountdownTimer = null;
+let bountyBoardTimer = null;
 
 function formatBountyResetCountdown(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600);
@@ -938,7 +1200,7 @@ function updateBountyResetCountdown() {
   if (!countdown) return;
 
   const secondsUntilReset = getDailyResetSeconds();
-  countdown.textContent = `Resets in ${formatBountyResetCountdown(secondsUntilReset)}`;
+  countdown.textContent = `RESETS IN ${formatBountyResetCountdown(secondsUntilReset)}`;
   countdown.title = "Daily contracts refresh at local midnight.";
 
   if (secondsUntilReset <= 1) {
@@ -949,41 +1211,189 @@ function updateBountyResetCountdown() {
 function startBountyResetTimer() {
   stopBountyResetTimer();
   updateBountyResetCountdown();
-  bountyResetCountdownTimer = setInterval(updateBountyResetCountdown, 1000);
+  bountyResetCountdownTimer = setInterval(() => {
+    updateBountyResetCountdown();
+    updateActiveBountyTimers();
+  }, 1000);
 }
 
 function stopBountyResetTimer() {
   if (!bountyResetCountdownTimer) return;
   clearInterval(bountyResetCountdownTimer);
   bountyResetCountdownTimer = null;
+  stopBountyBoardTimer();
 }
 
+function startBountyBoardTimer() {
+  stopBountyBoardTimer();
+  bountyBoardTimer = setInterval(updateActiveBountyTimers, 1000);
+}
+
+function stopBountyBoardTimer() {
+  if (!bountyBoardTimer) return;
+  clearInterval(bountyBoardTimer);
+  bountyBoardTimer = null;
+}
+
+function cloneBountyReward(reward = {}) {
+  const legacyShards = Number(reward.weaponParts || 0) + Number(reward.equipmentModules || 0);
+  return {
+    credits: Number(reward.credits || 0),
+    xp: Number(reward.xp || 0),
+    lupenCores: Number(reward.lupenCores || 0),
+    lupenShards: Number(reward.lupenShards ?? legacyShards ?? 0)
+  };
+}
+
+function getBountyRequiredKills(contract) {
+  return Number(contract?.requiredKills || contract?.killsRequired || 1);
+}
+
+function formatBountyReward(reward = {}) {
+  const safeReward = cloneBountyReward(reward);
+  const parts = [];
+  if (safeReward.lupenCores) parts.push(`${formatNumber(safeReward.lupenCores)}x Lupen Core`);
+  if (safeReward.credits) parts.push(`CR ${formatNumber(safeReward.credits)}`);
+  if (safeReward.xp) parts.push(`${formatNumber(safeReward.xp)} XP`);
+  if (safeReward.lupenShards) parts.push(`${formatNumber(safeReward.lupenShards)} Lupen Shards`);
+  return parts.length ? parts.join(" / ") : "No reward";
+}
+
+function getBountyIconSrc(iconName) {
+  const iconMap = {
+    "bounty-patrol-sweep": "assets/bounties/bounty-patrol-sweep.png",
+    "bounty-rapid-response": "assets/bounties/bounty-rapid-response.png",
+    "bounty-behemoth-cull": "assets/bounties/bounty-behemoth-cull.png"
+  };
+  if (!iconName) return "assets/bounties/raider-sweep.png";
+  if (iconMap[iconName]) return iconMap[iconName];
+  if (String(iconName).includes("/") || String(iconName).endsWith(".png")) return iconName;
+  if (typeof getBotImageSrc === "function") return getBotImageSrc(iconName);
+  return "assets/bounties/raider-sweep.png";
+}
+
+function doesBotCountForBounty(bot, bounty) {
+  if (!bot || !bounty) return false;
+  if (bounty.targetBotType === "any_erebus") {
+    return bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_");
+  }
+  return !bounty.targetBotType || bot.botType === bounty.targetBotType;
+}
+
+function formatBountyTime(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.ceil(Number(totalSeconds || 0)));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getBountyRemainingSeconds(contract) {
+  if (!contract?.timed) return null;
+  if (contract.status === "active" && contract.expiresAt) {
+    return Math.max(0, Math.ceil((Number(contract.expiresAt) - Date.now()) / 1000));
+  }
+  return Number(contract.timeLimitSeconds || 0);
+}
+
+function getBountyTimerLabel(contract) {
+  if (!contract?.timed) return "";
+  if (contract.status === "failed") return "FAILED";
+  if (["readyToClaim", "completed", "claimed"].includes(contract.status)) return "COMPLETED";
+  const timeText = formatBountyTime(getBountyRemainingSeconds(contract));
+  return contract.status === "active" ? `TIME REMAINING ${timeText}` : `TIME LIMIT ${timeText}`;
+}
+
+function getBountyTimerParts(contract) {
+  const text = getBountyTimerLabel(contract);
+  if (!text) return null;
+  const match = text.match(/^(TIME LIMIT|TIME REMAINING)\s+(.+)$/);
+  return match ? { label: match[1], value: match[2] } : { label: "STATUS", value: text };
+}
+
+function expireBountyContract(contract, shouldSave = true) {
+  if (!contract || contract.status !== "active") return false;
+  contract.status = "failed";
+  contract.progress = 0;
+  contract.expiresAt = null;
+  if (activeObjective?.type === "bounty" && activeObjective.contractId === contract.id) {
+    activeObjective.status = "failed";
+    activeObjective = null;
+  }
+  if (activeBountyId === contract.id) activeBountyId = null;
+  addActivityLog(`Bounty expired: ${contract.title || contract.name}.`);
+  updateHudDock();
+  updateBountyHubBadge();
+  if (shouldSave) saveGame();
+  return true;
+}
+
+function updateActiveBountyTimers() {
+  let changed = false;
+  dailyBountyContracts.forEach(contract => {
+    if (contract.timed && contract.status === "active" && contract.expiresAt && Date.now() > Number(contract.expiresAt)) {
+      changed = expireBountyContract(contract, false) || changed;
+    }
+  });
+  if (changed) saveGame();
+  if (document.getElementById("bountyScreen")?.classList.contains("active")) renderBountyBoard();
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+}
 
 function ensureDailyBounties() {
   const today = getTodayKey();
-  if (dailyBountyDate !== today || !Array.isArray(dailyBountyContracts) || !dailyBountyContracts.length) {
+  const templateIds = DAILY_BOUNTY_CONTRACTS.map(contract => contract.id).join("|");
+  const currentIds = Array.isArray(dailyBountyContracts) ? dailyBountyContracts.map(contract => contract.id).join("|") : "";
+  if (dailyBountyDate !== today || !Array.isArray(dailyBountyContracts) || !dailyBountyContracts.length || currentIds !== templateIds) {
     dailyBountyDate = today;
     dailyBountyContracts = createDailyBountyContracts();
     selectedBountyContractId = dailyBountyContracts[0]?.id || null;
+    activeBountyId = null;
+    if (activeObjective?.type === "bounty") activeObjective = null;
   }
 
   dailyBountyContracts = dailyBountyContracts.map(contract => {
     const template = DAILY_BOUNTY_CONTRACTS.find(item => item.id === contract.id) || contract;
     const targetArea = contract.targetArea || template.targetArea || "anyHostile";
+    const requiredKills = getBountyRequiredKills({ ...template, ...contract });
+    const savedTargetBotType = contract.targetBotType || "";
+    const legacyPrefix = "man" + "ta_";
+    const legacyPattern = new RegExp("man" + "ta", "i");
+    const hasLegacyBotData = savedTargetBotType.startsWith(legacyPrefix) || legacyPattern.test(`${contract.subtitle || ""} ${contract.description || ""} ${contract.targetBotLabel || ""} ${contract.icon || ""}`);
+    const targetBotType = hasLegacyBotData ? template.targetBotType : (contract.targetBotType || template.targetBotType || null);
     return {
       ...template,
       ...contract,
+      name: hasLegacyBotData ? template.name : (contract.name || contract.title || template.name || template.title),
+      title: hasLegacyBotData ? template.title : (contract.title || contract.name || template.title || template.name),
+      subtitle: hasLegacyBotData ? template.subtitle : (contract.subtitle || template.subtitle || ""),
+      description: hasLegacyBotData ? template.description : (contract.description || template.description || ""),
+      type: contract.type || template.type || "standard",
+      chipLabel: contract.chipLabel || template.chipLabel || "STANDARD",
+      area: contract.area || template.area || getBountyAreaLabel(targetArea),
       targetArea,
       targetLabel: contract.targetLabel || template.targetLabel || getBountyAreaLabel(targetArea),
+      targetBotType,
+      targetBotLabel: hasLegacyBotData ? template.targetBotLabel : (contract.targetBotLabel || template.targetBotLabel || "Hostile Bot"),
       targetNode: undefined,
-      killsRequired: Number(contract.killsRequired || template.killsRequired || 1),
-      reward: Number(contract.reward || template.reward || 0),
+      requiredKills,
+      killsRequired: requiredKills,
+      reward: cloneBountyReward(typeof contract.reward === "object" ? contract.reward : template.reward),
       lootChance: Number(contract.lootChance ?? template.lootChance ?? 0),
       materialReward: contract.materialReward || template.materialReward || null,
       progress: Math.max(0, Number(contract.progress || 0)),
-      status: ["available", "active", "readyToClaim", "completed"].includes(contract.status) ? contract.status : "available"
+      timed: Boolean(contract.timed ?? template.timed),
+      timeLimitSeconds: contract.timeLimitSeconds ?? template.timeLimitSeconds ?? null,
+      expiresAt: contract.expiresAt || null,
+      bonus: contract.bonus ?? template.bonus ?? null,
+      accent: contract.accent || template.accent || "blue",
+      icon: hasLegacyBotData ? template.icon : (contract.icon || template.icon),
+      fallbackIcon: hasLegacyBotData ? template.fallbackIcon : (contract.fallbackIcon || template.fallbackIcon || "assets/bots/erebus-attacker.png"),
+      status: ["available", "active", "readyToClaim", "completed", "claimed", "failed"].includes(contract.status) ? contract.status : "available"
     };
   });
+
+  const activeContract = dailyBountyContracts.find(contract => contract.status === "active");
+  activeBountyId = activeContract?.id || null;
 }
 
 function getBountyContract(contractId) {
@@ -993,15 +1403,16 @@ function getBountyContract(contractId) {
 
 function getBountyObjectiveIcon(objective) {
   const contract = objective?.contractId ? getBountyContract(objective.contractId) : null;
-  return objective?.icon || contract?.icon || "assets/bounties/raider-sweep.png";
+  return getBountyIconSrc(objective?.icon || contract?.icon || contract?.fallbackIcon);
 }
 
 function getBountyStatusLabel(contract) {
+  if (contract.status === "failed") return "FAILED";
   if (contract.status === "readyToClaim") return "COMPLETE";
   if (activeObjective?.type === "bounty" && activeObjective.contractId === contract.id) {
     return activeObjective.status === "readyToClaim" ? "COMPLETE" : "ACTIVE";
   }
-  if (contract.status === "completed") return "CLAIMED";
+  if (contract.status === "completed" || contract.status === "claimed") return "CLAIMED";
   return "AVAILABLE";
 }
 
@@ -1010,44 +1421,48 @@ function renderBountyBoard() {
   updateBountyResetCountdown();
 
   const title = document.getElementById("bountyLocationTitle");
-  const availableText = document.getElementById("bountyAvailableText");
-  const creditsText = document.getElementById("bountyCreditsText");
   const grid = document.getElementById("bountyContractGrid");
 
   if (title) title.textContent = `DAILY SECTOR BOUNTIES`;
-  if (availableText) {
-    const claimReady = dailyBountyContracts.filter(contract => contract.status === "readyToClaim").length;
-    const available = dailyBountyContracts.filter(contract => contract.status === "available").length;
-    availableText.textContent = claimReady ? `${claimReady} ready` : `${available}/${dailyBountyContracts.length}`;
-  }
-  if (creditsText) creditsText.textContent = formatNumber(credits);
 
   if (activeObjective?.type === "bounty" && activeObjective.status === "readyToClaim") {
     selectedBountyContractId = activeObjective.contractId;
   }
 
   if (!selectedBountyContractId || !getBountyContract(selectedBountyContractId)) {
-    selectedBountyContractId = dailyBountyContracts.find(contract => contract.status === "readyToClaim")?.id || dailyBountyContracts.find(contract => contract.status !== "completed")?.id || dailyBountyContracts[0]?.id || null;
+    selectedBountyContractId = dailyBountyContracts.find(contract => contract.status === "readyToClaim")?.id || dailyBountyContracts.find(contract => !["completed", "claimed", "failed"].includes(contract.status))?.id || dailyBountyContracts[0]?.id || null;
   }
 
   if (grid) {
     grid.innerHTML = dailyBountyContracts.map(contract => {
       const isSelected = selectedBountyContractId === contract.id;
       const status = getBountyStatusLabel(contract);
-      const complete = contract.status === "completed";
+      const complete = contract.status === "completed" || contract.status === "claimed";
       const ready = contract.status === "readyToClaim";
-      const icon = contract.icon || "assets/bounties/raider-sweep.png";
+      const failed = contract.status === "failed";
+      const active = contract.status === "active";
+      const statusKey = complete ? "claimed" : ready ? "completed" : failed ? "failed" : active ? "active" : "available";
+      const icon = getBountyIconSrc(contract.icon || contract.fallbackIcon);
+      const timerParts = getBountyTimerParts(contract);
       return `
-        <button class="bounty-contract-card ${isSelected ? "selected" : ""} ${complete ? "completed" : ""} ${ready ? "ready-to-claim" : ""}" onclick="selectBountyContract('${escapeJsString(contract.id)}')">
-          <span class="bounty-card-icon"><img src="${icon}" alt=""></span>
-          <span class="bounty-card-copy">
-            <strong>${contract.title}</strong>
-            <em>${contract.contractType || "Contract"} / ${contract.targetLabel}</em>
+        <button class="bounty-card bounty-contract-card bounty-card--${escapeHtml(contract.type || "standard")} bounty-card--${statusKey} ${isSelected ? "selected bounty-card--selected" : ""} ${complete ? "completed" : ""} ${ready ? "ready-to-claim" : ""} ${failed ? "failed" : ""} ${active ? "active" : ""}" onclick="selectBountyContract('${escapeJsString(contract.id)}')">
+          ${ready || complete ? `<span class="bounty-card__status-check" aria-hidden="true">✓</span>` : ""}
+          <span class="bounty-card__icon-frame bounty-card-icon"><img src="${icon}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></span>
+          <span class="bounty-card__body bounty-card-copy">
+            <strong class="bounty-card__title">${contract.title || contract.name}</strong>
+            <span class="bounty-card__subtitle">${contract.subtitle || contract.description}</span>
+            <span class="bounty-card__chips">
+              <span class="bounty-chip bounty-chip--${escapeHtml(contract.type || "standard")}">${contract.chipLabel || "STANDARD"}</span>
+              <span class="bounty-chip bounty-chip--target">${formatNumber(getBountyRequiredKills(contract))} ${contract.targetBotLabel || "bots"}</span>
+              <span class="bounty-chip bounty-card-threat">${contract.threat || "Standard"}</span>
+              ${timerParts ? `<span class="bounty-chip bounty-timer-chip"><small>${timerParts.label}</small><strong>${timerParts.value}</strong></span>` : ""}
+            </span>
           </span>
-          <span class="bounty-card-threat">${contract.threat || "Standard"}</span>
-          <span class="bounty-card-objective">${contract.killsRequired} bot${contract.killsRequired === 1 ? "" : "s"}</span>
-          <span class="bounty-card-reward">CR ${formatNumber(contract.reward)}</span>
-          <span class="bounty-card-status">${status}</span>
+          <span class="bounty-reward-box bounty-card-reward bounty-reward">
+            <span class="bounty-reward-box__label">REWARD</span>
+            <strong class="bounty-reward-box__value">${formatBountyReward(contract.reward)}<img class="bounty-reward-box__icon" src="assets/items/lupen-core.png" alt=""></strong>
+            <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
+          </span>
         </button>
       `;
     }).join("");
@@ -1067,52 +1482,74 @@ function renderBountyDetail() {
 
   const contract = getBountyContract(selectedBountyContractId);
   if (!contract) {
+    const shell = panel.closest(".selected-contract-panel");
+    if (shell) {
+      ["available", "active", "completed", "claimed", "failed"].forEach(state => shell.classList.remove(`selected-contract-panel--${state}`));
+    }
     panel.innerHTML = `<div class="bounty-empty">No bounty selected.</div>`;
     return;
   }
 
   const active = activeObjective?.type === "bounty" && activeObjective.contractId === contract.id;
   const readyToClaim = contract.status === "readyToClaim" || (active && activeObjective.status === "readyToClaim");
-  const complete = contract.status === "completed";
-  const progress = readyToClaim ? contract.killsRequired : active ? activeObjective.kills : contract.progress;
-  const progressPct = Math.max(0, Math.min(100, Math.round((progress / Math.max(1, contract.killsRequired)) * 100)));
-  const buttonDisabled = active || complete || readyToClaim || Boolean(getActiveObjective());
-  const buttonText = complete ? "Claimed" : readyToClaim ? "Complete" : active ? "Active" : getActiveObjective() ? "Objective Active" : "Accept Bounty";
-  const stateText = readyToClaim ? "Contract complete" : complete ? "Reward claimed" : active ? "Active objective" : "Available";
+  const complete = contract.status === "completed" || contract.status === "claimed";
+  const failed = contract.status === "failed";
+  const stateKey = complete ? "claimed" : readyToClaim ? "completed" : failed ? "failed" : active ? "active" : "available";
+  const shell = panel.closest(".selected-contract-panel");
+  if (shell) {
+    ["available", "active", "completed", "claimed", "failed"].forEach(state => shell.classList.remove(`selected-contract-panel--${state}`));
+    shell.classList.add(`selected-contract-panel--${stateKey}`);
+  }
+  const requiredKills = getBountyRequiredKills(contract);
+  const progress = readyToClaim ? requiredKills : active ? activeObjective.kills : contract.progress;
+  const progressPct = Math.max(0, Math.min(100, Math.round((progress / Math.max(1, requiredKills)) * 100)));
+  const buttonDisabled = active || complete || readyToClaim || failed || Boolean(getActiveObjective());
+  const buttonText = complete ? "Claimed" : failed ? "Failed" : readyToClaim ? "Claim Reward" : active ? "Active Bounty" : getActiveObjective() ? "Objective Active" : "Accept Bounty";
+  const stateText = failed ? "Failed" : readyToClaim ? "Contract complete" : complete ? "Reward claimed" : active ? "Active objective" : "Available";
+  const timerParts = getBountyTimerParts(contract);
   const completionNote = readyToClaim
     ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Return to the board and claim this payout.</span></div>`
     : complete
       ? `<div class="bounty-complete-note claimed"><strong>Claimed</strong><span>This contract has been paid out.</span></div>`
+      : failed
+        ? `<div class="bounty-complete-note failed"><strong>Expired</strong><span>This contract failed before completion.</span></div>`
       : "";
-  const icon = contract.icon || "assets/bounties/raider-sweep.png";
+  const icon = getBountyIconSrc(contract.icon || contract.fallbackIcon);
+  const infoRows = [
+    ["AREA", contract.area || contract.targetLabel],
+    ["TARGET", contract.targetBotLabel],
+    ["THREAT", contract.threat || "Standard"],
+    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} bots`],
+    ["REWARD", `<span class="selected-bounty-reward selected-bounty-reward--${stateKey}"><span>${formatBountyReward(contract.reward)}</span><img src="assets/items/lupen-core.png" alt=""></span>`]
+  ];
+  if (contract.bonus) infoRows.push(["BONUS", contract.bonus]);
 
   panel.innerHTML = `
-    <div class="bounty-detail-hero ${readyToClaim ? "reward-ready" : ""} ${complete ? "completed" : ""}">
-      <div class="bounty-detail-icon"><img src="${icon}" alt=""></div>
-      <div>
-        <span class="bounty-detail-kicker">${stateText}</span>
-        <strong>${contract.title}</strong>
-        <span>${readyToClaim ? "Contract complete. Claim your reward while docked." : complete ? "Reward claimed. This bounty is closed." : contract.description}</span>
+    <div class="selected-contract-top bounty-detail-hero selected-bounty-header selected-contract-top--${stateKey} ${readyToClaim ? "reward-ready" : ""} ${complete ? "completed" : ""} ${failed ? "failed" : ""}">
+      <div class="selected-contract-icon bounty-detail-icon"><img src="${icon}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></div>
+      <div class="selected-contract-copy">
+        <span class="bounty-chip bounty-chip--${escapeHtml(contract.type || "standard")}">${contract.chipLabel || stateText}</span>
+        ${readyToClaim || complete ? `<span class="selected-contract-check" aria-hidden="true">✓</span>` : ""}
+        <strong>${contract.title || contract.name}</strong>
+        <span>${readyToClaim ? "Contract complete. Claim your reward while docked." : complete ? "Reward claimed. This bounty is closed." : failed ? "This timed contract has expired." : contract.description}</span>
       </div>
     </div>
 
     ${completionNote}
 
-    <div class="bounty-detail-progress-block">
-      <div class="bounty-progress-heading"><span>Progress</span><strong>${formatNumber(progress)} / ${formatNumber(contract.killsRequired)}</strong></div>
+    <div class="selected-contract-progress bounty-detail-progress-block selected-bounty-progress">
+      <div class="bounty-progress-heading"><span>Progress</span><strong>${formatNumber(progress)} / ${formatNumber(requiredKills)}</strong></div>
       <div class="bounty-progress-bar"><span style="width:${progressPct}%"></span></div>
     </div>
 
-    <div class="bounty-detail-grid">
-      <div class="bounty-detail-stat"><span>Area</span><strong>${contract.targetLabel}</strong></div>
-      <div class="bounty-detail-stat"><span>Threat</span><strong>${contract.threat || "Standard"}</strong></div>
-      <div class="bounty-detail-stat"><span>Objective</span><strong>${contract.killsRequired} bot${contract.killsRequired === 1 ? "" : "s"}</strong></div>
-      <div class="bounty-detail-stat"><span>Reward</span><strong>CR ${formatNumber(contract.reward)}</strong></div>
-      <div class="bounty-detail-stat"><span>Loot</span><strong>${contract.lootLabel || "Rare chance"}</strong></div>
+    ${timerParts ? `<div class="selected-contract-timer selected-bounty-timer"><span>${timerParts.label}</span><strong>${timerParts.value}</strong></div>` : ""}
+
+    <div class="selected-contract-rows bounty-detail-grid">
+      ${infoRows.map(([label, value]) => `<div class="selected-contract-row bounty-detail-stat selected-bounty-info-row"><span>${label}</span><strong>${value || "None"}</strong></div>`).join("")}
     </div>
 
-    <div class="bounty-detail-actions">
-      ${readyToClaim ? `<button class="bounty-claim-btn" onclick="claimBountyReward('${escapeJsString(contract.id)}')">Claim Reward</button>` : `<button class="bounty-accept-btn" ${buttonDisabled ? "disabled" : ""} onclick="acceptBountyContract('${escapeJsString(contract.id)}')">${buttonText}</button>`}
+    <div class="selected-contract-actions bounty-detail-actions">
+      ${readyToClaim ? `<button class="selected-contract-action bounty-claim-btn" onclick="claimBountyReward('${escapeJsString(contract.id)}')">Claim Reward</button>` : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${buttonDisabled ? "disabled" : ""} onclick="acceptBountyContract('${escapeJsString(contract.id)}')">${buttonText}</button>`}
       ${active && !readyToClaim ? `<button class="bounty-cancel-btn" onclick="cancelActiveBountyContract('${escapeJsString(contract.id)}')">Cancel Bounty</button>` : ""}
     </div>
     ${active && !readyToClaim ? `<p class="bounty-detail-note compact">Docked only / cancelling clears progress.</p>` : ""}
@@ -1121,19 +1558,25 @@ function renderBountyDetail() {
 }
 
 function createBountyObjective(contract) {
+  const requiredKills = getBountyRequiredKills(contract);
   return {
     id: `bounty-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
     type: "bounty",
     contractId: contract.id,
-    title: contract.title,
+    title: contract.title || contract.name,
     targetArea: contract.targetArea || "anyHostile",
     targetLabel: contract.targetLabel || getBountyAreaLabel(contract.targetArea),
-    killsRequired: contract.killsRequired,
+    targetBotType: contract.targetBotType || null,
+    targetBotLabel: contract.targetBotLabel || "Hostile Bot",
+    killsRequired: requiredKills,
     kills: contract.progress || 0,
     reward: contract.reward,
+    timed: Boolean(contract.timed),
+    timeLimitSeconds: contract.timeLimitSeconds || null,
+    expiresAt: contract.expiresAt || null,
     lootChance: contract.lootChance,
     materialReward: contract.materialReward || null,
-    icon: contract.icon || "assets/bounties/raider-sweep.png",
+    icon: getBountyIconSrc(contract.icon || contract.fallbackIcon),
     createdAt: Date.now(),
     status: "active"
   };
@@ -1142,7 +1585,8 @@ function createBountyObjective(contract) {
 function generateBountyMaterialRewards(contract) {
   const rule = contract?.materialReward;
   if (!rule || Math.random() >= Number(rule.chance || 0)) return [];
-  const materialKey = rule.altMaterialKey && Math.random() < 0.5 ? rule.altMaterialKey : rule.materialKey;
+  const rawMaterialKey = rule.altMaterialKey && Math.random() < 0.5 ? rule.altMaterialKey : rule.materialKey;
+  const materialKey = ["weaponParts", "equipmentModules"].includes(rawMaterialKey) ? "lupenShards" : rawMaterialKey;
   const definition = upgradeMaterialDefinitions?.[materialKey];
   if (!definition) return [];
 
@@ -1170,14 +1614,20 @@ function acceptBountyContract(contractId) {
   }
 
   const contract = getBountyContract(contractId);
-  if (!contract || contract.status === "completed") return;
+  if (!contract || ["completed", "claimed"].includes(contract.status)) return;
+  if (contract.status === "failed") {
+    alert("That contract has expired.");
+    return;
+  }
 
   contract.status = "active";
   contract.progress = 0;
+  contract.expiresAt = contract.timed ? Date.now() + (Number(contract.timeLimitSeconds || 0) * 1000) : null;
   activeObjective = createBountyObjective(contract);
+  activeBountyId = contract.id;
   selectedBountyContractId = contract.id;
 
-  addActivityLog(`Bounty accepted: ${contract.title}. Area: ${contract.targetLabel}.`);
+  addActivityLog(`Bounty accepted: ${contract.title || contract.name}. Target: ${contract.targetBotLabel}.`);
   tutorialEvent("acceptedBounty");
   renderBountyBoard();
   updateHudDock();
@@ -1192,8 +1642,10 @@ function cancelActiveBountyContract(contractId = null) {
 
   contract.status = "available";
   contract.progress = 0;
+  contract.expiresAt = null;
   selectedBountyContractId = contract.id;
-  addActivityLog(`Bounty cancelled: ${contract.title}.`);
+  activeBountyId = null;
+  addActivityLog(`Bounty cancelled: ${contract.title || contract.name}.`);
   activeObjective = null;
 
   renderBountyBoard();
@@ -1220,7 +1672,7 @@ function completeActiveBountyObjective() {
     jumpTimer = null;
   }
 
-  addActivityLog(`Bounty complete: ${activeObjective.title}. Return to any planet to claim CR ${formatNumber(activeObjective.reward)}.`);
+  addActivityLog(`Bounty complete: ${activeObjective.title}. Return to any planet to claim ${formatBountyReward(contract?.reward || activeObjective.reward)}.`);
   showBountyCompleteBurst(activeObjective);
   updateHudDock();
   updateBountyHubBadge();
@@ -1234,34 +1686,45 @@ function claimBountyReward(contractId) {
   const contract = getBountyContract(contractId);
   if (!contract || contract.status !== "readyToClaim") return;
 
-  const reward = Number(contract.reward || 0);
-  credits += reward;
-
   let bonusDrops = [];
   if (Math.random() < Number(contract.lootChance || 0)) {
     bonusDrops = generateBotLootItems();
-    if (bonusDrops.length) {
-      inventoryItems.push(...bonusDrops);
-      showItemFoundBurst(bonusDrops);
-    }
+  }
+
+  const reward = cloneBountyReward(contract.reward);
+  const neededItemSlots = reward.lupenCores + bonusDrops.length;
+  if (!canAddInventoryItems(neededItemSlots)) {
+    alert(INVENTORY_FULL_MESSAGE);
+    return;
+  }
+
+  const rewardSummary = formatBountyReward(contract.reward);
+  const applied = applyBountyReward(contract);
+
+  if (bonusDrops.length) {
+    const inventoryResult = addInventoryItems(bonusDrops);
+    bonusDrops = inventoryResult.added;
+    if (bonusDrops.length) showItemFoundBurst(bonusDrops);
   }
   const materialDrops = generateBountyMaterialRewards(contract);
   bonusDrops = [...bonusDrops, ...materialDrops];
 
   const bonusText = bonusDrops.length ? summarizeInventoryItems(bonusDrops) : "No bonus loot recovered.";
-  contract.status = "completed";
-  contract.progress = contract.killsRequired;
+  contract.status = "claimed";
+  contract.progress = getBountyRequiredKills(contract);
+  contract.expiresAt = null;
 
   if (activeObjective?.type === "bounty" && activeObjective.contractId === contract.id) {
     activeObjective = null;
   }
+  if (activeBountyId === contract.id) activeBountyId = null;
 
   selectedBountyContractId = dailyBountyContracts.find(item => item.status === "readyToClaim")?.id || dailyBountyContracts.find(item => item.status === "available")?.id || contract.id;
   awardBountyXpOnClaim(contract);
-  addActivityLog(`Bounty reward claimed: ${contract.title}. +CR ${formatNumber(reward)}. ${bonusText}`);
+  addActivityLog(`Bounty reward claimed: ${contract.title || contract.name}. +${rewardSummary}. ${bonusText}`);
   tutorialEvent("claimedBountyReward");
   if (typeof playRewardClaimSound === "function") playRewardClaimSound();
-  showBountyRewardOverlay(contract.title, reward, bonusDrops);
+  showBountyRewardOverlay(contract.title || contract.name, applied, bonusDrops);
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "continue-after-bounty-reward") {
     setTimeout(renderStarterTutorial, 80);
   }
@@ -1269,6 +1732,28 @@ function claimBountyReward(contractId) {
   updateBountyHubBadge();
   renderBountyBoard();
   saveGame();
+}
+
+function applyBountyReward(bounty) {
+  const reward = cloneBountyReward(bounty?.reward);
+  if (reward.lupenCores > 0) {
+    const coreDrops = [];
+    for (let index = 0; index < reward.lupenCores; index += 1) {
+      coreDrops.push(createInventoryDrop("lupenCore"));
+    }
+    addInventoryItems(coreDrops);
+  }
+
+  credits += reward.credits;
+  if (reward.xp > 0 && typeof addCombatXp === "function") {
+    addCombatXp(reward.xp, "bounty");
+  } else {
+    playerProgress.combatXp = Number(playerProgress.combatXp || 0) + reward.xp;
+  }
+  upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+  upgradeMaterials.lupenShards = Math.max(0, Number(upgradeMaterials.lupenShards || 0)) + reward.lupenShards;
+
+  return reward;
 }
 
 function showBountyRewardOverlay(title, reward, bonusDrops = []) {
@@ -1294,7 +1779,7 @@ function showBountyRewardOverlay(title, reward, bonusDrops = []) {
     <div class="reward-modal">
       <div class="reward-kicker">Bounty Reward Claimed</div>
       <h2>${title}</h2>
-      <div class="reward-credit-pulse">+ CR ${formatNumber(reward)}</div>
+      <div class="reward-credit-pulse">+ ${formatBountyReward(reward)}</div>
       <div class="reward-loot-list">${lootMarkup}</div>
       <button onclick="closeBountyRewardOverlay()">Continue</button>
     </div>
@@ -1315,11 +1800,25 @@ function closeBountyRewardOverlay() {
 function trackBountyBotKill(bot) {
   if (activeObjective?.type !== "bounty") return;
   if (activeObjective.status === "readyToClaim") return;
-  if (!bot || !isNodeInBountyArea(bot.node, activeObjective.targetArea)) return;
+  if (!bot) return;
+  const botNode = bot.currentNodeId || bot.node;
+  if (!isNodeInBountyArea(botNode, activeObjective.targetArea)) return;
+
+  const contract = getBountyContract(activeObjective.contractId);
+  if (!contract || contract.status !== "active") return;
+  if (contract.timed && contract.expiresAt && Date.now() > Number(contract.expiresAt)) {
+    expireBountyContract(contract);
+    renderBountyBoard();
+    return;
+  }
+  if (!doesBotCountForBounty(bot, contract)) {
+    addActivityLog(`Bounty target mismatch: destroyed ${bot.displayName || bot.name || "hostile bot"}, but ${contract.targetBotLabel} required.`);
+    updateHudDock();
+    return;
+  }
 
   activeObjective.kills = Math.min(activeObjective.killsRequired, (activeObjective.kills || 0) + 1);
 
-  const contract = getBountyContract(activeObjective.contractId);
   if (contract) {
     contract.progress = activeObjective.kills;
     contract.status = "active";

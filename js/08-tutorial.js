@@ -17,42 +17,35 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-first-ship",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. This is where you will manage your ship, complete repairs and improve your fleet.",
+    text: "Open Hangar Bay. With no active vessel, the bay will take you straight to the Vessel Exchange.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
-    id: "open-vessel-exchange-first-ship",
-    title: "Open Vessel Exchange",
-    text: "Click Vessel Exchange. This is where you will buy your first hull and compare future ships.",
-    target: "tutorial:vesselExchangeTab",
-    event: "openedVesselExchange"
-  },
-  {
     id: "buy-first-ship",
-    title: "Buy your first ship",
-    text: "Buy the LF-1 Origin. It is only a starter hull, but your loadout will decide what it becomes.",
+    title: "Buy Your First Hull",
+    text: "Buy the LF-1 Origin. It is the starter hull, and the loadout you fit next will decide what kind of pilot it becomes.",
     target: "tutorial:firstShipBuy",
     event: "boughtFirstShip"
   },
   {
     id: "open-first-loadout",
     title: "Open Loadout",
-    text: "Open Loadout. This is where you will fit guns and equipment to shape your ship.",
+    text: "Open the Loadout tab. This is where weapons, equipment and repairs live for your active vessel.",
     target: "tutorial:hangarLoadoutTab",
     event: "openedHangarLoadout"
   },
   {
     id: "equip-first-gun",
-    title: "Equip first gun",
-    text: "Fit your first gun from Available Equipment. This gives your ship its first real attack system.",
+    title: "Equip First Gun",
+    text: "Fit your first gun from Available Equipment. The Weapons rail will show it installed around the ship.",
     target: "tutorial:firstGun",
     event: "equippedFirstGun"
   },
   {
     id: "equip-second-gun",
-    title: "Equip second gun",
-    text: "Fit a second gun. More gun slots mean more attacking potential when combat begins.",
+    title: "Equip Second Gun",
+    text: "Fit a second gun. Multiple weapon slots combine into your active attack system in combat.",
     target: "tutorial:secondGun",
     event: "equippedSecondGun"
   },
@@ -86,31 +79,31 @@ const STARTER_TUTORIAL_STEPS = [
     event: "openedTradeTerminal"
   },
   {
-    id: "preview-trade",
-    title: "Preview a trade",
-    text: "Click Preview on a station trade. Check the margin, units, jumps and CR per jump before you commit.",
-    target: ".trade-contract-card",
-    event: "selectedTrade"
+    id: "select-market-resource",
+    title: "Select a resource",
+    text: "Select a resource on the market board. The Trade Builder will calculate the route numbers.",
+    target: ".market-board-table tbody tr",
+    event: "selectedMarketResource"
   },
   {
-    id: "accept-trade",
-    title: "Accept the trade",
-    text: "Press Accept Trade. This creates your active objective and unlocks the buy controls.",
-    target: ".accept-route-action",
-    event: "acceptedTrade"
+    id: "select-market-target",
+    title: "Choose destination",
+    text: "Choose a target planet in the Trade Builder. Sell price and estimated profit update from live market prices.",
+    target: ".market-target-select",
+    event: "selectedMarketTarget"
   },
   {
     id: "select-buy-amount",
     title: "Choose buy amount",
-    text: "Choose how much cargo you want to buy. Use Max for the quickest tutorial run.",
-    target: ".trade-max-btn, .trade-amount-btn, .trade-qty-input",
+    text: "Choose how much cargo you want to buy. MAX fills the run using your credits and free cargo space.",
+    target: "tutorial:buyAmount",
     event: "selectedBuyAmount"
   },
   {
     id: "buy-cargo",
     title: "Buy cargo",
-    text: "Now press Buy Cargo. Your Objectives tab will guide you to the destination.",
-    target: ".trade-primary-action",
+    text: "Now press Buy Cargo. The route objective will guide you to the selected destination.",
+    target: "tutorial:buyCargo",
     event: "boughtTradeCargo"
   },
   {
@@ -124,21 +117,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "launch",
     title: "Launch into orbit",
-    text: "Click Launch Ship. Your accepted trade route will remain active in space.",
+    text: "Click Launch Ship. Your market route will remain active in space.",
     target: ".hub-launch-btn",
     event: "launched"
   },
   {
     id: "map-route",
     title: "Open the sector map",
-    text: "Wait for your Jump bar to recharge, then click Jump to open the sector map.",
+    text: "Wait for your Jump bar to recharge, then click MAP to open the sector map.",
     target: "#jumpBtn",
     event: "openedSectorMap"
   },
   {
     id: "make-jump",
     title: "Continue route",
-    text: "After each jump, let your Jump bar recharge. Then open the map and keep following the highlighted route.",
+    text: "After each jump, let the Jump bar recharge. Open MAP again and keep following the highlighted route.",
     target: "dynamicTradeRoute",
     event: "jumpedNode"
   },
@@ -160,7 +153,7 @@ const STARTER_TUTORIAL_STEPS = [
     id: "sell-cargo",
     title: "Sell cargo",
     text: "Sell your route cargo to complete the trade and bank your profit.",
-    target: ".trade-primary-action",
+    target: "tutorial:sellCargo",
     event: "soldTradeCargo"
   },
   {
@@ -247,7 +240,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-map-for-bounty",
     title: "Open sector map",
-    text: "Wait for your Jump bar, then click Jump to open the sector map.",
+    text: "Wait for your Jump bar, then click MAP to open the sector map.",
     target: "#jumpBtn",
     event: "openedSectorMap"
   },
@@ -269,8 +262,8 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "destroy-bot",
     title: "Destroy the bounty bots",
-    text: "Use Jump and Bots scan as needed, then fight normally until the bounty objective is complete.",
-    target: null,
+    text: "Use MAP, Bots scan and ENGAGE as needed, then fight normally until the bounty objective is complete.",
+    target: "tutorial:destroyBountyBot",
     event: ["destroyedBountyBot", "openedSectorMap", "scannedBots", "jumpedNode"],
     place: "left"
   },
@@ -305,7 +298,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "claim-bounty",
     title: "Claim bounty reward",
-    text: "Open the Bounty Board, then claim your completed bounty. This is your combat payout moment.",
+    text: "Claim your completed bounty. Combat payouts now include credits, XP, Lupen Shards and Lupen Cores.",
     target: "tutorial:claimBountyReward",
     event: ["openedBountyBoard", "claimedBountyReward"]
   },
@@ -326,16 +319,31 @@ const STARTER_TUTORIAL_STEPS = [
     place: "left"
   },
   {
+    id: "open-forge",
+    title: "Open Forge",
+    text: "Open the Forge. Lupen Shards raise item levels, while Lupen Cores support quality upgrades.",
+    target: ".hub-actions button[onclick='openUpgradeForge()']",
+    event: "openedForge"
+  },
+  {
+    id: "return-after-forge",
+    title: "Back to station",
+    text: "Return to the station hub. Before the starter route ends, check your ship after combat.",
+    target: "#upgradeForgeScreen .screen-back-btn",
+    event: "returnedToHub",
+    place: "left"
+  },
+  {
     id: "repair-reminder",
     title: "Repair check",
-    text: "Open Hangar after combat and check your hull and shield condition. Repair if your hull took damage before risky launches.",
+    text: "Open Hangar after combat and check your hull and shield condition. Repair before risky launches if your hull took damage.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "complete",
     title: "Good luck, Pilot",
-    text: "Your starter route is complete. The trade lanes are open, hostile space is waiting, and your fleet begins here. Build carefully, fly smart, and carve your name into the stars.",
+    text: "Your starter route is complete. Trade builds credits, bounties feed the Forge, and Hangar keeps your fleet ready. Build carefully and fly smart.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin your journey",
@@ -464,7 +472,7 @@ function tutorialEvent(eventName, detail = {}) {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
       const remaining = Math.max(0, Number(activeObjective.killsRequired || 0) - Number(activeObjective.kills || 0));
-      addHudToast(`${remaining} bounty bot${remaining === 1 ? "" : "s"} remaining. Use Jump and Bots scan to find the next target.`);
+      addHudToast(`${remaining} bounty bot${remaining === 1 ? "" : "s"} remaining. Use MAP and Bots scan to find the next target.`);
       renderStarterTutorial();
     }, 180);
     return;
@@ -524,10 +532,6 @@ function isAtActiveTradeDestination() {
 function getDynamicTutorialTarget(step) {
   if (!step) return null;
 
-  if (step.target === "tutorial:vesselExchangeTab") {
-    return document.querySelector("#hangarShipyardTab") || document.querySelector("[data-tutorial-target='vesselExchange']");
-  }
-
   if (step.target === "tutorial:hangarLoadoutTab") {
     return document.querySelector("#hangarOverviewTab") || document.querySelector("[data-tutorial-target='hangarLoadout']");
   }
@@ -552,6 +556,21 @@ function getDynamicTutorialTarget(step) {
   if (step.target === "tutorial:jumpDrive") {
     return document.querySelector("#attachmentInventory .hangar-equipment-card[data-item-key='jumpDrive']:not(:disabled)") ||
            document.querySelector("#attachmentInventory .hangar-equipment-card:not(:disabled)");
+  }
+
+  if (step.target === "tutorial:buyAmount") {
+    return document.querySelector(".market-amount-control button:not(.trade-primary-action):not(:disabled)") ||
+           document.querySelector(".market-amount-control button:not(:disabled)");
+  }
+
+  if (step.target === "tutorial:buyCargo") {
+    return document.querySelector(".market-amount-control .trade-primary-action:not(:disabled)") ||
+           document.querySelector(".market-builder-panel .trade-primary-action:not(:disabled)");
+  }
+
+  if (step.target === "tutorial:sellCargo") {
+    return document.querySelector(".market-sell-action:not(:disabled)") ||
+           document.querySelector(".market-builder-actions .trade-primary-action:not(:disabled)");
   }
 
   if (step.target === "tutorial:destroyBountyBot") {
@@ -645,7 +664,7 @@ function getDynamicTutorialTarget(step) {
     return evasionCard || evasionBuy || document.querySelector(".store-detail-actions button:not(:disabled)");
   }
 
-if (step.target === "tutorial:storeAttachment") {
+  if (step.target === "tutorial:storeAttachment") {
     return document.querySelector(".store-buy-attachment-action[data-item-key='shieldBooster']:not(:disabled)") ||
            document.querySelector(".store-buy-attachment-action[data-item-key='evasionMatrix']:not(:disabled)") ||
            document.querySelector(".store-buy-attachment-action:not(:disabled)");

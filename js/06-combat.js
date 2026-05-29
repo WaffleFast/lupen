@@ -17,7 +17,7 @@ function selectAsteroid(asteroidId) {
 function selectHostileBot(botId) {
   const bot = getHostileBotById(botId);
 
-  if (!bot || !bot.alive || bot.node !== currentNode) return;
+  if (!bot || !bot.alive || (bot.currentNodeId || bot.node) !== currentNode) return;
 
   selectedTarget = { type: "hostileBot", id: bot.id };
   showTargetPanel();
@@ -33,7 +33,7 @@ function selectHostileBot(botId) {
 function engageTarget() {
   let target = getSelectedTargetEntity();
 
-  if (!target || !target.alive || target.node !== currentNode) {
+  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
     target = getVisibleTargets()[0];
     if (target) {
       selectedTarget = {
@@ -43,7 +43,7 @@ function engageTarget() {
     }
   }
 
-  if (!target || !target.alive || target.node !== currentNode) return;
+  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) return;
   if (engageTimer) return;
 
   engagedTarget = {
@@ -243,10 +243,55 @@ function applyWeaponDamageToTarget(target, weapon) {
   return { hit: true, layer: "hull", amount: applied };
 }
 
+function isPlayerInSpaceView() {
+  return Boolean(document.getElementById("spaceScreen")?.classList.contains("active"));
+}
+
+function isPlayerInNode(nodeId) {
+  return isPlayerInSpaceView() && currentNode === nodeId;
+}
+
+function setErebusBotNode(bot, nodeId) {
+  if (!bot || !nodeId) return;
+  bot.currentNodeId = nodeId;
+  bot.node = nodeId;
+}
+
+function triggerErebusAggro(attackedBotId, playerId = getPilotName()) {
+  const attackedBot = getHostileBotById(attackedBotId);
+  if (!attackedBot || attackedBot.faction !== "erebus") return;
+
+  const now = Date.now();
+  const nodeId = attackedBot.currentNodeId || attackedBot.node;
+  hostileBots
+    .filter(bot => bot.faction === "erebus" && bot.aggroState !== "defeated" && (bot.currentNodeId || bot.node) === nodeId)
+    .forEach(bot => {
+      bot.aggroState = "hostile";
+      bot.aggroUntil = now + EREBUS_BOT_AGGRO_MS;
+      bot.targetPlayerId = playerId;
+    });
+}
+
+function updateErebusAggroStates() {
+  const now = Date.now();
+  hostileBots.forEach(bot => {
+    if (bot.faction !== "erebus" || bot.aggroState !== "hostile") return;
+    if (engagedTarget?.type === "hostileBot" && engagedTarget.id === bot.id && engageTimer) {
+      bot.aggroUntil = now + EREBUS_BOT_AGGRO_MS;
+      return;
+    }
+    if (bot.aggroUntil && now > Number(bot.aggroUntil)) {
+      bot.aggroState = "neutral";
+      bot.aggroUntil = null;
+      bot.targetPlayerId = null;
+    }
+  });
+}
+
 function performAttackCycle() {
   const target = getEngagedTargetEntity();
 
-  if (!target || !target.alive || target.node !== currentNode) {
+  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
     disengageTarget(true);
     return;
   }
@@ -255,6 +300,9 @@ function performAttackCycle() {
   playPlayerLaserPulse();
   const weapon = getEquippedWeapon();
   const result = applyWeaponDamageToTarget(target, weapon);
+  if (result.hit && engagedTarget?.type === "hostileBot" && target.faction === "erebus") {
+    triggerErebusAggro(target.id);
+  }
 
   if (target.hp <= 0) {
     showExplosionAtTarget(target);
@@ -265,10 +313,13 @@ function performAttackCycle() {
     const destroyedType = engagedTarget?.type;
 
     if (destroyedType === "hostileBot") {
+      target.aggroState = "defeated";
       const itemDrops = generateBotLootItems();
-      if (itemDrops.length) {
-        inventoryItems.push(...itemDrops);
-        addHudToast(`${getPilotName()} destroyed ${target.name}. Loot secured: ${summarizeInventoryItems(itemDrops)}.`);
+      const inventoryResult = addInventoryItems(itemDrops);
+      if (inventoryResult.added.length) {
+        addHudToast(`${getPilotName()} destroyed ${target.name}. Loot secured: ${summarizeInventoryItems(inventoryResult.added)}.`);
+      } else if (itemDrops.length) {
+        addHudToast(`${getPilotName()} destroyed ${target.name}. ${INVENTORY_FULL_MESSAGE}`);
       } else {
         addHudToast(`${getPilotName()} destroyed ${target.name}. No equipment recovered.`);
       }
@@ -277,8 +328,13 @@ function performAttackCycle() {
       awardCombatXpFromBot(target);
       scheduleHostileBotRespawn(target.id);
     } else {
-      const dropSummary = addLootToNode(currentNode, generateLootFromAsteroid(currentNode));
-      addHudToast(`${getPilotName()} destroyed ${target.name}. Dropped ${dropSummary}.`);
+      const drops = generateLootFromAsteroid(target);
+      const cargoResult = depositLootToCargo(drops);
+      const collectedSummary = summarizeLootMap(cargoResult.collected);
+      const overflowSummary = summarizeLootMap(cargoResult.overflow);
+      const overflowText = cargoResult.overflowAmount > 0 ? ` ${overflowSummary} left as salvage.` : "";
+      const recoveredText = cargoResult.collectedAmount > 0 ? `Cargo recovered: ${collectedSummary}.` : "Cargo hold full.";
+      addHudToast(`${getPilotName()} destroyed ${target.name}. ${recoveredText}${overflowText}`);
       scheduleAsteroidRespawn();
     }
 
@@ -299,7 +355,16 @@ function asteroidVisibleInCurrentNode(asteroid) {
 
 function ensureActiveAsteroids() {
   if (!Array.isArray(asteroids)) {
-    asteroids = [];
+    asteroids = createInitialAsteroids();
+    return;
+  }
+
+  if (asteroids.length < MAP_ONE_ASTEROID_COUNT) {
+    asteroids = normalizeAsteroidCollection(asteroids);
+  }
+
+  if (!asteroids.some(asteroid => asteroid.alive)) {
+    asteroids = createInitialAsteroids();
   }
 }
 
@@ -378,7 +443,7 @@ function renderTargetButton(target, options = {}) {
   btn.className = `${options.className || "asteroid-target"} visible`;
 
   if (selectedTarget?.id === target.id) {
-    btn.classList.add("selected");
+    btn.classList.add("selected", "is-selected");
   }
 
   if (engagedTarget?.id === target.id) {
@@ -387,6 +452,8 @@ function renderTargetButton(target, options = {}) {
 
   if (options.isHostileBot) {
     btn.classList.add(...getBotDirectionClass(target).split(" "));
+    btn.classList.add(`threat-${String(target.threat || "medium").toLowerCase()}`);
+    if (target.aggroState === "hostile") btn.classList.add("is-hostile");
   }
 
   btn.style.left = `${target.x}%`;
@@ -394,11 +461,23 @@ function renderTargetButton(target, options = {}) {
   btn.style.transform = "translate(-50%, -50%)";
   btn.onclick = options.onClick;
   btn.setAttribute("aria-label", target.name);
+  if (target.resource) {
+    btn.dataset.resource = target.resource;
+    btn.style.setProperty("--asteroid-scale", Number(target.scale || 1));
+  }
 
   const hpPct = Math.max(0, (target.hp / target.maxHp) * 100);
+  const isSelectedBot = options.isHostileBot && selectedTarget?.id === target.id;
+  const fallbackSrc = options.fallbackSrc || EREBUS_BOT_FALLBACK_ASSET;
+  const label = isSelectedBot
+    ? `<div class="sector-bot-label">
+        <strong class="sector-bot-label-text">${escapeHtml(target.displayName || target.name || "Erebus Bot").toUpperCase()}</strong>
+      </div>`
+    : "";
 
   btn.innerHTML = `
-    <img src="${options.imageSrc}" alt="${target.name}">
+    <img src="${options.imageSrc}" alt="${target.name}" onerror="this.onerror=null;this.src='${fallbackSrc}'">
+    ${label}
     <div class="asteroid-hp-mini"><span style="width:${hpPct}%"></span></div>
   `;
 
@@ -414,7 +493,7 @@ function updateAsteroidUI() {
 
   field.innerHTML = "";
 
-  const visibleBots = hostileBots.filter(bot => bot.alive && bot.node === currentNode);
+  const visibleBots = hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
   const visibleAsteroids = asteroids.filter(asteroid => asteroid.alive && asteroid.node === currentNode);
 
   separateVisibleTargets([...visibleBots, ...visibleAsteroids]);
@@ -422,7 +501,7 @@ function updateAsteroidUI() {
   visibleBots.forEach(bot => {
     renderTargetButton(bot, {
       className: "asteroid-target enemy-bot-target",
-      imageSrc: bot.image || MANTA_BOT_ASSET,
+      imageSrc: bot.image || EREBUS_BOT_FALLBACK_ASSET,
       isHostileBot: true,
       onClick: () => selectHostileBot(bot.id)
     });
@@ -430,8 +509,9 @@ function updateAsteroidUI() {
 
   visibleAsteroids.forEach(asteroid => {
     renderTargetButton(asteroid, {
-      className: "asteroid-target",
-      imageSrc: "glowing_asteroid_with_cyan_veins.png",
+      className: `asteroid-target resource-asteroid-target asteroid-${getAsteroidResourceSlug(asteroid.resource)}`,
+      imageSrc: asteroid.image || getAsteroidImage(asteroid.resource),
+      fallbackSrc: getCommodityImage(asteroid.resource),
       onClick: () => selectAsteroid(asteroid.id)
     });
   });
@@ -469,33 +549,25 @@ function updateTargetPanel() {
   updateHudDock();
 }
 
-function generateLootFromAsteroid(nodeName) {
-  const minerals = nodeMineralPools[nodeName] || ["Iron"];
-  const drops = {};
-
-  minerals.forEach((mineral, index) => {
-    const rarity = commodityInfo[mineral]?.rarity || "Common";
-    const include = index === 0 || Math.random() > 0.42;
-
-    if (!include) return;
-
-    if (rarity === "Exotic") {
-      drops[mineral] = Math.floor(Math.random() * 4) + 2;
-    } else if (rarity === "Rare") {
-      drops[mineral] = Math.floor(Math.random() * 7) + 4;
-    } else if (rarity === "Industrial") {
-      drops[mineral] = Math.floor(Math.random() * 13) + 8;
-    } else {
-      drops[mineral] = Math.floor(Math.random() * 19) + 18;
-    }
-  });
-
-  if (!Object.keys(drops).length) {
-    const fallbackMineral = minerals[0] || "Iron";
-    drops[fallbackMineral] = Math.floor(Math.random() * 19) + 18;
+function generateLootFromAsteroid(asteroidOrNode) {
+  if (asteroidOrNode && typeof asteroidOrNode === "object") {
+    const resource = ASTEROID_RESOURCE_TYPES[asteroidOrNode.resource] ? asteroidOrNode.resource : "Iron";
+    const min = Math.max(1, Math.round(Number(asteroidOrNode.dropMin || getAsteroidResourceDefinition(resource).dropMin || 1)));
+    const max = Math.max(min, Math.round(Number(asteroidOrNode.dropMax || getAsteroidResourceDefinition(resource).dropMax || min)));
+    return {
+      [resource]: Math.floor(Math.random() * (max - min + 1)) + min
+    };
   }
 
-  return drops;
+  const nodeName = asteroidOrNode;
+  const fallbackMineral = nodeMineralPools[nodeName]?.[0] || "Iron";
+  const definition = getAsteroidResourceDefinition(fallbackMineral);
+  const min = Math.max(1, Number(definition.dropMin || 1));
+  const max = Math.max(min, Number(definition.dropMax || min));
+
+  return {
+    [fallbackMineral]: Math.floor(Math.random() * (max - min + 1)) + min
+  };
 }
 
 function summarizeLootMap(lootMap) {
@@ -536,6 +608,41 @@ function addLootToNode(nodeName, drops) {
 
   updateTargetPanel();
   return summarizeLootMap(drops);
+}
+
+function depositLootToCargo(drops) {
+  const collected = {};
+  const overflow = {};
+  let availableSpace = Math.max(0, getShipStats().cargo - cargoUsed());
+  let collectedAmount = 0;
+  let overflowAmount = 0;
+
+  Object.entries(drops || {}).forEach(([mineral, amount]) => {
+    const quantity = Math.max(0, Math.round(Number(amount || 0)));
+    if (!quantity || !mineralKeys.includes(mineral)) return;
+
+    const collectedQuantity = Math.min(quantity, availableSpace);
+    const overflowQuantity = quantity - collectedQuantity;
+
+    if (collectedQuantity > 0) {
+      cargo[mineral] += collectedQuantity;
+      collected[mineral] = (collected[mineral] || 0) + collectedQuantity;
+      collectedAmount += collectedQuantity;
+      availableSpace -= collectedQuantity;
+    }
+
+    if (overflowQuantity > 0) {
+      overflow[mineral] = (overflow[mineral] || 0) + overflowQuantity;
+      overflowAmount += overflowQuantity;
+    }
+  });
+
+  if (overflowAmount > 0) {
+    addLootToNode(currentNode, overflow);
+  }
+
+  updateCargoSummary();
+  return { collected, overflow, collectedAmount, overflowAmount };
 }
 
 function collectLoot(mineralToCollect = null) {
@@ -620,13 +727,11 @@ function respawnAsteroid() {
 
   if (!asteroid) return;
 
-  const spaceNodes = Object.keys(sectorNodes).filter(name => sectorNodes[name].type === "space");
-  asteroid.node = spaceNodes[Math.floor(Math.random() * spaceNodes.length)];
-  asteroid.maxHp = ASTEROID_BASE_HP + Math.floor(Math.random() * 25);
-  asteroid.hp = asteroid.maxHp;
-  asteroid.alive = true;
-  asteroid.x = Math.floor(Math.random() * 72) + 12;
-  asteroid.y = Math.floor(Math.random() * 45) + 12;
+  const spaceNodes = getLowerCombatAsteroidNodeIds();
+  const asteroidIndex = Math.max(0, asteroids.indexOf(asteroid));
+  const node = spaceNodes[Math.floor(Math.random() * spaceNodes.length)] || createMapOneAsteroid(asteroidIndex).node;
+  const refreshed = createAsteroid(asteroid.resource || MAP_ONE_ASTEROID_SPAWN_PLAN[asteroidIndex] || "Iron", node, asteroidIndex);
+  Object.assign(asteroid, refreshed, { id: asteroid.id || refreshed.id });
 
   updateAsteroidUI();
   updateTargetPanel();
@@ -638,46 +743,84 @@ function respawnHostileBot(botId) {
   const bot = hostileBots.find(item => item.id === botId) || hostileBots.find(item => !item.alive);
   if (!bot) return;
 
-  const spaceNodes = getHostileBotNodes();
-  bot.node = spaceNodes[Math.floor(Math.random() * spaceNodes.length)];
-  bot.shield = HOSTILE_BOT_BASE_SHIELD;
-  bot.shieldMax = HOSTILE_BOT_BASE_SHIELD;
-  bot.armor = HOSTILE_BOT_BASE_ARMOR;
-  bot.hull = HOSTILE_BOT_BASE_HP;
-  bot.hullMax = HOSTILE_BOT_BASE_HP;
+  const spaceNodes = getAllowedErebusBotNodeIds();
+  const botClass = EREBUS_BOT_TYPES[bot.botType] || EREBUS_BOT_TYPES.erebus_attacker;
+  const shield = Number(botClass.shield || HOSTILE_BOT_BASE_SHIELD);
+  const hullValue = Number(botClass.hull || HOSTILE_BOT_BASE_HP);
+  setErebusBotNode(bot, spaceNodes[Math.floor(Math.random() * spaceNodes.length)] || currentNode);
+  bot.name = botClass.displayName || bot.name || "Erebus Bot";
+  bot.displayName = botClass.displayName || bot.name;
+  bot.className = botClass.className || bot.className;
+  bot.shield = shield;
+  bot.shieldMax = shield;
+  bot.maxShield = shield;
+  bot.armor = Number(botClass.armor || HOSTILE_BOT_BASE_ARMOR);
+  bot.hull = hullValue;
+  bot.hullMax = hullValue;
+  bot.maxHull = hullValue;
   bot.maxHp = bot.shieldMax + bot.hullMax;
   bot.hp = bot.maxHp;
   bot.alive = true;
   bot.x = Math.floor(Math.random() * 52) + 34;
   bot.y = Math.floor(Math.random() * 34) + 18;
-  bot.image = MANTA_BOT_ASSET;
+  bot.damage = Number(botClass.damage || HOSTILE_BOT_DAMAGE);
+  bot.fireRateMs = Number(botClass.fireRateMs || HOSTILE_BOT_ATTACK_MS);
+  bot.accuracy = Number(botClass.accuracy || 1);
+  bot.classRole = botClass.role || bot.classRole;
+  bot.threat = botClass.threat || bot.threat;
+  bot.xpReward = Number(botClass.xpReward || bot.xpReward || XP_CONFIG.combatBotXp);
+  bot.creditReward = Number(botClass.creditReward || bot.creditReward || 0);
+  bot.moveIntervalMs = Number(botClass.moveIntervalMs || bot.moveIntervalMs || HOSTILE_BOT_MOVE_MS);
+  bot.lastMovedAt = Date.now();
+  bot.faction = "erebus";
+  bot.allegiance = "hostile_neutral";
+  bot.aggroState = "neutral";
+  bot.aggroUntil = null;
+  bot.targetPlayerId = null;
+  bot.image = getErebusBotImagePath(botClass.image);
 
   updateAsteroidUI();
   updateTargetPanel();
 }
 
+function getAllowedErebusBotMoves(bot) {
+  const currentNodeId = bot?.currentNodeId || bot?.node;
+  const current = getNodeById(currentNodeId);
+  if (!current) return [];
+  const connectedNodeIds = current.connections || current.connectedNodes || current.connects || [];
+  return connectedNodeIds.filter(nodeId => isAllowedErebusBotNode(nodeId));
+}
+
 function moveHostileBotsBetweenNodes() {
   ensureActiveHostileBots();
+  updateErebusAggroStates();
+  const now = Date.now();
 
   hostileBots.forEach(bot => {
     if (!bot.alive) return;
+    if (bot.faction === "erebus" && bot.aggroState === "defeated") return;
 
-    const currentLinks = sectorNodes[bot.node]?.connects || [];
-    const spaceLinks = currentLinks.filter(name => sectorNodes[name]?.type === "space" && sectorNodes[name]?.danger === "hostile");
-    const fallbackSpaceNodes = getHostileBotNodes();
-    const options = spaceLinks.length ? spaceLinks : fallbackSpaceNodes.filter(name => name !== bot.node);
+    const botNode = bot.currentNodeId || bot.node;
+    if (bot.faction === "erebus" && bot.aggroState === "hostile" && isPlayerInNode(botNode)) return;
+    if (now - Number(bot.lastMovedAt || 0) < Number(bot.moveIntervalMs || HOSTILE_BOT_MOVE_MS)) return;
+
+    const options = bot.faction === "erebus"
+      ? getAllowedErebusBotMoves(bot)
+      : (sectorNodes[botNode]?.connects || []).filter(name => sectorNodes[name]?.type === "space" && sectorNodes[name]?.danger === "hostile");
 
     if (!options.length) return;
 
     const botIsEngaged = engagedTarget?.type === "hostileBot" && engagedTarget.id === bot.id && engageTimer;
-    if (botIsEngaged && bot.node === currentNode) return;
+    if (botIsEngaged && botNode === currentNode) return;
 
-    const previousNode = bot.node;
-    bot.node = options[Math.floor(Math.random() * options.length)];
+    const nextNode = options[Math.floor(Math.random() * options.length)];
+    if (bot.faction === "erebus" && (!isAllowedErebusBotNode(nextNode) || isPlanetNode(nextNode))) return;
+    setErebusBotNode(bot, nextNode);
+    bot.lastMovedAt = now;
     bot.x = Math.floor(Math.random() * 52) + 34;
     bot.y = Math.floor(Math.random() * 34) + 18;
 
-    if (engagedTarget?.type === "hostileBot" && engagedTarget.id === bot.id && bot.node !== currentNode) {
+    if (engagedTarget?.type === "hostileBot" && engagedTarget.id === bot.id && (bot.currentNodeId || bot.node) !== currentNode) {
       disengageTarget(true);
       autoCollapseTargetPanel(1200);
     }
@@ -697,7 +840,15 @@ function startHostileBotMovement() {
 }
 
 function hostileBotAttackCycle() {
-  const attackers = getVisibleHostileBots();
+  updateErebusAggroStates();
+  if (!isPlayerInSpaceView() || isAtPlanetNode()) return;
+
+  const now = Date.now();
+  const attackers = getVisibleHostileBots().filter(bot => {
+    if (bot.faction !== "erebus") return true;
+    if (bot.aggroState !== "hostile" || (bot.aggroUntil && now > Number(bot.aggroUntil))) return false;
+    return now - Number(bot.lastFiredAt || 0) >= Number(bot.fireRateMs || HOSTILE_BOT_ATTACK_MS);
+  });
   if (!attackers.length) return;
 
   let totalDamage = 0;
@@ -707,7 +858,10 @@ function hostileBotAttackCycle() {
 
   attackers.forEach(bot => {
     markBotFacingPlayer(bot);
-    totalDamage += HOSTILE_BOT_DAMAGE;
+    bot.lastFiredAt = now;
+    if (Math.random() <= Number(bot.accuracy || 1)) {
+      totalDamage += Number(bot.damage || HOSTILE_BOT_DAMAGE);
+    }
   });
 
   updateAsteroidUI();
@@ -737,15 +891,15 @@ function maybeMoveAsteroid() {
     if (Math.random() > 0.5) return;
 
     const currentLinks = sectorNodes[asteroid.node]?.connects || [];
-    const spaceLinks = currentLinks.filter(name => sectorNodes[name]?.type === "space");
-    const fallbackSpaceNodes = Object.keys(sectorNodes).filter(name => sectorNodes[name].type === "space");
+    const spaceLinks = currentLinks.filter(isAllowedAsteroidNode);
+    const fallbackSpaceNodes = getLowerCombatAsteroidNodeIds();
     const options = spaceLinks.length ? spaceLinks : fallbackSpaceNodes.filter(name => name !== asteroid.node);
 
     if (!options.length) return;
 
     asteroid.node = options[Math.floor(Math.random() * options.length)];
-    asteroid.x = Math.floor(Math.random() * 46) + 43;
-    asteroid.y = Math.floor(Math.random() * 38) + 18;
+    asteroid.x = Math.floor(Math.random() * 72) + 12;
+    asteroid.y = Math.floor(Math.random() * 45) + 12;
   });
 }
 

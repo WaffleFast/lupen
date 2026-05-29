@@ -7,6 +7,8 @@ const SAVE_EXPORT_VERSION = 1;
 
 const mineralKeys = ["Iron", "Copper", "Cobalt", "Titanium", "Crystal Shards", "Xenon Gas", "Iridium", "Platinum", "Uranium", "Dark Matter Residue"];
 
+const MAP_ONE_MARKET_PLANETS = ["Asteron Prime", "Virella", "Nyxara"];
+const MAP_ONE_TRADE_RESOURCES = ["Iron", "Copper", "Cobalt", "Crystal Shards"];
 
 const COMMODITY_ICON_PATH = "assets/commodities/";
 
@@ -114,6 +116,15 @@ const sectorMapZones = [
   { name: "LOWER COMBAT ZONE", subtitle: "HOSTILE SPACE", x: 50, y: 94, tone: "combat" }
 ];
 
+Object.values(sectorNodes).forEach(node => {
+  if (node.type === "space" && node.danger === "hostile" && Number(node.y) < 50) {
+    node.zone = "upper";
+    node.tags = Array.from(new Set([...(node.tags || []), "upper_combat_zone", "erebus_patrol_zone"]));
+  } else if (node.type === "space" && node.danger === "hostile" && Number(node.y) > 50) {
+    node.zone = "lower";
+    node.tags = Array.from(new Set([...(node.tags || []), "lower_combat_zone", "asteroid_field"]));
+  }
+});
 
 const nodeMineralPools = Object.fromEntries(
   Object.entries(sectorNodes).map(([name, node]) => {
@@ -137,11 +148,11 @@ const nodeMineralPools = Object.fromEntries(
 
 const planetMarkets = {
   "Virella": {
-    "Iron": 9,
-    "Copper": 13,
-    "Cobalt": 42,
+    "Iron": 428,
+    "Copper": 820,
+    "Cobalt": 1684,
     "Titanium": 58,
-    "Crystal Shards": 74,
+    "Crystal Shards": 2112,
     "Xenon Gas": 92,
     "Iridium": 132,
     "Platinum": 170,
@@ -149,11 +160,11 @@ const planetMarkets = {
     "Dark Matter Residue": 390
   },
   "Asteron Prime": {
-    "Iron": 16,
-    "Copper": 18,
-    "Cobalt": 34,
+    "Iron": 312,
+    "Copper": 982,
+    "Cobalt": 2340,
     "Titanium": 48,
-    "Crystal Shards": 58,
+    "Crystal Shards": 2520,
     "Xenon Gas": 82,
     "Iridium": 148,
     "Platinum": 190,
@@ -161,11 +172,11 @@ const planetMarkets = {
     "Dark Matter Residue": 420
   },
   "Nyxara": {
-    "Iron": 25,
-    "Copper": 28,
-    "Cobalt": 55,
+    "Iron": 645,
+    "Copper": 1845,
+    "Cobalt": 1248,
     "Titanium": 72,
-    "Crystal Shards": 88,
+    "Crystal Shards": 2980,
     "Xenon Gas": 66,
     "Iridium": 118,
     "Platinum": 152,
@@ -219,6 +230,34 @@ function createInitialMarketStock() {
 
 function getHostileBotNodes() {
   return Object.keys(sectorNodes).filter(name => sectorNodes[name].type === "space" && sectorNodes[name].danger === "hostile");
+}
+
+function getNodeById(nodeId) {
+  return sectorNodes[nodeId] ? { id: nodeId, ...sectorNodes[nodeId] } : null;
+}
+
+function getAllNodes() {
+  return Object.keys(sectorNodes).map(getNodeById).filter(Boolean);
+}
+
+function isPlanetNode(nodeId) {
+  const node = getNodeById(nodeId);
+  return Boolean(node?.planetId || node?.type === "planet");
+}
+
+function isAllowedErebusBotNode(nodeId) {
+  const node = getNodeById(nodeId);
+  if (!node || isPlanetNode(nodeId)) return false;
+  return Boolean(
+    node.tags?.includes("upper_combat_zone") ||
+    node.tags?.includes("erebus_patrol_zone") ||
+    node.zone === "upper" ||
+    (node.type === "space" && node.danger === "hostile" && Number(node.y) < 50)
+  );
+}
+
+function getAllowedErebusBotNodeIds() {
+  return Object.keys(sectorNodes).filter(isAllowedErebusBotNode);
 }
 
 function getSpaceNodes() {
@@ -374,6 +413,57 @@ const SHIPS = {
     evasion: 20,
     gunSlots: 4,
     attachmentSlots: 3
+  },
+  hephaestusTrader: {
+    id: "hephaestusTrader",
+    name: "Hephaestus Trader",
+    manufacturer: "Asteron Freightworks",
+    roleSubtitle: "Heavy Trade Hull",
+    description: "A high-capacity trader with reinforced service bays, oversized cargo handling and enough utility mounts for long commercial routes.",
+    image: "assets/ships/hephaestus-trader.png",
+    price: 42000,
+    hull: 1700,
+    shield: 180,
+    armor: 24,
+    cargo: 360,
+    jumpRecharge: 8,
+    evasion: 8,
+    gunSlots: 2,
+    attachmentSlots: 6
+  },
+  poseidonAggressor: {
+    id: "poseidonAggressor",
+    name: "Poseidon Aggressor",
+    manufacturer: "Asteron Skunkworks",
+    roleSubtitle: "Assault / Control Hull",
+    description: "An aggressive blue-water combat platform with heavy hardpoint coverage, resilient defensive systems and room for tactical equipment.",
+    image: "assets/ships/poseidon-aggressor.png",
+    price: 52000,
+    hull: 1500,
+    shield: 210,
+    armor: 26,
+    cargo: 120,
+    jumpRecharge: 12,
+    evasion: 18,
+    gunSlots: 5,
+    attachmentSlots: 4
+  },
+  zeusExplorer: {
+    id: "zeusExplorer",
+    name: "Zeus Explorer",
+    manufacturer: "Asteron Skunkworks",
+    roleSubtitle: "Deep Range Explorer",
+    description: "A long-range explorer built for volatile lanes, pairing fast repositioning with strong utility capacity and dependable shielding.",
+    image: "assets/ships/zeus-explorer.png",
+    price: 48000,
+    hull: 1150,
+    shield: 185,
+    armor: 16,
+    cargo: 220,
+    jumpRecharge: 20,
+    evasion: 24,
+    gunSlots: 3,
+    attachmentSlots: 6
   }
 };
 
@@ -462,7 +552,7 @@ const cargo = {
 };
 
 let cargoCostBasis = {};
-let activeTradeTerminalTab = "contracts";
+let activeTradeTerminalTab = "market";
 let tradeTerminalTimer = null;
 let storeDailyTimer = null;
 let renderedStoreDayKey = "";
@@ -472,6 +562,9 @@ let selectedStationTradeRoute = null;
 let activeTradeRoute = null;
 let activeObjective = null;
 let selectedLooseCargoSellGood = null;
+let selectedMarketResource = "Crystal Shards";
+let selectedMarketTargetPlanet = "Nyxara";
+let selectedMarketQuantity = 200;
 
 const XP_CONFIG = {
   combatZoneKey: "sector-one",
@@ -488,6 +581,7 @@ let playerProgress = createDefaultPlayerProgress();
 let dailyBountyDate = null;
 let dailyBountyContracts = [];
 let selectedBountyContractId = null;
+let activeBountyId = null;
 
 const commodityImageMap = {
   "Iron": "assets/commodities/iron.png",
@@ -526,51 +620,94 @@ const BOUNTY_AREAS = {
   }
 };
 
+const BOUNTY_REWARD_DEFAULT = {
+  credits: 0,
+  xp: 0,
+  lupenCores: 1,
+  lupenShards: 3
+};
+
 const DAILY_BOUNTY_CONTRACTS = [
   {
-    id: "daily-raider-sweep",
-    title: "Raider Sweep",
-    icon: "assets/bounties/raider-sweep.png",
-    threat: "Standard",
-    contractType: "Sweep",
-    lootLabel: "Rare chance",
+    id: "patrol-sweep",
+    name: "Patrol Sweep",
+    title: "Patrol Sweep",
+    subtitle: "Destroy 5 Erebus bots",
+    description: "Clear Erebus patrol ships from the upper combat lanes.",
+    type: "standard",
+    chipLabel: "STANDARD",
+    contractType: "Standard",
+    area: "Upper Combat Zone",
     targetArea: "upperCombat",
-    targetLabel: "Upper Combat Zone",
-    killsRequired: 3,
-    reward: 1200,
-    lootChance: 0.18,
-    materialReward: { chance: 0.28, materialKey: "weaponParts", min: 1, max: 1 },
-    description: "Clear raiders from any hostile node in the upper combat zone."
+    targetBotType: "any_erebus",
+    targetBotLabel: "Any Erebus Bot",
+    requiredKills: 5,
+    killsRequired: 5,
+    progress: 0,
+    threat: "Low",
+    reward: { ...BOUNTY_REWARD_DEFAULT },
+    bonus: null,
+    timed: false,
+    timeLimitSeconds: null,
+    expiresAt: null,
+    status: "available",
+    accent: "blue",
+    icon: "bounty-patrol-sweep",
+    fallbackIcon: "assets/bounties/bounty-patrol-sweep.png"
   },
   {
-    id: "daily-station-patrol",
-    title: "Station Defence Patrol",
-    icon: "assets/bounties/station-defence.png",
-    threat: "Defence",
-    contractType: "Patrol",
-    lootLabel: "Rare chance",
-    targetArea: "lowerCombat",
-    targetLabel: "Lower Combat Zone",
-    killsRequired: 3,
-    reward: 1500,
-    lootChance: 0.22,
-    materialReward: { chance: 0.28, materialKey: "equipmentModules", min: 1, max: 1 },
-    description: "Suppress bots across the lower hostile lanes threatening station traffic."
+    id: "rapid-response",
+    name: "Rapid Response",
+    title: "Rapid Response",
+    subtitle: "Destroy 10 Erebus bots in 5 minutes",
+    description: "Destroy 10 Erebus ships before the response window closes.",
+    type: "rapid",
+    chipLabel: "RAPID RESPONSE",
+    contractType: "Rapid Response",
+    area: "Upper Combat Zone",
+    targetArea: "upperCombat",
+    targetBotType: "any_erebus",
+    targetBotLabel: "Any Erebus Bot",
+    requiredKills: 10,
+    killsRequired: 10,
+    progress: 0,
+    threat: "High",
+    reward: { ...BOUNTY_REWARD_DEFAULT },
+    bonus: "Timed combat challenge",
+    timed: true,
+    timeLimitSeconds: 300,
+    expiresAt: null,
+    status: "available",
+    accent: "orange",
+    icon: "bounty-rapid-response",
+    fallbackIcon: "assets/bounties/bounty-rapid-response.png"
   },
   {
-    id: "daily-manta-intercept",
-    title: "Manta Intercept",
-    icon: "assets/bounties/manta-intercept.png",
-    threat: "High value",
-    contractType: "Intercept",
-    lootLabel: "Better chance",
-    targetArea: "anyHostile",
-    targetLabel: "Any Hostile Zone",
+    id: "behemoth-cull",
+    name: "Behemoth Cull",
+    title: "Behemoth Cull",
+    subtitle: "Destroy 2 Erebus Behemoths",
+    description: "Hunt down and destroy two Erebus Behemoths in the upper combat lanes.",
+    type: "boss",
+    chipLabel: "BOSS HUNT",
+    contractType: "Boss Hunt",
+    area: "Upper Combat Zone",
+    targetArea: "upperCombat",
+    targetBotType: "erebus_behemoth",
+    targetBotLabel: "Erebus Behemoth",
+    requiredKills: 2,
     killsRequired: 2,
-    reward: 1800,
-    lootChance: 0.28,
-    materialReward: { chance: 0.38, materialKey: "weaponParts", altMaterialKey: "equipmentModules", min: 1, max: 2 },
-    description: "Intercept roaming hostile bots anywhere in combat space."
+    progress: 0,
+    threat: "Extreme",
+    reward: { ...BOUNTY_REWARD_DEFAULT },
+    bonus: "Extreme target bounty",
+    timed: false,
+    timeLimitSeconds: null,
+    expiresAt: null,
+    status: "available",
+    accent: "red",
+    icon: "bounty-behemoth-cull",
+    fallbackIcon: "assets/bounties/bounty-behemoth-cull.png"
   }
 ];
 
@@ -632,10 +769,19 @@ function getNearestBountyAreaNode(startNode, areaId) {
 function getNearestActiveBountyBotNode(startNode = currentNode) {
   const objective = activeObjective?.type === "bounty" ? activeObjective : null;
   const targetArea = objective?.targetArea || "anyHostile";
+  const targetBotType = objective?.targetBotType || null;
+  const matchesTarget = bot => {
+    if (!targetBotType) return true;
+    if (targetBotType === "any_erebus") return bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_");
+    return bot.botType === targetBotType;
+  };
 
   const candidates = hostileBots
-    .filter(bot => bot.alive && sectorNodes[bot.node] && isNodeInBountyArea(bot.node, targetArea))
-    .map(bot => bot.node)
+    .filter(bot => {
+      const nodeId = bot.currentNodeId || bot.node;
+      return bot.alive && sectorNodes[nodeId] && isNodeInBountyArea(nodeId, targetArea) && matchesTarget(bot);
+    })
+    .map(bot => bot.currentNodeId || bot.node)
     .filter((nodeName, index, list) => list.indexOf(nodeName) === index);
 
   if (!candidates.length) return getNearestBountyAreaNode(startNode, targetArea);
@@ -650,7 +796,12 @@ function getNearestActiveBountyBotNode(startNode = currentNode) {
 function isAtActiveBountyCombatNode() {
   if (activeObjective?.type !== "bounty") return false;
   if (!isNodeInBountyArea(currentNode, activeObjective.targetArea)) return false;
-  return hostileBots.some(bot => bot.alive && bot.node === currentNode);
+  const targetBotType = activeObjective.targetBotType || null;
+  return hostileBots.some(bot => {
+    const matchesTarget = !targetBotType
+      || (targetBotType === "any_erebus" ? bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_") : bot.botType === targetBotType);
+    return bot.alive && (bot.currentNodeId || bot.node) === currentNode && matchesTarget;
+  });
 }
 
 function getNearestPlanetNode(startNode = currentNode) {
@@ -675,35 +826,33 @@ const ITEM_QUALITY_LABELS = Object.fromEntries(
 ITEM_QUALITY_LABELS.unique = "Refined";
 const LUPEN_CORE_QUALITY = "core";
 const FUTURE_ASTEROID_LUPEN_CORE_DROP_CHANCE = 1 / 5000;
-const MAX_ITEM_LEVEL = 15;
+const MAX_ITEM_LEVEL = 5;
 
 const upgradeMaterialDefinitions = {
-  weaponParts: {
-    name: "Weapon Upgrade Parts",
-    shortLabel: "WP",
-    icon: "assets/items/weapon-upgrade-parts.png",
-    description: "Rare weapon components used to raise gun levels."
-  },
-  equipmentModules: {
-    name: "Equipment Upgrade Modules",
-    shortLabel: "EM",
-    icon: "assets/items/equipment-upgrade-modules.png",
-    description: "Rare modules used to tune ship equipment."
+  lupenShards: {
+    name: "Lupen Shards",
+    shortLabel: "LS",
+    icon: "assets/items/lupen-shard.png",
+    description: "Charged crystal shards used to raise item levels."
   }
 };
 
 function createDefaultUpgradeMaterials() {
   return {
-    weaponParts: 6,
-    equipmentModules: 4
+    lupenShards: 10
   };
 }
 
 function normalizeUpgradeMaterials(materials) {
   const defaults = createDefaultUpgradeMaterials();
   const safe = materials && typeof materials === "object" ? materials : {};
+  const legacyShardValue = Math.max(0, Math.floor(Number(safe.weaponParts || 0))) + Math.max(0, Math.floor(Number(safe.equipmentModules || 0)));
+  const migrated = {
+    ...safe,
+    lupenShards: safe.lupenShards ?? legacyShardValue
+  };
   return Object.fromEntries(
-    Object.keys(defaults).map(key => [key, Math.max(0, Math.floor(Number(safe[key] ?? defaults[key] ?? 0)))])
+    Object.keys(defaults).map(key => [key, Math.max(0, Math.floor(Number(migrated[key] ?? defaults[key] ?? 0)))])
   );
 }
 
@@ -735,6 +884,8 @@ Object.entries(GUNS).forEach(([key, gun]) => {
 const botDropPool = ["cargoPod", "hullBooster", "jumpDrive", "shieldBooster", "evasionMatrix", "pulseLaser", "repeater", "ionBlaster", "meltCannon", "ripperGun", "heavyLance", "voidRail"];
 
 let inventoryItems = [];
+const MAX_CARRIED_INVENTORY_ITEMS = 12;
+const INVENTORY_FULL_MESSAGE = "Inventory full. Return to a planet to sell items or cargo.";
 let upgradeMaterials = createDefaultUpgradeMaterials();
 let storeFilter = "all";
 let selectedStoreItemId = null;
@@ -871,6 +1022,46 @@ function groupInventoryItems(items) {
   });
 }
 
+function getStoredEquipmentItemCount() {
+  const attachmentCount = Object.values(ownedAttachments || {}).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
+  const gunCount = Object.values(ownedGuns || {}).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
+  return attachmentCount + gunCount;
+}
+
+function getCarriedInventoryItemCount() {
+  return (Array.isArray(inventoryItems) ? inventoryItems.length : 0) + getStoredEquipmentItemCount();
+}
+
+function getAvailableInventoryItemSlots() {
+  return Math.max(0, MAX_CARRIED_INVENTORY_ITEMS - getCarriedInventoryItemCount());
+}
+
+function canAddInventoryItems(quantity = 1) {
+  return getAvailableInventoryItemSlots() >= Math.max(0, Number(quantity || 0));
+}
+
+function addInventoryItems(items) {
+  const pending = Array.isArray(items) ? items.filter(Boolean) : [items].filter(Boolean);
+  const added = [];
+  const rejected = [];
+
+  pending.forEach(item => {
+    if (getAvailableInventoryItemSlots() <= 0) {
+      rejected.push(item);
+      return;
+    }
+
+    inventoryItems.push(item);
+    added.push(item);
+  });
+
+  return { added, rejected };
+}
+
+function addInventoryItem(item) {
+  return addInventoryItems([item]).added[0] || null;
+}
+
 const ITEM_QUALITY_SELL_MULTIPLIERS = {
   standard: 1,
   refined: 2,
@@ -923,8 +1114,8 @@ function removeInventoryItems(key, quality, quantity) {
 }
 
 function trimPrototypeInventoryItems() {
-  if (Array.isArray(inventoryItems) && inventoryItems.length > PROTOTYPE_STARTING_INVENTORY_ITEMS) {
-    inventoryItems = inventoryItems.slice(0, PROTOTYPE_STARTING_INVENTORY_ITEMS);
+  if (Array.isArray(inventoryItems) && inventoryItems.length > MAX_CARRIED_INVENTORY_ITEMS) {
+    inventoryItems = inventoryItems.slice(0, MAX_CARRIED_INVENTORY_ITEMS);
   }
 }
 
@@ -1051,16 +1242,225 @@ let engagedTarget = null;
 let engageTimer = null;
 const ASTEROID_RESPAWN_MS = 10000;
 const ASTEROID_BASE_HP = 294;
-const HOSTILE_BOT_MOVE_MS = 10000;
+const ASTEROID_ASSET_PATH = "assets/asteroids/";
+const MAP_ONE_ASTEROID_COUNT = 15;
+const MAP_ONE_ASTEROID_SPAWN_PLAN = [
+  "Iron",
+  "Iron",
+  "Iron",
+  "Copper",
+  "Iron",
+  "Copper",
+  "Iron",
+  "Iron",
+  "Copper",
+  "Iron",
+  "Iron",
+  "Copper",
+  "Iron",
+  "Copper",
+  "Iron"
+];
+const ASTEROID_FIELD_POSITIONS = [
+  { x: 16, y: 18 },
+  { x: 33, y: 20 },
+  { x: 52, y: 18 },
+  { x: 72, y: 21 },
+  { x: 86, y: 29 },
+  { x: 22, y: 34 },
+  { x: 42, y: 36 },
+  { x: 63, y: 35 },
+  { x: 80, y: 43 },
+  { x: 13, y: 50 },
+  { x: 31, y: 55 },
+  { x: 51, y: 54 },
+  { x: 68, y: 57 },
+  { x: 85, y: 60 },
+  { x: 44, y: 25 }
+];
+const ASTEROID_YIELD_VARIANTS = [
+  { label: "Light", hp: 0.86, drop: 0.78, scale: 0.86 },
+  { label: "Standard", hp: 1, drop: 1, scale: 1 },
+  { label: "Dense", hp: 1.18, drop: 1.22, scale: 1.08 },
+  { label: "Rich", hp: 1.32, drop: 1.45, scale: 1.16 }
+];
+const ASTEROID_RESOURCE_TYPES = {
+  "Iron": {
+    image: "asteroid-iron.png",
+    hp: 250,
+    armor: 2,
+    dropMin: 18,
+    dropMax: 38
+  },
+  "Copper": {
+    image: "asteroid-copper.png",
+    hp: 275,
+    armor: 3,
+    dropMin: 12,
+    dropMax: 28
+  },
+  "Cobalt": {
+    image: "asteroid-cobalt.png",
+    hp: 315,
+    armor: 5,
+    dropMin: 8,
+    dropMax: 20
+  },
+  "Titanium": {
+    image: "asteroid-titanium.png",
+    hp: 340,
+    armor: 7,
+    dropMin: 8,
+    dropMax: 18
+  },
+  "Crystal Shards": {
+    image: "asteroid-crystal.png",
+    hp: 360,
+    armor: 6,
+    dropMin: 6,
+    dropMax: 16
+  },
+  "Xenon Gas": {
+    image: "asteroid-xenon-gas.png",
+    hp: 350,
+    armor: 5,
+    dropMin: 5,
+    dropMax: 14
+  },
+  "Iridium": {
+    image: "asteroid-iridium.png",
+    hp: 400,
+    armor: 10,
+    dropMin: 4,
+    dropMax: 10
+  },
+  "Platinum": {
+    image: "asteroid-platinum.png",
+    hp: 390,
+    armor: 9,
+    dropMin: 4,
+    dropMax: 10
+  },
+  "Uranium": {
+    image: "asteroid-uranium.png",
+    hp: 430,
+    armor: 12,
+    dropMin: 3,
+    dropMax: 8
+  },
+  "Dark Matter Residue": {
+    image: "asteroid-dark-matter.png",
+    hp: 520,
+    armor: 16,
+    dropMin: 2,
+    dropMax: 5
+  }
+};
+const HOSTILE_BOT_MOVE_MS = 1000;
 const HOSTILE_BOT_RESPAWN_MS = 10000;
-const HOSTILE_BOT_BASE_HP = 240;
-const HOSTILE_BOT_BASE_SHIELD = 60;
+const HOSTILE_BOT_BASE_HP = 165;
+const HOSTILE_BOT_BASE_SHIELD = 95;
 const HOSTILE_BOT_BASE_ARMOR = 12;
 const HOSTILE_BOT_ATTACK_MS = 3000;
 const HOSTILE_BOT_DAMAGE = 4;
 const HULL_REPAIR_COST_PER_POINT = 2;
 const DISABLED_CARGO_LOSS_RATE = 0.3;
-const MANTA_BOT_ASSET = "assets/ships/manta-bot.png";
+const EREBUS_BOT_AGGRO_MS = 45000;
+const EREBUS_BOT_ASSET_PATH = "assets/bots/";
+const EREBUS_BOT_FALLBACK_ASSET = "assets/bots/erebus-attacker.png";
+const EREBUS_BOT_SPAWN_CAPS = {
+  erebus_hunter: 8,
+  erebus_attacker: 5,
+  erebus_destroyer: 4,
+  erebus_behemoth: 2
+};
+const EREBUS_STARTER_SPAWN_PLAN = [
+  "erebus_hunter",
+  "erebus_hunter",
+  "erebus_hunter",
+  "erebus_hunter",
+  "erebus_hunter",
+  "erebus_hunter",
+  "erebus_attacker",
+  "erebus_attacker",
+  "erebus_attacker",
+  "erebus_attacker",
+  "erebus_destroyer",
+  "erebus_destroyer",
+  "erebus_destroyer",
+  "erebus_behemoth",
+  "erebus_behemoth"
+];
+const EREBUS_BOT_TYPES = {
+  erebus_hunter: {
+    id: "erebus_hunter",
+    displayName: "Erebus Hunter",
+    className: "Hunter",
+    role: "Light scout",
+    image: "erebus-hunter",
+    hull: 110,
+    shield: 60,
+    armor: 6,
+    damage: 8,
+    fireRateMs: 1400,
+    accuracy: 0.72,
+    moveIntervalMs: 14000,
+    threat: "Low",
+    xpReward: 25,
+    creditReward: 90
+  },
+  erebus_attacker: {
+    id: "erebus_attacker",
+    displayName: "Erebus Attacker",
+    className: "Attacker",
+    role: "Assault craft",
+    image: "erebus-attacker",
+    hull: 165,
+    shield: 95,
+    armor: 12,
+    damage: 13,
+    fireRateMs: 1700,
+    accuracy: 0.75,
+    moveIntervalMs: 18000,
+    threat: "Medium",
+    xpReward: 45,
+    creditReward: 150
+  },
+  erebus_destroyer: {
+    id: "erebus_destroyer",
+    displayName: "Erebus Destroyer",
+    className: "Destroyer",
+    role: "Heavy gunship",
+    image: "erebus-destroyer",
+    hull: 260,
+    shield: 150,
+    armor: 22,
+    damage: 20,
+    fireRateMs: 2300,
+    accuracy: 0.78,
+    moveIntervalMs: 24000,
+    threat: "High",
+    xpReward: 75,
+    creditReward: 275
+  },
+  erebus_behemoth: {
+    id: "erebus_behemoth",
+    displayName: "Erebus Behemoth",
+    className: "Behemoth",
+    role: "Heavy mini-boss",
+    image: "erebus-behemoth",
+    hull: 140,
+    shield: 60,
+    armor: 6,
+    damage: 28,
+    fireRateMs: 3200,
+    accuracy: 0.8,
+    moveIntervalMs: 32000,
+    threat: "Extreme",
+    xpReward: 130,
+    creditReward: 500
+  }
+};
 const HOSTILE_BOT_ATTACK_FACE_MS = 1200;
 const HOSTILE_BOT_LASER_DELAY_MS = 260;
 const SECTOR_SCAN_DURATION_MS = 5000;
@@ -1075,39 +1475,208 @@ let sectorScanTicker = null;
 
 let lootByNode = {};
 
+function getAsteroidResourceDefinition(resource) {
+  return ASTEROID_RESOURCE_TYPES[resource] || ASTEROID_RESOURCE_TYPES.Iron;
+}
+
+function getAsteroidImage(resource) {
+  const definition = getAsteroidResourceDefinition(resource);
+  return `${ASTEROID_ASSET_PATH}${definition.image}`;
+}
+
+function getAsteroidDisplayName(resource, richnessLabel = "") {
+  const base = resource === "Dark Matter Residue" ? "Dark Matter" : resource;
+  return `${richnessLabel && richnessLabel !== "Standard" ? `${richnessLabel} ` : ""}${base} Asteroid`;
+}
+
+function getAsteroidResourceSlug(resource) {
+  return String(resource || "Iron").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function getLowerCombatAsteroidNodeIds() {
+  return Object.keys(sectorNodes).filter(name => {
+    const node = sectorNodes[name];
+    return node?.type === "space" && node?.danger === "hostile" && Number(node.y) > 50;
+  });
+}
+
+function isAllowedAsteroidNode(nodeId) {
+  return getLowerCombatAsteroidNodeIds().includes(nodeId);
+}
+
+function createAsteroid(resource, nodeId, index = 0) {
+  const definition = getAsteroidResourceDefinition(resource);
+  const variant = ASTEROID_YIELD_VARIANTS[index % ASTEROID_YIELD_VARIANTS.length];
+  const position = ASTEROID_FIELD_POSITIONS[index % ASTEROID_FIELD_POSITIONS.length];
+  const maxHp = Math.max(80, Math.round(Number(definition.hp || ASTEROID_BASE_HP) * variant.hp));
+  const dropMin = Math.max(1, Math.round(Number(definition.dropMin || 1) * variant.drop));
+  const dropMax = Math.max(dropMin, Math.round(Number(definition.dropMax || dropMin) * variant.drop));
+
+  return {
+    id: `asteroid-${index + 1}-${getAsteroidResourceSlug(resource)}`,
+    resource,
+    name: getAsteroidDisplayName(resource, variant.label),
+    node: nodeId,
+    image: getAsteroidImage(resource),
+    shield: 0,
+    shieldMax: 0,
+    maxShield: 0,
+    hull: maxHp,
+    hullMax: maxHp,
+    maxHull: maxHp,
+    armor: Number(definition.armor || 0),
+    hp: maxHp,
+    maxHp,
+    dropMin,
+    dropMax,
+    yieldLabel: variant.label,
+    scale: variant.scale,
+    alive: true,
+    x: position.x,
+    y: position.y
+  };
+}
+
+function createMapOneAsteroid(index = 0) {
+  const lowerNodes = getLowerCombatAsteroidNodeIds();
+  const resource = MAP_ONE_ASTEROID_SPAWN_PLAN[index % MAP_ONE_ASTEROID_SPAWN_PLAN.length] || "Iron";
+  const nodeId = lowerNodes[index % Math.max(1, lowerNodes.length)] || currentNode || "Lower Gate Core";
+  return createAsteroid(resource, nodeId, index);
+}
+
 function createInitialAsteroids() {
-  // Asteroids are intentionally disabled in Map 1.
-  // They will return in later maps as the source of weapon/equipment parts and rare Lupen Core progression.
-  return [];
+  return Array.from({ length: MAP_ONE_ASTEROID_COUNT }, (_, index) => createMapOneAsteroid(index));
+}
+
+function normalizeAsteroid(asteroid, index = 0) {
+  const fallback = createMapOneAsteroid(index);
+  if (!asteroid || typeof asteroid !== "object") return fallback;
+
+  const resource = ASTEROID_RESOURCE_TYPES[asteroid.resource] ? asteroid.resource : fallback.resource;
+  const definition = getAsteroidResourceDefinition(resource);
+  const node = isAllowedAsteroidNode(asteroid.node) ? asteroid.node : fallback.node;
+  const maxHp = Math.max(80, Math.round(Number(asteroid.maxHp || asteroid.hullMax || definition.hp || fallback.maxHp)));
+  const hp = Math.max(0, Math.min(maxHp, Math.round(Number(asteroid.hp || asteroid.hull || maxHp))));
+  const dropMin = Math.max(1, Number(asteroid.dropMin || fallback.dropMin || definition.dropMin || 1));
+  const dropMax = Math.max(dropMin, Number(asteroid.dropMax || fallback.dropMax || definition.dropMax || dropMin));
+
+  return {
+    ...fallback,
+    ...asteroid,
+    id: asteroid.id || fallback.id,
+    resource,
+    name: asteroid.name || getAsteroidDisplayName(resource, asteroid.yieldLabel || fallback.yieldLabel),
+    node,
+    image: getAsteroidImage(resource),
+    shield: 0,
+    shieldMax: 0,
+    maxShield: 0,
+    hull: hp,
+    hullMax: maxHp,
+    maxHull: maxHp,
+    armor: Number(asteroid.armor ?? definition.armor ?? 0),
+    hp,
+    maxHp,
+    dropMin,
+    dropMax,
+    scale: Number(asteroid.scale || fallback.scale || 1),
+    alive: asteroid.alive !== false
+  };
+}
+
+function normalizeAsteroidCollection(savedAsteroids) {
+  const defaults = createInitialAsteroids();
+  if (!Array.isArray(savedAsteroids) || !savedAsteroids.length) return defaults;
+
+  const normalized = savedAsteroids
+    .slice(0, MAP_ONE_ASTEROID_COUNT)
+    .map((asteroid, index) => normalizeAsteroid(asteroid?.alive === false ? null : asteroid, index));
+  const seen = new Set(normalized.map(asteroid => asteroid.id));
+
+  defaults.forEach(defaultAsteroid => {
+    if (normalized.length >= MAP_ONE_ASTEROID_COUNT) return;
+    if (seen.has(defaultAsteroid.id)) return;
+    normalized.push(defaultAsteroid);
+    seen.add(defaultAsteroid.id);
+  });
+
+  return normalized.slice(0, MAP_ONE_ASTEROID_COUNT);
+}
+
+function getErebusBotImagePath(imageName) {
+  if (!imageName) return EREBUS_BOT_FALLBACK_ASSET;
+  if (String(imageName).includes("/") || String(imageName).endsWith(".png")) return imageName;
+  return `${EREBUS_BOT_ASSET_PATH}${imageName}.png`;
+}
+
+function createErebusBot(def, nodeId, index = 0) {
+  const shield = Number(def.shield || HOSTILE_BOT_BASE_SHIELD);
+  const hullValue = Number(def.hull || HOSTILE_BOT_BASE_HP);
+  return {
+    id: `erebus-bot-${index + 1}-${def.id}`,
+    botType: def.id,
+    name: def.displayName,
+    displayName: def.displayName,
+    className: def.className,
+    classRole: def.role,
+    role: def.role,
+    currentNodeId: nodeId,
+    node: nodeId,
+    hull: hullValue,
+    maxHull: hullValue,
+    hullMax: hullValue,
+    shield,
+    maxShield: shield,
+    shieldMax: shield,
+    armor: Number(def.armor || HOSTILE_BOT_BASE_ARMOR),
+    damage: Number(def.damage || HOSTILE_BOT_DAMAGE),
+    fireRateMs: Number(def.fireRateMs || HOSTILE_BOT_ATTACK_MS),
+    lastFiredAt: 0,
+    accuracy: Number(def.accuracy || 1),
+    image: getErebusBotImagePath(def.image),
+    faction: "erebus",
+    allegiance: "hostile_neutral",
+    aggroState: "neutral",
+    aggroUntil: null,
+    lastMovedAt: Date.now() - Math.floor(Math.random() * Number(def.moveIntervalMs || HOSTILE_BOT_MOVE_MS)),
+    moveIntervalMs: Number(def.moveIntervalMs || HOSTILE_BOT_MOVE_MS),
+    targetPlayerId: null,
+    threat: def.threat || "Medium",
+    xpReward: Number(def.xpReward || XP_CONFIG.combatBotXp),
+    creditReward: Number(def.creditReward || 0),
+    hp: shield + hullValue,
+    maxHp: shield + hullValue,
+    alive: true,
+    x: Math.floor(Math.random() * 52) + 34,
+    y: Math.floor(Math.random() * 34) + 18,
+    attackingUntil: 0
+  };
 }
 
 function createInitialHostileBots() {
-  const spaceNodes = getHostileBotNodes();
-  const positions = [
-    { x: 18, y: 24 }, { x: 32, y: 39 }, { x: 48, y: 22 }, { x: 64, y: 34 }, { x: 78, y: 26 },
-    { x: 24, y: 58 }, { x: 42, y: 66 }, { x: 58, y: 54 }, { x: 72, y: 62 }, { x: 86, y: 48 }
-  ];
+  const allowedNodes = getAllowedErebusBotNodeIds();
+  if (!allowedNodes.length) {
+    console.warn("No allowed Erebus bot nodes found.");
+    return [];
+  }
 
-  return Array.from({ length: 10 }, (_, index) => {
-    const pos = positions[index % positions.length];
+  return EREBUS_STARTER_SPAWN_PLAN.map((botType, index) => {
+    const def = EREBUS_BOT_TYPES[botType] || EREBUS_BOT_TYPES.erebus_attacker;
+    const nodeIndex = botType === "erebus_behemoth"
+      ? (index * 5) % allowedNodes.length
+      : index % allowedNodes.length;
+    return createErebusBot(def, allowedNodes[nodeIndex], index);
+  });
+}
 
-    return {
-      id: `manta-bot-${index + 1}`,
-      name: `Manta Bot ${index + 1}`,
-      node: spaceNodes[(index + 1) % spaceNodes.length],
-      shield: HOSTILE_BOT_BASE_SHIELD,
-      shieldMax: HOSTILE_BOT_BASE_SHIELD,
-      armor: HOSTILE_BOT_BASE_ARMOR,
-      hull: HOSTILE_BOT_BASE_HP,
-      hullMax: HOSTILE_BOT_BASE_HP,
-      hp: HOSTILE_BOT_BASE_SHIELD + HOSTILE_BOT_BASE_HP,
-      maxHp: HOSTILE_BOT_BASE_SHIELD + HOSTILE_BOT_BASE_HP,
-      alive: true,
-      x: pos.x,
-      y: pos.y,
-      image: MANTA_BOT_ASSET,
-      attackingUntil: 0
-    };
+function enforceErebusSpawnCaps(bots = hostileBots) {
+  if (!Array.isArray(bots)) return [];
+  const counts = {};
+  return bots.filter(bot => {
+    if (bot?.faction !== "erebus") return true;
+    const cap = EREBUS_BOT_SPAWN_CAPS[bot.botType] || 0;
+    counts[bot.botType] = Number(counts[bot.botType] || 0) + 1;
+    return counts[bot.botType] <= cap;
   });
 }
 
@@ -1150,7 +1719,7 @@ function getEngagedTargetEntity() {
 }
 
 function getTargetTypeFromEntity(target) {
-  return target?.id?.startsWith("manta-bot") ? "hostileBot" : "asteroid";
+  return target?.faction === "erebus" || target?.id?.startsWith("erebus-bot") ? "hostileBot" : "asteroid";
 }
 
 function getVisibleAsteroids() {
@@ -1158,7 +1727,7 @@ function getVisibleAsteroids() {
 }
 
 function getVisibleHostileBots() {
-  return hostileBots.filter(bot => bot.alive && bot.node === currentNode);
+  return hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
 }
 
 function isBotFacingPlayer(bot) {
@@ -1321,7 +1890,7 @@ function addCombatXp(amount, source = "") {
 }
 
 function awardCombatXpFromBot(bot) {
-  const award = getCombatXpPerBot();
+  const award = Number(bot?.xpReward || getCombatXpPerBot());
   playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
 
   if (award <= 0) {

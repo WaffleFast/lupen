@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lupen</title>
+  <title>Lupen Tutorial</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="orbit-reference.css" />
 </head>
 <body>
   <div class="stars"></div>
@@ -43,49 +44,49 @@
       <p id="loginMessage" class="message"></p>
     </section>
 
-    <section id="gameScreen" class="hub-screen">
-      <div class="hub-overlay">
-        <button class="logout-btn hub-image-button hub-logout-button" onclick="logout()" aria-label="Logout">
-          <img src="assets/hub/logout-icon.png" alt="" />
+    <section id="gameScreen" class="hub-screen planet-home-screen">
+      <div class="hub-overlay home-bg-overlay">
+        <button class="logout-btn hub-logout-button home-logout-btn" onclick="logout()" aria-label="Logout">
+          <span>Logout</span>
         </button>
         <div id="saveStatusIndicator" class="save-status-indicator" data-state="local">Saved locally</div>
 
-        <div class="hub-header">
-          <p>LOCATION:</p>
-          <h2 id="hubLocationTitle">ASTERON PRIME</h2>
+        <div class="hub-header home-location-panel">
+          <p class="home-location-label">LOCATION:</p>
+          <h2 id="hubLocationTitle">VIRELLA</h2>
         </div>
 
-        <button class="hub-launch-btn hub-image-button" onclick="launchShip()" aria-label="Launch Ship">
-          <img src="assets/hub/launch-ship-icon.png" alt="" />
+        <button class="hub-launch-btn launch-ship-btn" onclick="launchShip()" aria-label="Launch Ship">
+          <span>Launch Ship</span>
         </button>
 
-        <div class="hub-actions">
-          <button class="hub-image-button hub-action-button" onclick="openMarketplace()" aria-label="Trade Terminal">
+        <nav class="hub-actions home-bottom-dock" aria-label="Planet services">
+          <button class="hub-action-button home-dock-item" onclick="openMarketplace()" aria-label="Trade Terminal">
             <img src="assets/hub/trade-terminal-icon.png" alt="" />
             <span>Trade<br />Terminal</span>
           </button>
-          <button class="hub-image-button hub-action-button" id="bountyBoardHubBtn" onclick="openBountyBoard()" aria-label="Bounty Board">
+          <button class="hub-action-button home-dock-item" id="bountyBoardHubBtn" onclick="openBountyBoard()" aria-label="Bounty Board">
             <img src="assets/hub/bounty-board-icon.png" alt="" />
-            <span>Bounty Board</span>
+            <span>Bounty<br />Board</span>
             <span id="bountyRewardBadge" class="hub-action-badge">Reward Ready</span>
           </button>
-          <button class="hub-image-button hub-action-button" onclick="openStore()" aria-label="Store">
+          <button class="hub-action-button home-dock-item" onclick="openStore()" aria-label="Store">
             <img src="assets/hub/store-icon.png" alt="" />
             <span>Store</span>
           </button>
-          <button class="hub-image-button hub-action-button" onclick="openHangar()" aria-label="Hangar">
+          <button class="hub-action-button home-dock-item" onclick="openHangar()" aria-label="Hangar">
             <img src="assets/hub/hangar-icon.png" alt="" />
             <span>Hangar</span>
           </button>
-          <button class="hub-image-button hub-action-button" onclick="openUpgradeForge()" aria-label="Forge">
+          <button class="hub-action-button home-dock-item" onclick="openUpgradeForge()" aria-label="Forge">
             <img src="assets/hub/forge-icon.png" alt="" />
             <span>Forge</span>
           </button>
-          <button class="hub-image-button hub-action-button" onclick="openPilotProfile()" aria-label="Pilot">
+          <button class="hub-action-button home-dock-item" onclick="openPilotProfile()" aria-label="Pilot">
             <img src="assets/hub/pilot-icon.png" alt="" />
             <span>Pilot</span>
           </button>
-        </div>
+        </nav>
       </div>
     </section>
 
@@ -118,24 +119,20 @@
             </div>
           </div>
 
-          <div class="terminal-card terminal-card-wide">
-            <h3>Your Hold</h3>
-            <div id="marketCargoSummary" class="market-cargo-summary">Empty</div>
-          </div>
         </div>
 
         <section class="market-list-panel trade-terminal-panel">
           <div class="market-list-header phase-one-market-header">
-            <span>Station Trades</span>
-            <span id="marketCycleText">Market shifts in 10:00.</span>
+            <span>Market Board</span>
+            <span id="marketCycleText">Prices refresh in: 10:00</span>
           </div>
           <div id="marketGoods" class="market-goods"></div>
         </section>
       </div>
     </section>
 
-    <section id="bountyScreen" class="market-screen bounty-screen">
-      <div class="market-header">
+    <section id="bountyScreen" class="market-screen bounty-screen bounty-board-screen">
+      <div class="bounty-board-header market-header">
         <div>
           <p>BOUNTY BOARD</p>
           <h2 id="bountyLocationTitle">SECTOR CONTRACTS</h2>
@@ -143,32 +140,28 @@
         <button class="screen-back-btn" onclick="returnToHub()">Back</button>
       </div>
 
-      <div class="bounty-top-strip">
-        <div class="bounty-strip-card">
-          <span>Daily Contracts</span>
-          <strong id="bountyAvailableText">0 / 3</strong>
+      <div class="bounty-status-strip bounty-top-strip">
+        <div class="bounty-status-message">
+          <span class="bounty-status-icon" aria-hidden="true">i</span>
+          <span>Complete Erebus bounties to earn Lupen Cores and advance combat progression.</span>
         </div>
-        <div class="bounty-strip-card">
-          <span>Credits</span>
-          <strong><span class="credit-icon">CR</span><span id="bountyCreditsText">0</span></strong>
-        </div>
-        <div class="bounty-strip-note">Hunt hostile targets, earn combat pay, and chase rare drops across dangerous sector lanes.</div>
+        <em id="bountyResetCountdown" class="bounty-reset-chip">RESETS IN --:--:--</em>
       </div>
 
-      <div class="bounty-board-layout bounty-board-layout-refined">
-        <section class="bounty-contract-panel">
-          <div class="modern-store-panel-header bounty-panel-header">
-            <span>Available Bounties</span>
-            <em id="bountyResetCountdown">Resets in --:--:--</em>
+      <div class="bounty-main-grid bounty-board-layout bounty-board-layout-refined">
+        <section class="bounty-list-panel bounty-contract-panel">
+          <div class="bounty-list-header modern-store-panel-header bounty-panel-header">
+            <span>AVAILABLE BOUNTIES</span>
+            <span class="bounty-list-count">3 CONTRACTS</span>
           </div>
-          <div id="bountyContractGrid" class="bounty-contract-grid"></div>
+          <div id="bountyContractGrid" class="bounty-list bounty-contract-grid"></div>
         </section>
 
-        <aside class="bounty-detail-panel">
-          <div class="modern-store-panel-header">
-            <span>Selected Contract</span>
+        <aside class="selected-contract-panel bounty-detail-panel selected-bounty-panel">
+          <div class="selected-contract-heading modern-store-panel-header">
+            <span>SELECTED CONTRACT</span>
           </div>
-          <div id="bountyDetailPanel" class="bounty-detail-body"></div>
+          <div id="bountyDetailPanel" class="selected-contract-body bounty-detail-body"></div>
         </aside>
       </div>
     </section>
@@ -199,7 +192,8 @@
         <div class="forge-top-stats">
           <div class="forge-top-chip"><span>CR</span><strong id="forgeCreditsText">0</strong><small>Credits</small></div>
           <div class="forge-top-chip core-chip"><span>LC</span><strong id="forgeCoreCountText">0</strong><small>Lupen Cores</small></div>
-          <div class="forge-top-chip"><span>LVL</span><strong id="forgePilotLevelText">1</strong><small id="forgePilotXpText">0 XP</small></div>
+          <div class="forge-top-chip shard-chip"><span>LS</span><strong id="forgeShardCountText">0</strong><small>Lupen Shards</small></div>
+          <div class="forge-top-chip"><span>XP</span><strong id="forgePilotLevelText">0</strong><small id="forgePilotXpText">Level I</small></div>
           <button class="screen-back-btn" onclick="returnToHub()">Back</button>
         </div>
       </div>
@@ -207,8 +201,7 @@
       <div class="upgrade-forge-layout">
         <aside class="forge-panel forge-selected-panel">
           <div class="modern-store-panel-header">
-            <span>Item Slot</span>
-            <button type="button" onclick="openForgeInventoryPicker()">Select Item</button>
+            <span>Selected Item</span>
           </div>
           <div id="forgeSelectedPanel" class="forge-selected-body"></div>
         </aside>
@@ -216,20 +209,21 @@
         <main class="forge-panel forge-chamber-panel">
           <div class="forge-chamber-title">
             <span>Forge Chamber</span>
-            <small id="forgeChamberStatus">Ready</small>
           </div>
-          <div id="forgeChamber" class="forge-chamber">
+          <div id="forgeChamber" class="forge-chamber forge-chamber-visual">
+            <div class="forge-chamber-bg" aria-hidden="true"></div>
+            <div class="forge-chamber-vignette" aria-hidden="true"></div>
             <div class="forge-ring ring-one"></div>
             <div class="forge-ring ring-two"></div>
             <div class="forge-beam"></div>
             <div class="forge-scanline"></div>
             <div class="forge-particles"></div>
-            <img id="forgePreviewImage" src="assets/weapons/pulse-laser.png" alt="Selected item">
+            <img id="forgePreviewImage" class="forge-chamber-item" src="assets/weapons/pulse-laser.png" alt="Selected item">
           </div>
           <div id="forgeStatePreview" class="forge-state-preview"></div>
           <div class="forge-mode-switch">
-            <button id="forgeLevelModeBtn" type="button" onclick="setForgeMode('level')">Upgrade Level<span>Increase item level</span></button>
-            <button id="forgeQualityModeBtn" type="button" onclick="setForgeMode('quality')">Upgrade Quality<span>Advance to next tier</span></button>
+            <button id="forgeLevelModeBtn" class="forge-mode-card" type="button" onclick="setForgeMode('level')">Level Upgrade<span>Increase item power</span></button>
+            <button id="forgeQualityModeBtn" class="forge-mode-card" type="button" onclick="setForgeMode('quality')">Quality Upgrade<span>Advance item quality</span></button>
           </div>
         </main>
 
@@ -240,14 +234,6 @@
           <div id="forgeMaterialsList" class="forge-materials-list"></div>
           <div id="forgeCorePanel" class="forge-core-panel"></div>
         </aside>
-      </div>
-
-      <div class="forge-summary-bar">
-        <div><span>Success Chance</span><strong id="forgeSuccessText">--</strong><small id="forgeBonusText">Base --</small></div>
-        <div><span>Est. Outcome</span><strong id="forgeOutcomeText">Select item</strong><small id="forgePowerText">Power increase --</small></div>
-        <div><span>Est. Cost</span><strong><span class="credit-icon">CR</span><span id="forgeCostText">0</span></strong></div>
-        <button type="button" onclick="previewForgeUpgrade()">Preview</button>
-        <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Start Upgrade</button>
       </div>
 
       <div id="forgeInventoryPicker" class="forge-inventory-picker" aria-hidden="true">
@@ -340,34 +326,54 @@
               </div>
             </div>
 
-            <div class="orbit-loadout-arena">
-              <section class="orbit-rail orbit-rail-left">
-                <div class="loadout-bank-title compact-bank-title">
-                  <span>Guns</span>
-                  <small id="gunSlotSummary">0/0</small>
-                </div>
-                <div id="installedGuns" class="orbit-slot-rail gun-slot-grid"></div>
-              </section>
+            <div class="orbit-loadout-arena scalable-loadout-arena">
+              <div class="loadout-slot-matrix" aria-label="Equipped loadout slots">
+                <section class="loadout-slot-bank weapon-slot-bank">
+                  <div class="loadout-bank-title compact-bank-title">
+                    <span>Weapons</span>
+                    <small id="gunSlotSummary">0/0</small>
+                  </div>
+                  <div id="installedGuns" class="orbit-slot-rail gun-slot-grid"></div>
+                </section>
 
-              <div class="orbit-ship-stage">
-                <div class="orbit-halo orbit-halo-outer"></div>
-                <div class="orbit-halo orbit-halo-inner"></div>
-                <img id="overviewShipImage" src="assets/ships/lupen-origin.png" alt="Equipped ship">
-                <div class="ship-effect-anchor ship-effect-blue"></div>
+                <div class="orbit-ship-stage">
+                  <div class="orbit-halo orbit-halo-outer"></div>
+                  <div class="orbit-halo orbit-halo-inner"></div>
+                  <img id="overviewShipImage" src="assets/ships/lupen-origin.png" alt="Equipped ship">
+                  <div class="ship-effect-anchor ship-effect-blue"></div>
+                </div>
+
+                <section class="loadout-slot-bank attachment-slot-bank">
+                  <div class="loadout-bank-title compact-bank-title">
+                    <span>Attach</span>
+                    <small id="attachmentSlotSummary">0/0</small>
+                  </div>
+                  <div id="installedAttachments" class="orbit-slot-rail attachment-slot-grid"></div>
+                </section>
               </div>
+            </div>
 
-              <section class="orbit-rail orbit-rail-right">
-                <div class="loadout-bank-title compact-bank-title">
-                  <span>Equip</span>
-                  <small id="attachmentSlotSummary">0/0</small>
-                </div>
-                <div id="installedAttachments" class="orbit-slot-rail attachment-slot-grid"></div>
-              </section>
+            <div class="loadout-quick-stats" aria-label="Loadout totals">
+              <div>
+                <span>Weapons</span>
+                <strong id="gunSlotSummaryMirror">0/0</strong>
+                <div id="gunSlotPipsMirror" class="loadout-summary-pips ship-slot-pips" aria-hidden="true"></div>
+              </div>
+              <div>
+                <span>Attachments</span>
+                <strong id="attachmentSlotSummaryMirror">0/0</strong>
+                <div id="attachmentSlotPipsMirror" class="loadout-summary-pips ship-slot-pips" aria-hidden="true"></div>
+              </div>
+              <div>
+                <span>Total Slots</span>
+                <strong id="totalSlotSummary">0</strong>
+                <div id="totalSlotPips" class="loadout-summary-pips ship-slot-pips" aria-hidden="true"></div>
+              </div>
             </div>
 
             <div class="loadout-stage-footer">
               <span>Click installed systems to unequip</span>
-              <span>Effect-ready slots</span>
+              <span>Large hulls support dense 15-slot banks</span>
             </div>
           </main>
 
@@ -490,7 +496,7 @@
       </div>
     </section>
 
-    <section id="spaceScreen" class="space-screen">
+    <section id="spaceScreen" class="space-screen player-orbit-screen">
       <button
         id="planetLandBtn"
         class="clickable-planet"
@@ -504,6 +510,14 @@
 
       <div id="explosionLayer" class="explosion-layer" aria-hidden="true"></div>
 
+      <div class="player-hud-frame" aria-hidden="true">
+        <header class="orbit-header">
+          <img class="orbit-header-trim" src="assets/ui/player-ui/header-trim.png" alt="" />
+          <div id="nodeNameTag" class="node-name-tag orbit-location">ASTERON PRIME ORBIT</div>
+        </header>
+        <img class="bottom-hud-divider" src="assets/ui/player-ui/bottom-divider.png" alt="" />
+      </div>
+
       <div id="inventoryDrawer" class="inventory-drawer" aria-label="Inventory drawer">
         <div class="inventory-drawer-head">
           <div>
@@ -512,8 +526,7 @@
           </div>
           <div id="inventoryDrawerFilters" class="inventory-drawer-filters">
             <button id="inventoryFilterCargo" onclick="setInventoryDrawerFilter('cargo')">Cargo</button>
-            <button id="inventoryFilterEquipment" onclick="setInventoryDrawerFilter('equipment')">Equipment</button>
-            <button id="inventoryFilterEquipped" onclick="setInventoryDrawerFilter('equipped')">Loadout</button>
+            <button id="inventoryFilterEquipment" onclick="setInventoryDrawerFilter('equipment')">Inventory</button>
           </div>
         </div>
         <div class="inventory-drawer-body">
@@ -521,8 +534,6 @@
           <div id="inventoryDrawerDetail" class="inventory-drawer-detail"></div>
         </div>
       </div>
-
-      <div id="nodeNameTag" class="node-name-tag">ASTERON PRIME ORBIT</div>
 
       <div id="sectorMap" class="sector-map">
         <div class="map-title">SECTOR MAP</div>
@@ -543,38 +554,63 @@
         <button id="objectEngageBtn" class="engage-action" onclick="toggleTargetEngagement()">ENGAGE</button>
       </div>
 
-      <div class="space-combat-hud compact-hud command-hud">
-        <div class="vertical-stats">
+      <div class="space-combat-hud compact-hud command-hud player-bottom-hud">
+        <div class="vertical-stats hud-panel status-panel">
           <div class="stat-col">
             <div id="jumpValue" class="stat-value">100</div>
             <div class="stat-meter"><div id="jumpFill" class="stat-fill jump-fill"></div></div>
-            <button id="jumpBtn" class="stat-btn" onclick="openSectorMap()">JUMP</button>
+            <button id="jumpBtn" class="stat-btn stat-label jump-action" onclick="openSectorMap()" title="Open node map" aria-label="Open node map to jump">
+              <img src="assets/ui/player-ui/icon-jump.png" alt="" />
+              <span>JUMP</span>
+            </button>
           </div>
 
           <div class="stat-col">
             <div id="hullValue" class="stat-value">800</div>
             <div class="stat-meter"><div id="hullFill" class="stat-fill hull-fill"></div></div>
-            <button class="stat-btn static-btn">HULL</button>
+            <button class="stat-btn stat-label static-btn hull-action" type="button">
+              <img src="assets/ui/player-ui/icon-hull.png" alt="" />
+              <span>HULL</span>
+            </button>
           </div>
 
           <div class="stat-col">
             <div id="shieldValue" class="stat-value">0</div>
             <div class="stat-meter"><div id="shieldFill" class="stat-fill shield-fill"></div></div>
-            <button id="shieldBtn" class="stat-btn static-btn" type="button">SHIELD</button>
+            <button id="shieldBtn" class="stat-btn stat-label static-btn shield-action" type="button">
+              <img src="assets/ui/player-ui/icon-shield.png" alt="" />
+              <span>SHIELD</span>
+            </button>
           </div>
         </div>
 
-        <div class="ship-display-panel ship-display-panel-action">
-          <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image">
+        <div class="ship-display-panel ship-display-panel-action hud-panel ship-panel">
+          <div class="ship-card-main">
+            <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image active-player-ship">
+          </div>
           <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
-          <button id="shipInventoryBtn" class="ship-inventory-btn" onclick="toggleShipInventoryDrawer(event)">LOADOUT</button>
+          <div class="ship-storage-strip" aria-label="Ship storage">
+            <button id="shipInventoryBtn" class="ship-storage-button" onclick="openShipStorageDrawer('equipment', event)">
+              <span>Inventory</span>
+              <strong id="hudInventorySlots">0 items</strong>
+            </button>
+          </div>
         </div>
 
-        <div class="hud-command-console">
-          <div class="hud-command-tabs">
-            <button id="chatDockBtn" class="active" onclick="openHudPanel('chat')">CHAT</button>
-            <button id="objectivesDockBtn" onclick="openHudPanel('objectives')">OBJECTIVES</button>
-            <button id="activityDockBtn" onclick="openHudPanel('activity')">ACTIVITY</button>
+        <div class="hud-command-console hud-panel info-panel">
+          <div class="hud-command-tabs info-tabs">
+            <button id="chatDockBtn" class="info-tab active" onclick="openHudPanel('chat')">
+              <img src="assets/ui/player-ui/icon-chat.png" alt="" />
+              <span>CHAT</span>
+            </button>
+            <button id="objectivesDockBtn" class="info-tab" onclick="openHudPanel('objectives')">
+              <img src="assets/ui/player-ui/icon-objectives.png" alt="" />
+              <span>OBJECTIVES</span>
+            </button>
+            <button id="activityDockBtn" class="info-tab" onclick="openHudPanel('activity')">
+              <img src="assets/ui/player-ui/icon-activity.png" alt="" />
+              <span>ACTIVITY</span>
+            </button>
           </div>
 
           <div id="hudInlinePanel" class="hud-inline-panel compact-tabs-panel">
