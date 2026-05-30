@@ -77,7 +77,7 @@ function buildSaveState(options = {}) {
 
 function saveGame(options = {}) {
   const state = buildSaveState(options);
-  localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify(state));
+  LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, state);
   queueSupabaseSave(state);
 }
 
@@ -97,16 +97,9 @@ function setSaveStatus(state) {
 }
 
 async function getAuthenticatedSupabaseUser() {
-  const client = typeof getSupabaseClient === "function" ? getSupabaseClient() : null;
-  if (!client) return null;
-
-  const { data, error } = await client.auth.getUser();
-  if (error) {
-    console.warn("Unable to read Supabase user for save sync.", error);
-    return null;
-  }
-
-  return data?.user ? { client, user: data.user } : null;
+  return LupenSaveService.getAuthenticatedSupabaseUser(
+    typeof getSupabaseClient === "function" ? getSupabaseClient : null
+  );
 }
 
 function queueSupabaseSave(state) {
@@ -132,40 +125,25 @@ async function saveGameToSupabase(state = buildSaveState()) {
 }
 
 async function saveGameStateToSupabaseForUser(client, user, state) {
-  const { error } = await client
-    .from("player_saves")
-    .upsert({
-      user_id: user.id,
-      save_data: state,
-      updated_at: new Date().toISOString()
-    }, { onConflict: "user_id" });
-
-  if (error) throw error;
-  return true;
+  return LupenSaveService.saveGameStateToSupabaseForUser(client, user, state);
 }
 
 async function loadGameFromSupabase() {
   const auth = await getAuthenticatedSupabaseUser();
   if (!auth) return { loaded: false, exists: false, reason: "not_authenticated" };
 
-  const { data, error } = await auth.client
-    .from("player_saves")
-    .select("save_data")
-    .eq("user_id", auth.user.id)
-    .maybeSingle();
+  const saveData = await LupenSaveService.loadGameStateFromSupabaseForUser(auth.client, auth.user);
+  if (!saveData) return { loaded: false, exists: false, reason: "missing" };
 
-  if (error) throw error;
-  if (!data?.save_data) return { loaded: false, exists: false, reason: "missing" };
-
-  const applied = applyLoadedGameState(data.save_data);
+  const applied = applyLoadedGameState(saveData);
   if (applied) {
-    localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify(buildSaveState({ leaveSave: false })));
+    LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
   }
   return { loaded: applied, exists: true, reason: applied ? "loaded" : "invalid" };
 }
 
 function getLocalSavePayloadForCloudMigration() {
-  return migrateSavedGame(safeParseLocalStorage(STORAGE_GAME_KEY));
+  return migrateSavedGame(LupenSaveService.readJsonLocalStorage(STORAGE_GAME_KEY));
 }
 
 function hasMeaningfulLocalSave(saved = getLocalSavePayloadForCloudMigration()) {
@@ -245,8 +223,8 @@ function buildSaveExportPayload() {
     saveVersion: SAVE_VERSION,
     exportedAt: new Date().toISOString(),
     game: buildSaveState({ leaveSave: false }),
-    account: safeParseLocalStorage(STORAGE_ACCOUNT_KEY),
-    tutorial: safeParseLocalStorage("lupenStarterPilotTutorial")
+    account: LupenSaveService.readJsonLocalStorage(STORAGE_ACCOUNT_KEY),
+    tutorial: LupenSaveService.readJsonLocalStorage("lupenStarterPilotTutorial")
   };
 }
 
@@ -298,14 +276,14 @@ function importSavePayload(payload) {
     throw new Error("Unsupported save file.");
   }
 
-  localStorage.setItem(STORAGE_GAME_KEY, JSON.stringify(migratedGame));
+  LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, migratedGame);
 
   if (payload.schema === SAVE_SCHEMA_ID) {
     if (payload.account && typeof payload.account === "object") {
-      localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify(payload.account));
+      LupenSaveService.writeJsonLocalStorage(STORAGE_ACCOUNT_KEY, payload.account);
     }
     if (payload.tutorial && typeof payload.tutorial === "object") {
-      localStorage.setItem("lupenStarterPilotTutorial", JSON.stringify(payload.tutorial));
+      LupenSaveService.writeJsonLocalStorage("lupenStarterPilotTutorial", payload.tutorial);
     }
   }
 
@@ -488,7 +466,7 @@ function applyLoadedGameState(rawSaved) {
 }
 
 function loadGame() {
-  return applyLoadedGameState(safeParseLocalStorage(STORAGE_GAME_KEY));
+  return applyLoadedGameState(LupenSaveService.readJsonLocalStorage(STORAGE_GAME_KEY));
 }
 
 function isDebugToolsEnabled() {
@@ -602,10 +580,10 @@ function debugOpenBounty() {
 
 function debugResetSave() {
   if (!confirm("Reset this browser save and reload Lupen?")) return;
-  localStorage.removeItem(STORAGE_GAME_KEY);
-  localStorage.removeItem(STORAGE_ACCOUNT_KEY);
-  localStorage.removeItem("lupenStarterPilotTutorial");
-  localStorage.removeItem(STORAGE_VAULT_RESET_KEY);
+  LupenSaveService.removeLocalStorage(STORAGE_GAME_KEY);
+  LupenSaveService.removeLocalStorage(STORAGE_ACCOUNT_KEY);
+  LupenSaveService.removeLocalStorage("lupenStarterPilotTutorial");
+  LupenSaveService.removeLocalStorage(STORAGE_VAULT_RESET_KEY);
   window.location.reload();
 }
 
