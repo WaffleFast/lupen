@@ -215,60 +215,20 @@ function showExplosionAtTarget(target) {
 function normalizeTargetCombatLayers(target) {
   if (!target) return target;
 
-  const fallbackMaxHp = Math.max(1, Number(target.maxHp || target.hp || HOSTILE_BOT_BASE_HP || 1));
-  if (!Number.isFinite(Number(target.shieldMax))) {
-    target.shieldMax = Math.max(0, Number(target.shield || 0));
-  }
-  if (!Number.isFinite(Number(target.shield))) {
-    target.shield = Math.max(0, Number(target.shieldMax || 0));
-  }
-  if (!Number.isFinite(Number(target.hullMax)) || Number(target.hullMax) <= 0) {
-    target.hullMax = Math.max(1, fallbackMaxHp - Number(target.shieldMax || 0));
-  }
-  if (!Number.isFinite(Number(target.hull))) {
-    target.hull = Math.min(Number(target.hullMax), Math.max(0, Number(target.hp || target.hullMax)));
-  }
-  if (!Number.isFinite(Number(target.armor))) {
-    target.armor = 0;
-  }
-
-  target.maxHp = Math.max(1, Number(target.shieldMax || 0) + Number(target.hullMax || 0));
-  target.hp = Math.max(0, Number(target.shield || 0) + Number(target.hull || 0));
+  Object.assign(target, LupenCombatRules.normalizeTargetCombatLayers(target, HOSTILE_BOT_BASE_HP));
   return target;
 }
 
 function syncTargetHpFromLayers(target) {
   if (!target) return;
-  target.shield = Math.max(0, Math.round(Number(target.shield || 0)));
-  target.hull = Math.max(0, Math.round(Number(target.hull || 0)));
-  target.hp = Math.max(0, target.shield + target.hull);
-  target.maxHp = Math.max(1, Math.round(Number(target.shieldMax || 0) + Number(target.hullMax || target.maxHp || 1)));
+  Object.assign(target, LupenCombatRules.syncTargetHpFromLayers(target));
+  return target;
 }
 
 function applyWeaponDamageToTarget(target, weapon) {
-  normalizeTargetCombatLayers(target);
-
-  const accuracy = Number(weapon.accuracy || 100);
-  if (Math.random() * 100 > accuracy) {
-    return { hit: false, layer: "miss", amount: 0 };
-  }
-
-  const damage = weapon.damageLayers || { shield: Number(weapon.damage || 0), armor: Number(weapon.damage || 0), hull: Number(weapon.damage || 0) };
-
-  if (target.shield > 0) {
-    const shieldDamage = Math.max(1, Math.round(Number(damage.shield || 1)));
-    const applied = Math.min(target.shield, shieldDamage);
-    target.shield -= applied;
-    syncTargetHpFromLayers(target);
-    return { hit: true, layer: "shield", amount: applied };
-  }
-
-  const reduction = Math.min(Number(target.armor || 0), 75) / 100;
-  const finalHullDamage = Math.max(1, Math.round(Number(damage.hull || 1) * (1 - reduction)));
-  const applied = Math.min(target.hull, finalHullDamage);
-  target.hull -= applied;
-  syncTargetHpFromLayers(target);
-  return { hit: true, layer: "hull", amount: applied };
+  const resolved = LupenCombatRules.resolveWeaponDamageToTarget(target, weapon, Math.random() * 100, HOSTILE_BOT_BASE_HP);
+  Object.assign(target, resolved.target);
+  return resolved.result;
 }
 
 function isPlayerInSpaceView() {
