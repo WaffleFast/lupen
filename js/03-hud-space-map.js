@@ -964,28 +964,17 @@ function applyDamageToPlayer(totalDamage) {
 
   stopShieldRegen();
 
-  const previousHull = hull;
-  let remainingDamage = getMitigatedIncomingDamage(totalDamage);
-  let shieldDamage = 0;
-  let hullDamage = 0;
+  const damageResult = LupenCombatRules.resolveIncomingPlayerDamage(
+    { hull, shield, armor },
+    getMitigatedIncomingDamage(totalDamage)
+  );
+  hull = damageResult.hull;
+  shield = damageResult.shield;
 
-  if (shield > 0) {
-    shieldDamage = Math.min(shield, remainingDamage);
-    shield = Math.max(0, shield - shieldDamage);
-    remainingDamage -= shieldDamage;
-  }
+  if (damageResult.shieldDamage > 0 && typeof playShieldHitSound === "function") playShieldHitSound();
+  if (damageResult.hullDamage > 0 && typeof playHullHitSound === "function") playHullHitSound();
 
-  if (remainingDamage > 0) {
-    const armorReduction = Math.min(Number(armor || 0), 75) / 100;
-    const reducedHullDamage = Math.max(1, Math.round(remainingDamage * (1 - armorReduction)));
-    hullDamage = Math.min(hull, reducedHullDamage);
-    hull = Math.max(0, hull - reducedHullDamage);
-  }
-
-  if (shieldDamage > 0 && typeof playShieldHitSound === "function") playShieldHitSound();
-  if (hullDamage > 0 && typeof playHullHitSound === "function") playHullHitSound();
-
-  if (hull <= 0 && previousHull > 0) {
+  if (damageResult.destroyed) {
     handleShipDisabled();
     return;
   }
