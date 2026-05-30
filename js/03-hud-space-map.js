@@ -1085,7 +1085,7 @@ function toggleShield() {
 /* Sector Map */
 
 function openSectorMap() {
-  if (jumpCharge < jumpMax) return;
+  if (!LupenMovementRules.canOpenSectorMap(jumpCharge, jumpMax)) return;
   document.getElementById("sectorMap").classList.add("active");
   renderSectorMap();
   tutorialEvent("openedSectorMap");
@@ -1489,7 +1489,7 @@ function drawNodes(svg) {
   const objectiveRoute = getActiveObjectiveRouteNodes();
   Object.entries(sectorNodes).forEach(([name, node]) => {
     const isCurrent = name === currentNode;
-    const canJump = sectorNodes[currentNode].connects.includes(name);
+    const canJump = LupenMovementRules.isAdjacentNode(sectorNodes, currentNode, name);
     const isObjectiveTarget = objectiveTarget === name;
     const isObjectivePath = objectiveRoute.includes(name);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -1620,12 +1620,11 @@ function drawSpaceNode(group, node, isCurrent, canJump, isObjectiveTarget = fals
 }
 
 function jumpToNode(destination) {
-  if (destination === currentNode) return;
-  if (!sectorNodes[currentNode].connects.includes(destination)) return;
-  if (jumpCharge < jumpMax) return;
+  const transition = LupenMovementRules.getJumpTransition(sectorNodes, currentNode, destination, jumpCharge, jumpMax);
+  if (!transition.canJump) return;
 
   currentNode = destination;
-  if (sectorNodes[currentNode].type === "planet") {
+  if (transition.isPlanetDestination) {
     lastPlanetNode = currentNode;
   }
 
