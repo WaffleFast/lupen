@@ -567,3 +567,228 @@
   min-height: 26px !important;
   font-size: 10px !important;
 }
+
+/* Final HUD section framing and objective visibility fix. */
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+  left: 24px !important;
+  right: 24px !important;
+  bottom: 4px !important;
+  width: auto !important;
+  height: 184px !important;
+  min-height: 184px !important;
+  max-height: 184px !important;
+  display: grid !important;
+  grid-template-columns: 250px 230px minmax(0, 1fr) !important;
+  gap: 12px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud > .status-panel,
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud > .ship-panel,
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud > .info-panel {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(37, 171, 245, 0.82) !important;
+  border-radius: 10px !important;
+  clip-path: none !important;
+  background-clip: padding-box !important;
+  background:
+    linear-gradient(180deg, rgba(5, 18, 34, 0.70), rgba(1, 7, 18, 0.84)),
+    radial-gradient(circle at 55% 0%, rgba(39, 170, 255, 0.10), transparent 62%) !important;
+  box-shadow:
+    0 0 12px rgba(0, 155, 255, 0.14),
+    inset 0 0 18px rgba(0, 155, 255, 0.055) !important;
+  overflow: hidden !important;
+}
+
+.player-orbit-screen .player-bottom-hud .status-panel.vertical-stats {
+  padding: 12px 16px 10px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .stat-meter {
+  height: 100px !important;
+  flex-basis: 100px !important;
+  max-height: 100px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action {
+  grid-template-columns: minmax(0, 1fr) 50px !important;
+  grid-template-rows: minmax(0, 1fr) auto auto auto !important;
+  padding: 9px 11px !important;
+  gap: 5px 8px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-card-main {
+  min-height: 76px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .active-player-ship,
+.player-orbit-screen .player-bottom-hud .hud-ship-image {
+  max-width: 112px !important;
+  max-height: 84px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .level-badge {
+  width: 50px !important;
+  height: 48px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-storage-button {
+  height: 27px !important;
+  min-height: 27px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-panel.hud-command-console {
+  grid-template-rows: 24px minmax(0, 1fr) !important;
+  gap: 5px !important;
+  padding: 7px 9px 8px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-inline-panel {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objectives-panel,
+.player-orbit-screen .player-bottom-hud .activity-panel,
+.player-orbit-screen .player-bottom-hud .comms-panel {
+  padding-top: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-panel-layout,
+.player-orbit-screen .player-bottom-hud .activity-objective-block,
+.player-orbit-screen .player-bottom-hud .activity-log-only-block {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-objective-block,
+.player-orbit-screen .player-bottom-hud .activity-log-only-block {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-panel-header.compact-header h3,
+.player-orbit-screen .player-bottom-hud .activity-objective-block h3 {
+  margin: 0 0 4px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  letter-spacing: 1.2px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-hud-summary,
+.player-orbit-screen .player-bottom-hud .activity-log-feed {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-hud-summary {
+  align-self: stretch !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 5px !important;
+  overflow: visible !important;
+}
+
+.player-orbit-screen .player-bottom-hud .compact-objective-list {
+  width: 100% !important;
+  height: auto !important;
+}
+
+.player-orbit-screen .player-bottom-hud .orbit-objective-card {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 76px !important;
+  padding: 8px 10px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-orbit-row {
+  height: auto !important;
+  min-height: 0 !important;
+  grid-template-columns: 42px minmax(0, 1fr) minmax(92px, 124px) 62px !important;
+  gap: 9px !important;
+  align-items: center !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-icon-large,
+.player-orbit-screen .player-bottom-hud .objective-bounty-icon {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-orbit-copy {
+  gap: 2px !important;
+  align-content: center !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-orbit-copy .objective-title-line {
+  min-height: 14px !important;
+  align-items: center !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-orbit-copy strong {
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-orbit-copy span,
+.player-orbit-screen .player-bottom-hud .objective-orbit-copy em,
+.player-orbit-screen .player-bottom-hud .objective-orbit-meta span,
+.player-orbit-screen .player-bottom-hud .objective-orbit-meta strong {
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+}
+
+.player-orbit-screen #chatPanel.comms-panel.active {
+  grid-template-rows: 16px minmax(92px, 1fr) 26px !important;
+  gap: 3px !important;
+  padding-top: 0 !important;
+}
+
+.player-orbit-screen #chatPanel .local-chat-feed {
+  min-height: 92px !important;
+  gap: 1px !important;
+  padding: 3px 7px 3px 0 !important;
+}
+
+.player-orbit-screen #chatPanel .chat-line {
+  padding: 1px 0 !important;
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-feed {
+  gap: 3px !important;
+  padding: 3px 7px 3px 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-item {
+  padding: 0 0 4px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+@media (max-width: 760px) {
+  .player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+    left: 12px !important;
+    right: 12px !important;
+    height: auto !important;
+    max-height: 54vh !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .objective-orbit-row {
+    grid-template-columns: 36px minmax(0, 1fr) 58px !important;
+  }
+}

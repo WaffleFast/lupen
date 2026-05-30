@@ -28,8 +28,8 @@ const WEAPON_FAMILIES = {
   meltCannon: {
     id: "meltCannon",
     name: "Melt Cannon",
-    shortDescription: "Armour-melting weapon for hardened targets.",
-    role: "Armour-focused weapon",
+    shortDescription: "Armor-melting weapon for hardened targets.",
+    role: "Armor-focused weapon",
     image: "assets/weapons/melt-cannon.png",
     projectileColor: "#77dd77",
     fireStyle: "melt",

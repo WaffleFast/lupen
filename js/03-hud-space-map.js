@@ -374,7 +374,7 @@ function renderLoadoutSlotDetail() {
       <div class="inventory-detail-stats">
         <span>Hull <strong>${formatNumber(hullMax)}</strong></span>
         <span>Shield <strong>${formatNumber(shieldMax)}</strong></span>
-        <span>Armour <strong>${formatNumber(armor)}</strong></span>
+        <span>Armor <strong>${formatNumber(armor)}</strong></span>
         <span>Cargo <strong>${formatNumber(cargoCapacity())}</strong></span>
         <span>Jump Speed <strong>${formatNumber(ship.baseJumpRecharge || 0)}</strong></span>
         <span>Evasion <strong>${formatEvasion(evasion)}</strong></span>
@@ -665,7 +665,7 @@ function autoCollapseTargetPanel(delay = 3500) {
 function toggleTargetEngagement() {
   const selected = getSelectedTargetEntity();
   const engaged = getEngagedTargetEntity();
-  const selectedIsEngaged = selected && engagedTarget && selected.id === engagedTarget.id;
+  const selectedIsEngaged = selected && selectedTarget && engagedTarget && selectedTarget.type === engagedTarget.type && selectedTarget.id === engagedTarget.id;
 
   if (engageTimer && selectedIsEngaged) {
     disengageTarget(true);
@@ -769,7 +769,7 @@ function updateObjectActionPanel(forceVisible = false) {
     return;
   }
 
-  const selectedIsEngaged = selected && engagedTarget && selected.id === engagedTarget.id;
+  const selectedIsEngaged = selected && selectedTarget && engagedTarget && selectedTarget.type === engagedTarget.type && selectedTarget.id === engagedTarget.id;
 
   panel.classList.add("visible");
   actionBtn.disabled = false;
@@ -1161,6 +1161,13 @@ function getActiveObjectiveMapLabel() {
   return "Objective";
 }
 
+function isActiveObjectiveClaimRewardTarget(nodeName) {
+  const objective = typeof getActiveObjective === "function" ? getActiveObjective() : null;
+  if (!objective || objective.type !== "bounty") return false;
+  const readyToClaim = objective.status === "readyToClaim" || objective.kills >= objective.killsRequired;
+  return readyToClaim && sectorNodes[nodeName]?.type === "planet" && getActiveObjectiveTargetNode() === nodeName;
+}
+
 
 function getSectorScanRemainingMs(targetTime) {
   return Math.max(0, Math.ceil((Number(targetTime || 0) - Date.now()) / 1000));
@@ -1512,9 +1519,10 @@ function drawNodes(svg) {
   });
 }
 
-function drawObjectiveTargetMarker(group, node) {
+function drawObjectiveTargetMarker(group, node, options = {}) {
+  const isClaimReward = options.variant === "claimReward";
   const marker = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  marker.setAttribute("class", "svg-objective-target-marker");
+  marker.setAttribute("class", `svg-objective-target-marker ${isClaimReward ? "claim-reward-note" : ""}`.trim());
 
   const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   ring.setAttribute("cx", node.x);
@@ -1528,10 +1536,21 @@ function drawObjectiveTargetMarker(group, node) {
   pointer.setAttribute("class", "objective-target-pointer");
   marker.appendChild(pointer);
 
+  if (isClaimReward) {
+    const note = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    note.setAttribute("x", node.x - 6.35);
+    note.setAttribute("y", node.y - 10.65);
+    note.setAttribute("width", 12.7);
+    note.setAttribute("height", 2.75);
+    note.setAttribute("rx", 0.72);
+    note.setAttribute("class", "objective-target-note");
+    marker.appendChild(note);
+  }
+
   const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
   label.setAttribute("x", node.x);
-  label.setAttribute("y", node.y - 7.7);
-  label.setAttribute("class", "objective-target-label");
+  label.setAttribute("y", isClaimReward ? node.y - 8.82 : node.y - 7.7);
+  label.setAttribute("class", `objective-target-label ${isClaimReward ? "claim-reward-label" : ""}`.trim());
   label.textContent = getActiveObjectiveMapLabel();
   marker.appendChild(label);
 
@@ -1540,7 +1559,10 @@ function drawObjectiveTargetMarker(group, node) {
 
 function drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget = false) {
   const isPlanned = isNodeOnActiveTradeRoute(name);
-  if (isObjectiveTarget && !isCurrent) drawObjectiveTargetMarker(group, node);
+  const isClaimRewardTarget = isActiveObjectiveClaimRewardTarget(name);
+  if (isObjectiveTarget && (!isCurrent || isClaimRewardTarget)) {
+    drawObjectiveTargetMarker(group, node, { variant: isClaimRewardTarget ? "claimReward" : "objective" });
+  }
 
   const glow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   glow.setAttribute("cx", node.x);
@@ -1582,7 +1604,7 @@ function drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget
 function drawSpaceNode(group, node, isCurrent, canJump, isObjectiveTarget = false) {
   const nodeName = Object.keys(sectorNodes).find(name => sectorNodes[name] === node);
   const isPlanned = isNodeOnActiveTradeRoute(nodeName);
-  if (isObjectiveTarget && !isCurrent) drawObjectiveTargetMarker(group, node);
+  if (isObjectiveTarget && !isCurrent && !isActiveObjectiveClaimRewardTarget(nodeName)) drawObjectiveTargetMarker(group, node);
 
   const star = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   star.setAttribute("cx", node.x);
@@ -1679,9 +1701,14 @@ function updateCurrentNodeUI() {
   }
 
   if (landBtn) {
-    landBtn.style.display = node.type === "planet" ? "block" : "none";
-    landBtn.style.pointerEvents = node.type === "planet" ? "auto" : "none";
-    if (node.type === "planet") syncPlanetLandingTarget();
+    const canLand = node?.type === "planet";
+    landBtn.style.display = canLand ? "block" : "none";
+    landBtn.style.pointerEvents = canLand ? "auto" : "none";
+    landBtn.disabled = !canLand;
+    landBtn.hidden = !canLand;
+    landBtn.tabIndex = canLand ? 0 : -1;
+    landBtn.setAttribute("aria-hidden", canLand ? "false" : "true");
+    if (canLand) syncPlanetLandingTarget();
   }
 
   if (spaceScreen) {

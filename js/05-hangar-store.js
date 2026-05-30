@@ -512,7 +512,7 @@ function renderHangarOverview() {
     overviewStats.innerHTML = `
       <div class="hangar-stat-card hull-stat featured-stat"><span>Hull</span><strong>${formatNumber(Math.floor(hull))}/${formatNumber(hullMax)}</strong></div>
       <div class="hangar-stat-card shield-stat"><span>Shield</span><strong>${formatNumber(stats.shield)}</strong></div>
-      <div class="hangar-stat-card hull-stat"><span>Armour</span><strong>${formatNumber(stats.armor)}</strong></div>
+      <div class="hangar-stat-card hull-stat"><span>Armor</span><strong>${formatNumber(stats.armor)}</strong></div>
       <div class="hangar-stat-card cargo-stat"><span>Cargo</span><strong>${formatNumber(stats.cargo)}</strong></div>
       <div class="hangar-stat-card jump-stat"><span>Jump</span><strong>${formatNumber(stats.jumpRecharge)}</strong></div>
       <div class="hangar-stat-card evasion-stat"><span>Evasion</span><strong>${formatEvasion(stats.evasion)}</strong></div>
@@ -691,7 +691,7 @@ function renderFleetDetail() {
     <div class="fleet-detail-stats">
       ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
       ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
-      ${renderFleetStatChip("Armour", formatNumber(stats.armor), "hull-stat")}
+      ${renderFleetStatChip("Armor", formatNumber(stats.armor), "hull-stat")}
       ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
       ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
       ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
@@ -785,12 +785,12 @@ function renderHangarEditor() {
     <div><strong>Cargo:</strong> ${formatNumber(stats.cargo)}</div>
     <div><strong>Hull:</strong> ${formatNumber(stats.hull)}</div>
     <div><strong>Shield:</strong> ${formatNumber(stats.shield)}</div>
-    <div><strong>Armour:</strong> ${formatNumber(stats.armor)}</div>
+    <div><strong>Armor:</strong> ${formatNumber(stats.armor)}</div>
     <div><strong>Jump Recharge:</strong> ${formatNumber(stats.jumpRecharge)}</div>
     <div><strong>Evasion:</strong> ${formatEvasion(stats.evasion)}</div>
     <div><strong>Active Weapon:</strong> ${weapon.name}</div>
     <div><strong>Shield Damage:</strong> ${formatNumber(weapon.damageLayers.shield)}</div>
-    <div><strong>Armour Damage:</strong> ${formatNumber(weapon.damageLayers.armor)}</div>
+    <div><strong>Armor Damage:</strong> ${formatNumber(weapon.damageLayers.armor)}</div>
     <div><strong>Hull Damage:</strong> ${formatNumber(weapon.damageLayers.hull)}</div>
     <div><strong>Fire Rate:</strong> ${weapon.fireRate.toFixed(1)}/s</div>
     <div><strong>Credits:</strong> ${formatNumber(credits)}</div>
@@ -1272,10 +1272,72 @@ function renderShipyardStatPills(shipId) {
   return `
     ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
     ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
-    ${renderFleetStatChip("Armour", formatNumber(stats.armor), "hull-stat")}
+    ${renderFleetStatChip("Armor", formatNumber(stats.armor), "hull-stat")}
     ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
     ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
     ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
+  `;
+}
+
+function getShipyardClassLabel(ship = {}) {
+  return String(ship.roleSubtitle || "Available Hull")
+    .replace(/\s+hull$/i, "")
+    .split("/")
+    .map(part => part.trim())
+    .filter(Boolean)
+    .join(" / ")
+    .toUpperCase();
+}
+
+function getShipyardClassMark(ship = {}) {
+  const label = getShipyardClassLabel(ship);
+  return label.split(/\s+/).map(part => part[0]).join("").slice(0, 2) || "HX";
+}
+
+function renderExchangeStatRail(shipId) {
+  const stats = getShipStats(shipId);
+  const statRows = [
+    ["Hull", formatNumber(stats.hull)],
+    ["Shield", formatNumber(stats.shield)],
+    ["Armor", formatNumber(stats.armor)],
+    ["Cargo", formatNumber(stats.cargo)],
+    ["Jump", `${formatNumber(stats.jumpRecharge)} LY`],
+    ["Evasion", formatEvasion(stats.evasion)]
+  ];
+
+  return statRows.map(([label, value]) => `
+    <div class="exchange-stat-cell">
+      <span>${label}</span>
+      <strong>${value}</strong>
+    </div>
+  `).join("");
+}
+
+function renderExchangeSlotPips(count) {
+  const safeCount = Math.max(0, Math.round(Number(count || 0)));
+  const visibleCount = Math.min(safeCount, 8);
+  if (!visibleCount) return `<span class="exchange-slot-pip empty"></span>`;
+  return Array.from({ length: visibleCount }).map(() => `<span class="exchange-slot-pip filled"></span>`).join("");
+}
+
+function renderExchangeHardpointRail(shipId) {
+  const guns = getGunSlotLimit(shipId);
+  const equip = getAttachmentSlotLimit(shipId);
+  return `
+    <div class="exchange-hardpoint-title">
+      <span>Hardpoints</span>
+      <strong>${guns} gun / ${equip} equip</strong>
+    </div>
+    <div class="exchange-hardpoint-bank">
+      <span>Guns</span>
+      <strong>${guns}</strong>
+      <div class="exchange-slot-pips">${renderExchangeSlotPips(guns)}</div>
+    </div>
+    <div class="exchange-hardpoint-bank">
+      <span>Equip</span>
+      <strong>${equip}</strong>
+      <div class="exchange-slot-pips">${renderExchangeSlotPips(equip)}</div>
+    </div>
   `;
 }
 
@@ -1287,20 +1349,25 @@ function renderShipyardDetail() {
   const owned = ownedShips.includes(ship.id);
   const equipped = currentShipId === ship.id;
   const canAfford = credits >= ship.price;
+  const stats = getShipStats(ship.id);
   const status = document.getElementById("shipyardDetailStatus");
   if (status) status.textContent = equipped ? "In Use" : owned ? "Owned" : "Available";
 
-  let action = "";
+  let primaryAction = "";
+  let secondaryAction = "";
   if (equipped) {
-    action = `<button disabled>In Use</button>`;
+    primaryAction = `<button class="fleet-primary-swap" disabled>In Use</button>`;
+    secondaryAction = `<button onclick="showHangarSection('overview');">Open Loadout</button>`;
   } else if (owned) {
-    action = `<button onclick="selectedFleetShipId='${ship.id}'; showHangarSection('owned');">Manage in Fleet</button>`;
+    primaryAction = `<button class="fleet-primary-swap" onclick="equipShip('${ship.id}'); showHangarSection('shipyard');">Fly This Ship</button>`;
+    secondaryAction = `<button onclick="equipShip('${ship.id}'); showHangarSection('overview');">Open Loadout</button>`;
   } else {
-    action = `<button class="buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>Buy / CR ${formatNumber(ship.price)}</button>`;
+    primaryAction = `<button class="fleet-primary-swap buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>Buy Hull</button>`;
+    secondaryAction = `<button class="shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   }
 
   panel.innerHTML = `
-    <div class="fleet-detail-hero vessel-detail-hero">
+    <div class="fleet-detail-hero">
       <div class="fleet-detail-ship-glow"></div>
       <img src="${ship.image}" alt="${ship.name}">
     </div>
@@ -1308,25 +1375,32 @@ function renderShipyardDetail() {
     <div class="fleet-detail-title">
       <div>
         <h4>${ship.name}</h4>
-        <p>${ship.roleSubtitle || "Available hull"}</p>
+        <p>${ship.roleSubtitle || getShipyardClassLabel(ship)}</p>
       </div>
-      <span class="fleet-status-chip ${equipped ? "active" : ""}">${equipped ? "In Use" : owned ? "Owned" : `CR ${formatNumber(ship.price)}`}</span>
+      <span class="fleet-status-chip ${equipped ? "active" : owned ? "" : "available"}">${equipped ? "In Use" : owned ? "Owned" : "Available"}</span>
     </div>
 
-    <div class="shipyard-primary-action">
-      ${action}
+    <div class="fleet-detail-stats">
+      ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
+      ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
+      ${renderFleetStatChip("Armor", formatNumber(stats.armor), "hull-stat")}
+      ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
+      ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
+      ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
     </div>
 
-    <div class="fleet-detail-stats shipyard-stat-grid">${renderShipyardStatPills(ship.id)}</div>
-
-    <div class="shipyard-capacity-panel">
+    <div class="shipyard-capacity-panel fleet-capacity-panel">
       <div class="shipyard-capacity-heading">
         <span>Hardpoints</span>
         <strong>${formatSlotCapacityShort(ship.id)}</strong>
       </div>
-      ${renderShipSlotSummary(ship.id)}
+      ${renderShipSlotSummary(ship.id, "capacity")}
     </div>
 
+    <div class="fleet-detail-actions compact fleet-swap-actions shipyard-purchase-actions">
+      ${primaryAction}
+      ${secondaryAction}
+    </div>
   `;
 }
 
@@ -1351,20 +1425,27 @@ function renderShipShop() {
     const owned = ownedShips.includes(ship.id);
     const equipped = currentShipId === ship.id;
     const selected = selectedShipyardShipId === ship.id;
+    const stats = getShipStats(ship.id);
 
     const card = document.createElement("button");
     const isTutorialRequiredShip = tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && ship.id === "lupenOrigin";
-    card.className = `fleet-ship-card vessel-exchange-card ${selected ? "selected" : ""} ${equipped ? "active" : ""} ${isTutorialRequiredShip ? "tutorial-required-ship" : ""}`;
+    card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card ${selected ? "selected" : ""} ${equipped ? "active" : ""} ${owned ? "owned" : ""} ${isTutorialRequiredShip ? "tutorial-required-ship" : ""}`;
     card.dataset.shipId = ship.id;
     if (ship.id === "lupenOrigin") card.dataset.tutorialTarget = "firstShipCard";
     card.onclick = () => selectShipyardShip(ship.id);
     card.innerHTML = `
-      <div class="fleet-card-badge">${equipped ? "In Use" : (owned ? "Owned" : `CR ${formatNumber(ship.price)}`)}</div>
+      <div class="fleet-card-badge">${equipped ? "In Use" : owned ? "Owned" : `CR ${formatNumber(ship.price)}`}</div>
       <div class="fleet-card-image-wrap">
         <img src="${ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
-      <div class="fleet-card-role">${ship.roleSubtitle || "Available hull"}</div>
+      <div class="fleet-card-role">${ship.roleSubtitle || getShipyardClassLabel(ship)}</div>
+      <div class="fleet-card-mini-stats">
+        <span>Hull ${formatNumber(stats.hull)}</span>
+        <span>Shield ${formatNumber(stats.shield)}</span>
+        <span>Cargo ${formatNumber(stats.cargo)}</span>
+      </div>
+      <div class="fleet-card-slots compact-fleet-slots">${renderShipSlotSummary(ship.id, "capacity")}</div>
     `;
     box.appendChild(card);
   });
@@ -1537,7 +1618,7 @@ function getStoreCatalogItems() {
   const order = { attachments: 0, guns: 1 };
   return items.sort((a, b) => {
     if (a.dailyStock !== b.dailyStock) return a.dailyStock ? 1 : -1;
-    const delta = (order[a.category] || 99) - (order[b.category] || 99);
+    const delta = (order[a.category] ?? 99) - (order[b.category] ?? 99);
     if (delta !== 0) return delta;
     return a.name.localeCompare(b.name);
   });
@@ -1780,6 +1861,8 @@ function selectStoreQuality(quality) {
 
 function renderStore() {
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
+    storeFilter = "attachments";
+    selectedStoreQuality = "standard";
     const evasionItem = getStoreCatalogItems().find(item => item.key === "evasionMatrix" && item.kind === "attachment");
     if (evasionItem) selectedStoreItemId = evasionItem.id;
   }
@@ -1797,6 +1880,15 @@ function renderStore() {
   renderStoreQualityFilters();
   renderStoreCatalog();
   renderStoreDetail();
+
+  if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
+    setTimeout(() => {
+      const target = document.querySelector(".store-detail-buy-action[data-item-key='evasionMatrix']:not(:disabled)") ||
+        document.querySelector(".store-catalog-card[data-item-key='evasionMatrix']:not(.sold-out)");
+      target?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      if (typeof renderStarterTutorial === "function") renderStarterTutorial();
+    }, 40);
+  }
 }
 
 function renderStoreFilters() {

@@ -2017,16 +2017,17 @@ function renderObjectiveHud() {
     const potentialProfit = held > 0 ? held * margin : Number(objective.maxUnits || 0) * margin;
     const routeProgress = stage === "buy" ? "Buy cargo" : stage === "launch" ? "Launch and travel" : stage === "travel" ? `Next: ${nextHop || objective.destination}` : stage === "sell" ? "Sell cargo" : "Complete";
     const capacityText = `${formatNumber(held)} / ${formatNumber(objective.maxUnits || 0)}`;
+    const profitText = `${potentialProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(potentialProfit))}`;
 
     panel.innerHTML = `
       <div class="objective-list compact-objective-list">
-        <div class="objective-hud-card objective-trade-card compact-objective-card ${getCommodityRarityClass(objective.good)}">
-          <div class="objective-main-row compact-objective-main">
+        <div class="objective-hud-card objective-trade-card compact-objective-card orbit-objective-card ${getCommodityRarityClass(objective.good)}">
+          <div class="objective-main-row compact-objective-main objective-orbit-row">
             <div class="commodity-icon objective-icon objective-icon-large">
               <img src="${info.icon || getCommodityImage(objective.good)}" alt="${objective.good}" class="commodity-icon-img">
             </div>
 
-            <div class="objective-copy objective-copy-large">
+            <div class="objective-copy objective-copy-large objective-orbit-copy">
               <div class="objective-title-line">
                 <span class="objective-type-pill">Trade</span>
                 <strong>${objective.good}</strong>
@@ -2035,18 +2036,15 @@ function renderObjectiveHud() {
               <em>${routeProgress}</em>
             </div>
 
-            <div class="objective-compact-actions">
-              <button class="objective-map-btn" onclick="openSectorMap()">Map</button>
+            <div class="objective-orbit-meta">
+              <span>${capacityText} cargo</span>
+              <strong class="${potentialProfit >= 0 ? "profit-good" : "profit-bad"}">${profitText}</strong>
+            </div>
+
+            <div class="objective-compact-actions objective-orbit-actions">
+              <button class="objective-map-btn" onclick="openSectorMap()">Jump</button>
               <button class="objective-abandon-btn" onclick="abandonTradeRoute()">Abandon</button>
             </div>
-          </div>
-
-          <div class="objective-compact-stats">
-            <div><span>Buy</span><strong>CR ${formatNumber(objective.buyPrice)}</strong></div>
-            <div><span>Sell</span><strong>CR ${formatNumber(objective.sellPrice)}</strong></div>
-            <div><span>Margin</span><strong class="${margin >= 0 ? "profit-good" : "profit-bad"}">${margin >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(margin))}/u</strong></div>
-            <div><span>Held</span><strong>${capacityText}</strong></div>
-            <div><span>Profit</span><strong class="${potentialProfit >= 0 ? "profit-good" : "profit-bad"}">${potentialProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(potentialProfit))}</strong></div>
           </div>
         </div>
       </div>
@@ -2057,21 +2055,24 @@ function renderObjectiveHud() {
   if (objective.type === "bounty") {
     const icon = getBountyObjectiveIcon(objective);
     panel.innerHTML = `
-      <div class="objective-hud-card bounty-objective-card">
-        <div class="objective-hud-top">
-          <span class="objective-type-pill bounty-pill">Bounty</span>
-        </div>
-        <div class="objective-main-row">
+      <div class="objective-hud-card bounty-objective-card orbit-objective-card">
+        <div class="objective-main-row objective-orbit-row">
           <div class="objective-bounty-icon image"><img src="${icon}" alt=""></div>
-          <div class="objective-copy">
-            <strong>${objective.title}</strong>
+          <div class="objective-copy objective-orbit-copy">
+            <div class="objective-title-line">
+              <span class="objective-type-pill bounty-pill">Bounty</span>
+              <strong>${objective.title}</strong>
+            </div>
             <span>${objective.targetLabel}</span>
+            <em>${getBountyObjectiveActionText(objective)}</em>
           </div>
-        </div>
-        <div class="objective-mini-stats">
-          <span>${getBountyObjectiveActionText(objective)}</span>
-          <span>${formatNumber(objective.kills)} / ${formatNumber(objective.killsRequired)} bots</span>
-          <span>CR ${formatNumber(objective.reward)}</span>
+          <div class="objective-orbit-meta">
+            <span>${formatNumber(objective.kills)} / ${formatNumber(objective.killsRequired)} bots</span>
+            <strong>CR ${formatNumber(objective.reward)}</strong>
+          </div>
+          <div class="objective-compact-actions objective-orbit-actions">
+            <button class="objective-map-btn" onclick="openSectorMap()">Jump</button>
+          </div>
         </div>
       </div>
     `;

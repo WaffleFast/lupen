@@ -2,6 +2,35 @@
 
 /* Asteroid / combat */
 
+function isSameTargetRef(left, right) {
+  return Boolean(left && right && left.type === right.type && left.id === right.id);
+}
+
+function getTargetRefFromEntity(target) {
+  if (!target) return null;
+  return {
+    type: getTargetTypeFromEntity(target),
+    id: target.id
+  };
+}
+
+function retargetEngagementToSelectedTarget() {
+  if (!engageTimer) return false;
+
+  const target = getSelectedTargetEntity();
+  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) return false;
+
+  const nextTargetRef = getTargetRefFromEntity(target);
+  if (!nextTargetRef || isSameTargetRef(nextTargetRef, engagedTarget)) return false;
+
+  engagedTarget = nextTargetRef;
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(true);
+  performAttackCycle();
+  return true;
+}
+
 function selectAsteroid(asteroidId) {
   const asteroid = getAsteroidById(asteroidId);
 
@@ -9,9 +38,10 @@ function selectAsteroid(asteroidId) {
 
   selectedTarget = { type: "asteroid", id: asteroid.id };
   showTargetPanel();
+  const retargeted = retargetEngagementToSelectedTarget();
   updateAsteroidUI();
   updateTargetPanel();
-  updateObjectActionPanel();
+  updateObjectActionPanel(retargeted);
 }
 
 function selectHostileBot(botId) {
@@ -21,9 +51,10 @@ function selectHostileBot(botId) {
 
   selectedTarget = { type: "hostileBot", id: bot.id };
   showTargetPanel();
+  const retargeted = retargetEngagementToSelectedTarget();
   updateAsteroidUI();
   updateTargetPanel();
-  updateObjectActionPanel();
+  updateObjectActionPanel(retargeted);
 
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "destroy-bot") {
     setTimeout(renderStarterTutorial, 40);
@@ -46,10 +77,7 @@ function engageTarget() {
   if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) return;
   if (engageTimer) return;
 
-  engagedTarget = {
-    type: getTargetTypeFromEntity(target),
-    id: target.id
-  };
+  engagedTarget = getTargetRefFromEntity(target);
 
   updateAsteroidUI();
   performAttackCycle();
@@ -438,15 +466,16 @@ function renderTargetButton(target, options = {}) {
   const field = document.getElementById("asteroidField");
   if (!field) return;
   normalizeTargetCombatLayers(target);
+  const targetType = options.isHostileBot ? "hostileBot" : "asteroid";
 
   const btn = document.createElement("button");
   btn.className = `${options.className || "asteroid-target"} visible`;
 
-  if (selectedTarget?.id === target.id) {
+  if (selectedTarget?.type === targetType && selectedTarget?.id === target.id) {
     btn.classList.add("selected", "is-selected");
   }
 
-  if (engagedTarget?.id === target.id) {
+  if (engagedTarget?.type === targetType && engagedTarget?.id === target.id) {
     btn.classList.add("engaged");
   }
 
@@ -467,7 +496,7 @@ function renderTargetButton(target, options = {}) {
   }
 
   const hpPct = Math.max(0, (target.hp / target.maxHp) * 100);
-  const isSelectedBot = options.isHostileBot && selectedTarget?.id === target.id;
+  const isSelectedBot = options.isHostileBot && selectedTarget?.type === "hostileBot" && selectedTarget?.id === target.id;
   const fallbackSrc = options.fallbackSrc || EREBUS_BOT_FALLBACK_ASSET;
   const label = isSelectedBot
     ? `<div class="sector-bot-label">

@@ -46,7 +46,7 @@ const commodityInfo = {
   "Iridium": {
     icon: `${COMMODITY_ICON_PATH}iridium.png`,
     rarity: "Rare",
-    description: "Rare heavy metal used in precision drives and high-end armour."
+    description: "Rare heavy metal used in precision drives and high-end armor."
   },
   "Platinum": {
     icon: `${COMMODITY_ICON_PATH}platinum.png`,

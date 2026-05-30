@@ -124,14 +124,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "map-route",
     title: "Open the sector map",
-    text: "Wait for your Jump bar to recharge, then click MAP to open the sector map.",
+    text: "Wait for your Jump bar to recharge, then click Jump to open the sector map.",
     target: "#jumpBtn",
     event: "openedSectorMap"
   },
   {
     id: "make-jump",
     title: "Continue route",
-    text: "After each jump, let the Jump bar recharge. Open MAP again and keep following the highlighted route.",
+    text: "After each jump, let the Jump bar recharge. Use Jump again and keep following the highlighted route.",
     target: "dynamicTradeRoute",
     event: "jumpedNode"
   },
@@ -240,7 +240,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-map-for-bounty",
     title: "Open sector map",
-    text: "Wait for your Jump bar, then click MAP to open the sector map.",
+    text: "Wait for your Jump bar, then click Jump to open the sector map.",
     target: "#jumpBtn",
     event: "openedSectorMap"
   },
@@ -262,7 +262,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "destroy-bot",
     title: "Destroy the bounty bots",
-    text: "Use MAP, Bots scan and ENGAGE as needed, then fight normally until the bounty objective is complete.",
+    text: "Use Jump, Bots scan and ENGAGE as needed, then fight normally until the bounty objective is complete.",
     target: "tutorial:destroyBountyBot",
     event: ["destroyedBountyBot", "openedSectorMap", "scannedBots", "jumpedNode"],
     place: "left"
@@ -284,8 +284,8 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "land-after-bounty",
     title: "Land at the planet",
-    text: "Click the highlighted planet to land and return to the station hub.",
-    target: "#planetLandBtn",
+    text: "Use Jump until you reach a planet, then click the highlighted planet to return to the station hub.",
+    target: "tutorial:bountyLanding",
     event: "landedOnPlanet",
     place: "left"  },
   {
@@ -472,7 +472,7 @@ function tutorialEvent(eventName, detail = {}) {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
       const remaining = Math.max(0, Number(activeObjective.killsRequired || 0) - Number(activeObjective.kills || 0));
-      addHudToast(`${remaining} bounty bot${remaining === 1 ? "" : "s"} remaining. Use MAP and Bots scan to find the next target.`);
+      addHudToast(`${remaining} bounty bot${remaining === 1 ? "" : "s"} remaining. Use Jump and Bots scan to find the next target.`);
       renderStarterTutorial();
     }, 180);
     return;
@@ -639,6 +639,15 @@ function getDynamicTutorialTarget(step) {
     return document.querySelector("#jumpBtn") || document.querySelector("#sectorSvg");
   }
 
+  if (step.target === "tutorial:bountyLanding") {
+    if (isAtPlanetNode()) return document.querySelector("#planetLandBtn");
+    const sectorMap = document.getElementById("sectorMap");
+    if (sectorMap?.classList.contains("active")) {
+      return document.querySelector("#sectorSvg") || document.querySelector("#jumpBtn");
+    }
+    return document.querySelector("#jumpBtn") || document.querySelector("#sectorSvg");
+  }
+
   if (step.target === "dynamicTradeRoute") {
     if (isAtActiveTradeDestination()) {
       return document.querySelector("#planetLandBtn");
@@ -684,6 +693,7 @@ function findTutorialTarget(selector) {
   if (dynamicTarget) return dynamicTarget;
 
   if (!selector || selector.startsWith?.("tutorial:") || selector === "dynamicTradeRoute") return null;
+  if (selector.includes("#planetLandBtn") && !isAtPlanetNode()) return null;
   const selectors = selector.split(",").map(item => item.trim()).filter(Boolean);
   for (const item of selectors) {
     const found = document.querySelector(item);
@@ -699,6 +709,10 @@ function highlightTutorialTarget(step) {
   const target = findTutorialTarget(step?.target);
   const spotlight = document.getElementById("tutorialSpotlight");
   if (!target || !spotlight) return;
+
+  if (step?.target === "tutorial:storeEvasionMatrix") {
+    target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }
 
   target.classList.add("tutorial-highlight-target");
 
@@ -813,7 +827,8 @@ function isTutorialClickAllowed(event) {
 
   if (
     ["land-destination", "open-map-return-bounty", "return-to-planet-after-bounty", "land-after-bounty"].includes(step?.id) &&
-    event.target.closest?.("#planetLandBtn")
+    event.target.closest?.("#planetLandBtn") &&
+    isAtPlanetNode()
   ) return true;
 
   if (step?.id === "claim-bounty") {
@@ -844,7 +859,7 @@ function isTutorialClickAllowed(event) {
   if (["open-map-return-bounty", "land-after-bounty"].includes(step?.id)) {
     if (
       event.target.closest?.("#jumpBtn") ||
-      event.target.closest?.("#planetLandBtn") ||
+      (isAtPlanetNode() && event.target.closest?.("#planetLandBtn")) ||
       event.target.closest?.(".enemy-bot-target") ||
       event.target.closest?.("#objectEngageBtn") ||
       event.target.closest?.("#objectActionPanel")

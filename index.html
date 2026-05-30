@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lupen Tutorial</title>
+  <title>Lupen - Explore, Trade, Fight</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="orbit-reference.css" />
 </head>
@@ -47,6 +47,7 @@
     <section id="gameScreen" class="hub-screen planet-home-screen">
       <div class="hub-overlay home-bg-overlay">
         <button class="logout-btn hub-logout-button home-logout-btn" onclick="logout()" aria-label="Logout">
+          <span class="home-logout-symbol" aria-hidden="true"></span>
           <span>Logout</span>
         </button>
         <div id="saveStatusIndicator" class="save-status-indicator" data-state="local">Saved locally</div>
@@ -57,6 +58,9 @@
         </div>
 
         <button class="hub-launch-btn launch-ship-btn" onclick="launchShip()" aria-label="Launch Ship">
+          <span class="launch-ship-emblem" aria-hidden="true">
+            <img src="assets/hub/hangar-icon.png" alt="" />
+          </span>
           <span>Launch Ship</span>
         </button>
 
@@ -68,7 +72,7 @@
           <button class="hub-action-button home-dock-item" id="bountyBoardHubBtn" onclick="openBountyBoard()" aria-label="Bounty Board">
             <img src="assets/hub/bounty-board-icon.png" alt="" />
             <span>Bounty<br />Board</span>
-            <span id="bountyRewardBadge" class="hub-action-badge">Reward Ready</span>
+            <span id="bountyRewardBadge" class="hub-action-badge" aria-label="Reward Ready" title="Reward Ready">Ready</span>
           </button>
           <button class="hub-action-button home-dock-item" onclick="openStore()" aria-label="Store">
             <img src="assets/hub/store-icon.png" alt="" />
@@ -452,7 +456,7 @@
 
           <div class="shipyard-detail-panel fleet-detail-panel">
             <div class="modern-store-panel-header">
-              <span>Hull Detail</span>
+              <span>Ship Detail</span>
               <small id="shipyardDetailStatus">Available</small>
             </div>
             <div id="shipyardDetailPanel" class="shipyard-detail-body fleet-detail-body"></div>
@@ -464,18 +468,6 @@
         <div class="hangar-section-title compact-title">
           <h3>Vault</h3>
           <p>Browse owned guns, attachments and Lupen Cores kept in station storage.</p>
-        </div>
-
-        <div class="save-transfer-panel">
-          <div>
-            <strong>Save Backup</strong>
-            <span id="saveTransferStatus">Export this pilot before testing on another browser or device.</span>
-          </div>
-          <div class="save-transfer-actions">
-            <button onclick="exportSaveFile()">Export Save</button>
-            <button onclick="document.getElementById('saveImportInput').click()">Import Save</button>
-            <input id="saveImportInput" type="file" accept="application/json,.json" onchange="importSaveFile(event)" hidden>
-          </div>
         </div>
 
         <div class="vault-layout">
