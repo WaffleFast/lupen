@@ -38,6 +38,7 @@
     lastTargetResponse: null,
     lastBotEvent: null,
     lastShotEvent: null,
+    lastRewardPreview: null,
     lastError: null
   };
 
@@ -243,6 +244,7 @@
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -620,6 +622,26 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("staging:reward_preview", (message) => {
+      connection.lastRewardPreview = {
+        ok: message?.ok === true,
+        botId: String(message?.botId || ""),
+        botName: String(message?.botName || "Staging Bot"),
+        disabledBySessionId: String(message?.disabledBySessionId || ""),
+        node: String(message?.node || ""),
+        previewXp: Number.isFinite(Number(message?.previewXp)) ? Number(message.previewXp) : 0,
+        previewCredits: Number.isFinite(Number(message?.previewCredits)) ? Number(message.previewCredits) : 0,
+        previewLoot: Array.isArray(message?.previewLoot)
+          ? message.previewLoot.map((item) => String(item || "")).filter(Boolean)
+          : [],
+        applied: message?.applied === true,
+        reason: String(message?.reason || "staging_preview_only"),
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server staging reward preview", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("target:selected", (message) => {
       connection.lastTargetResponse = {
         ok: message?.ok === true,
@@ -691,6 +713,7 @@
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,

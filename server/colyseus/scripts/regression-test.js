@@ -262,12 +262,15 @@ try {
   const botRespawnedEvents = [];
   const roomAShotEvents = [];
   const roomBShotEvents = [];
+  const rewardPreviewEvents = [];
   roomA.onMessage("bot:disabled", (message) => botDisabledEvents.push(message));
   roomA.onMessage("bot:respawned", (message) => botRespawnedEvents.push(message));
   roomB.onMessage("bot:disabled", () => {});
   roomB.onMessage("bot:respawned", () => {});
   roomA.onMessage("staging:shot", (message) => roomAShotEvents.push(message));
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
+  roomA.onMessage("staging:reward_preview", (message) => rewardPreviewEvents.push(message));
+  roomB.onMessage("staging:reward_preview", () => {});
 
   console.log(`joined ${ROOM_NAME}: A=${roomA.sessionId} B=${roomB.sessionId}`);
 
@@ -480,6 +483,19 @@ try {
       botA.hull === botB.hull;
   });
   assert(botDisabledEvents.some((event) => event?.botId === inspectedBotBeforeCombat.id), "bot:disabled event was not observed.");
+  await waitFor("staging reward preview after bot disabled", () => {
+    return rewardPreviewEvents.some((event) => {
+      return event?.botId === inspectedBotBeforeCombat.id &&
+        event?.disabledBySessionId === roomA.sessionId &&
+        event?.applied === false &&
+        event?.reason === "staging_preview_only" &&
+        Array.isArray(event?.previewLoot);
+    });
+  });
+  const playerAfterRewardPreview = playerFrom(roomA, roomA.sessionId);
+  assert(playerAfterRewardPreview && !("xp" in playerAfterRewardPreview), "Reward preview created player XP field.");
+  assert(playerAfterRewardPreview && !("credits" in playerAfterRewardPreview), "Reward preview created player credits field.");
+  assert(playerAfterRewardPreview && !("inventory" in playerAfterRewardPreview), "Reward preview created player inventory field.");
   console.log("repeated valid hits disabled staging bot without rewards");
 
   await waitForFireReady(roomA, roomA.sessionId);

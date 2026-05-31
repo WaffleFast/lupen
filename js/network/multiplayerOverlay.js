@@ -1113,6 +1113,13 @@
     return `${attacker}->${target} / ${event.weaponName || "weapon"} / ${Math.round(Number(event.damage || 0))}`;
   }
 
+  function getRewardPreviewLabel(status) {
+    const preview = status?.lastRewardPreview;
+    if (!preview?.botId) return "none";
+    const loot = preview.previewLoot?.length ? preview.previewLoot.join(", ") : "None";
+    return `${preview.botName || "Staging Bot"} / XP ${preview.previewXp || 0} / C ${preview.previewCredits || 0} / ${loot} / not applied`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -1243,6 +1250,12 @@
       ? "Disabled - waiting for server respawn"
       : `${weaponName} / dmg ${Math.round(Number(stagingDamage || 0))} / no rewards / ${cooldownText}${lastDamage}`;
     summary.appendChild(note);
+
+    if (status.lastRewardPreview?.botId) {
+      const preview = global.document.createElement("small");
+      preview.textContent = "Reward Preview Only - Not Applied";
+      summary.appendChild(preview);
+    }
     inner.appendChild(summary);
 
     const button = global.document.createElement("button");
@@ -1311,6 +1324,7 @@
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
+      setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);

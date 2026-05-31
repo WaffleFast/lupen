@@ -742,6 +742,22 @@ export class LupenSectorRoom extends Room {
         rewardsGranted: false,
         receivedAt: Date.now()
       });
+
+      // Preview-only multiplayer reward design event. This is intentionally
+      // detached from XP, credits, inventory, bounties, saves, and Supabase.
+      this.broadcast("staging:reward_preview", {
+        ok: true,
+        botId: targetBot.id,
+        botName: targetBot.name || targetBot.type || "Staging Bot",
+        disabledBySessionId: client.sessionId,
+        node: targetBot.currentNode,
+        previewXp: 0,
+        previewCredits: 0,
+        previewLoot: [],
+        applied: false,
+        reason: "staging_preview_only",
+        receivedAt: Date.now()
+      });
     }
   }
 
