@@ -734,6 +734,47 @@
     };
   }
 
+  function normalizePlayerSavePatchPlan(plan) {
+    if (!plan || typeof plan !== "object") return null;
+
+    return {
+      playerId: String(plan.playerId || ""),
+      sourceEventId: String(plan.sourceEventId || ""),
+      sourceLedgerId: String(plan.sourceLedgerId || ""),
+      xpPath: String(plan.xpPath || ""),
+      creditsPath: String(plan.creditsPath || ""),
+      xpDelta: Number.isFinite(Number(plan.xpDelta)) ? Number(plan.xpDelta) : 0,
+      creditsDelta: Number.isFinite(Number(plan.creditsDelta)) ? Number(plan.creditsDelta) : 0,
+      xpBefore: Number.isFinite(Number(plan.xpBefore)) ? Number(plan.xpBefore) : null,
+      xpAfter: Number.isFinite(Number(plan.xpAfter)) ? Number(plan.xpAfter) : null,
+      creditsBefore: Number.isFinite(Number(plan.creditsBefore)) ? Number(plan.creditsBefore) : null,
+      creditsAfter: Number.isFinite(Number(plan.creditsAfter)) ? Number(plan.creditsAfter) : null,
+      lootPreviewOnly: Number.isFinite(Number(plan.lootPreviewOnly)) ? Number(plan.lootPreviewOnly) : 0,
+      eligible: plan.eligible === true,
+      skippedReason: String(plan.skippedReason || ""),
+      progressionWritesEnabled: plan.progressionWritesEnabled === true,
+      applied: plan.applied === true,
+      dryRun: plan.dryRun !== false
+    };
+  }
+
+  function normalizePlayerSavePatchResult(result) {
+    if (!result || typeof result !== "object") return null;
+
+    return {
+      ok: result.ok === true,
+      applied: result.applied === true,
+      dryRun: result.dryRun !== false,
+      skippedReason: String(result.skippedReason || ""),
+      xpBefore: Number.isFinite(Number(result.xpBefore)) ? Number(result.xpBefore) : null,
+      xpAfter: Number.isFinite(Number(result.xpAfter)) ? Number(result.xpAfter) : null,
+      creditsBefore: Number.isFinite(Number(result.creditsBefore)) ? Number(result.creditsBefore) : null,
+      creditsAfter: Number.isFinite(Number(result.creditsAfter)) ? Number(result.creditsAfter) : null,
+      progressionWritesEnabled: result.progressionWritesEnabled === true,
+      plan: normalizePlayerSavePatchPlan(result.plan)
+    };
+  }
+
   function updateBotsFromServerState(serverState) {
     botsById.clear();
 
@@ -924,6 +965,8 @@
         rewardApplicationResult: normalizeRewardApplicationResult(message?.rewardApplicationResult),
         progressionPreview: normalizeProgressionPreview(message?.progressionPreview),
         progressionShadowResult: normalizeProgressionShadowResult(message?.progressionShadowResult),
+        playerSavePatchPlan: normalizePlayerSavePatchPlan(message?.playerSavePatchPlan),
+        playerSavePatchResult: normalizePlayerSavePatchResult(message?.playerSavePatchResult),
         claimSimulated: message?.claimSimulated === true,
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()

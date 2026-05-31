@@ -16,6 +16,10 @@ import {
   buildProgressionShadowEntry,
   writeProgressionShadowEntry
 } from "../services/progressionShadowService.js";
+import {
+  applyPlayerSavePatchPlan,
+  buildPlayerSavePatchPlan
+} from "../services/playerSaveWriteService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -911,6 +915,15 @@ export class LupenSectorRoom extends Room {
       skippedReason: reason,
       entry: progressionShadowEntry
     };
+    const playerSavePatchPlan = buildPlayerSavePatchPlan({}, rewardApplicationPlan);
+    const playerSavePatchResult = {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      progressionWritesEnabled: false,
+      skippedReason: reason,
+      plan: playerSavePatchPlan
+    };
 
     client.send("reward:claim_preview_result", {
       ok: false,
@@ -944,6 +957,8 @@ export class LupenSectorRoom extends Room {
       progressionPreview,
       progressionShadowEntry,
       progressionShadowResult,
+      playerSavePatchPlan,
+      playerSavePatchResult,
       receivedAt: Date.now()
     });
   }
@@ -1019,6 +1034,19 @@ export class LupenSectorRoom extends Room {
       rewardLedgerResult
     );
     const progressionShadowResult = await writeProgressionShadowEntry(progressionShadowEntry);
+    const previewSaveData = progressionPreview.available
+      ? {
+        credits: progressionPreview.currentCredits,
+        playerProgress: {
+          combatXp: progressionPreview.currentXp
+        }
+      }
+      : {};
+    const playerSavePatchPlan = buildPlayerSavePatchPlan(previewSaveData, rewardApplicationPlan, {
+      sourceEventId: preview.rewardPreviewId,
+      sourceLedgerId: rewardLedgerResult?.ledgerId || ""
+    });
+    const playerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan);
 
     client.send("reward:claim_preview_result", {
       ...preview,
@@ -1038,6 +1066,8 @@ export class LupenSectorRoom extends Room {
       progressionPreview,
       progressionShadowEntry,
       progressionShadowResult,
+      playerSavePatchPlan,
+      playerSavePatchResult,
       receivedAt: Date.now()
     });
   }

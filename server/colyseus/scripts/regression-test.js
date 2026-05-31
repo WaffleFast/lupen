@@ -23,6 +23,10 @@ import {
   checkProgressionShadowConnectivity,
   writeProgressionShadowEntry
 } from "../src/services/progressionShadowService.js";
+import {
+  applyPlayerSavePatchPlan,
+  buildPlayerSavePatchPlan
+} from "../src/services/playerSaveWriteService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -354,6 +358,14 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(saveReadOptions?.method === "GET", "Save preview read did not use GET.");
   assert(saveReadOptions?.headers?.authorization === "Bearer stub-service-key", "Save preview read did not use service role bearer auth.");
 
+  const validMockSaveData = {
+    credits: 1200,
+    playerProgress: {
+      combatXp: 80,
+      level: 3
+    },
+    inventoryItems: [{ id: "loot-a" }, { id: "loot-b" }]
+  };
   const validSaveContext = await fetchPlayerSavePreviewContext("verified-player-a", {
     env: {
       SUPABASE_URL: "https://example.supabase.co",
@@ -366,14 +378,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
         async json() {
           return [{
             updated_at: "2026-05-31T12:00:00.000Z",
-            save_data: {
-              credits: 1200,
-              playerProgress: {
-                combatXp: 80,
-                level: 3
-              },
-              inventoryItems: [{ id: "loot-a" }, { id: "loot-b" }]
-            }
+            save_data: validMockSaveData
           }];
         }
       };
@@ -393,6 +398,66 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(progressionPreview?.previewCredits === 1232, `Unexpected preview credits: ${progressionPreview?.previewCredits}`);
   assert(progressionPreview?.applied === false && progressionPreview?.dryRun === true, "Progression preview was not dry-run/unapplied.");
   assert(progressionPreview?.progressionWritesEnabled === false, "Progression preview enabled writes.");
+
+  const playerSavePatchPlan = buildPlayerSavePatchPlan(validMockSaveData, applicationPlan, {
+    sourceEventId: "reward-preview-stub",
+    sourceLedgerId: "ledger-row-1"
+  });
+  assert(playerSavePatchPlan?.eligible === true, `Verified player_saves patch plan was not eligible: ${playerSavePatchPlan?.skippedReason}`);
+  assert(playerSavePatchPlan?.applied === false && playerSavePatchPlan?.dryRun === true, "player_saves patch plan was not dry-run/unapplied.");
+  assert(playerSavePatchPlan?.playerId === "verified-player-a", "player_saves patch plan did not include verified player id.");
+  assert(playerSavePatchPlan?.xpPath === "playerProgress.combatXp", `Unexpected player_saves XP path: ${playerSavePatchPlan?.xpPath}`);
+  assert(playerSavePatchPlan?.creditsPath === "credits", `Unexpected player_saves credits path: ${playerSavePatchPlan?.creditsPath}`);
+  assert(playerSavePatchPlan?.xpBefore === 80 && playerSavePatchPlan?.xpAfter === 100, "player_saves patch plan did not calculate XP before/after.");
+  assert(playerSavePatchPlan?.creditsBefore === 1200 && playerSavePatchPlan?.creditsAfter === 1232, "player_saves patch plan did not calculate credits before/after.");
+  assert(playerSavePatchPlan?.lootPreviewOnly === 0, "player_saves patch plan attempted to include loot writes.");
+
+  const disabledPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "false"
+    }
+  });
+  assert(disabledPlayerSavePatchResult?.dryRun === true, "Disabled player_saves patch adapter was not dry-run.");
+  assert(disabledPlayerSavePatchResult?.applied === false, "Disabled player_saves patch adapter applied progression.");
+  assert(disabledPlayerSavePatchResult?.progressionWritesEnabled === false, "Disabled player_saves patch adapter reported writes enabled.");
+  assert(disabledPlayerSavePatchResult?.skippedReason === "progression_writes_disabled", `Unexpected disabled player_saves patch reason: ${disabledPlayerSavePatchResult?.skippedReason}`);
+
+  const enabledPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true"
+    }
+  });
+  assert(enabledPlayerSavePatchResult?.dryRun === true, "Enabled player_saves patch adapter did not stay dry-run.");
+  assert(enabledPlayerSavePatchResult?.applied === false, "Enabled player_saves patch adapter applied progression.");
+  assert(enabledPlayerSavePatchResult?.progressionWritesEnabled === true, "Enabled player_saves patch adapter did not report writes enabled.");
+  assert(enabledPlayerSavePatchResult?.skippedReason === "idempotency_not_ready", `Unexpected enabled player_saves patch reason: ${enabledPlayerSavePatchResult?.skippedReason}`);
+
+  const missingXpPatchPlan = buildPlayerSavePatchPlan({
+    credits: 1200,
+    playerProgress: {}
+  }, applicationPlan, {
+    sourceEventId: "reward-preview-stub"
+  });
+  assert(missingXpPatchPlan?.eligible === false, "Missing XP path player_saves patch plan was eligible.");
+  assert(missingXpPatchPlan?.skippedReason === "xp_path_missing_or_ambiguous", `Unexpected missing XP path reason: ${missingXpPatchPlan?.skippedReason}`);
+
+  const missingCreditsPatchPlan = buildPlayerSavePatchPlan({
+    playerProgress: {
+      combatXp: 80
+    }
+  }, applicationPlan, {
+    sourceEventId: "reward-preview-stub"
+  });
+  assert(missingCreditsPatchPlan?.eligible === false, "Missing credits path player_saves patch plan was eligible.");
+  assert(missingCreditsPatchPlan?.skippedReason === "credits_path_missing_or_ambiguous", `Unexpected missing credits path reason: ${missingCreditsPatchPlan?.skippedReason}`);
+
+  const missingIdempotencyPatchPlan = buildPlayerSavePatchPlan(validMockSaveData, {
+    ...applicationPlan,
+    sourceEventId: "",
+    sourceLedgerId: ""
+  });
+  assert(missingIdempotencyPatchPlan?.eligible === false, "Missing idempotency player_saves patch plan was eligible.");
+  assert(missingIdempotencyPatchPlan?.skippedReason === "idempotency_not_ready", `Unexpected missing idempotency reason: ${missingIdempotencyPatchPlan?.skippedReason}`);
 
   const unavailableProgressionPreview = buildProgressionPreview(missingSaveContext, applicationPlan);
   assert(unavailableProgressionPreview?.available === false, "Missing-save progression preview was available.");
@@ -741,6 +806,27 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(blockedApplicationResult?.dryRun === true, "Blocked application result was not dry-run.");
   assert(blockedApplicationResult?.applied === false, "Blocked application result applied progression.");
   assert(blockedApplicationResult?.skippedReason === "reward_application_not_eligible", `Unexpected blocked application skipped reason: ${blockedApplicationResult?.skippedReason}`);
+
+  const blockedPlayerSavePatchPlan = buildPlayerSavePatchPlan({
+    credits: 1200,
+    playerProgress: {
+      combatXp: 80
+    }
+  }, blockedApplicationPlan, {
+    sourceEventId: "blocked-reward-preview-stub"
+  });
+  assert(blockedPlayerSavePatchPlan?.eligible === false, "Blocked player_saves patch plan was eligible.");
+  assert(blockedPlayerSavePatchPlan?.skippedReason === "reward_application_not_eligible", `Unexpected blocked player_saves patch reason: ${blockedPlayerSavePatchPlan?.skippedReason}`);
+  const blockedPlayerSavePatchResult = await applyPlayerSavePatchPlan(blockedPlayerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true"
+    }
+  });
+  assert(blockedPlayerSavePatchResult?.dryRun === true, "Blocked player_saves patch result was not dry-run.");
+  assert(blockedPlayerSavePatchResult?.applied === false, "Blocked player_saves patch result applied progression.");
+  assert(blockedPlayerSavePatchResult?.progressionWritesEnabled === true, "Blocked player_saves patch result did not report enabled write mode.");
+  assert(blockedPlayerSavePatchResult?.skippedReason === "reward_application_not_eligible", `Unexpected blocked player_saves patch result reason: ${blockedPlayerSavePatchResult?.skippedReason}`);
+
   const blockedLedgerEntry = buildRewardLedgerEntry(blockedPlan, {
     roomName: ROOM_NAME,
     sourceEventId: "blocked-reward-preview-stub"
@@ -1208,6 +1294,14 @@ try {
   assert(claimPreviewResult?.progressionShadowResult?.dryRun === true, "Progression shadow result was not dry-run.");
   assert(claimPreviewResult?.progressionShadowResult?.applied === false, "Progression shadow result applied progression.");
   assert(claimPreviewResult?.progressionShadowResult?.skippedReason === "progression_shadow_writes_disabled", `Unexpected progression shadow skipped reason: ${claimPreviewResult?.progressionShadowResult?.skippedReason}`);
+  assert(claimPreviewResult?.playerSavePatchPlan?.dryRun === true, "player_saves patch plan was not dry-run.");
+  assert(claimPreviewResult?.playerSavePatchPlan?.applied === false, "player_saves patch plan applied progression.");
+  assert(claimPreviewResult?.playerSavePatchPlan?.eligible === false, "Unverified player_saves patch plan was eligible.");
+  assert(claimPreviewResult?.playerSavePatchPlan?.skippedReason === "reward_application_not_eligible", `Unexpected player_saves patch skipped reason: ${claimPreviewResult?.playerSavePatchPlan?.skippedReason}`);
+  assert(claimPreviewResult?.playerSavePatchResult?.dryRun === true, "player_saves patch result was not dry-run.");
+  assert(claimPreviewResult?.playerSavePatchResult?.applied === false, "player_saves patch result applied progression.");
+  assert(claimPreviewResult?.playerSavePatchResult?.progressionWritesEnabled === false, "player_saves patch result reported writes enabled by default.");
+  assert(claimPreviewResult?.playerSavePatchResult?.skippedReason === "progression_writes_disabled", `Unexpected player_saves patch result reason: ${claimPreviewResult?.playerSavePatchResult?.skippedReason}`);
   assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
   assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
   assert(claimPreviewResult?.finalHitPlayerId === "", "Unverified reward claim result included a trusted final hit player id.");

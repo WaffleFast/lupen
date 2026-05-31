@@ -1234,6 +1234,25 @@
     return `${idLabel} / ${appliedLabel} / dry-run`;
   }
 
+  function getPlayerSavePatchLabel(status) {
+    const result = status?.lastRewardClaimResult?.playerSavePatchResult;
+    const plan = status?.lastRewardClaimResult?.playerSavePatchPlan || result?.plan;
+    if (!plan && !result) return "";
+
+    const xpBefore = formatPreviewValue(result?.xpBefore ?? plan?.xpBefore);
+    const xpAfter = formatPreviewValue(result?.xpAfter ?? plan?.xpAfter);
+    const creditsBefore = formatPreviewValue(result?.creditsBefore ?? plan?.creditsBefore);
+    const creditsAfter = formatPreviewValue(result?.creditsAfter ?? plan?.creditsAfter);
+    const statusLabel = result?.applied ? "applied" : result?.skippedReason || plan?.skippedReason || "dry-run";
+    const writesEnabled = result?.progressionWritesEnabled === true || plan?.progressionWritesEnabled === true;
+    const warning = result?.applied
+      ? "STAGING SERVER WRITE"
+      : writesEnabled
+        ? "writes enabled but fail-closed"
+        : "writes disabled";
+    return `${statusLabel} / XP ${xpBefore} -> ${xpAfter} / C ${creditsBefore} -> ${creditsAfter} / ${warning}`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -1413,6 +1432,12 @@
       shadow.textContent = `${progressionShadowLabel} / Shadow only - real save not changed`;
       summary.appendChild(shadow);
     }
+    const playerSavePatchLabel = getPlayerSavePatchLabel(status);
+    if (playerSavePatchLabel) {
+      const patch = global.document.createElement("small");
+      patch.textContent = `${playerSavePatchLabel} / XP+credits only / no loot`;
+      summary.appendChild(patch);
+    }
     inner.appendChild(summary);
 
     const button = global.document.createElement("button");
@@ -1507,6 +1532,8 @@
       if (progressionPreviewLabel) setDiagnosticsRow(panel, "save preview", progressionPreviewLabel);
       const progressionShadowLabel = getProgressionShadowLabel(status);
       if (progressionShadowLabel) setDiagnosticsRow(panel, "shadow", progressionShadowLabel);
+      const playerSavePatchLabel = getPlayerSavePatchLabel(status);
+      if (playerSavePatchLabel) setDiagnosticsRow(panel, "player_saves", playerSavePatchLabel);
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
