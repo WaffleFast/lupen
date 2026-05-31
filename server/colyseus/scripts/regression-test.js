@@ -229,6 +229,36 @@ async function expectRewardClaimResult(room, sendMessage) {
   });
 }
 
+async function expectStagingTradeOffers(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for staging trade offers."));
+    }, 3000);
+
+    room.onMessage("stagingTrade:offers", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectStagingTradePreview(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for staging trade preview."));
+    }, 3000);
+
+    room.onMessage("stagingTrade:previewResult", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
 async function assertIdentityVerificationAndRewardPlanHelpers() {
   const verified = await verifySupabaseAccessToken(
     "stub-valid-token",
@@ -1154,6 +1184,137 @@ try {
   assert(playerFrom(roomA, roomA.sessionId)?.supabaseAccessToken === undefined, "Raw Supabase token leaked into room state.");
   console.log("both clients see each other");
 
+  const tradeOffers = await expectStagingTradeOffers(roomA, () => {
+    roomA.send("stagingTrade:listOffers", {});
+  });
+  assert(tradeOffers?.ok === true, "Staging trade offers did not return ok.");
+  assert(tradeOffers?.mode === "dry_run", `Unexpected trade offers mode: ${tradeOffers?.mode}`);
+  assert(tradeOffers?.applied === false, "Staging trade offers reported applied.");
+  assert(Array.isArray(tradeOffers?.offers) && tradeOffers.offers.length >= 3, "Staging trade offers were not deterministic/non-empty.");
+  assert(tradeOffers?.creditsWritten === false && tradeOffers?.cargoWritten === false && tradeOffers?.saveWritten === false, "Staging trade offers reported writes.");
+  const firstTradeOffer = tradeOffers.offers[0];
+  assert(firstTradeOffer?.offerId && firstTradeOffer?.buyPrice > 0 && firstTradeOffer?.sellPrice > firstTradeOffer?.buyPrice, "First staging trade offer is invalid.");
+
+  const validTradePreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 3,
+      playerSnapshot: {
+        credits: 10000,
+        cargoUsed: 10,
+        cargoCapacity: 150
+      }
+    });
+  });
+  assert(validTradePreview?.ok === true, `Valid staging trade preview failed: ${validTradePreview?.reason}`);
+  assert(validTradePreview?.mode === "dry_run", `Unexpected trade preview mode: ${validTradePreview?.mode}`);
+  assert(validTradePreview?.applied === false, "Staging trade preview applied a trade.");
+  assert(validTradePreview?.quantity === 3, "Staging trade preview did not preserve requested quantity.");
+  assert(validTradePreview?.totalCost === firstTradeOffer.buyPrice * 3, "Staging trade preview total cost was not server-calculated.");
+  assert(validTradePreview?.projectedRevenue === firstTradeOffer.sellPrice * 3, "Staging trade preview revenue was not server-calculated.");
+  assert(validTradePreview?.projectedProfit === (firstTradeOffer.sellPrice - firstTradeOffer.buyPrice) * 3, "Staging trade preview profit was not server-calculated.");
+  assert(validTradePreview?.wouldPass === true, "Valid staging trade preview did not pass snapshot validation.");
+  assert(validTradePreview?.validationMode === "snapshot", `Unexpected valid trade validation mode: ${validTradePreview?.validationMode}`);
+  assert(validTradePreview?.blockReason === null, `Unexpected valid trade block reason: ${validTradePreview?.blockReason}`);
+  assert(validTradePreview?.maxAffordableQuantity === Math.floor(10000 / firstTradeOffer.buyPrice), "Staging trade max affordable quantity was incorrect.");
+  assert(validTradePreview?.maxCargoQuantity === 140, "Staging trade max cargo quantity was incorrect.");
+  assert(validTradePreview?.maxValidQuantity === Math.min(Math.floor(10000 / firstTradeOffer.buyPrice), 140, firstTradeOffer.maxQuantity), "Staging trade max valid quantity was incorrect.");
+  assert(validTradePreview?.creditsWritten === false && validTradePreview?.cargoWritten === false && validTradePreview?.saveWritten === false, "Staging trade preview reported writes.");
+
+  const insufficientCreditsPreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 3,
+      playerSnapshot: {
+        credits: firstTradeOffer.buyPrice - 1,
+        cargoUsed: 0,
+        cargoCapacity: 150
+      }
+    });
+  });
+  assert(insufficientCreditsPreview?.ok === true, "Insufficient-credit staging trade should still return a dry-run preview.");
+  assert(insufficientCreditsPreview?.wouldPass === false, "Insufficient-credit staging trade passed validation.");
+  assert(insufficientCreditsPreview?.blockReason === "insufficient_credits", `Unexpected insufficient-credit block reason: ${insufficientCreditsPreview?.blockReason}`);
+  assert(insufficientCreditsPreview?.creditsWritten === false && insufficientCreditsPreview?.cargoWritten === false && insufficientCreditsPreview?.saveWritten === false, "Insufficient-credit trade preview reported writes.");
+
+  const insufficientCargoPreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 3,
+      playerSnapshot: {
+        credits: 10000,
+        cargoUsed: 149,
+        cargoCapacity: 150
+      }
+    });
+  });
+  assert(insufficientCargoPreview?.ok === true, "Insufficient-cargo staging trade should still return a dry-run preview.");
+  assert(insufficientCargoPreview?.wouldPass === false, "Insufficient-cargo staging trade passed validation.");
+  assert(insufficientCargoPreview?.blockReason === "insufficient_cargo", `Unexpected insufficient-cargo block reason: ${insufficientCargoPreview?.blockReason}`);
+  assert(insufficientCargoPreview?.maxCargoQuantity === 1, "Insufficient-cargo max cargo quantity was incorrect.");
+
+  const missingSnapshotTradePreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 2
+    });
+  });
+  assert(missingSnapshotTradePreview?.ok === true, "Missing snapshot trade preview should still return price math.");
+  assert(missingSnapshotTradePreview?.validationMode === "unknown", `Unexpected missing snapshot validation mode: ${missingSnapshotTradePreview?.validationMode}`);
+  assert(missingSnapshotTradePreview?.blockReason === "unknown_player_state", `Unexpected missing snapshot block reason: ${missingSnapshotTradePreview?.blockReason}`);
+  assert(missingSnapshotTradePreview?.totalCost === firstTradeOffer.buyPrice * 2, "Missing snapshot trade preview did not include total cost.");
+  assert(missingSnapshotTradePreview?.projectedRevenue === firstTradeOffer.sellPrice * 2, "Missing snapshot trade preview did not include projected revenue.");
+  assert(missingSnapshotTradePreview?.projectedProfit === (firstTradeOffer.sellPrice - firstTradeOffer.buyPrice) * 2, "Missing snapshot trade preview did not include projected profit.");
+
+  const malformedSnapshotTradePreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 2,
+      playerSnapshot: {
+        credits: "not-a-number",
+        cargoUsed: {},
+        cargoCapacity: null
+      }
+    });
+  });
+  assert(malformedSnapshotTradePreview?.ok === true, "Malformed snapshot trade preview should still return price math.");
+  assert(malformedSnapshotTradePreview?.validationMode === "unknown", `Unexpected malformed snapshot validation mode: ${malformedSnapshotTradePreview?.validationMode}`);
+  assert(malformedSnapshotTradePreview?.blockReason === "unknown_player_state", `Unexpected malformed snapshot block reason: ${malformedSnapshotTradePreview?.blockReason}`);
+  assert(malformedSnapshotTradePreview?.creditsWritten === false && malformedSnapshotTradePreview?.cargoWritten === false && malformedSnapshotTradePreview?.saveWritten === false, "Malformed snapshot trade preview reported writes.");
+
+  const unknownTradePreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: "not-a-real-offer",
+      quantity: 1
+    });
+  });
+  assert(unknownTradePreview?.ok === false, "Unknown staging trade offer was not rejected.");
+  assert(unknownTradePreview?.reason === "unknown_trade_offer", `Unexpected unknown trade reason: ${unknownTradePreview?.reason}`);
+  assert(unknownTradePreview?.creditsWritten === false && unknownTradePreview?.cargoWritten === false && unknownTradePreview?.saveWritten === false, "Rejected unknown trade preview reported writes.");
+
+  const invalidQuantityPreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 0
+    });
+  });
+  assert(invalidQuantityPreview?.ok === false, "Invalid staging trade quantity was not rejected.");
+  assert(invalidQuantityPreview?.reason === "invalid_trade_quantity", `Unexpected invalid quantity reason: ${invalidQuantityPreview?.reason}`);
+  assert(invalidQuantityPreview?.wouldPass === false, "Invalid staging trade quantity reported wouldPass.");
+  assert(invalidQuantityPreview?.blockReason === "invalid_quantity", `Unexpected invalid quantity block reason: ${invalidQuantityPreview?.blockReason}`);
+
+  const excessiveQuantityPreview = await expectStagingTradePreview(roomA, () => {
+    roomA.send("stagingTrade:preview", {
+      offerId: firstTradeOffer.offerId,
+      quantity: Number(firstTradeOffer.maxQuantity || 0) + 1
+    });
+  });
+  assert(excessiveQuantityPreview?.ok === false, "Excessive staging trade quantity was not rejected.");
+  assert(excessiveQuantityPreview?.reason === "quantity_exceeds_staging_offer_limit", `Unexpected excessive quantity reason: ${excessiveQuantityPreview?.reason}`);
+  assert(excessiveQuantityPreview?.wouldPass === false, "Excessive staging trade quantity reported wouldPass.");
+  assert(excessiveQuantityPreview?.blockReason === "invalid_quantity", `Unexpected excessive quantity block reason: ${excessiveQuantityPreview?.blockReason}`);
+  console.log("staging trade dry-run offers and previews stayed write-free");
+
   const unsafeShipImageWarning = await expectPresenceWarning(roomA, () => {
     roomA.send("presence:update", {
       currentNode: "Asteron Prime",
@@ -1440,6 +1601,18 @@ try {
   assert(claimPreviewResult?.dryRun === true, "Reward preview claim simulation was not marked dry-run.");
   assert(claimPreviewResult?.reason === "staging_preview_only", `Unexpected reward claim simulation reason: ${claimPreviewResult?.reason}`);
   assert(claimPreviewResult?.claimSimulated === true, "Reward preview claim result was not marked simulated.");
+  assert(claimPreviewResult?.mode === "blocked", `Unexpected reward claim summary mode: ${claimPreviewResult?.mode}`);
+  assert(claimPreviewResult?.xpDelta > 0, "Reward claim summary did not include XP delta.");
+  assert(claimPreviewResult?.debugReason === "reward_application_not_eligible" || claimPreviewResult?.debugReason === "identity_unverified", `Unexpected reward claim debug reason: ${claimPreviewResult?.debugReason}`);
+  assert(claimPreviewResult?.gates?.verified === false, "Unverified reward claim summary reported verified gate.");
+  assert(claimPreviewResult?.gates?.xpWriteAllowed === false, "Unverified reward claim summary allowed XP writes.");
+  assert(claimPreviewResult?.ledger?.written === false, "Reward claim summary reported ledger write by default.");
+  assert(claimPreviewResult?.progressionShadow?.written === false, "Reward claim summary reported progression shadow write by default.");
+  assert(claimPreviewResult?.playerSave?.attempted === true, "Reward claim summary did not report player_saves attempt.");
+  assert(claimPreviewResult?.playerSave?.written === false, "Reward claim summary reported player_saves write.");
+  assert(claimPreviewResult?.playerSave?.creditsWritten === false, "Reward claim summary reported credits write.");
+  assert(claimPreviewResult?.claimStatus?.mode === claimPreviewResult?.mode, "Nested claim status mode did not match top-level mode.");
+  assert(claimPreviewResult?.claimStatus?.playerSave?.creditsWritten === false, "Nested claim status reported credits write.");
   assert(claimPreviewResult?.rewardWritePlan?.dryRun === true, "Reward claim did not include a dry-run write plan.");
   assert(claimPreviewResult?.rewardWritePlan?.applied === false, "Reward write plan applied real rewards.");
   assert(claimPreviewResult?.rewardWritePlan?.eligible === false, "Unverified reward write plan was eligible.");
@@ -1508,6 +1681,9 @@ try {
   });
   assert(nonContributorClaim?.ok === false, "Non-contributor reward preview claim was not rejected.");
   assert(nonContributorClaim?.reason === "reward_preview_not_eligible", `Unexpected non-contributor reward claim reason: ${nonContributorClaim?.reason}`);
+  assert(nonContributorClaim?.mode === "blocked", `Unexpected non-contributor claim mode: ${nonContributorClaim?.mode}`);
+  assert(nonContributorClaim?.playerSave?.written === false, "Rejected non-contributor claim reported player_saves write.");
+  assert(nonContributorClaim?.playerSave?.creditsWritten === false, "Rejected non-contributor claim reported credits write.");
   assert(nonContributorClaim?.applied === false, "Rejected non-contributor reward claim applied rewards.");
   await leaveRoom(roomC);
   roomC = null;

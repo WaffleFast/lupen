@@ -2195,6 +2195,16 @@
     });
   }
 
+  function getTradeValidationLabel(result) {
+    if (!result) return "";
+    if (result.validationMode === "unknown") return "Price preview only - player state unavailable";
+    if (result.wouldPass) return "Would pass dry-run validation";
+    if (result.blockReason === "insufficient_credits") return "Blocked: not enough credits";
+    if (result.blockReason === "insufficient_cargo") return "Blocked: not enough cargo space";
+    if (result.blockReason === "invalid_quantity") return "Blocked: invalid quantity";
+    return `Blocked: ${result.blockReason || result.reason || "validation failed"}`;
+  }
+
   function renderStagingTradePanel(status) {
     removeStagingTradePanel();
     if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) return;
@@ -2238,12 +2248,12 @@
     const quantity = global.document.createElement("input");
     quantity.type = "number";
     quantity.min = "1";
-    quantity.max = String(selectedOffer?.maxQuantity || 99);
+    quantity.max = "999";
     quantity.step = "1";
     quantity.value = String(stagingTradeQuantity);
     quantity.disabled = !selectedOffer;
     quantity.addEventListener("change", () => {
-      stagingTradeQuantity = Math.max(1, Math.min(Number(selectedOffer?.maxQuantity || 99), Math.round(Number(quantity.value || 1))));
+      stagingTradeQuantity = Math.max(1, Math.min(999, Math.round(Number(quantity.value || 1))));
       scheduleRender();
     });
     controls.appendChild(quantity);
@@ -2280,11 +2290,18 @@
           `${result.resourceName} x${formatTradeNumber(result.quantity)} / ${result.buyNode} -> ${result.sellNode}`,
           `Cost CR ${formatTradeNumber(result.totalCost)} / Revenue CR ${formatTradeNumber(result.projectedRevenue)}`,
           `Projected profit CR ${formatTradeNumber(result.projectedProfit)}`,
-          `Credits check: ${result.enoughCredits === null ? "unknown" : result.enoughCredits ? "enough" : "not enough"} / Cargo check: ${result.enoughCargo === null ? "unknown" : result.enoughCargo ? "enough" : "not enough"}`
+          getTradeValidationLabel(result),
+          result.validationMode === "snapshot"
+            ? `Credits CR ${formatTradeNumber(result.creditsAvailable)} / Cargo ${formatTradeNumber(result.cargoUsed)} used, ${formatTradeNumber(result.cargoFree)} free`
+            : "Credits/cargo unavailable",
+          result.validationMode === "snapshot"
+            ? `Max affordable ${formatTradeNumber(result.maxAffordableQuantity)} / Max cargo ${formatTradeNumber(result.maxCargoQuantity)} / Max valid ${formatTradeNumber(result.maxValidQuantity)}`
+            : "Max valid quantity unknown"
         ]
         : [
-          `Preview blocked: ${result.reason || "invalid trade preview"}`,
-          result.debugReason || "No trade data changed."
+          getTradeValidationLabel(result),
+          result.userReason || result.reason || "No trade data changed.",
+          isMpDebugEnabled() ? (result.debugReason || "No debug detail") : "Dry-run only - no write attempted"
         ];
       lines.forEach((line) => {
         const row = global.document.createElement("span");

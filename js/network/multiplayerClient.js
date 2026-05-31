@@ -901,6 +901,17 @@
       totalCost: Number.isFinite(Number(preview.totalCost)) ? Number(preview.totalCost) : 0,
       projectedRevenue: Number.isFinite(Number(preview.projectedRevenue)) ? Number(preview.projectedRevenue) : 0,
       projectedProfit: Number.isFinite(Number(preview.projectedProfit)) ? Number(preview.projectedProfit) : 0,
+      wouldPass: preview.wouldPass === true,
+      validationMode: String(preview.validationMode || "unknown"),
+      blockReason: preview.blockReason === null || preview.blockReason === undefined ? null : String(preview.blockReason || ""),
+      userReason: String(preview.userReason || ""),
+      creditsAvailable: Number.isFinite(Number(preview.creditsAvailable)) ? Number(preview.creditsAvailable) : null,
+      cargoUsed: Number.isFinite(Number(preview.cargoUsed)) ? Number(preview.cargoUsed) : null,
+      cargoCapacity: Number.isFinite(Number(preview.cargoCapacity)) ? Number(preview.cargoCapacity) : null,
+      cargoFree: Number.isFinite(Number(preview.cargoFree)) ? Number(preview.cargoFree) : null,
+      maxAffordableQuantity: Number.isFinite(Number(preview.maxAffordableQuantity)) ? Number(preview.maxAffordableQuantity) : null,
+      maxCargoQuantity: Number.isFinite(Number(preview.maxCargoQuantity)) ? Number(preview.maxCargoQuantity) : null,
+      maxValidQuantity: Number.isFinite(Number(preview.maxValidQuantity)) ? Number(preview.maxValidQuantity) : null,
       enoughCredits: preview.enoughCredits === true ? true : preview.enoughCredits === false ? false : null,
       enoughCargo: preview.enoughCargo === true ? true : preview.enoughCargo === false ? false : null,
       creditsWritten: preview.creditsWritten === true,
@@ -910,6 +921,30 @@
       debugReason: String(preview.debugReason || ""),
       receivedAt: Number.isFinite(Number(preview.receivedAt)) ? Number(preview.receivedAt) : Date.now()
     };
+  }
+
+  function getStagingTradePlayerSnapshot() {
+    try {
+      const creditsValue = typeof credits !== "undefined" ? Number(credits) : NaN;
+      const cargoUsedValue = typeof cargoUsed === "function" ? Number(cargoUsed()) : NaN;
+      const shipStats = typeof getShipStats === "function" ? getShipStats() || {} : {};
+      const cargoCapacityValue = Number(shipStats.cargo);
+
+      if (!Number.isFinite(creditsValue) ||
+        !Number.isFinite(cargoUsedValue) ||
+        !Number.isFinite(cargoCapacityValue)) {
+        return null;
+      }
+
+      return {
+        credits: Math.max(0, Math.floor(creditsValue)),
+        cargoUsed: Math.max(0, Math.floor(cargoUsedValue)),
+        cargoCapacity: Math.max(0, Math.floor(cargoCapacityValue))
+      };
+    } catch (err) {
+      logDev("staging trade player snapshot unavailable", err);
+      return null;
+    }
   }
 
   function updateBotsFromServerState(serverState) {
@@ -1411,7 +1446,8 @@
     requestStagingTradePreview(options = {}) {
       return sendRoomMessage("requestStagingTradePreview", "stagingTrade:preview", {
         offerId: String(options.offerId || ""),
-        quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity
+        quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity,
+        playerSnapshot: options.playerSnapshot || getStagingTradePlayerSnapshot()
       });
     },
 

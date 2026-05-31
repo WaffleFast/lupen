@@ -20,6 +20,10 @@ import {
   applyPlayerSavePatchPlan,
   buildPlayerSavePatchPlan
 } from "../services/playerSaveWriteService.js";
+import {
+  buildStagingTradePreview,
+  getStagingTradeOffers
+} from "../config/stagingTradeConfig.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -375,6 +379,145 @@ export function buildRewardWritePlan({
   };
 }
 
+function getClaimDebugReason({
+  ok = true,
+  reason = "",
+  rewardWritePlan = null,
+  rewardApplicationPlan = null,
+  rewardApplicationResult = null,
+  playerSavePatchPlan = null,
+  playerSavePatchResult = null
+} = {}) {
+  if (rewardApplicationPlan?.eligible === false || rewardWritePlan?.eligible === false) {
+    return getSafeIdentityValue(
+      rewardApplicationPlan?.blockedReason ||
+      rewardWritePlan?.blockedReason ||
+      rewardApplicationResult?.skippedReason ||
+      "reward_application_not_eligible",
+      "reward_application_not_eligible"
+    );
+  }
+
+  return getSafeIdentityValue(
+    playerSavePatchResult?.skippedReason ||
+    playerSavePatchPlan?.skippedReason ||
+    rewardApplicationResult?.skippedReason ||
+    rewardApplicationPlan?.blockedReason ||
+    rewardWritePlan?.blockedReason ||
+    reason ||
+    (ok ? "staging_preview_only" : "claim_rejected"),
+    ok ? "staging_preview_only" : "claim_rejected"
+  );
+}
+
+function buildRewardClaimStatus({
+  ok = true,
+  reason = "",
+  rewardWritePlan = null,
+  rewardLedgerResult = null,
+  rewardApplicationPlan = null,
+  rewardApplicationResult = null,
+  progressionShadowResult = null,
+  playerSavePatchPlan = null,
+  playerSavePatchResult = null
+} = {}) {
+  const debugReason = getClaimDebugReason({
+    ok,
+    reason,
+    rewardWritePlan,
+    rewardApplicationPlan,
+    rewardApplicationResult,
+    playerSavePatchPlan,
+    playerSavePatchResult
+  });
+  const verified = rewardWritePlan?.authStatus === "verified" ||
+    rewardApplicationPlan?.authStatus === "verified";
+  const progressionWritesEnabled = playerSavePatchResult?.progressionWritesEnabled === true ||
+    playerSavePatchPlan?.progressionWritesEnabled === true;
+  const playerAllowedForStagingWrite = playerSavePatchResult?.playerAllowedForStagingWrite === true ||
+    playerSavePatchPlan?.playerAllowedForStagingWrite === true;
+  const idempotencyReady = playerSavePatchResult?.idempotencyReady === true ||
+    playerSavePatchPlan?.idempotencyReady === true;
+  const duplicateDetected = playerSavePatchResult?.duplicateDetected === true ||
+    playerSavePatchPlan?.duplicateDetected === true ||
+    rewardApplicationResult?.duplicateDetected === true ||
+    rewardApplicationPlan?.duplicateDetected === true;
+  const xpWriteAllowed = verified &&
+    progressionWritesEnabled &&
+    playerAllowedForStagingWrite &&
+    idempotencyReady &&
+    !duplicateDetected &&
+    playerSavePatchPlan?.eligible === true;
+  const xpDelta = Math.max(0, Math.round(Number(
+    playerSavePatchPlan?.xpDelta ??
+    playerSavePatchResult?.plan?.xpDelta ??
+    rewardApplicationPlan?.xpDelta ??
+    rewardWritePlan?.intendedXp ??
+    0
+  )));
+  const ledgerWritten = !!rewardLedgerResult?.ledgerId;
+  const progressionShadowWritten = !!progressionShadowResult?.shadowId;
+  const playerSaveWritten = playerSavePatchResult?.applied === true;
+  const mode = playerSaveWritten
+    ? "xp_only"
+    : !ok || duplicateDetected || !verified || rewardWritePlan?.eligible === false || rewardApplicationPlan?.eligible === false
+      ? "blocked"
+      : progressionWritesEnabled
+        ? "blocked"
+        : playerSavePatchPlan || rewardApplicationPlan || rewardWritePlan
+          ? "dry_run"
+          : "simulated";
+
+  return {
+    ok: ok === true,
+    mode,
+    applied: playerSaveWritten,
+    xpDelta,
+    reason: playerSaveWritten
+      ? "xp_only_staging_claim_applied"
+      : mode === "blocked"
+        ? debugReason
+        : mode === "dry_run"
+          ? "staging_xp_claim_dry_run"
+          : "staging_claim_simulated",
+    debugReason,
+    gates: {
+      verified,
+      allowlisted: playerAllowedForStagingWrite,
+      scope: getSafeIdentityValue(
+        playerSavePatchResult?.progressionWriteScope ||
+        playerSavePatchPlan?.progressionWriteScope,
+        "allowlist"
+      ),
+      xpWriteAllowed
+    },
+    ledger: {
+      reachable: rewardLedgerResult?.ok === true ||
+        ledgerWritten ||
+        rewardLedgerResult?.skippedReason === "reward_writes_disabled",
+      written: ledgerWritten,
+      duplicate: rewardLedgerResult?.skippedReason === "duplicate_reward_ledger"
+    },
+    progressionShadow: {
+      reachable: progressionShadowResult?.ok === true ||
+        progressionShadowWritten ||
+        progressionShadowResult?.skippedReason === "progression_shadow_writes_disabled",
+      written: progressionShadowWritten
+    },
+    playerSave: {
+      attempted: !!playerSavePatchPlan || !!playerSavePatchResult,
+      written: playerSaveWritten,
+      xpBefore: Number.isFinite(Number(playerSavePatchResult?.xpBefore ?? playerSavePatchPlan?.xpBefore))
+        ? Number(playerSavePatchResult?.xpBefore ?? playerSavePatchPlan?.xpBefore)
+        : null,
+      xpAfter: Number.isFinite(Number(playerSavePatchResult?.xpAfter ?? playerSavePatchPlan?.xpAfter))
+        ? Number(playerSavePatchResult?.xpAfter ?? playerSavePatchPlan?.xpAfter)
+        : null,
+      creditsWritten: false
+    }
+  };
+}
+
 function validatePresencePayload(message = {}) {
   if (!message || typeof message !== "object") {
     return "payload must be an object";
@@ -554,6 +697,38 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("staging:claimRewardPreview", async (client, message = {}) => {
       await this.claimRewardPreview(client, message, "staging:claimRewardPreview");
+    });
+
+    // Staging-only trade dry-run endpoints. These preview deterministic
+    // server-owned route math without mutating credits, cargo, inventory,
+    // player_saves, economy state, Supabase rows, bounties, loot, or rewards.
+    this.onMessage("stagingTrade:listOffers", (client) => {
+      this.touchPlayer(client.sessionId);
+      client.send("stagingTrade:offers", {
+        ok: true,
+        mode: "dry_run",
+        applied: false,
+        offers: getStagingTradeOffers(),
+        creditsWritten: false,
+        cargoWritten: false,
+        saveWritten: false,
+        reason: "staging_trade_offers",
+        receivedAt: Date.now()
+      });
+    });
+
+    this.onMessage("stagingTrade:preview", (client, message = {}) => {
+      this.touchPlayer(client.sessionId);
+      const preview = buildStagingTradePreview({
+        offerId: message?.offerId,
+        quantity: message?.quantity,
+        playerSnapshot: message?.playerSnapshot
+      });
+      client.send("stagingTrade:previewResult", {
+        ...preview,
+        sessionId: client.sessionId,
+        receivedAt: Date.now()
+      });
     });
 
     // Legacy local prototype alias. New clients should send movement:update.
@@ -953,11 +1128,41 @@ export class LupenSectorRoom extends Room {
       skippedReason: reason,
       plan: playerSavePatchPlan
     };
+    const rewardWritePlan = {
+      applied: false,
+      dryRun: true,
+      eligible: false,
+      blockedReason: reason,
+      intendedXp: 0,
+      intendedCredits: 0,
+      intendedLoot: [],
+      intendedReason: "staging_bot_disabled"
+    };
+    const rewardApplicationResult = {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      skippedReason: reason,
+      plan: rewardApplicationPlan
+    };
+    const claimStatus = buildRewardClaimStatus({
+      ok: false,
+      reason,
+      rewardWritePlan,
+      rewardApplicationPlan,
+      rewardApplicationResult,
+      progressionShadowResult,
+      playerSavePatchPlan,
+      playerSavePatchResult
+    });
 
     client.send("reward:claim_preview_result", {
       ok: false,
       applied: false,
+      mode: claimStatus.mode,
+      xpDelta: claimStatus.xpDelta,
       reason,
+      debugReason: claimStatus.debugReason,
       messageType,
       sessionId: client.sessionId,
       botId,
@@ -965,24 +1170,14 @@ export class LupenSectorRoom extends Room {
       previewXp: 0,
       previewCredits: 0,
       previewLoot: [],
-      rewardWritePlan: {
-        applied: false,
-        dryRun: true,
-        eligible: false,
-        blockedReason: reason,
-        intendedXp: 0,
-        intendedCredits: 0,
-        intendedLoot: [],
-        intendedReason: "staging_bot_disabled"
-      },
+      gates: claimStatus.gates,
+      ledger: claimStatus.ledger,
+      progressionShadow: claimStatus.progressionShadow,
+      playerSave: claimStatus.playerSave,
+      claimStatus,
+      rewardWritePlan,
       rewardApplicationPlan,
-      rewardApplicationResult: {
-        ok: false,
-        applied: false,
-        dryRun: true,
-        skippedReason: reason,
-        plan: rewardApplicationPlan
-      },
+      rewardApplicationResult,
       progressionPreview,
       progressionShadowEntry,
       progressionShadowResult,
@@ -1086,17 +1281,36 @@ export class LupenSectorRoom extends Room {
       (playerSavePatchResult.applied === true || playerSavePatchResult.progressionWritesEnabled !== true)) {
       this.rewardApplicationIdempotencyKeys.add(playerSavePatchPlan.idempotencyKey);
     }
+    const claimStatus = buildRewardClaimStatus({
+      ok: true,
+      reason: "staging_preview_only",
+      rewardWritePlan,
+      rewardLedgerResult,
+      rewardApplicationPlan,
+      rewardApplicationResult,
+      progressionShadowResult,
+      playerSavePatchPlan,
+      playerSavePatchResult
+    });
 
     client.send("reward:claim_preview_result", {
       ...preview,
       ok: true,
       applied: false,
+      mode: claimStatus.mode,
+      xpDelta: claimStatus.xpDelta,
       dryRun: true,
       reason: "staging_preview_only",
+      debugReason: claimStatus.debugReason,
       messageType,
       sessionId: client.sessionId,
       claimedBySessionId: client.sessionId,
       claimSimulated: true,
+      gates: claimStatus.gates,
+      ledger: claimStatus.ledger,
+      progressionShadow: claimStatus.progressionShadow,
+      playerSave: claimStatus.playerSave,
+      claimStatus,
       rewardWritePlan,
       rewardLedgerEntry,
       rewardLedgerResult,
