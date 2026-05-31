@@ -31,18 +31,100 @@ function getConnectivityCheckUrl(url) {
   return `${url.replace(/\/$/, "")}/rest/v1/multiplayer_reward_ledger?select=id&limit=1`;
 }
 
+function getValidSupabaseUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch (_err) {
+    return "";
+  }
+}
+
+function containsSensitiveValue(text, config) {
+  const value = String(text || "");
+  if (!value) return false;
+  if (config.serviceRoleKey && value.includes(config.serviceRoleKey)) return true;
+  if (/\bBearer\s+[A-Za-z0-9._-]+/i.test(value)) return true;
+  if (/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/.test(value)) return true;
+  if (/\b(apikey|service_role|jwt|token|authorization)\b/i.test(value)) return true;
+  return false;
+}
+
+function getSafeErrorText(text, config) {
+  const value = getStringValue(text);
+  if (!value || containsSensitiveValue(value, config)) return "";
+  return value.slice(0, 180);
+}
+
+async function readSafeSupabaseError(response, config) {
+  if (!response || typeof response.json !== "function") {
+    return {
+      safeErrorCode: "",
+      safeErrorMessage: ""
+    };
+  }
+
+  try {
+    const body = await response.json();
+    return {
+      safeErrorCode: getSafeErrorText(body?.code, config),
+      safeErrorMessage: getSafeErrorText(body?.message || body?.hint || body?.details, config)
+    };
+  } catch (_err) {
+    return {
+      safeErrorCode: "",
+      safeErrorMessage: ""
+    };
+  }
+}
+
+function getHttpConnectivityReason(status, safeErrorCode = "", safeErrorMessage = "") {
+  const code = safeErrorCode.toUpperCase();
+  const message = safeErrorMessage.toLowerCase();
+
+  if (status === 401 || code === "PGRST301" || message.includes("invalid api key")) {
+    return "invalid_key";
+  }
+
+  if (status === 403 || code === "42501" || message.includes("permission denied")) {
+    return "permission_denied";
+  }
+
+  if (status === 404 || code === "42P01" || code === "PGRST205" || message.includes("could not find the table")) {
+    return "table_missing";
+  }
+
+  return "http_error";
+}
+
 export async function checkRewardLedgerConnectivity(options = {}) {
   const env = options.env || process.env;
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const rewardWritesEnabled = isRewardWriteEnabled(env);
   const config = getSupabaseConfig(env);
 
-  if (!config.url || !config.serviceRoleKey) {
+  if (!config.url) {
     return {
       ok: false,
       ledgerReachable: false,
       rewardWritesEnabled,
-      reason: "supabase_config_missing"
+      reason: "missing_supabase_url",
+      status: 0,
+      safeErrorCode: "",
+      safeErrorMessage: ""
+    };
+  }
+
+  if (!config.serviceRoleKey) {
+    return {
+      ok: false,
+      ledgerReachable: false,
+      rewardWritesEnabled,
+      reason: "missing_service_role_key",
+      status: 0,
+      safeErrorCode: "",
+      safeErrorMessage: ""
     };
   }
 
@@ -51,12 +133,28 @@ export async function checkRewardLedgerConnectivity(options = {}) {
       ok: false,
       ledgerReachable: false,
       rewardWritesEnabled,
-      reason: "fetch_unavailable"
+      reason: "fetch_failed",
+      status: 0,
+      safeErrorCode: "",
+      safeErrorMessage: "fetch is unavailable in this runtime"
+    };
+  }
+
+  const supabaseUrl = getValidSupabaseUrl(config.url);
+  if (!supabaseUrl) {
+    return {
+      ok: false,
+      ledgerReachable: false,
+      rewardWritesEnabled,
+      reason: "invalid_supabase_url",
+      status: 0,
+      safeErrorCode: "",
+      safeErrorMessage: ""
     };
   }
 
   try {
-    const response = await fetchImpl(getConnectivityCheckUrl(config.url), {
+    const response = await fetchImpl(getConnectivityCheckUrl(supabaseUrl), {
       method: "GET",
       headers: {
         apikey: config.serviceRoleKey,
@@ -66,12 +164,17 @@ export async function checkRewardLedgerConnectivity(options = {}) {
     });
 
     if (!response?.ok) {
+      const status = Number(response?.status || 0);
+      const { safeErrorCode, safeErrorMessage } = await readSafeSupabaseError(response, config);
+
       return {
         ok: false,
         ledgerReachable: false,
         rewardWritesEnabled,
-        reason: "ledger_connectivity_check_failed",
-        status: response?.status || 0
+        reason: getHttpConnectivityReason(status, safeErrorCode, safeErrorMessage),
+        status,
+        safeErrorCode,
+        safeErrorMessage
       };
     }
 
@@ -80,14 +183,19 @@ export async function checkRewardLedgerConnectivity(options = {}) {
       ledgerReachable: true,
       rewardWritesEnabled,
       reason: "",
-      status: response.status || 200
+      status: response.status || 200,
+      safeErrorCode: "",
+      safeErrorMessage: ""
     };
   } catch (_err) {
     return {
       ok: false,
       ledgerReachable: false,
       rewardWritesEnabled,
-      reason: "ledger_connectivity_check_failed"
+      reason: "fetch_failed",
+      status: 0,
+      safeErrorCode: "",
+      safeErrorMessage: "request failed before receiving an HTTP response"
     };
   }
 }

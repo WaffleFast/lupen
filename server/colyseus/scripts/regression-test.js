@@ -297,7 +297,30 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(missingEnvConnectivity?.ok === false, "Missing-env ledger connectivity check unexpectedly succeeded.");
   assert(missingEnvConnectivity?.ledgerReachable === false, "Missing-env ledger connectivity check marked ledger reachable.");
   assert(missingEnvConnectivity?.rewardWritesEnabled === false, "Missing-env ledger connectivity check enabled writes.");
-  assert(missingEnvConnectivity?.reason === "supabase_config_missing", `Unexpected missing-env connectivity reason: ${missingEnvConnectivity?.reason}`);
+  assert(missingEnvConnectivity?.reason === "missing_supabase_url", `Unexpected missing-env connectivity reason: ${missingEnvConnectivity?.reason}`);
+
+  const missingKeyConnectivity = await checkRewardLedgerConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run without service role key");
+    }
+  });
+  assert(missingKeyConnectivity?.reason === "missing_service_role_key", `Unexpected missing-key connectivity reason: ${missingKeyConnectivity?.reason}`);
+
+  const invalidUrlConnectivity = await checkRewardLedgerConnectivity({
+    env: {
+      SUPABASE_URL: "not-a-valid-url",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run for invalid Supabase URL");
+    }
+  });
+  assert(invalidUrlConnectivity?.ok === false, "Invalid URL ledger connectivity check unexpectedly succeeded.");
+  assert(invalidUrlConnectivity?.ledgerReachable === false, "Invalid URL ledger connectivity check marked ledger reachable.");
+  assert(invalidUrlConnectivity?.reason === "invalid_supabase_url", `Unexpected invalid URL connectivity reason: ${invalidUrlConnectivity?.reason}`);
 
   let connectivityUrl = "";
   let connectivityOptions = null;
@@ -326,7 +349,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(connectivityOptions?.headers?.authorization === "Bearer stub-service-key", "Ledger connectivity check did not use service role bearer auth.");
   assert(!connectivityUrl.includes("player_saves"), "Ledger connectivity check targeted player_saves.");
 
-  const failedConnectivity = await checkRewardLedgerConnectivity({
+  const invalidKeyConnectivity = await checkRewardLedgerConnectivity({
     env: {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
@@ -334,13 +357,79 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
     fetchImpl: async () => {
       return {
         ok: false,
-        status: 403
+        status: 401,
+        async json() {
+          return {
+            code: "PGRST301",
+            message: "JWT expired"
+          };
+        }
       };
     }
   });
-  assert(failedConnectivity?.ok === false, "Failed ledger connectivity check unexpectedly succeeded.");
-  assert(failedConnectivity?.ledgerReachable === false, "Failed ledger connectivity check marked ledger reachable.");
-  assert(failedConnectivity?.reason === "ledger_connectivity_check_failed", `Unexpected failed connectivity reason: ${failedConnectivity?.reason}`);
+  assert(invalidKeyConnectivity?.ok === false, "Invalid-key ledger connectivity check unexpectedly succeeded.");
+  assert(invalidKeyConnectivity?.ledgerReachable === false, "Invalid-key ledger connectivity check marked ledger reachable.");
+  assert(invalidKeyConnectivity?.reason === "invalid_key", `Unexpected invalid-key connectivity reason: ${invalidKeyConnectivity?.reason}`);
+  assert(invalidKeyConnectivity?.safeErrorCode === "PGRST301", "Invalid-key connectivity did not expose safe error code.");
+
+  const permissionDeniedConnectivity = await checkRewardLedgerConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      return {
+        ok: false,
+        status: 403,
+        async json() {
+          return {
+            code: "42501",
+            message: "permission denied for table multiplayer_reward_ledger"
+          };
+        }
+      };
+    }
+  });
+  assert(permissionDeniedConnectivity?.ok === false, "Permission-denied ledger connectivity check unexpectedly succeeded.");
+  assert(permissionDeniedConnectivity?.ledgerReachable === false, "Permission-denied ledger connectivity check marked ledger reachable.");
+  assert(permissionDeniedConnectivity?.reason === "permission_denied", `Unexpected permission-denied connectivity reason: ${permissionDeniedConnectivity?.reason}`);
+  assert(permissionDeniedConnectivity?.safeErrorMessage === "permission denied for table multiplayer_reward_ledger", "Permission-denied connectivity did not expose safe error message.");
+
+  const tableMissingConnectivity = await checkRewardLedgerConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      return {
+        ok: false,
+        status: 404,
+        async json() {
+          return {
+            code: "PGRST205",
+            message: "Could not find the table public.multiplayer_reward_ledger"
+          };
+        }
+      };
+    }
+  });
+  assert(tableMissingConnectivity?.ok === false, "Missing-table ledger connectivity check unexpectedly succeeded.");
+  assert(tableMissingConnectivity?.ledgerReachable === false, "Missing-table ledger connectivity check marked ledger reachable.");
+  assert(tableMissingConnectivity?.reason === "table_missing", `Unexpected missing-table connectivity reason: ${tableMissingConnectivity?.reason}`);
+
+  const fetchFailedConnectivity = await checkRewardLedgerConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      throw new Error("network down");
+    }
+  });
+  assert(fetchFailedConnectivity?.ok === false, "Fetch-failed ledger connectivity check unexpectedly succeeded.");
+  assert(fetchFailedConnectivity?.ledgerReachable === false, "Fetch-failed ledger connectivity check marked ledger reachable.");
+  assert(fetchFailedConnectivity?.status === 0, "Fetch-failed ledger connectivity did not use status 0.");
+  assert(fetchFailedConnectivity?.reason === "fetch_failed", `Unexpected fetch-failed connectivity reason: ${fetchFailedConnectivity?.reason}`);
 
   const missingEnvLedgerResult = await writeRewardLedgerEntry(ledgerEntry, {
     env: {

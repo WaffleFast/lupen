@@ -35,7 +35,10 @@ function getDefaultRewardLedgerHealth() {
   return {
     ledgerReachable: "unknown",
     rewardWritesEnabled: isRewardWriteEnabled(),
-    reason: "not_checked"
+    reason: "not_checked",
+    status: 0,
+    safeErrorCode: "",
+    safeErrorMessage: ""
   };
 }
 
@@ -44,7 +47,9 @@ function sanitizeRewardLedgerHealth(checkResult = {}) {
     ledgerReachable: checkResult.ledgerReachable === true,
     rewardWritesEnabled: checkResult.rewardWritesEnabled === true,
     reason: checkResult.reason || "",
-    status: Number(checkResult.status || 0)
+    status: Number(checkResult.status || 0),
+    safeErrorCode: checkResult.safeErrorCode || "",
+    safeErrorMessage: checkResult.safeErrorMessage || ""
   };
 }
 

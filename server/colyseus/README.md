@@ -94,7 +94,7 @@ Manual Colyseus Cloud steps later:
 - Add any staging environment variables in Colyseus Cloud settings; do not commit secrets.
 - For staging identity verification, configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Colyseus Cloud environment variables. Do not commit either value.
 - Reward ledger writes remain disabled unless `ENABLE_STAGING_REWARD_WRITES=true` is explicitly set later. Leave this unset/false for current staging dry-runs. If enabled, the adapter requires verified identity plus `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, writes only to `multiplayer_reward_ledger`, and still uses `applied: false`.
-- `/health` includes a safe reward ledger connectivity summary with `ledgerReachable` and `rewardWritesEnabled`. This uses the service role key server-side only, performs a read-only `select=id&limit=1` request, and does not expose secrets or raw Supabase errors.
+- `/health` includes a safe reward ledger connectivity summary with `ledgerReachable`, `rewardWritesEnabled`, `reason`, `status`, `safeErrorCode`, and `safeErrorMessage`. This uses the service role key server-side only, performs a read-only `select=id&limit=1` request, and does not expose secrets or raw Supabase errors.
 - After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
 - Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
 
@@ -128,6 +128,7 @@ Current staging access model:
 - The service role key must never be committed, logged, stored in room state, sent to clients, or shown in diagnostics.
 - `ENABLE_STAGING_REWARD_WRITES` remains unset/false by default, so reward claim simulations stay dry-run/no-write.
 - The `/health` ledger check is read-only and requests at most one row from `multiplayer_reward_ledger` to confirm service-role reachability.
+- Safe ledger check reasons include `missing_supabase_url`, `missing_service_role_key`, `invalid_supabase_url`, `fetch_failed`, `invalid_key`, `permission_denied`, `table_missing`, and `http_error`.
 - No XP, credits, loot, bounty progress, saves, `player_saves`, or progression are mutated by the ledger check or current reward claim simulation.
 
 ## CORS Allow-List
@@ -236,7 +237,7 @@ The regression test uses two Colyseus clients to verify that:
 - A contributor can simulate claiming the preview reward, receiving `applied: false`, `dryRun: true`, preview values, contribution info, and a reward write plan.
 - Verified identity helper coverage confirms a verified/stubbed player would receive an eligible dry-run plan, while unverified/guest claim simulations are blocked from real reward eligibility.
 - The disabled reward ledger adapter returns `dryRun: true`, `applied: false`, and `skippedReason: reward_writes_disabled`.
-- The reward ledger connectivity helper performs a read-only service-role reachability check with `select=id&limit=1` and never writes data.
+- The reward ledger connectivity helper performs a read-only service-role reachability check with `select=id&limit=1`, categorizes safe failure reasons, and never writes data.
 - Mocked enabled-write coverage verifies the adapter targets only `/rest/v1/multiplayer_reward_ledger`, returns an inserted ledger id, and keeps `applied: false`.
 - A non-contributor preview claim is rejected safely without applying rewards.
 - Bot respawn confirms staging contribution data was cleared.
