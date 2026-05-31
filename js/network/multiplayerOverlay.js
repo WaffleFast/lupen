@@ -9,9 +9,11 @@
   const layerClass = "svg-mp-ghost-layer";
   const markerClass = "svg-mp-ghost";
   const spaceLayerId = "lupenMultiplayerSpaceGhostLayer";
+  const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
   const styleId = "lupenMultiplayerOverlayStyles";
   let unsubscribe = null;
   let renderQueued = false;
+  let diagnosticsTimer = null;
 
   function getClient() {
     return global.LupenMultiplayerClient || null;
@@ -87,6 +89,51 @@
         letter-spacing: 0.04em;
         text-shadow: 0 1px 3px rgba(0, 4, 10, 0.9);
       }
+
+      #${diagnosticsPanelId} {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 80;
+        width: min(260px, calc(100vw - 24px));
+        padding: 9px 10px;
+        border: 1px solid rgba(127, 223, 255, 0.36);
+        border-radius: 6px;
+        background: rgba(2, 8, 16, 0.78);
+        color: #d7fbff;
+        box-shadow: 0 0 18px rgba(0, 150, 220, 0.18);
+        font: 700 10px/1.35 Arial, sans-serif;
+        pointer-events: none;
+        text-transform: uppercase;
+      }
+
+      #${diagnosticsPanelId} strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #80efff;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+      }
+
+      #${diagnosticsPanelId} .lupen-mp-diagnostics-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        border-top: 1px solid rgba(127, 223, 255, 0.1);
+        padding-top: 3px;
+        margin-top: 3px;
+      }
+
+      #${diagnosticsPanelId} span {
+        color: rgba(215, 251, 255, 0.68);
+      }
+
+      #${diagnosticsPanelId} em {
+        color: #ffffff;
+        font-style: normal;
+        text-align: right;
+        overflow-wrap: anywhere;
+      }
     `;
     global.document.head.appendChild(style);
   }
@@ -100,9 +147,14 @@
     global.document?.getElementById(spaceLayerId)?.remove();
   }
 
+  function removeDiagnosticsPanel() {
+    global.document?.getElementById(diagnosticsPanelId)?.remove();
+  }
+
   function removeLayers() {
     removeSectorLayer();
     removeSpaceLayer();
+    removeDiagnosticsPanel();
   }
 
   function clampMapCoordinate(value) {
@@ -302,6 +354,59 @@
     spaceScreen.appendChild(layer);
   }
 
+  function getSameNodePlayers(players) {
+    const currentNodeName = getCurrentNodeName();
+    return players.filter((player) => normalizeNodeKey(player.currentNode) === normalizeNodeKey(currentNodeName));
+  }
+
+  function getShortSessionId(value) {
+    return String(value || "").slice(0, 8) || "none";
+  }
+
+  function setDiagnosticsRow(panel, label, value) {
+    const row = global.document.createElement("div");
+    row.className = "lupen-mp-diagnostics-row";
+
+    const labelNode = global.document.createElement("span");
+    labelNode.textContent = label;
+    row.appendChild(labelNode);
+
+    const valueNode = global.document.createElement("em");
+    valueNode.textContent = value;
+    row.appendChild(valueNode);
+
+    panel.appendChild(row);
+  }
+
+  function renderDiagnostics(players) {
+    removeDiagnosticsPanel();
+    if (!isEnabled()) return;
+
+    ensureStyles();
+
+    const status = getClient()?.getStatus?.() || {};
+    const sameNodePlayers = getSameNodePlayers(players);
+    const panel = global.document.createElement("div");
+    panel.id = diagnosticsPanelId;
+    panel.setAttribute("aria-hidden", "true");
+
+    const title = global.document.createElement("strong");
+    title.textContent = "MP Dev Diagnostics";
+    panel.appendChild(title);
+
+    setDiagnosticsRow(panel, "status", status.isConnected ? "connected" : status.isConnecting ? "connecting" : "offline");
+    setDiagnosticsRow(panel, "room", status.roomName || "none");
+    setDiagnosticsRow(panel, "session", getShortSessionId(status.sessionId));
+    setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
+    setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
+    setDiagnosticsRow(panel, "pilots", `${players.length} remote / ${sameNodePlayers.length} local`);
+    if (status.clientLoadError || status.lastError) {
+      setDiagnosticsRow(panel, "error", status.clientLoadError || status.lastError);
+    }
+
+    global.document.body.appendChild(panel);
+  }
+
   function render() {
     renderQueued = false;
 
@@ -313,6 +418,7 @@
     const players = getClient()?.getPlayers?.({ includeSelf: false }) || [];
     renderSectorGhosts(players);
     renderSpaceGhosts(players);
+    renderDiagnostics(players);
   }
 
   function scheduleRender() {
@@ -327,6 +433,7 @@
 
     const subscription = client.onServerState(() => scheduleRender());
     unsubscribe = subscription.unsubscribe;
+    if (!diagnosticsTimer) diagnosticsTimer = global.setInterval(scheduleRender, 1000);
     scheduleRender();
   }
 
