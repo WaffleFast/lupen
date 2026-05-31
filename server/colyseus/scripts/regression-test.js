@@ -69,6 +69,14 @@ function botSnapshots(room) {
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
+function botById(room, botId) {
+  return botSnapshots(room).find((bot) => bot.id === botId) || null;
+}
+
+function botHealthTotal(bot) {
+  return Number(bot?.shield || 0) + Number(bot?.hull || 0);
+}
+
 function botSnapshotKey(room) {
   return botSnapshots(room)
     .map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}:${bot.lastUpdatedAt}`)
@@ -178,6 +186,50 @@ async function expectTargetRejected(room, sendMessage) {
   });
 }
 
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function waitForFireReady(room, sessionId) {
+  await waitFor("staging fire cooldown", () => {
+    return Number(playerFrom(room, sessionId)?.nextFireAt || 0) <= Date.now();
+  }, 4000);
+}
+
+async function moveAndSelectBot(room, botId) {
+  const bot = botById(room, botId);
+  assert(bot, `Missing staging bot ${botId}.`);
+
+  room.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    currentNode: bot.currentNode,
+    x: bot.x,
+    y: bot.y
+  });
+
+  await waitFor("client A presence to reach selected staging bot node", () => {
+    return playerFrom(room, room.sessionId)?.currentNode === bot.currentNode;
+  });
+
+  if (playerFrom(room, room.sessionId)?.selectedTargetBotId === botId) return bot;
+
+  const selectResponse = await expectTargetSelected(room, () => {
+    room.send("target:select", {
+      targetBotId: botId,
+      currentNode: bot.currentNode
+    });
+  });
+
+  assert(selectResponse?.ok === true, "Valid staging bot selection did not succeed.");
+  await waitFor("server player selectedTargetBotId to update", () => {
+    return playerFrom(room, room.sessionId)?.selectedTargetBotId === botId;
+  });
+
+  return bot;
+}
+
 async function leaveRoom(room) {
   if (!room) return;
   try {
@@ -205,6 +257,13 @@ try {
     x: 51,
     y: 50
   });
+
+  const botDisabledEvents = [];
+  const botRespawnedEvents = [];
+  roomA.onMessage("bot:disabled", (message) => botDisabledEvents.push(message));
+  roomA.onMessage("bot:respawned", (message) => botRespawnedEvents.push(message));
+  roomB.onMessage("bot:disabled", () => {});
+  roomB.onMessage("bot:respawned", () => {});
 
   console.log(`joined ${ROOM_NAME}: A=${roomA.sessionId} B=${roomB.sessionId}`);
 
@@ -245,31 +304,7 @@ try {
   const inspectedBotBeforeCombat = botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
 
-  roomA.send("movement:update", {
-    displayName: "Regression Pilot A",
-    currentShipId: "lupenOrigin",
-    shipName: "LF-1 Origin",
-    currentNode: inspectedBotBeforeCombat.currentNode,
-    x: inspectedBotBeforeCombat.x,
-    y: inspectedBotBeforeCombat.y
-  });
-
-  await waitFor("client A presence to reach staging bot node", () => {
-    const playerA = playerFrom(roomA, roomA.sessionId);
-    return playerA?.currentNode === inspectedBotBeforeCombat.currentNode;
-  });
-
-  const selectResponse = await expectTargetSelected(roomA, () => {
-    roomA.send("target:select", {
-      targetBotId: inspectedBotBeforeCombat.id,
-      currentNode: inspectedBotBeforeCombat.currentNode
-    });
-  });
-
-  assert(selectResponse?.ok === true, "Valid staging bot selection did not succeed.");
-  await waitFor("server player selectedTargetBotId to update", () => {
-    return playerFrom(roomA, roomA.sessionId)?.selectedTargetBotId === inspectedBotBeforeCombat.id;
-  });
+  await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id);
   console.log("staging bot lock-on selected for display only");
 
   const combatResponse = await expectCombatResolved(roomA, () => {
@@ -304,6 +339,25 @@ try {
   assert(inspectedBotAfterCombat?.visualOnly === true, "Combat intent changed visualOnly flag.");
   console.log("combat intent applied staging damage without rewards");
 
+  const cooldownRejected = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "pulseLaser",
+      weaponFamily: "pulse",
+      currentNode: inspectedBotBeforeCombat.currentNode,
+      timestamp: Date.now()
+    });
+  });
+
+  assert(cooldownRejected?.reason === "staging_fire_cooldown", `Unexpected cooldown rejection: ${cooldownRejected?.reason}`);
+  assert(Number(cooldownRejected?.cooldownRemainingMs || 0) > 0, "Cooldown rejection did not include remaining time.");
+  assert(cooldownRejected?.rewardsGranted === false, "Cooldown rejection granted rewards.");
+  await sleep(250);
+  const inspectedBotAfterCooldownReject = botById(roomA, inspectedBotBeforeCombat.id);
+  assert(inspectedBotAfterCooldownReject?.shield === inspectedBotAfterCombat.shield, "Cooldown rejection changed bot shield.");
+  assert(inspectedBotAfterCooldownReject?.hull === inspectedBotAfterCombat.hull, "Cooldown rejection changed bot hull.");
+  console.log("immediate second combat intent rejected by staging cooldown");
+
   const invalidCombatResponse = await expectCombatRejected(roomA, () => {
     roomA.send("combat:intent", {
       targetBotId: "missing-staging-bot",
@@ -320,6 +374,79 @@ try {
   assert(inspectedBotAfterInvalidCombat?.shield === inspectedBotAfterCombat.shield, "Invalid combat intent changed bot shield.");
   assert(inspectedBotAfterInvalidCombat?.hull === inspectedBotAfterCombat.hull, "Invalid combat intent changed bot hull.");
   console.log("invalid combat intent rejected without damage or rewards");
+
+  let latestCombatBot = inspectedBotAfterInvalidCombat;
+  const maxFollowUpShots = Math.ceil(botHealthTotal(latestCombatBot) / 5) + 4;
+  for (let shot = 0; shot < maxFollowUpShots && !latestCombatBot.disabled; shot += 1) {
+    await waitForFireReady(roomA, roomA.sessionId);
+    const currentBot = await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id);
+    const response = await expectCombatResolved(roomA, () => {
+      roomA.send("combat:intent", {
+        targetBotId: currentBot.id,
+        weaponId: "pulseLaser",
+        weaponFamily: "pulse",
+        currentNode: currentBot.currentNode,
+        timestamp: Date.now()
+      });
+    });
+
+    assert(response?.rewardsGranted === false, "Repeated staging combat intent granted rewards.");
+    latestCombatBot = botById(roomA, inspectedBotBeforeCombat.id);
+    if (response?.disabled === true) {
+      latestCombatBot = {
+        ...latestCombatBot,
+        disabled: true
+      };
+      break;
+    }
+  }
+
+  assert(latestCombatBot?.disabled === true, "Repeated valid staging hits did not disable the bot.");
+  await waitFor("client B to receive disabled bot state", () => {
+    const botA = botById(roomA, inspectedBotBeforeCombat.id);
+    const botB = botById(roomB, inspectedBotBeforeCombat.id);
+    return botA?.disabled === true && botB?.disabled === true &&
+      botA.shield === botB.shield &&
+      botA.hull === botB.hull;
+  });
+  assert(botDisabledEvents.some((event) => event?.botId === inspectedBotBeforeCombat.id), "bot:disabled event was not observed.");
+  console.log("repeated valid hits disabled staging bot without rewards");
+
+  await waitForFireReady(roomA, roomA.sessionId);
+  const disabledBotBeforeRejectedHit = botById(roomA, inspectedBotBeforeCombat.id);
+  const disabledCombatResponse = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "pulseLaser",
+      weaponFamily: "pulse",
+      currentNode: disabledBotBeforeRejectedHit.currentNode,
+      timestamp: Date.now()
+    });
+  });
+  assert(disabledCombatResponse?.reason === "combat_intent_rejected", "Disabled bot combat intent did not reject.");
+  assert(disabledCombatResponse?.validation === "staging_bot_disabled", `Unexpected disabled bot validation: ${disabledCombatResponse?.validation}`);
+  await sleep(250);
+  const disabledBotAfterRejectedHit = botById(roomA, inspectedBotBeforeCombat.id);
+  assert(disabledBotAfterRejectedHit?.shield === disabledBotBeforeRejectedHit.shield, "Disabled bot took shield damage.");
+  assert(disabledBotAfterRejectedHit?.hull === disabledBotBeforeRejectedHit.hull, "Disabled bot took hull damage.");
+  console.log("disabled bot rejected further staging damage");
+
+  await waitFor("disabled staging bot to respawn on both clients", () => {
+    const botA = botById(roomA, inspectedBotBeforeCombat.id);
+    const botB = botById(roomB, inspectedBotBeforeCombat.id);
+    return botA && botB &&
+      botA.disabled === false &&
+      botB.disabled === false &&
+      botA.shield === botA.shieldMax &&
+      botA.hull === botA.hullMax &&
+      botB.shield === botA.shield &&
+      botB.hull === botA.hull &&
+      botB.currentNode === botA.currentNode;
+  }, 12000);
+  assert(botRespawnedEvents.some((event) => event?.botId === inspectedBotBeforeCombat.id), "bot:respawned event was not observed.");
+  assertAllowedBotNodes(roomA);
+  assertAllowedBotNodes(roomB);
+  console.log("disabled staging bot respawned with matching shared state");
 
   roomA.send("movement:update", {
     displayName: "Regression Pilot A",

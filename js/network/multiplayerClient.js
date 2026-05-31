@@ -36,6 +36,7 @@
     lastServerWarning: null,
     lastCombatResponse: null,
     lastTargetResponse: null,
+    lastBotEvent: null,
     lastError: null
   };
 
@@ -239,6 +240,7 @@
       lastServerWarning: connection.lastServerWarning,
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
+      lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -398,6 +400,8 @@
       currentNode: String(player.currentNode || "Asteron Prime"),
       joinedAt: Number.isFinite(Number(player.joinedAt)) ? Number(player.joinedAt) : 0,
       lastSeenAt: Number.isFinite(Number(player.lastSeenAt)) ? Number(player.lastSeenAt) : 0,
+      lastFireAt: Number.isFinite(Number(player.lastFireAt)) ? Number(player.lastFireAt) : 0,
+      nextFireAt: Number.isFinite(Number(player.nextFireAt)) ? Number(player.nextFireAt) : 0,
       isSelf: sessionId === connection.sessionId
     };
   }
@@ -492,6 +496,7 @@
         validation: String(message?.validation || ""),
         targetBotId: String(message?.targetBotId || ""),
         targetNode: String(message?.targetNode || ""),
+        cooldownRemainingMs: Number.isFinite(Number(message?.cooldownRemainingMs)) ? Number(message.cooldownRemainingMs) : 0,
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
@@ -508,10 +513,39 @@
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         disabled: message?.disabled === true,
+        cooldownMs: Number.isFinite(Number(message?.cooldownMs)) ? Number(message.cooldownMs) : 0,
+        nextFireAt: Number.isFinite(Number(message?.nextFireAt)) ? Number(message.nextFireAt) : 0,
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server combat intent resolved", message);
+    });
+
+    activeRoom.onMessage("bot:disabled", (message) => {
+      connection.lastBotEvent = {
+        type: "bot:disabled",
+        botId: String(message?.botId || ""),
+        currentNode: String(message?.currentNode || ""),
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        disabledUntil: Number.isFinite(Number(message?.disabledUntil)) ? Number(message.disabledUntil) : 0,
+        rewardsGranted: message?.rewardsGranted === true,
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server bot disabled", message);
+    });
+
+    activeRoom.onMessage("bot:respawned", (message) => {
+      connection.lastBotEvent = {
+        type: "bot:respawned",
+        botId: String(message?.botId || ""),
+        currentNode: String(message?.currentNode || ""),
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        rewardsGranted: message?.rewardsGranted === true,
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server bot respawned", message);
     });
 
     activeRoom.onMessage("target:selected", (message) => {
@@ -583,11 +617,14 @@
       lastServerWarning: connection.lastServerWarning,
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
+      lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
       lastBotUpdateAt,
       selectedTargetBotId: playersById.get(connection.sessionId)?.selectedTargetBotId || "",
+      nextFireAt: playersById.get(connection.sessionId)?.nextFireAt || 0,
+      fireCooldownRemainingMs: Math.max(0, Math.ceil((playersById.get(connection.sessionId)?.nextFireAt || 0) - Date.now())),
       originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,

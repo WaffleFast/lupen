@@ -195,6 +195,17 @@
         color: #fff4c7;
       }
 
+      .lupen-mp-space-bot-damage {
+        position: absolute;
+        left: 50%;
+        top: -18px;
+        transform: translateX(-50%);
+        color: #fff1b2;
+        font: 900 13px/1 Arial, sans-serif;
+        text-shadow: 0 0 8px rgba(255, 93, 52, 0.92), 0 1px 2px rgba(10, 2, 0, 0.95);
+        animation: lupen-mp-damage-float 0.78s ease-out forwards;
+      }
+
       @keyframes lupen-mp-staging-hit {
         0% {
           transform: translate(-50%, -50%) scale(1);
@@ -222,6 +233,21 @@
         100% {
           opacity: 0.72;
           filter: drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72));
+        }
+      }
+
+      @keyframes lupen-mp-damage-float {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, 8px) scale(0.9);
+        }
+        25% {
+          opacity: 1;
+          transform: translate(-50%, 0) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -14px) scale(1.04);
         }
       }
 
@@ -452,6 +478,10 @@
     return Date.now() - Number(response.receivedAt || 0) < 1200;
   }
 
+  function getRecentDamageAmount(bot, status = getClient()?.getStatus?.()) {
+    return wasRecentlyHit(bot, status) ? Math.max(0, Math.round(Number(status.lastCombatResponse.damage || 0))) : 0;
+  }
+
   function selectStagingBot(bot) {
     if (!bot?.id) return;
     const client = getClient();
@@ -598,6 +628,22 @@
       lockRing.setAttribute("stroke-width", "0.18");
       lockRing.setAttribute("stroke-dasharray", "0.9 0.7");
       group.appendChild(lockRing);
+    }
+
+    const damageAmount = getRecentDamageAmount(bot);
+    if (damageAmount > 0) {
+      const damageText = global.document.createElementNS(SVG_NS, "text");
+      damageText.setAttribute("x", "0");
+      damageText.setAttribute("y", "-3.6");
+      damageText.setAttribute("fill", "#fff1b2");
+      damageText.setAttribute("font-size", "1.25");
+      damageText.setAttribute("font-weight", "900");
+      damageText.setAttribute("paint-order", "stroke");
+      damageText.setAttribute("stroke", "rgba(25, 5, 0, 0.96)");
+      damageText.setAttribute("stroke-width", "0.28");
+      damageText.setAttribute("text-anchor", "middle");
+      damageText.textContent = `-${damageAmount}`;
+      group.appendChild(damageText);
     }
 
     const ship = global.document.createElementNS(SVG_NS, "polygon");
@@ -766,8 +812,16 @@
 
       const note = global.document.createElement("div");
       note.className = "lupen-mp-space-bot-note";
-      note.textContent = getBotModeLabel();
+      note.textContent = bot.disabled ? "DISABLED" : getBotModeLabel();
       marker.appendChild(note);
+
+      const damageAmount = getRecentDamageAmount(bot);
+      if (damageAmount > 0) {
+        const damage = global.document.createElement("div");
+        damage.className = "lupen-mp-space-bot-damage";
+        damage.textContent = `-${damageAmount}`;
+        marker.appendChild(damage);
+      }
 
       layer.appendChild(marker);
     });
@@ -805,6 +859,20 @@
     return `${seconds}s ago`;
   }
 
+  function formatCooldown(milliseconds) {
+    const remaining = Math.max(0, Math.ceil(Number(milliseconds || 0)));
+    if (!remaining) return "ready";
+    return `${(remaining / 1000).toFixed(1)}s`;
+  }
+
+  function getLastBotEventLabel(status) {
+    const event = status?.lastBotEvent;
+    if (!event?.type) return "none";
+    const name = event.type.replace("bot:", "");
+    const id = String(event.botId || "").slice(-6) || "unknown";
+    return `${name} / ${id}`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -820,12 +888,17 @@
     panel.appendChild(row);
   }
 
-  function canSendStagingTestFire(status, selectedBot) {
+  function canShowStagingTestFire(status, selectedBot) {
     return !!status?.enabled &&
       !!status?.isConnected &&
       !!selectedBot?.id &&
-      !selectedBot.disabled &&
       isSameCurrentNode(selectedBot);
+  }
+
+  function canSendStagingTestFire(status, selectedBot) {
+    return canShowStagingTestFire(status, selectedBot) &&
+      !selectedBot.disabled &&
+      Math.max(0, Number(status.fireCooldownRemainingMs || 0)) <= 0;
   }
 
   function sendStagingTestFire(selectedBot) {
@@ -843,7 +916,7 @@
   }
 
   function addDiagnosticsActions(panel, status, selectedBot) {
-    if (!canSendStagingTestFire(status, selectedBot)) return;
+    if (!canShowStagingTestFire(status, selectedBot)) return;
 
     const actions = global.document.createElement("div");
     actions.className = "lupen-mp-diagnostics-actions";
@@ -851,8 +924,10 @@
     const button = global.document.createElement("button");
     button.type = "button";
     button.className = "lupen-mp-test-fire-button";
-    button.textContent = "Test Fire";
+    const cooldownRemainingMs = Math.max(0, Number(status.fireCooldownRemainingMs || 0));
+    button.textContent = cooldownRemainingMs > 0 ? `Test Fire ${formatCooldown(cooldownRemainingMs)}` : "Test Fire";
     button.title = "Send staging-only server test damage. No real combat or rewards.";
+    button.disabled = !canSendStagingTestFire(status, selectedBot);
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -896,6 +971,8 @@
       setDiagnosticsRow(panel, "inspect bot", getBotInspectionLabel(inspectedBot));
       setDiagnosticsRow(panel, "bot node", getBotLayerSummary(inspectedBot));
       setDiagnosticsRow(panel, "bot status", getBotHullSummary(inspectedBot));
+      setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
+      setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
@@ -903,7 +980,9 @@
     if (status.lastCombatResponse) {
       const combatLabel = status.lastCombatResponse.ok
         ? `${status.lastCombatResponse.reason || "resolved"} / ${status.lastCombatResponse.damage || 0} dmg`
-        : status.lastCombatResponse.reason || "received";
+        : status.lastCombatResponse.reason === "staging_fire_cooldown"
+          ? `cooldown / ${formatCooldown(status.lastCombatResponse.cooldownRemainingMs)}`
+          : status.lastCombatResponse.reason || "received";
       setDiagnosticsRow(panel, "combat intent", combatLabel);
       if (status.lastCombatResponse.ok) {
         setDiagnosticsRow(panel, "last damage", `${status.lastCombatResponse.damage || 0} / rewards no`);

@@ -110,7 +110,8 @@ const BOT_NODE_LINKS = new Map(
 const BOT_MOVE_TICK_MS = 4000;
 const BOT_NODE_MOVE_MS = 16000;
 const STAGING_TEST_DAMAGE = 5;
-const STAGING_BOT_DISABLED_RESET_MS = 8000;
+const STAGING_FIRE_COOLDOWN_MS = 900;
+const STAGING_BOT_DISABLED_RESET_MS = 6500;
 
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 35, hull: 70 },
@@ -137,6 +138,8 @@ type("number")(LupenSectorPlayer.prototype, "x");
 type("number")(LupenSectorPlayer.prototype, "y");
 type("number")(LupenSectorPlayer.prototype, "joinedAt");
 type("number")(LupenSectorPlayer.prototype, "lastSeenAt");
+type("number")(LupenSectorPlayer.prototype, "lastFireAt");
+type("number")(LupenSectorPlayer.prototype, "nextFireAt");
 
 export class LupenSectorBot extends Schema {
   constructor(values = {}) {
@@ -332,7 +335,9 @@ export class LupenSectorRoom extends Room {
       x: getNumberValue(options.x, 50),
       y: getNumberValue(options.y, 50),
       joinedAt: now,
-      lastSeenAt: now
+      lastSeenAt: now,
+      lastFireAt: 0,
+      nextFireAt: 0
     }));
   }
 
@@ -381,11 +386,7 @@ export class LupenSectorRoom extends Room {
     // bounty systems.
     Array.from(this.state.bots.values()).forEach((bot, index) => {
       if (bot.disabled && now >= Number(bot.disabledUntil || 0)) {
-        bot.shield = Number(bot.shieldMax || 0);
-        bot.hull = Number(bot.hullMax || 1);
-        bot.disabled = false;
-        bot.disabledUntil = 0;
-        bot.lastUpdatedAt = now;
+        this.respawnStagingBot(bot, index, now);
       }
 
       if (bot.disabled) return;
@@ -442,7 +443,7 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  sendCombatRejected(client, reason, message = {}, messageType = "combat:intent", validation = "") {
+  sendCombatRejected(client, reason, message = {}, messageType = "combat:intent", validation = "", extra = {}) {
     const player = this.state.players.get(client.sessionId);
     const targetBotId = getStringValue(message.targetBotId);
     const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
@@ -459,7 +460,8 @@ export class LupenSectorRoom extends Room {
       weaponId: getStringValue(message.weaponId),
       weaponFamily: getStringValue(message.weaponFamily),
       rewardsGranted: false,
-      receivedAt: Date.now()
+      receivedAt: Date.now(),
+      ...extra
     });
   }
 
@@ -557,8 +559,36 @@ export class LupenSectorRoom extends Room {
     };
   }
 
+  respawnStagingBot(bot, index = 0, now = Date.now()) {
+    const respawnNode = this.getNextBotNode(bot.currentNode, index + this.botStep + 1);
+    const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
+
+    bot.currentNode = nodePosition.node;
+    bot.x = clampNumber(nodePosition.x, 4, 96);
+    bot.y = clampNumber(nodePosition.y, 4, 96);
+    bot.shield = Number(bot.shieldMax || 0);
+    bot.hull = Number(bot.hullMax || 1);
+    bot.disabled = false;
+    bot.disabledUntil = 0;
+    bot.lastUpdatedAt = now;
+    bot.nextMoveAt = now + BOT_NODE_MOVE_MS + index * 1250;
+
+    this.broadcast("bot:respawned", {
+      ok: true,
+      botId: bot.id,
+      currentNode: bot.currentNode,
+      shield: bot.shield,
+      hull: bot.hull,
+      rewardsGranted: false,
+      receivedAt: now
+    });
+
+    this.reconcilePlayerSelections();
+  }
+
   resolveCombatIntent(client, message = {}, messageType = "combat:intent") {
     const player = this.touchPlayer(client.sessionId);
+    const now = Date.now();
     const payloadWarning = validateCombatIntentPayload(message);
     const targetBotId = getStringValue(message.targetBotId);
     const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
@@ -581,6 +611,13 @@ export class LupenSectorRoom extends Room {
       validationReason = "combat target does not match selected staging bot";
     }
 
+    if (!validationReason && Number(player.nextFireAt || 0) > now) {
+      this.sendCombatRejected(client, "staging_fire_cooldown", message, messageType, "fire cooldown active", {
+        cooldownRemainingMs: Math.max(0, Math.ceil(Number(player.nextFireAt || 0) - now))
+      });
+      return;
+    }
+
     if (!validationReason && clientCurrentNode && clientCurrentNode !== player.currentNode) {
       validationReason = "combat node does not match player node";
     }
@@ -590,7 +627,7 @@ export class LupenSectorRoom extends Room {
     }
 
     if (!validationReason && targetBot.disabled) {
-      validationReason = "staging bot is temporarily disabled";
+      validationReason = "staging_bot_disabled";
     }
 
     if (validationReason) {
@@ -599,6 +636,8 @@ export class LupenSectorRoom extends Room {
     }
 
     const result = this.applyStagingTestDamage(targetBot, STAGING_TEST_DAMAGE);
+    player.lastFireAt = now;
+    player.nextFireAt = now + STAGING_FIRE_COOLDOWN_MS;
 
     client.send("combat:resolved", {
       ok: true,
@@ -616,9 +655,24 @@ export class LupenSectorRoom extends Room {
       shield: result.shield,
       hull: result.hull,
       disabled: result.disabled,
+      cooldownMs: STAGING_FIRE_COOLDOWN_MS,
+      nextFireAt: player.nextFireAt,
       rewardsGranted: false,
       receivedAt: Date.now()
     });
+
+    if (result.disabled) {
+      this.broadcast("bot:disabled", {
+        ok: true,
+        botId: targetBot.id,
+        currentNode: targetBot.currentNode,
+        shield: targetBot.shield,
+        hull: targetBot.hull,
+        disabledUntil: targetBot.disabledUntil,
+        rewardsGranted: false,
+        receivedAt: Date.now()
+      });
+    }
   }
 
   applyPresenceUpdate(client, message = {}, messageType = "presence:update") {
