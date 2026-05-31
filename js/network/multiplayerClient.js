@@ -8,6 +8,12 @@
 
   const localServerUrl = "ws://localhost:2567";
   const localClientScriptUrl = "http://localhost:2567/colyseus.js";
+  const colyseusBrowserClientVersion = "0.16.22";
+  const clientScriptSources = [
+    { source: "local", url: localClientScriptUrl },
+    { source: "cdn-jsdelivr", url: `https://cdn.jsdelivr.net/npm/colyseus.js@${colyseusBrowserClientVersion}/dist/colyseus.js` },
+    { source: "cdn-unpkg", url: `https://unpkg.com/colyseus.js@${colyseusBrowserClientVersion}/dist/colyseus.js` }
+  ];
   const defaultRoomName = "lupen_test";
   const disabledReason = "multiplayer_disabled";
   const notLocalReason = "multiplayer_local_only";
@@ -18,6 +24,8 @@
     isConnected: false,
     roomName: defaultRoomName,
     sessionId: null,
+    clientLoadSource: null,
+    clientLoadError: null,
     lastError: null
   };
 
@@ -60,6 +68,11 @@
     logDev("error", connection.lastError);
   }
 
+  function setClientLoadError(error) {
+    connection.clientLoadError = error && error.message ? error.message : String(error || "Unknown Colyseus client load error");
+    setError(connection.clientLoadError);
+  }
+
   function disabledResult(action, extra = {}) {
     return {
       ok: false,
@@ -79,9 +92,23 @@
       connected: connection.isConnected,
       roomName: connection.roomName,
       sessionId: connection.sessionId,
+      clientLoadSource: connection.clientLoadSource,
+      clientLoadError: connection.clientLoadError,
       lastError: connection.lastError,
       ...extra
     };
+  }
+
+  function getLocalPresenceOptions() {
+    try {
+      if (typeof global.getLupenMultiplayerPresence === "function") {
+        return global.getLupenMultiplayerPresence() || {};
+      }
+    } catch (err) {
+      logDev("local presence unavailable", err);
+    }
+
+    return {};
   }
 
   function ensureEnabled(action) {
@@ -94,41 +121,97 @@
     });
   }
 
-  function ensureBrowserClientLoaded() {
-    if (global.Colyseus && typeof global.Colyseus.Client === "function") {
-      return Promise.resolve(global.Colyseus);
-    }
-
-    if (clientScriptPromise) return clientScriptPromise;
-
-    clientScriptPromise = new Promise((resolve, reject) => {
+  function loadClientScript(scriptSource) {
+    return new Promise((resolve, reject) => {
       if (!global.document || !global.document.head) {
         reject(new Error("document_unavailable"));
         return;
       }
 
-      const existingScript = global.document.querySelector("script[data-lupen-colyseus-client='local']");
-      if (existingScript) {
-        existingScript.addEventListener("load", () => resolve(global.Colyseus), { once: true });
-        existingScript.addEventListener("error", () => reject(new Error("colyseus_client_load_failed")), { once: true });
+      const existingScript = global.document.querySelector(`script[data-lupen-colyseus-client-source="${scriptSource.source}"]`);
+      if (existingScript && global.Colyseus && typeof global.Colyseus.Client === "function") {
+        resolve(global.Colyseus);
         return;
       }
 
+      if (existingScript) existingScript.remove();
+
       const script = global.document.createElement("script");
-      script.src = localClientScriptUrl;
+      let settled = false;
+      const timeout = global.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        script.remove();
+        reject(new Error(`${scriptSource.source}:timeout`));
+      }, 7000);
+
+      script.src = scriptSource.url;
       script.async = true;
-      script.dataset.lupenColyseusClient = "local";
+      script.dataset.lupenColyseusClient = "true";
+      script.dataset.lupenColyseusClientSource = scriptSource.source;
       script.onload = () => {
+        if (settled) return;
+        settled = true;
+        global.clearTimeout(timeout);
         if (global.Colyseus && typeof global.Colyseus.Client === "function") {
           resolve(global.Colyseus);
           return;
         }
 
-        reject(new Error("colyseus_client_unavailable"));
+        script.remove();
+        reject(new Error(`${scriptSource.source}:client_unavailable`));
       };
-      script.onerror = () => reject(new Error("colyseus_client_load_failed"));
+      script.onerror = () => {
+        if (settled) return;
+        settled = true;
+        global.clearTimeout(timeout);
+        script.remove();
+        reject(new Error(`${scriptSource.source}:load_failed`));
+      };
       global.document.head.appendChild(script);
     });
+  }
+
+  async function loadBrowserClientFromSources() {
+    if (global.Colyseus && typeof global.Colyseus.Client === "function") {
+      connection.clientLoadSource = connection.clientLoadSource || "existing";
+      connection.clientLoadError = null;
+      return Promise.resolve(global.Colyseus);
+    }
+
+    const errors = [];
+    for (const scriptSource of clientScriptSources) {
+      try {
+        logDev(`loading Colyseus browser client from ${scriptSource.source}`, scriptSource.url);
+        const Colyseus = await loadClientScript(scriptSource);
+        connection.clientLoadSource = scriptSource.source;
+        connection.clientLoadError = null;
+        logDev(`loaded Colyseus browser client from ${scriptSource.source}`);
+        return Colyseus;
+      } catch (err) {
+        errors.push(err && err.message ? err.message : String(err));
+        connection.clientLoadError = errors.join(" | ");
+        logDev(`Colyseus browser client load failed from ${scriptSource.source}`, err);
+      }
+    }
+
+    throw new Error(`colyseus_client_load_failed: ${errors.join(" | ")}`);
+  }
+
+  function ensureBrowserClientLoaded() {
+    if (global.Colyseus && typeof global.Colyseus.Client === "function") {
+      connection.clientLoadSource = connection.clientLoadSource || "existing";
+      connection.clientLoadError = null;
+      return Promise.resolve(global.Colyseus);
+    }
+
+    if (!clientScriptPromise) {
+      clientScriptPromise = loadBrowserClientFromSources().catch((err) => {
+        clientScriptPromise = null;
+        setClientLoadError(err);
+        throw err;
+      });
+    }
 
     return clientScriptPromise;
   }
@@ -225,6 +308,8 @@
       isConnecting: connection.isConnecting,
       roomName: connection.roomName,
       sessionId: connection.sessionId,
+      clientLoadSource: connection.clientLoadSource,
+      clientLoadError: connection.clientLoadError,
       lastError: connection.lastError,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
@@ -272,10 +357,12 @@
 
       try {
         const Colyseus = await ensureBrowserClientLoaded();
+        const localPresence = getLocalPresenceOptions();
         colyseusClient = new Colyseus.Client(options.serverUrl || localServerUrl);
         room = await colyseusClient.joinOrCreate(connection.roomName, {
-          displayName: options.displayName || "Pilot",
-          currentNode: options.currentNode || "asteron-prime"
+          ...localPresence,
+          displayName: options.displayName || localPresence.displayName || "Pilot",
+          currentNode: options.currentNode || localPresence.currentNode || "Asteron Prime"
         });
 
         connection.isConnected = true;

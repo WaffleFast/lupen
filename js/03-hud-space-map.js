@@ -713,6 +713,31 @@ function getPilotName() {
   return savedAccount?.username || localPilot || "Pilot";
 }
 
+function getMultiplayerPresencePayload() {
+  const node = sectorNodes[currentNode] || {};
+  return {
+    currentNode,
+    x: Number.isFinite(Number(node.x)) ? Number(node.x) : 50,
+    y: Number.isFinite(Number(node.y)) ? Number(node.y) : 50,
+    displayName: getPilotName(),
+    currentShipId: currentShipId || "",
+    ship: SHIPS[currentShipId]?.name || ""
+  };
+}
+
+window.getLupenMultiplayerPresence = getMultiplayerPresencePayload;
+
+function syncMultiplayerPresence(reason = "position_update") {
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!status?.enabled || !status?.isConnected) return;
+
+  client.sendMovementIntent({
+    ...getMultiplayerPresencePayload(),
+    reason
+  });
+}
+
 function addLocalChatLine(author, message, type = "") {
   const feed = document.getElementById("localChatFeed");
   if (!feed) return;
@@ -1638,6 +1663,7 @@ function jumpToNode(destination) {
   updateCurrentNodeUI();
   updateSpaceHUD();
   updateAsteroidUI();
+  syncMultiplayerPresence("jump");
   tutorialEvent("jumpedNode");
   if (tutorialState?.active) setTimeout(renderStarterTutorial, 120);
   startJumpRecharge();
