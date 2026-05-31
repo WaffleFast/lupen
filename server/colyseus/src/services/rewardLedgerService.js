@@ -12,7 +12,7 @@ function getNumberValue(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function isRewardWriteEnabled(env = process.env) {
+export function isRewardWriteEnabled(env = process.env) {
   return String(env.ENABLE_STAGING_REWARD_WRITES || "").toLowerCase() === "true";
 }
 
@@ -25,6 +25,71 @@ function getSupabaseConfig(env = process.env) {
 
 function getInsertUrl(url) {
   return `${url.replace(/\/$/, "")}/rest/v1/multiplayer_reward_ledger`;
+}
+
+function getConnectivityCheckUrl(url) {
+  return `${url.replace(/\/$/, "")}/rest/v1/multiplayer_reward_ledger?select=id&limit=1`;
+}
+
+export async function checkRewardLedgerConnectivity(options = {}) {
+  const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const rewardWritesEnabled = isRewardWriteEnabled(env);
+  const config = getSupabaseConfig(env);
+
+  if (!config.url || !config.serviceRoleKey) {
+    return {
+      ok: false,
+      ledgerReachable: false,
+      rewardWritesEnabled,
+      reason: "supabase_config_missing"
+    };
+  }
+
+  if (typeof fetchImpl !== "function") {
+    return {
+      ok: false,
+      ledgerReachable: false,
+      rewardWritesEnabled,
+      reason: "fetch_unavailable"
+    };
+  }
+
+  try {
+    const response = await fetchImpl(getConnectivityCheckUrl(config.url), {
+      method: "GET",
+      headers: {
+        apikey: config.serviceRoleKey,
+        authorization: `Bearer ${config.serviceRoleKey}`,
+        accept: "application/json"
+      }
+    });
+
+    if (!response?.ok) {
+      return {
+        ok: false,
+        ledgerReachable: false,
+        rewardWritesEnabled,
+        reason: "ledger_connectivity_check_failed",
+        status: response?.status || 0
+      };
+    }
+
+    return {
+      ok: true,
+      ledgerReachable: true,
+      rewardWritesEnabled,
+      reason: "",
+      status: response.status || 200
+    };
+  } catch (_err) {
+    return {
+      ok: false,
+      ledgerReachable: false,
+      rewardWritesEnabled,
+      reason: "ledger_connectivity_check_failed"
+    };
+  }
 }
 
 export function buildRewardLedgerEntry(rewardWritePlan = {}, context = {}) {
@@ -159,5 +224,7 @@ export async function writeRewardLedgerEntry(entry = {}, options = {}) {
 
 export const RewardLedgerService = Object.freeze({
   buildRewardLedgerEntry,
-  writeRewardLedgerEntry
+  writeRewardLedgerEntry,
+  checkRewardLedgerConnectivity,
+  isRewardWriteEnabled
 });

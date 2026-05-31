@@ -45,7 +45,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Staging-only `reward:claim_preview` / `staging:claimRewardPreview` messages simulate claiming a recent reward preview and reply with `reward:claim_preview_result`. Eligible contributors receive `applied: false` and `reason: staging_preview_only`; non-contributors are rejected safely. No real rewards are marked claimed or applied.
 - Supabase identity sent by the browser client is staging preparation metadata only. The server verifies access tokens with Supabase when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured. Verified tokens set `authStatus: verified` and trusted player ids; missing tokens stay `guest`; failed verification becomes `unverified`. Access tokens are never stored in room state or sent back to clients, and no reward writes are trusted or performed yet.
 - Reward claim simulation now includes a reward write dry-run plan with intended XP, credits, loot, contribution percentage, eligibility, and blocked reason. `dryRun` remains `true` and `applied` remains `false`; no Supabase writes or game progression mutations occur.
-- Reward claim simulation also passes the dry-run plan through `src/services/rewardLedgerService.js`. Ledger writes are disabled by default and return `skippedReason: reward_writes_disabled` unless `ENABLE_STAGING_REWARD_WRITES=true` is explicitly configured later. When enabled, the adapter only inserts into `multiplayer_reward_ledger` with `applied: false`; it never mutates `player_saves` or progression.
+- Reward claim simulation also passes the dry-run plan through `src/services/rewardLedgerService.js`. Ledger writes are disabled by default and return `skippedReason: reward_writes_disabled` unless `ENABLE_STAGING_REWARD_WRITES=true` is explicitly configured later. When enabled, the adapter only inserts into `multiplayer_reward_ledger` with `applied: false`; it never mutates `player_saves` or progression. The service also exposes a read-only ledger connectivity check used by `/health`; it requests at most one row and never inserts, updates, or deletes data.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
@@ -94,6 +94,7 @@ Manual Colyseus Cloud steps later:
 - Add any staging environment variables in Colyseus Cloud settings; do not commit secrets.
 - For staging identity verification, configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Colyseus Cloud environment variables. Do not commit either value.
 - Reward ledger writes remain disabled unless `ENABLE_STAGING_REWARD_WRITES=true` is explicitly set later. Leave this unset/false for current staging dry-runs. If enabled, the adapter requires verified identity plus `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, writes only to `multiplayer_reward_ledger`, and still uses `applied: false`.
+- `/health` includes a safe reward ledger connectivity summary with `ledgerReachable` and `rewardWritesEnabled`. This uses the service role key server-side only, performs a read-only `select=id&limit=1` request, and does not expose secrets or raw Supabase errors.
 - After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
 - Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
 
@@ -116,6 +117,18 @@ server/colyseus/docs/multiplayer_reward_ledger.sql
 ```
 
 This draft is not run automatically and should be reviewed before any migration is applied.
+
+## Reward Ledger Safety
+
+The `public.multiplayer_reward_ledger` table is created manually in Supabase. Row Level Security is enabled, and no browser/client read or write policies should be added yet. Browser clients should not read from or write to this table.
+
+Current staging access model:
+
+- Colyseus uses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from server/Cloud environment variables only.
+- The service role key must never be committed, logged, stored in room state, sent to clients, or shown in diagnostics.
+- `ENABLE_STAGING_REWARD_WRITES` remains unset/false by default, so reward claim simulations stay dry-run/no-write.
+- The `/health` ledger check is read-only and requests at most one row from `multiplayer_reward_ledger` to confirm service-role reachability.
+- No XP, credits, loot, bounty progress, saves, `player_saves`, or progression are mutated by the ledger check or current reward claim simulation.
 
 ## CORS Allow-List
 
@@ -223,6 +236,7 @@ The regression test uses two Colyseus clients to verify that:
 - A contributor can simulate claiming the preview reward, receiving `applied: false`, `dryRun: true`, preview values, contribution info, and a reward write plan.
 - Verified identity helper coverage confirms a verified/stubbed player would receive an eligible dry-run plan, while unverified/guest claim simulations are blocked from real reward eligibility.
 - The disabled reward ledger adapter returns `dryRun: true`, `applied: false`, and `skippedReason: reward_writes_disabled`.
+- The reward ledger connectivity helper performs a read-only service-role reachability check with `select=id&limit=1` and never writes data.
 - Mocked enabled-write coverage verifies the adapter targets only `/rest/v1/multiplayer_reward_ledger`, returns an inserted ledger id, and keeps `applied: false`.
 - A non-contributor preview claim is rejected safely without applying rewards.
 - Bot respawn confirms staging contribution data was cleared.

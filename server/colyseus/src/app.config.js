@@ -4,6 +4,10 @@ import cors from "cors";
 import config from "@colyseus/tools";
 import { matchMaker } from "colyseus";
 import { LupenSectorRoom } from "./rooms/LupenSectorRoom.js";
+import {
+  checkRewardLedgerConnectivity,
+  isRewardWriteEnabled
+} from "./services/rewardLedgerService.js";
 
 export const ROOM_NAME = "lupen_sector";
 export const LEGACY_ROOM_NAME = "lupen_test";
@@ -27,7 +31,24 @@ export function getEffectiveListenPort(basePort = Number(process.env.PORT || DEF
   return cloudPort + Number(process.env.NODE_APP_INSTANCE || "0");
 }
 
-export function getHealthPayload(port = getEffectiveListenPort()) {
+function getDefaultRewardLedgerHealth() {
+  return {
+    ledgerReachable: "unknown",
+    rewardWritesEnabled: isRewardWriteEnabled(),
+    reason: "not_checked"
+  };
+}
+
+function sanitizeRewardLedgerHealth(checkResult = {}) {
+  return {
+    ledgerReachable: checkResult.ledgerReachable === true,
+    rewardWritesEnabled: checkResult.rewardWritesEnabled === true,
+    reason: checkResult.reason || "",
+    status: Number(checkResult.status || 0)
+  };
+}
+
+export function getHealthPayload(port = getEffectiveListenPort(), rewardLedger = getDefaultRewardLedgerHealth()) {
   return {
     ok: true,
     service: "lupen-colyseus-prototype",
@@ -35,8 +56,14 @@ export function getHealthPayload(port = getEffectiveListenPort()) {
     rooms: [ROOM_NAME, LEGACY_ROOM_NAME],
     preferredRoom: ROOM_NAME,
     environment: process.env.NODE_ENV || "development",
-    port
+    port,
+    rewardLedger
   };
+}
+
+async function getHealthPayloadWithLedger(port = getEffectiveListenPort()) {
+  const rewardLedgerCheck = await checkRewardLedgerConnectivity();
+  return getHealthPayload(port, sanitizeRewardLedgerHealth(rewardLedgerCheck));
 }
 
 function isCorsOriginAllowed(origin) {
@@ -95,8 +122,8 @@ export default config({
   initializeExpress(app) {
     app.use(applyLupenCors);
 
-    app.get(["/", "/health"], (_req, res) => {
-      res.status(200).json(getHealthPayload());
+    app.get(["/", "/health"], async (_req, res) => {
+      res.status(200).json(await getHealthPayloadWithLedger());
     });
 
     app.get("/test-client.html", (_req, res) => {

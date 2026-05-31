@@ -7,6 +7,7 @@ import {
 } from "../src/rooms/LupenSectorRoom.js";
 import {
   buildRewardLedgerEntry,
+  checkRewardLedgerConnectivity,
   writeRewardLedgerEntry
 } from "../src/services/rewardLedgerService.js";
 
@@ -286,6 +287,60 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(disabledLedgerResult?.dryRun === true, "Disabled ledger adapter did not return dryRun true.");
   assert(disabledLedgerResult?.applied === false, "Disabled ledger adapter applied rewards.");
   assert(disabledLedgerResult?.skippedReason === "reward_writes_disabled", `Unexpected disabled ledger reason: ${disabledLedgerResult?.skippedReason}`);
+
+  const missingEnvConnectivity = await checkRewardLedgerConnectivity({
+    env: {},
+    fetchImpl: async () => {
+      throw new Error("fetch should not run without Supabase config");
+    }
+  });
+  assert(missingEnvConnectivity?.ok === false, "Missing-env ledger connectivity check unexpectedly succeeded.");
+  assert(missingEnvConnectivity?.ledgerReachable === false, "Missing-env ledger connectivity check marked ledger reachable.");
+  assert(missingEnvConnectivity?.rewardWritesEnabled === false, "Missing-env ledger connectivity check enabled writes.");
+  assert(missingEnvConnectivity?.reason === "supabase_config_missing", `Unexpected missing-env connectivity reason: ${missingEnvConnectivity?.reason}`);
+
+  let connectivityUrl = "";
+  let connectivityOptions = null;
+  const successfulConnectivity = await checkRewardLedgerConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      connectivityUrl = url;
+      connectivityOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [];
+        }
+      };
+    }
+  });
+  assert(successfulConnectivity?.ok === true, "Mocked ledger connectivity check did not succeed.");
+  assert(successfulConnectivity?.ledgerReachable === true, "Mocked ledger connectivity check did not mark ledger reachable.");
+  assert(successfulConnectivity?.rewardWritesEnabled === false, "Mocked ledger connectivity check enabled writes by default.");
+  assert(connectivityUrl === "https://example.supabase.co/rest/v1/multiplayer_reward_ledger?select=id&limit=1", `Unexpected ledger connectivity URL: ${connectivityUrl}`);
+  assert(connectivityOptions?.method === "GET", "Ledger connectivity check did not use GET.");
+  assert(connectivityOptions?.headers?.authorization === "Bearer stub-service-key", "Ledger connectivity check did not use service role bearer auth.");
+  assert(!connectivityUrl.includes("player_saves"), "Ledger connectivity check targeted player_saves.");
+
+  const failedConnectivity = await checkRewardLedgerConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      return {
+        ok: false,
+        status: 403
+      };
+    }
+  });
+  assert(failedConnectivity?.ok === false, "Failed ledger connectivity check unexpectedly succeeded.");
+  assert(failedConnectivity?.ledgerReachable === false, "Failed ledger connectivity check marked ledger reachable.");
+  assert(failedConnectivity?.reason === "ledger_connectivity_check_failed", `Unexpected failed connectivity reason: ${failedConnectivity?.reason}`);
 
   const missingEnvLedgerResult = await writeRewardLedgerEntry(ledgerEntry, {
     env: {
