@@ -1,7 +1,7 @@
 /* Future multiplayer client boundary.
    Multiplayer remains disabled unless the game is opened locally with ?mp=1.
    This local-only path is for Colyseus prototype testing and must not mutate
-   gameplay state or render other players yet. */
+   gameplay state. Server snapshots are read-only presence/visual data. */
 
 (function registerMultiplayerClient(global) {
   "use strict";
@@ -34,6 +34,7 @@
   let room = null;
   let clientScriptPromise = null;
   const playersById = new Map();
+  const botsById = new Map();
 
   function hasDevFlag() {
     try {
@@ -270,9 +271,47 @@
     });
   }
 
+  function normalizeBot(bot, fallbackId = "") {
+    if (!bot) return null;
+
+    const id = String(bot.id || fallbackId || "");
+    if (!id) return null;
+
+    return {
+      id,
+      type: String(bot.type || "Dev Bot"),
+      name: String(bot.name || bot.type || "Dev Bot"),
+      x: Number.isFinite(Number(bot.x)) ? Number(bot.x) : 50,
+      y: Number.isFinite(Number(bot.y)) ? Number(bot.y) : 50,
+      currentNode: String(bot.currentNode || "Asteron Prime"),
+      lastUpdatedAt: Number.isFinite(Number(bot.lastUpdatedAt)) ? Number(bot.lastUpdatedAt) : 0
+    };
+  }
+
+  function updateBotsFromServerState(serverState) {
+    botsById.clear();
+
+    const bots = serverState?.bots;
+    if (!bots) return;
+
+    if (typeof bots.forEach === "function") {
+      bots.forEach((bot, key) => {
+        const snapshot = normalizeBot(bot, key);
+        if (snapshot) botsById.set(snapshot.id, snapshot);
+      });
+      return;
+    }
+
+    Object.entries(bots).forEach(([key, bot]) => {
+      const snapshot = normalizeBot(bot, key);
+      if (snapshot) botsById.set(snapshot.id, snapshot);
+    });
+  }
+
   function bindRoomEvents(activeRoom) {
     activeRoom.onStateChange((serverState) => {
       updatePlayersFromServerState(serverState);
+      updateBotsFromServerState(serverState);
       notifyServerState(serverState);
     });
 
@@ -293,6 +332,7 @@
       room = null;
       colyseusClient = null;
       playersById.clear();
+      botsById.clear();
       notifyServerState(null);
     });
   }
@@ -328,6 +368,7 @@
       lastServerWarning: connection.lastServerWarning,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
+      botCount: botsById.size,
       serverUrl: localServerUrl
     };
   }
@@ -413,6 +454,8 @@
         connection.isConnected = false;
         connection.isConnecting = false;
         connection.sessionId = null;
+        playersById.clear();
+        botsById.clear();
         return statusResult("disconnect", true, { alreadyDisconnected: true });
       }
 
@@ -423,6 +466,7 @@
       connection.sessionId = null;
       room = null;
       colyseusClient = null;
+      botsById.clear();
       return statusResult("disconnect");
     },
 
@@ -447,6 +491,10 @@
       return Array.from(playersById.values())
         .filter((player) => includeSelf || !player.isSelf)
         .map((player) => ({ ...player }));
+    },
+
+    getBots() {
+      return Array.from(botsById.values()).map((bot) => ({ ...bot }));
     },
 
     onServerState(handler) {

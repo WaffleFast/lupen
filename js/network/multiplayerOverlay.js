@@ -8,7 +8,10 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   const layerClass = "svg-mp-ghost-layer";
   const markerClass = "svg-mp-ghost";
+  const botLayerClass = "svg-mp-bot-layer";
+  const botMarkerClass = "svg-mp-bot";
   const spaceLayerId = "lupenMultiplayerSpaceGhostLayer";
+  const spaceBotLayerId = "lupenMultiplayerSpaceBotLayer";
   const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
   const styleId = "lupenMultiplayerOverlayStyles";
   let unsubscribe = null;
@@ -34,6 +37,14 @@
         position: absolute;
         inset: 84px 18px 170px;
         z-index: 9;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      #${spaceBotLayerId} {
+        position: absolute;
+        inset: 84px 18px 170px;
+        z-index: 8;
         pointer-events: none;
         overflow: hidden;
       }
@@ -90,6 +101,58 @@
         text-shadow: 0 1px 3px rgba(0, 4, 10, 0.9);
       }
 
+      .lupen-mp-space-bot {
+        position: absolute;
+        display: grid;
+        justify-items: center;
+        gap: 3px;
+        transform: translate(-50%, -50%);
+        opacity: 0.72;
+        pointer-events: none;
+        filter: drop-shadow(0 0 10px rgba(255, 128, 62, 0.46));
+      }
+
+      .lupen-mp-space-bot-ship {
+        position: relative;
+        width: 32px;
+        height: 40px;
+        clip-path: polygon(50% 0%, 88% 48%, 68% 48%, 72% 88%, 50% 72%, 28% 88%, 32% 48%, 12% 48%);
+        background: linear-gradient(180deg, rgba(255, 184, 92, 0.9), rgba(255, 74, 58, 0.48));
+        border: 1px solid rgba(255, 224, 180, 0.68);
+      }
+
+      .lupen-mp-space-bot-ship::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 4px;
+        width: 10px;
+        height: 8px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: rgba(255, 93, 52, 0.72);
+        box-shadow: 0 0 12px rgba(255, 93, 52, 0.8);
+      }
+
+      .lupen-mp-space-bot-label {
+        padding: 2px 6px;
+        border: 1px solid rgba(255, 163, 92, 0.46);
+        border-radius: 4px;
+        background: rgba(18, 8, 2, 0.72);
+        color: #ffd9b0;
+        font: 700 10px/1.15 Arial, sans-serif;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .lupen-mp-space-bot-note {
+        color: rgba(255, 213, 172, 0.8);
+        font: 700 8px/1 Arial, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        text-shadow: 0 1px 3px rgba(10, 2, 0, 0.9);
+      }
+
       #${diagnosticsPanelId} {
         position: fixed;
         top: 12px;
@@ -141,10 +204,12 @@
   function removeSectorLayer() {
     const svg = global.document?.getElementById("sectorSvg");
     svg?.querySelector(`.${layerClass}`)?.remove();
+    svg?.querySelector(`.${botLayerClass}`)?.remove();
   }
 
   function removeSpaceLayer() {
     global.document?.getElementById(spaceLayerId)?.remove();
+    global.document?.getElementById(spaceBotLayerId)?.remove();
   }
 
   function removeDiagnosticsPanel() {
@@ -182,8 +247,8 @@
     return matchedName ? sectorNodes[matchedName] : null;
   }
 
-  function getPlayerPosition(player) {
-    const node = getSectorNodeByName(player.currentNode);
+  function getEntityPosition(entity) {
+    const node = getSectorNodeByName(entity.currentNode);
     if (node) {
       return {
         x: clampMapCoordinate(node.x + 2.4),
@@ -192,8 +257,8 @@
     }
 
     return {
-      x: clampMapCoordinate(player.x),
-      y: clampMapCoordinate(player.y)
+      x: clampMapCoordinate(entity.x),
+      y: clampMapCoordinate(entity.y)
     };
   }
 
@@ -217,12 +282,16 @@
     return shipLabel === "Unknown ship" ? "DEV GHOST" : `${shipLabel} / DEV GHOST`;
   }
 
+  function getBotLabel(bot) {
+    return String(bot.name || bot.type || "DEV BOT").trim().slice(0, 18) || "DEV BOT";
+  }
+
   function getLabelOffset(position) {
     return position.x > 82 ? -13.4 : 4.1;
   }
 
   function drawSectorGhost(layer, player) {
-    const position = getPlayerPosition(player);
+    const position = getEntityPosition(player);
     const labelOffset = getLabelOffset(position);
     const group = global.document.createElementNS(SVG_NS, "g");
     group.setAttribute("class", markerClass);
@@ -297,6 +366,74 @@
     layer.appendChild(group);
   }
 
+  function drawSectorBot(layer, bot) {
+    const position = getEntityPosition(bot);
+    const labelOffset = getLabelOffset(position);
+    const group = global.document.createElementNS(SVG_NS, "g");
+    group.setAttribute("class", botMarkerClass);
+    group.setAttribute("data-bot-id", bot.id || "");
+    group.setAttribute("pointer-events", "none");
+    group.setAttribute("transform", `translate(${position.x} ${position.y})`);
+
+    const title = global.document.createElementNS(SVG_NS, "title");
+    title.textContent = `${getBotLabel(bot)} / DEV BOT / ${bot.currentNode || "Unknown"} / x:${bot.x} y:${bot.y}`;
+    group.appendChild(title);
+
+    const halo = global.document.createElementNS(SVG_NS, "circle");
+    halo.setAttribute("cx", "0");
+    halo.setAttribute("cy", "0");
+    halo.setAttribute("r", "4");
+    halo.setAttribute("fill", "rgba(255, 114, 60, 0.12)");
+    halo.setAttribute("stroke", "rgba(255, 160, 87, 0.55)");
+    halo.setAttribute("stroke-width", "0.18");
+    group.appendChild(halo);
+
+    const ship = global.document.createElementNS(SVG_NS, "polygon");
+    ship.setAttribute("points", "0,-3.9 3,0.6 1.3,0.6 1.55,3.4 0,2.25 -1.55,3.4 -1.3,0.6 -3,0.6");
+    ship.setAttribute("fill", "rgba(255, 132, 69, 0.74)");
+    ship.setAttribute("stroke", "rgba(255, 225, 185, 0.94)");
+    ship.setAttribute("stroke-width", "0.25");
+    ship.setAttribute("filter", "drop-shadow(0 0 2.6px rgba(255, 113, 55, 0.86))");
+    group.appendChild(ship);
+
+    const core = global.document.createElementNS(SVG_NS, "circle");
+    core.setAttribute("cx", "0");
+    core.setAttribute("cy", "0.2");
+    core.setAttribute("r", "0.78");
+    core.setAttribute("fill", "rgba(48, 9, 4, 0.8)");
+    core.setAttribute("stroke", "rgba(255, 230, 194, 0.82)");
+    core.setAttribute("stroke-width", "0.13");
+    group.appendChild(core);
+
+    const label = global.document.createElementNS(SVG_NS, "text");
+    label.setAttribute("x", labelOffset);
+    label.setAttribute("y", "-1.8");
+    label.setAttribute("fill", "#ffd0a2");
+    label.setAttribute("font-size", "1.65");
+    label.setAttribute("font-weight", "800");
+    label.setAttribute("paint-order", "stroke");
+    label.setAttribute("stroke", "rgba(10, 2, 0, 0.96)");
+    label.setAttribute("stroke-width", "0.46");
+    label.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
+    label.textContent = getBotLabel(bot);
+    group.appendChild(label);
+
+    const note = global.document.createElementNS(SVG_NS, "text");
+    note.setAttribute("x", labelOffset);
+    note.setAttribute("y", "0.3");
+    note.setAttribute("fill", "rgba(255, 218, 177, 0.82)");
+    note.setAttribute("font-size", "1.08");
+    note.setAttribute("font-weight", "700");
+    note.setAttribute("paint-order", "stroke");
+    note.setAttribute("stroke", "rgba(10, 2, 0, 0.96)");
+    note.setAttribute("stroke-width", "0.3");
+    note.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
+    note.textContent = "DEV BOT";
+    group.appendChild(note);
+
+    layer.appendChild(group);
+  }
+
   function renderSectorGhosts(players) {
     const svg = global.document?.getElementById("sectorSvg");
     if (!svg || !isEnabled()) {
@@ -312,6 +449,24 @@
     layer.setAttribute("class", layerClass);
     layer.setAttribute("pointer-events", "none");
     players.forEach((player) => drawSectorGhost(layer, player));
+    svg.appendChild(layer);
+  }
+
+  function renderSectorBots(bots) {
+    const svg = global.document?.getElementById("sectorSvg");
+    if (!svg || !isEnabled()) {
+      removeSectorLayer();
+      return;
+    }
+
+    svg.querySelector(`.${botLayerClass}`)?.remove();
+
+    if (!bots.length) return;
+
+    const layer = global.document.createElementNS(SVG_NS, "g");
+    layer.setAttribute("class", botLayerClass);
+    layer.setAttribute("pointer-events", "none");
+    bots.forEach((bot) => drawSectorBot(layer, bot));
     svg.appendChild(layer);
   }
 
@@ -369,9 +524,58 @@
     spaceScreen.appendChild(layer);
   }
 
+  function renderSpaceBots(bots) {
+    global.document?.getElementById(spaceBotLayerId)?.remove();
+    if (!isEnabled()) return;
+
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return;
+
+    const currentNodeName = getCurrentNodeName();
+    const localBots = bots.filter((bot) => normalizeNodeKey(bot.currentNode) === normalizeNodeKey(currentNodeName));
+    if (!localBots.length) return;
+
+    ensureStyles();
+
+    const layer = global.document.createElement("div");
+    layer.id = spaceBotLayerId;
+    layer.setAttribute("aria-hidden", "true");
+
+    localBots.slice(0, 6).forEach((bot, index) => {
+      const marker = global.document.createElement("div");
+      marker.className = "lupen-mp-space-bot";
+      marker.dataset.botId = bot.id || "";
+      marker.style.left = `${36 + getStableOffset(bot, index)}%`;
+      marker.style.top = `${32 + (index % 3) * 13}%`;
+
+      const ship = global.document.createElement("div");
+      ship.className = "lupen-mp-space-bot-ship";
+      marker.appendChild(ship);
+
+      const label = global.document.createElement("div");
+      label.className = "lupen-mp-space-bot-label";
+      label.textContent = getBotLabel(bot);
+      marker.appendChild(label);
+
+      const note = global.document.createElement("div");
+      note.className = "lupen-mp-space-bot-note";
+      note.textContent = "DEV BOT";
+      marker.appendChild(note);
+
+      layer.appendChild(marker);
+    });
+
+    spaceScreen.appendChild(layer);
+  }
+
   function getSameNodePlayers(players) {
     const currentNodeName = getCurrentNodeName();
     return players.filter((player) => normalizeNodeKey(player.currentNode) === normalizeNodeKey(currentNodeName));
+  }
+
+  function getSameNodeBots(bots) {
+    const currentNodeName = getCurrentNodeName();
+    return bots.filter((bot) => normalizeNodeKey(bot.currentNode) === normalizeNodeKey(currentNodeName));
   }
 
   function getShortSessionId(value) {
@@ -393,7 +597,7 @@
     panel.appendChild(row);
   }
 
-  function renderDiagnostics(players) {
+  function renderDiagnostics(players, bots) {
     removeDiagnosticsPanel();
     if (!isEnabled()) return;
 
@@ -401,6 +605,7 @@
 
     const status = getClient()?.getStatus?.() || {};
     const sameNodePlayers = getSameNodePlayers(players);
+    const sameNodeBots = getSameNodeBots(bots);
     const panel = global.document.createElement("div");
     panel.id = diagnosticsPanelId;
     panel.setAttribute("aria-hidden", "true");
@@ -415,6 +620,7 @@
     setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
     setDiagnosticsRow(panel, "pilots", `${players.length} remote / ${sameNodePlayers.length} local`);
+    setDiagnosticsRow(panel, "bots", `${bots.length} total / ${sameNodeBots.length} local`);
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
     }
@@ -434,9 +640,12 @@
     }
 
     const players = getClient()?.getPlayers?.({ includeSelf: false }) || [];
+    const bots = getClient()?.getBots?.() || [];
     renderSectorGhosts(players);
+    renderSectorBots(bots);
     renderSpaceGhosts(players);
-    renderDiagnostics(players);
+    renderSpaceBots(bots);
+    renderDiagnostics(players, bots);
   }
 
   function scheduleRender() {

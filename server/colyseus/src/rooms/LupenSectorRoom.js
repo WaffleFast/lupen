@@ -43,6 +43,21 @@ const KNOWN_SECTOR_NODES = new Set([
   "Lower Gate East"
 ]);
 
+const BOT_PATROL_NODES = [
+  { node: "Asteron Prime", x: 50, y: 50 },
+  { node: "East Link 1", x: 62, y: 50 },
+  { node: "Upper Gate Core", x: 50, y: 30 },
+  { node: "Lower Gate Core", x: 50, y: 70 },
+  { node: "West Link 1", x: 38, y: 50 }
+];
+
+const DUMMY_BOT_DEFINITIONS = [
+  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone" },
+  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout" },
+  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher" },
+  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor" }
+];
+
 export class LupenSectorPlayer extends Schema {
   constructor(values = {}) {
     super();
@@ -61,14 +76,31 @@ type("number")(LupenSectorPlayer.prototype, "y");
 type("number")(LupenSectorPlayer.prototype, "joinedAt");
 type("number")(LupenSectorPlayer.prototype, "lastSeenAt");
 
+export class LupenSectorBot extends Schema {
+  constructor(values = {}) {
+    super();
+    Object.assign(this, values);
+  }
+}
+
+type("string")(LupenSectorBot.prototype, "id");
+type("string")(LupenSectorBot.prototype, "type");
+type("string")(LupenSectorBot.prototype, "name");
+type("string")(LupenSectorBot.prototype, "currentNode");
+type("number")(LupenSectorBot.prototype, "x");
+type("number")(LupenSectorBot.prototype, "y");
+type("number")(LupenSectorBot.prototype, "lastUpdatedAt");
+
 export class LupenSectorState extends Schema {
   constructor() {
     super();
     this.players = new MapSchema();
+    this.bots = new MapSchema();
   }
 }
 
 type({ map: LupenSectorPlayer })(LupenSectorState.prototype, "players");
+type({ map: LupenSectorBot })(LupenSectorState.prototype, "bots");
 
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -113,11 +145,18 @@ function validatePresencePayload(message = {}) {
 }
 
 // Presence-only stepping stone for future server-authoritative multiplayer.
-// This room mirrors local player display/location data for dev ghosts only:
-// it does not validate movement, persist state, grant rewards, or run combat.
+// This room mirrors local player display/location data and server-owned dummy
+// bot positions for dev ghosts only. It does not persist state, grant rewards,
+// run combat, or control the real single-player game.
 export class LupenSectorRoom extends Room {
   onCreate() {
     this.setState(new LupenSectorState());
+    this.botStep = 0;
+
+    this.spawnDummyBots();
+    this.botInterval = this.clock.setInterval(() => {
+      this.updateDummyBots();
+    }, 9000);
 
     this.onMessage("ping", (client, message = {}) => {
       this.touchPlayer(client.sessionId);
@@ -160,6 +199,42 @@ export class LupenSectorRoom extends Room {
 
   onLeave(client) {
     this.state.players.delete(client.sessionId);
+  }
+
+  onDispose() {
+    this.botInterval?.clear?.();
+  }
+
+  spawnDummyBots() {
+    const now = Date.now();
+
+    DUMMY_BOT_DEFINITIONS.forEach((definition, index) => {
+      const patrolNode = BOT_PATROL_NODES[index % BOT_PATROL_NODES.length];
+      this.state.bots.set(definition.id, new LupenSectorBot({
+        id: definition.id,
+        type: definition.type,
+        name: definition.name,
+        currentNode: patrolNode.node,
+        x: patrolNode.x + (index % 2 === 0 ? 1.2 : -1.2),
+        y: patrolNode.y + (index % 2 === 0 ? -1.2 : 1.2),
+        lastUpdatedAt: now
+      }));
+    });
+  }
+
+  updateDummyBots() {
+    const now = Date.now();
+    this.botStep += 1;
+
+    Array.from(this.state.bots.values()).forEach((bot, index) => {
+      const patrolNode = BOT_PATROL_NODES[(this.botStep + index) % BOT_PATROL_NODES.length];
+      const drift = ((this.botStep + index) % 3) - 1;
+
+      bot.currentNode = patrolNode.node;
+      bot.x = patrolNode.x + drift * 1.6;
+      bot.y = patrolNode.y - drift * 1.2;
+      bot.lastUpdatedAt = now;
+    });
   }
 
   touchPlayer(sessionId) {

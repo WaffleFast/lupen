@@ -55,14 +55,16 @@
       font-family: Consolas, monospace;
     }
 
-    #players {
+    #players,
+    #bots {
       display: grid;
       gap: 8px;
       padding: 0;
       list-style: none;
     }
 
-    #players li {
+    #players li,
+    #bots li {
       border: 1px solid #303845;
       border-radius: 4px;
       padding: 10px;
@@ -101,6 +103,11 @@
     </section>
 
     <section>
+      <h2>Server Dummy Bots</h2>
+      <ul id="bots"></ul>
+    </section>
+
+    <section>
       <h2>Event Log</h2>
       <pre id="log"></pre>
     </section>
@@ -117,6 +124,7 @@
     const statusEl = document.getElementById("status");
     const sessionIdEl = document.getElementById("sessionId");
     const playersEl = document.getElementById("players");
+    const botsEl = document.getElementById("bots");
     const logEl = document.getElementById("log");
     const connectButton = document.getElementById("connectButton");
     const disconnectButton = document.getElementById("disconnectButton");
@@ -156,6 +164,23 @@
       });
     }
 
+    function renderBots(state) {
+      botsEl.textContent = "";
+
+      if (!state || !state.bots || state.bots.size === 0) {
+        const empty = document.createElement("li");
+        empty.textContent = "No server dummy bots";
+        botsEl.appendChild(empty);
+        return;
+      }
+
+      state.bots.forEach((bot) => {
+        const item = document.createElement("li");
+        item.textContent = `${bot.name || bot.type || "Dev Bot"} | ${bot.id} | x:${bot.x} y:${bot.y} | node:${bot.currentNode}`;
+        botsEl.appendChild(item);
+      });
+    }
+
     async function connect() {
       if (room) return;
 
@@ -178,6 +203,7 @@
 
         room.onStateChange((state) => {
           renderPlayers(state);
+          renderBots(state);
         });
 
         room.onMessage("pong", (message) => {
@@ -192,6 +218,7 @@
           setControls(false);
           sessionIdEl.textContent = "none";
           renderPlayers(null);
+          renderBots(null);
         });
       } catch (error) {
         setStatus("error");
@@ -237,6 +264,7 @@
     setStatus("disconnected");
     setControls(false);
     renderPlayers(null);
+    renderBots(null);
   </script>
 </body>
 </html>

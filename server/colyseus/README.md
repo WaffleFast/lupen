@@ -8,6 +8,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Preferred registered room: `lupen_sector`.
 - Legacy compatibility room: `lupen_test`.
 - A `LupenSectorRoom` that tracks connected players by `sessionId`.
+- A small fixed set of server-owned dummy bots for visual-only multiplayer presence testing.
 - Each joined player gets:
   - `id` / `sessionId`: the Colyseus `sessionId`
   - `displayName`: supplied by join options, otherwise `Pilot`
@@ -19,6 +20,13 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
 - Legacy local prototype `move` messages are still accepted for compatibility.
 - Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
+- Dummy bots include:
+  - `id`: stable local dummy bot id
+  - `type` / `name`: display-only bot identity such as `Erebus Drone`
+  - `currentNode`: visual sector location
+  - `x` / `y`: placeholder map position
+  - `lastUpdatedAt`: local server timestamp
+- Dummy bots drift between placeholder sector nodes on a slow local interval. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
 
 ## Install
 
@@ -59,7 +67,7 @@ cd server\colyseus
 npm.cmd run smoke
 ```
 
-The smoke test joins `lupen_sector`, sends `ping`, receives `pong`, sends a placeholder `movement:update`, confirms an invalid movement update returns a dev warning, then leaves.
+The smoke test joins `lupen_sector`, confirms dummy bots are present in room state, sends `ping`, receives `pong`, sends a placeholder `movement:update`, confirms an invalid movement update returns a dev warning, then leaves.
 
 ## Browser Test Client
 
@@ -69,7 +77,7 @@ While the local server is running, open this URL in one or more browser tabs:
 http://localhost:2567/test-client.html
 ```
 
-Use `Connect` in each tab to join `lupen_sector`. The page shows the current tab's session id, connected players, placeholder movement updates, ping/pong messages, and disconnect events.
+Use `Connect` in each tab to join `lupen_sector`. The page shows the current tab's session id, connected players, server dummy bots, placeholder movement updates, ping/pong messages, and disconnect events.
 
 This page is served only by the local prototype server. It is not imported by the real Lupen frontend.
 
