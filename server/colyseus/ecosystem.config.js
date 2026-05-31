@@ -6,9 +6,13 @@ export default {
       time: true,
       watch: false,
       instances: 1,
-      exec_mode: "fork",
+      // Colyseus Cloud deploys through PM2. Cluster mode with one instance lets
+      // PM2 coordinate replacement workers instead of starting two forked
+      // processes that can race for the same PORT during rolling deploys.
+      exec_mode: "cluster",
       env: {
-        NODE_ENV: "production"
+        NODE_ENV: "production",
+        PORT: 2567
       }
     }
   ]
