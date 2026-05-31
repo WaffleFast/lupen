@@ -1,10 +1,10 @@
-/* Staging player_saves XP/credits patch adapter.
+/* Staging player_saves XP-only patch adapter.
    This is the future real progression write path, but it is disabled by
-   default and fail-closed. It supports XP/credits only and never applies
-   loot, inventory, bounties, cargo, equipment, or ship changes. */
+   default and fail-closed. It supports XP only for the current staging
+   sprint and never applies credits, loot, inventory, bounties, cargo,
+   equipment, or ship changes. */
 
 const MAX_STAGING_XP_DELTA = 500;
-const MAX_STAGING_CREDITS_DELTA = 5000;
 
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -93,13 +93,28 @@ function getStagingProgressionWriteAllowlist(env = process.env) {
     .filter(Boolean);
 }
 
+export function getProgressionWriteScope(env = process.env) {
+  const scope = getStringValue(env.STAGING_PROGRESSION_WRITE_SCOPE, "allowlist").toLowerCase();
+  return scope === "verified" ? "verified" : "allowlist";
+}
+
+export function isProgressionWriteEnabled(env = process.env) {
+  return String(env.ENABLE_STAGING_PROGRESSION_WRITES || "").toLowerCase() === "true";
+}
+
 function getAllowlistStatus(playerId, env = process.env) {
   const allowlist = getStagingProgressionWriteAllowlist(env);
   const normalizedPlayerId = getStringValue(playerId);
+  const progressionWriteScope = getProgressionWriteScope(env);
+  const playerInStagingWriteAllowlist = !!normalizedPlayerId && allowlist.includes(normalizedPlayerId);
+  const verifiedScopeEnabled = progressionWriteScope === "verified";
 
   return {
+    progressionWriteScope,
+    verifiedScopeEnabled,
     stagingWriteAllowlistPresent: allowlist.length > 0,
-    playerInStagingWriteAllowlist: !!normalizedPlayerId && allowlist.includes(normalizedPlayerId)
+    playerInStagingWriteAllowlist,
+    playerAllowedForStagingWrite: verifiedScopeEnabled ? !!normalizedPlayerId : playerInStagingWriteAllowlist
   };
 }
 
@@ -181,7 +196,7 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
   const duplicateDetected = context.duplicateDetected === true || rewardApplicationPlan.duplicateDetected === true;
   const idempotencyKey = getIdempotencyKey(playerId, sourceEventId, sourceLedgerId);
   const xpDelta = clampInteger(rewardApplicationPlan.xpDelta, 0, MAX_STAGING_XP_DELTA);
-  const creditsDelta = clampInteger(rewardApplicationPlan.creditsDelta, 0, MAX_STAGING_CREDITS_DELTA);
+  const creditsDelta = 0;
   const xpMatch = resolveNumericPath(currentSaveData, [
     ["playerProgress", "combatXp"]
   ]);
@@ -197,10 +212,8 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
       ? "idempotency_not_ready"
       : duplicateDetected
         ? "duplicate_reward_application"
-      : !xpMatch
-        ? "xp_path_missing_or_ambiguous"
-        : !creditsMatch
-          ? "credits_path_missing_or_ambiguous"
+        : !xpMatch
+          ? "xp_path_missing_or_ambiguous"
           : "";
 
   return {
@@ -222,8 +235,11 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
     eligible: !blockedReason,
     skippedReason: blockedReason,
     progressionWritesEnabled: false,
+    progressionWriteScope: "allowlist",
+    verifiedScopeEnabled: false,
     stagingWriteAllowlistPresent: false,
     playerInStagingWriteAllowlist: false,
+    playerAllowedForStagingWrite: false,
     applied: false,
     dryRun: true
   };
@@ -233,8 +249,9 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
   const env = options.env || process.env;
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const allowlistStatus = getAllowlistStatus(plan?.playerId, env);
+  const progressionWritesEnabled = isProgressionWriteEnabled(env);
 
-  if (String(env.ENABLE_STAGING_PROGRESSION_WRITES || "").toLowerCase() !== "true") {
+  if (!progressionWritesEnabled) {
     return {
       ok: true,
       applied: false,
@@ -294,7 +311,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
     };
   }
 
-  if (!allowlistStatus.stagingWriteAllowlistPresent) {
+  if (allowlistStatus.progressionWriteScope !== "verified" && !allowlistStatus.stagingWriteAllowlistPresent) {
     return {
       ok: false,
       applied: false,
@@ -309,7 +326,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
     };
   }
 
-  if (!allowlistStatus.playerInStagingWriteAllowlist) {
+  if (!allowlistStatus.playerAllowedForStagingWrite) {
     return {
       ok: false,
       applied: false,
@@ -319,7 +336,9 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       idempotencyReady: true,
       duplicateDetected: false,
       ...allowlistStatus,
-      skippedReason: "player_not_in_staging_write_allowlist",
+      skippedReason: allowlistStatus.progressionWriteScope === "verified"
+        ? "verified_player_missing"
+        : "player_not_in_staging_write_allowlist",
       plan
     };
   }
@@ -435,8 +454,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       };
     }
 
-    const withXp = setValueAtPath(saveData, ["playerProgress", "combatXp"], refreshedPlan.xpAfter);
-    const updatedSaveData = setValueAtPath(withXp, ["credits"], refreshedPlan.creditsAfter);
+    const updatedSaveData = setValueAtPath(saveData, ["playerProgress", "combatXp"], refreshedPlan.xpAfter);
     const patchResult = await patchPlayerSaveData(supabaseUrl, plan.playerId, updatedSaveData, config, fetchImpl);
 
     if (!patchResult.ok) {
@@ -470,7 +488,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       xpAfter: refreshedPlan.xpAfter,
       creditsBefore: refreshedPlan.creditsBefore,
       creditsAfter: refreshedPlan.creditsAfter,
-      appliedFields: ["xp", "credits"],
+      appliedFields: ["xp"],
       plan: refreshedPlan
     };
   } catch (_err) {
@@ -493,5 +511,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
 export const PlayerSaveWriteService = Object.freeze({
   buildPlayerSavePatchPlan,
   applyPlayerSavePatchPlan,
+  getProgressionWriteScope,
+  isProgressionWriteEnabled,
   getStagingProgressionWriteAllowlist
 });

@@ -15,6 +15,7 @@
   const spaceLayerId = "lupenMultiplayerSpaceGhostLayer";
   const spaceBotLayerId = "lupenMultiplayerSpaceBotLayer";
   const spaceShotLayerId = "lupenMultiplayerSpaceShotLayer";
+  const statusChipId = "lupenMultiplayerStatusChip";
   const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
   const stagingCombatPanelId = "lupenMultiplayerStagingCombatPanel";
   const styleId = "lupenMultiplayerOverlayStyles";
@@ -49,6 +50,13 @@
     "cobra seeker": shipImageById.cobraSeeker,
     "cobra moth": shipImageById.cobraMoth
   };
+  const botImageByType = {
+    "erebus drone": "assets/bots/erebus-attacker.png",
+    "erebus attacker": "assets/bots/erebus-attacker.png",
+    "erebus hunter": "assets/bots/erebus-hunter.png",
+    "erebus destroyer": "assets/bots/erebus-destroyer.png",
+    "erebus behemoth": "assets/bots/erebus-behemoth.png"
+  };
 
   function getClient() {
     return global.LupenMultiplayerClient || null;
@@ -61,6 +69,14 @@
 
   function isStagingMode(status = getClient()?.getStatus?.()) {
     return status?.enabledReason === "staging_enabled";
+  }
+
+  function isMpDebugEnabled() {
+    try {
+      return new URLSearchParams(global.location?.search || "").get("debug") === "mp";
+    } catch (_err) {
+      return false;
+    }
   }
 
   function ensureStyles() {
@@ -95,18 +111,18 @@
 
       #${spaceShotLayerId} .lupen-mp-shot-beam {
         position: absolute;
-        height: 3px;
+        height: 4px;
         transform-origin: 0 50%;
         border-radius: 999px;
-        background: linear-gradient(90deg, rgba(117, 242, 255, 0.08), rgba(131, 243, 255, 0.92), rgba(255, 239, 180, 0.86));
-        box-shadow: 0 0 12px rgba(110, 229, 255, 0.76), 0 0 18px rgba(255, 126, 65, 0.34);
-        animation: lupen-mp-shot-beam 0.52s ease-out forwards;
+        background: linear-gradient(90deg, rgba(117, 242, 255, 0), rgba(131, 243, 255, 0.96) 18%, rgba(255, 239, 180, 0.94) 62%, rgba(255, 126, 65, 0));
+        box-shadow: 0 0 14px rgba(110, 229, 255, 0.78), 0 0 22px rgba(255, 126, 65, 0.4);
+        animation: lupen-mp-shot-beam 0.42s ease-out forwards;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-hit {
         position: absolute;
-        width: 26px;
-        height: 26px;
+        width: 30px;
+        height: 30px;
         transform: translate(-50%, -50%);
         border: 2px solid rgba(255, 229, 156, 0.88);
         border-radius: 50%;
@@ -117,14 +133,13 @@
 
       #${stagingCombatPanelId} {
         position: absolute;
-        left: 50%;
-        bottom: 172px;
+        right: 20px;
+        bottom: 156px;
         z-index: 35;
-        width: min(360px, calc(100vw - 32px));
-        transform: translateX(-50%);
+        width: min(338px, calc(100vw - 32px));
         border: 1px solid rgba(255, 193, 104, 0.46);
         border-radius: 6px;
-        background: linear-gradient(180deg, rgba(23, 12, 8, 0.92), rgba(8, 12, 20, 0.9));
+        background: linear-gradient(180deg, rgba(22, 15, 10, 0.9), rgba(8, 12, 20, 0.88));
         box-shadow: 0 0 18px rgba(255, 122, 48, 0.18), inset 0 0 20px rgba(255, 174, 86, 0.06);
         color: #ffe5c0;
         font-family: Arial, sans-serif;
@@ -229,7 +244,7 @@
         justify-items: center;
         gap: 3px;
         transform: translate(-50%, -50%);
-        opacity: 0.86;
+        opacity: 0.9;
         pointer-events: none;
         filter: drop-shadow(0 0 13px rgba(93, 232, 255, 0.62));
       }
@@ -244,8 +259,8 @@
       }
 
       .lupen-mp-space-ghost-ship.has-image {
-        width: 54px;
-        height: 54px;
+        width: 68px;
+        height: 68px;
         clip-path: none;
         background: radial-gradient(circle, rgba(108, 235, 255, 0.2), rgba(8, 32, 54, 0.05) 64%);
         border: 0;
@@ -255,7 +270,7 @@
         width: 100%;
         height: 100%;
         object-fit: contain;
-        opacity: 0.82;
+        opacity: 0.9;
         filter: drop-shadow(0 0 12px rgba(91, 224, 255, 0.86));
       }
 
@@ -291,13 +306,13 @@
       }
 
       .lupen-mp-space-ghost-label {
-        padding: 2px 6px;
+        padding: 2px 7px;
         border: 1px solid rgba(127, 223, 255, 0.42);
         border-radius: 4px;
         background: rgba(2, 10, 18, 0.72);
-        color: #c8fbff;
+        color: #dffcff;
         font: 700 10px/1.15 Arial, sans-serif;
-        text-transform: uppercase;
+        text-transform: none;
         white-space: nowrap;
       }
 
@@ -315,15 +330,37 @@
         justify-items: center;
         gap: 3px;
         transform: translate(-50%, -50%);
-        opacity: 0.66;
+        opacity: 0.86;
         pointer-events: auto;
         cursor: crosshair;
         filter: drop-shadow(0 0 8px rgba(255, 128, 62, 0.42));
       }
 
+      .lupen-mp-space-bot::after {
+        content: "";
+        position: absolute;
+        inset: -8px -11px 18px;
+        opacity: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(#7fe7ff, #7fe7ff) left top / 18px 2px no-repeat,
+          linear-gradient(#7fe7ff, #7fe7ff) left top / 2px 18px no-repeat,
+          linear-gradient(#7fe7ff, #7fe7ff) right top / 18px 2px no-repeat,
+          linear-gradient(#7fe7ff, #7fe7ff) right top / 2px 18px no-repeat,
+          linear-gradient(#7fe7ff, #7fe7ff) left bottom / 18px 2px no-repeat,
+          linear-gradient(#7fe7ff, #7fe7ff) left bottom / 2px 18px no-repeat,
+          linear-gradient(#7fe7ff, #7fe7ff) right bottom / 18px 2px no-repeat,
+          linear-gradient(#7fe7ff, #7fe7ff) right bottom / 2px 18px no-repeat;
+        filter: drop-shadow(0 0 8px rgba(91, 213, 255, 0.56));
+      }
+
       .lupen-mp-space-bot.is-locked {
-        opacity: 0.88;
-        filter: drop-shadow(0 0 13px rgba(255, 198, 102, 0.7));
+        opacity: 0.95;
+        filter: drop-shadow(0 0 16px rgba(255, 198, 102, 0.78));
+      }
+
+      .lupen-mp-space-bot.is-locked::after {
+        opacity: 1;
       }
 
       .lupen-mp-space-bot.is-disabled {
@@ -341,24 +378,42 @@
 
       .lupen-mp-space-bot-ship {
         position: relative;
-        width: 24px;
-        height: 32px;
-        clip-path: polygon(50% 0%, 88% 48%, 68% 48%, 72% 88%, 50% 72%, 28% 88%, 32% 48%, 12% 48%);
-        background: linear-gradient(180deg, rgba(255, 184, 92, 0.76), rgba(255, 74, 58, 0.4));
-        border: 1px solid rgba(255, 224, 180, 0.58);
+        width: 76px;
+        height: 76px;
+        display: grid;
+        place-items: center;
       }
 
       .lupen-mp-space-bot-ship::after {
-        content: "";
+        content: none;
+      }
+
+      .lupen-mp-space-bot-ship img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+        filter:
+          drop-shadow(0 0 14px rgba(255, 110, 90, 0.42))
+          drop-shadow(0 0 24px rgba(80, 210, 235, 0.28));
+      }
+
+      .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-ship img {
+        filter:
+          drop-shadow(0 0 5px rgba(127, 223, 255, 0.55))
+          drop-shadow(0 0 10px rgba(255, 110, 90, 0.2));
+      }
+
+      .lupen-mp-space-bot-ship-fallback {
         position: absolute;
         left: 50%;
-        bottom: 4px;
-        width: 10px;
-        height: 8px;
-        transform: translateX(-50%);
-        border-radius: 50%;
-        background: rgba(255, 93, 52, 0.72);
-        box-shadow: 0 0 12px rgba(255, 93, 52, 0.8);
+        top: 50%;
+        width: 34px;
+        height: 44px;
+        transform: translate(-50%, -50%);
+        clip-path: polygon(50% 0%, 88% 48%, 68% 48%, 72% 88%, 50% 72%, 28% 88%, 32% 48%, 12% 48%);
+        background: linear-gradient(180deg, rgba(255, 184, 92, 0.76), rgba(255, 74, 58, 0.4));
+        border: 1px solid rgba(255, 224, 180, 0.58);
       }
 
       .lupen-mp-space-bot-label {
@@ -367,7 +422,7 @@
         border-radius: 4px;
         background: rgba(18, 8, 2, 0.72);
         color: #ffd9b0;
-        font: 700 9px/1.15 Arial, sans-serif;
+        font: 800 9px/1.15 Arial, sans-serif;
         text-transform: uppercase;
         white-space: nowrap;
       }
@@ -394,6 +449,77 @@
         font: 900 13px/1 Arial, sans-serif;
         text-shadow: 0 0 8px rgba(255, 93, 52, 0.92), 0 1px 2px rgba(10, 2, 0, 0.95);
         animation: lupen-mp-damage-float 0.78s ease-out forwards;
+      }
+
+      .lupen-mp-space-bot-bars {
+        width: 74px;
+        display: grid;
+        gap: 2px;
+        margin-top: -5px;
+      }
+
+      .lupen-mp-space-bot-bar {
+        height: 5px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 221, 170, 0.24);
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.42);
+      }
+
+      .lupen-mp-space-bot-bar-fill {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      .lupen-mp-space-bot-bar-fill.shield {
+        background: linear-gradient(90deg, rgba(76, 205, 255, 0.5), rgba(159, 246, 255, 0.9));
+      }
+
+      .lupen-mp-space-bot-bar-fill.hull {
+        background: linear-gradient(90deg, rgba(255, 86, 65, 0.56), rgba(255, 186, 74, 0.88));
+      }
+
+      #${statusChipId} {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 78;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        max-width: min(260px, calc(100vw - 24px));
+        padding: 6px 9px;
+        border: 1px solid rgba(127, 223, 255, 0.3);
+        border-radius: 999px;
+        background: rgba(3, 10, 18, 0.72);
+        color: #d8fbff;
+        box-shadow: 0 0 14px rgba(0, 150, 220, 0.16);
+        font: 800 10px/1 Arial, sans-serif;
+        pointer-events: none;
+        text-transform: uppercase;
+      }
+
+      #${statusChipId} i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #ff8f64;
+        box-shadow: 0 0 8px rgba(255, 117, 74, 0.72);
+      }
+
+      #${statusChipId}.is-connected i {
+        background: #75f2ff;
+        box-shadow: 0 0 8px rgba(117, 242, 255, 0.72);
+      }
+
+      #${statusChipId} em {
+        max-width: 86px;
+        overflow: hidden;
+        color: rgba(216, 251, 255, 0.72);
+        font-style: normal;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       @keyframes lupen-mp-staging-hit {
@@ -576,6 +702,10 @@
     global.document?.getElementById(diagnosticsPanelId)?.remove();
   }
 
+  function removeStatusChip() {
+    global.document?.getElementById(statusChipId)?.remove();
+  }
+
   function removeStagingCombatPanel() {
     global.document?.getElementById(stagingCombatPanelId)?.remove();
   }
@@ -584,6 +714,7 @@
     removeSectorLayer();
     removeSpaceLayer();
     removeDiagnosticsPanel();
+    removeStatusChip();
     removeStagingCombatPanel();
   }
 
@@ -733,6 +864,16 @@
 
   function getBotLabel(bot) {
     return String(bot.name || bot.type || "DEV BOT").trim().slice(0, 18) || "DEV BOT";
+  }
+
+  function getBotImageSrc(bot) {
+    const explicit = String(bot?.image || bot?.imageSrc || bot?.imagePath || "").trim().replace(/\\/g, "/");
+    if (explicit && /^assets\/bots\/[a-z0-9-]+\.png$/i.test(explicit) && !explicit.includes("..") && !explicit.includes("//")) {
+      return explicit;
+    }
+
+    const typeKey = normalizeShipLookupKey(bot?.type || bot?.name || "");
+    return botImageByType[typeKey] || "assets/bots/erebus-attacker.png";
   }
 
   function getBotInspectionLabel(bot) {
@@ -1142,6 +1283,17 @@
 
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-bot-ship";
+      const image = global.document.createElement("img");
+      image.src = getBotImageSrc(bot);
+      image.alt = "";
+      image.onerror = () => {
+        image.remove();
+        if (ship.querySelector(".lupen-mp-space-bot-ship-fallback")) return;
+        const fallback = global.document.createElement("span");
+        fallback.className = "lupen-mp-space-bot-ship-fallback";
+        ship.appendChild(fallback);
+      };
+      ship.appendChild(image);
       marker.appendChild(ship);
 
       const label = global.document.createElement("div");
@@ -1153,6 +1305,8 @@
       note.className = "lupen-mp-space-bot-note";
       note.textContent = bot.disabled ? "DISABLED" : getBotModeLabel();
       marker.appendChild(note);
+
+      marker.appendChild(createCompactHealthBars(bot));
 
       const damageAmount = getRecentDamageAmount(bot);
       if (damageAmount > 0) {
@@ -1485,6 +1639,31 @@
     });
   }
 
+  function renderStatusChip(status) {
+    removeStatusChip();
+    if (!isStagingMode(status) || !status?.enabled) return;
+
+    ensureStyles();
+
+    const chip = global.document.createElement("div");
+    chip.id = statusChipId;
+    if (status.isConnected) chip.classList.add("is-connected");
+    chip.setAttribute("aria-hidden", "true");
+
+    const dot = global.document.createElement("i");
+    chip.appendChild(dot);
+
+    const label = global.document.createElement("span");
+    label.textContent = status.isConnected ? "Multiplayer Staging" : status.isConnecting ? "Staging Connecting" : "Staging Offline";
+    chip.appendChild(label);
+
+    const room = global.document.createElement("em");
+    room.textContent = status.roomName || "";
+    chip.appendChild(room);
+
+    global.document.body.appendChild(chip);
+  }
+
   function addDiagnosticsActions(panel, status, selectedBot) {
     if (!canShowStagingTestFire(status, selectedBot)) return;
 
@@ -1534,6 +1713,23 @@
     row.appendChild(value);
 
     return row;
+  }
+
+  function createCompactHealthBars(entity) {
+    const bars = global.document.createElement("div");
+    bars.className = "lupen-mp-space-bot-bars";
+
+    [["shield", entity.shield, entity.shieldMax], ["hull", entity.hull, entity.hullMax]].forEach(([type, current, max]) => {
+      const track = global.document.createElement("span");
+      track.className = "lupen-mp-space-bot-bar";
+      const fill = global.document.createElement("i");
+      fill.className = `lupen-mp-space-bot-bar-fill ${type}`;
+      fill.style.width = `${getPercent(current, max)}%`;
+      track.appendChild(fill);
+      bars.appendChild(track);
+    });
+
+    return bars;
   }
 
   function renderStagingCombatPanel(status, selectedBot) {
@@ -1656,6 +1852,7 @@
   function renderDiagnostics(players, bots) {
     removeDiagnosticsPanel();
     if (!isEnabled()) return;
+    if (!isMpDebugEnabled()) return;
 
     ensureStyles();
 
@@ -1764,6 +1961,7 @@
     const bots = getClient()?.getBots?.() || [];
     const status = getClient()?.getStatus?.() || {};
     const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
+    renderStatusChip(status);
     renderSectorGhosts(players);
     renderSectorBots(bots);
     renderSpaceGhosts(players);

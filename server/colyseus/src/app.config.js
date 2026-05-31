@@ -12,6 +12,10 @@ import {
   checkProgressionShadowConnectivity,
   isProgressionShadowWriteEnabled
 } from "./services/progressionShadowService.js";
+import {
+  getProgressionWriteScope,
+  isProgressionWriteEnabled
+} from "./services/playerSaveWriteService.js";
 
 export const ROOM_NAME = "lupen_sector";
 export const LEGACY_ROOM_NAME = "lupen_test";
@@ -89,7 +93,11 @@ export function getHealthPayload(
     environment: process.env.NODE_ENV || "development",
     port,
     rewardLedger,
-    progressionShadow
+    progressionShadow,
+    progressionWrites: {
+      progressionWritesEnabled: isProgressionWriteEnabled(),
+      progressionWriteScope: getProgressionWriteScope()
+    }
   };
 }
 
