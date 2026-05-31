@@ -287,6 +287,18 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(disabledLedgerResult?.applied === false, "Disabled ledger adapter applied rewards.");
   assert(disabledLedgerResult?.skippedReason === "reward_writes_disabled", `Unexpected disabled ledger reason: ${disabledLedgerResult?.skippedReason}`);
 
+  const missingEnvLedgerResult = await writeRewardLedgerEntry(ledgerEntry, {
+    env: {
+      ENABLE_STAGING_REWARD_WRITES: "true"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run without Supabase config");
+    }
+  });
+  assert(missingEnvLedgerResult?.dryRun === true, "Missing-env ledger result was not dry-run.");
+  assert(missingEnvLedgerResult?.applied === false, "Missing-env ledger result applied rewards.");
+  assert(missingEnvLedgerResult?.skippedReason === "supabase_config_missing", `Unexpected missing-env ledger reason: ${missingEnvLedgerResult?.skippedReason}`);
+
   const blockedPlan = buildRewardWritePlan({
     preview: {
       botId: "dev-bot-erebus-1",
@@ -309,6 +321,53 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(blockedPlan.eligible === false, "Unverified dry-run plan was eligible.");
   assert(blockedPlan.blockedReason === "identity_unverified", `Unexpected blocked reason: ${blockedPlan.blockedReason}`);
   assert(blockedPlan.dryRun === true && blockedPlan.applied === false, "Blocked plan was not dry-run/unapplied.");
+  const blockedLedgerEntry = buildRewardLedgerEntry(blockedPlan, {
+    roomName: ROOM_NAME,
+    sourceEventId: "blocked-reward-preview-stub"
+  });
+  const blockedLedgerResult = await writeRewardLedgerEntry(blockedLedgerEntry, {
+    env: {
+      ENABLE_STAGING_REWARD_WRITES: "true",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run for an ineligible plan");
+    }
+  });
+  assert(blockedLedgerResult?.dryRun === true, "Blocked ledger result was not dry-run.");
+  assert(blockedLedgerResult?.applied === false, "Blocked ledger result applied rewards.");
+  assert(blockedLedgerResult?.skippedReason === "reward_plan_not_eligible", `Unexpected blocked ledger reason: ${blockedLedgerResult?.skippedReason}`);
+
+  let writeUrl = "";
+  let writeOptions = null;
+  const enabledLedgerResult = await writeRewardLedgerEntry(ledgerEntry, {
+    env: {
+      ENABLE_STAGING_REWARD_WRITES: "true",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      writeUrl = url;
+      writeOptions = options;
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return [{ id: "ledger-row-1" }];
+        }
+      };
+    }
+  });
+  assert(enabledLedgerResult?.ok === true, "Enabled ledger adapter mock did not succeed.");
+  assert(enabledLedgerResult?.ledgerId === "ledger-row-1", "Enabled ledger adapter did not return inserted ledger id.");
+  assert(enabledLedgerResult?.applied === false && enabledLedgerResult?.dryRun === true, "Enabled ledger adapter applied progression.");
+  assert(writeUrl === "https://example.supabase.co/rest/v1/multiplayer_reward_ledger", `Unexpected ledger write URL: ${writeUrl}`);
+  assert(writeOptions?.method === "POST", "Ledger write did not use POST.");
+  assert(writeOptions?.headers?.authorization === "Bearer stub-service-key", "Ledger write did not use service role bearer auth.");
+  assert(!writeUrl.includes("player_saves"), "Ledger write targeted player_saves.");
+  const writeBody = JSON.parse(writeOptions?.body || "{}");
+  assert(writeBody.applied === false && writeBody.dry_run === true, "Ledger write body was not dry-run/unapplied.");
   console.log("identity verification and reward dry-run helper checks passed");
 }
 

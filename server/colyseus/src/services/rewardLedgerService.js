@@ -23,6 +23,10 @@ function getSupabaseConfig(env = process.env) {
   };
 }
 
+function getInsertUrl(url) {
+  return `${url.replace(/\/$/, "")}/rest/v1/multiplayer_reward_ledger`;
+}
+
 export function buildRewardLedgerEntry(rewardWritePlan = {}, context = {}) {
   const loot = Array.isArray(rewardWritePlan.intendedLoot)
     ? rewardWritePlan.intendedLoot
@@ -59,6 +63,7 @@ export function buildRewardLedgerEntry(rewardWritePlan = {}, context = {}) {
 
 export async function writeRewardLedgerEntry(entry = {}, options = {}) {
   const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
 
   if (!isRewardWriteEnabled(env)) {
     return {
@@ -91,16 +96,65 @@ export async function writeRewardLedgerEntry(entry = {}, options = {}) {
     };
   }
 
-  // This branch is intentionally still a dry-run placeholder. Future work can
-  // replace this with a real insert into multiplayer_reward_ledger after the
-  // SQL draft is reviewed/applied and idempotency rules are finalised.
-  return {
-    ok: false,
+  if (typeof fetchImpl !== "function") {
+    return {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      skippedReason: "fetch_unavailable",
+      entry
+    };
+  }
+
+  const ledgerEntry = {
+    ...entry,
     applied: false,
-    dryRun: true,
-    skippedReason: "reward_ledger_write_not_implemented",
-    entry
+    dry_run: true
   };
+
+  try {
+    const response = await fetchImpl(getInsertUrl(config.url), {
+      method: "POST",
+      headers: {
+        apikey: config.serviceRoleKey,
+        authorization: `Bearer ${config.serviceRoleKey}`,
+        "content-type": "application/json",
+        prefer: "return=representation"
+      },
+      body: JSON.stringify(ledgerEntry)
+    });
+
+    if (!response?.ok) {
+      return {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        skippedReason: "supabase_ledger_write_failed",
+        status: response?.status || 0,
+        entry: ledgerEntry
+      };
+    }
+
+    const rows = typeof response.json === "function" ? await response.json() : [];
+    const inserted = Array.isArray(rows) ? rows[0] : rows;
+
+    return {
+      ok: true,
+      applied: false,
+      dryRun: true,
+      skippedReason: "",
+      ledgerId: getStringValue(inserted?.id),
+      entry: ledgerEntry
+    };
+  } catch (_err) {
+    return {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      skippedReason: "supabase_ledger_write_failed",
+      entry: ledgerEntry
+    };
+  }
 }
 
 export const RewardLedgerService = Object.freeze({

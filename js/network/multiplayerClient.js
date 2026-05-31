@@ -618,6 +618,7 @@
       applied: result.applied === true,
       dryRun: result.dryRun !== false,
       skippedReason: String(result.skippedReason || ""),
+      ledgerId: String(result.ledgerId || ""),
       entry: result.entry && typeof result.entry === "object"
         ? {
           playerId: String(result.entry.player_id || ""),

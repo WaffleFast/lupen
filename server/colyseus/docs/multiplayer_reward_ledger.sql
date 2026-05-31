@@ -46,10 +46,18 @@ comment on column public.multiplayer_reward_ledger.dry_run is
 comment on column public.multiplayer_reward_ledger.metadata is
   'Extra audited reward context such as session id, contribution list, room version, and dry-run diagnostics.';
 
--- Recommended future indexes, if/when this draft is applied:
--- create index if not exists multiplayer_reward_ledger_player_id_idx
---   on public.multiplayer_reward_ledger (player_id, created_at desc);
---
--- create unique index if not exists multiplayer_reward_ledger_source_event_id_idx
---   on public.multiplayer_reward_ledger (source_event_id)
---   where source_event_id is not null and applied = true;
+create index if not exists multiplayer_reward_ledger_player_id_idx
+  on public.multiplayer_reward_ledger (player_id, created_at desc);
+
+create index if not exists multiplayer_reward_ledger_room_bot_idx
+  on public.multiplayer_reward_ledger (room_name, bot_id, created_at desc);
+
+create index if not exists multiplayer_reward_ledger_dry_run_idx
+  on public.multiplayer_reward_ledger (dry_run, applied, created_at desc);
+
+-- Future duplicate protection for applied rewards. Dry-run staging rows may be
+-- repeated while testing, but applied rows should become idempotent by source
+-- event when real reward writes are enabled.
+create unique index if not exists multiplayer_reward_ledger_source_event_applied_uidx
+  on public.multiplayer_reward_ledger (source_event_id)
+  where source_event_id is not null and applied = true;
