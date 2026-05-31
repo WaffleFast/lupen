@@ -24,6 +24,9 @@ import {
   buildStagingTradePreview,
   getStagingTradeOffers
 } from "../config/stagingTradeConfig.js";
+import {
+  fetchPlayerTradeValidationState
+} from "../services/playerSaveReadService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -717,12 +720,18 @@ export class LupenSectorRoom extends Room {
       });
     });
 
-    this.onMessage("stagingTrade:preview", (client, message = {}) => {
-      this.touchPlayer(client.sessionId);
+    this.onMessage("stagingTrade:preview", async (client, message = {}) => {
+      const player = this.touchPlayer(client.sessionId);
+      const trustedState = await fetchPlayerTradeValidationState({
+        authStatus: player?.authStatus || "guest",
+        trustedPlayerId: player?.trustedPlayerId || "",
+        playerId: player?.playerId || ""
+      });
       const preview = buildStagingTradePreview({
         offerId: message?.offerId,
         quantity: message?.quantity,
-        playerSnapshot: message?.playerSnapshot
+        playerSnapshot: message?.playerSnapshot,
+        trustedState
       });
       client.send("stagingTrade:previewResult", {
         ...preview,

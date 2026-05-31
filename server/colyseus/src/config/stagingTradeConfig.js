@@ -1,7 +1,8 @@
 /* Static staging trade preview config.
    This is intentionally deterministic server-side data for multiplayer trade
-   dry-runs only. It does not read Supabase and never writes credits, cargo,
-   inventory, player_saves, bounties, or progression. */
+   dry-runs only. It never writes credits, cargo, inventory, player_saves,
+   bounties, or progression. Trusted save reads may be used only to validate
+   dry-run feasibility for verified staging players. */
 
 export const STAGING_TRADE_OFFERS = Object.freeze([
   Object.freeze({
@@ -61,57 +62,71 @@ export function getStagingTradeOfferById(offerId = "") {
 }
 
 function getFiniteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
 
+function normalizeTradeNumber(value, max = 999999999) {
+  const number = getFiniteNumber(value);
+  if (number === null) return null;
+  return Math.max(0, Math.min(max, Math.floor(number)));
+}
+
+function getUnknownValidation(reason = "unknown_player_state", readStatus = "") {
+  return {
+    validationMode: "unknown",
+    trustedStateAvailable: false,
+    snapshotUsed: false,
+    stateSources: {
+      credits: "unknown",
+      cargoUsed: "unknown",
+      cargoCapacity: "unknown"
+    },
+    readStatus,
+    blockReason: reason,
+    userReason: "Player state unavailable; showing price preview only.",
+    creditsAvailable: null,
+    cargoUsed: null,
+    cargoCapacity: null,
+    cargoFree: null,
+    maxAffordableQuantity: null,
+    maxCargoQuantity: null,
+    maxValidQuantity: null
+  };
+}
+
 function sanitizePlayerSnapshot(playerSnapshot) {
   if (!playerSnapshot || typeof playerSnapshot !== "object") {
-    return {
-      validationMode: "unknown",
-      blockReason: "unknown_player_state",
-      userReason: "Player state unavailable; showing price preview only.",
-      creditsAvailable: null,
-      cargoUsed: null,
-      cargoCapacity: null,
-      cargoFree: null,
-      maxAffordableQuantity: null,
-      maxCargoQuantity: null,
-      maxValidQuantity: null
-    };
+    return getUnknownValidation();
   }
 
-  const creditsAvailable = getFiniteNumber(playerSnapshot.credits);
-  const cargoUsed = getFiniteNumber(playerSnapshot.cargoUsed);
-  const cargoCapacity = getFiniteNumber(playerSnapshot.cargoCapacity);
+  const creditsAvailable = normalizeTradeNumber(playerSnapshot.credits, 999999999);
+  const cargoUsed = normalizeTradeNumber(playerSnapshot.cargoUsed, 999999);
+  const cargoCapacity = normalizeTradeNumber(playerSnapshot.cargoCapacity, 999999);
 
   if (creditsAvailable === null || cargoUsed === null || cargoCapacity === null) {
-    return {
-      validationMode: "unknown",
-      blockReason: "unknown_player_state",
-      userReason: "Player state unavailable; showing price preview only.",
-      creditsAvailable: null,
-      cargoUsed: null,
-      cargoCapacity: null,
-      cargoFree: null,
-      maxAffordableQuantity: null,
-      maxCargoQuantity: null,
-      maxValidQuantity: null
-    };
+    return getUnknownValidation();
   }
 
-  const safeCredits = Math.max(0, Math.min(999999999, Math.floor(creditsAvailable)));
-  const safeCargoCapacity = Math.max(0, Math.min(999999, Math.floor(cargoCapacity)));
-  const safeCargoUsed = Math.max(0, Math.min(safeCargoCapacity, Math.floor(cargoUsed)));
-  const cargoFree = Math.max(0, safeCargoCapacity - safeCargoUsed);
+  const safeCargoUsed = Math.max(0, Math.min(cargoCapacity, cargoUsed));
+  const cargoFree = Math.max(0, cargoCapacity - safeCargoUsed);
 
   return {
     validationMode: "snapshot",
+    trustedStateAvailable: false,
+    snapshotUsed: true,
+    stateSources: {
+      credits: "snapshot",
+      cargoUsed: "snapshot",
+      cargoCapacity: "snapshot"
+    },
+    readStatus: "",
     blockReason: null,
     userReason: "Dry run valid.",
-    creditsAvailable: safeCredits,
+    creditsAvailable,
     cargoUsed: safeCargoUsed,
-    cargoCapacity: safeCargoCapacity,
+    cargoCapacity,
     cargoFree,
     maxAffordableQuantity: null,
     maxCargoQuantity: cargoFree,
@@ -119,19 +134,89 @@ function sanitizePlayerSnapshot(playerSnapshot) {
   };
 }
 
-function getTradeValidation({ offer, quantity, playerSnapshot }) {
+function sanitizeTrustedState(trustedState) {
+  const state = trustedState?.validationState || {};
+  const creditsAvailable = normalizeTradeNumber(state.credits, 999999999);
+  const cargoUsed = normalizeTradeNumber(state.cargoUsed, 999999);
+  const cargoCapacity = normalizeTradeNumber(state.cargoCapacity, 999999);
+
+  if (!trustedState?.available || creditsAvailable === null || cargoUsed === null) {
+    return null;
+  }
+
+  return {
+    validationMode: "trusted_save",
+    trustedStateAvailable: true,
+    snapshotUsed: false,
+    stateSources: {
+      credits: "trusted_save",
+      cargoUsed: "trusted_save",
+      cargoCapacity: cargoCapacity === null ? "unknown" : "trusted_save",
+      ...(trustedState.stateSources || {})
+    },
+    readStatus: trustedState.reason || "ok",
+    blockReason: null,
+    userReason: "Dry run valid.",
+    creditsAvailable,
+    cargoUsed,
+    cargoCapacity,
+    cargoFree: cargoCapacity === null ? null : Math.max(0, cargoCapacity - Math.min(cargoUsed, cargoCapacity)),
+    maxAffordableQuantity: null,
+    maxCargoQuantity: cargoCapacity === null ? null : Math.max(0, cargoCapacity - Math.min(cargoUsed, cargoCapacity)),
+    maxValidQuantity: null
+  };
+}
+
+function getValidationSource({ playerSnapshot, trustedState }) {
   const snapshot = sanitizePlayerSnapshot(playerSnapshot);
-  if (snapshot.validationMode === "unknown") {
+  const trusted = sanitizeTrustedState(trustedState);
+
+  if (trusted) {
+    const snapshotCapacity = snapshot.validationMode === "snapshot" ? snapshot.cargoCapacity : null;
+    const cargoCapacity = trusted.cargoCapacity === null ? snapshotCapacity : trusted.cargoCapacity;
+    if (cargoCapacity !== null) {
+      const cargoUsed = Math.max(0, Math.min(cargoCapacity, trusted.cargoUsed));
+      return {
+        ...trusted,
+        snapshotUsed: trusted.cargoCapacity === null && snapshot.validationMode === "snapshot",
+        stateSources: {
+          ...trusted.stateSources,
+          cargoCapacity: trusted.cargoCapacity === null ? "snapshot" : "trusted_save"
+        },
+        cargoUsed,
+        cargoCapacity,
+        cargoFree: Math.max(0, cargoCapacity - cargoUsed),
+        maxCargoQuantity: Math.max(0, cargoCapacity - cargoUsed)
+      };
+    }
+  }
+
+  if (snapshot.validationMode === "snapshot") {
     return {
       ...snapshot,
+      readStatus: trustedState?.reason || ""
+    };
+  }
+
+  return {
+    ...getUnknownValidation("unknown_player_state", trustedState?.reason || ""),
+    trustedStateAvailable: trustedState?.available === true
+  };
+}
+
+function getTradeValidation({ offer, quantity, playerSnapshot, trustedState }) {
+  const validation = getValidationSource({ playerSnapshot, trustedState });
+  if (validation.validationMode === "unknown") {
+    return {
+      ...validation,
       wouldPass: false
     };
   }
 
   const maxAffordableQuantity = offer.buyPrice > 0
-    ? Math.floor(snapshot.creditsAvailable / offer.buyPrice)
+    ? Math.floor(validation.creditsAvailable / offer.buyPrice)
     : 0;
-  const maxCargoQuantity = snapshot.cargoFree;
+  const maxCargoQuantity = validation.cargoFree;
   const maxValidQuantity = Math.max(0, Math.min(maxAffordableQuantity, maxCargoQuantity, offer.maxQuantity));
   const insufficientCredits = quantity > maxAffordableQuantity;
   const insufficientCargo = quantity > maxCargoQuantity;
@@ -147,7 +232,7 @@ function getTradeValidation({ offer, quantity, playerSnapshot }) {
       : "Dry run valid.";
 
   return {
-    ...snapshot,
+    ...validation,
     wouldPass: blockReason === null,
     blockReason,
     userReason,
@@ -157,7 +242,23 @@ function getTradeValidation({ offer, quantity, playerSnapshot }) {
   };
 }
 
-export function buildStagingTradePreview({ offerId = "", quantity = 1, playerSnapshot = null } = {}) {
+function getRejectedValidation({ playerSnapshot, trustedState }) {
+  const validation = getValidationSource({ playerSnapshot, trustedState });
+  return {
+    validationMode: validation.validationMode,
+    trustedStateAvailable: validation.trustedStateAvailable,
+    snapshotUsed: validation.snapshotUsed,
+    stateSources: validation.stateSources,
+    readStatus: validation.readStatus
+  };
+}
+
+export function buildStagingTradePreview({
+  offerId = "",
+  quantity = 1,
+  playerSnapshot = null,
+  trustedState = null
+} = {}) {
   const offer = getStagingTradeOfferById(offerId);
   const requestedQuantity = Number(quantity);
 
@@ -171,6 +272,10 @@ export function buildStagingTradePreview({ offerId = "", quantity = 1, playerSna
       debugReason: "unknown_trade_offer",
       wouldPass: false,
       validationMode: "unknown",
+      trustedStateAvailable: false,
+      snapshotUsed: false,
+      stateSources: {},
+      readStatus: "",
       blockReason: "unknown_trade_offer",
       userReason: "Unknown staging trade offer.",
       creditsWritten: false,
@@ -188,7 +293,7 @@ export function buildStagingTradePreview({ offerId = "", quantity = 1, playerSna
       reason: "invalid_trade_quantity",
       debugReason: "quantity_must_be_positive_integer",
       wouldPass: false,
-      validationMode: playerSnapshot && typeof playerSnapshot === "object" ? "snapshot" : "unknown",
+      ...getRejectedValidation({ playerSnapshot, trustedState }),
       blockReason: "invalid_quantity",
       userReason: "Invalid trade quantity.",
       creditsWritten: false,
@@ -207,7 +312,7 @@ export function buildStagingTradePreview({ offerId = "", quantity = 1, playerSna
       debugReason: "quantity_exceeds_max_quantity",
       maxQuantity: offer.maxQuantity,
       wouldPass: false,
-      validationMode: playerSnapshot && typeof playerSnapshot === "object" ? "snapshot" : "unknown",
+      ...getRejectedValidation({ playerSnapshot, trustedState }),
       blockReason: "invalid_quantity",
       userReason: "Invalid trade quantity.",
       creditsWritten: false,
@@ -222,7 +327,8 @@ export function buildStagingTradePreview({ offerId = "", quantity = 1, playerSna
   const validation = getTradeValidation({
     offer,
     quantity: requestedQuantity,
-    playerSnapshot
+    playerSnapshot,
+    trustedState
   });
 
   return {
@@ -242,6 +348,10 @@ export function buildStagingTradePreview({ offerId = "", quantity = 1, playerSna
     projectedProfit,
     wouldPass: validation.wouldPass,
     validationMode: validation.validationMode,
+    trustedStateAvailable: validation.trustedStateAvailable,
+    snapshotUsed: validation.snapshotUsed,
+    stateSources: validation.stateSources,
+    readStatus: validation.readStatus,
     blockReason: validation.blockReason,
     userReason: validation.userReason,
     creditsAvailable: validation.creditsAvailable,
@@ -251,10 +361,10 @@ export function buildStagingTradePreview({ offerId = "", quantity = 1, playerSna
     maxAffordableQuantity: validation.maxAffordableQuantity,
     maxCargoQuantity: validation.maxCargoQuantity,
     maxValidQuantity: validation.maxValidQuantity,
-    enoughCredits: validation.validationMode === "snapshot"
+    enoughCredits: validation.validationMode !== "unknown"
       ? requestedQuantity <= validation.maxAffordableQuantity
       : null,
-    enoughCargo: validation.validationMode === "snapshot"
+    enoughCargo: validation.validationMode !== "unknown"
       ? requestedQuantity <= validation.maxCargoQuantity
       : null,
     creditsWritten: false,

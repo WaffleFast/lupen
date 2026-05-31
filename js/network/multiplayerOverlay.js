@@ -2205,6 +2205,22 @@
     return `Blocked: ${result.blockReason || result.reason || "validation failed"}`;
   }
 
+  function getTradeValidationSourceLabel(result) {
+    if (!result) return "";
+    if (result.validationMode === "trusted_save") {
+      return result.snapshotUsed
+        ? "Validated from trusted save + client capacity snapshot"
+        : "Validated from trusted save";
+    }
+    if (result.validationMode === "snapshot") return "Validated from client snapshot";
+    return "Price preview only - player state unavailable";
+  }
+
+  function getTradeStateSourceSummary(result) {
+    const sources = result?.stateSources || {};
+    return `credits ${sources.credits || "unknown"} / cargo ${sources.cargoUsed || "unknown"} / capacity ${sources.cargoCapacity || "unknown"}`;
+  }
+
   function renderStagingTradePanel(status) {
     removeStagingTradePanel();
     if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) return;
@@ -2290,11 +2306,12 @@
           `${result.resourceName} x${formatTradeNumber(result.quantity)} / ${result.buyNode} -> ${result.sellNode}`,
           `Cost CR ${formatTradeNumber(result.totalCost)} / Revenue CR ${formatTradeNumber(result.projectedRevenue)}`,
           `Projected profit CR ${formatTradeNumber(result.projectedProfit)}`,
+          getTradeValidationSourceLabel(result),
           getTradeValidationLabel(result),
-          result.validationMode === "snapshot"
+          result.validationMode !== "unknown"
             ? `Credits CR ${formatTradeNumber(result.creditsAvailable)} / Cargo ${formatTradeNumber(result.cargoUsed)} used, ${formatTradeNumber(result.cargoFree)} free`
             : "Credits/cargo unavailable",
-          result.validationMode === "snapshot"
+          result.validationMode !== "unknown"
             ? `Max affordable ${formatTradeNumber(result.maxAffordableQuantity)} / Max cargo ${formatTradeNumber(result.maxCargoQuantity)} / Max valid ${formatTradeNumber(result.maxValidQuantity)}`
             : "Max valid quantity unknown"
         ]
@@ -2662,6 +2679,9 @@
         setDiagnosticsRow(panel, "trade preview", tradePreview.ok
           ? `profit CR ${formatTradeNumber(tradePreview.projectedProfit)} / writes no`
           : `${tradePreview.reason || "blocked"} / writes no`);
+        setDiagnosticsRow(panel, "trade source", `${tradePreview.validationMode || "unknown"} / trusted ${tradePreview.trustedStateAvailable ? "yes" : "no"} / snapshot ${tradePreview.snapshotUsed ? "yes" : "no"}`);
+        setDiagnosticsRow(panel, "trade state", getTradeStateSourceSummary(tradePreview));
+        if (tradePreview.readStatus) setDiagnosticsRow(panel, "trade read", tradePreview.readStatus);
       }
     }
     if (status.lastServerWarning) {

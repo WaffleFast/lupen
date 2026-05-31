@@ -48,7 +48,7 @@ Cargo is stored in global `cargo`, with purchase basis in `cargoCostBasis`. Cred
 
 Multiplayer authority needs: server-side price calculation or signed market snapshots, cargo capacity validation, credit balance validation, idempotent buy/sell operations, and Supabase persistence through a server-owned ledger or transaction path.
 
-Current staging trade prototype: Colyseus exposes static trade offers and a `stagingTrade:preview` dry-run response that calculates cost, revenue, and projected profit server-side. The client may send a minimal, untrusted snapshot of credits, cargo used, and cargo capacity so the server can return dry-run validation fields such as max affordable quantity, max cargo quantity, max valid quantity, and block reason. It intentionally reports `creditsWritten:false`, `cargoWritten:false`, and `saveWritten:false`; it does not touch the real Trade Terminal, cargo hold, credits, `player_saves`, Supabase writes, or economy state.
+Current staging trade prototype: Colyseus exposes static trade offers and a `stagingTrade:preview` dry-run response that calculates cost, revenue, and projected profit server-side. For verified staging players, Colyseus may read `player_saves` with the service role to validate saved credits and cargo used without exposing raw save data or writing anything. Because cargo capacity is currently derived from ship/loadout data in the client, the dry-run can use a sanitized client snapshot for capacity and clearly reports its sources. If trusted save state is unavailable, it falls back to a minimal untrusted snapshot of credits, cargo used, and cargo capacity; if neither is available it returns price preview only. It intentionally reports `creditsWritten:false`, `cargoWritten:false`, and `saveWritten:false`; it does not touch the real Trade Terminal, cargo hold, credits, `player_saves`, Supabase writes, or economy state.
 
 While staging is active, real Trade Terminal buy/sell handlers return before mutating credits, cargo, cargo cost basis, trade totals, or saves. Normal single-player trading remains unchanged outside `?mp=staging`. A later phase should replace these disabled real actions with server-authoritative buy/sell validation and dedicated persistence.
 
@@ -143,7 +143,7 @@ Classification:
 1. Phase 1: Connection, presence, remote ships, staging bots, lock/fire/damage, debug tools.
 2. Phase 2: Combat loop clarity, bot destruction feedback, contribution, XP preview.
 3. Phase 3: Safe XP-only online reward writes.
-4. Phase 4: Server-side resource/trade prototype with credits and cargo still gated or dry-run. Started with static staging trade offers, server-calculated previews, and player-state-aware dry-run validation.
+4. Phase 4: Server-side resource/trade prototype with credits and cargo still gated or dry-run. Started with static staging trade offers, server-calculated previews, player-state-aware dry-run validation, and read-only trusted `player_saves` checks for verified staging players.
 5. Phase 5: Credits write path with strict validation.
 6. Phase 6: Store purchases and ship/equipment ownership.
 7. Phase 7: Inventory/loadout persistence.

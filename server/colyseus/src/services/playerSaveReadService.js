@@ -1,0 +1,208 @@
+/* Read-only player_saves helpers for staging trade dry-runs.
+   This service uses the Supabase service role only on the Colyseus server,
+   never writes player_saves, and returns sanitized trade validation fields
+   instead of raw save snapshots. */
+
+const PLAYER_SAVES_TABLE = "player_saves";
+const CARGO_KEYS = Object.freeze([
+  "Iron",
+  "Copper",
+  "Cobalt",
+  "Titanium",
+  "Crystal Shards",
+  "Xenon Gas",
+  "Iridium",
+  "Platinum",
+  "Uranium",
+  "Dark Matter Residue"
+]);
+
+function getString(value, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
+function getFiniteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function clampInteger(value, min, max) {
+  const number = getFiniteNumber(value);
+  if (number === null) return null;
+  return Math.max(min, Math.min(max, Math.floor(number)));
+}
+
+function getSupabaseConfig(env = process.env) {
+  return {
+    url: getString(env.SUPABASE_URL),
+    serviceRoleKey: getString(env.SUPABASE_SERVICE_ROLE_KEY)
+  };
+}
+
+function getValidSupabaseUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    return parsed.toString().replace(/\/$/, "");
+  } catch (_err) {
+    return null;
+  }
+}
+
+function getPlayerSaveReadUrl(baseUrl, playerId) {
+  const query = new URLSearchParams({
+    select: "save_data,updated_at",
+    user_id: `eq.${playerId}`,
+    limit: "1"
+  });
+  return `${baseUrl}/rest/v1/${PLAYER_SAVES_TABLE}?${query.toString()}`;
+}
+
+function getSaveDataFromRow(row) {
+  const saveData = row?.save_data;
+  return saveData && typeof saveData === "object" && !Array.isArray(saveData)
+    ? saveData
+    : null;
+}
+
+function getCargoUsedFromSave(saveData) {
+  const cargo = saveData?.cargo;
+  if (!cargo || typeof cargo !== "object" || Array.isArray(cargo)) return null;
+
+  return CARGO_KEYS.reduce((total, key) => {
+    const amount = clampInteger(cargo[key], 0, 999999);
+    return total + (amount || 0);
+  }, 0);
+}
+
+function getTrustedCargoCapacityFromSave(saveData) {
+  const candidates = [
+    saveData?.cargoCapacity,
+    saveData?.shipStats?.cargo,
+    saveData?.currentShipStats?.cargo,
+    saveData?.ship?.cargo
+  ];
+
+  for (const candidate of candidates) {
+    const capacity = clampInteger(candidate, 0, 999999);
+    if (capacity !== null) return capacity;
+  }
+
+  return null;
+}
+
+function unavailable(reason, extra = {}) {
+  return {
+    ok: false,
+    available: false,
+    trustedStateAvailable: false,
+    reason,
+    status: null,
+    validationState: null,
+    stateSources: {
+      credits: "unknown",
+      cargoUsed: "unknown",
+      cargoCapacity: "unknown"
+    },
+    ...extra
+  };
+}
+
+export function extractTradeValidationStateFromSave(saveData) {
+  if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) {
+    return unavailable("save_data_missing_or_invalid");
+  }
+
+  const credits = clampInteger(saveData.credits, 0, 999999999);
+  const cargoUsed = getCargoUsedFromSave(saveData);
+  const cargoCapacity = getTrustedCargoCapacityFromSave(saveData);
+
+  if (credits === null || cargoUsed === null) {
+    return unavailable("trade_state_missing_or_invalid");
+  }
+
+  return {
+    ok: true,
+    available: true,
+    trustedStateAvailable: true,
+    reason: "",
+    status: 200,
+    validationState: {
+      credits,
+      cargoUsed,
+      cargoCapacity
+    },
+    stateSources: {
+      credits: "trusted_save",
+      cargoUsed: "trusted_save",
+      cargoCapacity: cargoCapacity === null ? "unknown" : "trusted_save"
+    }
+  };
+}
+
+export async function fetchPlayerTradeValidationState(identity = {}, options = {}) {
+  const playerId = getString(identity.trustedPlayerId || identity.playerId || identity);
+  const authStatus = getString(identity.authStatus, typeof identity === "string" ? "verified" : "guest");
+
+  if (authStatus !== "verified" || !playerId) {
+    return unavailable("verified_identity_required", {
+      playerId: "",
+      status: 0
+    });
+  }
+
+  const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const config = getSupabaseConfig(env);
+  const baseUrl = getValidSupabaseUrl(config.url);
+
+  if (!baseUrl || !config.serviceRoleKey || typeof fetchImpl !== "function") {
+    return unavailable("supabase_config_missing", {
+      playerId,
+      status: 0
+    });
+  }
+
+  try {
+    const response = await fetchImpl(getPlayerSaveReadUrl(baseUrl, playerId), {
+      method: "GET",
+      headers: {
+        apikey: config.serviceRoleKey,
+        Authorization: `Bearer ${config.serviceRoleKey}`
+      }
+    });
+
+    const status = Number(response?.status || 0);
+    if (!response?.ok) {
+      return unavailable("player_save_read_failed", {
+        playerId,
+        status
+      });
+    }
+
+    const rows = await response.json();
+    const row = Array.isArray(rows) ? rows[0] : null;
+    const saveData = getSaveDataFromRow(row);
+    if (!saveData) {
+      return unavailable("save_missing", {
+        ok: true,
+        playerId,
+        status
+      });
+    }
+
+    const extracted = extractTradeValidationStateFromSave(saveData);
+    return {
+      ...extracted,
+      playerId,
+      status,
+      updatedAt: getString(row?.updated_at)
+    };
+  } catch (_err) {
+    return unavailable("player_save_read_failed", {
+      playerId,
+      status: 0
+    });
+  }
+}

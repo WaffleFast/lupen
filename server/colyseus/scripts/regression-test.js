@@ -6,6 +6,9 @@ import {
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
 import {
+  buildStagingTradePreview
+} from "../src/config/stagingTradeConfig.js";
+import {
   buildRewardLedgerEntry,
   checkRewardLedgerConnectivity,
   writeRewardLedgerEntry
@@ -27,6 +30,10 @@ import {
   applyPlayerSavePatchPlan,
   buildPlayerSavePatchPlan
 } from "../src/services/playerSaveWriteService.js";
+import {
+  extractTradeValidationStateFromSave,
+  fetchPlayerTradeValidationState
+} from "../src/services/playerSaveReadService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -257,6 +264,193 @@ async function expectStagingTradePreview(room, sendMessage) {
 
     sendMessage();
   });
+}
+
+async function assertStagingTradeValidationHelpers() {
+  const extracted = extractTradeValidationStateFromSave({
+    credits: 500,
+    cargo: {
+      Iron: 3,
+      "Crystal Shards": 2
+    },
+    cargoCapacity: 20
+  });
+  assert(extracted.available === true, "Trusted trade save state was not extracted.");
+  assert(extracted.validationState.credits === 500, "Trusted trade credits were not extracted.");
+  assert(extracted.validationState.cargoUsed === 5, "Trusted trade cargo used was not summed.");
+  assert(extracted.validationState.cargoCapacity === 20, "Trusted trade cargo capacity was not extracted.");
+  assert(extracted.stateSources.credits === "trusted_save", "Trusted trade credits source was not marked trusted.");
+
+  const malformed = extractTradeValidationStateFromSave({
+    cargo: {
+      Iron: 2
+    }
+  });
+  assert(malformed.available === false, "Malformed trade save state was unexpectedly available.");
+
+  let readMethod = "";
+  let readUrl = "";
+  const fetched = await fetchPlayerTradeValidationState({
+    authStatus: "verified",
+    trustedPlayerId: "verified-player-a"
+  }, {
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      readUrl = url;
+      readMethod = options.method;
+      assert(options.headers?.Authorization === "Bearer stub-service-key", "Trade save read did not use service role bearer auth.");
+      assert(options.headers?.apikey === "stub-service-key", "Trade save read did not use service role apikey.");
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [{
+            updated_at: "2026-06-01T12:00:00.000Z",
+            save_data: {
+              credits: 1000,
+              cargo: {
+                Iron: 4
+              },
+              cargoCapacity: 12
+            }
+          }];
+        }
+      };
+    }
+  });
+  assert(readMethod === "GET", "Trade save preview used a non-read method.");
+  assert(readUrl.includes("/rest/v1/player_saves?"), `Unexpected trade save read URL: ${readUrl}`);
+  assert(fetched.available === true, "Fetched trusted trade state was not available.");
+  assert(fetched.validationState.credits === 1000, "Fetched trusted trade credits were incorrect.");
+  assert(fetched.validationState.cargoUsed === 4, "Fetched trusted trade cargo used was incorrect.");
+
+  const unverified = await fetchPlayerTradeValidationState({
+    authStatus: "unverified",
+    trustedPlayerId: "untrusted-player"
+  }, {
+    fetchImpl: async () => {
+      throw new Error("fetch should not run for unverified identities");
+    }
+  });
+  assert(unverified.available === false, "Unverified trade save state was available.");
+  assert(unverified.reason === "verified_identity_required", `Unexpected unverified trade save reason: ${unverified.reason}`);
+
+  const offerId = "staging-iron-asteron-virella";
+  const trustedPreview = buildStagingTradePreview({
+    offerId,
+    quantity: 3,
+    trustedState: {
+      available: true,
+      reason: "",
+      validationState: {
+        credits: 1000,
+        cargoUsed: 4,
+        cargoCapacity: 12
+      },
+      stateSources: {
+        credits: "trusted_save",
+        cargoUsed: "trusted_save",
+        cargoCapacity: "trusted_save"
+      }
+    }
+  });
+  assert(trustedPreview.validationMode === "trusted_save", `Unexpected trusted preview mode: ${trustedPreview.validationMode}`);
+  assert(trustedPreview.trustedStateAvailable === true, "Trusted preview did not report trusted state.");
+  assert(trustedPreview.snapshotUsed === false, "Trusted preview unexpectedly used snapshot.");
+  assert(trustedPreview.wouldPass === true, "Trusted preview did not pass.");
+  assert(trustedPreview.maxCargoQuantity === 8, "Trusted preview max cargo quantity was incorrect.");
+
+  const trustedCapacityFromSnapshot = buildStagingTradePreview({
+    offerId,
+    quantity: 3,
+    trustedState: {
+      available: true,
+      reason: "",
+      validationState: {
+        credits: 1000,
+        cargoUsed: 4,
+        cargoCapacity: null
+      },
+      stateSources: {
+        credits: "trusted_save",
+        cargoUsed: "trusted_save",
+        cargoCapacity: "unknown"
+      }
+    },
+    playerSnapshot: {
+      credits: 1,
+      cargoUsed: 1,
+      cargoCapacity: 12
+    }
+  });
+  assert(trustedCapacityFromSnapshot.validationMode === "trusted_save", "Trusted preview did not keep trusted mode when using snapshot capacity.");
+  assert(trustedCapacityFromSnapshot.snapshotUsed === true, "Trusted preview did not report snapshot capacity use.");
+  assert(trustedCapacityFromSnapshot.stateSources.cargoCapacity === "snapshot", "Trusted preview did not mark capacity source as snapshot.");
+  assert(trustedCapacityFromSnapshot.creditsAvailable === 1000, "Trusted preview did not prefer trusted credits over snapshot.");
+  assert(trustedCapacityFromSnapshot.cargoUsed === 4, "Trusted preview did not prefer trusted cargo used over snapshot.");
+
+  const trustedInsufficientCredits = buildStagingTradePreview({
+    offerId,
+    quantity: 3,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1,
+        cargoUsed: 0,
+        cargoCapacity: 12
+      }
+    }
+  });
+  assert(trustedInsufficientCredits.validationMode === "trusted_save", "Trusted insufficient-credit preview lost trusted mode.");
+  assert(trustedInsufficientCredits.blockReason === "insufficient_credits", `Unexpected trusted insufficient-credit reason: ${trustedInsufficientCredits.blockReason}`);
+
+  const trustedInsufficientCargo = buildStagingTradePreview({
+    offerId,
+    quantity: 3,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 11,
+        cargoCapacity: 12
+      }
+    }
+  });
+  assert(trustedInsufficientCargo.validationMode === "trusted_save", "Trusted insufficient-cargo preview lost trusted mode.");
+  assert(trustedInsufficientCargo.blockReason === "insufficient_cargo", `Unexpected trusted insufficient-cargo reason: ${trustedInsufficientCargo.blockReason}`);
+
+  const fallbackSnapshotPreview = buildStagingTradePreview({
+    offerId,
+    quantity: 3,
+    trustedState: {
+      available: false,
+      reason: "save_missing"
+    },
+    playerSnapshot: {
+      credits: 1000,
+      cargoUsed: 0,
+      cargoCapacity: 12
+    }
+  });
+  assert(fallbackSnapshotPreview.validationMode === "snapshot", "Trade preview did not fall back to snapshot.");
+  assert(fallbackSnapshotPreview.snapshotUsed === true, "Snapshot fallback did not mark snapshot used.");
+
+  const unknownPreview = buildStagingTradePreview({
+    offerId,
+    quantity: 3,
+    trustedState: {
+      available: false,
+      reason: "save_missing"
+    }
+  });
+  assert(unknownPreview.validationMode === "unknown", "Trade preview without trusted state or snapshot was not unknown.");
+  assert(unknownPreview.wouldPass === false, "Unknown trade preview unexpectedly passed.");
+  assert(unknownPreview.creditsWritten === false && unknownPreview.cargoWritten === false && unknownPreview.saveWritten === false, "Trade helper reported writes.");
+
+  console.log("staging trade trusted-save validation helpers stayed read-only");
 }
 
 async function assertIdentityVerificationAndRewardPlanHelpers() {
@@ -1118,6 +1312,7 @@ async function leaveRoom(room) {
 }
 
 try {
+  await assertStagingTradeValidationHelpers();
   await assertIdentityVerificationAndRewardPlanHelpers();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
@@ -1215,6 +1410,9 @@ try {
   assert(validTradePreview?.projectedProfit === (firstTradeOffer.sellPrice - firstTradeOffer.buyPrice) * 3, "Staging trade preview profit was not server-calculated.");
   assert(validTradePreview?.wouldPass === true, "Valid staging trade preview did not pass snapshot validation.");
   assert(validTradePreview?.validationMode === "snapshot", `Unexpected valid trade validation mode: ${validTradePreview?.validationMode}`);
+  assert(validTradePreview?.trustedStateAvailable === false, "Unverified room trade preview unexpectedly used trusted save state.");
+  assert(validTradePreview?.snapshotUsed === true, "Unverified room trade preview did not report snapshot use.");
+  assert(validTradePreview?.stateSources?.credits === "snapshot", "Unverified room trade preview did not mark credits as snapshot.");
   assert(validTradePreview?.blockReason === null, `Unexpected valid trade block reason: ${validTradePreview?.blockReason}`);
   assert(validTradePreview?.maxAffordableQuantity === Math.floor(10000 / firstTradeOffer.buyPrice), "Staging trade max affordable quantity was incorrect.");
   assert(validTradePreview?.maxCargoQuantity === 140, "Staging trade max cargo quantity was incorrect.");
@@ -1261,6 +1459,8 @@ try {
   });
   assert(missingSnapshotTradePreview?.ok === true, "Missing snapshot trade preview should still return price math.");
   assert(missingSnapshotTradePreview?.validationMode === "unknown", `Unexpected missing snapshot validation mode: ${missingSnapshotTradePreview?.validationMode}`);
+  assert(missingSnapshotTradePreview?.trustedStateAvailable === false, "Missing snapshot trade preview unexpectedly had trusted state.");
+  assert(missingSnapshotTradePreview?.snapshotUsed === false, "Missing snapshot trade preview unexpectedly used snapshot.");
   assert(missingSnapshotTradePreview?.blockReason === "unknown_player_state", `Unexpected missing snapshot block reason: ${missingSnapshotTradePreview?.blockReason}`);
   assert(missingSnapshotTradePreview?.totalCost === firstTradeOffer.buyPrice * 2, "Missing snapshot trade preview did not include total cost.");
   assert(missingSnapshotTradePreview?.projectedRevenue === firstTradeOffer.sellPrice * 2, "Missing snapshot trade preview did not include projected revenue.");

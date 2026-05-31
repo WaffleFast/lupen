@@ -903,6 +903,20 @@
       projectedProfit: Number.isFinite(Number(preview.projectedProfit)) ? Number(preview.projectedProfit) : 0,
       wouldPass: preview.wouldPass === true,
       validationMode: String(preview.validationMode || "unknown"),
+      trustedStateAvailable: preview.trustedStateAvailable === true,
+      snapshotUsed: preview.snapshotUsed === true,
+      stateSources: preview.stateSources && typeof preview.stateSources === "object"
+        ? {
+          credits: String(preview.stateSources.credits || "unknown"),
+          cargoUsed: String(preview.stateSources.cargoUsed || "unknown"),
+          cargoCapacity: String(preview.stateSources.cargoCapacity || "unknown")
+        }
+        : {
+          credits: "unknown",
+          cargoUsed: "unknown",
+          cargoCapacity: "unknown"
+        },
+      readStatus: String(preview.readStatus || ""),
       blockReason: preview.blockReason === null || preview.blockReason === undefined ? null : String(preview.blockReason || ""),
       userReason: String(preview.userReason || ""),
       creditsAvailable: Number.isFinite(Number(preview.creditsAvailable)) ? Number(preview.creditsAvailable) : null,
