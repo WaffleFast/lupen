@@ -26,6 +26,7 @@
     isConnected: false,
     roomName: defaultRoomName,
     sessionId: null,
+    originalServerUrl: localServerUrl,
     serverUrl: localServerUrl,
     serverUrlSource: "default-local",
     enabledReason: disabledReason,
@@ -101,12 +102,18 @@
 
     try {
       const parsedUrl = new URL(rawServerUrl);
-      if (parsedUrl.protocol !== "ws:" && parsedUrl.protocol !== "wss:") {
-        throw new Error("server URL must use ws:// or wss://");
+      const allowedProtocols = new Set(["ws:", "wss:", "http:", "https:"]);
+      if (!allowedProtocols.has(parsedUrl.protocol)) {
+        throw new Error("server URL must use ws://, wss://, http://, or https://");
       }
 
+      // Colyseus Cloud may provide an HTTPS matchmaking endpoint. The
+      // browser client accepts that base URL and handles WebSocket upgrade
+      // details internally, so preserve http(s) endpoints instead of forcing
+      // them into ws(s) here.
       return {
         ok: true,
+        originalServerUrl: rawServerUrl,
         serverUrl: parsedUrl.toString().replace(/\/$/, ""),
         source,
         error: null
@@ -114,6 +121,7 @@
     } catch (err) {
       return {
         ok: false,
+        originalServerUrl: rawServerUrl,
         serverUrl: rawServerUrl,
         source,
         error: `invalid_multiplayer_server_url: ${err.message || err}`
@@ -123,6 +131,7 @@
 
   function updateEnabledState() {
     const serverConfig = resolveServerConfig();
+    connection.originalServerUrl = serverConfig.originalServerUrl || serverConfig.serverUrl || localServerUrl;
     connection.serverUrl = serverConfig.serverUrl || localServerUrl;
     connection.serverUrlSource = serverConfig.source;
 
@@ -194,6 +203,7 @@
       connected: connection.isConnected,
       roomName: connection.roomName,
       sessionId: connection.sessionId,
+      originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,
       serverConfigSource: connection.serverUrlSource,
@@ -473,6 +483,7 @@
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
+      originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,
       serverConfigSource: connection.serverUrlSource,
