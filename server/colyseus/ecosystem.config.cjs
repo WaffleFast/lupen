@@ -6,13 +6,13 @@ module.exports = {
       time: true,
       watch: false,
       instances: 1,
-      // Colyseus Cloud deploys through PM2. Cluster mode with one instance lets
-      // PM2 coordinate replacement workers instead of starting two forked
-      // processes that can race for the same PORT during rolling deploys.
-      exec_mode: "cluster",
+      // @colyseus/tools listen() cooperates with the Colyseus Cloud PM2
+      // lifecycle and NODE_APP_INSTANCE. Keep PM2 in fork mode and expose the
+      // base port here; the tools layer handles Cloud socket/port assignment.
+      exec_mode: "fork",
+      port: 2567,
       env: {
-        NODE_ENV: "production",
-        PORT: 2567
+        NODE_ENV: "production"
       }
     }
   ]

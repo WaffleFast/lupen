@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@colyseus/schema": "^3.0.0",
+    "@colyseus/tools": "^0.16.20",
     "@colyseus/ws-transport": "^0.16.0",
     "colyseus": "^0.16.0",
     "cors": "^2.8.6"
