@@ -21,6 +21,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - On leave, the player is removed.
 - Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
 - Staging-only `combat:intent` messages for future combat pipeline testing. These are validated against server-owned staging bots and always return `combat:rejected` with `reason: combat_disabled_in_staging`.
+- Staging-only `target:select` / `target:clear` messages for lock-on UI preparation. These update `selectedTargetBotId` on the player's presence record only when the server-owned bot is in the same node.
 - Legacy local prototype `move` messages are still accepted for compatibility.
 - Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
 - Staging bots include:
@@ -35,6 +36,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `nextMoveAt`: planned next node-move timestamp for debugging
 - Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
 - Combat intent handling does not mutate bot shield/hull, player state, progression, rewards, loot, saves, or bounty data. It is only a server-authoritative message path placeholder.
+- Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
 
@@ -177,6 +179,8 @@ The regression test uses two Colyseus clients to verify that:
 - At least one staging bot changes node while both clients observe matching state.
 - A valid `combat:intent` against a staging bot receives a safe disabled response.
 - Bot shield/hull remain unchanged after the combat intent.
+- A valid same-node staging bot lock-on updates the player's `selectedTargetBotId`.
+- Wrong-node and missing-bot lock-on requests are rejected safely.
 - Invalid movement is ignored and returns a dev-only warning.
 - Client B sees client A removed after disconnect.
 

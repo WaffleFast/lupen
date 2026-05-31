@@ -130,6 +130,36 @@ async function expectCombatRejected(room, sendMessage) {
   });
 }
 
+async function expectTargetSelected(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for target selection response."));
+    }, 3000);
+
+    room.onMessage("target:selected", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectTargetRejected(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for target rejection."));
+    }, 3000);
+
+    room.onMessage("target:rejected", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
 async function leaveRoom(room) {
   if (!room) return;
   try {
@@ -211,6 +241,19 @@ try {
     return playerA?.currentNode === inspectedBotBeforeCombat.currentNode;
   });
 
+  const selectResponse = await expectTargetSelected(roomA, () => {
+    roomA.send("target:select", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      currentNode: inspectedBotBeforeCombat.currentNode
+    });
+  });
+
+  assert(selectResponse?.ok === true, "Valid staging bot selection did not succeed.");
+  await waitFor("server player selectedTargetBotId to update", () => {
+    return playerFrom(roomA, roomA.sessionId)?.selectedTargetBotId === inspectedBotBeforeCombat.id;
+  });
+  console.log("staging bot lock-on selected for display only");
+
   const combatResponse = await expectCombatRejected(roomA, () => {
     roomA.send("combat:intent", {
       targetBotId: inspectedBotBeforeCombat.id,
@@ -248,6 +291,27 @@ try {
       playerA.y === 42;
   });
   console.log("client B received client A movement update");
+
+  await waitFor("staging target to clear after node change", () => {
+    return !playerFrom(roomA, roomA.sessionId)?.selectedTargetBotId;
+  });
+
+  const wrongNodeSelection = await expectTargetRejected(roomA, () => {
+    roomA.send("target:select", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      currentNode: "East Link 1"
+    });
+  });
+  assert(wrongNodeSelection?.reason, "Wrong-node staging bot selection did not return a rejection reason.");
+
+  const missingBotSelection = await expectTargetRejected(roomA, () => {
+    roomA.send("target:select", {
+      targetBotId: "missing-staging-bot",
+      currentNode: "East Link 1"
+    });
+  });
+  assert(missingBotSelection?.reason?.includes("unknown staging bot"), "Missing staging bot selection did not reject as unknown.");
+  console.log("invalid staging bot lock-on requests rejected safely");
 
   const warning = await expectPresenceWarning(roomA, () => {
     roomA.send("movement:update", {

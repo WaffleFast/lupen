@@ -126,8 +126,14 @@
         gap: 3px;
         transform: translate(-50%, -50%);
         opacity: 0.66;
-        pointer-events: none;
+        pointer-events: auto;
+        cursor: crosshair;
         filter: drop-shadow(0 0 8px rgba(255, 128, 62, 0.42));
+      }
+
+      .lupen-mp-space-bot.is-locked {
+        opacity: 0.88;
+        filter: drop-shadow(0 0 13px rgba(255, 198, 102, 0.7));
       }
 
       .lupen-mp-space-bot-ship {
@@ -169,6 +175,11 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
         text-shadow: 0 1px 3px rgba(10, 2, 0, 0.9);
+      }
+
+      .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-note::after {
+        content: " / LOCK";
+        color: #fff4c7;
       }
 
       #${diagnosticsPanelId} {
@@ -352,6 +363,18 @@
     return isStagingMode() ? "STAGING BOT" : "DEV BOT";
   }
 
+  function getSelectedTargetBotId() {
+    return getClient()?.getStatus?.()?.selectedTargetBotId || "";
+  }
+
+  function selectStagingBot(bot) {
+    if (!bot?.id) return;
+    const client = getClient();
+    const status = client?.getStatus?.();
+    if (!status?.enabled || !status?.isConnected) return;
+    client.selectStagingBot?.(bot.id, { currentNode: getCurrentNodeName() });
+  }
+
   function getCompactBotModeLabel() {
     return isStagingMode() ? "STG BOT" : "DEV BOT";
   }
@@ -447,7 +470,7 @@
     layer.appendChild(group);
   }
 
-  function drawSectorBot(layer, bot) {
+  function drawSectorBot(layer, bot, selectedTargetBotId = "") {
     const basePosition = getServerBotMapPosition(bot);
     const offset = getStableMapOffset(bot, 1.55);
     const position = {
@@ -456,10 +479,16 @@
     };
     const labelOffset = position.x > 82 ? -2.9 : 2.9;
     const group = global.document.createElementNS(SVG_NS, "g");
-    group.setAttribute("class", botMarkerClass);
+    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}`);
     group.setAttribute("data-bot-id", bot.id || "");
-    group.setAttribute("pointer-events", "none");
+    group.setAttribute("pointer-events", "auto");
+    group.style.cursor = "crosshair";
     group.setAttribute("transform", `translate(${position.x} ${position.y})`);
+    group.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      selectStagingBot(bot);
+    });
 
     const title = global.document.createElementNS(SVG_NS, "title");
     title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / visual only / combat disabled / ${bot.id || "unknown"} / x:${bot.x} y:${bot.y}`;
@@ -473,6 +502,18 @@
     halo.setAttribute("stroke", "rgba(255, 160, 87, 0.42)");
     halo.setAttribute("stroke-width", "0.12");
     group.appendChild(halo);
+
+    if (selectedTargetBotId === bot.id) {
+      const lockRing = global.document.createElementNS(SVG_NS, "circle");
+      lockRing.setAttribute("cx", "0");
+      lockRing.setAttribute("cy", "0");
+      lockRing.setAttribute("r", "3.1");
+      lockRing.setAttribute("fill", "none");
+      lockRing.setAttribute("stroke", "rgba(255, 244, 199, 0.92)");
+      lockRing.setAttribute("stroke-width", "0.18");
+      lockRing.setAttribute("stroke-dasharray", "0.9 0.7");
+      group.appendChild(lockRing);
+    }
 
     const ship = global.document.createElementNS(SVG_NS, "polygon");
     ship.setAttribute("points", "0,-2.25 1.65,1.25 0.65,0.9 0,2.15 -0.65,0.9 -1.65,1.25");
@@ -538,8 +579,9 @@
 
     const layer = global.document.createElementNS(SVG_NS, "g");
     layer.setAttribute("class", botLayerClass);
-    layer.setAttribute("pointer-events", "none");
-    bots.forEach((bot) => drawSectorBot(layer, bot));
+    layer.setAttribute("pointer-events", "auto");
+    const selectedTargetBotId = getSelectedTargetBotId();
+    bots.forEach((bot) => drawSectorBot(layer, bot, selectedTargetBotId));
     svg.appendChild(layer);
   }
 
@@ -618,9 +660,15 @@
       const marker = global.document.createElement("div");
       marker.className = "lupen-mp-space-bot";
       marker.dataset.botId = bot.id || "";
+      if (getSelectedTargetBotId() === bot.id) marker.classList.add("is-locked");
       marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / visual only / combat disabled`;
       marker.style.left = `${clampMapCoordinate(bot.x || 50)}%`;
       marker.style.top = `${clampMapCoordinate(bot.y || 50)}%`;
+      marker.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectStagingBot(bot);
+      });
 
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-bot-ship";
@@ -699,6 +747,7 @@
     const sameNodePlayers = getSameNodePlayers(players);
     const sameNodeBots = getSameNodeBots(bots);
     const inspectedBot = getInspectedBot(bots);
+    const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
     const panel = global.document.createElement("div");
     panel.id = diagnosticsPanelId;
     panel.setAttribute("aria-hidden", "true");
@@ -718,6 +767,7 @@
     setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
     if (isStagingMode(status)) {
       setDiagnosticsRow(panel, "bot layer", "server-owned visual");
+      setDiagnosticsRow(panel, "selected bot", getBotInspectionLabel(selectedBot));
       setDiagnosticsRow(panel, "inspect bot", getBotInspectionLabel(inspectedBot));
       setDiagnosticsRow(panel, "bot node", getBotLayerSummary(inspectedBot));
       setDiagnosticsRow(panel, "bot status", getBotHullSummary(inspectedBot));
@@ -728,6 +778,9 @@
     if (status.lastCombatResponse) {
       setDiagnosticsRow(panel, "combat intent", status.lastCombatResponse.reason || "received");
     }
+    if (status.lastTargetResponse) {
+      setDiagnosticsRow(panel, "lock-on", status.lastTargetResponse.reason || "received");
+    }
     if (status.clientLoadError || status.lastError) {
       setDiagnosticsRow(panel, "error", status.clientLoadError || status.lastError);
     }
@@ -735,7 +788,7 @@
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
     note.textContent = isStagingMode(status)
-      ? "Combat disabled in staging bot inspection. Shared staging bots are server-owned visual placeholders."
+      ? "Lock-on only - combat disabled. Shared staging bots are server-owned visual placeholders."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 

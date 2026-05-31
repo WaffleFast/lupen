@@ -35,6 +35,7 @@
     clientLoadError: null,
     lastServerWarning: null,
     lastCombatResponse: null,
+    lastTargetResponse: null,
     lastError: null
   };
 
@@ -237,6 +238,7 @@
       clientLoadError: connection.clientLoadError,
       lastServerWarning: connection.lastServerWarning,
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
+      lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -390,6 +392,7 @@
       displayName: String(player.displayName || "Pilot"),
       currentShipId: String(player.currentShipId || ""),
       shipName: String(player.shipName || player.ship || ""),
+      selectedTargetBotId: String(player.selectedTargetBotId || ""),
       x: Number.isFinite(Number(player.x)) ? Number(player.x) : 50,
       y: Number.isFinite(Number(player.y)) ? Number(player.y) : 50,
       currentNode: String(player.currentNode || "Asteron Prime"),
@@ -492,6 +495,28 @@
       logDev("server combat intent response", message);
     });
 
+    activeRoom.onMessage("target:selected", (message) => {
+      connection.lastTargetResponse = {
+        ok: message?.ok === true,
+        reason: String(message?.reason || "target_selected"),
+        targetBotId: String(message?.targetBotId || ""),
+        currentNode: String(message?.currentNode || ""),
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server target selection response", message);
+    });
+
+    activeRoom.onMessage("target:rejected", (message) => {
+      connection.lastTargetResponse = {
+        ok: false,
+        reason: String(message?.reason || "target_rejected"),
+        targetBotId: String(message?.targetBotId || ""),
+        currentNode: "",
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server target selection rejected", message);
+    });
+
     activeRoom.onLeave((code) => {
       logDev(`left ${connection.roomName}`, { code });
       connection.isConnected = false;
@@ -538,10 +563,12 @@
       lastError: connection.lastError,
       lastServerWarning: connection.lastServerWarning,
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
+      lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
       lastBotUpdateAt,
+      selectedTargetBotId: playersById.get(connection.sessionId)?.selectedTargetBotId || "",
       originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,
@@ -661,6 +688,18 @@
       return sendRoomMessage("sendCombatIntent", "combat:intent", intent);
     },
 
+    selectStagingBot(botId, options = {}) {
+      const localPresence = getLocalPresenceOptions();
+      return sendRoomMessage("selectStagingBot", "target:select", {
+        targetBotId: String(botId || ""),
+        currentNode: options.currentNode || localPresence.currentNode || ""
+      });
+    },
+
+    clearStagingTarget() {
+      return sendRoomMessage("clearStagingTarget", "target:clear", {});
+    },
+
     sendPing(payload = {}) {
       return sendRoomMessage("sendPing", "ping", payload);
     },
@@ -678,6 +717,12 @@
 
     getBotById(id) {
       const bot = botsById.get(String(id || ""));
+      return bot ? { ...bot } : null;
+    },
+
+    getSelectedStagingBot() {
+      const selectedTargetBotId = playersById.get(connection.sessionId)?.selectedTargetBotId || "";
+      const bot = selectedTargetBotId ? botsById.get(selectedTargetBotId) : null;
       return bot ? { ...bot } : null;
     },
 

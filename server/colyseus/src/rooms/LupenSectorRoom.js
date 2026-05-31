@@ -130,6 +130,7 @@ type("string")(LupenSectorPlayer.prototype, "displayName");
 type("string")(LupenSectorPlayer.prototype, "currentShipId");
 type("string")(LupenSectorPlayer.prototype, "shipName");
 type("string")(LupenSectorPlayer.prototype, "currentNode");
+type("string")(LupenSectorPlayer.prototype, "selectedTargetBotId");
 type("number")(LupenSectorPlayer.prototype, "x");
 type("number")(LupenSectorPlayer.prototype, "y");
 type("number")(LupenSectorPlayer.prototype, "joinedAt");
@@ -231,6 +232,22 @@ function validateCombatIntentPayload(message = {}) {
   return "";
 }
 
+function validateTargetSelectionPayload(message = {}) {
+  if (!message || typeof message !== "object") {
+    return "payload must be an object";
+  }
+
+  if (typeof message.targetBotId !== "string" || !message.targetBotId.trim()) {
+    return "targetBotId must be a non-empty string";
+  }
+
+  if (message.currentNode !== undefined && typeof message.currentNode !== "string") {
+    return "currentNode must be a string when provided";
+  }
+
+  return "";
+}
+
 // Presence-only stepping stone for future server-authoritative multiplayer.
 // This room mirrors local player display/location data and server-owned dummy
 // bot positions for dev ghosts only. It does not persist state, grant rewards,
@@ -276,6 +293,21 @@ export class LupenSectorRoom extends Room {
       this.rejectCombatIntent(client, message, "combat_intent");
     });
 
+    // Staging lock-on preparation only. This stores display-only bot selection
+    // on the player's presence record without creating real combat targets,
+    // timers, damage, rewards, or progression.
+    this.onMessage("target:select", (client, message = {}) => {
+      this.selectStagingBot(client, message, "target:select");
+    });
+
+    this.onMessage("staging:selectBot", (client, message = {}) => {
+      this.selectStagingBot(client, message, "staging:selectBot");
+    });
+
+    this.onMessage("target:clear", (client) => {
+      this.clearStagingBotSelection(client, "target:clear");
+    });
+
     // Legacy local prototype alias. New clients should send movement:update.
     this.onMessage("move", (client, message = {}) => {
       this.applyPresenceUpdate(client, message, "move");
@@ -291,6 +323,7 @@ export class LupenSectorRoom extends Room {
       currentShipId: getStringValue(options.currentShipId),
       shipName: getShipName(options),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
+      selectedTargetBotId: "",
       x: getNumberValue(options.x, 50),
       y: getNumberValue(options.y, 50),
       joinedAt: now,
@@ -355,6 +388,8 @@ export class LupenSectorRoom extends Room {
       bot.y = clampNumber(nodePosition.y + driftY, 4, 96);
       bot.lastUpdatedAt = now;
     });
+
+    this.reconcilePlayerSelections();
   }
 
   getNextBotNode(currentNode, index = 0) {
@@ -377,6 +412,87 @@ export class LupenSectorRoom extends Room {
       sessionId: client.sessionId,
       receivedAt: Date.now()
     });
+  }
+
+  sendTargetRejected(client, reason, messageType, targetBotId = "") {
+    client.send("target:rejected", {
+      ok: false,
+      reason,
+      messageType,
+      sessionId: client.sessionId,
+      targetBotId,
+      receivedAt: Date.now()
+    });
+  }
+
+  selectStagingBot(client, message = {}, messageType = "target:select") {
+    const player = this.touchPlayer(client.sessionId);
+    const payloadWarning = validateTargetSelectionPayload(message);
+    const targetBotId = getStringValue(message.targetBotId);
+    const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
+    const requestedNode = getStringValue(message.currentNode, player?.currentNode || "");
+
+    if (payloadWarning) {
+      this.sendTargetRejected(client, payloadWarning, messageType, targetBotId);
+      return;
+    }
+
+    if (!player) {
+      this.sendTargetRejected(client, "session player not found", messageType, targetBotId);
+      return;
+    }
+
+    if (!targetBot) {
+      this.sendTargetRejected(client, `unknown staging bot: ${targetBotId}`, messageType, targetBotId);
+      return;
+    }
+
+    if (requestedNode && requestedNode !== player.currentNode) {
+      this.sendTargetRejected(client, "selection node does not match player node", messageType, targetBotId);
+      return;
+    }
+
+    if (targetBot.currentNode !== player.currentNode) {
+      this.sendTargetRejected(client, "player and staging bot are not in the same node", messageType, targetBotId);
+      return;
+    }
+
+    player.selectedTargetBotId = targetBotId;
+    client.send("target:selected", {
+      ok: true,
+      reason: "lock_on_only_combat_disabled",
+      messageType,
+      sessionId: client.sessionId,
+      targetBotId,
+      currentNode: player.currentNode,
+      receivedAt: Date.now()
+    });
+  }
+
+  clearStagingBotSelection(client, messageType = "target:clear") {
+    const player = this.touchPlayer(client.sessionId);
+    if (player) player.selectedTargetBotId = "";
+    client.send("target:selected", {
+      ok: true,
+      reason: "selection_cleared",
+      messageType,
+      sessionId: client.sessionId,
+      targetBotId: "",
+      currentNode: player?.currentNode || "",
+      receivedAt: Date.now()
+    });
+  }
+
+  reconcilePlayerSelection(player) {
+    if (!player?.selectedTargetBotId) return;
+    const bot = this.state.bots.get(player.selectedTargetBotId);
+    if (!bot || bot.currentNode !== player.currentNode) {
+      player.selectedTargetBotId = "";
+    }
+  }
+
+  reconcilePlayerSelections() {
+    this.state.players.forEach((player) => this.reconcilePlayerSelection(player));
   }
 
   rejectCombatIntent(client, message = {}, messageType = "combat:intent") {
@@ -444,5 +560,6 @@ export class LupenSectorRoom extends Room {
 
     const currentNode = getStringValue(message.currentNode);
     if (currentNode) player.currentNode = currentNode;
+    this.reconcilePlayerSelection(player);
   }
 }
