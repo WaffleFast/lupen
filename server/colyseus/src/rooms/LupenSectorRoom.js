@@ -4,6 +4,14 @@ import {
   buildRewardLedgerEntry,
   writeRewardLedgerEntry
 } from "../services/rewardLedgerService.js";
+import {
+  applyRewardApplicationPlan,
+  buildRewardApplicationPlan
+} from "../services/rewardApplicationService.js";
+import {
+  buildProgressionPreview,
+  fetchPlayerSavePreviewContext
+} from "../services/playerSavePreviewService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -880,6 +888,18 @@ export class LupenSectorRoom extends Room {
 
   sendRewardPreviewRejected(client, reason, message = {}, messageType = "reward:claim_preview") {
     const botId = getStringValue(message.botId);
+    const rewardApplicationPlan = buildRewardApplicationPlan({
+      authStatus: "guest",
+      blockedReason: reason,
+      botId,
+      rewardPreviewId: getStringValue(message.rewardPreviewId)
+    });
+    const progressionPreview = buildProgressionPreview({
+      available: false,
+      reason,
+      playerId: ""
+    }, rewardApplicationPlan);
+
     client.send("reward:claim_preview_result", {
       ok: false,
       applied: false,
@@ -901,6 +921,15 @@ export class LupenSectorRoom extends Room {
         intendedLoot: [],
         intendedReason: "staging_bot_disabled"
       },
+      rewardApplicationPlan,
+      rewardApplicationResult: {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        skippedReason: reason,
+        plan: rewardApplicationPlan
+      },
+      progressionPreview,
       receivedAt: Date.now()
     });
   }
@@ -952,6 +981,24 @@ export class LupenSectorRoom extends Room {
       sourceEventId: preview.rewardPreviewId
     });
     const rewardLedgerResult = await writeRewardLedgerEntry(rewardLedgerEntry);
+    // Staging-only application preparation. This describes the future
+    // progression write but defaults to dry-run/no-write and never mutates
+    // player_saves, XP, credits, inventory, bounties, loot, or progression.
+    const rewardApplicationPlan = buildRewardApplicationPlan(rewardWritePlan, {
+      sourceLedgerId: rewardLedgerResult?.ledgerId || "",
+      sourceEventId: preview.rewardPreviewId
+    });
+    const rewardApplicationResult = await applyRewardApplicationPlan(rewardApplicationPlan);
+    const savePreviewContext = rewardApplicationPlan.eligible
+      ? await fetchPlayerSavePreviewContext(rewardApplicationPlan.playerId)
+      : {
+        ok: false,
+        available: false,
+        reason: rewardApplicationPlan.blockedReason || "reward_application_not_eligible",
+        playerId: rewardApplicationPlan.playerId || "",
+        saveSummary: null
+      };
+    const progressionPreview = buildProgressionPreview(savePreviewContext, rewardApplicationPlan);
 
     client.send("reward:claim_preview_result", {
       ...preview,
@@ -966,6 +1013,9 @@ export class LupenSectorRoom extends Room {
       rewardWritePlan,
       rewardLedgerEntry,
       rewardLedgerResult,
+      rewardApplicationPlan,
+      rewardApplicationResult,
+      progressionPreview,
       receivedAt: Date.now()
     });
   }

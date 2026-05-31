@@ -640,6 +640,71 @@
     };
   }
 
+  function normalizeRewardApplicationPlan(plan) {
+    if (!plan || typeof plan !== "object") return null;
+
+    return {
+      playerId: String(plan.playerId || ""),
+      displayName: String(plan.displayName || "Pilot"),
+      authStatus: String(plan.authStatus || "guest"),
+      botId: String(plan.botId || ""),
+      botName: String(plan.botName || "Staging Bot"),
+      node: String(plan.node || ""),
+      xpDelta: Number.isFinite(Number(plan.xpDelta)) ? Number(plan.xpDelta) : 0,
+      creditsDelta: Number.isFinite(Number(plan.creditsDelta)) ? Number(plan.creditsDelta) : 0,
+      lootAdditions: Array.isArray(plan.lootAdditions)
+        ? plan.lootAdditions.map((item) => String(item || "")).filter(Boolean)
+        : [],
+      reason: String(plan.reason || "staging_bot_disabled"),
+      sourceLedgerId: String(plan.sourceLedgerId || ""),
+      sourceEventId: String(plan.sourceEventId || ""),
+      contributionPercent: Number.isFinite(Number(plan.contributionPercent)) ? Number(plan.contributionPercent) : 0,
+      finalHit: plan.finalHit === true,
+      topContributor: plan.topContributor === true,
+      eligible: plan.eligible === true,
+      blockedReason: String(plan.blockedReason || ""),
+      applied: plan.applied === true,
+      dryRun: plan.dryRun !== false
+    };
+  }
+
+  function normalizeRewardApplicationResult(result) {
+    if (!result || typeof result !== "object") return null;
+
+    return {
+      ok: result.ok === true,
+      applied: result.applied === true,
+      dryRun: result.dryRun !== false,
+      skippedReason: String(result.skippedReason || ""),
+      plan: normalizeRewardApplicationPlan(result.plan)
+    };
+  }
+
+  function normalizeProgressionPreview(preview) {
+    if (!preview || typeof preview !== "object") return null;
+
+    return {
+      available: preview.available === true,
+      reason: String(preview.reason || ""),
+      playerId: String(preview.playerId || ""),
+      currentXp: Number.isFinite(Number(preview.currentXp)) ? Number(preview.currentXp) : null,
+      previewXp: Number.isFinite(Number(preview.previewXp)) ? Number(preview.previewXp) : null,
+      xpDelta: Number.isFinite(Number(preview.xpDelta)) ? Number(preview.xpDelta) : 0,
+      currentCredits: Number.isFinite(Number(preview.currentCredits)) ? Number(preview.currentCredits) : null,
+      previewCredits: Number.isFinite(Number(preview.previewCredits)) ? Number(preview.previewCredits) : null,
+      creditsDelta: Number.isFinite(Number(preview.creditsDelta)) ? Number(preview.creditsDelta) : 0,
+      currentLevel: Number.isFinite(Number(preview.currentLevel)) ? Number(preview.currentLevel) : null,
+      inventoryCount: Number.isFinite(Number(preview.inventoryCount)) ? Number(preview.inventoryCount) : null,
+      intendedLootAdditions: Array.isArray(preview.intendedLootAdditions)
+        ? preview.intendedLootAdditions.map((item) => String(item || "")).filter(Boolean)
+        : [],
+      applied: preview.applied === true,
+      dryRun: preview.dryRun !== false,
+      progressionWritesEnabled: preview.progressionWritesEnabled === true,
+      savedAt: String(preview.savedAt || "")
+    };
+  }
+
   function updateBotsFromServerState(serverState) {
     botsById.clear();
 
@@ -826,6 +891,9 @@
         dryRun: message?.dryRun === true,
         rewardWritePlan: normalizeRewardWritePlan(message?.rewardWritePlan),
         rewardLedgerResult: normalizeRewardLedgerResult(message?.rewardLedgerResult),
+        rewardApplicationPlan: normalizeRewardApplicationPlan(message?.rewardApplicationPlan),
+        rewardApplicationResult: normalizeRewardApplicationResult(message?.rewardApplicationResult),
+        progressionPreview: normalizeProgressionPreview(message?.progressionPreview),
         claimSimulated: message?.claimSimulated === true,
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()

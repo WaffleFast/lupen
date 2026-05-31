@@ -46,6 +46,8 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Supabase identity sent by the browser client is staging preparation metadata only. The server verifies access tokens with Supabase when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured. Verified tokens set `authStatus: verified` and trusted player ids; missing tokens stay `guest`; failed verification becomes `unverified`. Access tokens are never stored in room state or sent back to clients, and no reward writes are trusted or performed yet.
 - Reward claim simulation now includes a reward write dry-run plan with intended XP, credits, loot, contribution percentage, eligibility, and blocked reason. `dryRun` remains `true` and `applied` remains `false`; no Supabase writes or game progression mutations occur.
 - Reward claim simulation also passes the dry-run plan through `src/services/rewardLedgerService.js`. Ledger writes are disabled by default and return `skippedReason: reward_writes_disabled` unless `ENABLE_STAGING_REWARD_WRITES=true` is explicitly configured later. When enabled, the adapter only inserts into `multiplayer_reward_ledger` with `applied: false`; it never mutates `player_saves` or progression. The service also exposes a read-only ledger connectivity check used by `/health`; it requests at most one row and never inserts, updates, or deletes data.
+- Reward claim simulation also builds a future reward application plan through `src/services/rewardApplicationService.js`. Progression writes are disabled by default and return `skippedReason: progression_writes_disabled` unless a future `ENABLE_STAGING_PROGRESSION_WRITES=true` path is deliberately implemented. The current adapter never mutates `player_saves`, XP, credits, inventory, bounties, loot, or progression.
+- Verified reward claim simulation can read a sanitized `player_saves.save_data` summary through `src/services/playerSavePreviewService.js` to show a before/after progression preview. This read-only path selects at most one save row, returns only XP, credits, level, inventory count, and intended reward deltas, and never writes or returns the full save blob.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
@@ -94,6 +96,8 @@ Manual Colyseus Cloud steps later:
 - Add any staging environment variables in Colyseus Cloud settings; do not commit secrets.
 - For staging identity verification, configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Colyseus Cloud environment variables. Do not commit either value.
 - Reward ledger writes remain disabled unless `ENABLE_STAGING_REWARD_WRITES=true` is explicitly set later. Leave this unset/false for current staging dry-runs. If enabled, the adapter requires verified identity plus `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, writes only to `multiplayer_reward_ledger`, and still uses `applied: false`.
+- Progression writes remain disabled unless a future `ENABLE_STAGING_PROGRESSION_WRITES=true` implementation is explicitly added later. Leave this unset/false; the current adapter is dry-run only and does not update player progression.
+- Save/progression previews use `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to read `player_saves.save_data` server-side only. The preview is read-only, requests one row, exposes only sanitized summary fields, and must not be used as a client-authoritative reward source.
 - `/health` includes a safe reward ledger connectivity summary with `ledgerReachable`, `rewardWritesEnabled`, `reason`, `status`, `safeErrorCode`, and `safeErrorMessage`. This uses the service role key server-side only, performs a read-only `select=id&limit=1` request, and does not expose secrets or raw Supabase errors.
 - After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
 - Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
@@ -239,6 +243,8 @@ The regression test uses two Colyseus clients to verify that:
 - The disabled reward ledger adapter returns `dryRun: true`, `applied: false`, and `skippedReason: reward_writes_disabled`.
 - The reward ledger connectivity helper performs a read-only service-role reachability check with `select=id&limit=1`, categorizes safe failure reasons, and never writes data.
 - Mocked enabled-write coverage verifies the adapter targets only `/rest/v1/multiplayer_reward_ledger`, returns an inserted ledger id, and keeps `applied: false`.
+- The reward application adapter creates dry-run future progression plans and returns `skippedReason: progression_writes_disabled` with `applied: false` when progression writes are off.
+- The player save preview service reads only `player_saves.save_data` in mocked tests, returns before/after XP and credits previews when available, and never writes `player_saves`.
 - A non-contributor preview claim is rejected safely without applying rewards.
 - Bot respawn confirms staging contribution data was cleared.
 - Disabled bots reject further staging damage and then respawn/reset on both clients.

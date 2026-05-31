@@ -1161,6 +1161,7 @@
 
     const plan = result.rewardWritePlan;
     const ledger = result.rewardLedgerResult;
+    const application = result.rewardApplicationResult;
     if (plan) {
       const eligibility = plan.eligible ? "eligible" : `blocked ${plan.blockedReason || "not verified"}`;
       const loot = plan.intendedLoot?.length ? plan.intendedLoot.join(", ") : "none";
@@ -1169,7 +1170,10 @@
         : ledger?.skippedReason
           ? ` / ledger ${ledger.skippedReason}`
           : "";
-      return `${eligibility} / XP ${plan.intendedXp || 0} / C ${plan.intendedCredits || 0} / loot ${loot}${ledgerLabel} / progression not applied`;
+      const applicationLabel = application?.skippedReason
+        ? ` / application ${application.skippedReason}`
+        : "";
+      return `${eligibility} / XP ${plan.intendedXp || 0} / C ${plan.intendedCredits || 0} / loot ${loot}${ledgerLabel}${applicationLabel} / progression not applied`;
     }
 
     const selfContribution = Array.isArray(result.contributors)
@@ -1184,6 +1188,7 @@
     if (!plan) return "";
 
     const ledger = status?.lastRewardClaimResult?.rewardLedgerResult;
+    const application = status?.lastRewardClaimResult?.rewardApplicationResult;
     const eligibility = plan.eligible ? "Eligible" : `Blocked: ${plan.blockedReason || "not verified"}`;
     const loot = plan.intendedLoot?.length ? plan.intendedLoot.join(", ") : "none";
     const ledgerLabel = ledger?.ledgerId
@@ -1191,7 +1196,34 @@
       : ledger?.skippedReason
         ? ` / Ledger: ${ledger.skippedReason}`
         : "";
-    return `${eligibility} / XP ${plan.intendedXp || 0} / Credits ${plan.intendedCredits || 0} / Loot ${loot}${ledgerLabel} / Progression not applied`;
+    const applicationLabel = application?.skippedReason
+      ? ` / Application: ${application.skippedReason}`
+      : "";
+    return `${eligibility} / XP ${plan.intendedXp || 0} / Credits ${plan.intendedCredits || 0} / Loot ${loot}${ledgerLabel}${applicationLabel} / Progression not applied`;
+  }
+
+  function getRewardApplicationLabel(status) {
+    const result = status?.lastRewardClaimResult?.rewardApplicationResult;
+    const plan = status?.lastRewardClaimResult?.rewardApplicationPlan || result?.plan;
+    if (!plan && !result) return "";
+
+    const eligibility = plan?.eligible ? "eligible" : `blocked ${plan?.blockedReason || result?.skippedReason || "not verified"}`;
+    const loot = plan?.lootAdditions?.length ? plan.lootAdditions.join(", ") : "none";
+    const skipped = result?.skippedReason ? ` / ${result.skippedReason}` : "";
+    return `${eligibility} / XP +${plan?.xpDelta || 0} / C +${plan?.creditsDelta || 0} / loot ${loot}${skipped} / dry-run`;
+  }
+
+  function formatPreviewValue(value) {
+    return value === null || value === undefined ? "unknown" : String(Math.round(Number(value)));
+  }
+
+  function getProgressionPreviewLabel(status) {
+    const preview = status?.lastRewardClaimResult?.progressionPreview;
+    if (!preview) return "";
+    if (!preview.available) return `Save preview unavailable / ${preview.reason || "unknown"} / not saved`;
+
+    const loot = preview.intendedLootAdditions?.length ? preview.intendedLootAdditions.join(", ") : "none";
+    return `XP ${formatPreviewValue(preview.currentXp)} -> ${formatPreviewValue(preview.previewXp)} / C ${formatPreviewValue(preview.currentCredits)} -> ${formatPreviewValue(preview.previewCredits)} / loot ${loot} / not saved`;
   }
 
   function setDiagnosticsRow(panel, label, value) {
@@ -1361,6 +1393,12 @@
       dryRun.textContent = `${dryRunLabel} / Dry run only - not applied`;
       summary.appendChild(dryRun);
     }
+    const progressionPreviewLabel = getProgressionPreviewLabel(status);
+    if (progressionPreviewLabel) {
+      const progressionPreview = global.document.createElement("small");
+      progressionPreview.textContent = `${progressionPreviewLabel} / Progression preview only`;
+      summary.appendChild(progressionPreview);
+    }
     inner.appendChild(summary);
 
     const button = global.document.createElement("button");
@@ -1449,6 +1487,10 @@
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
       setDiagnosticsRow(panel, "claim preview", getRewardClaimResultLabel(status));
+      const applicationLabel = getRewardApplicationLabel(status);
+      if (applicationLabel) setDiagnosticsRow(panel, "application", applicationLabel);
+      const progressionPreviewLabel = getProgressionPreviewLabel(status);
+      if (progressionPreviewLabel) setDiagnosticsRow(panel, "save preview", progressionPreviewLabel);
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);

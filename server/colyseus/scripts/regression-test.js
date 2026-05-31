@@ -10,6 +10,14 @@ import {
   checkRewardLedgerConnectivity,
   writeRewardLedgerEntry
 } from "../src/services/rewardLedgerService.js";
+import {
+  applyRewardApplicationPlan,
+  buildRewardApplicationPlan
+} from "../src/services/rewardApplicationService.js";
+import {
+  buildProgressionPreview,
+  fetchPlayerSavePreviewContext
+} from "../src/services/playerSavePreviewService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -277,6 +285,114 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(ledgerEntry.credits_amount === 32, `Unexpected ledger credits amount: ${ledgerEntry.credits_amount}`);
   assert(ledgerEntry.dry_run === true && ledgerEntry.applied === false, "Ledger entry was not dry-run/unapplied.");
 
+  const applicationPlan = buildRewardApplicationPlan(plan, {
+    sourceLedgerId: "ledger-row-1",
+    sourceEventId: "reward-preview-stub"
+  });
+  assert(applicationPlan.eligible === true, "Verified application plan was not eligible.");
+  assert(applicationPlan.playerId === "verified-player-a", "Verified application plan did not include player id.");
+  assert(applicationPlan.xpDelta === 20, `Unexpected application XP delta: ${applicationPlan.xpDelta}`);
+  assert(applicationPlan.creditsDelta === 32, `Unexpected application credits delta: ${applicationPlan.creditsDelta}`);
+  assert(applicationPlan.sourceLedgerId === "ledger-row-1", "Application plan did not include source ledger id.");
+  assert(applicationPlan.sourceEventId === "reward-preview-stub", "Application plan did not include source event id.");
+  assert(applicationPlan.applied === false && applicationPlan.dryRun === true, "Application plan was not dry-run/unapplied.");
+  const disabledApplicationResult = await applyRewardApplicationPlan(applicationPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "false"
+    }
+  });
+  assert(disabledApplicationResult?.dryRun === true, "Disabled application adapter did not return dryRun true.");
+  assert(disabledApplicationResult?.applied === false, "Disabled application adapter applied progression.");
+  assert(disabledApplicationResult?.skippedReason === "progression_writes_disabled", `Unexpected disabled application reason: ${disabledApplicationResult?.skippedReason}`);
+
+  const enabledApplicationResult = await applyRewardApplicationPlan(applicationPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true"
+    }
+  });
+  assert(enabledApplicationResult?.dryRun === true, "Enabled placeholder application adapter did not stay dry-run.");
+  assert(enabledApplicationResult?.applied === false, "Enabled placeholder application adapter applied progression.");
+  assert(enabledApplicationResult?.skippedReason === "progression_write_adapter_not_implemented", `Unexpected enabled placeholder application reason: ${enabledApplicationResult?.skippedReason}`);
+
+  const missingSaveEnvContext = await fetchPlayerSavePreviewContext("verified-player-a", {
+    env: {},
+    fetchImpl: async () => {
+      throw new Error("fetch should not run without Supabase config");
+    }
+  });
+  assert(missingSaveEnvContext?.available === false, "Missing-env save preview context was available.");
+  assert(missingSaveEnvContext?.reason === "supabase_config_missing", `Unexpected missing-env save preview reason: ${missingSaveEnvContext?.reason}`);
+
+  let saveReadUrl = "";
+  let saveReadOptions = null;
+  const missingSaveContext = await fetchPlayerSavePreviewContext("verified-player-a", {
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      saveReadUrl = url;
+      saveReadOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [];
+        }
+      };
+    }
+  });
+  assert(missingSaveContext?.ok === true, "Missing save read did not succeed safely.");
+  assert(missingSaveContext?.available === false, "Missing save context was unexpectedly available.");
+  assert(missingSaveContext?.reason === "save_missing", `Unexpected missing save reason: ${missingSaveContext?.reason}`);
+  assert(saveReadUrl === "https://example.supabase.co/rest/v1/player_saves?select=save_data,updated_at&user_id=eq.verified-player-a&limit=1", `Unexpected save read URL: ${saveReadUrl}`);
+  assert(saveReadOptions?.method === "GET", "Save preview read did not use GET.");
+  assert(saveReadOptions?.headers?.authorization === "Bearer stub-service-key", "Save preview read did not use service role bearer auth.");
+
+  const validSaveContext = await fetchPlayerSavePreviewContext("verified-player-a", {
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [{
+            updated_at: "2026-05-31T12:00:00.000Z",
+            save_data: {
+              credits: 1200,
+              playerProgress: {
+                combatXp: 80,
+                level: 3
+              },
+              inventoryItems: [{ id: "loot-a" }, { id: "loot-b" }]
+            }
+          }];
+        }
+      };
+    }
+  });
+  assert(validSaveContext?.available === true, "Valid mocked save context was not available.");
+  assert(validSaveContext?.saveSummary?.xp === 80, `Unexpected mocked save XP: ${validSaveContext?.saveSummary?.xp}`);
+  assert(validSaveContext?.saveSummary?.credits === 1200, `Unexpected mocked save credits: ${validSaveContext?.saveSummary?.credits}`);
+  assert(validSaveContext?.saveSummary?.level === 3, `Unexpected mocked save level: ${validSaveContext?.saveSummary?.level}`);
+  assert(validSaveContext?.saveSummary?.inventoryCount === 2, `Unexpected mocked save inventory count: ${validSaveContext?.saveSummary?.inventoryCount}`);
+
+  const progressionPreview = buildProgressionPreview(validSaveContext, applicationPlan);
+  assert(progressionPreview?.available === true, "Progression preview was not available for mocked save.");
+  assert(progressionPreview?.currentXp === 80, `Unexpected current XP preview: ${progressionPreview?.currentXp}`);
+  assert(progressionPreview?.previewXp === 100, `Unexpected preview XP: ${progressionPreview?.previewXp}`);
+  assert(progressionPreview?.currentCredits === 1200, `Unexpected current credits preview: ${progressionPreview?.currentCredits}`);
+  assert(progressionPreview?.previewCredits === 1232, `Unexpected preview credits: ${progressionPreview?.previewCredits}`);
+  assert(progressionPreview?.applied === false && progressionPreview?.dryRun === true, "Progression preview was not dry-run/unapplied.");
+  assert(progressionPreview?.progressionWritesEnabled === false, "Progression preview enabled writes.");
+
+  const unavailableProgressionPreview = buildProgressionPreview(missingSaveContext, applicationPlan);
+  assert(unavailableProgressionPreview?.available === false, "Missing-save progression preview was available.");
+  assert(unavailableProgressionPreview?.reason === "save_missing", `Unexpected missing-save progression preview reason: ${unavailableProgressionPreview?.reason}`);
+
   const disabledLedgerResult = await writeRewardLedgerEntry(ledgerEntry, {
     env: {
       ENABLE_STAGING_REWARD_WRITES: "false",
@@ -465,6 +581,19 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(blockedPlan.eligible === false, "Unverified dry-run plan was eligible.");
   assert(blockedPlan.blockedReason === "identity_unverified", `Unexpected blocked reason: ${blockedPlan.blockedReason}`);
   assert(blockedPlan.dryRun === true && blockedPlan.applied === false, "Blocked plan was not dry-run/unapplied.");
+  const blockedApplicationPlan = buildRewardApplicationPlan(blockedPlan, {
+    sourceEventId: "blocked-reward-preview-stub"
+  });
+  assert(blockedApplicationPlan.eligible === false, "Blocked application plan was eligible.");
+  assert(blockedApplicationPlan.blockedReason === "identity_unverified", `Unexpected blocked application reason: ${blockedApplicationPlan.blockedReason}`);
+  const blockedApplicationResult = await applyRewardApplicationPlan(blockedApplicationPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "false"
+    }
+  });
+  assert(blockedApplicationResult?.dryRun === true, "Blocked application result was not dry-run.");
+  assert(blockedApplicationResult?.applied === false, "Blocked application result applied progression.");
+  assert(blockedApplicationResult?.skippedReason === "reward_application_not_eligible", `Unexpected blocked application skipped reason: ${blockedApplicationResult?.skippedReason}`);
   const blockedLedgerEntry = buildRewardLedgerEntry(blockedPlan, {
     roomName: ROOM_NAME,
     sourceEventId: "blocked-reward-preview-stub"
@@ -914,6 +1043,19 @@ try {
   assert(claimPreviewResult?.rewardLedgerResult?.skippedReason === "reward_writes_disabled", `Unexpected reward ledger skipped reason: ${claimPreviewResult?.rewardLedgerResult?.skippedReason}`);
   assert(claimPreviewResult?.rewardLedgerEntry?.dry_run === true, "Reward ledger entry was not marked dry-run.");
   assert(claimPreviewResult?.rewardLedgerEntry?.applied === false, "Reward ledger entry was applied.");
+  assert(claimPreviewResult?.rewardApplicationPlan?.dryRun === true, "Reward application plan was not dry-run.");
+  assert(claimPreviewResult?.rewardApplicationPlan?.applied === false, "Reward application plan applied progression.");
+  assert(claimPreviewResult?.rewardApplicationPlan?.eligible === false, "Unverified reward application plan was eligible.");
+  assert(claimPreviewResult?.rewardApplicationPlan?.blockedReason === "identity_unverified", `Unexpected reward application blocked reason: ${claimPreviewResult?.rewardApplicationPlan?.blockedReason}`);
+  assert(claimPreviewResult?.rewardApplicationPlan?.xpDelta > 0, "Reward application plan did not include XP delta.");
+  assert(claimPreviewResult?.rewardApplicationPlan?.creditsDelta > 0, "Reward application plan did not include credits delta.");
+  assert(claimPreviewResult?.rewardApplicationResult?.dryRun === true, "Reward application result was not dry-run.");
+  assert(claimPreviewResult?.rewardApplicationResult?.applied === false, "Reward application result applied progression.");
+  assert(claimPreviewResult?.rewardApplicationResult?.skippedReason === "reward_application_not_eligible", `Unexpected reward application skipped reason: ${claimPreviewResult?.rewardApplicationResult?.skippedReason}`);
+  assert(claimPreviewResult?.progressionPreview?.dryRun === true, "Progression preview was not dry-run.");
+  assert(claimPreviewResult?.progressionPreview?.applied === false, "Progression preview applied progression.");
+  assert(claimPreviewResult?.progressionPreview?.available === false, "Unverified progression preview was unexpectedly available.");
+  assert(claimPreviewResult?.progressionPreview?.reason === "identity_unverified", `Unexpected unverified progression preview reason: ${claimPreviewResult?.progressionPreview?.reason}`);
   assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
   assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
   assert(claimPreviewResult?.finalHitPlayerId === "", "Unverified reward claim result included a trusted final hit player id.");
