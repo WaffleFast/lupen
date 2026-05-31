@@ -1111,6 +1111,7 @@ function renderSectorMap() {
   drawRoutes(svg);
   drawNodes(svg);
   drawSectorScanMarkers(svg);
+  if (window.LupenMultiplayerOverlay?.render) window.LupenMultiplayerOverlay.render();
   updateSectorScanPanel();
 }
 

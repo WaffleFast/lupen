@@ -24,6 +24,7 @@
   let colyseusClient = null;
   let room = null;
   let clientScriptPromise = null;
+  const playersById = new Map();
 
   function hasDevFlag() {
     try {
@@ -142,8 +143,46 @@
     });
   }
 
+  function normalizePlayer(player, fallbackId = "") {
+    if (!player) return null;
+
+    const id = String(player.id || fallbackId || "");
+    if (!id) return null;
+
+    return {
+      id,
+      sessionId: id,
+      displayName: String(player.displayName || "Pilot"),
+      x: Number.isFinite(Number(player.x)) ? Number(player.x) : 50,
+      y: Number.isFinite(Number(player.y)) ? Number(player.y) : 50,
+      currentNode: String(player.currentNode || "Asteron Prime"),
+      isSelf: id === connection.sessionId
+    };
+  }
+
+  function updatePlayersFromServerState(serverState) {
+    playersById.clear();
+
+    const players = serverState?.players;
+    if (!players) return;
+
+    if (typeof players.forEach === "function") {
+      players.forEach((player, key) => {
+        const snapshot = normalizePlayer(player, key);
+        if (snapshot) playersById.set(snapshot.id, snapshot);
+      });
+      return;
+    }
+
+    Object.entries(players).forEach(([key, player]) => {
+      const snapshot = normalizePlayer(player, key);
+      if (snapshot) playersById.set(snapshot.id, snapshot);
+    });
+  }
+
   function bindRoomEvents(activeRoom) {
     activeRoom.onStateChange((serverState) => {
+      updatePlayersFromServerState(serverState);
       notifyServerState(serverState);
     });
 
@@ -158,6 +197,7 @@
       connection.sessionId = null;
       room = null;
       colyseusClient = null;
+      playersById.clear();
       notifyServerState(null);
     });
   }
@@ -187,6 +227,7 @@
       sessionId: connection.sessionId,
       lastError: connection.lastError,
       listenerCount: stateListeners.size,
+      playerCount: playersById.size,
       serverUrl: localServerUrl
     };
   }
@@ -297,6 +338,13 @@
 
     sendPing(payload = {}) {
       return sendRoomMessage("sendPing", "ping", payload);
+    },
+
+    getPlayers(options = {}) {
+      const includeSelf = options.includeSelf !== false;
+      return Array.from(playersById.values())
+        .filter((player) => includeSelf || !player.isSelf)
+        .map((player) => ({ ...player }));
     },
 
     onServerState(handler) {
