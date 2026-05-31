@@ -582,6 +582,34 @@
     };
   }
 
+  function normalizeRewardWritePlan(plan) {
+    if (!plan || typeof plan !== "object") return null;
+
+    return {
+      playerId: String(plan.playerId || ""),
+      trustedPlayerId: String(plan.trustedPlayerId || ""),
+      authStatus: String(plan.authStatus || "guest"),
+      displayName: String(plan.displayName || "Pilot"),
+      botId: String(plan.botId || ""),
+      botName: String(plan.botName || "Staging Bot"),
+      node: String(plan.node || ""),
+      finalHitBy: String(plan.finalHitBy || ""),
+      topContributorSessionId: String(plan.topContributorSessionId || ""),
+      contributorSessionId: String(plan.contributorSessionId || ""),
+      contributionPercent: Number.isFinite(Number(plan.contributionPercent)) ? Number(plan.contributionPercent) : 0,
+      intendedXp: Number.isFinite(Number(plan.intendedXp)) ? Number(plan.intendedXp) : 0,
+      intendedCredits: Number.isFinite(Number(plan.intendedCredits)) ? Number(plan.intendedCredits) : 0,
+      intendedLoot: Array.isArray(plan.intendedLoot)
+        ? plan.intendedLoot.map((item) => String(item || "")).filter(Boolean)
+        : [],
+      intendedReason: String(plan.intendedReason || "staging_bot_disabled"),
+      eligible: plan.eligible === true,
+      blockedReason: String(plan.blockedReason || ""),
+      applied: plan.applied === true,
+      dryRun: plan.dryRun !== false
+    };
+  }
+
   function updateBotsFromServerState(serverState) {
     botsById.clear();
 
@@ -731,6 +759,7 @@
           ? message.previewLoot.map((item) => String(item || "")).filter(Boolean)
           : [],
         applied: message?.applied === true,
+        dryRun: message?.dryRun === true,
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
@@ -764,6 +793,8 @@
           ? message.previewLoot.map((item) => String(item || "")).filter(Boolean)
           : [],
         applied: message?.applied === true,
+        dryRun: message?.dryRun === true,
+        rewardWritePlan: normalizeRewardWritePlan(message?.rewardWritePlan),
         claimSimulated: message?.claimSimulated === true,
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
@@ -823,6 +854,7 @@
   function getStatus() {
     updateEnabledState();
     const localPresence = getLocalPresenceOptions();
+    const selfPlayer = playersById.get(connection.sessionId);
     const lastBotUpdateAt = Array.from(botsById.values()).reduce((latest, bot) => {
       return Math.max(latest, Number(bot.lastUpdatedAt || 0));
     }, 0);
@@ -852,9 +884,10 @@
       selectedTargetBotId: playersById.get(connection.sessionId)?.selectedTargetBotId || "",
       nextFireAt: playersById.get(connection.sessionId)?.nextFireAt || 0,
       fireCooldownRemainingMs: Math.max(0, Math.ceil((playersById.get(connection.sessionId)?.nextFireAt || 0) - Date.now())),
-      authStatus: identity.authStatus,
-      playerIdPresent: identity.playerIdPresent,
-      displayName: identity.displayName || localPresence.displayName || "Pilot",
+      authStatus: selfPlayer?.authStatus || identity.authStatus,
+      playerIdPresent: !!(selfPlayer?.trustedPlayerId || selfPlayer?.playerId || identity.playerIdPresent),
+      trustedPlayerIdPresent: !!selfPlayer?.trustedPlayerId,
+      displayName: selfPlayer?.displayName || identity.displayName || localPresence.displayName || "Pilot",
       originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,

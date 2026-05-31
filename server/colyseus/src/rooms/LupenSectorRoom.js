@@ -117,6 +117,8 @@ const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_BOT_DISABLED_RESET_MS = 6500;
 const SUPABASE_VERIFY_TIMEOUT_MS = 4000;
+const STAGING_REWARD_DRY_RUN_XP = 25;
+const STAGING_REWARD_DRY_RUN_CREDITS = 40;
 
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 35, hull: 70 },
@@ -299,6 +301,40 @@ export async function verifySupabaseAccessToken(accessToken, env = process.env, 
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export function buildRewardWritePlan({
+  preview = {},
+  claimantIdentity = {},
+  contributor = {}
+} = {}) {
+  const authStatus = getSafeIdentityValue(claimantIdentity.authStatus || contributor.authStatus, "guest");
+  const trustedPlayerId = getSafeIdentityValue(claimantIdentity.trustedPlayerId || contributor.trustedPlayerId || claimantIdentity.playerId || contributor.playerId);
+  const contributionPercent = clampNumber(Math.round(Number(contributor.percent || 0)), 0, 100);
+  const eligible = authStatus === "verified" && !!trustedPlayerId;
+  const blockedReason = eligible ? "" : authStatus === "guest" ? "identity_guest" : "identity_unverified";
+
+  return {
+    playerId: eligible ? trustedPlayerId : "",
+    trustedPlayerId: eligible ? trustedPlayerId : "",
+    authStatus,
+    displayName: getSafeIdentityValue(claimantIdentity.displayName || contributor.displayName, "Pilot") || "Pilot",
+    botId: getSafeIdentityValue(preview.botId),
+    botName: getSafeIdentityValue(preview.botName, "Staging Bot") || "Staging Bot",
+    node: getSafeIdentityValue(preview.node),
+    finalHitBy: getSafeIdentityValue(preview.finalHitBy || preview.disabledBySessionId),
+    topContributorSessionId: getSafeIdentityValue(preview.topContributorSessionId),
+    contributorSessionId: getSafeIdentityValue(contributor.sessionId || claimantIdentity.sessionId),
+    contributionPercent,
+    intendedXp: Math.round((Number(preview.previewXp || STAGING_REWARD_DRY_RUN_XP) * contributionPercent) / 100),
+    intendedCredits: Math.round((Number(preview.previewCredits || STAGING_REWARD_DRY_RUN_CREDITS) * contributionPercent) / 100),
+    intendedLoot: Array.isArray(preview.previewLoot) ? preview.previewLoot.map((item) => getSafeIdentityValue(item)).filter(Boolean) : [],
+    intendedReason: "staging_bot_disabled",
+    eligible,
+    blockedReason,
+    applied: false,
+    dryRun: true
+  };
 }
 
 function validatePresencePayload(message = {}) {
@@ -828,11 +864,12 @@ export class LupenSectorRoom extends Room {
       contributors: contributionSummary.contributors,
       totalDamage: contributionSummary.totalDamage,
       node: bot?.currentNode || "",
-      previewXp: 0,
-      previewCredits: 0,
+      previewXp: STAGING_REWARD_DRY_RUN_XP,
+      previewCredits: STAGING_REWARD_DRY_RUN_CREDITS,
       previewLoot: [],
       applied: false,
       reason: "staging_preview_only",
+      dryRun: true,
       receivedAt
     };
   }
@@ -850,6 +887,16 @@ export class LupenSectorRoom extends Room {
       previewXp: 0,
       previewCredits: 0,
       previewLoot: [],
+      rewardWritePlan: {
+        applied: false,
+        dryRun: true,
+        eligible: false,
+        blockedReason: reason,
+        intendedXp: 0,
+        intendedCredits: 0,
+        intendedLoot: [],
+        intendedReason: "staging_bot_disabled"
+      },
       receivedAt: Date.now()
     });
   }
@@ -886,15 +933,28 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
+    const claimantIdentity = {
+      sessionId: client.sessionId,
+      ...this.getPlayerIdentitySnapshot(client.sessionId)
+    };
+    const contributor = contributors.find((entry) => entry?.sessionId === client.sessionId) || {};
+    const rewardWritePlan = buildRewardWritePlan({
+      preview,
+      claimantIdentity,
+      contributor
+    });
+
     client.send("reward:claim_preview_result", {
       ...preview,
       ok: true,
       applied: false,
+      dryRun: true,
       reason: "staging_preview_only",
       messageType,
       sessionId: client.sessionId,
       claimedBySessionId: client.sessionId,
       claimSimulated: true,
+      rewardWritePlan,
       receivedAt: Date.now()
     });
   }

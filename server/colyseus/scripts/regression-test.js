@@ -1,6 +1,10 @@
 import { Client } from "colyseus.js";
 import { ROOM_NAME } from "../src/app.config.js";
-import { STAGING_BOT_ALLOWED_NODE_IDS } from "../src/rooms/LupenSectorRoom.js";
+import {
+  STAGING_BOT_ALLOWED_NODE_IDS,
+  buildRewardWritePlan,
+  verifySupabaseAccessToken
+} from "../src/rooms/LupenSectorRoom.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -203,6 +207,88 @@ async function expectRewardClaimResult(room, sendMessage) {
   });
 }
 
+async function assertIdentityVerificationAndRewardPlanHelpers() {
+  const verified = await verifySupabaseAccessToken(
+    "stub-valid-token",
+    {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    async (_url, options = {}) => {
+      assert(options.headers?.authorization === "Bearer stub-valid-token", "Verification did not use bearer token.");
+      assert(options.headers?.apikey === "stub-service-key", "Verification did not use service key.");
+      return {
+        ok: true,
+        async json() {
+          return {
+            id: "verified-player-a",
+            user_metadata: {
+              pilot_name: "Verified Pilot A"
+            }
+          };
+        }
+      };
+    }
+  );
+
+  assert(verified.authStatus === "verified", "Stubbed Supabase verification did not return verified.");
+  assert(verified.trustedPlayerId === "verified-player-a", "Stubbed verification did not return trusted player id.");
+
+  const plan = buildRewardWritePlan({
+    preview: {
+      botId: "dev-bot-erebus-1",
+      botName: "Erebus Drone",
+      node: "Upper Apex",
+      finalHitBy: "session-a",
+      topContributorSessionId: "session-a",
+      previewXp: 25,
+      previewCredits: 40,
+      previewLoot: []
+    },
+    claimantIdentity: {
+      sessionId: "session-a",
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a",
+      displayName: "Verified Pilot A"
+    },
+    contributor: {
+      sessionId: "session-a",
+      percent: 80
+    }
+  });
+
+  assert(plan.eligible === true, "Verified reward dry-run plan was not eligible.");
+  assert(plan.dryRun === true, "Verified reward plan was not a dry run.");
+  assert(plan.applied === false, "Verified reward plan was applied.");
+  assert(plan.playerId === "verified-player-a", "Verified reward plan did not include trusted player id.");
+  assert(plan.intendedXp === 20, `Unexpected verified dry-run XP: ${plan.intendedXp}`);
+  assert(plan.intendedCredits === 32, `Unexpected verified dry-run credits: ${plan.intendedCredits}`);
+
+  const blockedPlan = buildRewardWritePlan({
+    preview: {
+      botId: "dev-bot-erebus-1",
+      botName: "Erebus Drone",
+      node: "Upper Apex",
+      previewXp: 25,
+      previewCredits: 40
+    },
+    claimantIdentity: {
+      sessionId: "session-b",
+      authStatus: "unverified",
+      displayName: "Unverified Pilot"
+    },
+    contributor: {
+      sessionId: "session-b",
+      percent: 40
+    }
+  });
+
+  assert(blockedPlan.eligible === false, "Unverified dry-run plan was eligible.");
+  assert(blockedPlan.blockedReason === "identity_unverified", `Unexpected blocked reason: ${blockedPlan.blockedReason}`);
+  assert(blockedPlan.dryRun === true && blockedPlan.applied === false, "Blocked plan was not dry-run/unapplied.");
+  console.log("identity verification and reward dry-run helper checks passed");
+}
+
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -257,6 +343,8 @@ async function leaveRoom(room) {
 }
 
 try {
+  await assertIdentityVerificationAndRewardPlanHelpers();
+
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot A",
     authStatus: "authenticated",
@@ -558,6 +646,7 @@ try {
         contributorIds.includes(roomA.sessionId) &&
         contributorIds.includes(roomB.sessionId) &&
         event?.applied === false &&
+        event?.dryRun === true &&
         event?.reason === "staging_preview_only" &&
         Array.isArray(event?.previewLoot);
     });
@@ -571,6 +660,8 @@ try {
   assert(!contributorA?.trustedPlayerId && !contributorA?.playerId, "Contributor A unverified identity was trusted.");
   assert(!contributorB?.trustedPlayerId && !contributorB?.playerId, "Contributor B unverified identity was trusted.");
   assert(contributorA?.displayName === "Regression Pilot A", "Contributor A display name was not included in preview.");
+  assert(rewardPreview?.previewXp === 25, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
+  assert(rewardPreview?.previewCredits === 40, `Unexpected reward preview credits: ${rewardPreview?.previewCredits}`);
   const playerAfterRewardPreview = playerFrom(roomA, roomA.sessionId);
   assert(playerAfterRewardPreview && !("xp" in playerAfterRewardPreview), "Reward preview created player XP field.");
   assert(playerAfterRewardPreview && !("credits" in playerAfterRewardPreview), "Reward preview created player credits field.");
@@ -583,8 +674,15 @@ try {
   });
   assert(claimPreviewResult?.ok === true, "Contributor reward preview claim simulation did not succeed.");
   assert(claimPreviewResult?.applied === false, "Reward preview claim simulation applied real rewards.");
+  assert(claimPreviewResult?.dryRun === true, "Reward preview claim simulation was not marked dry-run.");
   assert(claimPreviewResult?.reason === "staging_preview_only", `Unexpected reward claim simulation reason: ${claimPreviewResult?.reason}`);
   assert(claimPreviewResult?.claimSimulated === true, "Reward preview claim result was not marked simulated.");
+  assert(claimPreviewResult?.rewardWritePlan?.dryRun === true, "Reward claim did not include a dry-run write plan.");
+  assert(claimPreviewResult?.rewardWritePlan?.applied === false, "Reward write plan applied real rewards.");
+  assert(claimPreviewResult?.rewardWritePlan?.eligible === false, "Unverified reward write plan was eligible.");
+  assert(claimPreviewResult?.rewardWritePlan?.blockedReason === "identity_unverified", `Unexpected unverified blocked reason: ${claimPreviewResult?.rewardWritePlan?.blockedReason}`);
+  assert(claimPreviewResult?.rewardWritePlan?.intendedXp > 0, "Reward write plan did not include intended XP.");
+  assert(claimPreviewResult?.rewardWritePlan?.intendedCredits > 0, "Reward write plan did not include intended credits.");
   assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
   assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
   assert(claimPreviewResult?.finalHitPlayerId === "", "Unverified reward claim result included a trusted final hit player id.");

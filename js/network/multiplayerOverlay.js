@@ -1159,11 +1159,27 @@
     if (!result?.botId) return "none";
     if (!result.ok) return `${result.reason || "claim rejected"} / not applied`;
 
+    const plan = result.rewardWritePlan;
+    if (plan) {
+      const eligibility = plan.eligible ? "eligible" : `blocked ${plan.blockedReason || "not verified"}`;
+      const loot = plan.intendedLoot?.length ? plan.intendedLoot.join(", ") : "none";
+      return `${eligibility} / XP ${plan.intendedXp || 0} / C ${plan.intendedCredits || 0} / loot ${loot} / dry run`;
+    }
+
     const selfContribution = Array.isArray(result.contributors)
       ? result.contributors.find((contributor) => contributor.sessionId === status.sessionId)
       : null;
     const selfPercent = selfContribution ? Math.round(Number(selfContribution.percent || 0)) : 0;
     return `preview only / you ${selfPercent}% / not applied`;
+  }
+
+  function getRewardDryRunPanelLabel(status) {
+    const plan = status?.lastRewardClaimResult?.rewardWritePlan;
+    if (!plan) return "";
+
+    const eligibility = plan.eligible ? "Eligible" : `Blocked: ${plan.blockedReason || "not verified"}`;
+    const loot = plan.intendedLoot?.length ? plan.intendedLoot.join(", ") : "none";
+    return `${eligibility} / XP ${plan.intendedXp || 0} / Credits ${plan.intendedCredits || 0} / Loot ${loot}`;
   }
 
   function setDiagnosticsRow(panel, label, value) {
@@ -1327,6 +1343,12 @@
         summary.appendChild(contributionNode);
       }
     }
+    const dryRunLabel = getRewardDryRunPanelLabel(status);
+    if (dryRunLabel) {
+      const dryRun = global.document.createElement("small");
+      dryRun.textContent = `${dryRunLabel} / Dry run only - not applied`;
+      summary.appendChild(dryRun);
+    }
     inner.appendChild(summary);
 
     const button = global.document.createElement("button");
@@ -1396,7 +1418,7 @@
     setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
     if (isStagingMode(status)) {
-      setDiagnosticsRow(panel, "auth", `${status.authStatus || "guest"} / player id ${status.playerIdPresent ? "present" : "missing"}`);
+      setDiagnosticsRow(panel, "auth", `${status.authStatus || "guest"} / trusted id ${status.trustedPlayerIdPresent ? "present" : "missing"}`);
       setDiagnosticsRow(panel, "identity", String(status.displayName || "Pilot").slice(0, 24));
     }
     setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);

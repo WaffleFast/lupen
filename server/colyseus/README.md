@@ -44,6 +44,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Disabled staging bots also broadcast `staging:reward_preview` with `applied: false` and `reason: staging_preview_only`. The preview includes final-hit and top-contributor attribution from staging-only damage contribution tracking, but it never mutates XP, credits, inventory, bounties, saves, Supabase, or progression.
 - Staging-only `reward:claim_preview` / `staging:claimRewardPreview` messages simulate claiming a recent reward preview and reply with `reward:claim_preview_result`. Eligible contributors receive `applied: false` and `reason: staging_preview_only`; non-contributors are rejected safely. No real rewards are marked claimed or applied.
 - Supabase identity sent by the browser client is staging preparation metadata only. The server verifies access tokens with Supabase when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured. Verified tokens set `authStatus: verified` and trusted player ids; missing tokens stay `guest`; failed verification becomes `unverified`. Access tokens are never stored in room state or sent back to clients, and no reward writes are trusted or performed yet.
+- Reward claim simulation now includes a reward write dry-run plan with intended XP, credits, loot, contribution percentage, eligibility, and blocked reason. `dryRun` remains `true` and `applied` remains `false`; no Supabase writes or game progression mutations occur.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
@@ -93,6 +94,18 @@ Manual Colyseus Cloud steps later:
 - For staging identity verification, configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Colyseus Cloud environment variables. Do not commit either value.
 - After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
 - Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
+
+## Future Reward Storage Options
+
+The staging reward write plan is intentionally dry-run only. Future real multiplayer rewards should be written by trusted server code, not by client save mutations.
+
+Possible future storage paths:
+
+- Update the existing `player_saves` snapshot after authoritative server reward resolution. This is simplest, but it couples multiplayer rewards to a large save blob and is harder to audit.
+- Create a dedicated `multiplayer_rewards` table for each authoritative reward event. This is recommended because it gives a durable server-side ledger, makes retries/idempotency easier, and avoids trusting client saves.
+- Create a broader reward ledger table that can include PvE, events, bounties, loot rolls, and claim status later.
+
+Recommendation: use a dedicated server-side reward ledger/table later, then project claimed rewards into player save/profile state through controlled server-side code.
 
 ## CORS Allow-List
 
@@ -197,7 +210,8 @@ The regression test uses two Colyseus clients to verify that:
 - Repeated valid staging hits can disable a bot.
 - Disabling a bot emits a preview-only reward event with `applied: false`, final-hit attribution, top contributor attribution, contributor hit counts, and contribution percentages.
 - Reward previews include trusted contributor player ids only when server-side verification succeeds; unverified/guest contributors use session/display metadata.
-- A contributor can simulate claiming the preview reward, receiving `applied: false`, preview values, and contribution info.
+- A contributor can simulate claiming the preview reward, receiving `applied: false`, `dryRun: true`, preview values, contribution info, and a reward write plan.
+- Verified identity helper coverage confirms a verified/stubbed player would receive an eligible dry-run plan, while unverified/guest claim simulations are blocked from real reward eligibility.
 - A non-contributor preview claim is rejected safely without applying rewards.
 - Bot respawn confirms staging contribution data was cleared.
 - Disabled bots reject further staging damage and then respawn/reset on both clients.
