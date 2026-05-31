@@ -40,6 +40,8 @@
     lastShotEvent: null,
     lastRewardPreview: null,
     lastRewardClaimResult: null,
+    lastStagingTradeOffers: null,
+    lastStagingTradePreview: null,
     lastError: null
   };
   const identity = {
@@ -253,6 +255,8 @@
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
+      lastStagingTradeOffers: connection.lastStagingTradeOffers ? { ...connection.lastStagingTradeOffers } : null,
+      lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -804,6 +808,110 @@
     };
   }
 
+  function normalizeClaimGates(gates) {
+    if (!gates || typeof gates !== "object") return null;
+
+    return {
+      verified: gates.verified === true,
+      allowlisted: gates.allowlisted === true,
+      scope: String(gates.scope || ""),
+      xpWriteAllowed: gates.xpWriteAllowed === true
+    };
+  }
+
+  function normalizeClaimLedger(ledger) {
+    if (!ledger || typeof ledger !== "object") return null;
+
+    return {
+      reachable: ledger.reachable === true,
+      written: ledger.written === true,
+      duplicate: ledger.duplicate === true
+    };
+  }
+
+  function normalizeClaimProgressionShadow(progressionShadow) {
+    if (!progressionShadow || typeof progressionShadow !== "object") return null;
+
+    return {
+      reachable: progressionShadow.reachable === true,
+      written: progressionShadow.written === true
+    };
+  }
+
+  function normalizeClaimPlayerSave(playerSave) {
+    if (!playerSave || typeof playerSave !== "object") return null;
+
+    return {
+      attempted: playerSave.attempted === true,
+      written: playerSave.written === true,
+      xpBefore: Number.isFinite(Number(playerSave.xpBefore)) ? Number(playerSave.xpBefore) : null,
+      xpAfter: Number.isFinite(Number(playerSave.xpAfter)) ? Number(playerSave.xpAfter) : null,
+      creditsWritten: playerSave.creditsWritten === true
+    };
+  }
+
+  function normalizeRewardClaimStatus(status) {
+    if (!status || typeof status !== "object") return null;
+
+    return {
+      ok: status.ok === true,
+      mode: String(status.mode || ""),
+      applied: status.applied === true,
+      xpDelta: Number.isFinite(Number(status.xpDelta)) ? Number(status.xpDelta) : 0,
+      reason: String(status.reason || ""),
+      debugReason: String(status.debugReason || ""),
+      gates: normalizeClaimGates(status.gates),
+      ledger: normalizeClaimLedger(status.ledger),
+      progressionShadow: normalizeClaimProgressionShadow(status.progressionShadow),
+      playerSave: normalizeClaimPlayerSave(status.playerSave)
+    };
+  }
+
+  function normalizeStagingTradeOffer(offer) {
+    if (!offer || typeof offer !== "object") return null;
+
+    return {
+      offerId: String(offer.offerId || ""),
+      resourceId: String(offer.resourceId || ""),
+      resourceName: String(offer.resourceName || "Resource"),
+      buyNode: String(offer.buyNode || ""),
+      sellNode: String(offer.sellNode || ""),
+      buyPrice: Number.isFinite(Number(offer.buyPrice)) ? Number(offer.buyPrice) : 0,
+      sellPrice: Number.isFinite(Number(offer.sellPrice)) ? Number(offer.sellPrice) : 0,
+      maxQuantity: Number.isFinite(Number(offer.maxQuantity)) ? Number(offer.maxQuantity) : 0,
+      refreshSeconds: Number.isFinite(Number(offer.refreshSeconds)) ? Number(offer.refreshSeconds) : 0
+    };
+  }
+
+  function normalizeStagingTradePreview(preview) {
+    if (!preview || typeof preview !== "object") return null;
+
+    return {
+      ok: preview.ok === true,
+      mode: String(preview.mode || "dry_run"),
+      applied: preview.applied === true,
+      offerId: String(preview.offerId || ""),
+      resourceId: String(preview.resourceId || ""),
+      resourceName: String(preview.resourceName || ""),
+      quantity: Number.isFinite(Number(preview.quantity)) ? Number(preview.quantity) : 0,
+      buyNode: String(preview.buyNode || ""),
+      sellNode: String(preview.sellNode || ""),
+      buyPrice: Number.isFinite(Number(preview.buyPrice)) ? Number(preview.buyPrice) : 0,
+      sellPrice: Number.isFinite(Number(preview.sellPrice)) ? Number(preview.sellPrice) : 0,
+      totalCost: Number.isFinite(Number(preview.totalCost)) ? Number(preview.totalCost) : 0,
+      projectedRevenue: Number.isFinite(Number(preview.projectedRevenue)) ? Number(preview.projectedRevenue) : 0,
+      projectedProfit: Number.isFinite(Number(preview.projectedProfit)) ? Number(preview.projectedProfit) : 0,
+      enoughCredits: preview.enoughCredits === true ? true : preview.enoughCredits === false ? false : null,
+      enoughCargo: preview.enoughCargo === true ? true : preview.enoughCargo === false ? false : null,
+      creditsWritten: preview.creditsWritten === true,
+      cargoWritten: preview.cargoWritten === true,
+      saveWritten: preview.saveWritten === true,
+      reason: String(preview.reason || ""),
+      debugReason: String(preview.debugReason || ""),
+      receivedAt: Number.isFinite(Number(preview.receivedAt)) ? Number(preview.receivedAt) : Date.now()
+    };
+  }
+
   function updateBotsFromServerState(serverState) {
     botsById.clear();
 
@@ -987,7 +1095,17 @@
           ? message.previewLoot.map((item) => String(item || "")).filter(Boolean)
           : [],
         applied: message?.applied === true,
+        mode: String(message?.mode || message?.claimStatus?.mode || ""),
+        xpDelta: Number.isFinite(Number(message?.xpDelta ?? message?.claimStatus?.xpDelta))
+          ? Number(message?.xpDelta ?? message?.claimStatus?.xpDelta)
+          : 0,
         dryRun: message?.dryRun === true,
+        debugReason: String(message?.debugReason || message?.claimStatus?.debugReason || ""),
+        gates: normalizeClaimGates(message?.gates || message?.claimStatus?.gates),
+        ledger: normalizeClaimLedger(message?.ledger || message?.claimStatus?.ledger),
+        progressionShadow: normalizeClaimProgressionShadow(message?.progressionShadow || message?.claimStatus?.progressionShadow),
+        playerSave: normalizeClaimPlayerSave(message?.playerSave || message?.claimStatus?.playerSave),
+        claimStatus: normalizeRewardClaimStatus(message?.claimStatus),
         rewardWritePlan: normalizeRewardWritePlan(message?.rewardWritePlan),
         rewardLedgerResult: normalizeRewardLedgerResult(message?.rewardLedgerResult),
         rewardApplicationPlan: normalizeRewardApplicationPlan(message?.rewardApplicationPlan),
@@ -1001,6 +1119,30 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server staging reward claim preview result", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingTrade:offers", (message) => {
+      connection.lastStagingTradeOffers = {
+        ok: message?.ok === true,
+        mode: String(message?.mode || "dry_run"),
+        applied: message?.applied === true,
+        offers: Array.isArray(message?.offers)
+          ? message.offers.map(normalizeStagingTradeOffer).filter(Boolean)
+          : [],
+        creditsWritten: message?.creditsWritten === true,
+        cargoWritten: message?.cargoWritten === true,
+        saveWritten: message?.saveWritten === true,
+        reason: String(message?.reason || ""),
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server staging trade offers", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingTrade:previewResult", (message) => {
+      connection.lastStagingTradePreview = normalizeStagingTradePreview(message);
+      logDev("server staging trade preview", message);
       notifyServerState(activeRoom.state || null);
     });
 
@@ -1078,6 +1220,15 @@
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
+      lastStagingTradeOffers: connection.lastStagingTradeOffers
+        ? {
+          ...connection.lastStagingTradeOffers,
+          offers: Array.isArray(connection.lastStagingTradeOffers.offers)
+            ? connection.lastStagingTradeOffers.offers.map((offer) => ({ ...offer }))
+            : []
+        }
+        : null,
+      lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
@@ -1250,6 +1401,17 @@
       return sendRoomMessage("claimStagingRewardPreview", "reward:claim_preview", {
         botId: options.botId || preview.botId || "",
         rewardPreviewId: options.rewardPreviewId || preview.rewardPreviewId || ""
+      });
+    },
+
+    requestStagingTradeOffers() {
+      return sendRoomMessage("requestStagingTradeOffers", "stagingTrade:listOffers", {});
+    },
+
+    requestStagingTradePreview(options = {}) {
+      return sendRoomMessage("requestStagingTradePreview", "stagingTrade:preview", {
+        offerId: String(options.offerId || ""),
+        quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity
       });
     },
 

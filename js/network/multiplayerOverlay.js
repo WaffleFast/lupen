@@ -16,12 +16,17 @@
   const spaceBotLayerId = "lupenMultiplayerSpaceBotLayer";
   const spaceShotLayerId = "lupenMultiplayerSpaceShotLayer";
   const statusChipId = "lupenMultiplayerStatusChip";
+  const stagingFlowHintId = "lupenMultiplayerStagingFlowHint";
   const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
   const stagingCombatPanelId = "lupenMultiplayerStagingCombatPanel";
+  const stagingTradePanelId = "lupenMultiplayerStagingTradePanel";
   const styleId = "lupenMultiplayerOverlayStyles";
   let unsubscribe = null;
   let renderQueued = false;
   let diagnosticsTimer = null;
+  let stagingTradeOfferId = "";
+  let stagingTradeQuantity = 5;
+  let stagingTradeOffersRequested = false;
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const shipImageById = {
@@ -329,6 +334,88 @@
         box-shadow: none;
       }
 
+      #${stagingTradePanelId} {
+        position: fixed;
+        left: 14px;
+        bottom: 92px;
+        z-index: 76;
+        width: min(318px, calc(100vw - 28px));
+        border: 1px solid rgba(127, 223, 255, 0.28);
+        border-radius: 6px;
+        background: linear-gradient(180deg, rgba(6, 18, 27, 0.88), rgba(5, 11, 18, 0.84));
+        box-shadow: 0 0 16px rgba(0, 150, 220, 0.13), inset 0 0 18px rgba(127, 223, 255, 0.04);
+        color: #d9fbff;
+        font-family: Arial, sans-serif;
+        pointer-events: auto;
+      }
+
+      #${stagingTradePanelId} .lupen-mp-trade-inner {
+        display: grid;
+        gap: 7px;
+        padding: 8px 9px;
+      }
+
+      #${stagingTradePanelId} strong {
+        color: #8ff4ff;
+        font: 900 10px/1 Arial, sans-serif;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      #${stagingTradePanelId} select,
+      #${stagingTradePanelId} input {
+        min-height: 28px;
+        border: 1px solid rgba(127, 223, 255, 0.28);
+        border-radius: 4px;
+        background: rgba(0, 8, 14, 0.82);
+        color: #e8fdff;
+        font: 800 10px/1 Arial, sans-serif;
+      }
+
+      #${stagingTradePanelId} .lupen-mp-trade-controls {
+        display: grid;
+        grid-template-columns: 1fr 56px auto;
+        gap: 6px;
+        align-items: center;
+      }
+
+      #${stagingTradePanelId} button {
+        min-height: 28px;
+        padding: 5px 8px;
+        border: 1px solid rgba(127, 223, 255, 0.42);
+        border-radius: 4px;
+        background: rgba(23, 90, 118, 0.64);
+        color: #e8fdff;
+        cursor: pointer;
+        font: 900 10px/1 Arial, sans-serif;
+        text-transform: uppercase;
+      }
+
+      #${stagingTradePanelId} button:disabled {
+        opacity: 0.48;
+        cursor: default;
+      }
+
+      #${stagingTradePanelId} .lupen-mp-trade-route,
+      #${stagingTradePanelId} .lupen-mp-trade-result,
+      #${stagingTradePanelId} .lupen-mp-trade-note {
+        color: rgba(229, 252, 255, 0.82);
+        font: 800 10px/1.25 Arial, sans-serif;
+      }
+
+      #${stagingTradePanelId} .lupen-mp-trade-result {
+        display: grid;
+        gap: 3px;
+        padding: 6px;
+        border: 1px solid rgba(127, 223, 255, 0.18);
+        border-radius: 5px;
+        background: rgba(127, 223, 255, 0.06);
+      }
+
+      #${stagingTradePanelId} .lupen-mp-trade-note {
+        color: rgba(255, 229, 190, 0.82);
+      }
+
       .lupen-mp-space-ghost {
         position: absolute;
         display: grid;
@@ -613,6 +700,37 @@
         white-space: nowrap;
       }
 
+      #${stagingFlowHintId} {
+        position: fixed;
+        left: 14px;
+        bottom: 14px;
+        z-index: 77;
+        max-width: min(310px, calc(100vw - 28px));
+        padding: 8px 10px;
+        border: 1px solid rgba(127, 223, 255, 0.26);
+        border-radius: 6px;
+        background: rgba(3, 10, 18, 0.7);
+        color: #d9fbff;
+        box-shadow: 0 0 14px rgba(0, 150, 220, 0.14);
+        font: 800 10px/1.3 Arial, sans-serif;
+        pointer-events: none;
+        text-transform: uppercase;
+      }
+
+      #${stagingFlowHintId} strong {
+        display: block;
+        margin-bottom: 3px;
+        color: #80efff;
+        font: 900 10px/1 Arial, sans-serif;
+        letter-spacing: 0.06em;
+      }
+
+      #${stagingFlowHintId} span {
+        display: block;
+        color: rgba(229, 252, 255, 0.82);
+        text-transform: none;
+      }
+
       @keyframes lupen-mp-staging-hit {
         0% {
           transform: translate(-50%, -50%) scale(1);
@@ -797,8 +915,16 @@
     global.document?.getElementById(statusChipId)?.remove();
   }
 
+  function removeStagingFlowHint() {
+    global.document?.getElementById(stagingFlowHintId)?.remove();
+  }
+
   function removeStagingCombatPanel() {
     global.document?.getElementById(stagingCombatPanelId)?.remove();
+  }
+
+  function removeStagingTradePanel() {
+    global.document?.getElementById(stagingTradePanelId)?.remove();
   }
 
   function removeLayers() {
@@ -806,7 +932,9 @@
     removeSpaceLayer();
     removeDiagnosticsPanel();
     removeStatusChip();
+    removeStagingFlowHint();
     removeStagingCombatPanel();
+    removeStagingTradePanel();
   }
 
   function clampMapCoordinate(value) {
@@ -1697,12 +1825,77 @@
     ];
   }
 
+  function getFriendlyClaimReason(reason) {
+    const safeReason = String(reason || "").trim();
+    const labels = {
+      progression_writes_disabled: "progression writes are disabled",
+      reward_application_not_eligible: "verified reward eligibility is missing",
+      identity_guest: "guest identity cannot receive real staging XP",
+      identity_unverified: "Supabase identity is unverified",
+      staging_write_allowlist_missing: "staging write allow-list is missing",
+      player_not_in_staging_write_allowlist: "player is not in the staging write allow-list",
+      verified_player_missing: "verified player id is missing",
+      duplicate_reward_application: "duplicate claim blocked by idempotency",
+      idempotency_not_ready: "idempotency key is not ready",
+      xp_path_missing_or_ambiguous: "XP save path is unavailable",
+      player_save_read_failed: "player save read failed",
+      player_save_missing: "player save is missing",
+      player_save_patch_failed: "player save patch failed",
+      reward_preview_not_eligible: "not eligible for this preview",
+      reward_preview_not_found: "reward preview was not found",
+      reward_preview_id_mismatch: "reward preview id mismatch",
+      staging_preview_only: "preview-only staging claim"
+    };
+    return labels[safeReason] || safeReason || "not eligible";
+  }
+
+  function getClaimStatusSummary(result = {}) {
+    const summary = result.claimStatus || {};
+    return {
+      mode: String(summary.mode || result.mode || ""),
+      applied: summary.applied === true || result.applied === true,
+      xpDelta: Number.isFinite(Number(summary.xpDelta ?? result.xpDelta))
+        ? Number(summary.xpDelta ?? result.xpDelta)
+        : Number(result.rewardWritePlan?.intendedXp || result.rewardApplicationPlan?.xpDelta || 0),
+      reason: String(summary.reason || result.reason || ""),
+      debugReason: String(summary.debugReason || result.debugReason || ""),
+      gates: summary.gates || result.gates || null,
+      ledger: summary.ledger || result.ledger || null,
+      progressionShadow: summary.progressionShadow || result.progressionShadow || null,
+      playerSave: summary.playerSave || result.playerSave || null
+    };
+  }
+
   function getClaimPanelLabel(status, selectedBot) {
     const result = status?.lastRewardClaimResult;
     if (!isClaimResultForBot(status, selectedBot)) return "";
 
+    const claimStatus = getClaimStatusSummary(result);
+    const reason = claimStatus.debugReason || claimStatus.reason || result.reason;
+    const xpDelta = Math.round(Number(claimStatus.xpDelta || result.rewardWritePlan?.intendedXp || 0));
+    const playerSave = claimStatus.playerSave || {};
+    const gates = claimStatus.gates || {};
+
     if (!result.ok) {
-      return `Claim simulation blocked: ${result.reason || "not eligible"}. No save changed.`;
+      return `Claim blocked: ${getFriendlyClaimReason(reason)}. No save changed.`;
+    }
+
+    if (playerSave.written || result.playerSavePatchResult?.applied) {
+      const xpBefore = playerSave.xpBefore ?? result.playerSavePatchResult?.xpBefore;
+      const xpAfter = playerSave.xpAfter ?? result.playerSavePatchResult?.xpAfter;
+      return `XP-only staging claim applied: ${formatPreviewValue(xpBefore)} -> ${formatPreviewValue(xpAfter)}. No credits or loot awarded.`;
+    }
+
+    if (claimStatus.mode === "blocked") {
+      return `Claim blocked: ${getFriendlyClaimReason(reason)}. XP preview +${xpDelta}; no credits or loot awarded.`;
+    }
+
+    if (gates.xpWriteAllowed) {
+      return `XP-only claim available: +${xpDelta} XP if server gates remain enabled. No credits or loot awarded in staging.`;
+    }
+
+    if (claimStatus.mode === "dry_run") {
+      return `Simulated claim: +${xpDelta} XP dry-run only. Progression writes disabled; no credits or loot awarded.`;
     }
 
     const rewardPlan = result.rewardWritePlan;
@@ -1730,10 +1923,59 @@
     return "Claim received. No save changed.";
   }
 
+  function getClaimButtonState(status, selectedBot) {
+    const result = isClaimResultForBot(status, selectedBot) ? status?.lastRewardClaimResult : null;
+    const claimStatus = getClaimStatusSummary(result || {});
+    const reason = claimStatus.debugReason || claimStatus.reason || result?.reason || "";
+    const duplicateBlocked = reason === "duplicate_reward_application" ||
+      result?.playerSavePatchResult?.duplicateDetected === true ||
+      result?.playerSavePatchPlan?.duplicateDetected === true;
+
+    if (claimStatus.playerSave?.written || result?.playerSavePatchResult?.applied || claimStatus.mode === "xp_only") {
+      return {
+        label: "Claimed",
+        disabled: true,
+        title: "XP-only staging claim already applied. No credits or loot."
+      };
+    }
+
+    if (duplicateBlocked) {
+      return {
+        label: "Claimed",
+        disabled: true,
+        title: "Duplicate staging claim blocked by idempotency."
+      };
+    }
+
+    if (claimStatus.gates?.xpWriteAllowed) {
+      return {
+        label: "Claim XP",
+        disabled: false,
+        title: "Attempt gated XP-only staging claim. No credits or loot."
+      };
+    }
+
+    return {
+      label: "Sim Claim",
+      disabled: false,
+      title: "Simulate a staging reward claim. No real rewards are applied."
+    };
+  }
+
   function getRewardClaimResultLabel(status) {
     const result = status?.lastRewardClaimResult;
     if (!result?.botId) return "none";
     if (!result.ok) return `${result.reason || "claim rejected"} / not applied`;
+
+    const claimStatus = getClaimStatusSummary(result);
+    if (claimStatus.mode) {
+      const gateLabel = claimStatus.gates?.xpWriteAllowed
+        ? "XP gate open"
+        : claimStatus.gates?.verified
+          ? `XP gate blocked ${claimStatus.debugReason || claimStatus.reason || "dry-run"}`
+          : "identity not verified";
+      return `${claimStatus.mode} / XP +${Math.round(Number(claimStatus.xpDelta || 0))} / ${gateLabel} / C 0 / loot none`;
+    }
 
     const plan = result.rewardWritePlan;
     const ledger = result.rewardLedgerResult;
@@ -1910,6 +2152,157 @@
     });
   }
 
+  function formatTradeNumber(value) {
+    const number = Math.round(Number(value || 0));
+    return Number.isFinite(number) ? number.toLocaleString("en-US") : "0";
+  }
+
+  function getTradeOffers(status) {
+    return Array.isArray(status?.lastStagingTradeOffers?.offers)
+      ? status.lastStagingTradeOffers.offers
+      : [];
+  }
+
+  function getSelectedTradeOffer(status) {
+    const offers = getTradeOffers(status);
+    if (!offers.length) return null;
+    if (!stagingTradeOfferId || !offers.some((offer) => offer.offerId === stagingTradeOfferId)) {
+      stagingTradeOfferId = offers[0].offerId;
+    }
+    return offers.find((offer) => offer.offerId === stagingTradeOfferId) || offers[0] || null;
+  }
+
+  function requestStagingTradeOffersIfNeeded(status) {
+    if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) {
+      stagingTradeOffersRequested = false;
+      return;
+    }
+
+    if (getTradeOffers(status).length || stagingTradeOffersRequested) return;
+    stagingTradeOffersRequested = true;
+    getClient()?.requestStagingTradeOffers?.();
+  }
+
+  function requestStagingTradePreview(status) {
+    const offer = getSelectedTradeOffer(status);
+    if (!offer?.offerId) return;
+
+    // Staging-only trade preview. This does not call real trade terminal buy,
+    // sell, cargo, credit, save, Supabase, inventory, or economy systems.
+    getClient()?.requestStagingTradePreview?.({
+      offerId: offer.offerId,
+      quantity: stagingTradeQuantity
+    });
+  }
+
+  function renderStagingTradePanel(status) {
+    removeStagingTradePanel();
+    if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) return;
+
+    ensureStyles();
+    requestStagingTradeOffersIfNeeded(status);
+
+    const offers = getTradeOffers(status);
+    const selectedOffer = getSelectedTradeOffer(status);
+    const result = status?.lastStagingTradePreview;
+
+    const panel = global.document.createElement("div");
+    panel.id = stagingTradePanelId;
+    panel.setAttribute("aria-label", "Staging trade preview");
+
+    const inner = global.document.createElement("div");
+    inner.className = "lupen-mp-trade-inner";
+
+    const title = global.document.createElement("strong");
+    title.textContent = "Staging Trade Preview";
+    inner.appendChild(title);
+
+    const controls = global.document.createElement("div");
+    controls.className = "lupen-mp-trade-controls";
+
+    const select = global.document.createElement("select");
+    select.disabled = !offers.length;
+    offers.forEach((offer) => {
+      const option = global.document.createElement("option");
+      option.value = offer.offerId;
+      option.textContent = `${offer.resourceName} / ${offer.buyNode} -> ${offer.sellNode}`;
+      if (offer.offerId === selectedOffer?.offerId) option.selected = true;
+      select.appendChild(option);
+    });
+    select.addEventListener("change", () => {
+      stagingTradeOfferId = select.value;
+      scheduleRender();
+    });
+    controls.appendChild(select);
+
+    const quantity = global.document.createElement("input");
+    quantity.type = "number";
+    quantity.min = "1";
+    quantity.max = String(selectedOffer?.maxQuantity || 99);
+    quantity.step = "1";
+    quantity.value = String(stagingTradeQuantity);
+    quantity.disabled = !selectedOffer;
+    quantity.addEventListener("change", () => {
+      stagingTradeQuantity = Math.max(1, Math.min(Number(selectedOffer?.maxQuantity || 99), Math.round(Number(quantity.value || 1))));
+      scheduleRender();
+    });
+    controls.appendChild(quantity);
+
+    const previewButton = global.document.createElement("button");
+    previewButton.type = "button";
+    previewButton.textContent = offers.length ? "Preview" : "Load";
+    previewButton.disabled = !offers.length && stagingTradeOffersRequested;
+    previewButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!offers.length) {
+        stagingTradeOffersRequested = false;
+        requestStagingTradeOffersIfNeeded(status);
+        return;
+      }
+      requestStagingTradePreview(status);
+    });
+    controls.appendChild(previewButton);
+    inner.appendChild(controls);
+
+    if (selectedOffer) {
+      const route = global.document.createElement("div");
+      route.className = "lupen-mp-trade-route";
+      route.textContent = `${selectedOffer.resourceName}: CR ${formatTradeNumber(selectedOffer.buyPrice)} buy / CR ${formatTradeNumber(selectedOffer.sellPrice)} sell / max ${formatTradeNumber(selectedOffer.maxQuantity)}`;
+      inner.appendChild(route);
+    }
+
+    if (result?.offerId) {
+      const resultBox = global.document.createElement("div");
+      resultBox.className = "lupen-mp-trade-result";
+      const lines = result.ok
+        ? [
+          `${result.resourceName} x${formatTradeNumber(result.quantity)} / ${result.buyNode} -> ${result.sellNode}`,
+          `Cost CR ${formatTradeNumber(result.totalCost)} / Revenue CR ${formatTradeNumber(result.projectedRevenue)}`,
+          `Projected profit CR ${formatTradeNumber(result.projectedProfit)}`,
+          `Credits check: ${result.enoughCredits === null ? "unknown" : result.enoughCredits ? "enough" : "not enough"} / Cargo check: ${result.enoughCargo === null ? "unknown" : result.enoughCargo ? "enough" : "not enough"}`
+        ]
+        : [
+          `Preview blocked: ${result.reason || "invalid trade preview"}`,
+          result.debugReason || "No trade data changed."
+        ];
+      lines.forEach((line) => {
+        const row = global.document.createElement("span");
+        row.textContent = line;
+        resultBox.appendChild(row);
+      });
+      inner.appendChild(resultBox);
+    }
+
+    const note = global.document.createElement("div");
+    note.className = "lupen-mp-trade-note";
+    note.textContent = "Dry run only - no credits, cargo, inventory, saves, bounties, loot, or economy changed.";
+    inner.appendChild(note);
+
+    panel.appendChild(inner);
+    global.document.body.appendChild(panel);
+  }
+
   function renderStatusChip(status) {
     removeStatusChip();
     if (!isStagingMode(status) || !status?.enabled) return;
@@ -1933,6 +2326,55 @@
     chip.appendChild(room);
 
     global.document.body.appendChild(chip);
+  }
+
+  function getStagingFlowHint(status, selectedBot, players, bots) {
+    if (!status?.isConnected) {
+      return "Connecting to the staging room. Multiplayer is still presence-only outside this test flow.";
+    }
+
+    if (!bots.length) {
+      return "Waiting for server-owned staging bots.";
+    }
+
+    if (!selectedBot?.id) {
+      const pilotText = players.length ? `${players.length} remote pilot${players.length === 1 ? "" : "s"} connected. ` : "";
+      return `${pilotText}Select a staging bot to test server-owned lock-on and damage.`;
+    }
+
+    if (selectedBot.disabled) {
+      return status?.lastRewardPreview?.botId === selectedBot.id
+        ? "Target destroyed. Review the XP preview, then use the claim button to test the gated reward path."
+        : "Target destroyed. Waiting for the server to respawn it.";
+    }
+
+    const cooldown = Math.max(0, Number(status.fireCooldownRemainingMs || 0));
+    if (cooldown > 0) {
+      return `Server cooldown active: ${formatCooldown(cooldown)} remaining. Damage is server-owned.`;
+    }
+
+    return "Target locked. Use Staging Fire to test server damage. No credits, loot, bounties, PvP, or broad progression are enabled.";
+  }
+
+  function renderStagingFlowHint(status, selectedBot, players, bots) {
+    removeStagingFlowHint();
+    if (!isStagingMode(status) || !status?.enabled || isMpDebugEnabled()) return;
+
+    ensureStyles();
+
+    const hint = global.document.createElement("div");
+    hint.id = stagingFlowHintId;
+    hint.setAttribute("aria-hidden", "true");
+
+    const title = global.document.createElement("strong");
+    title.textContent = "Staging Test Flow";
+    hint.appendChild(title);
+
+    const text = global.document.createElement("span");
+    text.textContent = getStagingFlowHint(status, selectedBot, players, bots);
+    hint.appendChild(text);
+
+    global.document.body.appendChild(hint);
   }
 
   function addDiagnosticsActions(panel, status, selectedBot) {
@@ -2069,14 +2511,17 @@
     inner.appendChild(button);
 
     if (canClaimRewardPreview(status, selectedBot)) {
+      const claimState = getClaimButtonState(status, selectedBot);
       const claimButton = global.document.createElement("button");
       claimButton.type = "button";
       claimButton.className = "lupen-mp-staging-fire";
-      claimButton.textContent = "Sim Claim";
-      claimButton.title = "Simulate a staging reward claim. No rewards are applied.";
+      claimButton.textContent = claimState.label;
+      claimButton.title = claimState.title;
+      claimButton.disabled = claimState.disabled;
       claimButton.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (claimState.disabled) return;
         sendStagingRewardPreviewClaim(status);
       });
       inner.appendChild(claimButton);
@@ -2180,6 +2625,11 @@
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
       setDiagnosticsRow(panel, "claim preview", getRewardClaimResultLabel(status));
+      if (status.lastRewardClaimResult) {
+        const claimStatus = getClaimStatusSummary(status.lastRewardClaimResult);
+        setDiagnosticsRow(panel, "claim mode", `${claimStatus.mode || "unknown"} / XP +${Math.round(Number(claimStatus.xpDelta || 0))}`);
+        setDiagnosticsRow(panel, "claim gates", `verified ${claimStatus.gates?.verified ? "yes" : "no"} / allow ${claimStatus.gates?.allowlisted ? "yes" : "no"} / XP write ${claimStatus.gates?.xpWriteAllowed ? "yes" : "no"}`);
+      }
       const applicationLabel = getRewardApplicationLabel(status);
       if (applicationLabel) setDiagnosticsRow(panel, "application", applicationLabel);
       const progressionPreviewLabel = getProgressionPreviewLabel(status);
@@ -2188,6 +2638,14 @@
       if (progressionShadowLabel) setDiagnosticsRow(panel, "shadow", progressionShadowLabel);
       const playerSavePatchLabel = getPlayerSavePatchLabel(status);
       if (playerSavePatchLabel) setDiagnosticsRow(panel, "player_saves", playerSavePatchLabel);
+      const tradeOffers = getTradeOffers(status);
+      const tradePreview = status.lastStagingTradePreview;
+      setDiagnosticsRow(panel, "trade offers", `${tradeOffers.length} dry-run`);
+      if (tradePreview) {
+        setDiagnosticsRow(panel, "trade preview", tradePreview.ok
+          ? `profit CR ${formatTradeNumber(tradePreview.projectedProfit)} / writes no`
+          : `${tradePreview.reason || "blocked"} / writes no`);
+      }
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
@@ -2237,6 +2695,8 @@
     const status = getClient()?.getStatus?.() || {};
     const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
     renderStatusChip(status);
+    renderStagingFlowHint(status, selectedBot, players, bots);
+    renderStagingTradePanel(status);
     renderSectorGhosts(players);
     renderSectorBots(bots);
     renderSpaceGhosts(players);

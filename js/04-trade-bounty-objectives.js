@@ -4,6 +4,27 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString("en-GB");
 }
 
+function isMultiplayerStagingActive() {
+  try {
+    return typeof window !== "undefined" &&
+      window.location &&
+      new URLSearchParams(window.location.search).get("mp") === "staging";
+  } catch (_err) {
+    return false;
+  }
+}
+
+function blockRealTradeMutationInMultiplayerStaging() {
+  if (!isMultiplayerStagingActive()) return false;
+
+  const message = "Real trade is disabled in multiplayer staging. Use Staging Trade Preview for dry-run testing.";
+  if (typeof addHudToast === "function") addHudToast(message);
+  if (typeof addActivityLog === "function") addActivityLog(message);
+  if (typeof console !== "undefined" && typeof console.info === "function") {
+    console.info(`[Lupen multiplayer] ${message}`);
+  }
+  return true;
+}
 
 function renderNpcItemBroker() {
   const broker = document.getElementById("npcItemBroker");
@@ -245,6 +266,7 @@ function renderMarketplace() {
 function renderMapOneMarketTerminal(goodsBox) {
   normalizeMarketBuilderState();
 
+  const stagingTradeLocked = isMultiplayerStagingActive();
   const currentPlanet = getCurrentMarketPlanet();
   const orderedMarketPlanets = getOrderedMapOneMarketPlanets(currentPlanet);
   const resource = selectedMarketResource;
@@ -261,8 +283,11 @@ function renderMapOneMarketTerminal(goodsBox) {
   const held = cargo[resource] || 0;
   const atTargetWithCargo = held > 0 && currentPlanet === targetPlanet;
   const maxBuy = getMarketMaxBuyQuantity(resource, currentPlanet);
-  const canBuy = quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
+  const canBuy = !stagingTradeLocked && quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
   const info = commodityInfo[resource] || {};
+  const stagingTradeNotice = stagingTradeLocked
+    ? `<div class="trade-preview-note">Real Trade Terminal actions are disabled in MP staging. Use Staging Trade Preview for dry-run testing.</div>`
+    : "";
 
   goodsBox.innerHTML = `
     <div class="map-one-market-terminal">
@@ -323,10 +348,11 @@ function renderMapOneMarketTerminal(goodsBox) {
             <div class="market-amount-control">
               <strong>${formatNumber(quantity)} units</strong>
               <button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
-              <button class="trade-primary-action" onclick="buyMarketCargo()" ${canBuy ? "" : "disabled"}>Buy Cargo</button>
+              <button class="trade-primary-action" onclick="buyMarketCargo()" ${canBuy ? "" : "disabled"}>${stagingTradeLocked ? "Use Staging Preview" : "Buy Cargo"}</button>
             </div>
           </label>
         </div>
+        ${stagingTradeNotice}
 
         <div class="market-builder-summary">
           <div><span>Total Cost</span><strong>CR ${formatNumber(totalCost)}</strong></div>
@@ -334,7 +360,7 @@ function renderMapOneMarketTerminal(goodsBox) {
         </div>
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
-          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()">${atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
+          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? "disabled" : ""}>${stagingTradeLocked ? "Disabled in MP staging" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
       </aside>
     </div>
@@ -376,6 +402,8 @@ function setMarketQuantityMax() {
 }
 
 function buyMarketCargo() {
+  if (blockRealTradeMutationInMultiplayerStaging()) return;
+
   normalizeMarketBuilderState();
 
   const currentPlanet = getCurrentMarketPlanet();
@@ -420,6 +448,8 @@ function buyMarketCargo() {
 }
 
 function sellMarketCargo() {
+  if (blockRealTradeMutationInMultiplayerStaging()) return;
+
   normalizeMarketBuilderState();
   const good = selectedMarketResource;
   const held = cargo[good] || 0;
@@ -459,6 +489,7 @@ function sellMarketCargo() {
 function renderBuyCommodities(market, stock, goodsBox) {
   goodsBox.innerHTML = `<div class="trade-commodity-grid"></div>`;
   const grid = goodsBox.querySelector(".trade-commodity-grid");
+  const stagingTradeLocked = isMultiplayerStagingActive();
 
   MAP_ONE_TRADE_RESOURCES.forEach(good => {
     const buyPrice = market[good];
@@ -515,7 +546,7 @@ function renderBuyCommodities(market, stock, goodsBox) {
             oninput="syncTradeInput('${good}', 'buy')"
           />
           <button onclick="setTradeMax('${good}', 'buy')">Max</button>
-          <button onclick="buyGood('${good}')">Buy</button>
+          <button onclick="buyGood('${good}')" ${stagingTradeLocked ? "disabled" : ""}>${stagingTradeLocked ? "MP Staging" : "Buy"}</button>
         </div>
       </div>
     `;
@@ -527,6 +558,7 @@ function renderBuyCommodities(market, stock, goodsBox) {
 
 function renderSellCommodities(market, stock, goodsBox) {
   const heldGoods = mineralKeys.filter(good => (cargo[good] || 0) > 0);
+  const stagingTradeLocked = isMultiplayerStagingActive();
 
   if (!heldGoods.length) {
     goodsBox.innerHTML = `<div class="terminal-empty-state">Your cargo hold is empty. Buy or salvage commodities first.</div>`;
@@ -592,7 +624,7 @@ function renderSellCommodities(market, stock, goodsBox) {
             oninput="syncTradeInput('${good}', 'sell')"
           />
           <button onclick="setTradeMax('${good}', 'sell')">All</button>
-          <button onclick="sellGood('${good}')">Sell</button>
+          <button onclick="sellGood('${good}')" ${stagingTradeLocked ? "disabled" : ""}>${stagingTradeLocked ? "MP Staging" : "Sell"}</button>
         </div>
       </div>
     `;
@@ -2171,6 +2203,8 @@ function renderTradeQuantityControls(good, mode, maxValue, defaultValue = 0, act
   const value = clampNumber(defaultValue || 0, 0, max);
   const actionFn = mode === "sell" ? "sellGood" : "buyGood";
   const escapedGood = escapeJsString(good);
+  const stagingTradeLocked = isMultiplayerStagingActive();
+  const safeActionLabel = stagingTradeLocked ? "Disabled in MP staging" : actionLabel;
 
   return `
     <div class="trade-quantity-panel">
@@ -2193,7 +2227,7 @@ function renderTradeQuantityControls(good, mode, maxValue, defaultValue = 0, act
         />
         <button class="trade-step-btn" onclick="adjustTradeQuantity('${escapedGood}', '${mode}', 1)" ${max <= 0 ? "disabled" : ""}>+</button>
         <button class="trade-quick-btn trade-amount-btn trade-max-btn" onclick="setTradeMax('${escapedGood}', '${mode}')" ${max <= 0 ? "disabled" : ""}>Max</button>
-        <button id="${mode}Action-${id}" class="trade-primary-action" onclick="${actionFn}('${escapedGood}')" ${value <= 0 || max <= 0 ? "disabled" : ""}>${actionLabel}</button>
+        <button id="${mode}Action-${id}" class="trade-primary-action" onclick="${actionFn}('${escapedGood}')" ${stagingTradeLocked || value <= 0 || max <= 0 ? "disabled" : ""}>${safeActionLabel}</button>
       </div>
     </div>
   `;
@@ -2286,7 +2320,7 @@ function updateTradePreview(good) {
     if (buyRange) buyRange.value = buyAmount;
     if (buyQty) buyQty.value = buyAmount;
     const buyAction = document.getElementById(`buyAction-${id}`);
-    if (buyAction) buyAction.disabled = buyAmount <= 0;
+    if (buyAction) buyAction.disabled = isMultiplayerStagingActive() || buyAmount <= 0;
     buySummary.innerHTML = `${formatNumber(buyAmount)} units / <span class="mini-credit">CR</span>${formatNumber(investment)}`;
 
     if (buyRoi) {
@@ -2307,7 +2341,7 @@ function updateTradePreview(good) {
     if (sellRange) sellRange.value = sellAmount;
     if (sellQty) sellQty.value = sellAmount;
     const sellAction = document.getElementById(`sellAction-${id}`);
-    if (sellAction) sellAction.disabled = sellAmount <= 0;
+    if (sellAction) sellAction.disabled = isMultiplayerStagingActive() || sellAmount <= 0;
     sellSummary.innerHTML = `${formatNumber(sellAmount)} units / <span class="mini-credit">CR</span>${formatNumber(sellAmount * sellPrice)}`;
   }
 }
@@ -2327,6 +2361,8 @@ function getCurrentMarketStock() {
 }
 
 function buyGood(good) {
+  if (blockRealTradeMutationInMultiplayerStaging()) return;
+
   const price = getEffectiveBuyPrice(good, currentNode);
   const quantity = getTradeQuantity(good, "buy");
 
@@ -2373,6 +2409,8 @@ function buyGood(good) {
 }
 
 function sellGood(good) {
+  if (blockRealTradeMutationInMultiplayerStaging()) return;
+
   const price = getEffectiveSellPrice(good, currentNode);
   const quantity = getTradeQuantity(good, "sell");
   const maxSell = Math.min(quantity, cargo[good]);
