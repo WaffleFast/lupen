@@ -12,6 +12,10 @@ import {
   buildProgressionPreview,
   fetchPlayerSavePreviewContext
 } from "../services/playerSavePreviewService.js";
+import {
+  buildProgressionShadowEntry,
+  writeProgressionShadowEntry
+} from "../services/progressionShadowService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -899,6 +903,14 @@ export class LupenSectorRoom extends Room {
       reason,
       playerId: ""
     }, rewardApplicationPlan);
+    const progressionShadowEntry = buildProgressionShadowEntry(rewardApplicationPlan, progressionPreview, {});
+    const progressionShadowResult = {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      skippedReason: reason,
+      entry: progressionShadowEntry
+    };
 
     client.send("reward:claim_preview_result", {
       ok: false,
@@ -930,6 +942,8 @@ export class LupenSectorRoom extends Room {
         plan: rewardApplicationPlan
       },
       progressionPreview,
+      progressionShadowEntry,
+      progressionShadowResult,
       receivedAt: Date.now()
     });
   }
@@ -999,6 +1013,12 @@ export class LupenSectorRoom extends Room {
         saveSummary: null
       };
     const progressionPreview = buildProgressionPreview(savePreviewContext, rewardApplicationPlan);
+    const progressionShadowEntry = buildProgressionShadowEntry(
+      rewardApplicationPlan,
+      progressionPreview,
+      rewardLedgerResult
+    );
+    const progressionShadowResult = await writeProgressionShadowEntry(progressionShadowEntry);
 
     client.send("reward:claim_preview_result", {
       ...preview,
@@ -1016,6 +1036,8 @@ export class LupenSectorRoom extends Room {
       rewardApplicationPlan,
       rewardApplicationResult,
       progressionPreview,
+      progressionShadowEntry,
+      progressionShadowResult,
       receivedAt: Date.now()
     });
   }

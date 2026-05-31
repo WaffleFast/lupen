@@ -18,6 +18,10 @@ import {
   buildProgressionPreview,
   fetchPlayerSavePreviewContext
 } from "../src/services/playerSavePreviewService.js";
+import {
+  buildProgressionShadowEntry,
+  writeProgressionShadowEntry
+} from "../src/services/progressionShadowService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -392,6 +396,92 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   const unavailableProgressionPreview = buildProgressionPreview(missingSaveContext, applicationPlan);
   assert(unavailableProgressionPreview?.available === false, "Missing-save progression preview was available.");
   assert(unavailableProgressionPreview?.reason === "save_missing", `Unexpected missing-save progression preview reason: ${unavailableProgressionPreview?.reason}`);
+
+  const shadowEntry = buildProgressionShadowEntry(applicationPlan, progressionPreview, {
+    ledgerId: "11111111-1111-4111-8111-111111111111",
+    entry: ledgerEntry
+  });
+  assert(shadowEntry.player_id === "verified-player-a", "Progression shadow entry did not include verified player id.");
+  assert(shadowEntry.xp_delta === 20, `Unexpected shadow XP delta: ${shadowEntry.xp_delta}`);
+  assert(shadowEntry.credits_delta === 32, `Unexpected shadow credits delta: ${shadowEntry.credits_delta}`);
+  assert(shadowEntry.current_xp === 80 && shadowEntry.preview_xp === 100, "Shadow entry did not include progression preview XP.");
+  assert(shadowEntry.current_credits === 1200 && shadowEntry.preview_credits === 1232, "Shadow entry did not include progression preview credits.");
+  assert(shadowEntry.applied_to_real_save === false && shadowEntry.dry_run === true, "Shadow entry was not dry-run/unapplied.");
+  assert(shadowEntry.source_ledger_id === "11111111-1111-4111-8111-111111111111", "Shadow entry did not include source ledger id.");
+  const disabledShadowResult = await writeProgressionShadowEntry(shadowEntry, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_SHADOW_WRITES: "false",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    }
+  });
+  assert(disabledShadowResult?.dryRun === true, "Disabled shadow adapter did not return dryRun true.");
+  assert(disabledShadowResult?.applied === false, "Disabled shadow adapter applied progression.");
+  assert(disabledShadowResult?.skippedReason === "progression_shadow_writes_disabled", `Unexpected disabled shadow reason: ${disabledShadowResult?.skippedReason}`);
+
+  const missingEnvShadowResult = await writeProgressionShadowEntry(shadowEntry, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_SHADOW_WRITES: "true"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run without Supabase config");
+    }
+  });
+  assert(missingEnvShadowResult?.dryRun === true, "Missing-env shadow result was not dry-run.");
+  assert(missingEnvShadowResult?.applied === false, "Missing-env shadow result applied progression.");
+  assert(missingEnvShadowResult?.skippedReason === "supabase_config_missing", `Unexpected missing-env shadow reason: ${missingEnvShadowResult?.skippedReason}`);
+
+  const blockedShadowApplicationPlan = buildRewardApplicationPlan({
+    authStatus: "unverified",
+    blockedReason: "identity_unverified",
+    botId: "dev-bot-erebus-1",
+    botName: "Erebus Drone",
+    intendedXp: 20,
+    intendedCredits: 32
+  });
+  const blockedShadowEntry = buildProgressionShadowEntry(blockedShadowApplicationPlan, unavailableProgressionPreview, {});
+  const blockedShadowResult = await writeProgressionShadowEntry(blockedShadowEntry, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_SHADOW_WRITES: "true",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run for an ineligible shadow entry");
+    }
+  });
+  assert(blockedShadowResult?.dryRun === true, "Blocked shadow result was not dry-run.");
+  assert(blockedShadowResult?.applied === false, "Blocked shadow result applied progression.");
+  assert(blockedShadowResult?.skippedReason === "progression_shadow_not_eligible", `Unexpected blocked shadow reason: ${blockedShadowResult?.skippedReason}`);
+
+  let shadowWriteUrl = "";
+  let shadowWriteOptions = null;
+  const enabledShadowResult = await writeProgressionShadowEntry(shadowEntry, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_SHADOW_WRITES: "true",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      shadowWriteUrl = url;
+      shadowWriteOptions = options;
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return [{ id: "shadow-row-1" }];
+        }
+      };
+    }
+  });
+  assert(enabledShadowResult?.ok === true, "Enabled shadow adapter mock did not succeed.");
+  assert(enabledShadowResult?.shadowId === "shadow-row-1", "Enabled shadow adapter did not return inserted shadow id.");
+  assert(enabledShadowResult?.applied === false && enabledShadowResult?.dryRun === true, "Enabled shadow adapter applied progression.");
+  assert(shadowWriteUrl === "https://example.supabase.co/rest/v1/multiplayer_progression_shadow", `Unexpected shadow write URL: ${shadowWriteUrl}`);
+  assert(shadowWriteOptions?.method === "POST", "Shadow write did not use POST.");
+  assert(!shadowWriteUrl.includes("player_saves"), "Shadow write targeted player_saves.");
+  const shadowWriteBody = JSON.parse(shadowWriteOptions?.body || "{}");
+  assert(shadowWriteBody.applied_to_real_save === false && shadowWriteBody.dry_run === true, "Shadow write body was not dry-run/unapplied.");
 
   const disabledLedgerResult = await writeRewardLedgerEntry(ledgerEntry, {
     env: {
@@ -1056,6 +1146,11 @@ try {
   assert(claimPreviewResult?.progressionPreview?.applied === false, "Progression preview applied progression.");
   assert(claimPreviewResult?.progressionPreview?.available === false, "Unverified progression preview was unexpectedly available.");
   assert(claimPreviewResult?.progressionPreview?.reason === "identity_unverified", `Unexpected unverified progression preview reason: ${claimPreviewResult?.progressionPreview?.reason}`);
+  assert(claimPreviewResult?.progressionShadowEntry?.dry_run === true, "Progression shadow entry was not dry-run.");
+  assert(claimPreviewResult?.progressionShadowEntry?.applied_to_real_save === false, "Progression shadow entry applied to real save.");
+  assert(claimPreviewResult?.progressionShadowResult?.dryRun === true, "Progression shadow result was not dry-run.");
+  assert(claimPreviewResult?.progressionShadowResult?.applied === false, "Progression shadow result applied progression.");
+  assert(claimPreviewResult?.progressionShadowResult?.skippedReason === "progression_shadow_writes_disabled", `Unexpected progression shadow skipped reason: ${claimPreviewResult?.progressionShadowResult?.skippedReason}`);
   assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
   assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
   assert(claimPreviewResult?.finalHitPlayerId === "", "Unverified reward claim result included a trusted final hit player id.");

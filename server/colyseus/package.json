@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Local-only Colyseus prototype server for Lupen multiplayer groundwork.",
   "scripts": {
-    "build": "node --check src/index.js && node --check src/app.config.js && node --check src/rooms/LupenSectorRoom.js && node --check src/services/rewardLedgerService.js && node --check src/services/rewardApplicationService.js && node --check src/services/playerSavePreviewService.js && node --check ecosystem.config.js",
+    "build": "node --check src/index.js && node --check src/app.config.js && node --check src/rooms/LupenSectorRoom.js && node --check src/services/rewardLedgerService.js && node --check src/services/rewardApplicationService.js && node --check src/services/playerSavePreviewService.js && node --check src/services/progressionShadowService.js && node --check ecosystem.config.js",
     "start": "node src/index.js",
     "dev": "node src/index.js",
     "smoke": "node scripts/smoke-test.js",

@@ -705,6 +705,35 @@
     };
   }
 
+  function normalizeProgressionShadowResult(result) {
+    if (!result || typeof result !== "object") return null;
+
+    return {
+      ok: result.ok === true,
+      applied: result.applied === true,
+      dryRun: result.dryRun !== false,
+      skippedReason: String(result.skippedReason || ""),
+      shadowId: String(result.shadowId || ""),
+      entry: result.entry && typeof result.entry === "object"
+        ? {
+          playerId: String(result.entry.player_id || ""),
+          sourceLedgerId: String(result.entry.source_ledger_id || ""),
+          sourceEventId: String(result.entry.source_event_id || ""),
+          roomName: String(result.entry.room_name || ""),
+          rewardReason: String(result.entry.reward_reason || "staging_bot_disabled"),
+          currentXp: Number.isFinite(Number(result.entry.current_xp)) ? Number(result.entry.current_xp) : null,
+          previewXp: Number.isFinite(Number(result.entry.preview_xp)) ? Number(result.entry.preview_xp) : null,
+          xpDelta: Number.isFinite(Number(result.entry.xp_delta)) ? Number(result.entry.xp_delta) : 0,
+          currentCredits: Number.isFinite(Number(result.entry.current_credits)) ? Number(result.entry.current_credits) : null,
+          previewCredits: Number.isFinite(Number(result.entry.preview_credits)) ? Number(result.entry.preview_credits) : null,
+          creditsDelta: Number.isFinite(Number(result.entry.credits_delta)) ? Number(result.entry.credits_delta) : 0,
+          appliedToRealSave: result.entry.applied_to_real_save === true,
+          dryRun: result.entry.dry_run !== false
+        }
+        : null
+    };
+  }
+
   function updateBotsFromServerState(serverState) {
     botsById.clear();
 
@@ -894,6 +923,7 @@
         rewardApplicationPlan: normalizeRewardApplicationPlan(message?.rewardApplicationPlan),
         rewardApplicationResult: normalizeRewardApplicationResult(message?.rewardApplicationResult),
         progressionPreview: normalizeProgressionPreview(message?.progressionPreview),
+        progressionShadowResult: normalizeProgressionShadowResult(message?.progressionShadowResult),
         claimSimulated: message?.claimSimulated === true,
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()

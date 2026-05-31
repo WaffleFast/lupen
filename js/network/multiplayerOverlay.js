@@ -1226,6 +1226,14 @@
     return `XP ${formatPreviewValue(preview.currentXp)} -> ${formatPreviewValue(preview.previewXp)} / C ${formatPreviewValue(preview.currentCredits)} -> ${formatPreviewValue(preview.previewCredits)} / loot ${loot} / not saved`;
   }
 
+  function getProgressionShadowLabel(status) {
+    const shadow = status?.lastRewardClaimResult?.progressionShadowResult;
+    if (!shadow) return "";
+    const idLabel = shadow.shadowId ? `id ${shadow.shadowId}` : shadow.skippedReason || "not written";
+    const appliedLabel = shadow.entry?.appliedToRealSave ? "real save changed" : "real save not changed";
+    return `${idLabel} / ${appliedLabel} / dry-run`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -1399,6 +1407,12 @@
       progressionPreview.textContent = `${progressionPreviewLabel} / Progression preview only`;
       summary.appendChild(progressionPreview);
     }
+    const progressionShadowLabel = getProgressionShadowLabel(status);
+    if (progressionShadowLabel) {
+      const shadow = global.document.createElement("small");
+      shadow.textContent = `${progressionShadowLabel} / Shadow only - real save not changed`;
+      summary.appendChild(shadow);
+    }
     inner.appendChild(summary);
 
     const button = global.document.createElement("button");
@@ -1491,6 +1505,8 @@
       if (applicationLabel) setDiagnosticsRow(panel, "application", applicationLabel);
       const progressionPreviewLabel = getProgressionPreviewLabel(status);
       if (progressionPreviewLabel) setDiagnosticsRow(panel, "save preview", progressionPreviewLabel);
+      const progressionShadowLabel = getProgressionShadowLabel(status);
+      if (progressionShadowLabel) setDiagnosticsRow(panel, "shadow", progressionShadowLabel);
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
