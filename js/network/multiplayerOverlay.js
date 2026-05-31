@@ -1,6 +1,7 @@
-/* Dev-only multiplayer ghost overlay.
-   Draws read-only Colyseus pilot snapshots on the sector map when ?mp=1 is
-   active. These markers are visual only and never affect gameplay state. */
+/* Dev/staging multiplayer ghost overlay.
+   Draws read-only Colyseus pilot snapshots on the sector map when multiplayer
+   staging/dev mode is active. These markers are visual only and never affect
+   gameplay state. */
 
 (function registerMultiplayerOverlay(global) {
   "use strict";
@@ -25,6 +26,10 @@
   function isEnabled() {
     const status = getClient()?.getStatus?.();
     return !!status?.enabled;
+  }
+
+  function isStagingMode(status = getClient()?.getStatus?.()) {
+    return status?.enabledReason === "staging_enabled";
   }
 
   function ensureStyles() {
@@ -55,18 +60,18 @@
         justify-items: center;
         gap: 3px;
         transform: translate(-50%, -50%);
-        opacity: 0.78;
+        opacity: 0.86;
         pointer-events: none;
-        filter: drop-shadow(0 0 10px rgba(93, 232, 255, 0.48));
+        filter: drop-shadow(0 0 13px rgba(93, 232, 255, 0.62));
       }
 
       .lupen-mp-space-ghost-ship {
         position: relative;
-        width: 34px;
-        height: 46px;
+        width: 38px;
+        height: 50px;
         clip-path: polygon(50% 0%, 78% 62%, 61% 55%, 50% 100%, 39% 55%, 22% 62%);
         background: linear-gradient(180deg, rgba(187, 252, 255, 0.95), rgba(54, 186, 255, 0.5));
-        border: 1px solid rgba(210, 255, 255, 0.75);
+        border: 1px solid rgba(230, 255, 255, 0.86);
       }
 
       .lupen-mp-space-ghost-ship::after {
@@ -80,6 +85,19 @@
         border-radius: 50%;
         background: rgba(115, 246, 255, 0.78);
         box-shadow: 0 0 12px rgba(115, 246, 255, 0.82);
+      }
+
+      .lupen-mp-space-ghost-ship::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 12px;
+        width: 7px;
+        height: 17px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: rgba(4, 18, 30, 0.62);
+        border: 1px solid rgba(220, 255, 255, 0.62);
       }
 
       .lupen-mp-space-ghost-label {
@@ -279,7 +297,8 @@
 
   function getDevGhostLabel(player) {
     const shipLabel = getShipLabel(player);
-    return shipLabel === "Unknown ship" ? "DEV GHOST" : `${shipLabel} / DEV GHOST`;
+    const modeLabel = isStagingMode() ? "STAGING PILOT" : "DEV GHOST";
+    return shipLabel === "Unknown ship" ? modeLabel : `${shipLabel} / ${modeLabel}`;
   }
 
   function getBotLabel(bot) {
@@ -376,7 +395,7 @@
     group.setAttribute("transform", `translate(${position.x} ${position.y})`);
 
     const title = global.document.createElementNS(SVG_NS, "title");
-    title.textContent = `${getBotLabel(bot)} / DEV BOT / ${bot.currentNode || "Unknown"} / x:${bot.x} y:${bot.y}`;
+    title.textContent = `${getBotLabel(bot)} / ${isStagingMode() ? "STAGING BOT" : "DEV BOT"} / ${bot.currentNode || "Unknown"} / x:${bot.x} y:${bot.y}`;
     group.appendChild(title);
 
     const halo = global.document.createElementNS(SVG_NS, "circle");
@@ -428,7 +447,7 @@
     note.setAttribute("stroke", "rgba(10, 2, 0, 0.96)");
     note.setAttribute("stroke-width", "0.3");
     note.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
-    note.textContent = "DEV BOT";
+    note.textContent = isStagingMode() ? "STAGING BOT" : "DEV BOT";
     group.appendChild(note);
 
     layer.appendChild(group);
@@ -559,7 +578,7 @@
 
       const note = global.document.createElement("div");
       note.className = "lupen-mp-space-bot-note";
-      note.textContent = "DEV BOT";
+      note.textContent = isStagingMode() ? "STAGING BOT" : "DEV BOT";
       marker.appendChild(note);
 
       layer.appendChild(marker);
@@ -617,7 +636,7 @@
     panel.setAttribute("aria-hidden", "true");
 
     const title = global.document.createElement("strong");
-    title.textContent = "MP Dev Diagnostics";
+    title.textContent = isStagingMode(status) ? "MP Staging" : "MP Dev Diagnostics";
     panel.appendChild(title);
 
     setDiagnosticsRow(panel, "status", status.isConnected ? "connected" : status.isConnecting ? "connecting" : "offline");
