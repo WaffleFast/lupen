@@ -276,3 +276,5 @@ Colyseus Cloud staging deployment is planned for a later step. Nothing in this l
 Redeploy trigger: Colyseus Cloud environment refresh.
 
 Redeploy trigger: Supabase auth env refresh.
+
+Redeploy trigger: Supabase ledger env refresh.
