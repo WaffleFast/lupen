@@ -73,8 +73,27 @@ Manual Colyseus Cloud steps later:
 - Configure the app root as `server/colyseus` if the repository root is not used directly.
 - Confirm the Cloud start command runs `npm start` or uses `ecosystem.config.cjs`.
 - Add any staging environment variables in Colyseus Cloud settings; do not commit secrets.
-- After deployment, use the assigned `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
+- After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
 - Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
+
+## CORS Allow-List
+
+The Colyseus server uses an explicit CORS allow-list for browser matchmaking and local HTTP utility routes. Allowed origins:
+
+- `http://127.0.0.1:4173`
+- `http://localhost:4173`
+- `http://127.0.0.1:5173`
+- `http://localhost:5173`
+- `https://www.lupen.io`
+- `https://lupen.io`
+
+This allows local frontend testing against Colyseus Cloud staging, including:
+
+```text
+http://127.0.0.1:4173/?mp=1&mpServer=https://gb-man-e55e725e.colyseus.cloud
+```
+
+The production origins are CORS-allowed for later controlled staging tests, but production multiplayer is still disabled by frontend gating unless explicitly enabled.
 
 ## Frontend Server Configuration
 
@@ -104,13 +123,19 @@ Future hosted staging example:
 wss://multiplayer.lupen.io
 ```
 
-Future Colyseus Cloud staging URLs will also use `wss://`, for example:
+Future Colyseus Cloud staging may provide an HTTPS base URL for matchmaking, for example:
+
+```text
+https://your-colyseus-cloud-host.example
+```
+
+WebSocket URLs are also accepted when supported by the host:
 
 ```text
 wss://your-colyseus-cloud-host.example
 ```
 
-Only `ws://` and `wss://` server URLs are accepted. Page hosts are restricted to local development by default (`localhost`, `127.0.0.1`, and `::1`). A future staging page can opt in by setting an explicit allowed host config before `js/network/multiplayerClient.js` loads. Production `lupen.io` / `www.lupen.io` is not enabled just because `?mp=1` is present.
+Only `ws://`, `wss://`, `http://`, and `https://` server URLs are accepted. Page hosts are restricted to local development by default (`localhost`, `127.0.0.1`, and `::1`). A future staging page can opt in by setting an explicit allowed host config before `js/network/multiplayerClient.js` loads. Production `lupen.io` / `www.lupen.io` is not enabled just because `?mp=1` is present.
 
 ## Smoke Test
 
