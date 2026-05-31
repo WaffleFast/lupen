@@ -503,6 +503,10 @@
       trustedPlayerId: String(player.trustedPlayerId || ""),
       currentShipId: String(player.currentShipId || ""),
       shipName: String(player.shipName || player.ship || ""),
+      shipImage: String(player.shipImage || player.shipImageSrc || player.shipImagePath || ""),
+      shipImageSrc: String(player.shipImageSrc || player.shipImage || player.shipImagePath || ""),
+      shipImagePath: String(player.shipImagePath || player.shipImage || player.shipImageSrc || ""),
+      shipClass: String(player.shipClass || ""),
       selectedTargetBotId: String(player.selectedTargetBotId || ""),
       x: Number.isFinite(Number(player.x)) ? Number(player.x) : 50,
       y: Number.isFinite(Number(player.y)) ? Number(player.y) : 50,
@@ -762,8 +766,11 @@
       eligible: plan.eligible === true,
       skippedReason: String(plan.skippedReason || ""),
       progressionWritesEnabled: plan.progressionWritesEnabled === true,
+      progressionWriteScope: String(plan.progressionWriteScope || ""),
+      verifiedScopeEnabled: plan.verifiedScopeEnabled === true,
       stagingWriteAllowlistPresent: plan.stagingWriteAllowlistPresent === true,
       playerInStagingWriteAllowlist: plan.playerInStagingWriteAllowlist === true,
+      playerAllowedForStagingWrite: plan.playerAllowedForStagingWrite === true,
       applied: plan.applied === true,
       dryRun: plan.dryRun !== false
     };
@@ -785,8 +792,11 @@
       creditsBefore: Number.isFinite(Number(result.creditsBefore)) ? Number(result.creditsBefore) : null,
       creditsAfter: Number.isFinite(Number(result.creditsAfter)) ? Number(result.creditsAfter) : null,
       progressionWritesEnabled: result.progressionWritesEnabled === true,
+      progressionWriteScope: String(result.progressionWriteScope || ""),
+      verifiedScopeEnabled: result.verifiedScopeEnabled === true,
       stagingWriteAllowlistPresent: result.stagingWriteAllowlistPresent === true,
       playerInStagingWriteAllowlist: result.playerInStagingWriteAllowlist === true,
+      playerAllowedForStagingWrite: result.playerAllowedForStagingWrite === true,
       appliedFields: Array.isArray(result.appliedFields)
         ? result.appliedFields.map((field) => String(field || "")).filter(Boolean)
         : [],
@@ -1079,6 +1089,8 @@
       playerIdPresent: !!(selfPlayer?.trustedPlayerId || selfPlayer?.playerId || identity.playerIdPresent),
       trustedPlayerIdPresent: !!selfPlayer?.trustedPlayerId,
       displayName: selfPlayer?.displayName || identity.displayName || localPresence.displayName || "Pilot",
+      localShipId: localPresence.currentShipId || "",
+      localShipImage: localPresence.shipImage || localPresence.shipImageSrc || localPresence.shipImagePath || "",
       originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,
@@ -1148,6 +1160,16 @@
         if (options.sendInitialPing !== false) {
           client.sendPing({ local: true, auto: true });
         }
+
+        global.setTimeout(() => {
+          const refreshedPresence = getLocalPresenceOptions();
+          if (connection.isConnected && refreshedPresence && Object.keys(refreshedPresence).length) {
+            client.sendMovementIntent({
+              ...refreshedPresence,
+              reason: "connection_presence_refresh"
+            });
+          }
+        }, 300);
 
         return statusResult("connect");
       } catch (err) {

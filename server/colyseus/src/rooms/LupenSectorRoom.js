@@ -137,8 +137,8 @@ const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_BOT_DISABLED_RESET_MS = 6500;
 const SUPABASE_VERIFY_TIMEOUT_MS = 4000;
-const STAGING_REWARD_DRY_RUN_XP = 25;
-const STAGING_REWARD_DRY_RUN_CREDITS = 40;
+const STAGING_REWARD_DRY_RUN_XP = 5;
+const STAGING_REWARD_DRY_RUN_CREDITS = 0;
 
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 35, hull: 70 },
@@ -163,6 +163,8 @@ type("string")(LupenSectorPlayer.prototype, "trustedPlayerId");
 type("string")(LupenSectorPlayer.prototype, "displayName");
 type("string")(LupenSectorPlayer.prototype, "currentShipId");
 type("string")(LupenSectorPlayer.prototype, "shipName");
+type("string")(LupenSectorPlayer.prototype, "shipImage");
+type("string")(LupenSectorPlayer.prototype, "shipClass");
 type("string")(LupenSectorPlayer.prototype, "currentNode");
 type("string")(LupenSectorPlayer.prototype, "selectedTargetBotId");
 type("number")(LupenSectorPlayer.prototype, "x");
@@ -226,6 +228,22 @@ function getShipName(message = {}) {
     typeof message.shipName === "string" ? message.shipName : message.ship,
     ""
   );
+}
+
+function getShipImageValue(message = {}) {
+  return message.shipImage || message.shipImageSrc || message.shipImagePath || "";
+}
+
+function getSafeShipImagePath(value = "") {
+  const path = getStringValue(value).replace(/\\/g, "/").slice(0, 160);
+  if (!path) return "";
+  if (!/^assets\/(?:ships|player-ships|hub\/ships)\/[a-z0-9-]+\.png$/i.test(path)) return "";
+  if (path.includes("..") || path.includes("//")) return "";
+  return path;
+}
+
+function getSafeShipClass(message = {}) {
+  return getSafeIdentityValue(message.shipClass || message.shipType || message.shipRole, "").slice(0, 80);
 }
 
 function getSafeIdentityValue(value, fallback = "") {
@@ -347,7 +365,7 @@ export function buildRewardWritePlan({
     contributorSessionId: getSafeIdentityValue(contributor.sessionId || claimantIdentity.sessionId),
     contributionPercent,
     intendedXp: Math.round((Number(preview.previewXp || STAGING_REWARD_DRY_RUN_XP) * contributionPercent) / 100),
-    intendedCredits: Math.round((Number(preview.previewCredits || STAGING_REWARD_DRY_RUN_CREDITS) * contributionPercent) / 100),
+    intendedCredits: 0,
     intendedLoot: Array.isArray(preview.previewLoot) ? preview.previewLoot.map((item) => getSafeIdentityValue(item)).filter(Boolean) : [],
     intendedReason: "staging_bot_disabled",
     eligible,
@@ -378,6 +396,11 @@ function validatePresencePayload(message = {}) {
   if (message.y !== undefined) {
     const y = Number(message.y);
     if (!Number.isFinite(y) || y < -1000 || y > 1000) return "y is outside presence bounds";
+  }
+
+  const shipImageValue = getShipImageValue(message);
+  if (shipImageValue && typeof shipImageValue === "string" && shipImageValue.trim() && !getSafeShipImagePath(shipImageValue)) {
+    return "shipImage path is unsafe";
   }
 
   return "";
@@ -560,6 +583,8 @@ export class LupenSectorRoom extends Room {
       displayName,
       currentShipId: getSafeIdentityValue(options.currentShipId),
       shipName: getShipName(options),
+      shipImage: getSafeShipImagePath(getShipImageValue(options)),
+      shipClass: getSafeShipClass(options),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
       selectedTargetBotId: "",
       x: getNumberValue(options.x, 50),
@@ -1273,6 +1298,14 @@ export class LupenSectorRoom extends Room {
 
     if (typeof message.shipName === "string" || typeof message.ship === "string") {
       player.shipName = getShipName(message);
+    }
+
+    if (typeof message.shipImage === "string" || typeof message.shipImageSrc === "string" || typeof message.shipImagePath === "string") {
+      player.shipImage = getSafeShipImagePath(getShipImageValue(message));
+    }
+
+    if (typeof message.shipClass === "string" || typeof message.shipType === "string" || typeof message.shipRole === "string") {
+      player.shipClass = getSafeShipClass(message);
     }
 
     const currentNode = getStringValue(message.currentNode);

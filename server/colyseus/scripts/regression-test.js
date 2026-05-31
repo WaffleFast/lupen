@@ -263,8 +263,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
       node: "Upper Apex",
       finalHitBy: "session-a",
       topContributorSessionId: "session-a",
-      previewXp: 25,
-      previewCredits: 40,
+      previewXp: 5,
+      previewCredits: 0,
       previewLoot: []
     },
     claimantIdentity: {
@@ -283,15 +283,15 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(plan.dryRun === true, "Verified reward plan was not a dry run.");
   assert(plan.applied === false, "Verified reward plan was applied.");
   assert(plan.playerId === "verified-player-a", "Verified reward plan did not include trusted player id.");
-  assert(plan.intendedXp === 20, `Unexpected verified dry-run XP: ${plan.intendedXp}`);
-  assert(plan.intendedCredits === 32, `Unexpected verified dry-run credits: ${plan.intendedCredits}`);
+  assert(plan.intendedXp === 4, `Unexpected verified dry-run XP: ${plan.intendedXp}`);
+  assert(plan.intendedCredits === 0, `Unexpected verified dry-run credits: ${plan.intendedCredits}`);
   const ledgerEntry = buildRewardLedgerEntry(plan, {
     roomName: ROOM_NAME,
     sourceEventId: "reward-preview-stub"
   });
   assert(ledgerEntry.player_id === "verified-player-a", "Ledger entry did not include verified player id.");
-  assert(ledgerEntry.xp_amount === 20, `Unexpected ledger XP amount: ${ledgerEntry.xp_amount}`);
-  assert(ledgerEntry.credits_amount === 32, `Unexpected ledger credits amount: ${ledgerEntry.credits_amount}`);
+  assert(ledgerEntry.xp_amount === 4, `Unexpected ledger XP amount: ${ledgerEntry.xp_amount}`);
+  assert(ledgerEntry.credits_amount === 0, `Unexpected ledger credits amount: ${ledgerEntry.credits_amount}`);
   assert(ledgerEntry.dry_run === true && ledgerEntry.applied === false, "Ledger entry was not dry-run/unapplied.");
 
   const applicationPlan = buildRewardApplicationPlan(plan, {
@@ -300,8 +300,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   });
   assert(applicationPlan.eligible === true, "Verified application plan was not eligible.");
   assert(applicationPlan.playerId === "verified-player-a", "Verified application plan did not include player id.");
-  assert(applicationPlan.xpDelta === 20, `Unexpected application XP delta: ${applicationPlan.xpDelta}`);
-  assert(applicationPlan.creditsDelta === 32, `Unexpected application credits delta: ${applicationPlan.creditsDelta}`);
+  assert(applicationPlan.xpDelta === 4, `Unexpected application XP delta: ${applicationPlan.xpDelta}`);
+  assert(applicationPlan.creditsDelta === 0, `Unexpected application credits delta: ${applicationPlan.creditsDelta}`);
   assert(applicationPlan.sourceLedgerId === "ledger-row-1", "Application plan did not include source ledger id.");
   assert(applicationPlan.sourceEventId === "reward-preview-stub", "Application plan did not include source event id.");
   assert(applicationPlan.idempotencyKey === "verified-player-a:reward-preview-stub", `Unexpected application idempotency key: ${applicationPlan.idempotencyKey}`);
@@ -399,9 +399,9 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   const progressionPreview = buildProgressionPreview(validSaveContext, applicationPlan);
   assert(progressionPreview?.available === true, "Progression preview was not available for mocked save.");
   assert(progressionPreview?.currentXp === 80, `Unexpected current XP preview: ${progressionPreview?.currentXp}`);
-  assert(progressionPreview?.previewXp === 100, `Unexpected preview XP: ${progressionPreview?.previewXp}`);
+  assert(progressionPreview?.previewXp === 84, `Unexpected preview XP: ${progressionPreview?.previewXp}`);
   assert(progressionPreview?.currentCredits === 1200, `Unexpected current credits preview: ${progressionPreview?.currentCredits}`);
-  assert(progressionPreview?.previewCredits === 1232, `Unexpected preview credits: ${progressionPreview?.previewCredits}`);
+  assert(progressionPreview?.previewCredits === 1200, `Unexpected preview credits: ${progressionPreview?.previewCredits}`);
   assert(progressionPreview?.applied === false && progressionPreview?.dryRun === true, "Progression preview was not dry-run/unapplied.");
   assert(progressionPreview?.progressionWritesEnabled === false, "Progression preview enabled writes.");
 
@@ -418,8 +418,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(playerSavePatchPlan?.duplicateDetected === false, "Initial player_saves patch plan reported a duplicate.");
   assert(playerSavePatchPlan?.xpPath === "playerProgress.combatXp", `Unexpected player_saves XP path: ${playerSavePatchPlan?.xpPath}`);
   assert(playerSavePatchPlan?.creditsPath === "credits", `Unexpected player_saves credits path: ${playerSavePatchPlan?.creditsPath}`);
-  assert(playerSavePatchPlan?.xpBefore === 80 && playerSavePatchPlan?.xpAfter === 100, "player_saves patch plan did not calculate XP before/after.");
-  assert(playerSavePatchPlan?.creditsBefore === 1200 && playerSavePatchPlan?.creditsAfter === 1232, "player_saves patch plan did not calculate credits before/after.");
+  assert(playerSavePatchPlan?.xpBefore === 80 && playerSavePatchPlan?.xpAfter === 84, "player_saves patch plan did not calculate XP before/after.");
+  assert(playerSavePatchPlan?.creditsBefore === 1200 && playerSavePatchPlan?.creditsAfter === 1200, "player_saves patch plan did not preserve credits before/after.");
   assert(playerSavePatchPlan?.lootPreviewOnly === 0, "player_saves patch plan attempted to include loot writes.");
 
   const disabledPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
@@ -443,6 +443,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(missingAllowlistPlayerSavePatchResult?.dryRun === true, "Missing-allowlist player_saves patch adapter did not stay dry-run.");
   assert(missingAllowlistPlayerSavePatchResult?.applied === false, "Missing-allowlist player_saves patch adapter applied progression.");
   assert(missingAllowlistPlayerSavePatchResult?.progressionWritesEnabled === true, "Missing-allowlist player_saves patch adapter did not report writes enabled.");
+  assert(missingAllowlistPlayerSavePatchResult?.progressionWriteScope === "allowlist", "Missing-allowlist player_saves patch adapter did not default to allowlist scope.");
   assert(missingAllowlistPlayerSavePatchResult?.stagingWriteAllowlistPresent === false, "Missing-allowlist player_saves patch adapter reported an allow-list.");
   assert(missingAllowlistPlayerSavePatchResult?.playerInStagingWriteAllowlist === false, "Missing-allowlist player_saves patch adapter allow-listed player.");
   assert(missingAllowlistPlayerSavePatchResult?.idempotencyReady === true, "Missing-allowlist player_saves patch adapter did not keep idempotency ready.");
@@ -506,7 +507,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   const validPatchPlayerSaveResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
-      STAGING_PROGRESSION_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_PROGRESSION_WRITE_SCOPE: "verified",
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
     },
@@ -540,18 +541,20 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(validPatchPlayerSaveResult?.ok === true, "Valid mocked player_saves patch did not succeed.");
   assert(validPatchPlayerSaveResult?.applied === true, "Valid mocked player_saves patch was not applied.");
   assert(validPatchPlayerSaveResult?.dryRun === false, "Valid mocked player_saves patch stayed dry-run.");
-  assert(validPatchPlayerSaveResult?.xpBefore === 80 && validPatchPlayerSaveResult?.xpAfter === 100, "Valid mocked player_saves patch did not apply XP delta.");
-  assert(validPatchPlayerSaveResult?.creditsBefore === 1200 && validPatchPlayerSaveResult?.creditsAfter === 1232, "Valid mocked player_saves patch did not apply credits delta.");
+  assert(validPatchPlayerSaveResult?.progressionWriteScope === "verified", "Valid mocked player_saves patch did not use verified scope.");
+  assert(validPatchPlayerSaveResult?.playerAllowedForStagingWrite === true, "Verified-scope mocked player_saves patch did not allow the verified player.");
+  assert(validPatchPlayerSaveResult?.xpBefore === 80 && validPatchPlayerSaveResult?.xpAfter === 84, "Valid mocked player_saves patch did not apply XP delta.");
+  assert(validPatchPlayerSaveResult?.creditsBefore === 1200 && validPatchPlayerSaveResult?.creditsAfter === 1200, "Valid mocked player_saves patch changed credits.");
   assert(Array.isArray(validPatchPlayerSaveResult?.appliedFields), "Valid mocked player_saves patch did not include applied fields.");
-  assert(validPatchPlayerSaveResult.appliedFields.join(",") === "xp,credits", `Unexpected mocked player_saves applied fields: ${validPatchPlayerSaveResult.appliedFields.join(",")}`);
+  assert(validPatchPlayerSaveResult.appliedFields.join(",") === "xp", `Unexpected mocked player_saves applied fields: ${validPatchPlayerSaveResult.appliedFields.join(",")}`);
   assert(patchedCalls.length === 2, `Expected one read and one patch call, got ${patchedCalls.length}.`);
   assert(patchedCalls[0].url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a&select=save_data,updated_at&limit=1", `Unexpected player_saves read URL: ${patchedCalls[0].url}`);
   assert(patchedCalls[0].options.method === "GET", "Valid mocked player_saves first call was not GET.");
   assert(patchedCalls[1].url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a", `Unexpected player_saves patch URL: ${patchedCalls[1].url}`);
   assert(patchedCalls[1].options.method === "PATCH", "Valid mocked player_saves second call was not PATCH.");
   const patchedBody = JSON.parse(patchedCalls[1].options.body);
-  assert(patchedBody.save_data.playerProgress.combatXp === 100, "Patched save_data did not update combat XP.");
-  assert(patchedBody.save_data.credits === 1232, "Patched save_data did not update credits.");
+  assert(patchedBody.save_data.playerProgress.combatXp === 84, "Patched save_data did not update combat XP.");
+  assert(patchedBody.save_data.credits === 1200, "Patched save_data changed credits.");
   assert(patchedBody.save_data.playerProgress.level === 3, "Patched save_data changed unrelated playerProgress level.");
   assert(patchedBody.save_data.inventoryItems.length === 2, "Patched save_data changed inventory item count.");
   assert(patchedBody.save_data.inventoryItems[0].id === "loot-a", "Patched save_data changed inventory contents.");
@@ -601,8 +604,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   }, applicationPlan, {
     sourceEventId: "reward-preview-stub"
   });
-  assert(missingCreditsPatchPlan?.eligible === false, "Missing credits path player_saves patch plan was eligible.");
-  assert(missingCreditsPatchPlan?.skippedReason === "credits_path_missing_or_ambiguous", `Unexpected missing credits path reason: ${missingCreditsPatchPlan?.skippedReason}`);
+  assert(missingCreditsPatchPlan?.eligible === true, `Missing credits path player_saves patch plan was not eligible for XP-only writes: ${missingCreditsPatchPlan?.skippedReason}`);
+  assert(missingCreditsPatchPlan?.creditsPath === "", `Unexpected XP-only credits path: ${missingCreditsPatchPlan?.creditsPath}`);
 
   const missingIdempotencyPatchPlan = buildPlayerSavePatchPlan(validMockSaveData, {
     ...applicationPlan,
@@ -622,10 +625,10 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
     entry: ledgerEntry
   });
   assert(shadowEntry.player_id === "verified-player-a", "Progression shadow entry did not include verified player id.");
-  assert(shadowEntry.xp_delta === 20, `Unexpected shadow XP delta: ${shadowEntry.xp_delta}`);
-  assert(shadowEntry.credits_delta === 32, `Unexpected shadow credits delta: ${shadowEntry.credits_delta}`);
-  assert(shadowEntry.current_xp === 80 && shadowEntry.preview_xp === 100, "Shadow entry did not include progression preview XP.");
-  assert(shadowEntry.current_credits === 1200 && shadowEntry.preview_credits === 1232, "Shadow entry did not include progression preview credits.");
+  assert(shadowEntry.xp_delta === 4, `Unexpected shadow XP delta: ${shadowEntry.xp_delta}`);
+  assert(shadowEntry.credits_delta === 0, `Unexpected shadow credits delta: ${shadowEntry.credits_delta}`);
+  assert(shadowEntry.current_xp === 80 && shadowEntry.preview_xp === 84, "Shadow entry did not include progression preview XP.");
+  assert(shadowEntry.current_credits === 1200 && shadowEntry.preview_credits === 1200, "Shadow entry did not include progression preview credits.");
   assert(shadowEntry.applied_to_real_save === false && shadowEntry.dry_run === true, "Shadow entry was not dry-run/unapplied.");
   assert(shadowEntry.source_ledger_id === "11111111-1111-4111-8111-111111111111", "Shadow entry did not include source ledger id.");
 
@@ -712,8 +715,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
     blockedReason: "identity_unverified",
     botId: "dev-bot-erebus-1",
     botName: "Erebus Drone",
-    intendedXp: 20,
-    intendedCredits: 32
+    intendedXp: 4,
+    intendedCredits: 0
   });
   const blockedShadowEntry = buildProgressionShadowEntry(blockedShadowApplicationPlan, unavailableProgressionPreview, {});
   const blockedShadowResult = await writeProgressionShadowEntry(blockedShadowEntry, {
@@ -930,8 +933,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
       botId: "dev-bot-erebus-1",
       botName: "Erebus Drone",
       node: "Upper Apex",
-      previewXp: 25,
-      previewCredits: 40
+      previewXp: 5,
+      previewCredits: 0
     },
     claimantIdentity: {
       sessionId: "session-b",
@@ -1095,6 +1098,8 @@ try {
     supabaseAccessToken: "fake-token-a",
     currentShipId: "lupenOrigin",
     shipName: "LF-1 Origin",
+    shipImage: "assets/ships/lupen-origin.png",
+    shipClass: "Balanced Starter Hull",
     currentNode: "Asteron Prime",
     x: 50,
     y: 50
@@ -1108,6 +1113,8 @@ try {
     supabaseAccessToken: "fake-token-b",
     currentShipId: "lupenOrigin",
     shipName: "LF-1 Origin",
+    shipImage: "assets/ships/lupen-origin.png",
+    shipClass: "Balanced Starter Hull",
     currentNode: "Asteron Prime",
     x: 51,
     y: 50
@@ -1139,11 +1146,25 @@ try {
   assert(!playerFrom(roomA, roomA.sessionId)?.trustedPlayerId, "Client A fake token created a trusted player id.");
   assert(!playerFrom(roomA, roomA.sessionId)?.playerId, "Client A unverified playerId was trusted.");
   assert(playerFrom(roomA, roomA.sessionId)?.displayName === "Regression Pilot A", "Client A displayName was not preserved.");
+  assert(playerFrom(roomB, roomA.sessionId)?.shipImage === "assets/ships/lupen-origin.png", "Client B did not receive Client A ship image.");
+  assert(playerFrom(roomB, roomA.sessionId)?.shipClass === "Balanced Starter Hull", "Client B did not receive Client A ship class.");
   assert(playerFrom(roomA, roomB.sessionId)?.authStatus === "unverified", "Client B fake token did not become unverified.");
   assert(!playerFrom(roomA, roomB.sessionId)?.trustedPlayerId, "Client B fake token created a trusted player id.");
   assert(!playerFrom(roomA, roomB.sessionId)?.playerId, "Client B unverified playerId was trusted.");
   assert(playerFrom(roomA, roomA.sessionId)?.supabaseAccessToken === undefined, "Raw Supabase token leaked into room state.");
   console.log("both clients see each other");
+
+  const unsafeShipImageWarning = await expectPresenceWarning(roomA, () => {
+    roomA.send("presence:update", {
+      currentNode: "Asteron Prime",
+      x: 50,
+      y: 50,
+      shipImage: "https://example.com/not-allowed.png"
+    });
+  });
+  assert(unsafeShipImageWarning?.reason === "shipImage path is unsafe", `Unexpected unsafe ship image warning: ${unsafeShipImageWarning?.reason}`);
+  assert(playerFrom(roomB, roomA.sessionId)?.shipImage === "assets/ships/lupen-origin.png", "Unsafe ship image changed stored ship metadata.");
+  console.log("unsafe ship image metadata rejected safely");
 
   await waitFor("dummy bots to appear", () => botCount(roomA) > 0 && botCount(roomB) > 0);
   assertAllowedBotNodes(roomA);
@@ -1402,8 +1423,8 @@ try {
   assert(!contributorA?.trustedPlayerId && !contributorA?.playerId, "Contributor A unverified identity was trusted.");
   assert(!contributorB?.trustedPlayerId && !contributorB?.playerId, "Contributor B unverified identity was trusted.");
   assert(contributorA?.displayName === "Regression Pilot A", "Contributor A display name was not included in preview.");
-  assert(rewardPreview?.previewXp === 25, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
-  assert(rewardPreview?.previewCredits === 40, `Unexpected reward preview credits: ${rewardPreview?.previewCredits}`);
+  assert(rewardPreview?.previewXp === 5, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
+  assert(rewardPreview?.previewCredits === 0, `Unexpected reward preview credits: ${rewardPreview?.previewCredits}`);
   const playerAfterRewardPreview = playerFrom(roomA, roomA.sessionId);
   assert(playerAfterRewardPreview && !("xp" in playerAfterRewardPreview), "Reward preview created player XP field.");
   assert(playerAfterRewardPreview && !("credits" in playerAfterRewardPreview), "Reward preview created player credits field.");
@@ -1424,7 +1445,7 @@ try {
   assert(claimPreviewResult?.rewardWritePlan?.eligible === false, "Unverified reward write plan was eligible.");
   assert(claimPreviewResult?.rewardWritePlan?.blockedReason === "identity_unverified", `Unexpected unverified blocked reason: ${claimPreviewResult?.rewardWritePlan?.blockedReason}`);
   assert(claimPreviewResult?.rewardWritePlan?.intendedXp > 0, "Reward write plan did not include intended XP.");
-  assert(claimPreviewResult?.rewardWritePlan?.intendedCredits > 0, "Reward write plan did not include intended credits.");
+  assert(claimPreviewResult?.rewardWritePlan?.intendedCredits === 0, "Reward write plan attempted to include intended credits.");
   assert(claimPreviewResult?.rewardLedgerResult?.dryRun === true, "Reward ledger result was not dry-run.");
   assert(claimPreviewResult?.rewardLedgerResult?.applied === false, "Reward ledger result applied rewards.");
   assert(claimPreviewResult?.rewardLedgerResult?.skippedReason === "reward_writes_disabled", `Unexpected reward ledger skipped reason: ${claimPreviewResult?.rewardLedgerResult?.skippedReason}`);
@@ -1435,7 +1456,7 @@ try {
   assert(claimPreviewResult?.rewardApplicationPlan?.eligible === false, "Unverified reward application plan was eligible.");
   assert(claimPreviewResult?.rewardApplicationPlan?.blockedReason === "identity_unverified", `Unexpected reward application blocked reason: ${claimPreviewResult?.rewardApplicationPlan?.blockedReason}`);
   assert(claimPreviewResult?.rewardApplicationPlan?.xpDelta > 0, "Reward application plan did not include XP delta.");
-  assert(claimPreviewResult?.rewardApplicationPlan?.creditsDelta > 0, "Reward application plan did not include credits delta.");
+  assert(claimPreviewResult?.rewardApplicationPlan?.creditsDelta === 0, "Reward application plan attempted to include credits delta.");
   assert(claimPreviewResult?.rewardApplicationResult?.dryRun === true, "Reward application result was not dry-run.");
   assert(claimPreviewResult?.rewardApplicationResult?.applied === false, "Reward application result applied progression.");
   assert(claimPreviewResult?.rewardApplicationResult?.skippedReason === "reward_application_not_eligible", `Unexpected reward application skipped reason: ${claimPreviewResult?.rewardApplicationResult?.skippedReason}`);
@@ -1539,6 +1560,8 @@ try {
     displayName: "Regression Pilot A",
     currentShipId: "lupenOrigin",
     shipName: "LF-1 Origin",
+    shipImage: "assets/ships/lupen-origin.png",
+    shipClass: "Balanced Starter Hull",
     currentNode: "East Link 1",
     x: 64,
     y: 42
@@ -1548,6 +1571,7 @@ try {
     const playerA = playerFrom(roomB, roomA.sessionId);
     return playerA &&
       playerA.currentNode === "East Link 1" &&
+      playerA.shipImage === "assets/ships/lupen-origin.png" &&
       playerA.x === 64 &&
       playerA.y === 42;
   });

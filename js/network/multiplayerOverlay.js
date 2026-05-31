@@ -7,6 +7,7 @@
   "use strict";
 
   const SVG_NS = "http://www.w3.org/2000/svg";
+  const XLINK_NS = "http://www.w3.org/1999/xlink";
   const layerClass = "svg-mp-ghost-layer";
   const markerClass = "svg-mp-ghost";
   const botLayerClass = "svg-mp-bot-layer";
@@ -20,6 +21,34 @@
   let unsubscribe = null;
   let renderQueued = false;
   let diagnosticsTimer = null;
+  const shipImageLoadStatus = new Map();
+  const shipImageById = {
+    lupenOrigin: "assets/ships/lupen-origin.png",
+    lupenHauler: "assets/ships/lupen-hauler.png",
+    lupenStriker: "assets/ships/lupen-striker.png",
+    hermesCourier: "assets/ships/hermes-courier.png",
+    athenaSentinel: "assets/ships/athena-sentinel.png",
+    aresVindicator: "assets/ships/ares-vindicator.png",
+    hephaestusTrader: "assets/ships/hephaestus-trader.png",
+    poseidonAggressor: "assets/ships/poseidon-aggressor.png",
+    zeusExplorer: "assets/ships/zeus-explorer.png",
+    cobraSeeker: "assets/ships/cobra-seeker.png",
+    cobraMoth: "assets/ships/cobra-moth.png"
+  };
+  const shipImageByName = {
+    "lf 1 origin": shipImageById.lupenOrigin,
+    "lf-1 origin": shipImageById.lupenOrigin,
+    "hauler": shipImageById.lupenHauler,
+    "striker": shipImageById.lupenStriker,
+    "hermes courier": shipImageById.hermesCourier,
+    "athena sentinel": shipImageById.athenaSentinel,
+    "ares vindicator": shipImageById.aresVindicator,
+    "hephaestus trader": shipImageById.hephaestusTrader,
+    "poseidon aggressor": shipImageById.poseidonAggressor,
+    "zeus explorer": shipImageById.zeusExplorer,
+    "cobra seeker": shipImageById.cobraSeeker,
+    "cobra moth": shipImageById.cobraMoth
+  };
 
   function getClient() {
     return global.LupenMultiplayerClient || null;
@@ -212,6 +241,27 @@
         clip-path: polygon(50% 0%, 78% 62%, 61% 55%, 50% 100%, 39% 55%, 22% 62%);
         background: linear-gradient(180deg, rgba(187, 252, 255, 0.95), rgba(54, 186, 255, 0.5));
         border: 1px solid rgba(230, 255, 255, 0.86);
+      }
+
+      .lupen-mp-space-ghost-ship.has-image {
+        width: 54px;
+        height: 54px;
+        clip-path: none;
+        background: radial-gradient(circle, rgba(108, 235, 255, 0.2), rgba(8, 32, 54, 0.05) 64%);
+        border: 0;
+      }
+
+      .lupen-mp-space-ghost-ship.has-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        opacity: 0.82;
+        filter: drop-shadow(0 0 12px rgba(91, 224, 255, 0.86));
+      }
+
+      .lupen-mp-space-ghost-ship.has-image::before,
+      .lupen-mp-space-ghost-ship.has-image::after {
+        display: none;
       }
 
       .lupen-mp-space-ghost-ship::after {
@@ -605,6 +655,76 @@
     return shipId ? shipId.slice(0, 22) : "Unknown ship";
   }
 
+  function normalizeShipLookupKey(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getKnownShipImageSrc(player) {
+    const shipId = String(player?.currentShipId || "").trim();
+    if (shipId && shipImageById[shipId]) return shipImageById[shipId];
+
+    const lowerShipId = shipId.toLowerCase();
+    const idMatch = Object.keys(shipImageById).find((key) => key.toLowerCase() === lowerShipId);
+    if (idMatch) return shipImageById[idMatch];
+
+    const nameKey = normalizeShipLookupKey(player?.shipName || player?.ship || "");
+    return shipImageByName[nameKey] || "";
+  }
+
+  function getSafeShipImageSrc(player) {
+    const src = String(player?.shipImage || player?.shipImageSrc || player?.shipImagePath || getKnownShipImageSrc(player)).trim().replace(/\\/g, "/");
+    if (!src) return "";
+    if (!/^assets\/(?:ships|player-ships|hub\/ships)\/[a-z0-9-]+\.png$/i.test(src)) return "";
+    if (src.includes("..") || src.includes("//")) return "";
+    return src;
+  }
+
+  function trackShipImageLoad(src) {
+    if (!src || shipImageLoadStatus.has(src) || typeof global.Image !== "function") return;
+    shipImageLoadStatus.set(src, "loading");
+    const image = new global.Image();
+    image.onload = () => {
+      shipImageLoadStatus.set(src, "loaded");
+      scheduleRender();
+    };
+    image.onerror = () => {
+      shipImageLoadStatus.set(src, "failed");
+      scheduleRender();
+    };
+    image.src = src;
+  }
+
+  function getShipImageRenderSrc(player) {
+    const src = getSafeShipImageSrc(player);
+    if (!src) return "";
+    trackShipImageLoad(src);
+    return shipImageLoadStatus.get(src) === "failed" ? "" : src;
+  }
+
+  function getShipImageLoadLabel(player) {
+    const src = getSafeShipImageSrc(player);
+    if (!src) return "missing";
+    trackShipImageLoad(src);
+    return shipImageLoadStatus.get(src) || "loading";
+  }
+
+  function compactPath(value) {
+    const path = String(value || "").trim();
+    if (!path) return "missing";
+    return path.length > 42 ? `...${path.slice(-39)}` : path;
+  }
+
+  function getShipImageStatus(players) {
+    const withImages = players.filter((player) => getSafeShipImageSrc(player)).length;
+    const failed = players.filter((player) => getShipImageLoadLabel(player) === "failed").length;
+    return `${withImages}/${players.length} remote ship images${failed ? ` / ${failed} failed` : ""}`;
+  }
+
   function getDevGhostLabel(player) {
     const shipLabel = getShipLabel(player);
     const modeLabel = isStagingMode() ? "STAGING PILOT" : "DEV GHOST";
@@ -718,22 +838,37 @@
     halo.setAttribute("stroke-width", "0.18");
     group.appendChild(halo);
 
-    const ship = global.document.createElementNS(SVG_NS, "polygon");
-    ship.setAttribute("points", "0,-4.2 2.4,2.4 0.78,1.55 0,3.85 -0.78,1.55 -2.4,2.4");
-    ship.setAttribute("fill", "rgba(123, 239, 255, 0.76)");
-    ship.setAttribute("stroke", "rgba(239, 255, 255, 0.96)");
-    ship.setAttribute("stroke-width", "0.25");
-    ship.setAttribute("filter", "drop-shadow(0 0 2.6px rgba(80, 225, 255, 0.9))");
-    group.appendChild(ship);
+    const shipImage = getShipImageRenderSrc(player);
+    if (shipImage) {
+      const ship = global.document.createElementNS(SVG_NS, "image");
+      ship.setAttribute("href", shipImage);
+      ship.setAttributeNS(XLINK_NS, "xlink:href", shipImage);
+      ship.setAttribute("x", "-3.1");
+      ship.setAttribute("y", "-3.8");
+      ship.setAttribute("width", "6.2");
+      ship.setAttribute("height", "6.2");
+      ship.setAttribute("opacity", "0.82");
+      ship.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      ship.setAttribute("filter", "drop-shadow(0 0 2.8px rgba(80, 225, 255, 0.92))");
+      group.appendChild(ship);
+    } else {
+      const ship = global.document.createElementNS(SVG_NS, "polygon");
+      ship.setAttribute("points", "0,-4.2 2.4,2.4 0.78,1.55 0,3.85 -0.78,1.55 -2.4,2.4");
+      ship.setAttribute("fill", "rgba(123, 239, 255, 0.76)");
+      ship.setAttribute("stroke", "rgba(239, 255, 255, 0.96)");
+      ship.setAttribute("stroke-width", "0.25");
+      ship.setAttribute("filter", "drop-shadow(0 0 2.6px rgba(80, 225, 255, 0.9))");
+      group.appendChild(ship);
 
-    const cockpit = global.document.createElementNS(SVG_NS, "circle");
-    cockpit.setAttribute("cx", "0");
-    cockpit.setAttribute("cy", "-0.55");
-    cockpit.setAttribute("r", "0.58");
-    cockpit.setAttribute("fill", "rgba(4, 18, 30, 0.82)");
-    cockpit.setAttribute("stroke", "rgba(215, 255, 255, 0.8)");
-    cockpit.setAttribute("stroke-width", "0.13");
-    group.appendChild(cockpit);
+      const cockpit = global.document.createElementNS(SVG_NS, "circle");
+      cockpit.setAttribute("cx", "0");
+      cockpit.setAttribute("cy", "-0.55");
+      cockpit.setAttribute("r", "0.58");
+      cockpit.setAttribute("fill", "rgba(4, 18, 30, 0.82)");
+      cockpit.setAttribute("stroke", "rgba(215, 255, 255, 0.8)");
+      cockpit.setAttribute("stroke-width", "0.13");
+      group.appendChild(cockpit);
+    }
 
     const engine = global.document.createElementNS(SVG_NS, "path");
     engine.setAttribute("d", "M -0.85 3.55 Q 0 5.25 0.85 3.55");
@@ -938,6 +1073,23 @@
 
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-ghost-ship";
+      const shipImage = getShipImageRenderSrc(player);
+      if (shipImage) {
+        ship.classList.add("has-image");
+        const image = global.document.createElement("img");
+        image.src = shipImage;
+        image.alt = "";
+        image.onload = () => {
+          shipImageLoadStatus.set(shipImage, "loaded");
+        };
+        image.onerror = () => {
+          shipImageLoadStatus.set(shipImage, "failed");
+          image.remove();
+          ship.classList.remove("has-image");
+          scheduleRender();
+        };
+        ship.appendChild(image);
+      }
       marker.appendChild(ship);
 
       const label = global.document.createElement("div");
@@ -1199,7 +1351,7 @@
     const applicationLabel = application?.skippedReason
       ? ` / Application: ${application.skippedReason}`
       : "";
-    return `${eligibility} / XP ${plan.intendedXp || 0} / Credits ${plan.intendedCredits || 0} / Loot ${loot}${ledgerLabel}${applicationLabel} / Progression not applied`;
+    return `${eligibility} / XP ${plan.intendedXp || 0} / Credits preview ${plan.intendedCredits || 0} / Loot ${loot}${ledgerLabel}${applicationLabel} / Progression not applied`;
   }
 
   function getRewardApplicationLabel(status) {
@@ -1215,7 +1367,7 @@
       : result?.idempotencyReady || plan?.idempotencyReady
         ? "idempotency ready"
         : "idempotency not ready";
-    return `${eligibility} / ${idempotency} / XP +${plan?.xpDelta || 0} / C +${plan?.creditsDelta || 0} / loot ${loot}${skipped} / dry-run`;
+    return `${eligibility} / ${idempotency} / XP +${plan?.xpDelta || 0} / credits not applied / loot ${loot}${skipped} / dry-run`;
   }
 
   function formatPreviewValue(value) {
@@ -1255,11 +1407,16 @@
       : result?.idempotencyReady || plan?.idempotencyReady
         ? "idempotency ready"
         : "idempotency not ready";
-    const allowlistLabel = result?.stagingWriteAllowlistPresent || plan?.stagingWriteAllowlistPresent
-      ? result?.playerInStagingWriteAllowlist || plan?.playerInStagingWriteAllowlist
-        ? "allow-listed"
-        : "not allow-listed"
-      : "allow-list missing";
+    const progressionWriteScope = result?.progressionWriteScope || plan?.progressionWriteScope || "allowlist";
+    const allowlistLabel = progressionWriteScope === "verified"
+      ? result?.playerAllowedForStagingWrite || plan?.playerAllowedForStagingWrite
+        ? "verified scope"
+        : "verified scope blocked"
+      : result?.stagingWriteAllowlistPresent || plan?.stagingWriteAllowlistPresent
+        ? result?.playerInStagingWriteAllowlist || plan?.playerInStagingWriteAllowlist
+          ? "allow-listed"
+          : "not allow-listed"
+        : "allow-list missing";
     const warning = result?.applied
       ? "STAGING SERVER WRITE"
       : writesEnabled
@@ -1450,7 +1607,7 @@
     const playerSavePatchLabel = getPlayerSavePatchLabel(status);
     if (playerSavePatchLabel) {
       const patch = global.document.createElement("small");
-      patch.textContent = `${playerSavePatchLabel} / XP+credits only / no loot`;
+      patch.textContent = `${playerSavePatchLabel} / XP only / no credits or loot`;
       summary.appendChild(patch);
     }
     inner.appendChild(summary);
@@ -1526,6 +1683,16 @@
       setDiagnosticsRow(panel, "identity", String(status.displayName || "Pilot").slice(0, 24));
     }
     setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);
+    if (isStagingMode(status)) {
+      const firstRemote = players[0] || {};
+      const remoteShipImage = getSafeShipImageSrc(firstRemote);
+      setDiagnosticsRow(panel, "local ship id", String(status.localShipId || "missing").slice(0, 32));
+      setDiagnosticsRow(panel, "local ship img", compactPath(status.localShipImage));
+      setDiagnosticsRow(panel, "remote ship id", String(firstRemote.currentShipId || "missing").slice(0, 32));
+      setDiagnosticsRow(panel, "remote ship img", compactPath(remoteShipImage));
+      setDiagnosticsRow(panel, "remote img status", getShipImageLoadLabel(firstRemote));
+      setDiagnosticsRow(panel, "remote ships", getShipImageStatus(players));
+    }
     setDiagnosticsRow(panel, isStagingMode(status) ? "staging bots" : "dev bots", `${bots.length} total / ${sameNodeBots.length} same node`);
     setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
     if (isStagingMode(status)) {
@@ -1575,7 +1742,7 @@
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
     note.textContent = isStagingMode(status)
-      ? "Staging damage is server-owned test damage only. No rewards, XP, loot, bounties, saves, or progression."
+      ? "Staging multiplayer reward path - XP only when verified and explicitly enabled; no credits, loot, bounties, or PvP."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 
