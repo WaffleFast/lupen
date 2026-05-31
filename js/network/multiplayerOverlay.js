@@ -289,6 +289,19 @@
     };
   }
 
+  function getServerBotMapPosition(bot) {
+    const x = Number(bot?.x);
+    const y = Number(bot?.y);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      return {
+        x: clampMapCoordinate(x),
+        y: clampMapCoordinate(y)
+      };
+    }
+
+    return getEntityPosition(bot);
+  }
+
   function getPilotLabel(player) {
     const id = String(player.sessionId || player.id || "");
     const displayName = String(player.displayName || "").trim();
@@ -414,7 +427,7 @@
   }
 
   function drawSectorBot(layer, bot) {
-    const basePosition = getEntityPosition(bot);
+    const basePosition = getServerBotMapPosition(bot);
     const offset = getStableMapOffset(bot, 1.55);
     const position = {
       x: clampMapCoordinate(basePosition.x + offset.x),
@@ -584,8 +597,8 @@
       const marker = global.document.createElement("div");
       marker.className = "lupen-mp-space-bot";
       marker.dataset.botId = bot.id || "";
-      marker.style.left = `${36 + getStableOffset(bot, index)}%`;
-      marker.style.top = `${32 + (index % 3) * 13}%`;
+      marker.style.left = `${clampMapCoordinate(bot.x || 50)}%`;
+      marker.style.top = `${clampMapCoordinate(bot.y || 50)}%`;
 
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-bot-ship";
@@ -675,6 +688,9 @@
     setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);
     setDiagnosticsRow(panel, isStagingMode(status) ? "staging bots" : "dev bots", `${bots.length} total / ${sameNodeBots.length} same node`);
     setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
+    if (isStagingMode(status)) {
+      setDiagnosticsRow(panel, "bot layer", "server-owned visual");
+    }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
     }

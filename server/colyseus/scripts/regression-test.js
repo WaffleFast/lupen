@@ -1,5 +1,6 @@
 import { Client } from "colyseus.js";
 import { ROOM_NAME } from "../src/app.config.js";
+import { STAGING_BOT_ALLOWED_NODE_IDS } from "../src/rooms/LupenSectorRoom.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -68,6 +69,12 @@ function latestBotUpdateAt(room) {
   return botSnapshots(room).reduce((latest, bot) => Math.max(latest, Number(bot.lastUpdatedAt || 0)), 0);
 }
 
+function assertAllowedBotNodes(room) {
+  const allowedNodes = new Set(STAGING_BOT_ALLOWED_NODE_IDS);
+  const invalidBot = botSnapshots(room).find((bot) => !allowedNodes.has(bot.currentNode));
+  assert(!invalidBot, `Bot ${invalidBot?.id} is on invalid staging node ${invalidBot?.currentNode}.`);
+}
+
 function playerCount(room) {
   return room?.state?.players?.size || 0;
 }
@@ -126,8 +133,11 @@ try {
   console.log("both clients see each other");
 
   await waitFor("dummy bots to appear", () => botCount(roomA) > 0 && botCount(roomB) > 0);
+  assertAllowedBotNodes(roomA);
+  assertAllowedBotNodes(roomB);
   console.log(`dummy bot count: A=${botCount(roomA)} B=${botCount(roomB)}`);
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
+  const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
 
   await waitFor("shared server bot update", () => {
     return latestBotUpdateAt(roomA) > initialBotUpdateAt &&
@@ -135,6 +145,14 @@ try {
       botSnapshotKey(roomA) === botSnapshotKey(roomB);
   }, 7000);
   console.log("both clients received matching server bot movement update");
+
+  await waitFor("a staging bot node change", () => {
+    assertAllowedBotNodes(roomA);
+    assertAllowedBotNodes(roomB);
+    const currentBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
+    return currentBotNodes !== initialBotNodes && botSnapshotKey(roomA) === botSnapshotKey(roomB);
+  }, 22000);
+  console.log("staging bot node change stayed on allowed combat nodes");
 
   roomA.send("movement:update", {
     displayName: "Regression Pilot A",

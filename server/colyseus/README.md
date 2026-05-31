@@ -10,6 +10,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Legacy compatibility room: `lupen_test`.
 - A `LupenSectorRoom` that tracks connected players by `sessionId`.
 - A small fixed set of server-owned staging bots for visual-only multiplayer presence testing.
+- Staging bots spawn only on a server allow-list of hostile/combat sector nodes. They deliberately avoid planet safe nodes such as `Asteron Prime`, `Virella`, and `Nyxara`, plus safe link nodes.
 - Each joined player gets:
   - `id` / `sessionId`: the Colyseus `sessionId`
   - `displayName`: supplied by join options, otherwise `Pilot`
@@ -28,7 +29,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `x` / `y`: placeholder map position
   - `lastUpdatedAt`: local server timestamp
   - `nextMoveAt`: planned next node-move timestamp for debugging
-- Staging bots drift on a slow server tick and occasionally move to neighbouring placeholder sector nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
+- Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
 
 ## Install
 
@@ -166,6 +167,8 @@ The regression test uses two Colyseus clients to verify that:
 - A `movement:update` from client A reaches client B.
 - Dummy server bots exist in room state.
 - Both clients receive the same server-owned bot movement update.
+- Staging bot `currentNode` values stay inside the server's allowed combat node list.
+- At least one staging bot changes node while both clients observe matching state.
 - Invalid movement is ignored and returns a dev-only warning.
 - Client B sees client A removed after disconnect.
 

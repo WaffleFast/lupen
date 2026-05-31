@@ -43,40 +43,78 @@ const KNOWN_SECTOR_NODES = new Set([
   "Lower Gate East"
 ]);
 
-const BOT_PATROL_NODES = [
-  { node: "Asteron Prime", x: 50, y: 50 },
-  { node: "East Link 1", x: 62, y: 50 },
-  { node: "East Link 2", x: 74, y: 50 },
-  { node: "Upper Gate Core", x: 50, y: 30 },
-  { node: "Upper Gate West", x: 38, y: 30 },
-  { node: "Upper Gate East", x: 62, y: 30 },
-  { node: "Lower Gate Core", x: 50, y: 70 },
-  { node: "Lower Gate West", x: 38, y: 70 },
-  { node: "Lower Gate East", x: 62, y: 70 },
-  { node: "West Link 1", x: 38, y: 50 }
+export const STAGING_BOT_ALLOWED_NODE_IDS = [
+  "Upper Apex",
+  "Upper Arc West",
+  "Upper Arc East",
+  "Upper Mid West B",
+  "Upper Mid East B",
+  "Upper Lane West B",
+  "Upper Lane Core West",
+  "Upper Lane Core East",
+  "Upper Lane East B",
+  "Upper Gate West",
+  "Upper Gate Core",
+  "Upper Gate East",
+  "Lower Gate West",
+  "Lower Gate Core",
+  "Lower Gate East",
+  "Lower Lane West B",
+  "Lower Lane Core West",
+  "Lower Lane Core East",
+  "Lower Lane East B",
+  "Lower Mid West B",
+  "Lower Mid East B",
+  "Lower Arc West",
+  "Lower Arc East",
+  "Lower Apex"
 ];
 
-const BOT_NODE_POSITIONS = new Map(BOT_PATROL_NODES.map((entry) => [entry.node, entry]));
-const BOT_NODE_LINKS = new Map([
-  ["Asteron Prime", ["East Link 1", "West Link 1", "Upper Gate Core", "Lower Gate Core"]],
-  ["East Link 1", ["Asteron Prime", "East Link 2", "Upper Gate East", "Lower Gate East"]],
-  ["East Link 2", ["East Link 1", "Upper Gate East", "Lower Gate East"]],
-  ["West Link 1", ["Asteron Prime", "Upper Gate West", "Lower Gate West"]],
-  ["Upper Gate Core", ["Asteron Prime", "Upper Gate West", "Upper Gate East"]],
-  ["Upper Gate West", ["Upper Gate Core", "West Link 1"]],
-  ["Upper Gate East", ["Upper Gate Core", "East Link 1", "East Link 2"]],
-  ["Lower Gate Core", ["Asteron Prime", "Lower Gate West", "Lower Gate East"]],
-  ["Lower Gate West", ["Lower Gate Core", "West Link 1"]],
-  ["Lower Gate East", ["Lower Gate Core", "East Link 1", "East Link 2"]]
-]);
+// Combat-only subset of the current Lupen sector map. Staging bots deliberately
+// avoid planets and safe travel links so the shared multiplayer layer reads as
+// a hostile-sector presence test, not real economy/travel simulation.
+const STAGING_BOT_NODES = [
+  { node: "Upper Apex", x: 50, y: 14, connects: ["Upper Arc West", "Upper Arc East"] },
+  { node: "Upper Arc West", x: 30, y: 20.5, connects: ["Upper Apex", "Upper Mid West B"] },
+  { node: "Upper Arc East", x: 70, y: 20.5, connects: ["Upper Apex", "Upper Mid East B"] },
+  { node: "Upper Mid West B", x: 40, y: 28, connects: ["Upper Arc West", "Upper Lane West B", "Upper Lane Core West"] },
+  { node: "Upper Mid East B", x: 60, y: 28, connects: ["Upper Arc East", "Upper Lane Core East", "Upper Lane East B"] },
+  { node: "Upper Lane West B", x: 26, y: 36.5, connects: ["Upper Mid West B", "Upper Gate West", "Upper Gate Core"] },
+  { node: "Upper Lane Core West", x: 46, y: 36.5, connects: ["Upper Mid West B", "Upper Gate Core"] },
+  { node: "Upper Lane Core East", x: 54, y: 36.5, connects: ["Upper Mid East B", "Upper Gate Core"] },
+  { node: "Upper Lane East B", x: 74, y: 36.5, connects: ["Upper Mid East B", "Upper Gate Core", "Upper Gate East"] },
+  { node: "Upper Gate West", x: 18, y: 43, connects: ["Upper Lane West B", "Upper Gate Core"] },
+  { node: "Upper Gate Core", x: 50, y: 43, connects: ["Upper Gate West", "Upper Lane Core West", "Upper Lane Core East", "Upper Gate East"] },
+  { node: "Upper Gate East", x: 82, y: 43, connects: ["Upper Lane East B", "Upper Gate Core"] },
+  { node: "Lower Gate West", x: 18, y: 57, connects: ["Lower Lane West B", "Lower Gate Core"] },
+  { node: "Lower Gate Core", x: 50, y: 57, connects: ["Lower Gate West", "Lower Lane Core West", "Lower Lane Core East", "Lower Gate East"] },
+  { node: "Lower Gate East", x: 82, y: 57, connects: ["Lower Lane East B", "Lower Gate Core"] },
+  { node: "Lower Lane West B", x: 26, y: 63.5, connects: ["Lower Mid West B", "Lower Gate West", "Lower Gate Core"] },
+  { node: "Lower Lane Core West", x: 46, y: 63.5, connects: ["Lower Mid West B", "Lower Gate Core"] },
+  { node: "Lower Lane Core East", x: 54, y: 63.5, connects: ["Lower Mid East B", "Lower Gate Core"] },
+  { node: "Lower Lane East B", x: 74, y: 63.5, connects: ["Lower Mid East B", "Lower Gate Core", "Lower Gate East"] },
+  { node: "Lower Mid West B", x: 40, y: 72, connects: ["Lower Arc West", "Lower Lane West B", "Lower Lane Core West"] },
+  { node: "Lower Mid East B", x: 60, y: 72, connects: ["Lower Arc East", "Lower Lane Core East", "Lower Lane East B"] },
+  { node: "Lower Arc West", x: 30, y: 79.5, connects: ["Lower Apex", "Lower Mid West B"] },
+  { node: "Lower Arc East", x: 70, y: 79.5, connects: ["Lower Apex", "Lower Mid East B"] },
+  { node: "Lower Apex", x: 50, y: 86, connects: ["Lower Arc West", "Lower Arc East"] }
+];
+
+const BOT_NODE_POSITIONS = new Map(STAGING_BOT_NODES.map((entry) => [entry.node, entry]));
+const BOT_NODE_LINKS = new Map(
+  STAGING_BOT_NODES.map((entry) => [
+    entry.node,
+    entry.connects.filter((nodeId) => STAGING_BOT_ALLOWED_NODE_IDS.includes(nodeId))
+  ])
+);
 const BOT_MOVE_TICK_MS = 4000;
-const BOT_NODE_MOVE_MS = 12000;
+const BOT_NODE_MOVE_MS = 16000;
 
 const DUMMY_BOT_DEFINITIONS = [
-  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone" },
-  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout" },
-  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher" },
-  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor" }
+  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West" },
+  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Lane East B" },
+  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B" },
+  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East" }
 ];
 
 export class LupenSectorPlayer extends Schema {
@@ -235,7 +273,7 @@ export class LupenSectorRoom extends Room {
     const now = Date.now();
 
     DUMMY_BOT_DEFINITIONS.forEach((definition, index) => {
-      const patrolNode = BOT_PATROL_NODES[index % BOT_PATROL_NODES.length];
+      const patrolNode = BOT_NODE_POSITIONS.get(definition.startNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length];
       this.state.bots.set(definition.id, new LupenSectorBot({
         id: definition.id,
         type: definition.type,
@@ -244,7 +282,7 @@ export class LupenSectorRoom extends Room {
         x: patrolNode.x + (index % 2 === 0 ? 1.2 : -1.2),
         y: patrolNode.y + (index % 2 === 0 ? -1.2 : 1.2),
         lastUpdatedAt: now,
-        nextMoveAt: now + BOT_NODE_MOVE_MS + index * 1500
+        nextMoveAt: now + BOT_NODE_MOVE_MS + index * 2500
       }));
     });
   }
@@ -266,9 +304,9 @@ export class LupenSectorRoom extends Room {
         bot.nextMoveAt = now + BOT_NODE_MOVE_MS + index * 1250;
       }
 
-      const nodePosition = BOT_NODE_POSITIONS.get(bot.currentNode) || BOT_PATROL_NODES[0];
-      const driftX = (((this.botStep + index) % 5) - 2) * 0.75;
-      const driftY = (((this.botStep * 2 + index) % 5) - 2) * 0.55;
+      const nodePosition = BOT_NODE_POSITIONS.get(bot.currentNode) || STAGING_BOT_NODES[0];
+      const driftX = (((this.botStep + index) % 5) - 2) * 0.55;
+      const driftY = (((this.botStep * 2 + index) % 5) - 2) * 0.4;
       bot.x = clampNumber(nodePosition.x + driftX, 4, 96);
       bot.y = clampNumber(nodePosition.y + driftY, 4, 96);
       bot.lastUpdatedAt = now;
@@ -276,8 +314,9 @@ export class LupenSectorRoom extends Room {
   }
 
   getNextBotNode(currentNode, index = 0) {
-    const options = BOT_NODE_LINKS.get(currentNode) || BOT_PATROL_NODES.map((entry) => entry.node);
-    return options[(this.botStep + index) % options.length] || currentNode || "Asteron Prime";
+    const options = BOT_NODE_LINKS.get(currentNode) || STAGING_BOT_ALLOWED_NODE_IDS;
+    const nextNode = options[(this.botStep + index) % options.length] || currentNode || STAGING_BOT_ALLOWED_NODE_IDS[0];
+    return STAGING_BOT_ALLOWED_NODE_IDS.includes(nextNode) ? nextNode : STAGING_BOT_ALLOWED_NODE_IDS[0];
   }
 
   touchPlayer(sessionId) {
