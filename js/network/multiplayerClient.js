@@ -42,6 +42,12 @@
     lastRewardClaimResult: null,
     lastError: null
   };
+  const identity = {
+    authStatus: "guest",
+    playerIdPresent: false,
+    displayName: "",
+    lastCheckedAt: 0
+  };
 
   let colyseusClient = null;
   let room = null;
@@ -264,6 +270,53 @@
     return {};
   }
 
+  function getStoredAccountIdentity() {
+    try {
+      const raw = global.localStorage?.getItem?.("sectorOneAccount") || "";
+      if (!raw) return {};
+      const account = JSON.parse(raw);
+      return account && typeof account === "object" ? account : {};
+    } catch (_err) {
+      return {};
+    }
+  }
+
+  async function getMultiplayerIdentityOptions(localPresence = getLocalPresenceOptions()) {
+    const account = getStoredAccountIdentity();
+    const fallbackDisplayName = String(localPresence.displayName || account.pilot_name || account.username || "Pilot").slice(0, 80);
+    const identityOptions = {
+      authStatus: "guest",
+      displayName: fallbackDisplayName,
+      playerId: "",
+      supabaseUserId: "",
+      supabaseAccessToken: ""
+    };
+
+    try {
+      const supabaseClient = typeof global.getSupabaseClient === "function" ? global.getSupabaseClient() : global.lupenSupabase;
+      const sessionResponse = supabaseClient?.auth?.getSession ? await supabaseClient.auth.getSession() : null;
+      const session = sessionResponse?.data?.session || null;
+      const user = session?.user || null;
+
+      if (user?.id) {
+        identityOptions.authStatus = "authenticated";
+        identityOptions.playerId = String(user.id);
+        identityOptions.supabaseUserId = String(user.id);
+        identityOptions.displayName = String(account.pilot_name || account.username || user.user_metadata?.pilot_name || fallbackDisplayName).slice(0, 80);
+        identityOptions.supabaseAccessToken = String(session.access_token || "");
+      }
+    } catch (err) {
+      logDev("Supabase staging identity unavailable; connecting as guest", err);
+    }
+
+    identity.authStatus = identityOptions.authStatus;
+    identity.playerIdPresent = !!identityOptions.playerId;
+    identity.displayName = identityOptions.displayName || fallbackDisplayName;
+    identity.lastCheckedAt = Date.now();
+
+    return identityOptions;
+  }
+
   function getStagingWeaponIntent() {
     try {
       if (typeof global.getEquippedWeapon !== "function") {
@@ -444,6 +497,10 @@
       id,
       sessionId,
       displayName: String(player.displayName || "Pilot"),
+      authStatus: String(player.authStatus || "guest"),
+      playerId: String(player.playerId || player.supabaseUserId || ""),
+      supabaseUserId: String(player.supabaseUserId || player.playerId || ""),
+      trustedPlayerId: String(player.trustedPlayerId || ""),
       currentShipId: String(player.currentShipId || ""),
       shipName: String(player.shipName || player.ship || ""),
       selectedTargetBotId: String(player.selectedTargetBotId || ""),
@@ -513,6 +570,11 @@
 
     return {
       sessionId,
+      playerId: String(contributor.playerId || contributor.supabaseUserId || ""),
+      supabaseUserId: String(contributor.supabaseUserId || contributor.playerId || ""),
+      trustedPlayerId: String(contributor.trustedPlayerId || ""),
+      displayName: String(contributor.displayName || "Pilot"),
+      authStatus: String(contributor.authStatus || "guest"),
       totalDamage: Number.isFinite(Number(contributor.totalDamage)) ? Number(contributor.totalDamage) : 0,
       hits: Number.isFinite(Number(contributor.hits)) ? Number(contributor.hits) : 0,
       lastHitAt: Number.isFinite(Number(contributor.lastHitAt)) ? Number(contributor.lastHitAt) : 0,
@@ -654,7 +716,11 @@
         botName: String(message?.botName || "Staging Bot"),
         disabledBySessionId: String(message?.disabledBySessionId || ""),
         finalHitBy: String(message?.finalHitBy || message?.disabledBySessionId || ""),
+        finalHitPlayerId: String(message?.finalHitPlayerId || ""),
+        finalHitDisplayName: String(message?.finalHitDisplayName || ""),
         topContributorSessionId: String(message?.topContributorSessionId || message?.topContributor?.sessionId || ""),
+        topContributorPlayerId: String(message?.topContributorPlayerId || ""),
+        topContributorDisplayName: String(message?.topContributorDisplayName || ""),
         topContributor: normalizeRewardContributor(message?.topContributor),
         contributors,
         totalDamage: Number.isFinite(Number(message?.totalDamage)) ? Number(message.totalDamage) : 0,
@@ -683,7 +749,11 @@
         botName: String(message?.botName || "Staging Bot"),
         claimedBySessionId: String(message?.claimedBySessionId || message?.sessionId || ""),
         finalHitBy: String(message?.finalHitBy || message?.disabledBySessionId || ""),
+        finalHitPlayerId: String(message?.finalHitPlayerId || ""),
+        finalHitDisplayName: String(message?.finalHitDisplayName || ""),
         topContributorSessionId: String(message?.topContributorSessionId || message?.topContributor?.sessionId || ""),
+        topContributorPlayerId: String(message?.topContributorPlayerId || ""),
+        topContributorDisplayName: String(message?.topContributorDisplayName || ""),
         topContributor: normalizeRewardContributor(message?.topContributor),
         contributors,
         totalDamage: Number.isFinite(Number(message?.totalDamage)) ? Number(message.totalDamage) : 0,
@@ -782,6 +852,9 @@
       selectedTargetBotId: playersById.get(connection.sessionId)?.selectedTargetBotId || "",
       nextFireAt: playersById.get(connection.sessionId)?.nextFireAt || 0,
       fireCooldownRemainingMs: Math.max(0, Math.ceil((playersById.get(connection.sessionId)?.nextFireAt || 0) - Date.now())),
+      authStatus: identity.authStatus,
+      playerIdPresent: identity.playerIdPresent,
+      displayName: identity.displayName || localPresence.displayName || "Pilot",
       originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,
@@ -833,10 +906,12 @@
       try {
         const Colyseus = await ensureBrowserClientLoaded();
         const localPresence = getLocalPresenceOptions();
+        const identityOptions = await getMultiplayerIdentityOptions(localPresence);
         colyseusClient = new Colyseus.Client(serverUrl);
         room = await colyseusClient.joinOrCreate(connection.roomName, {
           ...localPresence,
-          displayName: options.displayName || localPresence.displayName || "Pilot",
+          ...identityOptions,
+          displayName: options.displayName || identityOptions.displayName || localPresence.displayName || "Pilot",
           currentNode: options.currentNode || localPresence.currentNode || "Asteron Prime"
         });
 

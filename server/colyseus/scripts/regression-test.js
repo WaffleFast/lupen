@@ -259,6 +259,10 @@ async function leaveRoom(room) {
 try {
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot A",
+    authStatus: "authenticated",
+    playerId: "stub-player-a",
+    supabaseUserId: "stub-player-a",
+    supabaseAccessToken: "fake-token-a",
     currentShipId: "lupenOrigin",
     shipName: "LF-1 Origin",
     currentNode: "Asteron Prime",
@@ -268,6 +272,10 @@ try {
 
   roomB = await clientB.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot B",
+    authStatus: "authenticated",
+    playerId: "stub-player-b",
+    supabaseUserId: "stub-player-b",
+    supabaseAccessToken: "fake-token-b",
     currentShipId: "lupenOrigin",
     shipName: "LF-1 Origin",
     currentNode: "Asteron Prime",
@@ -297,6 +305,14 @@ try {
 
   assert(playerFrom(roomA, roomB.sessionId), "Client A cannot see client B.");
   assert(playerFrom(roomB, roomA.sessionId), "Client B cannot see client A.");
+  assert(playerFrom(roomA, roomA.sessionId)?.authStatus === "unverified", "Client A fake token did not become unverified.");
+  assert(!playerFrom(roomA, roomA.sessionId)?.trustedPlayerId, "Client A fake token created a trusted player id.");
+  assert(!playerFrom(roomA, roomA.sessionId)?.playerId, "Client A unverified playerId was trusted.");
+  assert(playerFrom(roomA, roomA.sessionId)?.displayName === "Regression Pilot A", "Client A displayName was not preserved.");
+  assert(playerFrom(roomA, roomB.sessionId)?.authStatus === "unverified", "Client B fake token did not become unverified.");
+  assert(!playerFrom(roomA, roomB.sessionId)?.trustedPlayerId, "Client B fake token created a trusted player id.");
+  assert(!playerFrom(roomA, roomB.sessionId)?.playerId, "Client B unverified playerId was trusted.");
+  assert(playerFrom(roomA, roomA.sessionId)?.supabaseAccessToken === undefined, "Raw Supabase token leaked into room state.");
   console.log("both clients see each other");
 
   await waitFor("dummy bots to appear", () => botCount(roomA) > 0 && botCount(roomB) > 0);
@@ -536,7 +552,9 @@ try {
       return event?.botId === inspectedBotBeforeCombat.id &&
         event?.disabledBySessionId === roomA.sessionId &&
         event?.finalHitBy === roomA.sessionId &&
+        event?.finalHitPlayerId === "" &&
         event?.topContributorSessionId === roomA.sessionId &&
+        event?.topContributorPlayerId === "" &&
         contributorIds.includes(roomA.sessionId) &&
         contributorIds.includes(roomB.sessionId) &&
         event?.applied === false &&
@@ -550,6 +568,9 @@ try {
   assert(contributorA?.totalDamage > contributorB?.totalDamage, "Top contributor did not have the largest damage contribution.");
   assert(contributorA?.hits > 0 && contributorB?.hits === 1, "Contribution hit counts were not recorded correctly.");
   assert(Number(contributorA?.percent || 0) > Number(contributorB?.percent || 0), "Contribution percentages were not calculated correctly.");
+  assert(!contributorA?.trustedPlayerId && !contributorA?.playerId, "Contributor A unverified identity was trusted.");
+  assert(!contributorB?.trustedPlayerId && !contributorB?.playerId, "Contributor B unverified identity was trusted.");
+  assert(contributorA?.displayName === "Regression Pilot A", "Contributor A display name was not included in preview.");
   const playerAfterRewardPreview = playerFrom(roomA, roomA.sessionId);
   assert(playerAfterRewardPreview && !("xp" in playerAfterRewardPreview), "Reward preview created player XP field.");
   assert(playerAfterRewardPreview && !("credits" in playerAfterRewardPreview), "Reward preview created player credits field.");
@@ -566,6 +587,8 @@ try {
   assert(claimPreviewResult?.claimSimulated === true, "Reward preview claim result was not marked simulated.");
   assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
   assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
+  assert(claimPreviewResult?.finalHitPlayerId === "", "Unverified reward claim result included a trusted final hit player id.");
+  assert(claimPreviewResult?.topContributorPlayerId === "", "Unverified reward claim result included a trusted top contributor player id.");
   assert(!("xp" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player XP field.");
   assert(!("credits" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player credits field.");
   assert(!("inventory" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player inventory field.");
@@ -578,6 +601,11 @@ try {
     x: 52,
     y: 50
   });
+  await waitFor("client C guest identity to appear", () => {
+    return !!playerFrom(roomC, roomC.sessionId);
+  });
+  assert(playerFrom(roomC, roomC.sessionId)?.authStatus === "guest", "Guest staging identity did not fall back to guest.");
+  assert(!playerFrom(roomC, roomC.sessionId)?.playerId, "Guest staging identity unexpectedly had a playerId.");
   const nonContributorClaim = await expectRewardClaimResult(roomC, () => {
     roomC.send("reward:claim_preview", {
       botId: rewardPreview.botId,

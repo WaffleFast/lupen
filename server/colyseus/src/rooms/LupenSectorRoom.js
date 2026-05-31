@@ -116,6 +116,7 @@ const STAGING_FIRE_COOLDOWN_MS = 900;
 const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_BOT_DISABLED_RESET_MS = 6500;
+const SUPABASE_VERIFY_TIMEOUT_MS = 4000;
 
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 35, hull: 70 },
@@ -133,6 +134,10 @@ export class LupenSectorPlayer extends Schema {
 
 type("string")(LupenSectorPlayer.prototype, "id");
 type("string")(LupenSectorPlayer.prototype, "sessionId");
+type("string")(LupenSectorPlayer.prototype, "authStatus");
+type("string")(LupenSectorPlayer.prototype, "playerId");
+type("string")(LupenSectorPlayer.prototype, "supabaseUserId");
+type("string")(LupenSectorPlayer.prototype, "trustedPlayerId");
 type("string")(LupenSectorPlayer.prototype, "displayName");
 type("string")(LupenSectorPlayer.prototype, "currentShipId");
 type("string")(LupenSectorPlayer.prototype, "shipName");
@@ -199,6 +204,101 @@ function getShipName(message = {}) {
     typeof message.shipName === "string" ? message.shipName : message.ship,
     ""
   );
+}
+
+function getSafeIdentityValue(value, fallback = "") {
+  return getStringValue(value, fallback).slice(0, 120);
+}
+
+function getAuthStatus(options = {}) {
+  const requestedStatus = getSafeIdentityValue(options.authStatus, "guest").toLowerCase();
+
+  if (requestedStatus === "verified") return "verified";
+  if (requestedStatus === "unverified") return "unverified";
+  return "guest";
+}
+
+function getSupabaseVerifyConfig(env = process.env) {
+  return {
+    url: getSafeIdentityValue(env.SUPABASE_URL),
+    serviceRoleKey: getSafeIdentityValue(env.SUPABASE_SERVICE_ROLE_KEY)
+  };
+}
+
+export async function verifySupabaseAccessToken(accessToken, env = process.env, fetchImpl = globalThis.fetch) {
+  const token = getStringValue(accessToken);
+  if (!token) {
+    return {
+      authStatus: "guest",
+      trustedPlayerId: "",
+      supabaseUserId: "",
+      displayName: ""
+    };
+  }
+
+  const config = getSupabaseVerifyConfig(env);
+  if (!config.url || !config.serviceRoleKey || typeof fetchImpl !== "function") {
+    return {
+      authStatus: "unverified",
+      trustedPlayerId: "",
+      supabaseUserId: "",
+      displayName: "",
+      reason: "supabase_verification_unavailable"
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SUPABASE_VERIFY_TIMEOUT_MS);
+
+  try {
+    const response = await fetchImpl(`${config.url.replace(/\/$/, "")}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        apikey: config.serviceRoleKey,
+        authorization: `Bearer ${token}`
+      },
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      return {
+        authStatus: "unverified",
+        trustedPlayerId: "",
+        supabaseUserId: "",
+        displayName: "",
+        reason: "supabase_token_invalid"
+      };
+    }
+
+    const user = await response.json();
+    const userId = getSafeIdentityValue(user?.id);
+    if (!userId) {
+      return {
+        authStatus: "unverified",
+        trustedPlayerId: "",
+        supabaseUserId: "",
+        displayName: "",
+        reason: "supabase_user_missing"
+      };
+    }
+
+    return {
+      authStatus: "verified",
+      trustedPlayerId: userId,
+      supabaseUserId: userId,
+      displayName: getSafeIdentityValue(user?.user_metadata?.pilot_name || user?.user_metadata?.displayName || user?.user_metadata?.name)
+    };
+  } catch (_err) {
+    return {
+      authStatus: "unverified",
+      trustedPlayerId: "",
+      supabaseUserId: "",
+      displayName: "",
+      reason: "supabase_verification_failed"
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function validatePresencePayload(message = {}) {
@@ -379,13 +479,26 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  onJoin(client, options = {}) {
+  async onJoin(client, options = {}) {
     const now = Date.now();
+    // Server-side Supabase verification groundwork. The access token is read
+    // from join options, verified via Supabase when env vars are configured,
+    // and never logged, stored in room state, or returned to clients.
+    const verifiedIdentity = await verifySupabaseAccessToken(options.supabaseAccessToken);
+    const displayName = verifiedIdentity.displayName || getSafeIdentityValue(options.displayName, "Pilot") || "Pilot";
+    const trustedPlayerId = verifiedIdentity.trustedPlayerId || "";
     this.state.players.set(client.sessionId, new LupenSectorPlayer({
       id: client.sessionId,
       sessionId: client.sessionId,
-      displayName: getStringValue(options.displayName, "Pilot") || "Pilot",
-      currentShipId: getStringValue(options.currentShipId),
+      // Staging identity is preparation metadata only. Only verified tokens
+      // populate trusted ids; unverified/guest clients continue as session
+      // based staging participants with no real reward authority.
+      authStatus: getAuthStatus(verifiedIdentity),
+      playerId: trustedPlayerId,
+      supabaseUserId: verifiedIdentity.supabaseUserId || trustedPlayerId,
+      trustedPlayerId,
+      displayName,
+      currentShipId: getSafeIdentityValue(options.currentShipId),
       shipName: getShipName(options),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
       selectedTargetBotId: "",
@@ -649,6 +762,17 @@ export class LupenSectorRoom extends Room {
     });
   }
 
+  getPlayerIdentitySnapshot(sessionId) {
+    const player = this.state.players.get(getStringValue(sessionId));
+    return {
+      playerId: player?.playerId || "",
+      supabaseUserId: player?.supabaseUserId || player?.playerId || "",
+      trustedPlayerId: player?.trustedPlayerId || "",
+      displayName: player?.displayName || "Pilot",
+      authStatus: player?.authStatus || "guest"
+    };
+  }
+
   getContributionSummary(botId) {
     const contributionMap = this.botContributions.get(getStringValue(botId));
     const rawContributors = Array.from(contributionMap?.values?.() || []);
@@ -661,6 +785,7 @@ export class LupenSectorRoom extends Room {
         const contributorDamage = Math.max(0, Number(contributor.totalDamage || 0));
         return {
           sessionId: contributor.sessionId,
+          ...this.getPlayerIdentitySnapshot(contributor.sessionId),
           totalDamage: Math.round(contributorDamage * 100) / 100,
           hits: Math.max(0, Number(contributor.hits || 0)),
           lastHitAt: Number(contributor.lastHitAt || 0),
@@ -685,6 +810,8 @@ export class LupenSectorRoom extends Room {
 
   buildRewardPreviewPayload(bot, disabledBySessionId, contributionSummary, receivedAt = Date.now()) {
     const botId = getStringValue(bot?.id);
+    const finalHitIdentity = this.getPlayerIdentitySnapshot(disabledBySessionId);
+    const topContributorIdentity = this.getPlayerIdentitySnapshot(contributionSummary.topContributorSessionId);
     return {
       ok: true,
       rewardPreviewId: `${botId}:${receivedAt}`,
@@ -692,7 +819,11 @@ export class LupenSectorRoom extends Room {
       botName: bot?.name || bot?.type || "Staging Bot",
       disabledBySessionId,
       finalHitBy: disabledBySessionId,
+      finalHitPlayerId: finalHitIdentity.trustedPlayerId || finalHitIdentity.playerId || finalHitIdentity.supabaseUserId || "",
+      finalHitDisplayName: finalHitIdentity.displayName,
       topContributorSessionId: contributionSummary.topContributorSessionId,
+      topContributorPlayerId: topContributorIdentity.trustedPlayerId || topContributorIdentity.playerId || topContributorIdentity.supabaseUserId || "",
+      topContributorDisplayName: topContributorIdentity.displayName,
       topContributor: contributionSummary.contributors[0] || null,
       contributors: contributionSummary.contributors,
       totalDamage: contributionSummary.totalDamage,
@@ -945,6 +1076,9 @@ export class LupenSectorRoom extends Room {
 
     const displayName = getStringValue(message.displayName);
     if (displayName) player.displayName = displayName;
+
+    // Presence updates may refresh display-only identity labels, but they do
+    // not upgrade trusted identity. Only onJoin token verification can do that.
 
     if (typeof message.currentShipId === "string") {
       player.currentShipId = message.currentShipId.trim();

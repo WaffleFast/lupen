@@ -13,6 +13,8 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Staging bots spawn only on a server allow-list of hostile/combat sector nodes. They deliberately avoid planet safe nodes such as `Asteron Prime`, `Virella`, and `Nyxara`, plus safe link nodes.
 - Each joined player gets:
   - `id` / `sessionId`: the Colyseus `sessionId`
+  - `authStatus`: `guest`, `unverified`, or `verified`
+  - `playerId` / `supabaseUserId` / `trustedPlayerId`: populated only after server-side Supabase token verification
   - `displayName`: supplied by join options, otherwise `Pilot`
   - `currentShipId` / `shipName`: display-only ship identity
   - `currentNode`: current sector node, default `Asteron Prime`
@@ -41,6 +43,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - When staging bot hull reaches `0`, the bot broadcasts `bot:disabled`, stops taking staging damage, and respawns after a short delay with shield/hull restored. Respawn broadcasts `bot:respawned` and never grants rewards.
 - Disabled staging bots also broadcast `staging:reward_preview` with `applied: false` and `reason: staging_preview_only`. The preview includes final-hit and top-contributor attribution from staging-only damage contribution tracking, but it never mutates XP, credits, inventory, bounties, saves, Supabase, or progression.
 - Staging-only `reward:claim_preview` / `staging:claimRewardPreview` messages simulate claiming a recent reward preview and reply with `reward:claim_preview_result`. Eligible contributors receive `applied: false` and `reason: staging_preview_only`; non-contributors are rejected safely. No real rewards are marked claimed or applied.
+- Supabase identity sent by the browser client is staging preparation metadata only. The server verifies access tokens with Supabase when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured. Verified tokens set `authStatus: verified` and trusted player ids; missing tokens stay `guest`; failed verification becomes `unverified`. Access tokens are never stored in room state or sent back to clients, and no reward writes are trusted or performed yet.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
@@ -87,6 +90,7 @@ Manual Colyseus Cloud steps later:
 - Configure the app root as `server/colyseus` if the repository root is not used directly.
 - Confirm the Cloud start command runs `npm start` or uses `ecosystem.config.cjs`.
 - Add any staging environment variables in Colyseus Cloud settings; do not commit secrets.
+- For staging identity verification, configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Colyseus Cloud environment variables. Do not commit either value.
 - After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
 - Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
 
@@ -176,6 +180,7 @@ The regression test uses two Colyseus clients to verify that:
 - Both clients join `lupen_sector`.
 - Player count reaches `2`.
 - Each client can see the other player.
+- Fake access tokens become `unverified`, client-provided player ids are not trusted, and raw access tokens are not exposed in room state.
 - A `movement:update` from client A reaches client B.
 - Dummy server bots exist in room state.
 - Staging bot display fields are present and `visualOnly` remains true.
@@ -191,6 +196,7 @@ The regression test uses two Colyseus clients to verify that:
 - Oversized weapon damage is clamped and invalid weapon damage falls back safely.
 - Repeated valid staging hits can disable a bot.
 - Disabling a bot emits a preview-only reward event with `applied: false`, final-hit attribution, top contributor attribution, contributor hit counts, and contribution percentages.
+- Reward previews include trusted contributor player ids only when server-side verification succeeds; unverified/guest contributors use session/display metadata.
 - A contributor can simulate claiming the preview reward, receiving `applied: false`, preview values, and contribution info.
 - A non-contributor preview claim is rejected safely without applying rewards.
 - Bot respawn confirms staging contribution data was cleared.

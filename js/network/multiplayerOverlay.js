@@ -1116,13 +1116,19 @@
   function getRewardPreviewLabel(status) {
     const preview = status?.lastRewardPreview;
     if (!preview?.botId) return "none";
-    const finalHit = getShortSessionId(preview.finalHitBy || preview.disabledBySessionId);
-    const topContributor = getShortSessionId(preview.topContributorSessionId || preview.topContributor?.sessionId);
+    const finalHit = getPreviewIdentityLabel(preview.finalHitDisplayName, preview.finalHitPlayerId, preview.finalHitBy || preview.disabledBySessionId);
+    const topContributor = getPreviewIdentityLabel(preview.topContributorDisplayName, preview.topContributorPlayerId, preview.topContributorSessionId || preview.topContributor?.sessionId);
     const yourContribution = getRewardPreviewSelfContribution(status);
     const contributionLabel = yourContribution
       ? `you ${Math.round(Number(yourContribution.percent || 0))}%`
       : "you 0%";
     return `${preview.botName || "Staging Bot"} / final ${finalHit} / top ${topContributor} / ${contributionLabel} / not applied`;
+  }
+
+  function getPreviewIdentityLabel(displayName, playerId, sessionId) {
+    const name = String(displayName || "").trim();
+    if (name && name.toLowerCase() !== "pilot") return name.slice(0, 16);
+    return String(playerId || sessionId || "").slice(0, 8) || "unknown";
   }
 
   function getRewardPreviewSelfContribution(status) {
@@ -1139,8 +1145,8 @@
     const preview = status?.lastRewardPreview;
     if (!preview?.botId) return "";
 
-    const finalHit = getShortSessionId(preview.finalHitBy || preview.disabledBySessionId);
-    const topContributor = getShortSessionId(preview.topContributorSessionId || preview.topContributor?.sessionId);
+    const finalHit = getPreviewIdentityLabel(preview.finalHitDisplayName, preview.finalHitPlayerId, preview.finalHitBy || preview.disabledBySessionId);
+    const topContributor = getPreviewIdentityLabel(preview.topContributorDisplayName, preview.topContributorPlayerId, preview.topContributorSessionId || preview.topContributor?.sessionId);
     const selfContribution = getRewardPreviewSelfContribution(status);
     const selfDamage = selfContribution ? Math.round(Number(selfContribution.totalDamage || 0)) : 0;
     const selfPercent = selfContribution ? Math.round(Number(selfContribution.percent || 0)) : 0;
@@ -1389,6 +1395,10 @@
     setDiagnosticsRow(panel, "server", getCompactServerLabel(status));
     setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
+    if (isStagingMode(status)) {
+      setDiagnosticsRow(panel, "auth", `${status.authStatus || "guest"} / player id ${status.playerIdPresent ? "present" : "missing"}`);
+      setDiagnosticsRow(panel, "identity", String(status.displayName || "Pilot").slice(0, 24));
+    }
     setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);
     setDiagnosticsRow(panel, isStagingMode(status) ? "staging bots" : "dev bots", `${bots.length} total / ${sameNodeBots.length} same node`);
     setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
