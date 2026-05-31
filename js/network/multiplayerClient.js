@@ -610,6 +610,35 @@
     };
   }
 
+  function normalizeRewardLedgerResult(result) {
+    if (!result || typeof result !== "object") return null;
+
+    return {
+      ok: result.ok === true,
+      applied: result.applied === true,
+      dryRun: result.dryRun !== false,
+      skippedReason: String(result.skippedReason || ""),
+      entry: result.entry && typeof result.entry === "object"
+        ? {
+          playerId: String(result.entry.player_id || ""),
+          roomName: String(result.entry.room_name || ""),
+          botId: String(result.entry.bot_id || ""),
+          botName: String(result.entry.bot_name || "Staging Bot"),
+          node: String(result.entry.node || ""),
+          rewardReason: String(result.entry.reward_reason || "staging_bot_disabled"),
+          xpAmount: Number.isFinite(Number(result.entry.xp_amount)) ? Number(result.entry.xp_amount) : 0,
+          creditsAmount: Number.isFinite(Number(result.entry.credits_amount)) ? Number(result.entry.credits_amount) : 0,
+          contributionPercent: Number.isFinite(Number(result.entry.contribution_percent)) ? Number(result.entry.contribution_percent) : 0,
+          finalHit: result.entry.final_hit === true,
+          topContributor: result.entry.top_contributor === true,
+          sourceEventId: String(result.entry.source_event_id || ""),
+          applied: result.entry.applied === true,
+          dryRun: result.entry.dry_run !== false
+        }
+        : null
+    };
+  }
+
   function updateBotsFromServerState(serverState) {
     botsById.clear();
 
@@ -795,6 +824,7 @@
         applied: message?.applied === true,
         dryRun: message?.dryRun === true,
         rewardWritePlan: normalizeRewardWritePlan(message?.rewardWritePlan),
+        rewardLedgerResult: normalizeRewardLedgerResult(message?.rewardLedgerResult),
         claimSimulated: message?.claimSimulated === true,
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()

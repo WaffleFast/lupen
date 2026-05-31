@@ -5,6 +5,10 @@ import {
   buildRewardWritePlan,
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
+import {
+  buildRewardLedgerEntry,
+  writeRewardLedgerEntry
+} from "../src/services/rewardLedgerService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -263,6 +267,25 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(plan.playerId === "verified-player-a", "Verified reward plan did not include trusted player id.");
   assert(plan.intendedXp === 20, `Unexpected verified dry-run XP: ${plan.intendedXp}`);
   assert(plan.intendedCredits === 32, `Unexpected verified dry-run credits: ${plan.intendedCredits}`);
+  const ledgerEntry = buildRewardLedgerEntry(plan, {
+    roomName: ROOM_NAME,
+    sourceEventId: "reward-preview-stub"
+  });
+  assert(ledgerEntry.player_id === "verified-player-a", "Ledger entry did not include verified player id.");
+  assert(ledgerEntry.xp_amount === 20, `Unexpected ledger XP amount: ${ledgerEntry.xp_amount}`);
+  assert(ledgerEntry.credits_amount === 32, `Unexpected ledger credits amount: ${ledgerEntry.credits_amount}`);
+  assert(ledgerEntry.dry_run === true && ledgerEntry.applied === false, "Ledger entry was not dry-run/unapplied.");
+
+  const disabledLedgerResult = await writeRewardLedgerEntry(ledgerEntry, {
+    env: {
+      ENABLE_STAGING_REWARD_WRITES: "false",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    }
+  });
+  assert(disabledLedgerResult?.dryRun === true, "Disabled ledger adapter did not return dryRun true.");
+  assert(disabledLedgerResult?.applied === false, "Disabled ledger adapter applied rewards.");
+  assert(disabledLedgerResult?.skippedReason === "reward_writes_disabled", `Unexpected disabled ledger reason: ${disabledLedgerResult?.skippedReason}`);
 
   const blockedPlan = buildRewardWritePlan({
     preview: {
@@ -683,6 +706,11 @@ try {
   assert(claimPreviewResult?.rewardWritePlan?.blockedReason === "identity_unverified", `Unexpected unverified blocked reason: ${claimPreviewResult?.rewardWritePlan?.blockedReason}`);
   assert(claimPreviewResult?.rewardWritePlan?.intendedXp > 0, "Reward write plan did not include intended XP.");
   assert(claimPreviewResult?.rewardWritePlan?.intendedCredits > 0, "Reward write plan did not include intended credits.");
+  assert(claimPreviewResult?.rewardLedgerResult?.dryRun === true, "Reward ledger result was not dry-run.");
+  assert(claimPreviewResult?.rewardLedgerResult?.applied === false, "Reward ledger result applied rewards.");
+  assert(claimPreviewResult?.rewardLedgerResult?.skippedReason === "reward_writes_disabled", `Unexpected reward ledger skipped reason: ${claimPreviewResult?.rewardLedgerResult?.skippedReason}`);
+  assert(claimPreviewResult?.rewardLedgerEntry?.dry_run === true, "Reward ledger entry was not marked dry-run.");
+  assert(claimPreviewResult?.rewardLedgerEntry?.applied === false, "Reward ledger entry was applied.");
   assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
   assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
   assert(claimPreviewResult?.finalHitPlayerId === "", "Unverified reward claim result included a trusted final hit player id.");

@@ -1160,10 +1160,12 @@
     if (!result.ok) return `${result.reason || "claim rejected"} / not applied`;
 
     const plan = result.rewardWritePlan;
+    const ledger = result.rewardLedgerResult;
     if (plan) {
       const eligibility = plan.eligible ? "eligible" : `blocked ${plan.blockedReason || "not verified"}`;
       const loot = plan.intendedLoot?.length ? plan.intendedLoot.join(", ") : "none";
-      return `${eligibility} / XP ${plan.intendedXp || 0} / C ${plan.intendedCredits || 0} / loot ${loot} / dry run`;
+      const ledgerLabel = ledger?.skippedReason ? ` / ledger ${ledger.skippedReason}` : "";
+      return `${eligibility} / XP ${plan.intendedXp || 0} / C ${plan.intendedCredits || 0} / loot ${loot}${ledgerLabel} / dry run`;
     }
 
     const selfContribution = Array.isArray(result.contributors)
@@ -1177,9 +1179,11 @@
     const plan = status?.lastRewardClaimResult?.rewardWritePlan;
     if (!plan) return "";
 
+    const ledger = status?.lastRewardClaimResult?.rewardLedgerResult;
     const eligibility = plan.eligible ? "Eligible" : `Blocked: ${plan.blockedReason || "not verified"}`;
     const loot = plan.intendedLoot?.length ? plan.intendedLoot.join(", ") : "none";
-    return `${eligibility} / XP ${plan.intendedXp || 0} / Credits ${plan.intendedCredits || 0} / Loot ${loot}`;
+    const ledgerLabel = ledger?.skippedReason ? ` / Ledger: ${ledger.skippedReason}` : "";
+    return `${eligibility} / XP ${plan.intendedXp || 0} / Credits ${plan.intendedCredits || 0} / Loot ${loot}${ledgerLabel}`;
   }
 
   function setDiagnosticsRow(panel, label, value) {

@@ -1,5 +1,9 @@
 import { Room } from "colyseus";
 import { MapSchema, Schema, type } from "@colyseus/schema";
+import {
+  buildRewardLedgerEntry,
+  writeRewardLedgerEntry
+} from "../services/rewardLedgerService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -501,12 +505,12 @@ export class LupenSectorRoom extends Room {
     // Staging-only reward flow preparation. This validates a recent preview
     // and replies with applied:false; it never grants XP, credits, loot,
     // inventory, bounties, saves, Supabase writes, or progression.
-    this.onMessage("reward:claim_preview", (client, message = {}) => {
-      this.claimRewardPreview(client, message, "reward:claim_preview");
+    this.onMessage("reward:claim_preview", async (client, message = {}) => {
+      await this.claimRewardPreview(client, message, "reward:claim_preview");
     });
 
-    this.onMessage("staging:claimRewardPreview", (client, message = {}) => {
-      this.claimRewardPreview(client, message, "staging:claimRewardPreview");
+    this.onMessage("staging:claimRewardPreview", async (client, message = {}) => {
+      await this.claimRewardPreview(client, message, "staging:claimRewardPreview");
     });
 
     // Legacy local prototype alias. New clients should send movement:update.
@@ -901,7 +905,7 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  claimRewardPreview(client, message = {}, messageType = "reward:claim_preview") {
+  async claimRewardPreview(client, message = {}, messageType = "reward:claim_preview") {
     const player = this.touchPlayer(client.sessionId);
     const botId = getStringValue(message.botId);
     const rewardPreviewId = getStringValue(message.rewardPreviewId);
@@ -943,6 +947,11 @@ export class LupenSectorRoom extends Room {
       claimantIdentity,
       contributor
     });
+    const rewardLedgerEntry = buildRewardLedgerEntry(rewardWritePlan, {
+      roomName: this.roomName || "lupen_sector",
+      sourceEventId: preview.rewardPreviewId
+    });
+    const rewardLedgerResult = await writeRewardLedgerEntry(rewardLedgerEntry);
 
     client.send("reward:claim_preview_result", {
       ...preview,
@@ -955,6 +964,8 @@ export class LupenSectorRoom extends Room {
       claimedBySessionId: client.sessionId,
       claimSimulated: true,
       rewardWritePlan,
+      rewardLedgerEntry,
+      rewardLedgerResult,
       receivedAt: Date.now()
     });
   }
