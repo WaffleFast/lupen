@@ -5,6 +5,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 ## What It Provides
 
 - A Colyseus server listening on port `2567` by default.
+- The server reads `process.env.PORT` when provided, with `2567` as the local fallback.
 - Preferred registered room: `lupen_sector`.
 - Legacy compatibility room: `lupen_test`.
 - A `LupenSectorRoom` that tracks connected players by `sessionId`.
@@ -57,6 +58,23 @@ Health check:
 ```powershell
 Invoke-RestMethod http://localhost:2567/health
 ```
+
+## Colyseus Cloud Readiness
+
+This prototype is structured as a standalone Node package under `server/colyseus` with `package.json`, `package-lock.json`, `src/index.js`, and room code under `src/rooms`.
+
+The current implementation uses Colyseus `Server` with `WebSocketTransport`, which is compatible with the installed Colyseus `0.16.x` package in this project. Current Colyseus Cloud examples also show newer `defineServer()` / `defineRoom()` helpers; adopting those helpers later may require adding `@colyseus/tools` or updating the scaffold, so this audit does not rewrite the working local server.
+
+An `ecosystem.config.cjs` file is included for future PM2/Cloud-style process configuration. It uses `.cjs` because this package has `"type": "module"`.
+
+Manual Colyseus Cloud steps later:
+
+- Create/select the Colyseus Cloud staging application.
+- Configure the app root as `server/colyseus` if the repository root is not used directly.
+- Confirm the Cloud start command runs `npm start` or uses `ecosystem.config.cjs`.
+- Add any staging environment variables in Colyseus Cloud settings; do not commit secrets.
+- After deployment, use the assigned `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
+- Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
 
 ## Frontend Server Configuration
 

@@ -35,7 +35,7 @@ export function createHttpServer() {
       res.end(JSON.stringify({
         ok: true,
         service: "lupen-colyseus-prototype",
-        status: "local-only",
+        status: process.env.NODE_ENV === "production" ? "staging-ready" : "local-only",
         preferredRoom: ROOM_NAME,
         rooms: [ROOM_NAME, LEGACY_ROOM_NAME]
       }));
