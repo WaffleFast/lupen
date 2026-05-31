@@ -43,6 +43,105 @@ function getInsertUrl(url) {
   return `${url.replace(/\/$/, "")}/rest/v1/multiplayer_progression_shadow`;
 }
 
+function getConnectivityCheckUrl(url) {
+  return `${url.replace(/\/$/, "")}/rest/v1/multiplayer_progression_shadow?select=id&limit=1`;
+}
+
+function getValidSupabaseUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch (_err) {
+    return "";
+  }
+}
+
+export async function checkProgressionShadowConnectivity(options = {}) {
+  const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const progressionShadowWritesEnabled = isProgressionShadowWriteEnabled(env);
+  const config = getSupabaseConfig(env);
+
+  if (!config.url) {
+    return {
+      ok: false,
+      progressionShadowReachable: false,
+      progressionShadowWritesEnabled,
+      reason: "missing_supabase_url",
+      status: 0
+    };
+  }
+
+  if (!config.serviceRoleKey) {
+    return {
+      ok: false,
+      progressionShadowReachable: false,
+      progressionShadowWritesEnabled,
+      reason: "missing_service_role_key",
+      status: 0
+    };
+  }
+
+  if (typeof fetchImpl !== "function") {
+    return {
+      ok: false,
+      progressionShadowReachable: false,
+      progressionShadowWritesEnabled,
+      reason: "fetch_unavailable",
+      status: 0
+    };
+  }
+
+  const supabaseUrl = getValidSupabaseUrl(config.url);
+  if (!supabaseUrl) {
+    return {
+      ok: false,
+      progressionShadowReachable: false,
+      progressionShadowWritesEnabled,
+      reason: "invalid_supabase_url",
+      status: 0
+    };
+  }
+
+  try {
+    const response = await fetchImpl(getConnectivityCheckUrl(supabaseUrl), {
+      method: "GET",
+      headers: {
+        apikey: config.serviceRoleKey,
+        authorization: `Bearer ${config.serviceRoleKey}`,
+        accept: "application/json"
+      }
+    });
+
+    if (!response?.ok) {
+      return {
+        ok: false,
+        progressionShadowReachable: false,
+        progressionShadowWritesEnabled,
+        reason: "progression_shadow_connectivity_check_failed",
+        status: Number(response?.status || 0)
+      };
+    }
+
+    return {
+      ok: true,
+      progressionShadowReachable: true,
+      progressionShadowWritesEnabled,
+      reason: "",
+      status: response.status || 200
+    };
+  } catch (_err) {
+    return {
+      ok: false,
+      progressionShadowReachable: false,
+      progressionShadowWritesEnabled,
+      reason: "fetch_failed",
+      status: 0
+    };
+  }
+}
+
 export function buildProgressionShadowEntry(applicationPlan = {}, progressionPreview = {}, ledgerResult = {}) {
   const ledgerEntry = ledgerResult?.entry && typeof ledgerResult.entry === "object"
     ? ledgerResult.entry
@@ -184,5 +283,6 @@ export async function writeProgressionShadowEntry(entry = {}, options = {}) {
 export const ProgressionShadowService = Object.freeze({
   buildProgressionShadowEntry,
   writeProgressionShadowEntry,
+  checkProgressionShadowConnectivity,
   isProgressionShadowWriteEnabled
 });

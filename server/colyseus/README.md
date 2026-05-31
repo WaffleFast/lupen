@@ -48,7 +48,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Reward claim simulation also passes the dry-run plan through `src/services/rewardLedgerService.js`. Ledger writes are disabled by default and return `skippedReason: reward_writes_disabled` unless `ENABLE_STAGING_REWARD_WRITES=true` is explicitly configured later. When enabled, the adapter only inserts into `multiplayer_reward_ledger` with `applied: false`; it never mutates `player_saves` or progression. The service also exposes a read-only ledger connectivity check used by `/health`; it requests at most one row and never inserts, updates, or deletes data.
 - Reward claim simulation also builds a future reward application plan through `src/services/rewardApplicationService.js`. Progression writes are disabled by default and return `skippedReason: progression_writes_disabled` unless a future `ENABLE_STAGING_PROGRESSION_WRITES=true` path is deliberately implemented. The current adapter never mutates `player_saves`, XP, credits, inventory, bounties, loot, or progression.
 - Verified reward claim simulation can read a sanitized `player_saves.save_data` summary through `src/services/playerSavePreviewService.js` to show a before/after progression preview. This read-only path selects at most one save row, returns only XP, credits, level, inventory count, and intended reward deltas, and never writes or returns the full save blob.
-- Reward claim simulation can build a progression shadow entry through `src/services/progressionShadowService.js`. Shadow writes are disabled by default with `skippedReason: progression_shadow_writes_disabled`; if explicitly enabled later, the adapter writes only to `multiplayer_progression_shadow` with `applied_to_real_save: false` and `dry_run: true`.
+- Reward claim simulation can build a progression shadow entry through `src/services/progressionShadowService.js`. Shadow writes are disabled by default with `skippedReason: progression_shadow_writes_disabled`; if explicitly enabled later, the adapter writes only to `multiplayer_progression_shadow` with `applied_to_real_save: false` and `dry_run: true`. The service also exposes a read-only shadow connectivity check used by `/health`; it requests at most one row and never inserts, updates, or deletes data.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
@@ -100,7 +100,7 @@ Manual Colyseus Cloud steps later:
 - Progression writes remain disabled unless a future `ENABLE_STAGING_PROGRESSION_WRITES=true` implementation is explicitly added later. Leave this unset/false; the current adapter is dry-run only and does not update player progression.
 - Save/progression previews use `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to read `player_saves.save_data` server-side only. The preview is read-only, requests one row, exposes only sanitized summary fields, and must not be used as a client-authoritative reward source.
 - Progression shadow writes remain disabled unless `ENABLE_STAGING_PROGRESSION_SHADOW_WRITES=true` is explicitly configured later. Leave this unset/false for current staging. If enabled, the adapter writes only to the shadow/audit table, forces `applied_to_real_save: false`, and never mutates `player_saves`.
-- `/health` includes a safe reward ledger connectivity summary with `ledgerReachable`, `rewardWritesEnabled`, `reason`, `status`, `safeErrorCode`, and `safeErrorMessage`. This uses the service role key server-side only, performs a read-only `select=id&limit=1` request, and does not expose secrets or raw Supabase errors.
+- `/health` includes safe reward ledger and progression shadow connectivity summaries. The progression shadow summary includes `progressionShadowReachable`, `progressionShadowWritesEnabled`, `reason`, and `status`. These checks use the service role key server-side only, perform read-only `select=id&limit=1` requests, and do not expose secrets or raw Supabase errors.
 - After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
 - Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
 
@@ -137,6 +137,18 @@ Current staging access model:
 - The `/health` ledger check is read-only and requests at most one row from `multiplayer_reward_ledger` to confirm service-role reachability.
 - Safe ledger check reasons include `missing_supabase_url`, `missing_service_role_key`, `invalid_supabase_url`, `fetch_failed`, `invalid_key`, `permission_denied`, `table_missing`, and `http_error`.
 - No XP, credits, loot, bounty progress, saves, `player_saves`, or progression are mutated by the ledger check or current reward claim simulation.
+
+## Progression Shadow Safety
+
+The `public.multiplayer_progression_shadow` table is created manually in Supabase. Row Level Security is enabled, and no browser/client read or write policies should be added yet. Browser clients should not read from or write to this table.
+
+Current staging access model:
+
+- Colyseus uses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from server/Cloud environment variables only.
+- The service role key must never be committed, logged, stored in room state, sent to clients, or shown in diagnostics.
+- `ENABLE_STAGING_PROGRESSION_SHADOW_WRITES` remains unset/false by default, so progression shadow writes stay disabled.
+- The `/health` progression shadow check is read-only and requests at most one row from `multiplayer_progression_shadow` to confirm service-role reachability.
+- No XP, credits, loot, bounty progress, saves, `player_saves`, or progression are mutated by the shadow check or current reward claim simulation.
 
 ## CORS Allow-List
 
@@ -248,7 +260,7 @@ The regression test uses two Colyseus clients to verify that:
 - Mocked enabled-write coverage verifies the adapter targets only `/rest/v1/multiplayer_reward_ledger`, returns an inserted ledger id, and keeps `applied: false`.
 - The reward application adapter creates dry-run future progression plans and returns `skippedReason: progression_writes_disabled` with `applied: false` when progression writes are off.
 - The player save preview service reads only `player_saves.save_data` in mocked tests, returns before/after XP and credits previews when available, and never writes `player_saves`.
-- The progression shadow adapter returns `dryRun: true`, `applied: false`, and `skippedReason: progression_shadow_writes_disabled` by default, and mocked enabled-write coverage verifies it targets only `/rest/v1/multiplayer_progression_shadow`.
+- The progression shadow adapter returns `dryRun: true`, `applied: false`, and `skippedReason: progression_shadow_writes_disabled` by default. Mocked connectivity coverage verifies the read-only `/rest/v1/multiplayer_progression_shadow?select=id&limit=1` check, and mocked enabled-write coverage verifies the adapter targets only `/rest/v1/multiplayer_progression_shadow`.
 - A non-contributor preview claim is rejected safely without applying rewards.
 - Bot respawn confirms staging contribution data was cleared.
 - Disabled bots reject further staging damage and then respawn/reset on both clients.

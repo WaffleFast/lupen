@@ -8,6 +8,10 @@ import {
   checkRewardLedgerConnectivity,
   isRewardWriteEnabled
 } from "./services/rewardLedgerService.js";
+import {
+  checkProgressionShadowConnectivity,
+  isProgressionShadowWriteEnabled
+} from "./services/progressionShadowService.js";
 
 export const ROOM_NAME = "lupen_sector";
 export const LEGACY_ROOM_NAME = "lupen_test";
@@ -53,7 +57,29 @@ function sanitizeRewardLedgerHealth(checkResult = {}) {
   };
 }
 
-export function getHealthPayload(port = getEffectiveListenPort(), rewardLedger = getDefaultRewardLedgerHealth()) {
+function getDefaultProgressionShadowHealth() {
+  return {
+    progressionShadowReachable: "unknown",
+    progressionShadowWritesEnabled: isProgressionShadowWriteEnabled(),
+    reason: "not_checked",
+    status: 0
+  };
+}
+
+function sanitizeProgressionShadowHealth(checkResult = {}) {
+  return {
+    progressionShadowReachable: checkResult.progressionShadowReachable === true,
+    progressionShadowWritesEnabled: checkResult.progressionShadowWritesEnabled === true,
+    reason: checkResult.reason || "",
+    status: Number(checkResult.status || 0)
+  };
+}
+
+export function getHealthPayload(
+  port = getEffectiveListenPort(),
+  rewardLedger = getDefaultRewardLedgerHealth(),
+  progressionShadow = getDefaultProgressionShadowHealth()
+) {
   return {
     ok: true,
     service: "lupen-colyseus-prototype",
@@ -62,13 +88,21 @@ export function getHealthPayload(port = getEffectiveListenPort(), rewardLedger =
     preferredRoom: ROOM_NAME,
     environment: process.env.NODE_ENV || "development",
     port,
-    rewardLedger
+    rewardLedger,
+    progressionShadow
   };
 }
 
 async function getHealthPayloadWithLedger(port = getEffectiveListenPort()) {
-  const rewardLedgerCheck = await checkRewardLedgerConnectivity();
-  return getHealthPayload(port, sanitizeRewardLedgerHealth(rewardLedgerCheck));
+  const [rewardLedgerCheck, progressionShadowCheck] = await Promise.all([
+    checkRewardLedgerConnectivity(),
+    checkProgressionShadowConnectivity()
+  ]);
+  return getHealthPayload(
+    port,
+    sanitizeRewardLedgerHealth(rewardLedgerCheck),
+    sanitizeProgressionShadowHealth(progressionShadowCheck)
+  );
 }
 
 function isCorsOriginAllowed(origin) {

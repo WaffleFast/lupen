@@ -20,6 +20,7 @@ import {
 } from "../src/services/playerSavePreviewService.js";
 import {
   buildProgressionShadowEntry,
+  checkProgressionShadowConnectivity,
   writeProgressionShadowEntry
 } from "../src/services/progressionShadowService.js";
 
@@ -408,6 +409,62 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(shadowEntry.current_credits === 1200 && shadowEntry.preview_credits === 1232, "Shadow entry did not include progression preview credits.");
   assert(shadowEntry.applied_to_real_save === false && shadowEntry.dry_run === true, "Shadow entry was not dry-run/unapplied.");
   assert(shadowEntry.source_ledger_id === "11111111-1111-4111-8111-111111111111", "Shadow entry did not include source ledger id.");
+
+  const missingEnvShadowConnectivity = await checkProgressionShadowConnectivity({
+    env: {},
+    fetchImpl: async () => {
+      throw new Error("fetch should not run without Supabase config");
+    }
+  });
+  assert(missingEnvShadowConnectivity?.ok === false, "Missing-env shadow connectivity check unexpectedly succeeded.");
+  assert(missingEnvShadowConnectivity?.progressionShadowReachable === false, "Missing-env shadow connectivity marked table reachable.");
+  assert(missingEnvShadowConnectivity?.progressionShadowWritesEnabled === false, "Missing-env shadow connectivity enabled writes.");
+  assert(missingEnvShadowConnectivity?.reason === "missing_supabase_url", `Unexpected missing-env shadow connectivity reason: ${missingEnvShadowConnectivity?.reason}`);
+
+  let shadowConnectivityUrl = "";
+  let shadowConnectivityOptions = null;
+  const successfulShadowConnectivity = await checkProgressionShadowConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      shadowConnectivityUrl = url;
+      shadowConnectivityOptions = options;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [];
+        }
+      };
+    }
+  });
+  assert(successfulShadowConnectivity?.ok === true, "Mocked shadow connectivity check did not succeed.");
+  assert(successfulShadowConnectivity?.progressionShadowReachable === true, "Mocked shadow connectivity did not mark table reachable.");
+  assert(successfulShadowConnectivity?.progressionShadowWritesEnabled === false, "Mocked shadow connectivity enabled writes by default.");
+  assert(shadowConnectivityUrl === "https://example.supabase.co/rest/v1/multiplayer_progression_shadow?select=id&limit=1", `Unexpected shadow connectivity URL: ${shadowConnectivityUrl}`);
+  assert(shadowConnectivityOptions?.method === "GET", "Shadow connectivity check did not use GET.");
+  assert(shadowConnectivityOptions?.headers?.authorization === "Bearer stub-service-key", "Shadow connectivity check did not use service role bearer auth.");
+  assert(!shadowConnectivityUrl.includes("player_saves"), "Shadow connectivity check targeted player_saves.");
+
+  const failedShadowConnectivity = await checkProgressionShadowConnectivity({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async () => {
+      return {
+        ok: false,
+        status: 404
+      };
+    }
+  });
+  assert(failedShadowConnectivity?.ok === false, "Failed shadow connectivity check unexpectedly succeeded.");
+  assert(failedShadowConnectivity?.progressionShadowReachable === false, "Failed shadow connectivity marked table reachable.");
+  assert(failedShadowConnectivity?.reason === "progression_shadow_connectivity_check_failed", `Unexpected failed shadow connectivity reason: ${failedShadowConnectivity?.reason}`);
+  assert(failedShadowConnectivity?.status === 404, "Failed shadow connectivity did not preserve safe status.");
+
   const disabledShadowResult = await writeProgressionShadowEntry(shadowEntry, {
     env: {
       ENABLE_STAGING_PROGRESSION_SHADOW_WRITES: "false",
