@@ -162,6 +162,10 @@
         letter-spacing: 0.08em;
       }
 
+      #${stagingCombatPanelId} .lupen-mp-staging-combat-kicker.is-destroyed {
+        color: rgba(255, 124, 94, 0.9);
+      }
+
       #${stagingCombatPanelId} strong {
         display: block;
         margin-top: 2px;
@@ -170,11 +174,97 @@
         letter-spacing: 0.02em;
       }
 
+      #${stagingCombatPanelId} .lupen-mp-staging-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        width: fit-content;
+        margin-top: 5px;
+        padding: 3px 7px;
+        border: 1px solid rgba(255, 210, 140, 0.35);
+        border-radius: 999px;
+        background: rgba(255, 183, 81, 0.11);
+        color: #ffe9bb;
+        font: 900 9px/1 Arial, sans-serif;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-state::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ffe58a;
+        box-shadow: 0 0 8px rgba(255, 220, 120, 0.7);
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-state.is-destroyed {
+        border-color: rgba(255, 116, 91, 0.42);
+        background: rgba(255, 84, 62, 0.12);
+        color: #ffc3ad;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-state.is-destroyed::before {
+        background: #ff735f;
+        box-shadow: 0 0 8px rgba(255, 92, 72, 0.74);
+      }
+
       #${stagingCombatPanelId} small {
         display: block;
         margin-top: 3px;
         color: rgba(255, 226, 188, 0.78);
         font: 800 9px/1.2 Arial, sans-serif;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-message {
+        grid-column: 1 / -1;
+        padding: 6px 7px;
+        border: 1px solid rgba(255, 209, 142, 0.24);
+        border-radius: 5px;
+        background: rgba(255, 170, 77, 0.08);
+        color: #ffe4b8;
+        font: 850 10px/1.25 Arial, sans-serif;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-message.is-hit {
+        border-color: rgba(255, 231, 147, 0.38);
+        background: rgba(255, 211, 98, 0.11);
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-message.is-destroyed {
+        border-color: rgba(255, 109, 83, 0.42);
+        background: rgba(255, 77, 54, 0.12);
+        color: #ffd0bd;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-message.is-blocked {
+        border-color: rgba(255, 161, 93, 0.3);
+        color: rgba(255, 218, 183, 0.82);
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-reward {
+        grid-column: 1 / -1;
+        display: grid;
+        gap: 5px;
+        padding: 7px;
+        border: 1px solid rgba(127, 223, 255, 0.22);
+        border-radius: 5px;
+        background: rgba(33, 90, 114, 0.1);
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-reward b {
+        color: #dffcff;
+        font: 900 10px/1.15 Arial, sans-serif;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-reward span {
+        color: rgba(221, 250, 255, 0.78);
+        font: 800 9px/1.2 Arial, sans-serif;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-claim {
+        grid-column: 1 / -1;
+        color: rgba(255, 224, 184, 0.84);
+        font: 850 9px/1.25 Arial, sans-serif;
       }
 
       #${stagingCombatPanelId} .lupen-mp-staging-bars {
@@ -1460,6 +1550,112 @@
     return `Final ${finalHit} / Top ${topContributor} / You ${selfDamage} dmg (${selfPercent}%)`;
   }
 
+  function isRewardPreviewForBot(status, bot) {
+    return !!bot?.id && status?.lastRewardPreview?.botId === bot.id;
+  }
+
+  function isClaimResultForBot(status, bot) {
+    return !!bot?.id && status?.lastRewardClaimResult?.botId === bot.id;
+  }
+
+  function getCombatPanelMessage(status, selectedBot) {
+    const response = status?.lastCombatResponse;
+    const botEvent = status?.lastBotEvent;
+
+    if (selectedBot?.disabled) {
+      return {
+        tone: "destroyed",
+        text: isRewardPreviewForBot(status, selectedBot)
+          ? "Target destroyed. Staging XP preview is ready."
+          : "Target destroyed. Waiting for server respawn."
+      };
+    }
+
+    if (response?.targetBotId === selectedBot?.id) {
+      if (response.ok) {
+        return {
+          tone: "hit",
+          text: `Hit confirmed: -${Math.round(Number(response.damage || 0))} ${response.weaponName || "weapon"} damage.`
+        };
+      }
+
+      if (response.reason === "staging_fire_cooldown") {
+        return {
+          tone: "blocked",
+          text: `Weapon cooling down: ${formatCooldown(response.cooldownRemainingMs)} remaining.`
+        };
+      }
+
+      return {
+        tone: "blocked",
+        text: `Staging fire blocked: ${response.reason || "server rejected intent"}.`
+      };
+    }
+
+    if (botEvent?.botId === selectedBot?.id && botEvent.type === "bot:respawned") {
+      return {
+        tone: "hit",
+        text: "Target respawned by server. Contributions cleared."
+      };
+    }
+
+    return {
+      tone: "",
+      text: "Locked target. Server test damage only."
+    };
+  }
+
+  function getRewardPreviewPanelLines(status, selectedBot) {
+    const preview = status?.lastRewardPreview;
+    if (!isRewardPreviewForBot(status, selectedBot)) return [];
+
+    const selfContribution = getRewardPreviewSelfContribution(status);
+    const selfDamage = selfContribution ? Math.round(Number(selfContribution.totalDamage || 0)) : 0;
+    const selfPercent = selfContribution ? Math.round(Number(selfContribution.percent || 0)) : 0;
+    const finalHit = getPreviewIdentityLabel(preview.finalHitDisplayName, preview.finalHitPlayerId, preview.finalHitBy || preview.disabledBySessionId);
+    const topContributor = getPreviewIdentityLabel(preview.topContributorDisplayName, preview.topContributorPlayerId, preview.topContributorSessionId || preview.topContributor?.sessionId);
+
+    return [
+      `Staging XP preview: ${Math.round(Number(preview.previewXp || 0))}`,
+      `Your share: ${selfDamage} dmg (${selfPercent}%)`,
+      `Final hit: ${finalHit} / Top: ${topContributor}`,
+      "Simulated reward. No credits, loot, bounties, or saves from preview."
+    ];
+  }
+
+  function getClaimPanelLabel(status, selectedBot) {
+    const result = status?.lastRewardClaimResult;
+    if (!isClaimResultForBot(status, selectedBot)) return "";
+
+    if (!result.ok) {
+      return `Claim simulation blocked: ${result.reason || "not eligible"}. No save changed.`;
+    }
+
+    const rewardPlan = result.rewardWritePlan;
+    const patchResult = result.playerSavePatchResult;
+    const patchPlan = result.playerSavePatchPlan || patchResult?.plan;
+    if (patchResult?.applied) {
+      return `XP-only staging claim applied: ${formatPreviewValue(patchResult.xpBefore)} -> ${formatPreviewValue(patchResult.xpAfter)}. No credits or loot.`;
+    }
+
+    if (patchResult || patchPlan) {
+      const reason = patchResult?.skippedReason || patchPlan?.skippedReason || "dry-run";
+      const scope = patchResult?.progressionWriteScope || patchPlan?.progressionWriteScope || "allowlist";
+      return `XP-only claim not applied: ${reason}. Gate: ${scope}.`;
+    }
+
+    if (rewardPlan) {
+      const eligibility = rewardPlan.eligible ? "eligible dry-run" : `blocked: ${rewardPlan.blockedReason || "not verified"}`;
+      return `Claim simulated: XP ${rewardPlan.intendedXp || 0} preview / ${eligibility}. No save changed.`;
+    }
+
+    if (result.claimSimulated || result.dryRun) {
+      return "Claim simulated only. No save changed.";
+    }
+
+    return "Claim received. No save changed.";
+  }
+
   function getRewardClaimResultLabel(status) {
     const result = status?.lastRewardClaimResult;
     if (!result?.botId) return "none";
@@ -1620,11 +1816,12 @@
     });
   }
 
-  function canClaimRewardPreview(status) {
+  function canClaimRewardPreview(status, selectedBot = null) {
     return isStagingMode(status) &&
       !!status?.enabled &&
       !!status?.isConnected &&
       !!status?.lastRewardPreview?.botId &&
+      (!selectedBot?.id || status.lastRewardPreview.botId === selectedBot.id) &&
       status.lastRewardPreview.applied !== true;
   }
 
@@ -1744,6 +1941,7 @@
     const panel = global.document.createElement("div");
     panel.id = stagingCombatPanelId;
     panel.setAttribute("aria-label", "Staging combat test controls");
+    if (selectedBot.disabled) panel.classList.add("is-destroyed");
 
     const inner = global.document.createElement("div");
     inner.className = "lupen-mp-staging-combat-inner";
@@ -1751,12 +1949,19 @@
     const summary = global.document.createElement("div");
     const kicker = global.document.createElement("span");
     kicker.className = "lupen-mp-staging-combat-kicker";
-    kicker.textContent = "STAGING LOCK";
+    if (selectedBot.disabled) kicker.classList.add("is-destroyed");
+    kicker.textContent = selectedBot.disabled ? "TARGET DESTROYED" : "TARGET LOCKED";
     summary.appendChild(kicker);
 
     const title = global.document.createElement("strong");
     title.textContent = getBotLabel(selectedBot);
     summary.appendChild(title);
+
+    const state = global.document.createElement("span");
+    state.className = "lupen-mp-staging-state";
+    if (selectedBot.disabled) state.classList.add("is-destroyed");
+    state.textContent = selectedBot.disabled ? "DESTROYED" : "LOCKED";
+    summary.appendChild(state);
 
     const note = global.document.createElement("small");
     const cooldownText = formatCooldown(status.fireCooldownRemainingMs);
@@ -1767,45 +1972,9 @@
       ? ` / last -${Math.round(Number(status.lastCombatResponse.damage || 0))}`
       : "";
     note.textContent = selectedBot.disabled
-      ? "Disabled - waiting for server respawn"
-      : `${weaponName} / dmg ${Math.round(Number(stagingDamage || 0))} / no rewards / ${cooldownText}${lastDamage}`;
+      ? "Server disabled state - no rewards applied"
+      : `${weaponName} / staging dmg ${Math.round(Number(stagingDamage || 0))} / ${cooldownText}${lastDamage}`;
     summary.appendChild(note);
-
-    if (status.lastRewardPreview?.botId) {
-      const preview = global.document.createElement("small");
-      preview.textContent = "Reward Preview Only - Not Applied";
-      summary.appendChild(preview);
-      const contribution = getRewardPreviewContributionLabel(status);
-      if (contribution) {
-        const contributionNode = global.document.createElement("small");
-        contributionNode.textContent = contribution;
-        summary.appendChild(contributionNode);
-      }
-    }
-    const dryRunLabel = getRewardDryRunPanelLabel(status);
-    if (dryRunLabel) {
-      const dryRun = global.document.createElement("small");
-      dryRun.textContent = `${dryRunLabel} / Dry run only - not applied`;
-      summary.appendChild(dryRun);
-    }
-    const progressionPreviewLabel = getProgressionPreviewLabel(status);
-    if (progressionPreviewLabel) {
-      const progressionPreview = global.document.createElement("small");
-      progressionPreview.textContent = `${progressionPreviewLabel} / Progression preview only`;
-      summary.appendChild(progressionPreview);
-    }
-    const progressionShadowLabel = getProgressionShadowLabel(status);
-    if (progressionShadowLabel) {
-      const shadow = global.document.createElement("small");
-      shadow.textContent = `${progressionShadowLabel} / Shadow only - real save not changed`;
-      summary.appendChild(shadow);
-    }
-    const playerSavePatchLabel = getPlayerSavePatchLabel(status);
-    if (playerSavePatchLabel) {
-      const patch = global.document.createElement("small");
-      patch.textContent = `${playerSavePatchLabel} / XP only / no credits or loot`;
-      summary.appendChild(patch);
-    }
     inner.appendChild(summary);
 
     const button = global.document.createElement("button");
@@ -1825,11 +1994,11 @@
     });
     inner.appendChild(button);
 
-    if (canClaimRewardPreview(status)) {
+    if (canClaimRewardPreview(status, selectedBot)) {
       const claimButton = global.document.createElement("button");
       claimButton.type = "button";
       claimButton.className = "lupen-mp-staging-fire";
-      claimButton.textContent = "Preview Claim";
+      claimButton.textContent = "Sim Claim";
       claimButton.title = "Simulate a staging reward claim. No rewards are applied.";
       claimButton.addEventListener("click", (event) => {
         event.preventDefault();
@@ -1839,11 +2008,41 @@
       inner.appendChild(claimButton);
     }
 
+    const combatMessage = getCombatPanelMessage(status, selectedBot);
+    const message = global.document.createElement("div");
+    message.className = "lupen-mp-staging-message";
+    if (combatMessage.tone) message.classList.add(`is-${combatMessage.tone}`);
+    message.textContent = combatMessage.text;
+    inner.appendChild(message);
+
     const bars = global.document.createElement("div");
     bars.className = "lupen-mp-staging-bars";
     bars.appendChild(createStagingCombatBar("Shield", selectedBot.shield, selectedBot.shieldMax, "lupen-mp-staging-shield"));
     bars.appendChild(createStagingCombatBar("Hull", selectedBot.hull, selectedBot.hullMax, "lupen-mp-staging-hull"));
     inner.appendChild(bars);
+
+    const rewardLines = getRewardPreviewPanelLines(status, selectedBot);
+    if (rewardLines.length) {
+      const reward = global.document.createElement("div");
+      reward.className = "lupen-mp-staging-reward";
+      const rewardTitle = global.document.createElement("b");
+      rewardTitle.textContent = "Reward Preview Only - Not Applied";
+      reward.appendChild(rewardTitle);
+      rewardLines.forEach((line) => {
+        const row = global.document.createElement("span");
+        row.textContent = line;
+        reward.appendChild(row);
+      });
+      inner.appendChild(reward);
+    }
+
+    const claimLabel = getClaimPanelLabel(status, selectedBot);
+    if (claimLabel) {
+      const claim = global.document.createElement("div");
+      claim.className = "lupen-mp-staging-claim";
+      claim.textContent = claimLabel;
+      inner.appendChild(claim);
+    }
 
     panel.appendChild(inner);
     spaceScreen.appendChild(panel);
