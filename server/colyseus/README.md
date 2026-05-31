@@ -69,6 +69,34 @@ npm.cmd run smoke
 
 The smoke test joins `lupen_sector`, confirms dummy bots are present in room state, sends `ping`, receives `pong`, sends a placeholder `movement:update`, confirms an invalid movement update returns a dev warning, then leaves.
 
+## Regression Test
+
+In a second PowerShell window while the server is running:
+
+```powershell
+cd server\colyseus
+npm.cmd run regression
+```
+
+The regression test uses two Colyseus clients to verify that:
+
+- Both clients join `lupen_sector`.
+- Player count reaches `2`.
+- Each client can see the other player.
+- A `movement:update` from client A reaches client B.
+- Dummy server bots exist in room state.
+- Invalid movement is ignored and returns a dev-only warning.
+- Client B sees client A removed after disconnect.
+
+To run both local server-side checks:
+
+```powershell
+cd server\colyseus
+npm.cmd test
+```
+
+These tests validate local Colyseus room state and message behavior only. They do not validate browser visual polish, CSS layout, canvas/UI rendering, or the live single-player game.
+
 ## Browser Test Client
 
 While the local server is running, open this URL in one or more browser tabs:
