@@ -327,6 +327,27 @@
     return String(bot.name || bot.type || "DEV BOT").trim().slice(0, 18) || "DEV BOT";
   }
 
+  function getBotInspectionLabel(bot) {
+    if (!bot) return "none";
+    const name = getBotLabel(bot);
+    const id = String(bot.id || "").slice(-6) || "unknown";
+    return `${name} / ${id}`;
+  }
+
+  function getBotLayerSummary(bot) {
+    if (!bot) return "none";
+    const level = Number(bot.level || 0) > 0 ? `L${bot.level}` : "L?";
+    const faction = bot.faction || "Erebus";
+    return `${faction} ${level} / ${bot.currentNode || "unknown"}`;
+  }
+
+  function getBotHullSummary(bot) {
+    if (!bot) return "none";
+    const shield = `${Math.round(Number(bot.shield || 0))}/${Math.round(Number(bot.shieldMax || 0))}`;
+    const hull = `${Math.round(Number(bot.hull || 0))}/${Math.round(Number(bot.hullMax || 0))}`;
+    return `S ${shield} / H ${hull}`;
+  }
+
   function getBotModeLabel() {
     return isStagingMode() ? "STAGING BOT" : "DEV BOT";
   }
@@ -441,7 +462,7 @@
     group.setAttribute("transform", `translate(${position.x} ${position.y})`);
 
     const title = global.document.createElementNS(SVG_NS, "title");
-    title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / visual only / ${bot.currentNode || "Unknown"} / x:${bot.x} y:${bot.y}`;
+    title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / visual only / combat disabled / ${bot.id || "unknown"} / x:${bot.x} y:${bot.y}`;
     group.appendChild(title);
 
     const halo = global.document.createElementNS(SVG_NS, "circle");
@@ -597,6 +618,7 @@
       const marker = global.document.createElement("div");
       marker.className = "lupen-mp-space-bot";
       marker.dataset.botId = bot.id || "";
+      marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / visual only / combat disabled`;
       marker.style.left = `${clampMapCoordinate(bot.x || 50)}%`;
       marker.style.top = `${clampMapCoordinate(bot.y || 50)}%`;
 
@@ -628,6 +650,11 @@
   function getSameNodeBots(bots) {
     const currentNodeName = getCurrentNodeName();
     return bots.filter((bot) => normalizeNodeKey(bot.currentNode) === normalizeNodeKey(currentNodeName));
+  }
+
+  function getInspectedBot(bots) {
+    const sameNodeBots = getSameNodeBots(bots);
+    return sameNodeBots[0] || bots[0] || null;
   }
 
   function getShortSessionId(value) {
@@ -671,6 +698,7 @@
     const status = getClient()?.getStatus?.() || {};
     const sameNodePlayers = getSameNodePlayers(players);
     const sameNodeBots = getSameNodeBots(bots);
+    const inspectedBot = getInspectedBot(bots);
     const panel = global.document.createElement("div");
     panel.id = diagnosticsPanelId;
     panel.setAttribute("aria-hidden", "true");
@@ -690,6 +718,9 @@
     setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
     if (isStagingMode(status)) {
       setDiagnosticsRow(panel, "bot layer", "server-owned visual");
+      setDiagnosticsRow(panel, "inspect bot", getBotInspectionLabel(inspectedBot));
+      setDiagnosticsRow(panel, "bot node", getBotLayerSummary(inspectedBot));
+      setDiagnosticsRow(panel, "bot status", getBotHullSummary(inspectedBot));
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
@@ -701,7 +732,7 @@
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
     note.textContent = isStagingMode(status)
-      ? "Local combat bots hidden in staging; shared staging bots are server-owned visual placeholders."
+      ? "Combat disabled in staging bot inspection. Shared staging bots are server-owned visual placeholders."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 

@@ -50,9 +50,17 @@ function botSnapshots(room) {
     .map((bot) => ({
       id: bot.id,
       name: bot.name,
+      type: bot.type,
+      faction: bot.faction,
       currentNode: bot.currentNode,
       x: bot.x,
       y: bot.y,
+      level: bot.level,
+      shield: bot.shield,
+      shieldMax: bot.shieldMax,
+      hull: bot.hull,
+      hullMax: bot.hullMax,
+      visualOnly: bot.visualOnly,
       lastUpdatedAt: bot.lastUpdatedAt,
       nextMoveAt: bot.nextMoveAt
     }))
@@ -73,6 +81,19 @@ function assertAllowedBotNodes(room) {
   const allowedNodes = new Set(STAGING_BOT_ALLOWED_NODE_IDS);
   const invalidBot = botSnapshots(room).find((bot) => !allowedNodes.has(bot.currentNode));
   assert(!invalidBot, `Bot ${invalidBot?.id} is on invalid staging node ${invalidBot?.currentNode}.`);
+}
+
+function assertBotDisplayFields(room) {
+  botSnapshots(room).forEach((bot) => {
+    assert(bot.id, "Bot is missing a stable id.");
+    assert(bot.name, `Bot ${bot.id} is missing name.`);
+    assert(bot.type, `Bot ${bot.id} is missing type.`);
+    assert(bot.faction === "Erebus", `Bot ${bot.id} has unexpected faction ${bot.faction}.`);
+    assert(Number(bot.level) > 0, `Bot ${bot.id} is missing level.`);
+    assert(Number(bot.shieldMax) >= Number(bot.shield), `Bot ${bot.id} has invalid shield values.`);
+    assert(Number(bot.hullMax) >= Number(bot.hull), `Bot ${bot.id} has invalid hull values.`);
+    assert(bot.visualOnly === true, `Bot ${bot.id} must remain visualOnly.`);
+  });
 }
 
 function playerCount(room) {
@@ -135,6 +156,8 @@ try {
   await waitFor("dummy bots to appear", () => botCount(roomA) > 0 && botCount(roomB) > 0);
   assertAllowedBotNodes(roomA);
   assertAllowedBotNodes(roomB);
+  assertBotDisplayFields(roomA);
+  assertBotDisplayFields(roomB);
   console.log(`dummy bot count: A=${botCount(roomA)} B=${botCount(roomB)}`);
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
   const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
@@ -149,6 +172,8 @@ try {
   await waitFor("a staging bot node change", () => {
     assertAllowedBotNodes(roomA);
     assertAllowedBotNodes(roomB);
+    assertBotDisplayFields(roomA);
+    assertBotDisplayFields(roomB);
     const currentBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
     return currentBotNodes !== initialBotNodes && botSnapshotKey(roomA) === botSnapshotKey(roomB);
   }, 22000);

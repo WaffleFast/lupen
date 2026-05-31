@@ -367,6 +367,14 @@
     });
   }
 
+  function normalizeNodeKey(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ");
+  }
+
   function normalizePlayer(player, fallbackId = "") {
     if (!player) return null;
 
@@ -419,11 +427,18 @@
       id,
       type: String(bot.type || "Dev Bot"),
       name: String(bot.name || bot.type || "Dev Bot"),
+      faction: String(bot.faction || ""),
       x: Number.isFinite(Number(bot.x)) ? Number(bot.x) : 50,
       y: Number.isFinite(Number(bot.y)) ? Number(bot.y) : 50,
+      level: Number.isFinite(Number(bot.level)) ? Number(bot.level) : 0,
+      shield: Number.isFinite(Number(bot.shield)) ? Number(bot.shield) : 0,
+      shieldMax: Number.isFinite(Number(bot.shieldMax)) ? Number(bot.shieldMax) : 0,
+      hull: Number.isFinite(Number(bot.hull)) ? Number(bot.hull) : 0,
+      hullMax: Number.isFinite(Number(bot.hullMax)) ? Number(bot.hullMax) : 0,
       currentNode: String(bot.currentNode || "Asteron Prime"),
       lastUpdatedAt: Number.isFinite(Number(bot.lastUpdatedAt)) ? Number(bot.lastUpdatedAt) : 0,
-      nextMoveAt: Number.isFinite(Number(bot.nextMoveAt)) ? Number(bot.nextMoveAt) : 0
+      nextMoveAt: Number.isFinite(Number(bot.nextMoveAt)) ? Number(bot.nextMoveAt) : 0,
+      visualOnly: bot.visualOnly !== false
     };
   }
 
@@ -644,6 +659,20 @@
 
     getBots() {
       return Array.from(botsById.values()).map((bot) => ({ ...bot }));
+    },
+
+    getBotById(id) {
+      const bot = botsById.get(String(id || ""));
+      return bot ? { ...bot } : null;
+    },
+
+    getBotsInCurrentNode(currentNodeOverride = "") {
+      const localPresence = getLocalPresenceOptions();
+      const nodeName = currentNodeOverride || localPresence.currentNode || "";
+      const nodeKey = normalizeNodeKey(nodeName);
+      return Array.from(botsById.values())
+        .filter((bot) => normalizeNodeKey(bot.currentNode) === nodeKey)
+        .map((bot) => ({ ...bot }));
     },
 
     onServerState(handler) {

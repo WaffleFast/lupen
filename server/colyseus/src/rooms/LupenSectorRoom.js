@@ -111,10 +111,10 @@ const BOT_MOVE_TICK_MS = 4000;
 const BOT_NODE_MOVE_MS = 16000;
 
 const DUMMY_BOT_DEFINITIONS = [
-  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West" },
-  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Lane East B" },
-  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B" },
-  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East" }
+  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 35, hull: 70 },
+  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Lane East B", level: 1, shield: 28, hull: 58 },
+  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B", level: 2, shield: 42, hull: 82 },
+  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East", level: 2, shield: 38, hull: 76 }
 ];
 
 export class LupenSectorPlayer extends Schema {
@@ -145,11 +145,18 @@ export class LupenSectorBot extends Schema {
 type("string")(LupenSectorBot.prototype, "id");
 type("string")(LupenSectorBot.prototype, "type");
 type("string")(LupenSectorBot.prototype, "name");
+type("string")(LupenSectorBot.prototype, "faction");
 type("string")(LupenSectorBot.prototype, "currentNode");
 type("number")(LupenSectorBot.prototype, "x");
 type("number")(LupenSectorBot.prototype, "y");
+type("number")(LupenSectorBot.prototype, "level");
+type("number")(LupenSectorBot.prototype, "shield");
+type("number")(LupenSectorBot.prototype, "shieldMax");
+type("number")(LupenSectorBot.prototype, "hull");
+type("number")(LupenSectorBot.prototype, "hullMax");
 type("number")(LupenSectorBot.prototype, "lastUpdatedAt");
 type("number")(LupenSectorBot.prototype, "nextMoveAt");
+type("boolean")(LupenSectorBot.prototype, "visualOnly");
 
 export class LupenSectorState extends Schema {
   constructor() {
@@ -211,7 +218,8 @@ function validatePresencePayload(message = {}) {
 // Presence-only stepping stone for future server-authoritative multiplayer.
 // This room mirrors local player display/location data and server-owned dummy
 // bot positions for dev ghosts only. It does not persist state, grant rewards,
-// run combat, or control the real single-player game.
+// run combat, or control the real single-player game. Bot shield/hull/level
+// values are read-only inspection placeholders for future authoritative combat.
 export class LupenSectorRoom extends Room {
   onCreate() {
     this.setState(new LupenSectorState());
@@ -278,11 +286,18 @@ export class LupenSectorRoom extends Room {
         id: definition.id,
         type: definition.type,
         name: definition.name,
+        faction: "Erebus",
         currentNode: patrolNode.node,
         x: patrolNode.x + (index % 2 === 0 ? 1.2 : -1.2),
         y: patrolNode.y + (index % 2 === 0 ? -1.2 : 1.2),
+        level: Number(definition.level || 1),
+        shield: Number(definition.shield || 0),
+        shieldMax: Number(definition.shield || 0),
+        hull: Number(definition.hull || 1),
+        hullMax: Number(definition.hull || 1),
         lastUpdatedAt: now,
-        nextMoveAt: now + BOT_NODE_MOVE_MS + index * 2500
+        nextMoveAt: now + BOT_NODE_MOVE_MS + index * 2500,
+        visualOnly: true
       }));
     });
   }

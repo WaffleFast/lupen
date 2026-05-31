@@ -25,6 +25,9 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Staging bots include:
   - `id`: stable local dummy bot id
   - `type` / `name`: display-only bot identity such as `Erebus Drone`
+  - `faction`: display-only faction such as `Erebus`
+  - `level`, `shield` / `shieldMax`, `hull` / `hullMax`: read-only inspection placeholders
+  - `visualOnly`: always `true`
   - `currentNode`: visual sector location
   - `x` / `y`: placeholder map position
   - `lastUpdatedAt`: local server timestamp
@@ -166,6 +169,7 @@ The regression test uses two Colyseus clients to verify that:
 - Each client can see the other player.
 - A `movement:update` from client A reaches client B.
 - Dummy server bots exist in room state.
+- Staging bot display fields are present and `visualOnly` remains true.
 - Both clients receive the same server-owned bot movement update.
 - Staging bot `currentNode` values stay inside the server's allowed combat node list.
 - At least one staging bot changes node while both clients observe matching state.
