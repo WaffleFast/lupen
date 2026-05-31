@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lupen Colyseus Test Client</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Arial, sans-serif;
+      background: #111318;
+      color: #f3f5f7;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+    }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 24px;
+    }
+
+    section {
+      border: 1px solid #2c3340;
+      border-radius: 6px;
+      margin: 16px 0;
+      padding: 16px;
+      background: #171b22;
+    }
+
+    button {
+      margin: 4px 6px 4px 0;
+      padding: 8px 12px;
+      border: 1px solid #465163;
+      border-radius: 4px;
+      background: #252c37;
+      color: #f3f5f7;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    code,
+    pre {
+      font-family: Consolas, monospace;
+    }
+
+    #players {
+      display: grid;
+      gap: 8px;
+      padding: 0;
+      list-style: none;
+    }
+
+    #players li {
+      border: 1px solid #303845;
+      border-radius: 4px;
+      padding: 10px;
+      background: #10141a;
+    }
+
+    #log {
+      min-height: 160px;
+      max-height: 260px;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      background: #090b0f;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Lupen Colyseus Test Client</h1>
+
+    <section>
+      <p>Status: <strong id="status">disconnected</strong></p>
+      <p>Room: <code>lupen_test</code></p>
+      <p>Session: <code id="sessionId">none</code></p>
+      <button id="connectButton" type="button">Connect</button>
+      <button id="disconnectButton" type="button" disabled>Disconnect</button>
+      <button id="moveButton" type="button" disabled>Move Randomly</button>
+      <button id="pingButton" type="button" disabled>Ping</button>
+    </section>
+
+    <section>
+      <h2>Connected Players</h2>
+      <ul id="players"></ul>
+    </section>
+
+    <section>
+      <h2>Event Log</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script src="/colyseus.js"></script>
+  <script>
+    const ROOM_NAME = "lupen_test";
+    const SERVER_URL = "ws://localhost:2567";
+
+    let client = null;
+    let room = null;
+
+    const statusEl = document.getElementById("status");
+    const sessionIdEl = document.getElementById("sessionId");
+    const playersEl = document.getElementById("players");
+    const logEl = document.getElementById("log");
+    const connectButton = document.getElementById("connectButton");
+    const disconnectButton = document.getElementById("disconnectButton");
+    const moveButton = document.getElementById("moveButton");
+    const pingButton = document.getElementById("pingButton");
+
+    function setStatus(status) {
+      statusEl.textContent = status;
+    }
+
+    function addLog(message) {
+      const time = new Date().toLocaleTimeString();
+      logEl.textContent = `[${time}] ${message}\n${logEl.textContent}`;
+    }
+
+    function setControls(isConnected) {
+      connectButton.disabled = isConnected;
+      disconnectButton.disabled = !isConnected;
+      moveButton.disabled = !isConnected;
+      pingButton.disabled = !isConnected;
+    }
+
+    function renderPlayers(state) {
+      playersEl.textContent = "";
+
+      if (!state || !state.players || state.players.size === 0) {
+        const empty = document.createElement("li");
+        empty.textContent = "No connected players";
+        playersEl.appendChild(empty);
+        return;
+      }
+
+      state.players.forEach((player) => {
+        const item = document.createElement("li");
+        item.textContent = `${player.displayName} | ${player.id} | x:${player.x} y:${player.y} | node:${player.currentNode}`;
+        playersEl.appendChild(item);
+      });
+    }
+
+    async function connect() {
+      if (room) return;
+
+      setStatus("connecting");
+      addLog(`Connecting to ${SERVER_URL}`);
+
+      try {
+        client = new Colyseus.Client(SERVER_URL);
+        room = await client.joinOrCreate(ROOM_NAME, {
+          displayName: "Pilot",
+          currentNode: "asteron-prime"
+        });
+
+        setStatus("connected");
+        setControls(true);
+        sessionIdEl.textContent = room.sessionId;
+        addLog(`Joined ${ROOM_NAME} as ${room.sessionId}`);
+
+        room.onStateChange((state) => {
+          renderPlayers(state);
+        });
+
+        room.onMessage("pong", (message) => {
+          addLog(`Received pong: ${JSON.stringify(message)}`);
+        });
+
+        room.onLeave((code) => {
+          addLog(`Left room with code ${code}`);
+          room = null;
+          client = null;
+          setStatus("disconnected");
+          setControls(false);
+          sessionIdEl.textContent = "none";
+          renderPlayers(null);
+        });
+      } catch (error) {
+        setStatus("error");
+        setControls(false);
+        addLog(`Connection error: ${error.message || error}`);
+        room = null;
+        client = null;
+      }
+    }
+
+    function disconnect() {
+      if (!room) return;
+      addLog("Disconnecting");
+      room.leave();
+    }
+
+    function moveRandomly() {
+      if (!room) return;
+
+      const x = Math.floor(Math.random() * 500);
+      const y = Math.floor(Math.random() * 500);
+      room.send("move", {
+        x,
+        y,
+        currentNode: "asteron-prime"
+      });
+      addLog(`Sent move: x:${x} y:${y}`);
+    }
+
+    function ping() {
+      if (!room) return;
+      room.send("ping", { sentAt: Date.now() });
+      addLog("Sent ping");
+    }
+
+    connectButton.addEventListener("click", connect);
+    disconnectButton.addEventListener("click", disconnect);
+    moveButton.addEventListener("click", moveRandomly);
+    pingButton.addEventListener("click", ping);
+
+    setStatus("disconnected");
+    setControls(false);
+    renderPlayers(null);
+  </script>
+</body>
+</html>

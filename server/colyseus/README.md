@@ -56,6 +56,18 @@ npm.cmd run smoke
 
 The smoke test joins `lupen_test`, sends `ping`, receives `pong`, sends a placeholder `move`, then leaves.
 
+## Browser Test Client
+
+While the local server is running, open this URL in one or more browser tabs:
+
+```text
+http://localhost:2567/test-client.html
+```
+
+Use `Connect` in each tab to join `lupen_test`. The page shows the current tab's session id, connected players, placeholder movement updates, ping/pong messages, and disconnect events.
+
+This page is served only by the local prototype server. It is not imported by the real Lupen frontend.
+
 ## Production Status
 
 This package is intentionally separate from the browser game files. The main Lupen frontend does not import or connect to this server yet.
