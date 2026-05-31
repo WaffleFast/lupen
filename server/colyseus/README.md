@@ -234,3 +234,5 @@ This package is intentionally separate from the browser game files. The main Lup
 Colyseus Cloud staging deployment is planned for a later step. Nothing in this local prototype deploys Colyseus, connects `lupen.io` to Colyseus, or enables multiplayer for production players.
 
 Redeploy trigger: Colyseus Cloud environment refresh.
+
+Redeploy trigger: Supabase auth env refresh.
