@@ -58,6 +58,36 @@ Health check:
 Invoke-RestMethod http://localhost:2567/health
 ```
 
+## Frontend Server Configuration
+
+The real Lupen frontend remains multiplayer-disabled unless it is opened on an allowed development/staging host with `?mp=1`.
+
+Default local development:
+
+```text
+http://127.0.0.1:4173/?mp=1
+```
+
+Optional local URL override for testing:
+
+```text
+http://127.0.0.1:4173/?mp=1&mpServer=ws://localhost:2567
+```
+
+The browser client also checks this local storage key when `mpServer` is not present:
+
+```javascript
+localStorage.setItem("lupenMultiplayerServer", "ws://localhost:2567");
+```
+
+Future hosted staging example:
+
+```text
+wss://multiplayer.lupen.io
+```
+
+Only `ws://` and `wss://` server URLs are accepted. Page hosts are restricted to local development by default (`localhost`, `127.0.0.1`, and `::1`). A future staging page can opt in by setting an explicit allowed host config before `js/network/multiplayerClient.js` loads. Production `lupen.io` / `www.lupen.io` is not enabled just because `?mp=1` is present.
+
 ## Smoke Test
 
 In a second PowerShell window while the server is running:
@@ -112,3 +142,5 @@ This page is served only by the local prototype server. It is not imported by th
 ## Production Status
 
 This package is intentionally separate from the browser game files. The main Lupen frontend does not import or connect to this server yet.
+
+Colyseus Cloud staging deployment is planned for a later step. Nothing in this local prototype deploys Colyseus, connects `lupen.io` to Colyseus, or enables multiplayer for production players.
