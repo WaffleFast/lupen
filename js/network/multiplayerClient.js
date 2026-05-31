@@ -422,7 +422,8 @@
       x: Number.isFinite(Number(bot.x)) ? Number(bot.x) : 50,
       y: Number.isFinite(Number(bot.y)) ? Number(bot.y) : 50,
       currentNode: String(bot.currentNode || "Asteron Prime"),
-      lastUpdatedAt: Number.isFinite(Number(bot.lastUpdatedAt)) ? Number(bot.lastUpdatedAt) : 0
+      lastUpdatedAt: Number.isFinite(Number(bot.lastUpdatedAt)) ? Number(bot.lastUpdatedAt) : 0,
+      nextMoveAt: Number.isFinite(Number(bot.nextMoveAt)) ? Number(bot.nextMoveAt) : 0
     };
   }
 
@@ -491,6 +492,9 @@
   function getStatus() {
     updateEnabledState();
     const localPresence = getLocalPresenceOptions();
+    const lastBotUpdateAt = Array.from(botsById.values()).reduce((latest, bot) => {
+      return Math.max(latest, Number(bot.lastUpdatedAt || 0));
+    }, 0);
 
     return {
       enabled: connection.enabled,
@@ -507,6 +511,7 @@
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
+      lastBotUpdateAt,
       originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,

@@ -9,7 +9,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Preferred registered room: `lupen_sector`.
 - Legacy compatibility room: `lupen_test`.
 - A `LupenSectorRoom` that tracks connected players by `sessionId`.
-- A small fixed set of server-owned dummy bots for visual-only multiplayer presence testing.
+- A small fixed set of server-owned staging bots for visual-only multiplayer presence testing.
 - Each joined player gets:
   - `id` / `sessionId`: the Colyseus `sessionId`
   - `displayName`: supplied by join options, otherwise `Pilot`
@@ -21,13 +21,14 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
 - Legacy local prototype `move` messages are still accepted for compatibility.
 - Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
-- Dummy bots include:
+- Staging bots include:
   - `id`: stable local dummy bot id
   - `type` / `name`: display-only bot identity such as `Erebus Drone`
   - `currentNode`: visual sector location
   - `x` / `y`: placeholder map position
   - `lastUpdatedAt`: local server timestamp
-- Dummy bots drift between placeholder sector nodes on a slow local interval. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
+  - `nextMoveAt`: planned next node-move timestamp for debugging
+- Staging bots drift on a slow server tick and occasionally move to neighbouring placeholder sector nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
 
 ## Install
 
@@ -164,6 +165,7 @@ The regression test uses two Colyseus clients to verify that:
 - Each client can see the other player.
 - A `movement:update` from client A reaches client B.
 - Dummy server bots exist in room state.
+- Both clients receive the same server-owned bot movement update.
 - Invalid movement is ignored and returns a dev-only warning.
 - Client B sees client A removed after disconnect.
 

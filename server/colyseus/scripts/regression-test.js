@@ -44,6 +44,30 @@ function botCount(room) {
   return room?.state?.bots?.size || 0;
 }
 
+function botSnapshots(room) {
+  return Array.from(room?.state?.bots?.values?.() || [])
+    .map((bot) => ({
+      id: bot.id,
+      name: bot.name,
+      currentNode: bot.currentNode,
+      x: bot.x,
+      y: bot.y,
+      lastUpdatedAt: bot.lastUpdatedAt,
+      nextMoveAt: bot.nextMoveAt
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function botSnapshotKey(room) {
+  return botSnapshots(room)
+    .map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}:${bot.lastUpdatedAt}`)
+    .join("|");
+}
+
+function latestBotUpdateAt(room) {
+  return botSnapshots(room).reduce((latest, bot) => Math.max(latest, Number(bot.lastUpdatedAt || 0)), 0);
+}
+
 function playerCount(room) {
   return room?.state?.players?.size || 0;
 }
@@ -103,6 +127,14 @@ try {
 
   await waitFor("dummy bots to appear", () => botCount(roomA) > 0 && botCount(roomB) > 0);
   console.log(`dummy bot count: A=${botCount(roomA)} B=${botCount(roomB)}`);
+  const initialBotUpdateAt = latestBotUpdateAt(roomA);
+
+  await waitFor("shared server bot update", () => {
+    return latestBotUpdateAt(roomA) > initialBotUpdateAt &&
+      latestBotUpdateAt(roomB) >= latestBotUpdateAt(roomA) &&
+      botSnapshotKey(roomA) === botSnapshotKey(roomB);
+  }, 7000);
+  console.log("both clients received matching server bot movement update");
 
   roomA.send("movement:update", {
     displayName: "Regression Pilot A",

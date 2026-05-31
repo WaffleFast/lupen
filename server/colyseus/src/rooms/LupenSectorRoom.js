@@ -46,10 +46,31 @@ const KNOWN_SECTOR_NODES = new Set([
 const BOT_PATROL_NODES = [
   { node: "Asteron Prime", x: 50, y: 50 },
   { node: "East Link 1", x: 62, y: 50 },
+  { node: "East Link 2", x: 74, y: 50 },
   { node: "Upper Gate Core", x: 50, y: 30 },
+  { node: "Upper Gate West", x: 38, y: 30 },
+  { node: "Upper Gate East", x: 62, y: 30 },
   { node: "Lower Gate Core", x: 50, y: 70 },
+  { node: "Lower Gate West", x: 38, y: 70 },
+  { node: "Lower Gate East", x: 62, y: 70 },
   { node: "West Link 1", x: 38, y: 50 }
 ];
+
+const BOT_NODE_POSITIONS = new Map(BOT_PATROL_NODES.map((entry) => [entry.node, entry]));
+const BOT_NODE_LINKS = new Map([
+  ["Asteron Prime", ["East Link 1", "West Link 1", "Upper Gate Core", "Lower Gate Core"]],
+  ["East Link 1", ["Asteron Prime", "East Link 2", "Upper Gate East", "Lower Gate East"]],
+  ["East Link 2", ["East Link 1", "Upper Gate East", "Lower Gate East"]],
+  ["West Link 1", ["Asteron Prime", "Upper Gate West", "Lower Gate West"]],
+  ["Upper Gate Core", ["Asteron Prime", "Upper Gate West", "Upper Gate East"]],
+  ["Upper Gate West", ["Upper Gate Core", "West Link 1"]],
+  ["Upper Gate East", ["Upper Gate Core", "East Link 1", "East Link 2"]],
+  ["Lower Gate Core", ["Asteron Prime", "Lower Gate West", "Lower Gate East"]],
+  ["Lower Gate West", ["Lower Gate Core", "West Link 1"]],
+  ["Lower Gate East", ["Lower Gate Core", "East Link 1", "East Link 2"]]
+]);
+const BOT_MOVE_TICK_MS = 4000;
+const BOT_NODE_MOVE_MS = 12000;
 
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone" },
@@ -90,6 +111,7 @@ type("string")(LupenSectorBot.prototype, "currentNode");
 type("number")(LupenSectorBot.prototype, "x");
 type("number")(LupenSectorBot.prototype, "y");
 type("number")(LupenSectorBot.prototype, "lastUpdatedAt");
+type("number")(LupenSectorBot.prototype, "nextMoveAt");
 
 export class LupenSectorState extends Schema {
   constructor() {
@@ -109,6 +131,10 @@ function getStringValue(value, fallback = "") {
 function getNumberValue(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
+}
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function getShipName(message = {}) {
@@ -155,8 +181,8 @@ export class LupenSectorRoom extends Room {
 
     this.spawnDummyBots();
     this.botInterval = this.clock.setInterval(() => {
-      this.updateDummyBots();
-    }, 9000);
+      this.updateStagingBots();
+    }, BOT_MOVE_TICK_MS);
 
     this.onMessage("ping", (client, message = {}) => {
       this.touchPlayer(client.sessionId);
@@ -217,24 +243,41 @@ export class LupenSectorRoom extends Room {
         currentNode: patrolNode.node,
         x: patrolNode.x + (index % 2 === 0 ? 1.2 : -1.2),
         y: patrolNode.y + (index % 2 === 0 ? -1.2 : 1.2),
-        lastUpdatedAt: now
+        lastUpdatedAt: now,
+        nextMoveAt: now + BOT_NODE_MOVE_MS + index * 1500
       }));
     });
   }
 
-  updateDummyBots() {
+  updateStagingBots() {
     const now = Date.now();
     this.botStep += 1;
 
+    // Staging-only shared bot simulation. These are Colyseus-owned visual
+    // markers so connected clients see the same bot positions before real
+    // authoritative combat exists. They never enter loot, XP, targeting, or
+    // bounty systems.
     Array.from(this.state.bots.values()).forEach((bot, index) => {
-      const patrolNode = BOT_PATROL_NODES[(this.botStep + index) % BOT_PATROL_NODES.length];
-      const drift = ((this.botStep + index) % 3) - 1;
+      const shouldChangeNode = now >= Number(bot.nextMoveAt || 0);
+      const activeBotIndex = this.botStep % Math.max(1, this.state.bots.size);
 
-      bot.currentNode = patrolNode.node;
-      bot.x = patrolNode.x + drift * 1.6;
-      bot.y = patrolNode.y - drift * 1.2;
+      if (shouldChangeNode && index === activeBotIndex) {
+        bot.currentNode = this.getNextBotNode(bot.currentNode, index);
+        bot.nextMoveAt = now + BOT_NODE_MOVE_MS + index * 1250;
+      }
+
+      const nodePosition = BOT_NODE_POSITIONS.get(bot.currentNode) || BOT_PATROL_NODES[0];
+      const driftX = (((this.botStep + index) % 5) - 2) * 0.75;
+      const driftY = (((this.botStep * 2 + index) % 5) - 2) * 0.55;
+      bot.x = clampNumber(nodePosition.x + driftX, 4, 96);
+      bot.y = clampNumber(nodePosition.y + driftY, 4, 96);
       bot.lastUpdatedAt = now;
     });
+  }
+
+  getNextBotNode(currentNode, index = 0) {
+    const options = BOT_NODE_LINKS.get(currentNode) || BOT_PATROL_NODES.map((entry) => entry.node);
+    return options[(this.botStep + index) % options.length] || currentNode || "Asteron Prime";
   }
 
   touchPlayer(sessionId) {

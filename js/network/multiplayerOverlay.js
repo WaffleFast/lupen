@@ -627,6 +627,13 @@
     return `${serverUrl} / ${source}`;
   }
 
+  function formatRelativeAge(timestamp) {
+    const value = Number(timestamp || 0);
+    if (!value) return "none";
+    const seconds = Math.max(0, Math.round((Date.now() - value) / 1000));
+    return `${seconds}s ago`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -667,6 +674,7 @@
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
     setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);
     setDiagnosticsRow(panel, isStagingMode(status) ? "staging bots" : "dev bots", `${bots.length} total / ${sameNodeBots.length} same node`);
+    setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
     }
