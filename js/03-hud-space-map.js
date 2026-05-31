@@ -715,13 +715,15 @@ function getPilotName() {
 
 function getMultiplayerPresencePayload() {
   const node = sectorNodes[currentNode] || {};
+  const shipName = SHIPS[currentShipId]?.name || "";
   return {
     currentNode,
     x: Number.isFinite(Number(node.x)) ? Number(node.x) : 50,
     y: Number.isFinite(Number(node.y)) ? Number(node.y) : 50,
     displayName: getPilotName(),
     currentShipId: currentShipId || "",
-    ship: SHIPS[currentShipId]?.name || ""
+    shipName,
+    ship: shipName
   };
 }
 

@@ -14,7 +14,7 @@
     { source: "cdn-jsdelivr", url: `https://cdn.jsdelivr.net/npm/colyseus.js@${colyseusBrowserClientVersion}/dist/colyseus.js` },
     { source: "cdn-unpkg", url: `https://unpkg.com/colyseus.js@${colyseusBrowserClientVersion}/dist/colyseus.js` }
   ];
-  const defaultRoomName = "lupen_test";
+  const defaultRoomName = "lupen_sector";
   const disabledReason = "multiplayer_disabled";
   const notLocalReason = "multiplayer_local_only";
   const stateListeners = new Set();
@@ -26,6 +26,7 @@
     sessionId: null,
     clientLoadSource: null,
     clientLoadError: null,
+    lastServerWarning: null,
     lastError: null
   };
 
@@ -94,6 +95,7 @@
       sessionId: connection.sessionId,
       clientLoadSource: connection.clientLoadSource,
       clientLoadError: connection.clientLoadError,
+      lastServerWarning: connection.lastServerWarning,
       lastError: connection.lastError,
       ...extra
     };
@@ -229,17 +231,22 @@
   function normalizePlayer(player, fallbackId = "") {
     if (!player) return null;
 
-    const id = String(player.id || fallbackId || "");
+    const sessionId = String(player.sessionId || player.id || fallbackId || "");
+    const id = String(player.id || sessionId || fallbackId || "");
     if (!id) return null;
 
     return {
       id,
-      sessionId: id,
+      sessionId,
       displayName: String(player.displayName || "Pilot"),
+      currentShipId: String(player.currentShipId || ""),
+      shipName: String(player.shipName || player.ship || ""),
       x: Number.isFinite(Number(player.x)) ? Number(player.x) : 50,
       y: Number.isFinite(Number(player.y)) ? Number(player.y) : 50,
       currentNode: String(player.currentNode || "Asteron Prime"),
-      isSelf: id === connection.sessionId
+      joinedAt: Number.isFinite(Number(player.joinedAt)) ? Number(player.joinedAt) : 0,
+      lastSeenAt: Number.isFinite(Number(player.lastSeenAt)) ? Number(player.lastSeenAt) : 0,
+      isSelf: sessionId === connection.sessionId
     };
   }
 
@@ -273,6 +280,11 @@
       logDev("received pong", message);
     });
 
+    activeRoom.onMessage("presence:warning", (message) => {
+      connection.lastServerWarning = message?.reason || "presence warning";
+      logDev("server presence warning", message);
+    });
+
     activeRoom.onLeave((code) => {
       logDev(`left ${connection.roomName}`, { code });
       connection.isConnected = false;
@@ -300,6 +312,7 @@
 
   function getStatus() {
     updateEnabledState();
+    const localPresence = getLocalPresenceOptions();
 
     return {
       enabled: connection.enabled,
@@ -308,9 +321,11 @@
       isConnecting: connection.isConnecting,
       roomName: connection.roomName,
       sessionId: connection.sessionId,
+      currentNode: localPresence.currentNode || "",
       clientLoadSource: connection.clientLoadSource,
       clientLoadError: connection.clientLoadError,
       lastError: connection.lastError,
+      lastServerWarning: connection.lastServerWarning,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       serverUrl: localServerUrl
@@ -412,11 +427,11 @@
     },
 
     sendPlayerIntent(intent = {}) {
-      return sendRoomMessage("sendPlayerIntent", "player_intent", intent);
+      return sendRoomMessage("sendPlayerIntent", "presence:update", intent);
     },
 
     sendMovementIntent(intent = {}) {
-      return sendRoomMessage("sendMovementIntent", "move", intent);
+      return sendRoomMessage("sendMovementIntent", "movement:update", intent);
     },
 
     sendCombatIntent(intent = {}) {

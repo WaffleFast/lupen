@@ -5,15 +5,20 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 ## What It Provides
 
 - A Colyseus server listening on port `2567` by default.
-- One registered room: `lupen_test`.
-- A `LupenTestRoom` that tracks connected players by `sessionId`.
+- Preferred registered room: `lupen_sector`.
+- Legacy compatibility room: `lupen_test`.
+- A `LupenSectorRoom` that tracks connected players by `sessionId`.
 - Each joined player gets:
-  - `id`: the Colyseus `sessionId`
+  - `id` / `sessionId`: the Colyseus `sessionId`
   - `displayName`: supplied by join options, otherwise `Pilot`
+  - `currentShipId` / `shipName`: display-only ship identity
+  - `currentNode`: current sector node, default `Asteron Prime`
   - `x` / `y`: placeholder position
-  - `currentNode`: placeholder node, default `asteron-prime`
+  - `joinedAt` / `lastSeenAt`: local server timestamps
 - On leave, the player is removed.
-- Local-only `ping` and `move` messages for smoke testing.
+- Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
+- Legacy local prototype `move` messages are still accepted for compatibility.
+- Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
 
 ## Install
 
@@ -54,7 +59,7 @@ cd server\colyseus
 npm.cmd run smoke
 ```
 
-The smoke test joins `lupen_test`, sends `ping`, receives `pong`, sends a placeholder `move`, then leaves.
+The smoke test joins `lupen_sector`, sends `ping`, receives `pong`, sends a placeholder `movement:update`, confirms an invalid movement update returns a dev warning, then leaves.
 
 ## Browser Test Client
 
@@ -64,7 +69,7 @@ While the local server is running, open this URL in one or more browser tabs:
 http://localhost:2567/test-client.html
 ```
 
-Use `Connect` in each tab to join `lupen_test`. The page shows the current tab's session id, connected players, placeholder movement updates, ping/pong messages, and disconnect events.
+Use `Connect` in each tab to join `lupen_sector`. The page shows the current tab's session id, connected players, placeholder movement updates, ping/pong messages, and disconnect events.
 
 This page is served only by the local prototype server. It is not imported by the real Lupen frontend.
 

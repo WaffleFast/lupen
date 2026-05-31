@@ -4,9 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { LupenTestRoom } from "./rooms/LupenTestRoom.js";
+import { LupenSectorRoom } from "./rooms/LupenSectorRoom.js";
 
-export const ROOM_NAME = "lupen_test";
+export const ROOM_NAME = "lupen_sector";
+export const LEGACY_ROOM_NAME = "lupen_test";
 
 const prototypeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicRoot = path.join(prototypeRoot, "public");
@@ -35,7 +36,8 @@ export function createHttpServer() {
         ok: true,
         service: "lupen-colyseus-prototype",
         status: "local-only",
-        rooms: [ROOM_NAME]
+        preferredRoom: ROOM_NAME,
+        rooms: [ROOM_NAME, LEGACY_ROOM_NAME]
       }));
       return;
     }
@@ -61,7 +63,8 @@ export function createGameServer(httpServer = createHttpServer()) {
     greet: false
   });
 
-  gameServer.define(ROOM_NAME, LupenTestRoom);
+  gameServer.define(ROOM_NAME, LupenSectorRoom);
+  gameServer.define(LEGACY_ROOM_NAME, LupenSectorRoom);
 
   return gameServer;
 }

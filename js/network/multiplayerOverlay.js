@@ -199,7 +199,22 @@
 
   function getPilotLabel(player) {
     const id = String(player.sessionId || player.id || "");
+    const displayName = String(player.displayName || "").trim();
+    if (displayName && displayName.toLowerCase() !== "pilot") return displayName.slice(0, 18);
     return `Pilot ${id.slice(0, 6) || "DEV"}`;
+  }
+
+  function getShipLabel(player) {
+    const shipName = String(player.shipName || "").trim();
+    if (shipName) return shipName.slice(0, 22);
+
+    const shipId = String(player.currentShipId || "").trim();
+    return shipId ? shipId.slice(0, 22) : "Unknown ship";
+  }
+
+  function getDevGhostLabel(player) {
+    const shipLabel = getShipLabel(player);
+    return shipLabel === "Unknown ship" ? "DEV GHOST" : `${shipLabel} / DEV GHOST`;
   }
 
   function getLabelOffset(position) {
@@ -216,7 +231,7 @@
     group.setAttribute("transform", `translate(${position.x} ${position.y})`);
 
     const title = global.document.createElementNS(SVG_NS, "title");
-    title.textContent = `${getPilotLabel(player)} / ${player.currentNode || "Unknown"} / x:${player.x} y:${player.y}`;
+    title.textContent = `${getPilotLabel(player)} / ${getShipLabel(player)} / ${player.currentNode || "Unknown"} / x:${player.x} y:${player.y}`;
     group.appendChild(title);
 
     const halo = global.document.createElementNS(SVG_NS, "circle");
@@ -276,7 +291,7 @@
     note.setAttribute("stroke", "rgba(0, 5, 12, 0.96)");
     note.setAttribute("stroke-width", "0.32");
     note.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
-    note.textContent = "DEV GHOST";
+    note.textContent = getDevGhostLabel(player);
     group.appendChild(note);
 
     layer.appendChild(group);
@@ -345,7 +360,7 @@
 
       const note = global.document.createElement("div");
       note.className = "lupen-mp-space-ghost-note";
-      note.textContent = "Dev Ghost";
+      note.textContent = getDevGhostLabel(player);
       marker.appendChild(note);
 
       layer.appendChild(marker);
@@ -400,6 +415,9 @@
     setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
     setDiagnosticsRow(panel, "pilots", `${players.length} remote / ${sameNodePlayers.length} local`);
+    if (status.lastServerWarning) {
+      setDiagnosticsRow(panel, "warning", status.lastServerWarning);
+    }
     if (status.clientLoadError || status.lastError) {
       setDiagnosticsRow(panel, "error", status.clientLoadError || status.lastError);
     }

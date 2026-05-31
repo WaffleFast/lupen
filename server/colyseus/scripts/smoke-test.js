@@ -5,7 +5,10 @@ const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const client = new Client(endpoint);
 
 const room = await client.joinOrCreate(ROOM_NAME, {
-  displayName: "Smoke Pilot"
+  displayName: "Smoke Pilot",
+  currentShipId: "lupenOrigin",
+  shipName: "LF-1 Origin",
+  currentNode: "Asteron Prime"
 });
 
 console.log(`joined ${ROOM_NAME}: ${room.sessionId}`);
@@ -20,10 +23,26 @@ await new Promise((resolve, reject) => {
   room.send("ping", { local: true });
 });
 
-room.send("move", {
+room.send("movement:update", {
   x: 64,
   y: 42,
-  currentNode: "asteron-prime"
+  currentShipId: "lupenOrigin",
+  shipName: "LF-1 Origin",
+  currentNode: "East Link 1"
+});
+
+await new Promise((resolve, reject) => {
+  const timeout = setTimeout(() => reject(new Error("Timed out waiting for presence warning.")), 3000);
+  room.onMessage("presence:warning", (message) => {
+    clearTimeout(timeout);
+    console.log("received presence warning:", JSON.stringify(message));
+    resolve();
+  });
+  room.send("movement:update", {
+    x: 999999,
+    y: 42,
+    currentNode: "Invalid Node"
+  });
 });
 
 await room.leave();

@@ -87,7 +87,7 @@
 
     <section>
       <p>Status: <strong id="status">disconnected</strong></p>
-      <p>Room: <code>lupen_test</code></p>
+      <p>Room: <code>lupen_sector</code></p>
       <p>Session: <code id="sessionId">none</code></p>
       <button id="connectButton" type="button">Connect</button>
       <button id="disconnectButton" type="button" disabled>Disconnect</button>
@@ -108,7 +108,7 @@
 
   <script src="/colyseus.js"></script>
   <script>
-    const ROOM_NAME = "lupen_test";
+    const ROOM_NAME = "lupen_sector";
     const SERVER_URL = "ws://localhost:2567";
 
     let client = null;
@@ -151,7 +151,7 @@
 
       state.players.forEach((player) => {
         const item = document.createElement("li");
-        item.textContent = `${player.displayName} | ${player.id} | x:${player.x} y:${player.y} | node:${player.currentNode}`;
+        item.textContent = `${player.displayName} | ${player.currentShipId || "ship unknown"} | ${player.sessionId || player.id} | x:${player.x} y:${player.y} | node:${player.currentNode}`;
         playersEl.appendChild(item);
       });
     }
@@ -166,7 +166,9 @@
         client = new Colyseus.Client(SERVER_URL);
         room = await client.joinOrCreate(ROOM_NAME, {
           displayName: "Pilot",
-          currentNode: "asteron-prime"
+          currentShipId: "lupenOrigin",
+          shipName: "LF-1 Origin",
+          currentNode: "Asteron Prime"
         });
 
         setStatus("connected");
@@ -211,10 +213,12 @@
 
       const x = Math.floor(Math.random() * 500);
       const y = Math.floor(Math.random() * 500);
-      room.send("move", {
+      room.send("movement:update", {
         x,
         y,
-        currentNode: "asteron-prime"
+        currentShipId: "lupenOrigin",
+        shipName: "LF-1 Origin",
+        currentNode: "Asteron Prime"
       });
       addLog(`Sent move: x:${x} y:${y}`);
     }
