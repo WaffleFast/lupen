@@ -1730,6 +1730,27 @@ function getVisibleHostileBots() {
   return hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
 }
 
+function isStagingLocalCombatBotVisualGuardActive() {
+  let isStagingUrl = false;
+  try {
+    isStagingUrl = new URLSearchParams(window.location.search).get("mp") === "staging";
+  } catch (_err) {
+    isStagingUrl = false;
+  }
+
+  const status = window.LupenMultiplayerClient?.getStatus?.();
+  // Staging presence uses Colyseus-owned visual bots. Keep local real combat
+  // bots in their normal arrays/saves, but hide and pause their local combat
+  // presentation while ?mp=staging is active so two-player staging tests are
+  // not confused by client-local enemy spawns. This is temporary until
+  // Colyseus becomes authoritative for real bot simulation.
+  return isStagingUrl || status?.enabledReason === "staging_enabled";
+}
+
+function getVisibleHostileBotsForLocalTargetUi() {
+  return isStagingLocalCombatBotVisualGuardActive() ? [] : getVisibleHostileBots();
+}
+
 function isBotFacingPlayer(bot) {
   return Boolean(bot && Number(bot.attackingUntil || 0) > Date.now());
 }
@@ -1774,7 +1795,7 @@ function triggerWarningBanner(text = "WARNING") {
 }
 
 function getVisibleTargets() {
-  return [...getVisibleHostileBots(), ...getVisibleAsteroids()];
+  return [...getVisibleHostileBotsForLocalTargetUi(), ...getVisibleAsteroids()];
 }
 
 function showScreen(screenId) {

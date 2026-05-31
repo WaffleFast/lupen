@@ -14,8 +14,11 @@ function isPlayerUnderAttackForLeaveSave() {
   const node = sectorNodes[currentNode];
   if (!node || node.type === "planet") return false;
 
-  const hostileBotPresent = hostileBots.some(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode && (bot.faction !== "erebus" || bot.aggroState === "hostile"));
-  const hostileBotEngaged = engagedTarget?.type === "hostileBot" && engageTimer;
+  const localBotVisualGuardActive = typeof isStagingLocalCombatBotVisualGuardActive === "function"
+    && isStagingLocalCombatBotVisualGuardActive();
+  const hostileBotPresent = !localBotVisualGuardActive
+    && hostileBots.some(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode && (bot.faction !== "erebus" || bot.aggroState === "hostile"));
+  const hostileBotEngaged = !localBotVisualGuardActive && engagedTarget?.type === "hostileBot" && engageTimer;
   return Boolean(hostileBotPresent || hostileBotEngaged || getMultiplayerUnderAttackState());
 }
 

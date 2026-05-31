@@ -685,7 +685,7 @@
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
     note.textContent = isStagingMode(status)
-      ? "Staging bot markers are visual-only; real combat bots are still local."
+      ? "Local combat bots hidden in staging; shared staging bots are server-owned visual placeholders."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 

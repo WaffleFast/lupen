@@ -45,6 +45,8 @@ function selectAsteroid(asteroidId) {
 }
 
 function selectHostileBot(botId) {
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
+
   const bot = getHostileBotById(botId);
 
   if (!bot || !bot.alive || (bot.currentNodeId || bot.node) !== currentNode) return;
@@ -477,12 +479,18 @@ function updateAsteroidUI() {
   ensureActiveAsteroids();
   ensureActiveHostileBots();
 
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) {
+    clearLocalHostileBotSelectionForStaging();
+  }
+
   const field = document.getElementById("asteroidField");
   if (!field) return;
 
   field.innerHTML = "";
 
-  const visibleBots = hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
+  const visibleBots = typeof getVisibleHostileBotsForLocalTargetUi === "function"
+    ? getVisibleHostileBotsForLocalTargetUi()
+    : hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
   const visibleAsteroids = asteroids.filter(asteroid => asteroid.alive && asteroid.node === currentNode);
 
   separateVisibleTargets([...visibleBots, ...visibleAsteroids]);
@@ -504,6 +512,20 @@ function updateAsteroidUI() {
       onClick: () => selectAsteroid(asteroid.id)
     });
   });
+}
+
+function clearLocalHostileBotSelectionForStaging() {
+  // ?mp=staging shows server-owned Colyseus bot placeholders only. Local real
+  // combat bots stay in the single-player state but are not selectable,
+  // targetable, or engaged during staging presence tests.
+  if (selectedTarget?.type === "hostileBot") selectedTarget = null;
+  if (engagedTarget?.type !== "hostileBot") return;
+
+  engagedTarget = null;
+  if (engageTimer) {
+    clearInterval(engageTimer);
+    engageTimer = null;
+  }
 }
 
 function updateTargetPanel() {
@@ -781,6 +803,8 @@ function getAllowedErebusBotMoves(bot) {
 }
 
 function moveHostileBotsBetweenNodes() {
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
+
   ensureActiveHostileBots();
   updateErebusAggroStates();
   const now = Date.now();
@@ -822,6 +846,7 @@ function moveHostileBotsBetweenNodes() {
 
 function startHostileBotMovement() {
   if (botMovementTimer) return;
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
 
   botMovementTimer = setInterval(() => {
     moveHostileBotsBetweenNodes();
@@ -829,6 +854,8 @@ function startHostileBotMovement() {
 }
 
 function hostileBotAttackCycle() {
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
+
   updateErebusAggroStates();
   if (!isPlayerInSpaceView() || isAtPlanetNode()) return;
 
@@ -868,6 +895,7 @@ function hostileBotAttackCycle() {
 
 function startHostileBotAttacks() {
   if (botAttackTimer) return;
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
 
   botAttackTimer = setInterval(() => {
     hostileBotAttackCycle();

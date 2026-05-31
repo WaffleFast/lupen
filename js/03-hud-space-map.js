@@ -1210,6 +1210,10 @@ function hasSectorScanCooldownsActive() {
 }
 
 function getBotScanSignals() {
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) {
+    return [];
+  }
+
   const grouped = new Map();
   hostileBots
     .filter(bot => bot.alive && sectorNodes[bot.currentNodeId || bot.node])
