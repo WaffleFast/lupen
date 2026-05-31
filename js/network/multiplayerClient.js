@@ -8,6 +8,8 @@
 
   const localServerUrl = "ws://localhost:2567";
   const localClientScriptUrl = "http://localhost:2567/colyseus.js";
+  const serverStorageKey = "lupenMultiplayerServer";
+  const productionHosts = new Set(["lupen.io", "www.lupen.io"]);
   const colyseusBrowserClientVersion = "0.16.22";
   const clientScriptSources = [
     { source: "local", url: localClientScriptUrl },
@@ -24,6 +26,9 @@
     isConnected: false,
     roomName: defaultRoomName,
     sessionId: null,
+    serverUrl: localServerUrl,
+    serverUrlSource: "default-local",
+    enabledReason: disabledReason,
     clientLoadSource: null,
     clientLoadError: null,
     lastServerWarning: null,
@@ -49,8 +54,102 @@
     return host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
   }
 
+  function getRuntimeConfig() {
+    const legacyConfig = global.LupenMultiplayerConfig || {};
+    return {
+      allowedHosts: Array.isArray(legacyConfig.allowedHosts)
+        ? legacyConfig.allowedHosts
+        : Array.isArray(global.LUPEN_MULTIPLAYER_ALLOWED_HOSTS)
+          ? global.LUPEN_MULTIPLAYER_ALLOWED_HOSTS
+          : [],
+      allowProductionHost: legacyConfig.allowProductionHost === true || global.LUPEN_MULTIPLAYER_ALLOW_PRODUCTION_HOST === true
+    };
+  }
+
+  function getSearchParam(name) {
+    try {
+      return new URLSearchParams(global.location.search).get(name);
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function getStoredServerUrl() {
+    try {
+      return global.localStorage?.getItem?.(serverStorageKey) || "";
+    } catch (_err) {
+      return "";
+    }
+  }
+
+  function isAllowedPageHost() {
+    const host = String(global.location.hostname || "").toLowerCase();
+    const runtimeConfig = getRuntimeConfig();
+    const allowedHosts = runtimeConfig.allowedHosts.map((value) => String(value || "").toLowerCase());
+
+    if (isLocalHost()) return true;
+    if (productionHosts.has(host) && !runtimeConfig.allowProductionHost) return false;
+
+    return allowedHosts.includes(host);
+  }
+
+  function resolveServerConfig() {
+    const queryServerUrl = getSearchParam("mpServer");
+    const storedServerUrl = getStoredServerUrl();
+    const rawServerUrl = String(queryServerUrl || storedServerUrl || localServerUrl).trim();
+    const source = queryServerUrl ? "query" : storedServerUrl ? "localStorage" : "default-local";
+
+    try {
+      const parsedUrl = new URL(rawServerUrl);
+      if (parsedUrl.protocol !== "ws:" && parsedUrl.protocol !== "wss:") {
+        throw new Error("server URL must use ws:// or wss://");
+      }
+
+      return {
+        ok: true,
+        serverUrl: parsedUrl.toString().replace(/\/$/, ""),
+        source,
+        error: null
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        serverUrl: rawServerUrl,
+        source,
+        error: `invalid_multiplayer_server_url: ${err.message || err}`
+      };
+    }
+  }
+
   function updateEnabledState() {
-    connection.enabled = hasDevFlag() && isLocalHost();
+    const serverConfig = resolveServerConfig();
+    connection.serverUrl = serverConfig.serverUrl || localServerUrl;
+    connection.serverUrlSource = serverConfig.source;
+
+    if (!hasDevFlag()) {
+      connection.enabled = false;
+      connection.enabledReason = disabledReason;
+      return;
+    }
+
+    if (!isAllowedPageHost()) {
+      connection.enabled = false;
+      connection.enabledReason = notLocalReason;
+      return;
+    }
+
+    if (!serverConfig.ok) {
+      connection.enabled = false;
+      connection.enabledReason = serverConfig.error;
+      connection.lastError = serverConfig.error;
+      return;
+    }
+
+    connection.enabled = true;
+    connection.enabledReason = isLocalHost() ? "local_dev_enabled" : "allowed_staging_host_enabled";
+    if (String(connection.lastError || "").startsWith("invalid_multiplayer_server_url:")) {
+      connection.lastError = null;
+    }
   }
 
   updateEnabledState();
@@ -81,7 +180,8 @@
       action,
       enabled: connection.enabled,
       connected: false,
-      reason: connection.enabled ? "not_connected" : disabledReason,
+      reason: connection.enabled ? "not_connected" : connection.enabledReason,
+      enabledReason: connection.enabledReason,
       ...extra
     };
   }
@@ -94,6 +194,10 @@
       connected: connection.isConnected,
       roomName: connection.roomName,
       sessionId: connection.sessionId,
+      serverUrl: connection.serverUrl,
+      serverUrlSource: connection.serverUrlSource,
+      serverConfigSource: connection.serverUrlSource,
+      enabledReason: connection.enabledReason,
       clientLoadSource: connection.clientLoadSource,
       clientLoadError: connection.clientLoadError,
       lastServerWarning: connection.lastServerWarning,
@@ -120,7 +224,7 @@
     if (connection.enabled) return null;
 
     return disabledResult(action, {
-      reason: hasDevFlag() ? notLocalReason : disabledReason
+      reason: connection.enabledReason
     });
   }
 
@@ -369,7 +473,11 @@
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
-      serverUrl: localServerUrl
+      serverUrl: connection.serverUrl,
+      serverUrlSource: connection.serverUrlSource,
+      serverConfigSource: connection.serverUrlSource,
+      configSource: connection.serverUrlSource,
+      enabledReason: connection.enabledReason
     };
   }
 
@@ -409,12 +517,13 @@
       connection.isConnecting = true;
       connection.lastError = null;
       connection.roomName = options.roomName || defaultRoomName;
-      logDev(`connecting to ${localServerUrl}`, { roomName: connection.roomName });
+      const serverUrl = options.serverUrl || connection.serverUrl || localServerUrl;
+      logDev(`connecting to ${serverUrl}`, { roomName: connection.roomName, source: connection.serverUrlSource });
 
       try {
         const Colyseus = await ensureBrowserClientLoaded();
         const localPresence = getLocalPresenceOptions();
-        colyseusClient = new Colyseus.Client(options.serverUrl || localServerUrl);
+        colyseusClient = new Colyseus.Client(serverUrl);
         room = await colyseusClient.joinOrCreate(connection.roomName, {
           ...localPresence,
           displayName: options.displayName || localPresence.displayName || "Pilot",

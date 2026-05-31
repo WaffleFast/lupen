@@ -86,6 +86,12 @@ Future hosted staging example:
 wss://multiplayer.lupen.io
 ```
 
+Future Colyseus Cloud staging URLs will also use `wss://`, for example:
+
+```text
+wss://your-colyseus-cloud-host.example
+```
+
 Only `ws://` and `wss://` server URLs are accepted. Page hosts are restricted to local development by default (`localhost`, `127.0.0.1`, and `::1`). A future staging page can opt in by setting an explicit allowed host config before `js/network/multiplayerClient.js` loads. Production `lupen.io` / `www.lupen.io` is not enabled just because `?mp=1` is present.
 
 ## Smoke Test

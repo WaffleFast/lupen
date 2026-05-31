@@ -582,6 +582,12 @@
     return String(value || "").slice(0, 8) || "none";
   }
 
+  function getCompactServerLabel(status) {
+    const serverUrl = String(status.serverUrl || "none").replace(/^wss?:\/\//, "");
+    const source = status.serverUrlSource || status.serverConfigSource || status.configSource || "unknown";
+    return `${serverUrl} / ${source}`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -617,6 +623,7 @@
     setDiagnosticsRow(panel, "status", status.isConnected ? "connected" : status.isConnecting ? "connecting" : "offline");
     setDiagnosticsRow(panel, "room", status.roomName || "none");
     setDiagnosticsRow(panel, "session", getShortSessionId(status.sessionId));
+    setDiagnosticsRow(panel, "server", getCompactServerLabel(status));
     setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
     setDiagnosticsRow(panel, "pilots", `${players.length} remote / ${sameNodePlayers.length} local`);
