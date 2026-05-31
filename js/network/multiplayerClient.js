@@ -37,6 +37,7 @@
     lastCombatResponse: null,
     lastTargetResponse: null,
     lastBotEvent: null,
+    lastShotEvent: null,
     lastError: null
   };
 
@@ -241,6 +242,7 @@
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
+      lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -598,6 +600,26 @@
       logDev("server bot respawned", message);
     });
 
+    activeRoom.onMessage("staging:shot", (message) => {
+      connection.lastShotEvent = {
+        ok: message?.ok === true,
+        attackerSessionId: String(message?.attackerSessionId || ""),
+        targetBotId: String(message?.targetBotId || ""),
+        currentNode: String(message?.currentNode || ""),
+        damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
+        weaponName: String(message?.weaponName || ""),
+        weaponFamily: String(message?.weaponFamily || message?.weaponType || ""),
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        disabled: message?.disabled === true,
+        rewardsGranted: message?.rewardsGranted === true,
+        timestamp: Number.isFinite(Number(message?.timestamp)) ? Number(message.timestamp) : Date.now(),
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server staging shot", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("target:selected", (message) => {
       connection.lastTargetResponse = {
         ok: message?.ok === true,
@@ -668,6 +690,7 @@
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
+      lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,

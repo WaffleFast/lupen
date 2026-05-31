@@ -37,6 +37,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `nextMoveAt`: planned next node-move timestamp for debugging
 - Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot enter real target arrays, do not drop loot, do not grant XP/rewards, and are not persisted.
 - Combat intent handling can apply shield-first staging test damage to a locked same-node staging bot and returns `combat:resolved` with `rewardsGranted: false`. Clients may send equipped weapon display data, but the server clamps staging damage between `1` and `50`, derives/clamps cooldown safely, and falls back to conservative test damage when payloads are invalid. Fast repeat fire returns `combat:rejected` with `reason: staging_fire_cooldown` and `cooldownRemainingMs`. Invalid intents return `combat:rejected`. This does not mutate player progression, rewards, loot, saves, bounty data, Supabase data, or real combat systems.
+- Successful staging combat also broadcasts `staging:shot` as a visual-only synced event with attacker, target, weapon, damage, and resulting shield/hull data. Clients may render this as a beam/hit flash, but it is not real projectile simulation and does not damage players or grant progression.
 - When staging bot hull reaches `0`, the bot broadcasts `bot:disabled`, stops taking staging damage, and respawns after a short delay with shield/hull restored. Respawn broadcasts `bot:respawned` and never grants rewards.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
@@ -181,6 +182,7 @@ The regression test uses two Colyseus clients to verify that:
 - At least one staging bot changes node while both clients observe matching state.
 - A valid same-node staging bot lock-on updates the player's `selectedTargetBotId`.
 - A valid `combat:intent` against the selected same-node staging bot applies server-clamped weapon test damage.
+- Successful staging combat broadcasts a visual-only `staging:shot` event to both clients.
 - Client B receives the same updated staging bot shield/hull values.
 - An immediate second combat intent is rejected by `staging_fire_cooldown` without damage.
 - Oversized weapon damage is clamped and invalid weapon damage falls back safely.

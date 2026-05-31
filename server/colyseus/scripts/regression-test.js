@@ -260,10 +260,14 @@ try {
 
   const botDisabledEvents = [];
   const botRespawnedEvents = [];
+  const roomAShotEvents = [];
+  const roomBShotEvents = [];
   roomA.onMessage("bot:disabled", (message) => botDisabledEvents.push(message));
   roomA.onMessage("bot:respawned", (message) => botRespawnedEvents.push(message));
   roomB.onMessage("bot:disabled", () => {});
   roomB.onMessage("bot:respawned", () => {});
+  roomA.onMessage("staging:shot", (message) => roomAShotEvents.push(message));
+  roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
 
   console.log(`joined ${ROOM_NAME}: A=${roomA.sessionId} B=${roomB.sessionId}`);
 
@@ -326,6 +330,21 @@ try {
   assert(combatResponse?.stagingDamage === 12, `Unexpected validated staging damage: ${combatResponse?.stagingDamage}`);
   assert(combatResponse?.weaponName === "Regression Pulse Laser", "Combat response did not echo safe weapon name.");
   assert(combatResponse?.rewardsGranted === false, "Staging combat intent granted rewards.");
+
+  await waitFor("both clients to receive staging shot event", () => {
+    const shotA = roomAShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 12);
+    const shotB = roomBShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 12);
+    return shotA && shotB &&
+      shotA.attackerSessionId === roomA.sessionId &&
+      shotB.attackerSessionId === roomA.sessionId &&
+      shotA.currentNode === inspectedBotBeforeCombat.currentNode &&
+      shotB.currentNode === inspectedBotBeforeCombat.currentNode &&
+      shotA.weaponName === "Regression Pulse Laser" &&
+      shotB.weaponName === "Regression Pulse Laser" &&
+      shotA.rewardsGranted === false &&
+      shotB.rewardsGranted === false;
+  });
+  console.log("both clients received staging shot visual event");
 
   await waitFor("client B to receive server staging damage", () => {
     const botA = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);

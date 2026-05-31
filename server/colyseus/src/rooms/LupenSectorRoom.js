@@ -680,6 +680,10 @@ export class LupenSectorRoom extends Room {
     player.lastFireAt = now;
     player.nextFireAt = now + stagingCooldownMs;
 
+    const weaponName = getStringValue(message.weaponName, "Staging Test Weapon") || "Staging Test Weapon";
+    const weaponFamily = getStringValue(message.weaponFamily || message.weaponType);
+    const resolvedAt = Date.now();
+
     client.send("combat:resolved", {
       ok: true,
       reason: "staging_damage_applied",
@@ -689,8 +693,8 @@ export class LupenSectorRoom extends Room {
       targetNode: targetBot.currentNode,
       currentNode: player.currentNode,
       weaponId: getStringValue(message.weaponId),
-      weaponName: getStringValue(message.weaponName, "Staging Test Weapon") || "Staging Test Weapon",
-      weaponFamily: getStringValue(message.weaponFamily || message.weaponType),
+      weaponName,
+      weaponFamily,
       weaponQuality: getStringValue(message.quality),
       weaponLevel: getNumberValue(message.level, 0),
       damage: result.damage,
@@ -704,7 +708,27 @@ export class LupenSectorRoom extends Room {
       cooldownMs: stagingCooldownMs,
       nextFireAt: player.nextFireAt,
       rewardsGranted: false,
-      receivedAt: Date.now()
+      receivedAt: resolvedAt
+    });
+
+    // Visual-only staging combat event. Clients may render a synced flash/beam
+    // from this payload, but it is not a real projectile simulation and never
+    // grants rewards, progression, saves, PvP, or player damage.
+    this.broadcast("staging:shot", {
+      ok: true,
+      attackerSessionId: client.sessionId,
+      targetBotId,
+      currentNode: player.currentNode,
+      damage: result.damage,
+      weaponName,
+      weaponFamily,
+      weaponType: getStringValue(message.weaponType || message.weaponFamily),
+      shield: result.shield,
+      hull: result.hull,
+      disabled: result.disabled,
+      rewardsGranted: false,
+      timestamp: resolvedAt,
+      receivedAt: resolvedAt
     });
 
     if (result.disabled) {

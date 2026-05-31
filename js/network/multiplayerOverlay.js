@@ -13,6 +13,7 @@
   const botMarkerClass = "svg-mp-bot";
   const spaceLayerId = "lupenMultiplayerSpaceGhostLayer";
   const spaceBotLayerId = "lupenMultiplayerSpaceBotLayer";
+  const spaceShotLayerId = "lupenMultiplayerSpaceShotLayer";
   const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
   const stagingCombatPanelId = "lupenMultiplayerStagingCombatPanel";
   const styleId = "lupenMultiplayerOverlayStyles";
@@ -53,6 +54,36 @@
         z-index: 8;
         pointer-events: none;
         overflow: hidden;
+      }
+
+      #${spaceShotLayerId} {
+        position: absolute;
+        inset: 84px 18px 170px;
+        z-index: 10;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-beam {
+        position: absolute;
+        height: 3px;
+        transform-origin: 0 50%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(117, 242, 255, 0.08), rgba(131, 243, 255, 0.92), rgba(255, 239, 180, 0.86));
+        box-shadow: 0 0 12px rgba(110, 229, 255, 0.76), 0 0 18px rgba(255, 126, 65, 0.34);
+        animation: lupen-mp-shot-beam 0.52s ease-out forwards;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-hit {
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        transform: translate(-50%, -50%);
+        border: 2px solid rgba(255, 229, 156, 0.88);
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 233, 157, 0.8), rgba(255, 111, 54, 0.26) 48%, rgba(255, 111, 54, 0) 72%);
+        box-shadow: 0 0 16px rgba(255, 159, 73, 0.72);
+        animation: lupen-mp-shot-hit 0.62s ease-out forwards;
       }
 
       #${stagingCombatPanelId} {
@@ -360,6 +391,36 @@
         }
       }
 
+      @keyframes lupen-mp-shot-beam {
+        0% {
+          opacity: 0;
+          transform: rotate(var(--shot-angle)) scaleX(0.1);
+        }
+        35% {
+          opacity: 1;
+          transform: rotate(var(--shot-angle)) scaleX(1);
+        }
+        100% {
+          opacity: 0;
+          transform: rotate(var(--shot-angle)) scaleX(1);
+        }
+      }
+
+      @keyframes lupen-mp-shot-hit {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.45);
+        }
+        35% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1.05);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(1.45);
+        }
+      }
+
       #${diagnosticsPanelId} {
         position: fixed;
         top: 12px;
@@ -458,6 +519,7 @@
   function removeSpaceLayer() {
     global.document?.getElementById(spaceLayerId)?.remove();
     global.document?.getElementById(spaceBotLayerId)?.remove();
+    global.document?.getElementById(spaceShotLayerId)?.remove();
   }
 
   function removeDiagnosticsPanel() {
@@ -594,6 +656,17 @@
 
   function getRecentDamageAmount(bot, status = getClient()?.getStatus?.()) {
     return wasRecentlyHit(bot, status) ? Math.max(0, Math.round(Number(status.lastCombatResponse.damage || 0))) : 0;
+  }
+
+  function getShotEventAge(status = getClient()?.getStatus?.()) {
+    return Date.now() - Number(status?.lastShotEvent?.receivedAt || status?.lastShotEvent?.timestamp || 0);
+  }
+
+  function getSpacePercentPosition(entity, fallback = { x: 50, y: 50 }) {
+    return {
+      x: clampMapCoordinate(entity?.x ?? fallback.x),
+      y: clampMapCoordinate(entity?.y ?? fallback.y)
+    };
   }
 
   function selectStagingBot(bot) {
@@ -943,6 +1016,51 @@
     spaceScreen.appendChild(layer);
   }
 
+  function renderSpaceShot(players, bots, status) {
+    global.document?.getElementById(spaceShotLayerId)?.remove();
+    if (!isStagingMode(status) || !status?.lastShotEvent || getShotEventAge(status) > 900) return;
+    if (normalizeNodeKey(status.lastShotEvent.currentNode) !== normalizeNodeKey(getCurrentNodeName())) return;
+
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return;
+
+    const targetBot = bots.find((bot) => bot.id === status.lastShotEvent.targetBotId);
+    if (!targetBot || !isSameCurrentNode(targetBot)) return;
+
+    ensureStyles();
+
+    const attacker = players.find((player) => player.sessionId === status.lastShotEvent.attackerSessionId || player.id === status.lastShotEvent.attackerSessionId);
+    const targetPosition = getSpacePercentPosition(targetBot);
+    const attackerPosition = attacker && isSameCurrentNode(attacker)
+      ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
+      : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
+
+    const layer = global.document.createElement("div");
+    layer.id = spaceShotLayerId;
+    layer.setAttribute("aria-hidden", "true");
+
+    const dx = targetPosition.x - attackerPosition.x;
+    const dy = targetPosition.y - attackerPosition.y;
+    const distance = Math.max(8, Math.sqrt(dx * dx + dy * dy));
+    const angle = Math.atan2(dy, dx);
+
+    const beam = global.document.createElement("div");
+    beam.className = "lupen-mp-shot-beam";
+    beam.style.left = `${attackerPosition.x}%`;
+    beam.style.top = `${attackerPosition.y}%`;
+    beam.style.width = `${distance}%`;
+    beam.style.setProperty("--shot-angle", `${angle}rad`);
+    layer.appendChild(beam);
+
+    const hit = global.document.createElement("div");
+    hit.className = "lupen-mp-shot-hit";
+    hit.style.left = `${targetPosition.x}%`;
+    hit.style.top = `${targetPosition.y}%`;
+    layer.appendChild(hit);
+
+    spaceScreen.appendChild(layer);
+  }
+
   function getSameNodePlayers(players) {
     return players.filter((player) => isSameCurrentNode(player));
   }
@@ -985,6 +1103,14 @@
     const name = event.type.replace("bot:", "");
     const id = String(event.botId || "").slice(-6) || "unknown";
     return `${name} / ${id}`;
+  }
+
+  function getLastShotEventLabel(status) {
+    const event = status?.lastShotEvent;
+    if (!event?.targetBotId) return "none";
+    const attacker = String(event.attackerSessionId || "").slice(0, 6) || "pilot";
+    const target = String(event.targetBotId || "").slice(-6) || "bot";
+    return `${attacker}->${target} / ${event.weaponName || "weapon"} / ${Math.round(Number(event.damage || 0))}`;
   }
 
   function setDiagnosticsRow(panel, label, value) {
@@ -1184,6 +1310,7 @@
       setDiagnosticsRow(panel, "weapon", `${status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "unknown"} / dmg ${Math.round(Number(status.lastCombatResponse?.stagingDamage || weaponIntent.damage || 0))}`);
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
+      setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
@@ -1228,6 +1355,7 @@
     }
 
     const players = getClient()?.getPlayers?.({ includeSelf: false }) || [];
+    const allPlayers = getClient()?.getPlayers?.({ includeSelf: true }) || [];
     const bots = getClient()?.getBots?.() || [];
     const status = getClient()?.getStatus?.() || {};
     const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
@@ -1235,6 +1363,7 @@
     renderSectorBots(bots);
     renderSpaceGhosts(players);
     renderSpaceBots(bots);
+    renderSpaceShot(allPlayers, bots, status);
     renderStagingCombatPanel(status, selectedBot);
     renderDiagnostics(players, bots);
   }
