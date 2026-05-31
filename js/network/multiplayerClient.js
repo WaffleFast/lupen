@@ -39,6 +39,7 @@
     lastBotEvent: null,
     lastShotEvent: null,
     lastRewardPreview: null,
+    lastRewardClaimResult: null,
     lastError: null
   };
 
@@ -245,6 +246,7 @@
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
+      lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -647,6 +649,7 @@
         : [];
       connection.lastRewardPreview = {
         ok: message?.ok === true,
+        rewardPreviewId: String(message?.rewardPreviewId || ""),
         botId: String(message?.botId || ""),
         botName: String(message?.botName || "Staging Bot"),
         disabledBySessionId: String(message?.disabledBySessionId || ""),
@@ -666,6 +669,36 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server staging reward preview", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("reward:claim_preview_result", (message) => {
+      const contributors = Array.isArray(message?.contributors)
+        ? message.contributors.map(normalizeRewardContributor).filter(Boolean)
+        : [];
+      connection.lastRewardClaimResult = {
+        ok: message?.ok === true,
+        rewardPreviewId: String(message?.rewardPreviewId || ""),
+        botId: String(message?.botId || ""),
+        botName: String(message?.botName || "Staging Bot"),
+        claimedBySessionId: String(message?.claimedBySessionId || message?.sessionId || ""),
+        finalHitBy: String(message?.finalHitBy || message?.disabledBySessionId || ""),
+        topContributorSessionId: String(message?.topContributorSessionId || message?.topContributor?.sessionId || ""),
+        topContributor: normalizeRewardContributor(message?.topContributor),
+        contributors,
+        totalDamage: Number.isFinite(Number(message?.totalDamage)) ? Number(message.totalDamage) : 0,
+        node: String(message?.node || ""),
+        previewXp: Number.isFinite(Number(message?.previewXp)) ? Number(message.previewXp) : 0,
+        previewCredits: Number.isFinite(Number(message?.previewCredits)) ? Number(message.previewCredits) : 0,
+        previewLoot: Array.isArray(message?.previewLoot)
+          ? message.previewLoot.map((item) => String(item || "")).filter(Boolean)
+          : [],
+        applied: message?.applied === true,
+        claimSimulated: message?.claimSimulated === true,
+        reason: String(message?.reason || "staging_preview_only"),
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server staging reward claim preview result", message);
       notifyServerState(activeRoom.state || null);
     });
 
@@ -741,6 +774,7 @@
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
+      lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
@@ -888,6 +922,14 @@
 
     clearStagingTarget() {
       return sendRoomMessage("clearStagingTarget", "target:clear", {});
+    },
+
+    claimStagingRewardPreview(options = {}) {
+      const preview = connection.lastRewardPreview || {};
+      return sendRoomMessage("claimStagingRewardPreview", "reward:claim_preview", {
+        botId: options.botId || preview.botId || "",
+        rewardPreviewId: options.rewardPreviewId || preview.rewardPreviewId || ""
+      });
     },
 
     sendPing(payload = {}) {

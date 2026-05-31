@@ -40,6 +40,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Successful staging combat also broadcasts `staging:shot` as a visual-only synced event with attacker, target, weapon, damage, and resulting shield/hull data. Clients may render this as a beam/hit flash, but it is not real projectile simulation and does not damage players or grant progression.
 - When staging bot hull reaches `0`, the bot broadcasts `bot:disabled`, stops taking staging damage, and respawns after a short delay with shield/hull restored. Respawn broadcasts `bot:respawned` and never grants rewards.
 - Disabled staging bots also broadcast `staging:reward_preview` with `applied: false` and `reason: staging_preview_only`. The preview includes final-hit and top-contributor attribution from staging-only damage contribution tracking, but it never mutates XP, credits, inventory, bounties, saves, Supabase, or progression.
+- Staging-only `reward:claim_preview` / `staging:claimRewardPreview` messages simulate claiming a recent reward preview and reply with `reward:claim_preview_result`. Eligible contributors receive `applied: false` and `reason: staging_preview_only`; non-contributors are rejected safely. No real rewards are marked claimed or applied.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
@@ -190,6 +191,8 @@ The regression test uses two Colyseus clients to verify that:
 - Oversized weapon damage is clamped and invalid weapon damage falls back safely.
 - Repeated valid staging hits can disable a bot.
 - Disabling a bot emits a preview-only reward event with `applied: false`, final-hit attribution, top contributor attribution, contributor hit counts, and contribution percentages.
+- A contributor can simulate claiming the preview reward, receiving `applied: false`, preview values, and contribution info.
+- A non-contributor preview claim is rejected safely without applying rewards.
 - Bot respawn confirms staging contribution data was cleared.
 - Disabled bots reject further staging damage and then respawn/reset on both clients.
 - Invalid combat intents are rejected without rewards or additional damage.

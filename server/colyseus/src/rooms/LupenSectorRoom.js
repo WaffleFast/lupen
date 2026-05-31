@@ -308,6 +308,9 @@ export class LupenSectorRoom extends Room {
     // outside room state so it never becomes player progression, save data,
     // inventory, XP, credits, bounties, or real reward state.
     this.botContributions = new Map();
+    // Short-lived staging reward preview cache. Claims against this cache are
+    // simulation-only acknowledgements and never mark real rewards as claimed.
+    this.rewardPreviews = new Map();
 
     this.spawnDummyBots();
     this.botInterval = this.clock.setInterval(() => {
@@ -357,6 +360,17 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("target:clear", (client) => {
       this.clearStagingBotSelection(client, "target:clear");
+    });
+
+    // Staging-only reward flow preparation. This validates a recent preview
+    // and replies with applied:false; it never grants XP, credits, loot,
+    // inventory, bounties, saves, Supabase writes, or progression.
+    this.onMessage("reward:claim_preview", (client, message = {}) => {
+      this.claimRewardPreview(client, message, "reward:claim_preview");
+    });
+
+    this.onMessage("staging:claimRewardPreview", (client, message = {}) => {
+      this.claimRewardPreview(client, message, "staging:claimRewardPreview");
     });
 
     // Legacy local prototype alias. New clients should send movement:update.
@@ -669,6 +683,91 @@ export class LupenSectorRoom extends Room {
     this.botContributions.delete(getStringValue(botId));
   }
 
+  buildRewardPreviewPayload(bot, disabledBySessionId, contributionSummary, receivedAt = Date.now()) {
+    const botId = getStringValue(bot?.id);
+    return {
+      ok: true,
+      rewardPreviewId: `${botId}:${receivedAt}`,
+      botId,
+      botName: bot?.name || bot?.type || "Staging Bot",
+      disabledBySessionId,
+      finalHitBy: disabledBySessionId,
+      topContributorSessionId: contributionSummary.topContributorSessionId,
+      topContributor: contributionSummary.contributors[0] || null,
+      contributors: contributionSummary.contributors,
+      totalDamage: contributionSummary.totalDamage,
+      node: bot?.currentNode || "",
+      previewXp: 0,
+      previewCredits: 0,
+      previewLoot: [],
+      applied: false,
+      reason: "staging_preview_only",
+      receivedAt
+    };
+  }
+
+  sendRewardPreviewRejected(client, reason, message = {}, messageType = "reward:claim_preview") {
+    const botId = getStringValue(message.botId);
+    client.send("reward:claim_preview_result", {
+      ok: false,
+      applied: false,
+      reason,
+      messageType,
+      sessionId: client.sessionId,
+      botId,
+      rewardPreviewId: getStringValue(message.rewardPreviewId),
+      previewXp: 0,
+      previewCredits: 0,
+      previewLoot: [],
+      receivedAt: Date.now()
+    });
+  }
+
+  claimRewardPreview(client, message = {}, messageType = "reward:claim_preview") {
+    const player = this.touchPlayer(client.sessionId);
+    const botId = getStringValue(message.botId);
+    const rewardPreviewId = getStringValue(message.rewardPreviewId);
+    const preview = botId ? this.rewardPreviews.get(botId) : null;
+
+    if (!player) {
+      this.sendRewardPreviewRejected(client, "session player not found", message, messageType);
+      return;
+    }
+
+    if (!botId || !preview) {
+      this.sendRewardPreviewRejected(client, "reward_preview_not_found", message, messageType);
+      return;
+    }
+
+    if (rewardPreviewId && rewardPreviewId !== preview.rewardPreviewId) {
+      this.sendRewardPreviewRejected(client, "reward_preview_id_mismatch", message, messageType);
+      return;
+    }
+
+    const contributors = Array.isArray(preview.contributors) ? preview.contributors : [];
+    const isEligible = preview.finalHitBy === client.sessionId ||
+      preview.disabledBySessionId === client.sessionId ||
+      preview.topContributorSessionId === client.sessionId ||
+      contributors.some((contributor) => contributor?.sessionId === client.sessionId);
+
+    if (!isEligible) {
+      this.sendRewardPreviewRejected(client, "reward_preview_not_eligible", message, messageType);
+      return;
+    }
+
+    client.send("reward:claim_preview_result", {
+      ...preview,
+      ok: true,
+      applied: false,
+      reason: "staging_preview_only",
+      messageType,
+      sessionId: client.sessionId,
+      claimedBySessionId: client.sessionId,
+      claimSimulated: true,
+      receivedAt: Date.now()
+    });
+  }
+
   respawnStagingBot(bot, index = 0, now = Date.now()) {
     const respawnNode = this.getNextBotNode(bot.currentNode, index + this.botStep + 1);
     const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
@@ -683,6 +782,7 @@ export class LupenSectorRoom extends Room {
     bot.lastUpdatedAt = now;
     bot.nextMoveAt = now + BOT_NODE_MOVE_MS + index * 1250;
     this.clearBotContributions(bot.id);
+    this.rewardPreviews.delete(bot.id);
 
     this.broadcast("bot:respawned", {
       ok: true,
@@ -808,6 +908,9 @@ export class LupenSectorRoom extends Room {
 
     if (result.disabled) {
       const contributionSummary = this.getContributionSummary(targetBot.id);
+      const rewardPreview = this.buildRewardPreviewPayload(targetBot, client.sessionId, contributionSummary, Date.now());
+      this.rewardPreviews.set(targetBot.id, rewardPreview);
+
       this.broadcast("bot:disabled", {
         ok: true,
         botId: targetBot.id,
@@ -821,24 +924,7 @@ export class LupenSectorRoom extends Room {
 
       // Preview-only multiplayer reward design event. This is intentionally
       // detached from XP, credits, inventory, bounties, saves, and Supabase.
-      this.broadcast("staging:reward_preview", {
-        ok: true,
-        botId: targetBot.id,
-        botName: targetBot.name || targetBot.type || "Staging Bot",
-        disabledBySessionId: client.sessionId,
-        finalHitBy: client.sessionId,
-        topContributorSessionId: contributionSummary.topContributorSessionId,
-        topContributor: contributionSummary.contributors[0] || null,
-        contributors: contributionSummary.contributors,
-        totalDamage: contributionSummary.totalDamage,
-        node: targetBot.currentNode,
-        previewXp: 0,
-        previewCredits: 0,
-        previewLoot: [],
-        applied: false,
-        reason: "staging_preview_only",
-        receivedAt: Date.now()
-      });
+      this.broadcast("staging:reward_preview", rewardPreview);
     }
   }
 

@@ -5,9 +5,11 @@ import { STAGING_BOT_ALLOWED_NODE_IDS } from "../src/rooms/LupenSectorRoom.js";
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
 const clientB = new Client(endpoint);
+const clientC = new Client(endpoint);
 
 let roomA = null;
 let roomB = null;
+let roomC = null;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -178,6 +180,21 @@ async function expectTargetRejected(room, sendMessage) {
     }, 3000);
 
     room.onMessage("target:rejected", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectRewardClaimResult(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for reward preview claim result."));
+    }, 3000);
+
+    room.onMessage("reward:claim_preview_result", (message) => {
       clearTimeout(timeout);
       resolve(message);
     });
@@ -537,6 +554,42 @@ try {
   assert(playerAfterRewardPreview && !("xp" in playerAfterRewardPreview), "Reward preview created player XP field.");
   assert(playerAfterRewardPreview && !("credits" in playerAfterRewardPreview), "Reward preview created player credits field.");
   assert(playerAfterRewardPreview && !("inventory" in playerAfterRewardPreview), "Reward preview created player inventory field.");
+  const claimPreviewResult = await expectRewardClaimResult(roomA, () => {
+    roomA.send("reward:claim_preview", {
+      botId: rewardPreview.botId,
+      rewardPreviewId: rewardPreview.rewardPreviewId
+    });
+  });
+  assert(claimPreviewResult?.ok === true, "Contributor reward preview claim simulation did not succeed.");
+  assert(claimPreviewResult?.applied === false, "Reward preview claim simulation applied real rewards.");
+  assert(claimPreviewResult?.reason === "staging_preview_only", `Unexpected reward claim simulation reason: ${claimPreviewResult?.reason}`);
+  assert(claimPreviewResult?.claimSimulated === true, "Reward preview claim result was not marked simulated.");
+  assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
+  assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
+  assert(!("xp" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player XP field.");
+  assert(!("credits" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player credits field.");
+  assert(!("inventory" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player inventory field.");
+
+  roomC = await clientC.joinOrCreate(ROOM_NAME, {
+    displayName: "Regression Pilot C",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    currentNode: "Asteron Prime",
+    x: 52,
+    y: 50
+  });
+  const nonContributorClaim = await expectRewardClaimResult(roomC, () => {
+    roomC.send("reward:claim_preview", {
+      botId: rewardPreview.botId,
+      rewardPreviewId: rewardPreview.rewardPreviewId
+    });
+  });
+  assert(nonContributorClaim?.ok === false, "Non-contributor reward preview claim was not rejected.");
+  assert(nonContributorClaim?.reason === "reward_preview_not_eligible", `Unexpected non-contributor reward claim reason: ${nonContributorClaim?.reason}`);
+  assert(nonContributorClaim?.applied === false, "Rejected non-contributor reward claim applied rewards.");
+  await leaveRoom(roomC);
+  roomC = null;
+  console.log("reward preview claim simulation stayed preview-only");
   console.log("repeated valid hits disabled staging bot without rewards");
 
   await waitForFireReady(roomA, roomA.sessionId);
@@ -653,4 +706,5 @@ try {
 } finally {
   await leaveRoom(roomA);
   await leaveRoom(roomB);
+  await leaveRoom(roomC);
 }

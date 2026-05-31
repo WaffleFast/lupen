@@ -1148,6 +1148,18 @@
     return `Final ${finalHit} / Top ${topContributor} / You ${selfDamage} dmg (${selfPercent}%)`;
   }
 
+  function getRewardClaimResultLabel(status) {
+    const result = status?.lastRewardClaimResult;
+    if (!result?.botId) return "none";
+    if (!result.ok) return `${result.reason || "claim rejected"} / not applied`;
+
+    const selfContribution = Array.isArray(result.contributors)
+      ? result.contributors.find((contributor) => contributor.sessionId === status.sessionId)
+      : null;
+    const selfPercent = selfContribution ? Math.round(Number(selfContribution.percent || 0)) : 0;
+    return `preview only / you ${selfPercent}% / not applied`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -1186,6 +1198,25 @@
       targetBotId: selectedBot.id,
       currentNode: getCurrentNodeName(),
       timestamp: Date.now()
+    });
+  }
+
+  function canClaimRewardPreview(status) {
+    return isStagingMode(status) &&
+      !!status?.enabled &&
+      !!status?.isConnected &&
+      !!status?.lastRewardPreview?.botId &&
+      status.lastRewardPreview.applied !== true;
+  }
+
+  function sendStagingRewardPreviewClaim(status) {
+    if (!canClaimRewardPreview(status)) return;
+
+    // Staging-only reward flow simulation. This does not call real XP,
+    // credits, inventory, bounty, save, Supabase, or notification systems.
+    getClient()?.claimStagingRewardPreview?.({
+      botId: status.lastRewardPreview.botId,
+      rewardPreviewId: status.lastRewardPreview.rewardPreviewId || ""
     });
   }
 
@@ -1309,6 +1340,20 @@
     });
     inner.appendChild(button);
 
+    if (canClaimRewardPreview(status)) {
+      const claimButton = global.document.createElement("button");
+      claimButton.type = "button";
+      claimButton.className = "lupen-mp-staging-fire";
+      claimButton.textContent = "Preview Claim";
+      claimButton.title = "Simulate a staging reward claim. No rewards are applied.";
+      claimButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        sendStagingRewardPreviewClaim(status);
+      });
+      inner.appendChild(claimButton);
+    }
+
     const bars = global.document.createElement("div");
     bars.className = "lupen-mp-staging-bars";
     bars.appendChild(createStagingCombatBar("Shield", selectedBot.shield, selectedBot.shieldMax, "lupen-mp-staging-shield"));
@@ -1359,6 +1404,7 @@
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
+      setDiagnosticsRow(panel, "claim preview", getRewardClaimResultLabel(status));
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
