@@ -783,10 +783,16 @@ function updateObjectActionPanel(forceVisible = false) {
   const selected = getSelectedTargetEntity();
   const engaged = getEngagedTargetEntity();
   const target = selected || engaged;
+  const localBotVisualGuardActive = typeof isStagingLocalCombatBotVisualGuardActive === "function"
+    && isStagingLocalCombatBotVisualGuardActive();
 
   if (!panel || !actionBtn) return;
 
-  const isRelevant = target && (target.currentNodeId || target.node) === currentNode && target.alive;
+  const targetType = target ? getTargetTypeFromEntity(target) : "";
+  const isRelevant = target
+    && (target.currentNodeId || target.node) === currentNode
+    && target.alive
+    && !(localBotVisualGuardActive && targetType === "hostileBot");
 
   if (!isRelevant) {
     panel.classList.remove("visible");
