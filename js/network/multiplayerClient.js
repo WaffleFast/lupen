@@ -503,6 +503,21 @@
     };
   }
 
+  function normalizeRewardContributor(contributor) {
+    if (!contributor) return null;
+
+    const sessionId = String(contributor.sessionId || contributor.id || "");
+    if (!sessionId) return null;
+
+    return {
+      sessionId,
+      totalDamage: Number.isFinite(Number(contributor.totalDamage)) ? Number(contributor.totalDamage) : 0,
+      hits: Number.isFinite(Number(contributor.hits)) ? Number(contributor.hits) : 0,
+      lastHitAt: Number.isFinite(Number(contributor.lastHitAt)) ? Number(contributor.lastHitAt) : 0,
+      percent: Number.isFinite(Number(contributor.percent)) ? Number(contributor.percent) : 0
+    };
+  }
+
   function updateBotsFromServerState(serverState) {
     botsById.clear();
 
@@ -596,6 +611,10 @@
         currentNode: String(message?.currentNode || ""),
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        contributionCleared: message?.contributionCleared === true,
+        contributors: Array.isArray(message?.contributors)
+          ? message.contributors.map(normalizeRewardContributor).filter(Boolean)
+          : [],
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
@@ -623,11 +642,19 @@
     });
 
     activeRoom.onMessage("staging:reward_preview", (message) => {
+      const contributors = Array.isArray(message?.contributors)
+        ? message.contributors.map(normalizeRewardContributor).filter(Boolean)
+        : [];
       connection.lastRewardPreview = {
         ok: message?.ok === true,
         botId: String(message?.botId || ""),
         botName: String(message?.botName || "Staging Bot"),
         disabledBySessionId: String(message?.disabledBySessionId || ""),
+        finalHitBy: String(message?.finalHitBy || message?.disabledBySessionId || ""),
+        topContributorSessionId: String(message?.topContributorSessionId || message?.topContributor?.sessionId || ""),
+        topContributor: normalizeRewardContributor(message?.topContributor),
+        contributors,
+        totalDamage: Number.isFinite(Number(message?.totalDamage)) ? Number(message.totalDamage) : 0,
         node: String(message?.node || ""),
         previewXp: Number.isFinite(Number(message?.previewXp)) ? Number(message.previewXp) : 0,
         previewCredits: Number.isFinite(Number(message?.previewCredits)) ? Number(message.previewCredits) : 0,

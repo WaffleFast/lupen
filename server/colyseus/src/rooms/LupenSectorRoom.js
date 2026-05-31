@@ -304,6 +304,10 @@ export class LupenSectorRoom extends Room {
   onCreate() {
     this.setState(new LupenSectorState());
     this.botStep = 0;
+    // Preview-only attribution cache for staging reward design. This is kept
+    // outside room state so it never becomes player progression, save data,
+    // inventory, XP, credits, bounties, or real reward state.
+    this.botContributions = new Map();
 
     this.spawnDummyBots();
     this.botInterval = this.clock.setInterval(() => {
@@ -328,7 +332,7 @@ export class LupenSectorRoom extends Room {
     });
 
     // Staging-only combat intent pipeline. This validates lock-on state against
-    // server-owned visual bots, then applies fixed shield-first test damage
+    // server-owned visual bots, then applies clamped shield-first test damage
     // without granting rewards. Future authoritative combat can replace this
     // response path with real server-side resolution.
     this.onMessage("combat:intent", (client, message = {}) => {
@@ -598,6 +602,73 @@ export class LupenSectorRoom extends Room {
     };
   }
 
+  getBotContributionMap(botId) {
+    const safeBotId = getStringValue(botId);
+    if (!safeBotId) return null;
+
+    if (!this.botContributions.has(safeBotId)) {
+      this.botContributions.set(safeBotId, new Map());
+    }
+
+    return this.botContributions.get(safeBotId);
+  }
+
+  recordBotContribution(botId, sessionId, damage = 0, now = Date.now()) {
+    const safeSessionId = getStringValue(sessionId);
+    const safeDamage = Math.max(0, Number(damage || 0));
+    const contributionMap = this.getBotContributionMap(botId);
+
+    if (!contributionMap || !safeSessionId || safeDamage <= 0) return;
+
+    const previous = contributionMap.get(safeSessionId) || {
+      sessionId: safeSessionId,
+      totalDamage: 0,
+      hits: 0,
+      lastHitAt: 0
+    };
+
+    contributionMap.set(safeSessionId, {
+      sessionId: safeSessionId,
+      totalDamage: previous.totalDamage + safeDamage,
+      hits: previous.hits + 1,
+      lastHitAt: now
+    });
+  }
+
+  getContributionSummary(botId) {
+    const contributionMap = this.botContributions.get(getStringValue(botId));
+    const rawContributors = Array.from(contributionMap?.values?.() || []);
+    const totalDamage = rawContributors.reduce((sum, contributor) => {
+      return sum + Math.max(0, Number(contributor.totalDamage || 0));
+    }, 0);
+
+    const contributors = rawContributors
+      .map((contributor) => {
+        const contributorDamage = Math.max(0, Number(contributor.totalDamage || 0));
+        return {
+          sessionId: contributor.sessionId,
+          totalDamage: Math.round(contributorDamage * 100) / 100,
+          hits: Math.max(0, Number(contributor.hits || 0)),
+          lastHitAt: Number(contributor.lastHitAt || 0),
+          percent: totalDamage > 0 ? Math.round((contributorDamage / totalDamage) * 100) : 0
+        };
+      })
+      .sort((left, right) => {
+        if (right.totalDamage !== left.totalDamage) return right.totalDamage - left.totalDamage;
+        return right.lastHitAt - left.lastHitAt;
+      });
+
+    return {
+      totalDamage: Math.round(totalDamage * 100) / 100,
+      topContributorSessionId: contributors[0]?.sessionId || "",
+      contributors
+    };
+  }
+
+  clearBotContributions(botId) {
+    this.botContributions.delete(getStringValue(botId));
+  }
+
   respawnStagingBot(bot, index = 0, now = Date.now()) {
     const respawnNode = this.getNextBotNode(bot.currentNode, index + this.botStep + 1);
     const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
@@ -611,6 +682,7 @@ export class LupenSectorRoom extends Room {
     bot.disabledUntil = 0;
     bot.lastUpdatedAt = now;
     bot.nextMoveAt = now + BOT_NODE_MOVE_MS + index * 1250;
+    this.clearBotContributions(bot.id);
 
     this.broadcast("bot:respawned", {
       ok: true,
@@ -618,6 +690,8 @@ export class LupenSectorRoom extends Room {
       currentNode: bot.currentNode,
       shield: bot.shield,
       hull: bot.hull,
+      contributionCleared: true,
+      contributors: [],
       rewardsGranted: false,
       receivedAt: now
     });
@@ -683,6 +757,7 @@ export class LupenSectorRoom extends Room {
     const weaponName = getStringValue(message.weaponName, "Staging Test Weapon") || "Staging Test Weapon";
     const weaponFamily = getStringValue(message.weaponFamily || message.weaponType);
     const resolvedAt = Date.now();
+    this.recordBotContribution(targetBot.id, client.sessionId, result.damage, resolvedAt);
 
     client.send("combat:resolved", {
       ok: true,
@@ -732,6 +807,7 @@ export class LupenSectorRoom extends Room {
     });
 
     if (result.disabled) {
+      const contributionSummary = this.getContributionSummary(targetBot.id);
       this.broadcast("bot:disabled", {
         ok: true,
         botId: targetBot.id,
@@ -750,6 +826,11 @@ export class LupenSectorRoom extends Room {
         botId: targetBot.id,
         botName: targetBot.name || targetBot.type || "Staging Bot",
         disabledBySessionId: client.sessionId,
+        finalHitBy: client.sessionId,
+        topContributorSessionId: contributionSummary.topContributorSessionId,
+        topContributor: contributionSummary.contributors[0] || null,
+        contributors: contributionSummary.contributors,
+        totalDamage: contributionSummary.totalDamage,
         node: targetBot.currentNode,
         previewXp: 0,
         previewCredits: 0,

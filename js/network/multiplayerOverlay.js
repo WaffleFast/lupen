@@ -1116,8 +1116,36 @@
   function getRewardPreviewLabel(status) {
     const preview = status?.lastRewardPreview;
     if (!preview?.botId) return "none";
-    const loot = preview.previewLoot?.length ? preview.previewLoot.join(", ") : "None";
-    return `${preview.botName || "Staging Bot"} / XP ${preview.previewXp || 0} / C ${preview.previewCredits || 0} / ${loot} / not applied`;
+    const finalHit = getShortSessionId(preview.finalHitBy || preview.disabledBySessionId);
+    const topContributor = getShortSessionId(preview.topContributorSessionId || preview.topContributor?.sessionId);
+    const yourContribution = getRewardPreviewSelfContribution(status);
+    const contributionLabel = yourContribution
+      ? `you ${Math.round(Number(yourContribution.percent || 0))}%`
+      : "you 0%";
+    return `${preview.botName || "Staging Bot"} / final ${finalHit} / top ${topContributor} / ${contributionLabel} / not applied`;
+  }
+
+  function getRewardPreviewSelfContribution(status) {
+    const sessionId = String(status?.sessionId || "");
+    const contributors = Array.isArray(status?.lastRewardPreview?.contributors)
+      ? status.lastRewardPreview.contributors
+      : [];
+    if (!sessionId || !contributors.length) return null;
+
+    return contributors.find((contributor) => contributor.sessionId === sessionId) || null;
+  }
+
+  function getRewardPreviewContributionLabel(status) {
+    const preview = status?.lastRewardPreview;
+    if (!preview?.botId) return "";
+
+    const finalHit = getShortSessionId(preview.finalHitBy || preview.disabledBySessionId);
+    const topContributor = getShortSessionId(preview.topContributorSessionId || preview.topContributor?.sessionId);
+    const selfContribution = getRewardPreviewSelfContribution(status);
+    const selfDamage = selfContribution ? Math.round(Number(selfContribution.totalDamage || 0)) : 0;
+    const selfPercent = selfContribution ? Math.round(Number(selfContribution.percent || 0)) : 0;
+
+    return `Final ${finalHit} / Top ${topContributor} / You ${selfDamage} dmg (${selfPercent}%)`;
   }
 
   function setDiagnosticsRow(panel, label, value) {
@@ -1255,6 +1283,12 @@
       const preview = global.document.createElement("small");
       preview.textContent = "Reward Preview Only - Not Applied";
       summary.appendChild(preview);
+      const contribution = getRewardPreviewContributionLabel(status);
+      if (contribution) {
+        const contributionNode = global.document.createElement("small");
+        contributionNode.textContent = contribution;
+        summary.appendChild(contributionNode);
+      }
     }
     inner.appendChild(summary);
 

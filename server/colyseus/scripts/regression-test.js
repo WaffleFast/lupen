@@ -196,12 +196,12 @@ async function waitForFireReady(room, sessionId) {
   }, 4000);
 }
 
-async function moveAndSelectBot(room, botId) {
+async function moveAndSelectBot(room, botId, displayName = "Regression Pilot") {
   const bot = botById(room, botId);
   assert(bot, `Missing staging bot ${botId}.`);
 
   room.send("movement:update", {
-    displayName: "Regression Pilot A",
+    displayName,
     currentShipId: "lupenOrigin",
     shipName: "LF-1 Origin",
     currentNode: bot.currentNode,
@@ -209,7 +209,7 @@ async function moveAndSelectBot(room, botId) {
     y: bot.y
   });
 
-  await waitFor("client A presence to reach selected staging bot node", () => {
+  await waitFor(`${displayName} presence to reach selected staging bot node`, () => {
     return playerFrom(room, room.sessionId)?.currentNode === bot.currentNode;
   });
 
@@ -311,7 +311,7 @@ try {
   const inspectedBotBeforeCombat = botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
 
-  await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id);
+  await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id, "Regression Pilot A");
   console.log("staging bot lock-on selected for display only");
 
   const combatResponse = await expectCombatResolved(roomA, () => {
@@ -387,6 +387,35 @@ try {
   assert(inspectedBotAfterCooldownReject?.hull === inspectedBotAfterCombat.hull, "Cooldown rejection changed bot hull.");
   console.log("immediate second combat intent rejected by staging cooldown");
 
+  const botForClientB = await moveAndSelectBot(roomB, inspectedBotBeforeCombat.id, "Regression Pilot B");
+  const clientBContributionResponse = await expectCombatResolved(roomB, () => {
+    roomB.send("combat:intent", {
+      targetBotId: botForClientB.id,
+      weaponId: "supportLaser",
+      weaponName: "Regression Support Laser",
+      weaponFamily: "pulse",
+      damage: 10,
+      cooldownMs: 900,
+      currentNode: botForClientB.currentNode,
+      timestamp: Date.now()
+    });
+  });
+
+  assert(clientBContributionResponse?.ok === true, "Client B staging combat intent did not resolve.");
+  assert(clientBContributionResponse?.damage === 10, `Unexpected client B contribution damage: ${clientBContributionResponse?.damage}`);
+  assert(clientBContributionResponse?.rewardsGranted === false, "Client B staging combat intent granted rewards.");
+  await waitFor("both clients to receive client B contribution damage", () => {
+    const botA = botById(roomA, inspectedBotBeforeCombat.id);
+    const botB = botById(roomB, inspectedBotBeforeCombat.id);
+    return botA && botB &&
+      botA.shield === clientBContributionResponse.shield &&
+      botA.hull === clientBContributionResponse.hull &&
+      botB.shield === clientBContributionResponse.shield &&
+      botB.hull === clientBContributionResponse.hull;
+  });
+  const inspectedBotAfterClientBCombat = botById(roomA, inspectedBotBeforeCombat.id);
+  console.log("client B contributed staging damage to shared bot");
+
   await waitForFireReady(roomA, roomA.sessionId);
   const oversizedCombatResponse = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
@@ -413,7 +442,7 @@ try {
       botB.hull === oversizedCombatResponse.hull;
   });
   const inspectedBotAfterOversizedCombat = botById(roomA, inspectedBotBeforeCombat.id);
-  assert(botHealthTotal(inspectedBotAfterOversizedCombat) === healthAfterCombat - 50, "Clamped oversized damage did not apply expected staging damage.");
+  assert(botHealthTotal(inspectedBotAfterOversizedCombat) === botHealthTotal(inspectedBotAfterClientBCombat) - 50, "Clamped oversized damage did not apply expected staging damage.");
   console.log("oversized staging weapon damage clamped safely");
 
   await waitForFireReady(roomA, roomA.sessionId);
@@ -449,7 +478,7 @@ try {
   const maxFollowUpShots = Math.ceil(botHealthTotal(latestCombatBot) / 50) + 4;
   for (let shot = 0; shot < maxFollowUpShots && !latestCombatBot.disabled; shot += 1) {
     await waitForFireReady(roomA, roomA.sessionId);
-    const currentBot = await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id);
+    const currentBot = await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id, "Regression Pilot A");
     const response = await expectCombatResolved(roomA, () => {
       roomA.send("combat:intent", {
         targetBotId: currentBot.id,
@@ -485,13 +514,25 @@ try {
   assert(botDisabledEvents.some((event) => event?.botId === inspectedBotBeforeCombat.id), "bot:disabled event was not observed.");
   await waitFor("staging reward preview after bot disabled", () => {
     return rewardPreviewEvents.some((event) => {
+      const contributors = Array.isArray(event?.contributors) ? event.contributors : [];
+      const contributorIds = contributors.map((contributor) => contributor?.sessionId);
       return event?.botId === inspectedBotBeforeCombat.id &&
         event?.disabledBySessionId === roomA.sessionId &&
+        event?.finalHitBy === roomA.sessionId &&
+        event?.topContributorSessionId === roomA.sessionId &&
+        contributorIds.includes(roomA.sessionId) &&
+        contributorIds.includes(roomB.sessionId) &&
         event?.applied === false &&
         event?.reason === "staging_preview_only" &&
         Array.isArray(event?.previewLoot);
     });
   });
+  const rewardPreview = rewardPreviewEvents.find((event) => event?.botId === inspectedBotBeforeCombat.id && event?.finalHitBy === roomA.sessionId);
+  const contributorA = rewardPreview?.contributors?.find((contributor) => contributor?.sessionId === roomA.sessionId);
+  const contributorB = rewardPreview?.contributors?.find((contributor) => contributor?.sessionId === roomB.sessionId);
+  assert(contributorA?.totalDamage > contributorB?.totalDamage, "Top contributor did not have the largest damage contribution.");
+  assert(contributorA?.hits > 0 && contributorB?.hits === 1, "Contribution hit counts were not recorded correctly.");
+  assert(Number(contributorA?.percent || 0) > Number(contributorB?.percent || 0), "Contribution percentages were not calculated correctly.");
   const playerAfterRewardPreview = playerFrom(roomA, roomA.sessionId);
   assert(playerAfterRewardPreview && !("xp" in playerAfterRewardPreview), "Reward preview created player XP field.");
   assert(playerAfterRewardPreview && !("credits" in playerAfterRewardPreview), "Reward preview created player credits field.");
@@ -530,6 +571,12 @@ try {
       botB.currentNode === botA.currentNode;
   }, 12000);
   assert(botRespawnedEvents.some((event) => event?.botId === inspectedBotBeforeCombat.id), "bot:respawned event was not observed.");
+  assert(botRespawnedEvents.some((event) => {
+    return event?.botId === inspectedBotBeforeCombat.id &&
+      event?.contributionCleared === true &&
+      Array.isArray(event?.contributors) &&
+      event.contributors.length === 0;
+  }), "bot:respawned did not confirm contribution data was cleared.");
   assertAllowedBotNodes(roomA);
   assertAllowedBotNodes(roomB);
   console.log("disabled staging bot respawned with matching shared state");
