@@ -285,3 +285,5 @@ Redeploy trigger: Supabase ledger env refresh.
 Redeploy trigger: reward ledger diagnostics refresh.
 
 Redeploy trigger: enable staging reward ledger writes.
+
+Redeploy trigger: enable staging reward ledger writes env refresh.
