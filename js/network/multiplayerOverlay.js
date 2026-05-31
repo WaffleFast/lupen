@@ -125,18 +125,18 @@
         justify-items: center;
         gap: 3px;
         transform: translate(-50%, -50%);
-        opacity: 0.72;
+        opacity: 0.66;
         pointer-events: none;
-        filter: drop-shadow(0 0 10px rgba(255, 128, 62, 0.46));
+        filter: drop-shadow(0 0 8px rgba(255, 128, 62, 0.42));
       }
 
       .lupen-mp-space-bot-ship {
         position: relative;
-        width: 32px;
-        height: 40px;
+        width: 24px;
+        height: 32px;
         clip-path: polygon(50% 0%, 88% 48%, 68% 48%, 72% 88%, 50% 72%, 28% 88%, 32% 48%, 12% 48%);
-        background: linear-gradient(180deg, rgba(255, 184, 92, 0.9), rgba(255, 74, 58, 0.48));
-        border: 1px solid rgba(255, 224, 180, 0.68);
+        background: linear-gradient(180deg, rgba(255, 184, 92, 0.76), rgba(255, 74, 58, 0.4));
+        border: 1px solid rgba(255, 224, 180, 0.58);
       }
 
       .lupen-mp-space-bot-ship::after {
@@ -153,12 +153,12 @@
       }
 
       .lupen-mp-space-bot-label {
-        padding: 2px 6px;
+        padding: 2px 5px;
         border: 1px solid rgba(255, 163, 92, 0.46);
         border-radius: 4px;
         background: rgba(18, 8, 2, 0.72);
         color: #ffd9b0;
-        font: 700 10px/1.15 Arial, sans-serif;
+        font: 700 9px/1.15 Arial, sans-serif;
         text-transform: uppercase;
         white-space: nowrap;
       }
@@ -214,6 +214,15 @@
         font-style: normal;
         text-align: right;
         overflow-wrap: anywhere;
+      }
+
+      #${diagnosticsPanelId} .lupen-mp-diagnostics-note {
+        display: block;
+        margin-top: 6px;
+        padding-top: 5px;
+        border-top: 1px solid rgba(255, 176, 95, 0.18);
+        color: rgba(255, 224, 188, 0.86);
+        font: 700 9px/1.25 Arial, sans-serif;
       }
     `;
     global.document.head.appendChild(style);
@@ -305,8 +314,27 @@
     return String(bot.name || bot.type || "DEV BOT").trim().slice(0, 18) || "DEV BOT";
   }
 
+  function getBotModeLabel() {
+    return isStagingMode() ? "STAGING BOT" : "DEV BOT";
+  }
+
+  function getCompactBotModeLabel() {
+    return isStagingMode() ? "STG BOT" : "DEV BOT";
+  }
+
   function getLabelOffset(position) {
     return position.x > 82 ? -13.4 : 4.1;
+  }
+
+  function getStableMapOffset(entity, radius = 1.8) {
+    const id = String(entity?.id || entity?.sessionId || entity?.name || "");
+    const seed = id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const angle = (seed % 360) * (Math.PI / 180);
+    const distance = radius + (seed % 4) * 0.35;
+    return {
+      x: Math.cos(angle) * distance,
+      y: Math.sin(angle) * distance
+    };
   }
 
   function drawSectorGhost(layer, player) {
@@ -386,8 +414,13 @@
   }
 
   function drawSectorBot(layer, bot) {
-    const position = getEntityPosition(bot);
-    const labelOffset = getLabelOffset(position);
+    const basePosition = getEntityPosition(bot);
+    const offset = getStableMapOffset(bot, 1.55);
+    const position = {
+      x: clampMapCoordinate(basePosition.x + offset.x),
+      y: clampMapCoordinate(basePosition.y + offset.y)
+    };
+    const labelOffset = position.x > 82 ? -2.9 : 2.9;
     const group = global.document.createElementNS(SVG_NS, "g");
     group.setAttribute("class", botMarkerClass);
     group.setAttribute("data-bot-id", bot.id || "");
@@ -395,59 +428,46 @@
     group.setAttribute("transform", `translate(${position.x} ${position.y})`);
 
     const title = global.document.createElementNS(SVG_NS, "title");
-    title.textContent = `${getBotLabel(bot)} / ${isStagingMode() ? "STAGING BOT" : "DEV BOT"} / ${bot.currentNode || "Unknown"} / x:${bot.x} y:${bot.y}`;
+    title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / visual only / ${bot.currentNode || "Unknown"} / x:${bot.x} y:${bot.y}`;
     group.appendChild(title);
 
     const halo = global.document.createElementNS(SVG_NS, "circle");
     halo.setAttribute("cx", "0");
     halo.setAttribute("cy", "0");
-    halo.setAttribute("r", "4");
-    halo.setAttribute("fill", "rgba(255, 114, 60, 0.12)");
-    halo.setAttribute("stroke", "rgba(255, 160, 87, 0.55)");
-    halo.setAttribute("stroke-width", "0.18");
+    halo.setAttribute("r", "2.05");
+    halo.setAttribute("fill", "rgba(255, 114, 60, 0.08)");
+    halo.setAttribute("stroke", "rgba(255, 160, 87, 0.42)");
+    halo.setAttribute("stroke-width", "0.12");
     group.appendChild(halo);
 
     const ship = global.document.createElementNS(SVG_NS, "polygon");
-    ship.setAttribute("points", "0,-3.9 3,0.6 1.3,0.6 1.55,3.4 0,2.25 -1.55,3.4 -1.3,0.6 -3,0.6");
-    ship.setAttribute("fill", "rgba(255, 132, 69, 0.74)");
-    ship.setAttribute("stroke", "rgba(255, 225, 185, 0.94)");
-    ship.setAttribute("stroke-width", "0.25");
-    ship.setAttribute("filter", "drop-shadow(0 0 2.6px rgba(255, 113, 55, 0.86))");
+    ship.setAttribute("points", "0,-2.25 1.65,1.25 0.65,0.9 0,2.15 -0.65,0.9 -1.65,1.25");
+    ship.setAttribute("fill", "rgba(255, 132, 69, 0.66)");
+    ship.setAttribute("stroke", "rgba(255, 225, 185, 0.82)");
+    ship.setAttribute("stroke-width", "0.18");
+    ship.setAttribute("filter", "drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72))");
     group.appendChild(ship);
 
     const core = global.document.createElementNS(SVG_NS, "circle");
     core.setAttribute("cx", "0");
-    core.setAttribute("cy", "0.2");
-    core.setAttribute("r", "0.78");
+    core.setAttribute("cy", "0.05");
+    core.setAttribute("r", "0.42");
     core.setAttribute("fill", "rgba(48, 9, 4, 0.8)");
     core.setAttribute("stroke", "rgba(255, 230, 194, 0.82)");
-    core.setAttribute("stroke-width", "0.13");
+    core.setAttribute("stroke-width", "0.1");
     group.appendChild(core);
-
-    const label = global.document.createElementNS(SVG_NS, "text");
-    label.setAttribute("x", labelOffset);
-    label.setAttribute("y", "-1.8");
-    label.setAttribute("fill", "#ffd0a2");
-    label.setAttribute("font-size", "1.65");
-    label.setAttribute("font-weight", "800");
-    label.setAttribute("paint-order", "stroke");
-    label.setAttribute("stroke", "rgba(10, 2, 0, 0.96)");
-    label.setAttribute("stroke-width", "0.46");
-    label.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
-    label.textContent = getBotLabel(bot);
-    group.appendChild(label);
 
     const note = global.document.createElementNS(SVG_NS, "text");
     note.setAttribute("x", labelOffset);
-    note.setAttribute("y", "0.3");
+    note.setAttribute("y", "0.45");
     note.setAttribute("fill", "rgba(255, 218, 177, 0.82)");
-    note.setAttribute("font-size", "1.08");
+    note.setAttribute("font-size", "0.92");
     note.setAttribute("font-weight", "700");
     note.setAttribute("paint-order", "stroke");
     note.setAttribute("stroke", "rgba(10, 2, 0, 0.96)");
-    note.setAttribute("stroke-width", "0.3");
+    note.setAttribute("stroke-width", "0.24");
     note.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
-    note.textContent = isStagingMode() ? "STAGING BOT" : "DEV BOT";
+    note.textContent = getCompactBotModeLabel();
     group.appendChild(note);
 
     layer.appendChild(group);
@@ -578,7 +598,7 @@
 
       const note = global.document.createElement("div");
       note.className = "lupen-mp-space-bot-note";
-      note.textContent = isStagingMode() ? "STAGING BOT" : "DEV BOT";
+      note.textContent = getBotModeLabel();
       marker.appendChild(note);
 
       layer.appendChild(marker);
@@ -641,18 +661,25 @@
 
     setDiagnosticsRow(panel, "status", status.isConnected ? "connected" : status.isConnecting ? "connecting" : "offline");
     setDiagnosticsRow(panel, "room", status.roomName || "none");
-    setDiagnosticsRow(panel, "session", getShortSessionId(status.sessionId));
+    setDiagnosticsRow(panel, "local player", getShortSessionId(status.sessionId));
     setDiagnosticsRow(panel, "server", getCompactServerLabel(status));
     setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
-    setDiagnosticsRow(panel, "pilots", `${players.length} remote / ${sameNodePlayers.length} local`);
-    setDiagnosticsRow(panel, "bots", `${bots.length} total / ${sameNodeBots.length} local`);
+    setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);
+    setDiagnosticsRow(panel, isStagingMode(status) ? "staging bots" : "dev bots", `${bots.length} total / ${sameNodeBots.length} same node`);
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
     }
     if (status.clientLoadError || status.lastError) {
       setDiagnosticsRow(panel, "error", status.clientLoadError || status.lastError);
     }
+
+    const note = global.document.createElement("span");
+    note.className = "lupen-mp-diagnostics-note";
+    note.textContent = isStagingMode(status)
+      ? "Staging bot markers are visual-only; real combat bots are still local."
+      : "Dev bot markers are visual-only; real combat bots are still local.";
+    panel.appendChild(note);
 
     global.document.body.appendChild(panel);
   }
