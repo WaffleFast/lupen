@@ -55,6 +55,8 @@ While staging is active, real Trade Terminal buy/sell handlers return before mut
 
 Phase 4c Trade Terminal integration: the normal Trade Builder remains the primary staging trade surface. If the selected resource/origin/destination maps to a static staging offer, its button requests the server-side dry-run preview and renders the result in the Trade Terminal. Unknown routes remain blocked with a preview-unavailable message. The separate Staging Trade Preview overlay remains a compact dev helper for now.
 
+Phase 5 design status: [multiplayer-trade-write-design.md](multiplayer-trade-write-design.md) now defines the future heavily gated server-authoritative trade write prototype. It is design-only. No credit, cargo, inventory, loot, bounty, PvP, player damage, schema, or broad `player_saves` writes are enabled. The next implementation pass should add `stagingTrade:buy` and `stagingTrade:sell` handlers in dry-run default mode, with real writes blocked unless explicit staging env gates, verified identity, allowlist, trusted save validation, and idempotency all pass.
+
 Classification:
 
 - Market definitions: config/static data for now.
@@ -147,7 +149,7 @@ Classification:
 2. Phase 2: Combat loop clarity, bot destruction feedback, contribution, XP preview.
 3. Phase 3: Safe XP-only online reward writes.
 4. Phase 4: Server-side resource/trade prototype with credits and cargo still gated or dry-run. Started with static staging trade offers, server-calculated previews, player-state-aware dry-run validation, read-only trusted `player_saves` checks for verified staging players, and Phase 4c Trade Terminal integration for staging-only dry-run previews.
-5. Phase 5: Credits write path with strict validation.
+5. Phase 5: Server-authoritative trade write prototype with strict validation. Design complete; implementation not enabled. First implementation should remain dry-run by default with gated `stagingTrade:buy` and `stagingTrade:sell` handlers.
 6. Phase 6: Store purchases and ship/equipment ownership.
 7. Phase 7: Inventory/loadout persistence.
 8. Phase 8: Asteroids/resource finding.
@@ -161,7 +163,7 @@ Classification:
 - Keep refining staging combat readability and automated tests before broadening reward writes.
 - Next phase: test tiny XP-only writes only with explicit server env gates and an allow-listed verified account, then keep proving duplicate protection before any broader progression path.
 - Continue Phase 4 by hardening trade dry-run validation and tester UX before adding any heavily gated server-authoritative credit/cargo write prototype. Only consider writes after manual validation and dedicated persistence/idempotency gates.
-- Add server-side trade/resource dry-run endpoints before enabling credits.
+- Next trade implementation pass: add `stagingTrade:buy` and `stagingTrade:sell` handlers that default to dry-run/blocked, then test strict gating before any real credit or cargo write is considered.
 - Use dedicated ledgers for every real online reward or economic mutation.
 - Treat `player_saves` as an output of verified server actions, not as a client-trusted source for multiplayer rewards.
 - Keep `?debug=mp` as the place for raw server diagnostics; keep normal `?mp=staging` focused on tester flow.
