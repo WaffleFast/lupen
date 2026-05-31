@@ -14,6 +14,7 @@
   const spaceLayerId = "lupenMultiplayerSpaceGhostLayer";
   const spaceBotLayerId = "lupenMultiplayerSpaceBotLayer";
   const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
+  const stagingCombatPanelId = "lupenMultiplayerStagingCombatPanel";
   const styleId = "lupenMultiplayerOverlayStyles";
   let unsubscribe = null;
   let renderQueued = false;
@@ -52,6 +53,114 @@
         z-index: 8;
         pointer-events: none;
         overflow: hidden;
+      }
+
+      #${stagingCombatPanelId} {
+        position: absolute;
+        left: 50%;
+        bottom: 172px;
+        z-index: 35;
+        width: min(360px, calc(100vw - 32px));
+        transform: translateX(-50%);
+        border: 1px solid rgba(255, 193, 104, 0.46);
+        border-radius: 6px;
+        background: linear-gradient(180deg, rgba(23, 12, 8, 0.92), rgba(8, 12, 20, 0.9));
+        box-shadow: 0 0 18px rgba(255, 122, 48, 0.18), inset 0 0 20px rgba(255, 174, 86, 0.06);
+        color: #ffe5c0;
+        font-family: Arial, sans-serif;
+        pointer-events: auto;
+        text-transform: uppercase;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-combat-inner {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px 12px;
+        align-items: center;
+        padding: 9px 10px;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-combat-kicker {
+        display: block;
+        color: rgba(255, 206, 146, 0.68);
+        font: 900 9px/1 Arial, sans-serif;
+        letter-spacing: 0.08em;
+      }
+
+      #${stagingCombatPanelId} strong {
+        display: block;
+        margin-top: 2px;
+        color: #fff1cf;
+        font: 900 14px/1.1 Arial, sans-serif;
+        letter-spacing: 0.02em;
+      }
+
+      #${stagingCombatPanelId} small {
+        display: block;
+        margin-top: 3px;
+        color: rgba(255, 226, 188, 0.78);
+        font: 800 9px/1.2 Arial, sans-serif;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-bars {
+        grid-column: 1 / -1;
+        display: grid;
+        gap: 4px;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-bar {
+        display: grid;
+        grid-template-columns: 46px 1fr 52px;
+        gap: 6px;
+        align-items: center;
+        color: rgba(255, 232, 203, 0.8);
+        font: 900 9px/1 Arial, sans-serif;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-bar-track {
+        height: 5px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 210, 150, 0.22);
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.36);
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-bar-fill {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-shield {
+        background: linear-gradient(90deg, rgba(93, 226, 255, 0.52), rgba(155, 245, 255, 0.88));
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-hull {
+        background: linear-gradient(90deg, rgba(255, 95, 68, 0.54), rgba(255, 190, 90, 0.9));
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-fire {
+        min-width: 112px;
+        min-height: 42px;
+        padding: 7px 10px;
+        border: 1px solid rgba(255, 219, 150, 0.7);
+        border-radius: 5px;
+        background: linear-gradient(180deg, rgba(180, 69, 22, 0.96), rgba(95, 29, 10, 0.96));
+        color: #fff5d8;
+        box-shadow: 0 0 14px rgba(255, 119, 45, 0.28);
+        cursor: pointer;
+        font: 900 11px/1.05 Arial, sans-serif;
+        text-transform: uppercase;
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-fire:hover {
+        background: linear-gradient(180deg, rgba(210, 85, 28, 0.98), rgba(120, 39, 13, 0.98));
+      }
+
+      #${stagingCombatPanelId} .lupen-mp-staging-fire:disabled {
+        opacity: 0.48;
+        cursor: default;
+        box-shadow: none;
       }
 
       .lupen-mp-space-ghost {
@@ -355,10 +464,15 @@
     global.document?.getElementById(diagnosticsPanelId)?.remove();
   }
 
+  function removeStagingCombatPanel() {
+    global.document?.getElementById(stagingCombatPanelId)?.remove();
+  }
+
   function removeLayers() {
     removeSectorLayer();
     removeSpaceLayer();
     removeDiagnosticsPanel();
+    removeStagingCombatPanel();
   }
 
   function clampMapCoordinate(value) {
@@ -889,7 +1003,8 @@
   }
 
   function canShowStagingTestFire(status, selectedBot) {
-    return !!status?.enabled &&
+    return isStagingMode(status) &&
+      !!status?.enabled &&
       !!status?.isConnected &&
       !!selectedBot?.id &&
       isSameCurrentNode(selectedBot);
@@ -909,8 +1024,6 @@
     getClient()?.sendSelectedStagingBotCombatIntent?.({
       targetBotId: selectedBot.id,
       currentNode: getCurrentNodeName(),
-      weaponId: "stagingTestFire",
-      weaponFamily: "staging-test",
       timestamp: Date.now()
     });
   }
@@ -935,6 +1048,102 @@
     });
     actions.appendChild(button);
     panel.appendChild(actions);
+  }
+
+  function getPercent(current, max) {
+    const currentValue = Math.max(0, Number(current || 0));
+    const maxValue = Math.max(1, Number(max || 1));
+    return Math.max(0, Math.min(100, Math.round((currentValue / maxValue) * 100)));
+  }
+
+  function createStagingCombatBar(label, current, max, fillClass) {
+    const row = global.document.createElement("div");
+    row.className = "lupen-mp-staging-bar";
+
+    const labelNode = global.document.createElement("span");
+    labelNode.textContent = label;
+    row.appendChild(labelNode);
+
+    const track = global.document.createElement("span");
+    track.className = "lupen-mp-staging-bar-track";
+    const fill = global.document.createElement("i");
+    fill.className = `lupen-mp-staging-bar-fill ${fillClass}`;
+    fill.style.width = `${getPercent(current, max)}%`;
+    track.appendChild(fill);
+    row.appendChild(track);
+
+    const value = global.document.createElement("em");
+    value.textContent = `${Math.round(Number(current || 0))}/${Math.round(Number(max || 0))}`;
+    row.appendChild(value);
+
+    return row;
+  }
+
+  function renderStagingCombatPanel(status, selectedBot) {
+    removeStagingCombatPanel();
+    if (!canShowStagingTestFire(status, selectedBot)) return;
+
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return;
+
+    ensureStyles();
+
+    const panel = global.document.createElement("div");
+    panel.id = stagingCombatPanelId;
+    panel.setAttribute("aria-label", "Staging combat test controls");
+
+    const inner = global.document.createElement("div");
+    inner.className = "lupen-mp-staging-combat-inner";
+
+    const summary = global.document.createElement("div");
+    const kicker = global.document.createElement("span");
+    kicker.className = "lupen-mp-staging-combat-kicker";
+    kicker.textContent = "STAGING LOCK";
+    summary.appendChild(kicker);
+
+    const title = global.document.createElement("strong");
+    title.textContent = getBotLabel(selectedBot);
+    summary.appendChild(title);
+
+    const note = global.document.createElement("small");
+    const cooldownText = formatCooldown(status.fireCooldownRemainingMs);
+    const weaponIntent = getClient()?.getStagingWeaponIntent?.() || {};
+    const weaponName = status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "Equipped Weapon";
+    const stagingDamage = status.lastCombatResponse?.stagingDamage || weaponIntent.damage || 5;
+    const lastDamage = status.lastCombatResponse?.ok && status.lastCombatResponse.targetBotId === selectedBot.id
+      ? ` / last -${Math.round(Number(status.lastCombatResponse.damage || 0))}`
+      : "";
+    note.textContent = selectedBot.disabled
+      ? "Disabled - waiting for server respawn"
+      : `${weaponName} / dmg ${Math.round(Number(stagingDamage || 0))} / no rewards / ${cooldownText}${lastDamage}`;
+    summary.appendChild(note);
+    inner.appendChild(summary);
+
+    const button = global.document.createElement("button");
+    button.type = "button";
+    button.className = "lupen-mp-staging-fire";
+    button.textContent = selectedBot.disabled
+      ? "Disabled"
+      : Math.max(0, Number(status.fireCooldownRemainingMs || 0)) > 0
+        ? `Cooldown ${formatCooldown(status.fireCooldownRemainingMs)}`
+        : "Staging Fire";
+    button.disabled = !canSendStagingTestFire(status, selectedBot);
+    button.title = "Staging-only server test damage. No real combat or rewards.";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      sendStagingTestFire(selectedBot);
+    });
+    inner.appendChild(button);
+
+    const bars = global.document.createElement("div");
+    bars.className = "lupen-mp-staging-bars";
+    bars.appendChild(createStagingCombatBar("Shield", selectedBot.shield, selectedBot.shieldMax, "lupen-mp-staging-shield"));
+    bars.appendChild(createStagingCombatBar("Hull", selectedBot.hull, selectedBot.hullMax, "lupen-mp-staging-hull"));
+    inner.appendChild(bars);
+
+    panel.appendChild(inner);
+    spaceScreen.appendChild(panel);
   }
 
   function renderDiagnostics(players, bots) {
@@ -966,11 +1175,13 @@
     setDiagnosticsRow(panel, isStagingMode(status) ? "staging bots" : "dev bots", `${bots.length} total / ${sameNodeBots.length} same node`);
     setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
     if (isStagingMode(status)) {
+      const weaponIntent = getClient()?.getStagingWeaponIntent?.() || {};
       setDiagnosticsRow(panel, "bot layer", "server-owned visual");
       setDiagnosticsRow(panel, "selected bot", getBotInspectionLabel(selectedBot));
       setDiagnosticsRow(panel, "inspect bot", getBotInspectionLabel(inspectedBot));
       setDiagnosticsRow(panel, "bot node", getBotLayerSummary(inspectedBot));
       setDiagnosticsRow(panel, "bot status", getBotHullSummary(inspectedBot));
+      setDiagnosticsRow(panel, "weapon", `${status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "unknown"} / dmg ${Math.round(Number(status.lastCombatResponse?.stagingDamage || weaponIntent.damage || 0))}`);
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
     }
@@ -1018,10 +1229,13 @@
 
     const players = getClient()?.getPlayers?.({ includeSelf: false }) || [];
     const bots = getClient()?.getBots?.() || [];
+    const status = getClient()?.getStatus?.() || {};
+    const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
     renderSectorGhosts(players);
     renderSectorBots(bots);
     renderSpaceGhosts(players);
     renderSpaceBots(bots);
+    renderStagingCombatPanel(status, selectedBot);
     renderDiagnostics(players, bots);
   }
 

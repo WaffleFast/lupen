@@ -311,7 +311,10 @@ try {
     roomA.send("combat:intent", {
       targetBotId: inspectedBotBeforeCombat.id,
       weaponId: "pulseLaser",
+      weaponName: "Regression Pulse Laser",
       weaponFamily: "pulse",
+      damage: 12,
+      cooldownMs: 900,
       currentNode: inspectedBotBeforeCombat.currentNode,
       timestamp: Date.now()
     });
@@ -319,7 +322,9 @@ try {
 
   assert(combatResponse?.ok === true, "Valid staging combat intent did not resolve.");
   assert(combatResponse?.reason === "staging_damage_applied", `Unexpected combat response: ${combatResponse?.reason}`);
-  assert(combatResponse?.damage === 5, `Unexpected staging damage amount: ${combatResponse?.damage}`);
+  assert(combatResponse?.damage === 12, `Unexpected staging damage amount: ${combatResponse?.damage}`);
+  assert(combatResponse?.stagingDamage === 12, `Unexpected validated staging damage: ${combatResponse?.stagingDamage}`);
+  assert(combatResponse?.weaponName === "Regression Pulse Laser", "Combat response did not echo safe weapon name.");
   assert(combatResponse?.rewardsGranted === false, "Staging combat intent granted rewards.");
 
   await waitFor("client B to receive server staging damage", () => {
@@ -335,15 +340,17 @@ try {
   const inspectedBotAfterCombat = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);
   const healthBeforeCombat = Number(inspectedBotBeforeCombat.shield) + Number(inspectedBotBeforeCombat.hull);
   const healthAfterCombat = Number(inspectedBotAfterCombat.shield) + Number(inspectedBotAfterCombat.hull);
-  assert(healthAfterCombat === healthBeforeCombat - 5, "Combat intent did not apply fixed staging damage.");
+  assert(healthAfterCombat === healthBeforeCombat - 12, "Combat intent did not apply weapon-based staging damage.");
   assert(inspectedBotAfterCombat?.visualOnly === true, "Combat intent changed visualOnly flag.");
-  console.log("combat intent applied staging damage without rewards");
+  console.log("combat intent applied weapon-based staging damage without rewards");
 
   const cooldownRejected = await expectCombatRejected(roomA, () => {
     roomA.send("combat:intent", {
       targetBotId: inspectedBotBeforeCombat.id,
       weaponId: "pulseLaser",
       weaponFamily: "pulse",
+      damage: 12,
+      cooldownMs: 900,
       currentNode: inspectedBotBeforeCombat.currentNode,
       timestamp: Date.now()
     });
@@ -358,25 +365,66 @@ try {
   assert(inspectedBotAfterCooldownReject?.hull === inspectedBotAfterCombat.hull, "Cooldown rejection changed bot hull.");
   console.log("immediate second combat intent rejected by staging cooldown");
 
-  const invalidCombatResponse = await expectCombatRejected(roomA, () => {
+  await waitForFireReady(roomA, roomA.sessionId);
+  const oversizedCombatResponse = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
-      targetBotId: "missing-staging-bot",
-      weaponId: "pulseLaser",
-      weaponFamily: "pulse",
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "oversizedTest",
+      weaponName: "Oversized Test Weapon",
+      weaponFamily: "test",
+      damage: 9999,
+      cooldownMs: 900,
       currentNode: inspectedBotBeforeCombat.currentNode,
       timestamp: Date.now()
     });
   });
 
-  assert(invalidCombatResponse?.reason === "combat_intent_rejected", "Invalid combat intent did not reject.");
-  assert(invalidCombatResponse?.rewardsGranted === false, "Invalid combat intent granted rewards.");
-  const inspectedBotAfterInvalidCombat = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);
-  assert(inspectedBotAfterInvalidCombat?.shield === inspectedBotAfterCombat.shield, "Invalid combat intent changed bot shield.");
-  assert(inspectedBotAfterInvalidCombat?.hull === inspectedBotAfterCombat.hull, "Invalid combat intent changed bot hull.");
-  console.log("invalid combat intent rejected without damage or rewards");
+  assert(oversizedCombatResponse?.stagingDamage === 50, `Oversized weapon damage was not clamped: ${oversizedCombatResponse?.stagingDamage}`);
+  assert(oversizedCombatResponse?.rewardsGranted === false, "Oversized staging combat intent granted rewards.");
+  await waitFor("client B to receive clamped oversized staging damage", () => {
+    const botA = botById(roomA, inspectedBotBeforeCombat.id);
+    const botB = botById(roomB, inspectedBotBeforeCombat.id);
+    return botA && botB &&
+      botA.shield === oversizedCombatResponse.shield &&
+      botA.hull === oversizedCombatResponse.hull &&
+      botB.shield === oversizedCombatResponse.shield &&
+      botB.hull === oversizedCombatResponse.hull;
+  });
+  const inspectedBotAfterOversizedCombat = botById(roomA, inspectedBotBeforeCombat.id);
+  assert(botHealthTotal(inspectedBotAfterOversizedCombat) === healthAfterCombat - 50, "Clamped oversized damage did not apply expected staging damage.");
+  console.log("oversized staging weapon damage clamped safely");
+
+  await waitForFireReady(roomA, roomA.sessionId);
+  const invalidWeaponCombatResponse = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "invalidDamageTest",
+      weaponName: "Invalid Damage Test",
+      weaponFamily: "test",
+      damage: "not-a-number",
+      cooldownMs: 900,
+      currentNode: inspectedBotBeforeCombat.currentNode,
+      timestamp: Date.now()
+    });
+  });
+
+  assert(invalidWeaponCombatResponse?.stagingDamage === 5, `Invalid weapon payload did not use fallback damage: ${invalidWeaponCombatResponse?.stagingDamage}`);
+  assert(invalidWeaponCombatResponse?.rewardsGranted === false, "Invalid weapon staging combat intent granted rewards.");
+  await waitFor("client B to receive fallback staging damage", () => {
+    const botA = botById(roomA, inspectedBotBeforeCombat.id);
+    const botB = botById(roomB, inspectedBotBeforeCombat.id);
+    return botA && botB &&
+      botA.shield === invalidWeaponCombatResponse.shield &&
+      botA.hull === invalidWeaponCombatResponse.hull &&
+      botB.shield === invalidWeaponCombatResponse.shield &&
+      botB.hull === invalidWeaponCombatResponse.hull;
+  });
+  const inspectedBotAfterInvalidCombat = botById(roomA, inspectedBotBeforeCombat.id);
+  assert(botHealthTotal(inspectedBotAfterInvalidCombat) === botHealthTotal(inspectedBotAfterOversizedCombat) - 5, "Fallback damage did not apply expected staging damage.");
+  console.log("invalid weapon payload used fallback staging damage without rewards");
 
   let latestCombatBot = inspectedBotAfterInvalidCombat;
-  const maxFollowUpShots = Math.ceil(botHealthTotal(latestCombatBot) / 5) + 4;
+  const maxFollowUpShots = Math.ceil(botHealthTotal(latestCombatBot) / 50) + 4;
   for (let shot = 0; shot < maxFollowUpShots && !latestCombatBot.disabled; shot += 1) {
     await waitForFireReady(roomA, roomA.sessionId);
     const currentBot = await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id);
@@ -384,7 +432,10 @@ try {
       roomA.send("combat:intent", {
         targetBotId: currentBot.id,
         weaponId: "pulseLaser",
+        weaponName: "Regression Pulse Laser",
         weaponFamily: "pulse",
+        damage: 50,
+        cooldownMs: 900,
         currentNode: currentBot.currentNode,
         timestamp: Date.now()
       });

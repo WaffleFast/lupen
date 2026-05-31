@@ -110,7 +110,11 @@ const BOT_NODE_LINKS = new Map(
 const BOT_MOVE_TICK_MS = 4000;
 const BOT_NODE_MOVE_MS = 16000;
 const STAGING_TEST_DAMAGE = 5;
+const STAGING_DAMAGE_MIN = 1;
+const STAGING_DAMAGE_MAX = 50;
 const STAGING_FIRE_COOLDOWN_MS = 900;
+const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
+const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_BOT_DISABLED_RESET_MS = 6500;
 
 const DUMMY_BOT_DEFINITIONS = [
@@ -237,6 +241,41 @@ function validateCombatIntentPayload(message = {}) {
   }
 
   return "";
+}
+
+function getStagingDamageFromPayload(message = {}) {
+  const directDamage = Number(message.damage ?? message.weaponDamage);
+  const damageLayers = message.damageLayers && typeof message.damageLayers === "object"
+    ? message.damageLayers
+    : null;
+  const layeredDamage = damageLayers
+    ? Math.round((
+      Number(damageLayers.shield || 0) +
+      Number(damageLayers.armor || damageLayers.armour || 0) +
+      Number(damageLayers.hull || 0)
+    ) / 3)
+    : NaN;
+  const rawDamage = Number.isFinite(directDamage) && directDamage > 0
+    ? directDamage
+    : Number.isFinite(layeredDamage) && layeredDamage > 0
+      ? layeredDamage
+      : STAGING_TEST_DAMAGE;
+
+  return clampNumber(Math.round(rawDamage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
+}
+
+function getStagingCooldownFromPayload(message = {}) {
+  const directCooldown = Number(message.cooldownMs ?? message.cooldown ?? message.weaponCooldownMs);
+  if (Number.isFinite(directCooldown) && directCooldown > 0) {
+    return clampNumber(Math.round(directCooldown), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS);
+  }
+
+  const fireRate = Number(message.fireRate);
+  if (Number.isFinite(fireRate) && fireRate > 0) {
+    return clampNumber(Math.round(1000 / fireRate), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS);
+  }
+
+  return STAGING_FIRE_COOLDOWN_MS;
 }
 
 function validateTargetSelectionPayload(message = {}) {
@@ -635,9 +674,11 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
-    const result = this.applyStagingTestDamage(targetBot, STAGING_TEST_DAMAGE);
+    const stagingDamage = getStagingDamageFromPayload(message);
+    const stagingCooldownMs = getStagingCooldownFromPayload(message);
+    const result = this.applyStagingTestDamage(targetBot, stagingDamage);
     player.lastFireAt = now;
-    player.nextFireAt = now + STAGING_FIRE_COOLDOWN_MS;
+    player.nextFireAt = now + stagingCooldownMs;
 
     client.send("combat:resolved", {
       ok: true,
@@ -648,14 +689,19 @@ export class LupenSectorRoom extends Room {
       targetNode: targetBot.currentNode,
       currentNode: player.currentNode,
       weaponId: getStringValue(message.weaponId),
-      weaponFamily: getStringValue(message.weaponFamily),
+      weaponName: getStringValue(message.weaponName, "Staging Test Weapon") || "Staging Test Weapon",
+      weaponFamily: getStringValue(message.weaponFamily || message.weaponType),
+      weaponQuality: getStringValue(message.quality),
+      weaponLevel: getNumberValue(message.level, 0),
       damage: result.damage,
+      requestedDamage: Number.isFinite(Number(message.damage ?? message.weaponDamage)) ? Number(message.damage ?? message.weaponDamage) : 0,
+      stagingDamage,
       shieldDamage: result.shieldDamage,
       hullDamage: result.hullDamage,
       shield: result.shield,
       hull: result.hull,
       disabled: result.disabled,
-      cooldownMs: STAGING_FIRE_COOLDOWN_MS,
+      cooldownMs: stagingCooldownMs,
       nextFireAt: player.nextFireAt,
       rewardsGranted: false,
       receivedAt: Date.now()

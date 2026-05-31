@@ -258,6 +258,52 @@
     return {};
   }
 
+  function getStagingWeaponIntent() {
+    try {
+      if (typeof global.getEquippedWeapon !== "function") {
+        return {
+          weaponId: "stagingFallback",
+          weaponName: "Staging Fallback",
+          weaponFamily: "staging-fallback",
+          damage: 5,
+          fireRate: 1,
+          cooldownMs: 900
+        };
+      }
+
+      const weapon = global.getEquippedWeapon() || {};
+      return {
+        weaponId: String(weapon.id || weapon.key || weapon.familyId || weapon.fireStyle || "equippedWeapon"),
+        weaponName: String(weapon.name || "Equipped Weapon").slice(0, 80),
+        weaponFamily: String(weapon.familyId || weapon.family || weapon.fireStyle || weapon.type || ""),
+        weaponType: String(weapon.type || weapon.fireStyle || ""),
+        damage: Number.isFinite(Number(weapon.damage)) ? Number(weapon.damage) : 5,
+        damageLayers: weapon.damageLayers && typeof weapon.damageLayers === "object"
+          ? {
+            shield: Number.isFinite(Number(weapon.damageLayers.shield)) ? Number(weapon.damageLayers.shield) : 0,
+            armor: Number.isFinite(Number(weapon.damageLayers.armor)) ? Number(weapon.damageLayers.armor) : 0,
+            hull: Number.isFinite(Number(weapon.damageLayers.hull)) ? Number(weapon.damageLayers.hull) : 0
+          }
+          : undefined,
+        fireRate: Number.isFinite(Number(weapon.fireRate)) ? Number(weapon.fireRate) : 1,
+        cooldownMs: Number.isFinite(Number(weapon.speed)) ? Number(weapon.speed) : 900,
+        quality: String(weapon.quality || ""),
+        level: Number.isFinite(Number(weapon.level)) ? Number(weapon.level) : 0,
+        count: Number.isFinite(Number(weapon.count)) ? Number(weapon.count) : 0
+      };
+    } catch (err) {
+      logDev("staging weapon payload fallback", err);
+      return {
+        weaponId: "stagingFallback",
+        weaponName: "Staging Fallback",
+        weaponFamily: "staging-fallback",
+        damage: 5,
+        fireRate: 1,
+        cooldownMs: 900
+      };
+    }
+  }
+
   function ensureEnabled(action) {
     updateEnabledState();
 
@@ -496,6 +542,7 @@
         validation: String(message?.validation || ""),
         targetBotId: String(message?.targetBotId || ""),
         targetNode: String(message?.targetNode || ""),
+        weaponName: String(message?.weaponName || ""),
         cooldownRemainingMs: Number.isFinite(Number(message?.cooldownRemainingMs)) ? Number(message.cooldownRemainingMs) : 0,
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
@@ -509,7 +556,10 @@
         reason: String(message?.reason || "staging_damage_applied"),
         targetBotId: String(message?.targetBotId || ""),
         targetNode: String(message?.targetNode || ""),
+        weaponName: String(message?.weaponName || ""),
+        weaponFamily: String(message?.weaponFamily || ""),
         damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
+        stagingDamage: Number.isFinite(Number(message?.stagingDamage)) ? Number(message.stagingDamage) : 0,
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         disabled: message?.disabled === true,
@@ -748,6 +798,7 @@
       const localPresence = getLocalPresenceOptions();
       const selectedTargetBotId = playersById.get(connection.sessionId)?.selectedTargetBotId || "";
       return sendRoomMessage("sendSelectedStagingBotCombatIntent", "combat:intent", {
+        ...getStagingWeaponIntent(),
         ...intent,
         targetBotId: intent.targetBotId || selectedTargetBotId,
         currentNode: intent.currentNode || localPresence.currentNode || ""
@@ -790,6 +841,10 @@
       const selectedTargetBotId = playersById.get(connection.sessionId)?.selectedTargetBotId || "";
       const bot = selectedTargetBotId ? botsById.get(selectedTargetBotId) : null;
       return bot ? { ...bot } : null;
+    },
+
+    getStagingWeaponIntent() {
+      return { ...getStagingWeaponIntent() };
     },
 
     getBotsInCurrentNode(currentNodeOverride = "") {

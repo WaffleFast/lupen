@@ -20,7 +20,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `joinedAt` / `lastSeenAt`: local server timestamps
 - On leave, the player is removed.
 - Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
-- Staging-only `combat:intent` messages for future combat pipeline testing. These are validated against the player's selected same-node staging bot, enforce a short per-player fire cooldown, and apply fixed server-owned test damage only.
+- Staging-only `combat:intent` messages for future combat pipeline testing. These are validated against the player's selected same-node staging bot, enforce a short per-player fire cooldown, and apply server-clamped weapon test damage only.
 - Staging-only `target:select` / `target:clear` messages for lock-on UI preparation. These update `selectedTargetBotId` on the player's presence record only when the server-owned bot is in the same node.
 - Legacy local prototype `move` messages are still accepted for compatibility.
 - Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
@@ -36,7 +36,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `lastUpdatedAt`: local server timestamp
   - `nextMoveAt`: planned next node-move timestamp for debugging
 - Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot enter real target arrays, do not drop loot, do not grant XP/rewards, and are not persisted.
-- Combat intent handling can apply a small fixed shield-first staging test damage amount to a locked same-node staging bot and returns `combat:resolved` with `rewardsGranted: false`. Fast repeat fire returns `combat:rejected` with `reason: staging_fire_cooldown` and `cooldownRemainingMs`. Invalid intents return `combat:rejected`. This does not mutate player progression, rewards, loot, saves, bounty data, Supabase data, or real combat systems.
+- Combat intent handling can apply shield-first staging test damage to a locked same-node staging bot and returns `combat:resolved` with `rewardsGranted: false`. Clients may send equipped weapon display data, but the server clamps staging damage between `1` and `50`, derives/clamps cooldown safely, and falls back to conservative test damage when payloads are invalid. Fast repeat fire returns `combat:rejected` with `reason: staging_fire_cooldown` and `cooldownRemainingMs`. Invalid intents return `combat:rejected`. This does not mutate player progression, rewards, loot, saves, bounty data, Supabase data, or real combat systems.
 - When staging bot hull reaches `0`, the bot broadcasts `bot:disabled`, stops taking staging damage, and respawns after a short delay with shield/hull restored. Respawn broadcasts `bot:respawned` and never grants rewards.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
@@ -180,9 +180,10 @@ The regression test uses two Colyseus clients to verify that:
 - Staging bot `currentNode` values stay inside the server's allowed combat node list.
 - At least one staging bot changes node while both clients observe matching state.
 - A valid same-node staging bot lock-on updates the player's `selectedTargetBotId`.
-- A valid `combat:intent` against the selected same-node staging bot applies fixed server-owned test damage.
+- A valid `combat:intent` against the selected same-node staging bot applies server-clamped weapon test damage.
 - Client B receives the same updated staging bot shield/hull values.
 - An immediate second combat intent is rejected by `staging_fire_cooldown` without damage.
+- Oversized weapon damage is clamped and invalid weapon damage falls back safely.
 - Repeated valid staging hits can disable a bot.
 - Disabled bots reject further staging damage and then respawn/reset on both clients.
 - Invalid combat intents are rejected without rewards or additional damage.
