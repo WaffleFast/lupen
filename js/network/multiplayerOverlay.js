@@ -725,6 +725,9 @@
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
     }
+    if (status.lastCombatResponse) {
+      setDiagnosticsRow(panel, "combat intent", status.lastCombatResponse.reason || "received");
+    }
     if (status.clientLoadError || status.lastError) {
       setDiagnosticsRow(panel, "error", status.clientLoadError || status.lastError);
     }

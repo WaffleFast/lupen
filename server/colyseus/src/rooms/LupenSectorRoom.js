@@ -215,6 +215,22 @@ function validatePresencePayload(message = {}) {
   return "";
 }
 
+function validateCombatIntentPayload(message = {}) {
+  if (!message || typeof message !== "object") {
+    return "payload must be an object";
+  }
+
+  if (typeof message.targetBotId !== "string" || !message.targetBotId.trim()) {
+    return "targetBotId must be a non-empty string";
+  }
+
+  if (message.currentNode !== undefined && typeof message.currentNode !== "string") {
+    return "currentNode must be a string when provided";
+  }
+
+  return "";
+}
+
 // Presence-only stepping stone for future server-authoritative multiplayer.
 // This room mirrors local player display/location data and server-owned dummy
 // bot positions for dev ghosts only. It does not persist state, grant rewards,
@@ -245,6 +261,19 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("movement:update", (client, message = {}) => {
       this.applyPresenceUpdate(client, message, "movement:update");
+    });
+
+    // Staging-only combat intent pipeline. This validates the shape and target
+    // against server-owned visual bots, then rejects safely without mutating
+    // shield/hull or granting rewards. Future authoritative combat can replace
+    // this response path with real server-side resolution.
+    this.onMessage("combat:intent", (client, message = {}) => {
+      this.rejectCombatIntent(client, message, "combat:intent");
+    });
+
+    // Legacy local prototype alias. New clients should send combat:intent.
+    this.onMessage("combat_intent", (client, message = {}) => {
+      this.rejectCombatIntent(client, message, "combat_intent");
     });
 
     // Legacy local prototype alias. New clients should send movement:update.
@@ -346,6 +375,43 @@ export class LupenSectorRoom extends Room {
       reason,
       messageType,
       sessionId: client.sessionId,
+      receivedAt: Date.now()
+    });
+  }
+
+  rejectCombatIntent(client, message = {}, messageType = "combat:intent") {
+    const player = this.state.players.get(client.sessionId);
+    const payloadWarning = validateCombatIntentPayload(message);
+    const targetBotId = getStringValue(message.targetBotId);
+    const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
+    const clientCurrentNode = getStringValue(message.currentNode, player?.currentNode || "");
+    let validationReason = payloadWarning;
+
+    if (!validationReason && !player) {
+      validationReason = "session player not found";
+    }
+
+    if (!validationReason && !targetBot) {
+      validationReason = `unknown staging bot: ${targetBotId}`;
+    }
+
+    if (!validationReason && clientCurrentNode && targetBot.currentNode !== clientCurrentNode) {
+      validationReason = "player and staging bot are not in the same node";
+    }
+
+    if (player) player.lastSeenAt = Date.now();
+
+    client.send("combat:rejected", {
+      ok: false,
+      reason: "combat_disabled_in_staging",
+      validation: validationReason || "validated_no_damage_applied",
+      messageType,
+      sessionId: client.sessionId,
+      targetBotId,
+      targetNode: targetBot?.currentNode || "",
+      currentNode: player?.currentNode || clientCurrentNode || "",
+      weaponId: getStringValue(message.weaponId),
+      weaponFamily: getStringValue(message.weaponFamily),
       receivedAt: Date.now()
     });
   }

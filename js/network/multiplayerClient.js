@@ -34,6 +34,7 @@
     clientLoadSource: null,
     clientLoadError: null,
     lastServerWarning: null,
+    lastCombatResponse: null,
     lastError: null
   };
 
@@ -235,6 +236,7 @@
       clientLoadSource: connection.clientLoadSource,
       clientLoadError: connection.clientLoadError,
       lastServerWarning: connection.lastServerWarning,
+      lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -478,6 +480,18 @@
       logDev("server presence warning", message);
     });
 
+    activeRoom.onMessage("combat:rejected", (message) => {
+      connection.lastCombatResponse = {
+        ok: message?.ok === true,
+        reason: String(message?.reason || "combat_disabled_in_staging"),
+        validation: String(message?.validation || ""),
+        targetBotId: String(message?.targetBotId || ""),
+        targetNode: String(message?.targetNode || ""),
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server combat intent response", message);
+    });
+
     activeRoom.onLeave((code) => {
       logDev(`left ${connection.roomName}`, { code });
       connection.isConnected = false;
@@ -523,6 +537,7 @@
       clientLoadError: connection.clientLoadError,
       lastError: connection.lastError,
       lastServerWarning: connection.lastServerWarning,
+      lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
@@ -643,7 +658,7 @@
     },
 
     sendCombatIntent(intent = {}) {
-      return sendRoomMessage("sendCombatIntent", "combat_intent", intent);
+      return sendRoomMessage("sendCombatIntent", "combat:intent", intent);
     },
 
     sendPing(payload = {}) {

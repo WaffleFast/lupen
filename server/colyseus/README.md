@@ -20,6 +20,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `joinedAt` / `lastSeenAt`: local server timestamps
 - On leave, the player is removed.
 - Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
+- Staging-only `combat:intent` messages for future combat pipeline testing. These are validated against server-owned staging bots and always return `combat:rejected` with `reason: combat_disabled_in_staging`.
 - Legacy local prototype `move` messages are still accepted for compatibility.
 - Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
 - Staging bots include:
@@ -33,6 +34,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `lastUpdatedAt`: local server timestamp
   - `nextMoveAt`: planned next node-move timestamp for debugging
 - Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
+- Combat intent handling does not mutate bot shield/hull, player state, progression, rewards, loot, saves, or bounty data. It is only a server-authoritative message path placeholder.
 
 ## Install
 
@@ -173,6 +175,8 @@ The regression test uses two Colyseus clients to verify that:
 - Both clients receive the same server-owned bot movement update.
 - Staging bot `currentNode` values stay inside the server's allowed combat node list.
 - At least one staging bot changes node while both clients observe matching state.
+- A valid `combat:intent` against a staging bot receives a safe disabled response.
+- Bot shield/hull remain unchanged after the combat intent.
 - Invalid movement is ignored and returns a dev-only warning.
 - Client B sees client A removed after disconnect.
 

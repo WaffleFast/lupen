@@ -115,6 +115,21 @@ async function expectPresenceWarning(room, sendMessage) {
   });
 }
 
+async function expectCombatRejected(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for combat rejection."));
+    }, 3000);
+
+    room.onMessage("combat:rejected", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
 async function leaveRoom(room) {
   if (!room) return;
   try {
@@ -178,6 +193,43 @@ try {
     return currentBotNodes !== initialBotNodes && botSnapshotKey(roomA) === botSnapshotKey(roomB);
   }, 22000);
   console.log("staging bot node change stayed on allowed combat nodes");
+
+  const inspectedBotBeforeCombat = botSnapshots(roomA)[0];
+  assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
+
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    currentNode: inspectedBotBeforeCombat.currentNode,
+    x: inspectedBotBeforeCombat.x,
+    y: inspectedBotBeforeCombat.y
+  });
+
+  await waitFor("client A presence to reach staging bot node", () => {
+    const playerA = playerFrom(roomA, roomA.sessionId);
+    return playerA?.currentNode === inspectedBotBeforeCombat.currentNode;
+  });
+
+  const combatResponse = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "pulseLaser",
+      weaponFamily: "pulse",
+      currentNode: inspectedBotBeforeCombat.currentNode,
+      timestamp: Date.now()
+    });
+  });
+
+  assert(combatResponse?.reason === "combat_disabled_in_staging", "Combat intent was not safely rejected.");
+  assert(combatResponse?.validation === "validated_no_damage_applied", `Unexpected combat validation: ${combatResponse?.validation}`);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+
+  const inspectedBotAfterCombat = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);
+  assert(inspectedBotAfterCombat?.shield === inspectedBotBeforeCombat.shield, "Combat intent changed bot shield.");
+  assert(inspectedBotAfterCombat?.hull === inspectedBotBeforeCombat.hull, "Combat intent changed bot hull.");
+  assert(inspectedBotAfterCombat?.visualOnly === true, "Combat intent changed visualOnly flag.");
+  console.log("combat intent rejected without damage or rewards");
 
   roomA.send("movement:update", {
     displayName: "Regression Pilot A",
