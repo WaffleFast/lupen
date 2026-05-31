@@ -17,13 +17,145 @@ function isMultiplayerStagingActive() {
 function blockRealTradeMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingActive()) return false;
 
-  const message = "Real trade is disabled in multiplayer staging. Use Staging Trade Preview for dry-run testing.";
+  const message = "Real trade is disabled in multiplayer staging. Server preview is dry-run only.";
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof console !== "undefined" && typeof console.info === "function") {
     console.info(`[Lupen multiplayer] ${message}`);
   }
   return true;
+}
+
+function isMultiplayerStagingTradeReady() {
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  return isMultiplayerStagingActive() && client && status?.enabled && status?.isConnected;
+}
+
+function getMultiplayerStagingTradeStatus() {
+  return window.LupenMultiplayerClient?.getStatus?.() || {};
+}
+
+function getMultiplayerStagingTradeOffers() {
+  const status = getMultiplayerStagingTradeStatus();
+  return Array.isArray(status.lastStagingTradeOffers?.offers)
+    ? status.lastStagingTradeOffers.offers
+    : [];
+}
+
+function requestMultiplayerStagingTradeOffersIfNeeded() {
+  if (!isMultiplayerStagingActive()) return;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.requestStagingTradeOffers || !status?.enabled || !status?.isConnected) return;
+  if (getMultiplayerStagingTradeOffers().length) return;
+  client.requestStagingTradeOffers();
+}
+
+function normalizeTradeRouteValue(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function findMultiplayerStagingTradeOffer({ good = "", origin = "", destination = "" } = {}) {
+  const normalizedGood = normalizeTradeRouteValue(good).replace(/_/g, " ");
+  const normalizedOrigin = normalizeTradeRouteValue(origin);
+  const normalizedDestination = normalizeTradeRouteValue(destination);
+  return getMultiplayerStagingTradeOffers().find((offer) => {
+    return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizedGood &&
+      normalizeTradeRouteValue(offer.buyNode) === normalizedOrigin &&
+      normalizeTradeRouteValue(offer.sellNode) === normalizedDestination;
+  }) || null;
+}
+
+function getMultiplayerStagingTradeSourceLabel(result) {
+  if (!result) return "Server preview pending";
+  if (result.validationMode === "trusted_save") {
+    return result.snapshotUsed ? "Validated from trusted save + capacity snapshot" : "Validated from trusted save";
+  }
+  if (result.validationMode === "snapshot") return "Validated from client snapshot";
+  return "Price preview only - player state unavailable";
+}
+
+function getMultiplayerStagingTradeValidationLabel(result) {
+  if (!result) return "";
+  if (result.validationMode === "unknown") return "Server price preview only";
+  if (result.wouldPass) return "Would pass validation";
+  if (result.blockReason === "insufficient_credits") return "Blocked: not enough credits";
+  if (result.blockReason === "insufficient_cargo") return "Blocked: not enough cargo space";
+  if (result.blockReason === "invalid_quantity") return "Blocked: invalid quantity";
+  return `Blocked: ${result.blockReason || result.reason || "validation failed"}`;
+}
+
+function getLastMatchingMultiplayerStagingTradePreview(offerId) {
+  const result = getMultiplayerStagingTradeStatus().lastStagingTradePreview;
+  return result?.offerId === offerId ? result : null;
+}
+
+function renderMultiplayerStagingTradePreviewResult(offerId) {
+  if (!isMultiplayerStagingActive()) return "";
+  const result = getLastMatchingMultiplayerStagingTradePreview(offerId);
+  if (!offerId) {
+    return `<div class="trade-preview-note">MP staging: server preview not available for this route yet. No credits or cargo changed.</div>`;
+  }
+  if (!result) {
+    return `<div class="trade-preview-note">MP staging: server preview only. Click Server Preview to validate this route.</div>`;
+  }
+
+  const debugLine = new URLSearchParams(window.location.search).get("debug") === "mp"
+    ? `<span>${result.validationMode || "unknown"} / trusted ${result.trustedStateAvailable ? "yes" : "no"} / snapshot ${result.snapshotUsed ? "yes" : "no"}</span>`
+    : "";
+
+  return `
+    <div class="trade-preview-note">
+      <strong>MP staging: server preview only</strong>
+      <span>Cost CR ${formatNumber(result.totalCost)} / Revenue CR ${formatNumber(result.projectedRevenue)} / Profit ${result.projectedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(result.projectedProfit))}</span>
+      <span>${getMultiplayerStagingTradeValidationLabel(result)}</span>
+      <span>${getMultiplayerStagingTradeSourceLabel(result)}</span>
+      ${debugLine}
+      <span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>
+    </div>
+  `;
+}
+
+function requestMultiplayerStagingTradePreview({ offerId = "", quantity = 1 } = {}) {
+  if (!isMultiplayerStagingActive()) return false;
+  if (!isMultiplayerStagingTradeReady()) {
+    const message = "MP staging trade preview is waiting for the multiplayer server connection.";
+    if (typeof addHudToast === "function") addHudToast(message);
+    if (typeof addActivityLog === "function") addActivityLog(message);
+    requestMultiplayerStagingTradeOffersIfNeeded();
+    return true;
+  }
+  if (!offerId) {
+    const message = "Server staging preview not available for this route yet.";
+    if (typeof addHudToast === "function") addHudToast(message);
+    if (typeof addActivityLog === "function") addActivityLog(message);
+    return true;
+  }
+
+  window.LupenMultiplayerClient.requestStagingTradePreview({
+    offerId,
+    quantity
+  });
+  if (typeof addHudToast === "function") addHudToast("Requested MP staging server trade preview. No credits or cargo changed.");
+  window.setTimeout(() => {
+    if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
+  }, 350);
+  return true;
+}
+
+function setupMultiplayerStagingTradeTerminalSubscription() {
+  if (!isMultiplayerStagingActive()) return;
+  if (window.__lupenStagingTradeTerminalSubscribed) return;
+  const client = window.LupenMultiplayerClient;
+  if (!client?.onServerState) return;
+
+  const subscription = client.onServerState(() => {
+    if (document.getElementById("marketScreen")?.classList.contains("active")) {
+      renderMarketplace();
+    }
+  });
+  window.__lupenStagingTradeTerminalSubscribed = subscription;
 }
 
 function renderNpcItemBroker() {
@@ -236,6 +368,9 @@ function setTradeTerminalTab(tabName) {
 }
 
 function renderMarketplace() {
+  setupMultiplayerStagingTradeTerminalSubscription();
+  requestMultiplayerStagingTradeOffersIfNeeded();
+
   const market = getDynamicMarketPrices(currentNode);
   const stock = marketStock[currentNode] || marketStock[lastPlanetNode] || marketStock["Asteron Prime"];
   const goodsBox = document.getElementById("marketGoods");
@@ -274,6 +409,9 @@ function renderMapOneMarketTerminal(goodsBox) {
   const quantity = selectedMarketQuantity;
   const buyPrice = getMapOneMarketPrice(resource, currentPlanet);
   const estimatedSellPrice = getMapOneMarketPrice(resource, targetPlanet);
+  const activeMarketTrade = activeTradeRoute?.marketTrade && activeTradeRoute.good === resource
+    ? activeTradeRoute
+    : null;
   const totalCost = buyPrice * quantity;
   const estimatedRevenue = estimatedSellPrice * quantity;
   const estimatedProfit = estimatedRevenue - totalCost;
@@ -283,10 +421,19 @@ function renderMapOneMarketTerminal(goodsBox) {
   const held = cargo[resource] || 0;
   const atTargetWithCargo = held > 0 && currentPlanet === targetPlanet;
   const maxBuy = getMarketMaxBuyQuantity(resource, currentPlanet);
+  const buyStagingOffer = stagingTradeLocked
+    ? findMultiplayerStagingTradeOffer({ good: resource, origin: currentPlanet, destination: targetPlanet })
+    : null;
+  const sellStagingOrigin = activeMarketTrade?.origin || MAP_ONE_MARKET_PLANETS.find((planet) => {
+    return findMultiplayerStagingTradeOffer({ good: resource, origin: planet, destination: currentPlanet });
+  }) || currentPlanet;
+  const sellStagingOffer = stagingTradeLocked && held > 0
+    ? findMultiplayerStagingTradeOffer({ good: resource, origin: sellStagingOrigin, destination: currentPlanet })
+    : null;
   const canBuy = !stagingTradeLocked && quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
   const info = commodityInfo[resource] || {};
   const stagingTradeNotice = stagingTradeLocked
-    ? `<div class="trade-preview-note">Real Trade Terminal actions are disabled in MP staging. Use Staging Trade Preview for dry-run testing.</div>`
+    ? renderMultiplayerStagingTradePreviewResult(buyStagingOffer?.offerId || sellStagingOffer?.offerId || "")
     : "";
 
   goodsBox.innerHTML = `
@@ -348,7 +495,7 @@ function renderMapOneMarketTerminal(goodsBox) {
             <div class="market-amount-control">
               <strong>${formatNumber(quantity)} units</strong>
               <button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
-              <button class="trade-primary-action" onclick="buyMarketCargo()" ${canBuy ? "" : "disabled"}>${stagingTradeLocked ? "Use Staging Preview" : "Buy Cargo"}</button>
+              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? "Server Preview" : "Preview Unavailable" : "Buy Cargo"}</button>
             </div>
           </label>
         </div>
@@ -360,7 +507,7 @@ function renderMapOneMarketTerminal(goodsBox) {
         </div>
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
-          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? "disabled" : ""}>${stagingTradeLocked ? "Disabled in MP staging" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
+          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? "Server Preview Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
       </aside>
     </div>
@@ -402,13 +549,25 @@ function setMarketQuantityMax() {
 }
 
 function buyMarketCargo() {
-  if (blockRealTradeMutationInMultiplayerStaging()) return;
-
   normalizeMarketBuilderState();
 
   const currentPlanet = getCurrentMarketPlanet();
   const good = selectedMarketResource;
   const quantity = selectedMarketQuantity;
+  if (isMultiplayerStagingActive()) {
+    const offer = findMultiplayerStagingTradeOffer({
+      good,
+      origin: currentPlanet,
+      destination: selectedMarketTargetPlanet
+    });
+    requestMultiplayerStagingTradePreview({
+      offerId: offer?.offerId || "",
+      quantity
+    });
+    blockRealTradeMutationInMultiplayerStaging();
+    return;
+  }
+
   const price = getMapOneMarketPrice(good, currentPlanet);
   const totalCost = price * quantity;
   const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
@@ -448,11 +607,29 @@ function buyMarketCargo() {
 }
 
 function sellMarketCargo() {
-  if (blockRealTradeMutationInMultiplayerStaging()) return;
-
   normalizeMarketBuilderState();
   const good = selectedMarketResource;
   const held = cargo[good] || 0;
+  if (isMultiplayerStagingActive()) {
+    const currentPlanet = getCurrentMarketPlanet();
+    const origin = activeTradeRoute?.marketTrade && activeTradeRoute.good === good
+      ? activeTradeRoute.origin
+      : MAP_ONE_MARKET_PLANETS.find((planet) => {
+        return findMultiplayerStagingTradeOffer({ good, origin: planet, destination: currentPlanet });
+      }) || "";
+    const offer = findMultiplayerStagingTradeOffer({
+      good,
+      origin,
+      destination: currentPlanet
+    });
+    requestMultiplayerStagingTradePreview({
+      offerId: offer?.offerId || "",
+      quantity: Math.max(1, held)
+    });
+    blockRealTradeMutationInMultiplayerStaging();
+    return;
+  }
+
   if (held <= 0) {
     alert(`You have no ${good} in cargo.`);
     return;
@@ -546,7 +723,7 @@ function renderBuyCommodities(market, stock, goodsBox) {
             oninput="syncTradeInput('${good}', 'buy')"
           />
           <button onclick="setTradeMax('${good}', 'buy')">Max</button>
-          <button onclick="buyGood('${good}')" ${stagingTradeLocked ? "disabled" : ""}>${stagingTradeLocked ? "MP Staging" : "Buy"}</button>
+          <button onclick="buyGood('${good}')">${stagingTradeLocked ? "Preview" : "Buy"}</button>
         </div>
       </div>
     `;
@@ -624,7 +801,7 @@ function renderSellCommodities(market, stock, goodsBox) {
             oninput="syncTradeInput('${good}', 'sell')"
           />
           <button onclick="setTradeMax('${good}', 'sell')">All</button>
-          <button onclick="sellGood('${good}')" ${stagingTradeLocked ? "disabled" : ""}>${stagingTradeLocked ? "MP Staging" : "Sell"}</button>
+          <button onclick="sellGood('${good}')">${stagingTradeLocked ? "Preview" : "Sell"}</button>
         </div>
       </div>
     `;
@@ -2204,7 +2381,7 @@ function renderTradeQuantityControls(good, mode, maxValue, defaultValue = 0, act
   const actionFn = mode === "sell" ? "sellGood" : "buyGood";
   const escapedGood = escapeJsString(good);
   const stagingTradeLocked = isMultiplayerStagingActive();
-  const safeActionLabel = stagingTradeLocked ? "Disabled in MP staging" : actionLabel;
+  const safeActionLabel = stagingTradeLocked ? "Server Preview" : actionLabel;
 
   return `
     <div class="trade-quantity-panel">
@@ -2227,7 +2404,7 @@ function renderTradeQuantityControls(good, mode, maxValue, defaultValue = 0, act
         />
         <button class="trade-step-btn" onclick="adjustTradeQuantity('${escapedGood}', '${mode}', 1)" ${max <= 0 ? "disabled" : ""}>+</button>
         <button class="trade-quick-btn trade-amount-btn trade-max-btn" onclick="setTradeMax('${escapedGood}', '${mode}')" ${max <= 0 ? "disabled" : ""}>Max</button>
-        <button id="${mode}Action-${id}" class="trade-primary-action" onclick="${actionFn}('${escapedGood}')" ${stagingTradeLocked || value <= 0 || max <= 0 ? "disabled" : ""}>${safeActionLabel}</button>
+        <button id="${mode}Action-${id}" class="trade-primary-action" onclick="${actionFn}('${escapedGood}')" ${value <= 0 || max <= 0 ? "disabled" : ""}>${safeActionLabel}</button>
       </div>
     </div>
   `;
@@ -2320,7 +2497,7 @@ function updateTradePreview(good) {
     if (buyRange) buyRange.value = buyAmount;
     if (buyQty) buyQty.value = buyAmount;
     const buyAction = document.getElementById(`buyAction-${id}`);
-    if (buyAction) buyAction.disabled = isMultiplayerStagingActive() || buyAmount <= 0;
+    if (buyAction) buyAction.disabled = buyAmount <= 0;
     buySummary.innerHTML = `${formatNumber(buyAmount)} units / <span class="mini-credit">CR</span>${formatNumber(investment)}`;
 
     if (buyRoi) {
@@ -2341,7 +2518,7 @@ function updateTradePreview(good) {
     if (sellRange) sellRange.value = sellAmount;
     if (sellQty) sellQty.value = sellAmount;
     const sellAction = document.getElementById(`sellAction-${id}`);
-    if (sellAction) sellAction.disabled = isMultiplayerStagingActive() || sellAmount <= 0;
+    if (sellAction) sellAction.disabled = sellAmount <= 0;
     sellSummary.innerHTML = `${formatNumber(sellAmount)} units / <span class="mini-credit">CR</span>${formatNumber(sellAmount * sellPrice)}`;
   }
 }
@@ -2361,10 +2538,28 @@ function getCurrentMarketStock() {
 }
 
 function buyGood(good) {
-  if (blockRealTradeMutationInMultiplayerStaging()) return;
-
   const price = getEffectiveBuyPrice(good, currentNode);
   const quantity = getTradeQuantity(good, "buy");
+
+  if (isMultiplayerStagingActive()) {
+    const activeTrade = getActiveTradePricing(good);
+    const offer = activeTrade?.origin === currentNode
+      ? findMultiplayerStagingTradeOffer({
+        good,
+        origin: activeTrade.origin,
+        destination: activeTrade.destination
+      })
+      : getMultiplayerStagingTradeOffers().find((entry) => {
+        return normalizeTradeRouteValue(entry.resourceName || entry.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ") &&
+          normalizeTradeRouteValue(entry.buyNode) === normalizeTradeRouteValue(currentNode);
+      });
+    requestMultiplayerStagingTradePreview({
+      offerId: offer?.offerId || "",
+      quantity: Math.max(1, quantity)
+    });
+    blockRealTradeMutationInMultiplayerStaging();
+    return;
+  }
 
   const availableCargo = getShipStats().cargo - cargoUsed();
   const affordableQuantity = Math.floor(credits / price);
@@ -2409,11 +2604,29 @@ function buyGood(good) {
 }
 
 function sellGood(good) {
-  if (blockRealTradeMutationInMultiplayerStaging()) return;
-
   const price = getEffectiveSellPrice(good, currentNode);
   const quantity = getTradeQuantity(good, "sell");
   const maxSell = Math.min(quantity, cargo[good]);
+
+  if (isMultiplayerStagingActive()) {
+    const activeTrade = getActiveTradePricing(good);
+    const offer = activeTrade?.destination === currentNode
+      ? findMultiplayerStagingTradeOffer({
+        good,
+        origin: activeTrade.origin,
+        destination: activeTrade.destination
+      })
+      : getMultiplayerStagingTradeOffers().find((entry) => {
+        return normalizeTradeRouteValue(entry.resourceName || entry.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ") &&
+          normalizeTradeRouteValue(entry.sellNode) === normalizeTradeRouteValue(currentNode);
+      });
+    requestMultiplayerStagingTradePreview({
+      offerId: offer?.offerId || "",
+      quantity: Math.max(1, maxSell || quantity)
+    });
+    blockRealTradeMutationInMultiplayerStaging();
+    return;
+  }
 
   if (maxSell <= 0) {
     alert(`Select a quantity first, or check your ${good} stock.`);

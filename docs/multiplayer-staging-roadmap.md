@@ -18,6 +18,7 @@ Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Col
 - XP-only claim diagnostics that summarize simulated, dry-run, blocked, duplicate, and applied staging outcomes without enabling credits or loot.
 - Server-side staging trade preview/dry-run offers with deterministic route math, untrusted player snapshot validation, and no credit or cargo writes.
 - Real client-side Trade Terminal buy/sell mutations are fenced in `?mp=staging`; testers can inspect the UI but must use the staging preview panel for trade dry-runs.
+- In `?mp=staging`, the real Trade Terminal now starts routing matching buy/sell actions to Colyseus `stagingTrade:preview` so testers can see server-calculated dry-run cost, revenue, profit, validation status, and validation source in the normal trade UI.
 
 Diagnostics remain available with `?debug=mp`.
 
@@ -51,6 +52,8 @@ Multiplayer authority needs: server-side price calculation or signed market snap
 Current staging trade prototype: Colyseus exposes static trade offers and a `stagingTrade:preview` dry-run response that calculates cost, revenue, and projected profit server-side. For verified staging players, Colyseus may read `player_saves` with the service role to validate saved credits and cargo used without exposing raw save data or writing anything. Because cargo capacity is currently derived from ship/loadout data in the client, the dry-run can use a sanitized client snapshot for capacity and clearly reports its sources. If trusted save state is unavailable, it falls back to a minimal untrusted snapshot of credits, cargo used, and cargo capacity; if neither is available it returns price preview only. It intentionally reports `creditsWritten:false`, `cargoWritten:false`, and `saveWritten:false`; it does not touch the real Trade Terminal, cargo hold, credits, `player_saves`, Supabase writes, or economy state.
 
 While staging is active, real Trade Terminal buy/sell handlers return before mutating credits, cargo, cargo cost basis, trade totals, or saves. Normal single-player trading remains unchanged outside `?mp=staging`. A later phase should replace these disabled real actions with server-authoritative buy/sell validation and dedicated persistence.
+
+Phase 4c Trade Terminal integration: the normal Trade Builder remains the primary staging trade surface. If the selected resource/origin/destination maps to a static staging offer, its button requests the server-side dry-run preview and renders the result in the Trade Terminal. Unknown routes remain blocked with a preview-unavailable message. The separate Staging Trade Preview overlay remains a compact dev helper for now.
 
 Classification:
 
@@ -143,7 +146,7 @@ Classification:
 1. Phase 1: Connection, presence, remote ships, staging bots, lock/fire/damage, debug tools.
 2. Phase 2: Combat loop clarity, bot destruction feedback, contribution, XP preview.
 3. Phase 3: Safe XP-only online reward writes.
-4. Phase 4: Server-side resource/trade prototype with credits and cargo still gated or dry-run. Started with static staging trade offers, server-calculated previews, player-state-aware dry-run validation, and read-only trusted `player_saves` checks for verified staging players.
+4. Phase 4: Server-side resource/trade prototype with credits and cargo still gated or dry-run. Started with static staging trade offers, server-calculated previews, player-state-aware dry-run validation, read-only trusted `player_saves` checks for verified staging players, and Phase 4c Trade Terminal integration for staging-only dry-run previews.
 5. Phase 5: Credits write path with strict validation.
 6. Phase 6: Store purchases and ship/equipment ownership.
 7. Phase 7: Inventory/loadout persistence.
