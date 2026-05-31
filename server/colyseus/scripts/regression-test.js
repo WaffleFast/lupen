@@ -60,6 +60,8 @@ function botSnapshots(room) {
       shieldMax: bot.shieldMax,
       hull: bot.hull,
       hullMax: bot.hullMax,
+      disabled: bot.disabled,
+      disabledUntil: bot.disabledUntil,
       visualOnly: bot.visualOnly,
       lastUpdatedAt: bot.lastUpdatedAt,
       nextMoveAt: bot.nextMoveAt
@@ -92,6 +94,7 @@ function assertBotDisplayFields(room) {
     assert(Number(bot.level) > 0, `Bot ${bot.id} is missing level.`);
     assert(Number(bot.shieldMax) >= Number(bot.shield), `Bot ${bot.id} has invalid shield values.`);
     assert(Number(bot.hullMax) >= Number(bot.hull), `Bot ${bot.id} has invalid hull values.`);
+    assert(bot.disabled === true || bot.disabled === false, `Bot ${bot.id} is missing disabled state.`);
     assert(bot.visualOnly === true, `Bot ${bot.id} must remain visualOnly.`);
   });
 }
@@ -122,6 +125,21 @@ async function expectCombatRejected(room, sendMessage) {
     }, 3000);
 
     room.onMessage("combat:rejected", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectCombatResolved(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for combat resolution."));
+    }, 3000);
+
+    room.onMessage("combat:resolved", (message) => {
       clearTimeout(timeout);
       resolve(message);
     });
@@ -254,7 +272,7 @@ try {
   });
   console.log("staging bot lock-on selected for display only");
 
-  const combatResponse = await expectCombatRejected(roomA, () => {
+  const combatResponse = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetBotId: inspectedBotBeforeCombat.id,
       weaponId: "pulseLaser",
@@ -264,15 +282,44 @@ try {
     });
   });
 
-  assert(combatResponse?.reason === "combat_disabled_in_staging", "Combat intent was not safely rejected.");
-  assert(combatResponse?.validation === "validated_no_damage_applied", `Unexpected combat validation: ${combatResponse?.validation}`);
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  assert(combatResponse?.ok === true, "Valid staging combat intent did not resolve.");
+  assert(combatResponse?.reason === "staging_damage_applied", `Unexpected combat response: ${combatResponse?.reason}`);
+  assert(combatResponse?.damage === 5, `Unexpected staging damage amount: ${combatResponse?.damage}`);
+  assert(combatResponse?.rewardsGranted === false, "Staging combat intent granted rewards.");
+
+  await waitFor("client B to receive server staging damage", () => {
+    const botA = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);
+    const botB = botSnapshots(roomB).find((bot) => bot.id === inspectedBotBeforeCombat.id);
+    return botA && botB &&
+      botA.shield === combatResponse.shield &&
+      botA.hull === combatResponse.hull &&
+      botB.shield === combatResponse.shield &&
+      botB.hull === combatResponse.hull;
+  });
 
   const inspectedBotAfterCombat = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);
-  assert(inspectedBotAfterCombat?.shield === inspectedBotBeforeCombat.shield, "Combat intent changed bot shield.");
-  assert(inspectedBotAfterCombat?.hull === inspectedBotBeforeCombat.hull, "Combat intent changed bot hull.");
+  const healthBeforeCombat = Number(inspectedBotBeforeCombat.shield) + Number(inspectedBotBeforeCombat.hull);
+  const healthAfterCombat = Number(inspectedBotAfterCombat.shield) + Number(inspectedBotAfterCombat.hull);
+  assert(healthAfterCombat === healthBeforeCombat - 5, "Combat intent did not apply fixed staging damage.");
   assert(inspectedBotAfterCombat?.visualOnly === true, "Combat intent changed visualOnly flag.");
-  console.log("combat intent rejected without damage or rewards");
+  console.log("combat intent applied staging damage without rewards");
+
+  const invalidCombatResponse = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: "missing-staging-bot",
+      weaponId: "pulseLaser",
+      weaponFamily: "pulse",
+      currentNode: inspectedBotBeforeCombat.currentNode,
+      timestamp: Date.now()
+    });
+  });
+
+  assert(invalidCombatResponse?.reason === "combat_intent_rejected", "Invalid combat intent did not reject.");
+  assert(invalidCombatResponse?.rewardsGranted === false, "Invalid combat intent granted rewards.");
+  const inspectedBotAfterInvalidCombat = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);
+  assert(inspectedBotAfterInvalidCombat?.shield === inspectedBotAfterCombat.shield, "Invalid combat intent changed bot shield.");
+  assert(inspectedBotAfterInvalidCombat?.hull === inspectedBotAfterCombat.hull, "Invalid combat intent changed bot hull.");
+  console.log("invalid combat intent rejected without damage or rewards");
 
   roomA.send("movement:update", {
     displayName: "Regression Pilot A",

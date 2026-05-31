@@ -109,6 +109,8 @@ const BOT_NODE_LINKS = new Map(
 );
 const BOT_MOVE_TICK_MS = 4000;
 const BOT_NODE_MOVE_MS = 16000;
+const STAGING_TEST_DAMAGE = 5;
+const STAGING_BOT_DISABLED_RESET_MS = 8000;
 
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 35, hull: 70 },
@@ -158,6 +160,8 @@ type("number")(LupenSectorBot.prototype, "hullMax");
 type("number")(LupenSectorBot.prototype, "lastUpdatedAt");
 type("number")(LupenSectorBot.prototype, "nextMoveAt");
 type("boolean")(LupenSectorBot.prototype, "visualOnly");
+type("boolean")(LupenSectorBot.prototype, "disabled");
+type("number")(LupenSectorBot.prototype, "disabledUntil");
 
 export class LupenSectorState extends Schema {
   constructor() {
@@ -251,8 +255,9 @@ function validateTargetSelectionPayload(message = {}) {
 // Presence-only stepping stone for future server-authoritative multiplayer.
 // This room mirrors local player display/location data and server-owned dummy
 // bot positions for dev ghosts only. It does not persist state, grant rewards,
-// run combat, or control the real single-player game. Bot shield/hull/level
-// values are read-only inspection placeholders for future authoritative combat.
+// run real combat, or control the real single-player game. Staging combat
+// intents may apply tiny server-owned test damage to visual bots only; this
+// never grants progression, loot, saves, bounties, XP, credits, or rewards.
 export class LupenSectorRoom extends Room {
   onCreate() {
     this.setState(new LupenSectorState());
@@ -280,17 +285,17 @@ export class LupenSectorRoom extends Room {
       this.applyPresenceUpdate(client, message, "movement:update");
     });
 
-    // Staging-only combat intent pipeline. This validates the shape and target
-    // against server-owned visual bots, then rejects safely without mutating
-    // shield/hull or granting rewards. Future authoritative combat can replace
-    // this response path with real server-side resolution.
+    // Staging-only combat intent pipeline. This validates lock-on state against
+    // server-owned visual bots, then applies fixed shield-first test damage
+    // without granting rewards. Future authoritative combat can replace this
+    // response path with real server-side resolution.
     this.onMessage("combat:intent", (client, message = {}) => {
-      this.rejectCombatIntent(client, message, "combat:intent");
+      this.resolveCombatIntent(client, message, "combat:intent");
     });
 
     // Legacy local prototype alias. New clients should send combat:intent.
     this.onMessage("combat_intent", (client, message = {}) => {
-      this.rejectCombatIntent(client, message, "combat_intent");
+      this.resolveCombatIntent(client, message, "combat_intent");
     });
 
     // Staging lock-on preparation only. This stores display-only bot selection
@@ -359,7 +364,9 @@ export class LupenSectorRoom extends Room {
         hullMax: Number(definition.hull || 1),
         lastUpdatedAt: now,
         nextMoveAt: now + BOT_NODE_MOVE_MS + index * 2500,
-        visualOnly: true
+        visualOnly: true,
+        disabled: false,
+        disabledUntil: 0
       }));
     });
   }
@@ -373,6 +380,16 @@ export class LupenSectorRoom extends Room {
     // authoritative combat exists. They never enter loot, XP, targeting, or
     // bounty systems.
     Array.from(this.state.bots.values()).forEach((bot, index) => {
+      if (bot.disabled && now >= Number(bot.disabledUntil || 0)) {
+        bot.shield = Number(bot.shieldMax || 0);
+        bot.hull = Number(bot.hullMax || 1);
+        bot.disabled = false;
+        bot.disabledUntil = 0;
+        bot.lastUpdatedAt = now;
+      }
+
+      if (bot.disabled) return;
+
       const shouldChangeNode = now >= Number(bot.nextMoveAt || 0);
       const activeBotIndex = this.botStep % Math.max(1, this.state.bots.size);
 
@@ -421,6 +438,27 @@ export class LupenSectorRoom extends Room {
       messageType,
       sessionId: client.sessionId,
       targetBotId,
+      receivedAt: Date.now()
+    });
+  }
+
+  sendCombatRejected(client, reason, message = {}, messageType = "combat:intent", validation = "") {
+    const player = this.state.players.get(client.sessionId);
+    const targetBotId = getStringValue(message.targetBotId);
+    const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
+
+    client.send("combat:rejected", {
+      ok: false,
+      reason,
+      validation,
+      messageType,
+      sessionId: client.sessionId,
+      targetBotId,
+      targetNode: targetBot?.currentNode || "",
+      currentNode: player?.currentNode || getStringValue(message.currentNode) || "",
+      weaponId: getStringValue(message.weaponId),
+      weaponFamily: getStringValue(message.weaponFamily),
+      rewardsGranted: false,
       receivedAt: Date.now()
     });
   }
@@ -495,8 +533,32 @@ export class LupenSectorRoom extends Room {
     this.state.players.forEach((player) => this.reconcilePlayerSelection(player));
   }
 
-  rejectCombatIntent(client, message = {}, messageType = "combat:intent") {
-    const player = this.state.players.get(client.sessionId);
+  applyStagingTestDamage(bot, damage = STAGING_TEST_DAMAGE) {
+    const now = Date.now();
+    const safeDamage = Math.max(0, Number(damage || 0));
+    const shieldBefore = Math.max(0, Number(bot.shield || 0));
+    const hullBefore = Math.max(0, Number(bot.hull || 0));
+    const shieldDamage = Math.min(shieldBefore, safeDamage);
+    const hullDamage = Math.min(hullBefore, safeDamage - shieldDamage);
+
+    bot.shield = clampNumber(shieldBefore - shieldDamage, 0, Number(bot.shieldMax || 0));
+    bot.hull = clampNumber(hullBefore - hullDamage, 0, Number(bot.hullMax || 1));
+    bot.disabled = bot.hull <= 0;
+    bot.disabledUntil = bot.disabled ? now + STAGING_BOT_DISABLED_RESET_MS : 0;
+    bot.lastUpdatedAt = now;
+
+    return {
+      damage: shieldDamage + hullDamage,
+      shieldDamage,
+      hullDamage,
+      shield: bot.shield,
+      hull: bot.hull,
+      disabled: bot.disabled
+    };
+  }
+
+  resolveCombatIntent(client, message = {}, messageType = "combat:intent") {
+    const player = this.touchPlayer(client.sessionId);
     const payloadWarning = validateCombatIntentPayload(message);
     const targetBotId = getStringValue(message.targetBotId);
     const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
@@ -511,23 +573,50 @@ export class LupenSectorRoom extends Room {
       validationReason = `unknown staging bot: ${targetBotId}`;
     }
 
-    if (!validationReason && clientCurrentNode && targetBot.currentNode !== clientCurrentNode) {
+    if (!validationReason && !player.selectedTargetBotId) {
+      validationReason = "no staging bot selected";
+    }
+
+    if (!validationReason && player.selectedTargetBotId !== targetBotId) {
+      validationReason = "combat target does not match selected staging bot";
+    }
+
+    if (!validationReason && clientCurrentNode && clientCurrentNode !== player.currentNode) {
+      validationReason = "combat node does not match player node";
+    }
+
+    if (!validationReason && targetBot.currentNode !== player.currentNode) {
       validationReason = "player and staging bot are not in the same node";
     }
 
-    if (player) player.lastSeenAt = Date.now();
+    if (!validationReason && targetBot.disabled) {
+      validationReason = "staging bot is temporarily disabled";
+    }
 
-    client.send("combat:rejected", {
-      ok: false,
-      reason: "combat_disabled_in_staging",
-      validation: validationReason || "validated_no_damage_applied",
+    if (validationReason) {
+      this.sendCombatRejected(client, "combat_intent_rejected", message, messageType, validationReason);
+      return;
+    }
+
+    const result = this.applyStagingTestDamage(targetBot, STAGING_TEST_DAMAGE);
+
+    client.send("combat:resolved", {
+      ok: true,
+      reason: "staging_damage_applied",
       messageType,
       sessionId: client.sessionId,
       targetBotId,
-      targetNode: targetBot?.currentNode || "",
-      currentNode: player?.currentNode || clientCurrentNode || "",
+      targetNode: targetBot.currentNode,
+      currentNode: player.currentNode,
       weaponId: getStringValue(message.weaponId),
       weaponFamily: getStringValue(message.weaponFamily),
+      damage: result.damage,
+      shieldDamage: result.shieldDamage,
+      hullDamage: result.hullDamage,
+      shield: result.shield,
+      hull: result.hull,
+      disabled: result.disabled,
+      rewardsGranted: false,
       receivedAt: Date.now()
     });
   }

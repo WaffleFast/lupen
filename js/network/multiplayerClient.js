@@ -443,7 +443,9 @@
       currentNode: String(bot.currentNode || "Asteron Prime"),
       lastUpdatedAt: Number.isFinite(Number(bot.lastUpdatedAt)) ? Number(bot.lastUpdatedAt) : 0,
       nextMoveAt: Number.isFinite(Number(bot.nextMoveAt)) ? Number(bot.nextMoveAt) : 0,
-      visualOnly: bot.visualOnly !== false
+      visualOnly: bot.visualOnly !== false,
+      disabled: bot.disabled === true,
+      disabledUntil: Number.isFinite(Number(bot.disabledUntil)) ? Number(bot.disabledUntil) : 0
     };
   }
 
@@ -486,13 +488,30 @@
     activeRoom.onMessage("combat:rejected", (message) => {
       connection.lastCombatResponse = {
         ok: message?.ok === true,
-        reason: String(message?.reason || "combat_disabled_in_staging"),
+        reason: String(message?.reason || "combat_intent_rejected"),
         validation: String(message?.validation || ""),
         targetBotId: String(message?.targetBotId || ""),
         targetNode: String(message?.targetNode || ""),
+        rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server combat intent response", message);
+    });
+
+    activeRoom.onMessage("combat:resolved", (message) => {
+      connection.lastCombatResponse = {
+        ok: message?.ok === true,
+        reason: String(message?.reason || "staging_damage_applied"),
+        targetBotId: String(message?.targetBotId || ""),
+        targetNode: String(message?.targetNode || ""),
+        damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        disabled: message?.disabled === true,
+        rewardsGranted: message?.rewardsGranted === true,
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server combat intent resolved", message);
     });
 
     activeRoom.onMessage("target:selected", (message) => {
@@ -686,6 +705,16 @@
 
     sendCombatIntent(intent = {}) {
       return sendRoomMessage("sendCombatIntent", "combat:intent", intent);
+    },
+
+    sendSelectedStagingBotCombatIntent(intent = {}) {
+      const localPresence = getLocalPresenceOptions();
+      const selectedTargetBotId = playersById.get(connection.sessionId)?.selectedTargetBotId || "";
+      return sendRoomMessage("sendSelectedStagingBotCombatIntent", "combat:intent", {
+        ...intent,
+        targetBotId: intent.targetBotId || selectedTargetBotId,
+        currentNode: intent.currentNode || localPresence.currentNode || ""
+      });
     },
 
     selectStagingBot(botId, options = {}) {

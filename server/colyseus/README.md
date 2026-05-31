@@ -20,7 +20,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `joinedAt` / `lastSeenAt`: local server timestamps
 - On leave, the player is removed.
 - Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
-- Staging-only `combat:intent` messages for future combat pipeline testing. These are validated against server-owned staging bots and always return `combat:rejected` with `reason: combat_disabled_in_staging`.
+- Staging-only `combat:intent` messages for future combat pipeline testing. These are validated against the player's selected same-node staging bot and apply fixed server-owned test damage only.
 - Staging-only `target:select` / `target:clear` messages for lock-on UI preparation. These update `selectedTargetBotId` on the player's presence record only when the server-owned bot is in the same node.
 - Legacy local prototype `move` messages are still accepted for compatibility.
 - Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
@@ -28,14 +28,15 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `id`: stable local dummy bot id
   - `type` / `name`: display-only bot identity such as `Erebus Drone`
   - `faction`: display-only faction such as `Erebus`
-  - `level`, `shield` / `shieldMax`, `hull` / `hullMax`: read-only inspection placeholders
+  - `level`, `shield` / `shieldMax`, `hull` / `hullMax`: staging inspection and test-damage placeholders
+  - `disabled` / `disabledUntil`: temporary staging-only disabled state when hull reaches `0`
   - `visualOnly`: always `true`
   - `currentNode`: visual sector location
   - `x` / `y`: placeholder map position
   - `lastUpdatedAt`: local server timestamp
   - `nextMoveAt`: planned next node-move timestamp for debugging
-- Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot be targeted, do not drop loot, do not grant XP/rewards, and are not persisted.
-- Combat intent handling does not mutate bot shield/hull, player state, progression, rewards, loot, saves, or bounty data. It is only a server-authoritative message path placeholder.
+- Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot enter real target arrays, do not drop loot, do not grant XP/rewards, and are not persisted.
+- Combat intent handling can apply a small fixed shield-first staging test damage amount to a locked same-node staging bot and returns `combat:resolved` with `rewardsGranted: false`. Invalid intents return `combat:rejected`. This does not mutate player state, progression, rewards, loot, saves, bounty data, Supabase data, or real combat systems.
 - Staging target selection does not create real combat targets, timers, scans, rewards, damage, or save data. It is lock-on display state only and is cleared when the player or bot leaves the node.
 
 ## Install
@@ -177,9 +178,10 @@ The regression test uses two Colyseus clients to verify that:
 - Both clients receive the same server-owned bot movement update.
 - Staging bot `currentNode` values stay inside the server's allowed combat node list.
 - At least one staging bot changes node while both clients observe matching state.
-- A valid `combat:intent` against a staging bot receives a safe disabled response.
-- Bot shield/hull remain unchanged after the combat intent.
 - A valid same-node staging bot lock-on updates the player's `selectedTargetBotId`.
+- A valid `combat:intent` against the selected same-node staging bot applies fixed server-owned test damage.
+- Client B receives the same updated staging bot shield/hull values.
+- Invalid combat intents are rejected without rewards or additional damage.
 - Wrong-node and missing-bot lock-on requests are rejected safely.
 - Invalid movement is ignored and returns a dev-only warning.
 - Client B sees client A removed after disconnect.

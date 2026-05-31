@@ -136,6 +136,11 @@
         filter: drop-shadow(0 0 13px rgba(255, 198, 102, 0.7));
       }
 
+      .lupen-mp-space-bot.is-disabled {
+        opacity: 0.48;
+        filter: drop-shadow(0 0 8px rgba(170, 170, 170, 0.4));
+      }
+
       .lupen-mp-space-bot-ship {
         position: relative;
         width: 24px;
@@ -356,7 +361,7 @@
     if (!bot) return "none";
     const shield = `${Math.round(Number(bot.shield || 0))}/${Math.round(Number(bot.shieldMax || 0))}`;
     const hull = `${Math.round(Number(bot.hull || 0))}/${Math.round(Number(bot.hullMax || 0))}`;
-    return `S ${shield} / H ${hull}`;
+    return `${bot.disabled ? "DISABLED / " : ""}S ${shield} / H ${hull}`;
   }
 
   function getBotModeLabel() {
@@ -479,7 +484,7 @@
     };
     const labelOffset = position.x > 82 ? -2.9 : 2.9;
     const group = global.document.createElementNS(SVG_NS, "g");
-    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}`);
+    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}`);
     group.setAttribute("data-bot-id", bot.id || "");
     group.setAttribute("pointer-events", "auto");
     group.style.cursor = "crosshair";
@@ -491,7 +496,7 @@
     });
 
     const title = global.document.createElementNS(SVG_NS, "title");
-    title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / visual only / combat disabled / ${bot.id || "unknown"} / x:${bot.x} y:${bot.y}`;
+    title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards / ${bot.id || "unknown"} / x:${bot.x} y:${bot.y}`;
     group.appendChild(title);
 
     const halo = global.document.createElementNS(SVG_NS, "circle");
@@ -661,7 +666,8 @@
       marker.className = "lupen-mp-space-bot";
       marker.dataset.botId = bot.id || "";
       if (getSelectedTargetBotId() === bot.id) marker.classList.add("is-locked");
-      marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / visual only / combat disabled`;
+      if (bot.disabled) marker.classList.add("is-disabled");
+      marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards`;
       marker.style.left = `${clampMapCoordinate(bot.x || 50)}%`;
       marker.style.top = `${clampMapCoordinate(bot.y || 50)}%`;
       marker.addEventListener("click", (event) => {
@@ -776,7 +782,10 @@
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);
     }
     if (status.lastCombatResponse) {
-      setDiagnosticsRow(panel, "combat intent", status.lastCombatResponse.reason || "received");
+      const combatLabel = status.lastCombatResponse.ok
+        ? `${status.lastCombatResponse.reason || "resolved"} / ${status.lastCombatResponse.damage || 0} dmg`
+        : status.lastCombatResponse.reason || "received";
+      setDiagnosticsRow(panel, "combat intent", combatLabel);
     }
     if (status.lastTargetResponse) {
       setDiagnosticsRow(panel, "lock-on", status.lastTargetResponse.reason || "received");
@@ -788,7 +797,7 @@
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
     note.textContent = isStagingMode(status)
-      ? "Lock-on only - combat disabled. Shared staging bots are server-owned visual placeholders."
+      ? "Staging damage is server-owned test damage only. No rewards, XP, loot, bounties, saves, or progression."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 
