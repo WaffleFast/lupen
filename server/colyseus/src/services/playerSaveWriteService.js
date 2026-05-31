@@ -3,6 +3,9 @@
    default and fail-closed. It supports XP/credits only and never applies
    loot, inventory, bounties, cargo, equipment, or ship changes. */
 
+const MAX_STAGING_XP_DELTA = 500;
+const MAX_STAGING_CREDITS_DELTA = 5000;
+
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
@@ -14,6 +17,40 @@ function getNumberValue(value, fallback = 0) {
 
 function getIntegerValue(value, fallback = 0) {
   return Math.round(getNumberValue(value, fallback));
+}
+
+function clampInteger(value, min, max) {
+  return Math.max(min, Math.min(max, getIntegerValue(value, min)));
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getSupabaseConfig(env = process.env) {
+  return {
+    url: getStringValue(env.SUPABASE_URL),
+    serviceRoleKey: getStringValue(env.SUPABASE_SERVICE_ROLE_KEY)
+  };
+}
+
+function getValidSupabaseUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch (_err) {
+    return "";
+  }
+}
+
+function getPlayerSaveUrl(url, playerId) {
+  const safePlayerId = encodeURIComponent(playerId);
+  return `${url.replace(/\/$/, "")}/rest/v1/player_saves?user_id=eq.${safePlayerId}`;
+}
+
+function getPlayerSaveReadUrl(url, playerId) {
+  return `${getPlayerSaveUrl(url, playerId)}&select=save_data,updated_at&limit=1`;
 }
 
 function getValueAtPath(source = {}, path = []) {
@@ -32,6 +69,16 @@ function resolveNumericPath(saveData = {}, candidatePaths = []) {
     .filter((candidate) => Number.isFinite(Number(candidate.value)));
 
   return matches.length === 1 ? matches[0] : null;
+}
+
+function setValueAtPath(source = {}, path = [], value) {
+  const copy = cloneJson(source);
+  let cursor = copy;
+  path.slice(0, -1).forEach((key) => {
+    cursor = cursor[key];
+  });
+  cursor[path[path.length - 1]] = value;
+  return copy;
 }
 
 function getIdempotencyKey(playerId, sourceEventId, sourceLedgerId) {
@@ -56,14 +103,85 @@ function getAllowlistStatus(playerId, env = process.env) {
   };
 }
 
+function getSaveDataFromRow(row = {}) {
+  return row?.save_data && typeof row.save_data === "object" ? row.save_data : null;
+}
+
+async function fetchPlayerSaveRow(supabaseUrl, playerId, config, fetchImpl) {
+  const response = await fetchImpl(getPlayerSaveReadUrl(supabaseUrl, playerId), {
+    method: "GET",
+    headers: {
+      apikey: config.serviceRoleKey,
+      authorization: `Bearer ${config.serviceRoleKey}`,
+      accept: "application/json"
+    }
+  });
+
+  if (!response?.ok) {
+    return {
+      ok: false,
+      skippedReason: "player_save_read_failed",
+      status: Number(response?.status || 0),
+      row: null
+    };
+  }
+
+  const rows = typeof response.json === "function" ? await response.json() : [];
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  if (!row) {
+    return {
+      ok: false,
+      skippedReason: "player_save_missing",
+      status: response.status || 200,
+      row: null
+    };
+  }
+
+  return {
+    ok: true,
+    skippedReason: "",
+    status: response.status || 200,
+    row
+  };
+}
+
+async function patchPlayerSaveData(supabaseUrl, playerId, saveData, config, fetchImpl) {
+  const response = await fetchImpl(getPlayerSaveUrl(supabaseUrl, playerId), {
+    method: "PATCH",
+    headers: {
+      apikey: config.serviceRoleKey,
+      authorization: `Bearer ${config.serviceRoleKey}`,
+      "content-type": "application/json",
+      prefer: "return=representation"
+    },
+    body: JSON.stringify({
+      save_data: saveData
+    })
+  });
+
+  if (!response?.ok) {
+    return {
+      ok: false,
+      skippedReason: "player_save_patch_failed",
+      status: Number(response?.status || 0)
+    };
+  }
+
+  return {
+    ok: true,
+    skippedReason: "",
+    status: response.status || 200
+  };
+}
+
 export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplicationPlan = {}, context = {}) {
   const playerId = getStringValue(rewardApplicationPlan.playerId || context.playerId);
   const sourceEventId = getStringValue(rewardApplicationPlan.sourceEventId || context.sourceEventId);
   const sourceLedgerId = getStringValue(rewardApplicationPlan.sourceLedgerId || context.sourceLedgerId);
   const duplicateDetected = context.duplicateDetected === true || rewardApplicationPlan.duplicateDetected === true;
   const idempotencyKey = getIdempotencyKey(playerId, sourceEventId, sourceLedgerId);
-  const xpDelta = Math.max(0, getIntegerValue(rewardApplicationPlan.xpDelta, 0));
-  const creditsDelta = Math.max(0, getIntegerValue(rewardApplicationPlan.creditsDelta, 0));
+  const xpDelta = clampInteger(rewardApplicationPlan.xpDelta, 0, MAX_STAGING_XP_DELTA);
+  const creditsDelta = clampInteger(rewardApplicationPlan.creditsDelta, 0, MAX_STAGING_CREDITS_DELTA);
   const xpMatch = resolveNumericPath(currentSaveData, [
     ["playerProgress", "combatXp"]
   ]);
@@ -113,6 +231,7 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
 
 export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
   const env = options.env || process.env;
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
   const allowlistStatus = getAllowlistStatus(plan?.playerId, env);
 
   if (String(env.ENABLE_STAGING_PROGRESSION_WRITES || "").toLowerCase() !== "true") {
@@ -205,23 +324,170 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
     };
   }
 
-  // Future real writes must be tied to this idempotency key and backed by a
-  // durable uniqueness check, ideally the reward ledger source_event_id/applied
-  // record. Only explicit test-account allow-listed users can reach this
-  // branch, and player_saves still stays fail-closed until the final write
-  // path is reviewed.
-  return {
-    ok: false,
-    applied: false,
-    dryRun: true,
-    progressionWritesEnabled: true,
-    idempotencyKey: getStringValue(plan.idempotencyKey),
-    idempotencyReady: true,
-    duplicateDetected: false,
-    ...allowlistStatus,
-    skippedReason: "progression_write_adapter_not_implemented",
-    plan
-  };
+  const config = getSupabaseConfig(env);
+  if (!config.url || !config.serviceRoleKey) {
+    return {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      progressionWritesEnabled: true,
+      idempotencyKey: getStringValue(plan.idempotencyKey),
+      idempotencyReady: true,
+      duplicateDetected: false,
+      ...allowlistStatus,
+      skippedReason: "supabase_config_missing",
+      plan
+    };
+  }
+
+  if (typeof fetchImpl !== "function") {
+    return {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      progressionWritesEnabled: true,
+      idempotencyKey: getStringValue(plan.idempotencyKey),
+      idempotencyReady: true,
+      duplicateDetected: false,
+      ...allowlistStatus,
+      skippedReason: "fetch_unavailable",
+      plan
+    };
+  }
+
+  const supabaseUrl = getValidSupabaseUrl(config.url);
+  if (!supabaseUrl) {
+    return {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      progressionWritesEnabled: true,
+      idempotencyKey: getStringValue(plan.idempotencyKey),
+      idempotencyReady: true,
+      duplicateDetected: false,
+      ...allowlistStatus,
+      skippedReason: "invalid_supabase_url",
+      plan
+    };
+  }
+
+  try {
+    const saveRead = await fetchPlayerSaveRow(supabaseUrl, plan.playerId, config, fetchImpl);
+    if (!saveRead.ok) {
+      return {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        progressionWritesEnabled: true,
+        idempotencyKey: getStringValue(plan.idempotencyKey),
+        idempotencyReady: true,
+        duplicateDetected: false,
+        ...allowlistStatus,
+        skippedReason: saveRead.skippedReason,
+        status: saveRead.status,
+        plan
+      };
+    }
+
+    const saveData = getSaveDataFromRow(saveRead.row);
+    if (!saveData) {
+      return {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        progressionWritesEnabled: true,
+        idempotencyKey: getStringValue(plan.idempotencyKey),
+        idempotencyReady: true,
+        duplicateDetected: false,
+        ...allowlistStatus,
+        skippedReason: "save_data_missing_or_invalid",
+        status: saveRead.status,
+        plan
+      };
+    }
+
+    const refreshedPlan = buildPlayerSavePatchPlan(saveData, {
+      ...plan,
+      eligible: true,
+      authStatus: "verified",
+      playerId: plan.playerId,
+      sourceEventId: plan.sourceEventId,
+      sourceLedgerId: plan.sourceLedgerId,
+      duplicateDetected: false
+    }, {
+      sourceEventId: plan.sourceEventId,
+      sourceLedgerId: plan.sourceLedgerId
+    });
+
+    if (!refreshedPlan.eligible) {
+      return {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        progressionWritesEnabled: true,
+        idempotencyKey: getStringValue(plan.idempotencyKey),
+        idempotencyReady: refreshedPlan.idempotencyReady === true,
+        duplicateDetected: false,
+        ...allowlistStatus,
+        skippedReason: refreshedPlan.skippedReason || "player_save_patch_plan_invalid",
+        status: saveRead.status,
+        plan: refreshedPlan
+      };
+    }
+
+    const withXp = setValueAtPath(saveData, ["playerProgress", "combatXp"], refreshedPlan.xpAfter);
+    const updatedSaveData = setValueAtPath(withXp, ["credits"], refreshedPlan.creditsAfter);
+    const patchResult = await patchPlayerSaveData(supabaseUrl, plan.playerId, updatedSaveData, config, fetchImpl);
+
+    if (!patchResult.ok) {
+      return {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        progressionWritesEnabled: true,
+        idempotencyKey: getStringValue(plan.idempotencyKey),
+        idempotencyReady: true,
+        duplicateDetected: false,
+        ...allowlistStatus,
+        skippedReason: patchResult.skippedReason,
+        status: patchResult.status,
+        plan: refreshedPlan
+      };
+    }
+
+    return {
+      ok: true,
+      applied: true,
+      dryRun: false,
+      progressionWritesEnabled: true,
+      idempotencyKey: getStringValue(plan.idempotencyKey),
+      idempotencyReady: true,
+      duplicateDetected: false,
+      ...allowlistStatus,
+      skippedReason: "",
+      status: patchResult.status,
+      xpBefore: refreshedPlan.xpBefore,
+      xpAfter: refreshedPlan.xpAfter,
+      creditsBefore: refreshedPlan.creditsBefore,
+      creditsAfter: refreshedPlan.creditsAfter,
+      appliedFields: ["xp", "credits"],
+      plan: refreshedPlan
+    };
+  } catch (_err) {
+    return {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      progressionWritesEnabled: true,
+      idempotencyKey: getStringValue(plan.idempotencyKey),
+      idempotencyReady: true,
+      duplicateDetected: false,
+      ...allowlistStatus,
+      skippedReason: "player_save_patch_failed",
+      status: 0,
+      plan
+    };
+  }
 }
 
 export const PlayerSaveWriteService = Object.freeze({

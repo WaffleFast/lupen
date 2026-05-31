@@ -1056,7 +1056,9 @@ export class LupenSectorRoom extends Room {
       duplicateDetected
     });
     const playerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan);
-    if (playerSavePatchPlan.idempotencyReady && !playerSavePatchPlan.duplicateDetected) {
+    if (playerSavePatchPlan.idempotencyReady &&
+      !playerSavePatchPlan.duplicateDetected &&
+      (playerSavePatchResult.applied === true || playerSavePatchResult.progressionWritesEnabled !== true)) {
       this.rewardApplicationIdempotencyKeys.add(playerSavePatchPlan.idempotencyKey);
     }
 

@@ -471,7 +471,90 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(allowlistedPlayerSavePatchResult?.stagingWriteAllowlistPresent === true, "Allow-listed player_saves patch adapter did not report allow-list present.");
   assert(allowlistedPlayerSavePatchResult?.playerInStagingWriteAllowlist === true, "Allow-listed player_saves patch adapter did not allow the player.");
   assert(allowlistedPlayerSavePatchResult?.idempotencyReady === true, "Allow-listed player_saves patch adapter did not keep idempotency ready.");
-  assert(allowlistedPlayerSavePatchResult?.skippedReason === "progression_write_adapter_not_implemented", `Unexpected allow-listed player_saves patch reason: ${allowlistedPlayerSavePatchResult?.skippedReason}`);
+  assert(allowlistedPlayerSavePatchResult?.skippedReason === "supabase_config_missing", `Unexpected allow-listed missing-config player_saves patch reason: ${allowlistedPlayerSavePatchResult?.skippedReason}`);
+
+  const invalidShapePlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_ALLOWLIST: "verified-player-a",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      assert(options.method === "GET", "Invalid-shape player_saves test should only read.");
+      assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a&select=save_data,updated_at&limit=1", `Unexpected invalid-shape player_saves read URL: ${url}`);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [{
+            save_data: {
+              credits: 1200,
+              playerProgress: {},
+              inventoryItems: [{ id: "loot-a" }]
+            }
+          }];
+        }
+      };
+    }
+  });
+  assert(invalidShapePlayerSavePatchResult?.dryRun === true, "Invalid-shape player_saves patch result was not dry-run.");
+  assert(invalidShapePlayerSavePatchResult?.applied === false, "Invalid-shape player_saves patch result applied progression.");
+  assert(invalidShapePlayerSavePatchResult?.skippedReason === "xp_path_missing_or_ambiguous", `Unexpected invalid-shape player_saves patch reason: ${invalidShapePlayerSavePatchResult?.skippedReason}`);
+
+  const patchedCalls = [];
+  const validPatchPlayerSaveResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_ALLOWLIST: "verified-player-a",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (url, options = {}) => {
+      patchedCalls.push({ url, options });
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return [{
+              save_data: validMockSaveData
+            }];
+          }
+        };
+      }
+
+      if (options.method === "PATCH") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return [];
+          }
+        };
+      }
+
+      throw new Error(`Unexpected mocked player_saves method: ${options.method}`);
+    }
+  });
+  assert(validPatchPlayerSaveResult?.ok === true, "Valid mocked player_saves patch did not succeed.");
+  assert(validPatchPlayerSaveResult?.applied === true, "Valid mocked player_saves patch was not applied.");
+  assert(validPatchPlayerSaveResult?.dryRun === false, "Valid mocked player_saves patch stayed dry-run.");
+  assert(validPatchPlayerSaveResult?.xpBefore === 80 && validPatchPlayerSaveResult?.xpAfter === 100, "Valid mocked player_saves patch did not apply XP delta.");
+  assert(validPatchPlayerSaveResult?.creditsBefore === 1200 && validPatchPlayerSaveResult?.creditsAfter === 1232, "Valid mocked player_saves patch did not apply credits delta.");
+  assert(Array.isArray(validPatchPlayerSaveResult?.appliedFields), "Valid mocked player_saves patch did not include applied fields.");
+  assert(validPatchPlayerSaveResult.appliedFields.join(",") === "xp,credits", `Unexpected mocked player_saves applied fields: ${validPatchPlayerSaveResult.appliedFields.join(",")}`);
+  assert(patchedCalls.length === 2, `Expected one read and one patch call, got ${patchedCalls.length}.`);
+  assert(patchedCalls[0].url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a&select=save_data,updated_at&limit=1", `Unexpected player_saves read URL: ${patchedCalls[0].url}`);
+  assert(patchedCalls[0].options.method === "GET", "Valid mocked player_saves first call was not GET.");
+  assert(patchedCalls[1].url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a", `Unexpected player_saves patch URL: ${patchedCalls[1].url}`);
+  assert(patchedCalls[1].options.method === "PATCH", "Valid mocked player_saves second call was not PATCH.");
+  const patchedBody = JSON.parse(patchedCalls[1].options.body);
+  assert(patchedBody.save_data.playerProgress.combatXp === 100, "Patched save_data did not update combat XP.");
+  assert(patchedBody.save_data.credits === 1232, "Patched save_data did not update credits.");
+  assert(patchedBody.save_data.playerProgress.level === 3, "Patched save_data changed unrelated playerProgress level.");
+  assert(patchedBody.save_data.inventoryItems.length === 2, "Patched save_data changed inventory item count.");
+  assert(patchedBody.save_data.inventoryItems[0].id === "loot-a", "Patched save_data changed inventory contents.");
 
   const duplicatePlayerSavePatchPlan = buildPlayerSavePatchPlan(validMockSaveData, applicationPlan, {
     sourceEventId: "reward-preview-stub",

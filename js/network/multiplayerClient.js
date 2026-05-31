@@ -787,6 +787,9 @@
       progressionWritesEnabled: result.progressionWritesEnabled === true,
       stagingWriteAllowlistPresent: result.stagingWriteAllowlistPresent === true,
       playerInStagingWriteAllowlist: result.playerInStagingWriteAllowlist === true,
+      appliedFields: Array.isArray(result.appliedFields)
+        ? result.appliedFields.map((field) => String(field || "")).filter(Boolean)
+        : [],
       plan: normalizePlayerSavePatchPlan(result.plan)
     };
   }
