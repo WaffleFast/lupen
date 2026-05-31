@@ -23,6 +23,7 @@
   let renderQueued = false;
   let diagnosticsTimer = null;
   const shipImageLoadStatus = new Map();
+  const botImageLoadStatus = new Map();
   const shipImageById = {
     lupenOrigin: "assets/ships/lupen-origin.png",
     lupenHauler: "assets/ships/lupen-hauler.png",
@@ -956,14 +957,60 @@
     return String(bot.name || bot.type || "DEV BOT").trim().slice(0, 18) || "DEV BOT";
   }
 
-  function getBotImageSrc(bot) {
+  function getStagingBotImage(bot) {
     const explicit = String(bot?.image || bot?.imageSrc || bot?.imagePath || "").trim().replace(/\\/g, "/");
     if (explicit && /^assets\/bots\/[a-z0-9-]+\.png$/i.test(explicit) && !explicit.includes("..") && !explicit.includes("//")) {
       return explicit;
     }
 
-    const typeKey = normalizeShipLookupKey(bot?.type || bot?.name || "");
+    const rawType = String(
+      bot?.type ||
+      bot?.botType ||
+      bot?.kind ||
+      bot?.name ||
+      ""
+    ).toLowerCase();
+
+    if (rawType.includes("behemoth")) return "assets/bots/erebus-behemoth.png";
+    if (rawType.includes("destroyer")) return "assets/bots/erebus-destroyer.png";
+    if (rawType.includes("attacker")) return "assets/bots/erebus-attacker.png";
+    if (rawType.includes("hunter")) return "assets/bots/erebus-hunter.png";
+
+    const typeKey = normalizeShipLookupKey(rawType);
     return botImageByType[typeKey] || "assets/bots/erebus-attacker.png";
+  }
+
+  function trackBotImageLoad(src) {
+    if (!src || botImageLoadStatus.has(src) || typeof global.Image !== "function") return;
+    botImageLoadStatus.set(src, "loading");
+    const image = new global.Image();
+    image.onload = () => {
+      botImageLoadStatus.set(src, "loaded");
+      scheduleRender();
+    };
+    image.onerror = () => {
+      botImageLoadStatus.set(src, "failed");
+      scheduleRender();
+    };
+    image.src = src;
+  }
+
+  function getBotImageRenderSrc(bot) {
+    const src = getStagingBotImage(bot);
+    if (!src) return "";
+    trackBotImageLoad(src);
+    return botImageLoadStatus.get(src) === "failed" ? "" : src;
+  }
+
+  function getBotImageLoadLabel(bot) {
+    const src = getStagingBotImage(bot);
+    if (!src) return "missing";
+    trackBotImageLoad(src);
+    return botImageLoadStatus.get(src) || "loading";
+  }
+
+  function isBotFallbackActive(bot) {
+    return getBotImageLoadLabel(bot) === "failed";
   }
 
   function getBotInspectionLabel(bot) {
@@ -1199,22 +1246,37 @@
       group.appendChild(damageText);
     }
 
-    const ship = global.document.createElementNS(SVG_NS, "polygon");
-    ship.setAttribute("points", "0,-2.25 1.65,1.25 0.65,0.9 0,2.15 -0.65,0.9 -1.65,1.25");
-    ship.setAttribute("fill", "rgba(255, 132, 69, 0.66)");
-    ship.setAttribute("stroke", "rgba(255, 225, 185, 0.82)");
-    ship.setAttribute("stroke-width", "0.18");
-    ship.setAttribute("filter", "drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72))");
-    group.appendChild(ship);
+    const botImage = getBotImageRenderSrc(bot);
+    if (botImage) {
+      const ship = global.document.createElementNS(SVG_NS, "image");
+      ship.setAttribute("href", botImage);
+      ship.setAttributeNS(XLINK_NS, "xlink:href", botImage);
+      ship.setAttribute("x", "-2.8");
+      ship.setAttribute("y", "-2.8");
+      ship.setAttribute("width", "5.6");
+      ship.setAttribute("height", "5.6");
+      ship.setAttribute("opacity", bot.disabled ? "0.44" : "0.86");
+      ship.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      ship.setAttribute("filter", "drop-shadow(0 0 2px rgba(255, 113, 55, 0.68))");
+      group.appendChild(ship);
+    } else {
+      const ship = global.document.createElementNS(SVG_NS, "polygon");
+      ship.setAttribute("points", "0,-2.25 1.65,1.25 0.65,0.9 0,2.15 -0.65,0.9 -1.65,1.25");
+      ship.setAttribute("fill", "rgba(255, 132, 69, 0.66)");
+      ship.setAttribute("stroke", "rgba(255, 225, 185, 0.82)");
+      ship.setAttribute("stroke-width", "0.18");
+      ship.setAttribute("filter", "drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72))");
+      group.appendChild(ship);
 
-    const core = global.document.createElementNS(SVG_NS, "circle");
-    core.setAttribute("cx", "0");
-    core.setAttribute("cy", "0.05");
-    core.setAttribute("r", "0.42");
-    core.setAttribute("fill", "rgba(48, 9, 4, 0.8)");
-    core.setAttribute("stroke", "rgba(255, 230, 194, 0.82)");
-    core.setAttribute("stroke-width", "0.1");
-    group.appendChild(core);
+      const core = global.document.createElementNS(SVG_NS, "circle");
+      core.setAttribute("cx", "0");
+      core.setAttribute("cy", "0.05");
+      core.setAttribute("r", "0.42");
+      core.setAttribute("fill", "rgba(48, 9, 4, 0.8)");
+      core.setAttribute("stroke", "rgba(255, 230, 194, 0.82)");
+      core.setAttribute("stroke-width", "0.1");
+      group.appendChild(core);
+    }
 
     const note = global.document.createElementNS(SVG_NS, "text");
     note.setAttribute("x", labelOffset);
@@ -1374,16 +1436,28 @@
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-bot-ship";
       const image = global.document.createElement("img");
-      image.src = getBotImageSrc(bot);
+      const botImage = getBotImageRenderSrc(bot);
+      image.src = botImage;
       image.alt = "";
+      image.onload = () => {
+        botImageLoadStatus.set(botImage, "loaded");
+      };
       image.onerror = () => {
+        botImageLoadStatus.set(botImage, "failed");
         image.remove();
         if (ship.querySelector(".lupen-mp-space-bot-ship-fallback")) return;
         const fallback = global.document.createElement("span");
         fallback.className = "lupen-mp-space-bot-ship-fallback";
         ship.appendChild(fallback);
+        scheduleRender();
       };
-      ship.appendChild(image);
+      if (botImage) {
+        ship.appendChild(image);
+      } else {
+        const fallback = global.document.createElement("span");
+        fallback.className = "lupen-mp-space-bot-ship-fallback";
+        ship.appendChild(fallback);
+      }
       marker.appendChild(ship);
 
       const label = global.document.createElement("div");
@@ -2098,6 +2172,8 @@
       setDiagnosticsRow(panel, "inspect bot", getBotInspectionLabel(inspectedBot));
       setDiagnosticsRow(panel, "bot node", getBotLayerSummary(inspectedBot));
       setDiagnosticsRow(panel, "bot status", getBotHullSummary(inspectedBot));
+      setDiagnosticsRow(panel, "bot image", compactPath(getStagingBotImage(inspectedBot)));
+      setDiagnosticsRow(panel, "bot img status", `${getBotImageLoadLabel(inspectedBot)} / fallback ${isBotFallbackActive(inspectedBot) ? "yes" : "no"}`);
       setDiagnosticsRow(panel, "weapon", `${status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "unknown"} / dmg ${Math.round(Number(status.lastCombatResponse?.stagingDamage || weaponIntent.damage || 0))}`);
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
