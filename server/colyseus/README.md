@@ -193,3 +193,5 @@ This page is served only by the local prototype server. It is not imported by th
 This package is intentionally separate from the browser game files. The main Lupen frontend does not import or connect to this server yet.
 
 Colyseus Cloud staging deployment is planned for a later step. Nothing in this local prototype deploys Colyseus, connects `lupen.io` to Colyseus, or enables multiplayer for production players.
+
+Redeploy trigger: Colyseus Cloud environment refresh.
