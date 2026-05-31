@@ -141,6 +141,14 @@
         filter: drop-shadow(0 0 8px rgba(170, 170, 170, 0.4));
       }
 
+      .lupen-mp-space-bot.is-hit {
+        animation: lupen-mp-staging-hit 0.62s ease-out;
+      }
+
+      .${botMarkerClass}.is-hit {
+        animation: lupen-mp-sector-bot-hit 0.62s ease-out;
+      }
+
       .lupen-mp-space-bot-ship {
         position: relative;
         width: 24px;
@@ -185,6 +193,36 @@
       .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-note::after {
         content: " / LOCK";
         color: #fff4c7;
+      }
+
+      @keyframes lupen-mp-staging-hit {
+        0% {
+          transform: translate(-50%, -50%) scale(1);
+          filter: drop-shadow(0 0 8px rgba(255, 128, 62, 0.42));
+        }
+        35% {
+          transform: translate(-50%, -50%) scale(1.16);
+          filter: drop-shadow(0 0 18px rgba(255, 236, 158, 0.9));
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1);
+          filter: drop-shadow(0 0 8px rgba(255, 128, 62, 0.42));
+        }
+      }
+
+      @keyframes lupen-mp-sector-bot-hit {
+        0% {
+          opacity: 0.72;
+          filter: drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72));
+        }
+        35% {
+          opacity: 1;
+          filter: drop-shadow(0 0 4.6px rgba(255, 236, 158, 0.95));
+        }
+        100% {
+          opacity: 0.72;
+          filter: drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72));
+        }
       }
 
       #${diagnosticsPanelId} {
@@ -239,6 +277,38 @@
         border-top: 1px solid rgba(255, 176, 95, 0.18);
         color: rgba(255, 224, 188, 0.86);
         font: 700 9px/1.25 Arial, sans-serif;
+      }
+
+      #${diagnosticsPanelId} .lupen-mp-diagnostics-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 176, 95, 0.18);
+        pointer-events: auto;
+      }
+
+      #${diagnosticsPanelId} .lupen-mp-test-fire-button {
+        min-height: 24px;
+        padding: 4px 8px;
+        border: 1px solid rgba(255, 201, 118, 0.58);
+        border-radius: 4px;
+        background: rgba(78, 26, 6, 0.86);
+        color: #ffe6bd;
+        box-shadow: 0 0 10px rgba(255, 139, 69, 0.2);
+        cursor: pointer;
+        font: 800 10px/1 Arial, sans-serif;
+        text-transform: uppercase;
+      }
+
+      #${diagnosticsPanelId} .lupen-mp-test-fire-button:hover {
+        background: rgba(110, 39, 11, 0.92);
+        color: #fff4d6;
+      }
+
+      #${diagnosticsPanelId} .lupen-mp-test-fire-button:disabled {
+        opacity: 0.46;
+        cursor: default;
       }
     `;
     global.document.head.appendChild(style);
@@ -372,6 +442,16 @@
     return getClient()?.getStatus?.()?.selectedTargetBotId || "";
   }
 
+  function isSameCurrentNode(entity) {
+    return normalizeNodeKey(entity?.currentNode) === normalizeNodeKey(getCurrentNodeName());
+  }
+
+  function wasRecentlyHit(bot, status = getClient()?.getStatus?.()) {
+    const response = status?.lastCombatResponse;
+    if (!bot?.id || !response?.ok || response.targetBotId !== bot.id) return false;
+    return Date.now() - Number(response.receivedAt || 0) < 1200;
+  }
+
   function selectStagingBot(bot) {
     if (!bot?.id) return;
     const client = getClient();
@@ -484,7 +564,7 @@
     };
     const labelOffset = position.x > 82 ? -2.9 : 2.9;
     const group = global.document.createElementNS(SVG_NS, "g");
-    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}`);
+    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}${wasRecentlyHit(bot) ? " is-hit" : ""}`);
     group.setAttribute("data-bot-id", bot.id || "");
     group.setAttribute("pointer-events", "auto");
     group.style.cursor = "crosshair";
@@ -607,8 +687,7 @@
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
-    const currentNodeName = getCurrentNodeName();
-    const localPlayers = players.filter((player) => normalizeNodeKey(player.currentNode) === normalizeNodeKey(currentNodeName));
+    const localPlayers = players.filter((player) => isSameCurrentNode(player));
     if (!localPlayers.length) return;
 
     ensureStyles();
@@ -651,8 +730,7 @@
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
-    const currentNodeName = getCurrentNodeName();
-    const localBots = bots.filter((bot) => normalizeNodeKey(bot.currentNode) === normalizeNodeKey(currentNodeName));
+    const localBots = bots.filter((bot) => isSameCurrentNode(bot));
     if (!localBots.length) return;
 
     ensureStyles();
@@ -667,6 +745,7 @@
       marker.dataset.botId = bot.id || "";
       if (getSelectedTargetBotId() === bot.id) marker.classList.add("is-locked");
       if (bot.disabled) marker.classList.add("is-disabled");
+      if (wasRecentlyHit(bot)) marker.classList.add("is-hit");
       marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards`;
       marker.style.left = `${clampMapCoordinate(bot.x || 50)}%`;
       marker.style.top = `${clampMapCoordinate(bot.y || 50)}%`;
@@ -697,13 +776,11 @@
   }
 
   function getSameNodePlayers(players) {
-    const currentNodeName = getCurrentNodeName();
-    return players.filter((player) => normalizeNodeKey(player.currentNode) === normalizeNodeKey(currentNodeName));
+    return players.filter((player) => isSameCurrentNode(player));
   }
 
   function getSameNodeBots(bots) {
-    const currentNodeName = getCurrentNodeName();
-    return bots.filter((bot) => normalizeNodeKey(bot.currentNode) === normalizeNodeKey(currentNodeName));
+    return bots.filter((bot) => isSameCurrentNode(bot));
   }
 
   function getInspectedBot(bots) {
@@ -741,6 +818,48 @@
     row.appendChild(valueNode);
 
     panel.appendChild(row);
+  }
+
+  function canSendStagingTestFire(status, selectedBot) {
+    return !!status?.enabled &&
+      !!status?.isConnected &&
+      !!selectedBot?.id &&
+      !selectedBot.disabled &&
+      isSameCurrentNode(selectedBot);
+  }
+
+  function sendStagingTestFire(selectedBot) {
+    if (!canSendStagingTestFire(getClient()?.getStatus?.(), selectedBot)) return;
+
+    // Diagnostics-only staging damage path. This does not call local combat,
+    // projectile, sound, bounty, reward, save, or targeting systems.
+    getClient()?.sendSelectedStagingBotCombatIntent?.({
+      targetBotId: selectedBot.id,
+      currentNode: getCurrentNodeName(),
+      weaponId: "stagingTestFire",
+      weaponFamily: "staging-test",
+      timestamp: Date.now()
+    });
+  }
+
+  function addDiagnosticsActions(panel, status, selectedBot) {
+    if (!canSendStagingTestFire(status, selectedBot)) return;
+
+    const actions = global.document.createElement("div");
+    actions.className = "lupen-mp-diagnostics-actions";
+
+    const button = global.document.createElement("button");
+    button.type = "button";
+    button.className = "lupen-mp-test-fire-button";
+    button.textContent = "Test Fire";
+    button.title = "Send staging-only server test damage. No real combat or rewards.";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      sendStagingTestFire(selectedBot);
+    });
+    actions.appendChild(button);
+    panel.appendChild(actions);
   }
 
   function renderDiagnostics(players, bots) {
@@ -786,6 +905,10 @@
         ? `${status.lastCombatResponse.reason || "resolved"} / ${status.lastCombatResponse.damage || 0} dmg`
         : status.lastCombatResponse.reason || "received";
       setDiagnosticsRow(panel, "combat intent", combatLabel);
+      if (status.lastCombatResponse.ok) {
+        setDiagnosticsRow(panel, "last damage", `${status.lastCombatResponse.damage || 0} / rewards no`);
+        setDiagnosticsRow(panel, "after hit", `${status.lastCombatResponse.disabled ? "disabled / " : ""}S ${Math.round(Number(status.lastCombatResponse.shield || 0))} / H ${Math.round(Number(status.lastCombatResponse.hull || 0))}`);
+      }
     }
     if (status.lastTargetResponse) {
       setDiagnosticsRow(panel, "lock-on", status.lastTargetResponse.reason || "received");
@@ -800,6 +923,8 @@
       ? "Staging damage is server-owned test damage only. No rewards, XP, loot, bounties, saves, or progression."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
+
+    addDiagnosticsActions(panel, status, selectedBot);
 
     global.document.body.appendChild(panel);
   }
