@@ -23,6 +23,18 @@ const publicRoot = path.join(prototypeRoot, "public");
 const browserClientPath = path.join(prototypeRoot, "node_modules", "colyseus.js", "dist", "colyseus.js");
 const allowedCorsOriginSet = new Set(ALLOWED_CORS_ORIGINS);
 
+export function getHealthPayload(port = process.env.PORT || 2567) {
+  return {
+    ok: true,
+    service: "lupen-colyseus-prototype",
+    status: process.env.NODE_ENV === "production" ? "staging-ready" : "local-only",
+    rooms: [ROOM_NAME, LEGACY_ROOM_NAME],
+    preferredRoom: ROOM_NAME,
+    environment: process.env.NODE_ENV || "development",
+    port: Number(port)
+  };
+}
+
 function isCorsOriginAllowed(origin) {
   return !origin || allowedCorsOriginSet.has(origin);
 }
@@ -76,13 +88,7 @@ export function createHttpServer() {
 
       if (requestUrl.pathname === "/" || requestUrl.pathname === "/health") {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          ok: true,
-          service: "lupen-colyseus-prototype",
-          status: process.env.NODE_ENV === "production" ? "staging-ready" : "local-only",
-          preferredRoom: ROOM_NAME,
-          rooms: [ROOM_NAME, LEGACY_ROOM_NAME]
-        }));
+        res.end(JSON.stringify(getHealthPayload()));
         return;
       }
 
