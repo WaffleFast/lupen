@@ -467,6 +467,10 @@ export class LupenSectorRoom extends Room {
     // Short-lived staging reward preview cache. Claims against this cache are
     // simulation-only acknowledgements and never mark real rewards as claimed.
     this.rewardPreviews = new Map();
+    // In-memory staging duplicate guard for the future player_saves write path.
+    // Durable duplicate protection should later use a server-side ledger
+    // uniqueness key such as source_event_id before real progression writes.
+    this.rewardApplicationIdempotencyKeys = new Set();
 
     this.spawnDummyBots();
     this.botInterval = this.clock.setInterval(() => {
@@ -1042,11 +1046,19 @@ export class LupenSectorRoom extends Room {
         }
       }
       : {};
+    const idempotencyKey = rewardApplicationPlan.playerId && rewardApplicationPlan.sourceEventId
+      ? `${rewardApplicationPlan.playerId}:${rewardApplicationPlan.sourceEventId}`
+      : "";
+    const duplicateDetected = idempotencyKey ? this.rewardApplicationIdempotencyKeys.has(idempotencyKey) : false;
     const playerSavePatchPlan = buildPlayerSavePatchPlan(previewSaveData, rewardApplicationPlan, {
       sourceEventId: preview.rewardPreviewId,
-      sourceLedgerId: rewardLedgerResult?.ledgerId || ""
+      sourceLedgerId: rewardLedgerResult?.ledgerId || "",
+      duplicateDetected
     });
     const playerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan);
+    if (playerSavePatchPlan.idempotencyReady && !playerSavePatchPlan.duplicateDetected) {
+      this.rewardApplicationIdempotencyKeys.add(playerSavePatchPlan.idempotencyKey);
+    }
 
     client.send("reward:claim_preview_result", {
       ...preview,

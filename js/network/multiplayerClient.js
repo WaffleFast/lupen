@@ -658,6 +658,9 @@
       reason: String(plan.reason || "staging_bot_disabled"),
       sourceLedgerId: String(plan.sourceLedgerId || ""),
       sourceEventId: String(plan.sourceEventId || ""),
+      idempotencyKey: String(plan.idempotencyKey || ""),
+      idempotencyReady: plan.idempotencyReady === true,
+      duplicateDetected: plan.duplicateDetected === true,
       contributionPercent: Number.isFinite(Number(plan.contributionPercent)) ? Number(plan.contributionPercent) : 0,
       finalHit: plan.finalHit === true,
       topContributor: plan.topContributor === true,
@@ -676,6 +679,9 @@
       applied: result.applied === true,
       dryRun: result.dryRun !== false,
       skippedReason: String(result.skippedReason || ""),
+      idempotencyKey: String(result.idempotencyKey || ""),
+      idempotencyReady: result.idempotencyReady === true,
+      duplicateDetected: result.duplicateDetected === true,
       plan: normalizeRewardApplicationPlan(result.plan)
     };
   }
@@ -741,6 +747,9 @@
       playerId: String(plan.playerId || ""),
       sourceEventId: String(plan.sourceEventId || ""),
       sourceLedgerId: String(plan.sourceLedgerId || ""),
+      idempotencyKey: String(plan.idempotencyKey || ""),
+      idempotencyReady: plan.idempotencyReady === true,
+      duplicateDetected: plan.duplicateDetected === true,
       xpPath: String(plan.xpPath || ""),
       creditsPath: String(plan.creditsPath || ""),
       xpDelta: Number.isFinite(Number(plan.xpDelta)) ? Number(plan.xpDelta) : 0,
@@ -753,6 +762,8 @@
       eligible: plan.eligible === true,
       skippedReason: String(plan.skippedReason || ""),
       progressionWritesEnabled: plan.progressionWritesEnabled === true,
+      stagingWriteAllowlistPresent: plan.stagingWriteAllowlistPresent === true,
+      playerInStagingWriteAllowlist: plan.playerInStagingWriteAllowlist === true,
       applied: plan.applied === true,
       dryRun: plan.dryRun !== false
     };
@@ -766,11 +777,16 @@
       applied: result.applied === true,
       dryRun: result.dryRun !== false,
       skippedReason: String(result.skippedReason || ""),
+      idempotencyKey: String(result.idempotencyKey || ""),
+      idempotencyReady: result.idempotencyReady === true,
+      duplicateDetected: result.duplicateDetected === true,
       xpBefore: Number.isFinite(Number(result.xpBefore)) ? Number(result.xpBefore) : null,
       xpAfter: Number.isFinite(Number(result.xpAfter)) ? Number(result.xpAfter) : null,
       creditsBefore: Number.isFinite(Number(result.creditsBefore)) ? Number(result.creditsBefore) : null,
       creditsAfter: Number.isFinite(Number(result.creditsAfter)) ? Number(result.creditsAfter) : null,
       progressionWritesEnabled: result.progressionWritesEnabled === true,
+      stagingWriteAllowlistPresent: result.stagingWriteAllowlistPresent === true,
+      playerInStagingWriteAllowlist: result.playerInStagingWriteAllowlist === true,
       plan: normalizePlayerSavePatchPlan(result.plan)
     };
   }

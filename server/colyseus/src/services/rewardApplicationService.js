@@ -18,6 +18,11 @@ function getLootList(value) {
     : [];
 }
 
+function getIdempotencyKey(playerId, sourceEventId, sourceLedgerId) {
+  const sourceKey = sourceEventId || sourceLedgerId;
+  return playerId && sourceKey ? `${playerId}:${sourceKey}` : "";
+}
+
 export function isProgressionWriteEnabled(env = process.env) {
   return String(env.ENABLE_STAGING_PROGRESSION_WRITES || "").toLowerCase() === "true";
 }
@@ -39,6 +44,9 @@ export function buildRewardApplicationPlan(rewardPlanOrLedgerEntry = {}, context
   const blockedReason = eligible
     ? ""
     : getStringValue(rewardPlanOrLedgerEntry.blockedReason || metadata.blockedReason, authStatus === "guest" ? "identity_guest" : "identity_unverified");
+  const sourceLedgerId = getStringValue(context.sourceLedgerId || rewardPlanOrLedgerEntry.ledgerId || rewardPlanOrLedgerEntry.id);
+  const sourceEventId = getStringValue(context.sourceEventId || rewardPlanOrLedgerEntry.rewardPreviewId || rewardPlanOrLedgerEntry.source_event_id);
+  const idempotencyKey = getIdempotencyKey(playerId, sourceEventId, sourceLedgerId);
 
   return {
     playerId: eligible ? playerId : "",
@@ -51,8 +59,11 @@ export function buildRewardApplicationPlan(rewardPlanOrLedgerEntry = {}, context
     creditsDelta: Math.max(0, Math.round(getNumberValue(rewardPlanOrLedgerEntry.intendedCredits ?? rewardPlanOrLedgerEntry.credits_amount, 0))),
     lootAdditions: getLootList(rewardPlanOrLedgerEntry.intendedLoot || rewardPlanOrLedgerEntry.loot),
     reason: getStringValue(rewardPlanOrLedgerEntry.intendedReason || rewardPlanOrLedgerEntry.reward_reason, "staging_bot_disabled"),
-    sourceLedgerId: getStringValue(context.sourceLedgerId || rewardPlanOrLedgerEntry.ledgerId || rewardPlanOrLedgerEntry.id),
-    sourceEventId: getStringValue(context.sourceEventId || rewardPlanOrLedgerEntry.rewardPreviewId || rewardPlanOrLedgerEntry.source_event_id),
+    sourceLedgerId,
+    sourceEventId,
+    idempotencyKey: eligible ? idempotencyKey : "",
+    idempotencyReady: eligible && !!idempotencyKey,
+    duplicateDetected: context.duplicateDetected === true || rewardPlanOrLedgerEntry.duplicateDetected === true,
     contributionPercent: Math.max(0, Math.min(100, getNumberValue(rewardPlanOrLedgerEntry.contributionPercent ?? rewardPlanOrLedgerEntry.contribution_percent, 0))),
     finalHit: rewardPlanOrLedgerEntry.finalHit === true || rewardPlanOrLedgerEntry.final_hit === true,
     topContributor: rewardPlanOrLedgerEntry.topContributor === true || rewardPlanOrLedgerEntry.top_contributor === true,
@@ -71,6 +82,9 @@ export async function applyRewardApplicationPlan(plan = {}, options = {}) {
       ok: false,
       applied: false,
       dryRun: true,
+      idempotencyKey: getStringValue(plan?.idempotencyKey),
+      idempotencyReady: plan?.idempotencyReady === true,
+      duplicateDetected: plan?.duplicateDetected === true,
       skippedReason: "reward_application_not_eligible",
       plan
     };
@@ -81,6 +95,9 @@ export async function applyRewardApplicationPlan(plan = {}, options = {}) {
       ok: true,
       applied: false,
       dryRun: true,
+      idempotencyKey: getStringValue(plan?.idempotencyKey),
+      idempotencyReady: plan?.idempotencyReady === true,
+      duplicateDetected: plan?.duplicateDetected === true,
       skippedReason: "progression_writes_disabled",
       plan
     };
@@ -92,6 +109,9 @@ export async function applyRewardApplicationPlan(plan = {}, options = {}) {
     ok: false,
     applied: false,
     dryRun: true,
+    idempotencyKey: getStringValue(plan?.idempotencyKey),
+    idempotencyReady: plan?.idempotencyReady === true,
+    duplicateDetected: plan?.duplicateDetected === true,
     skippedReason: "progression_write_adapter_not_implemented",
     plan
   };

@@ -1210,7 +1210,12 @@
     const eligibility = plan?.eligible ? "eligible" : `blocked ${plan?.blockedReason || result?.skippedReason || "not verified"}`;
     const loot = plan?.lootAdditions?.length ? plan.lootAdditions.join(", ") : "none";
     const skipped = result?.skippedReason ? ` / ${result.skippedReason}` : "";
-    return `${eligibility} / XP +${plan?.xpDelta || 0} / C +${plan?.creditsDelta || 0} / loot ${loot}${skipped} / dry-run`;
+    const idempotency = result?.duplicateDetected || plan?.duplicateDetected
+      ? "duplicate"
+      : result?.idempotencyReady || plan?.idempotencyReady
+        ? "idempotency ready"
+        : "idempotency not ready";
+    return `${eligibility} / ${idempotency} / XP +${plan?.xpDelta || 0} / C +${plan?.creditsDelta || 0} / loot ${loot}${skipped} / dry-run`;
   }
 
   function formatPreviewValue(value) {
@@ -1245,12 +1250,22 @@
     const creditsAfter = formatPreviewValue(result?.creditsAfter ?? plan?.creditsAfter);
     const statusLabel = result?.applied ? "applied" : result?.skippedReason || plan?.skippedReason || "dry-run";
     const writesEnabled = result?.progressionWritesEnabled === true || plan?.progressionWritesEnabled === true;
+    const idempotencyLabel = result?.duplicateDetected || plan?.duplicateDetected
+      ? "duplicate blocked"
+      : result?.idempotencyReady || plan?.idempotencyReady
+        ? "idempotency ready"
+        : "idempotency not ready";
+    const allowlistLabel = result?.stagingWriteAllowlistPresent || plan?.stagingWriteAllowlistPresent
+      ? result?.playerInStagingWriteAllowlist || plan?.playerInStagingWriteAllowlist
+        ? "allow-listed"
+        : "not allow-listed"
+      : "allow-list missing";
     const warning = result?.applied
       ? "STAGING SERVER WRITE"
       : writesEnabled
         ? "writes enabled but fail-closed"
         : "writes disabled";
-    return `${statusLabel} / XP ${xpBefore} -> ${xpAfter} / C ${creditsBefore} -> ${creditsAfter} / ${warning}`;
+    return `${statusLabel} / ${idempotencyLabel} / ${allowlistLabel} / XP ${xpBefore} -> ${xpAfter} / C ${creditsBefore} -> ${creditsAfter} / ${warning}`;
   }
 
   function setDiagnosticsRow(panel, label, value) {

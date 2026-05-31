@@ -304,6 +304,9 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(applicationPlan.creditsDelta === 32, `Unexpected application credits delta: ${applicationPlan.creditsDelta}`);
   assert(applicationPlan.sourceLedgerId === "ledger-row-1", "Application plan did not include source ledger id.");
   assert(applicationPlan.sourceEventId === "reward-preview-stub", "Application plan did not include source event id.");
+  assert(applicationPlan.idempotencyKey === "verified-player-a:reward-preview-stub", `Unexpected application idempotency key: ${applicationPlan.idempotencyKey}`);
+  assert(applicationPlan.idempotencyReady === true, "Application plan was not idempotency-ready.");
+  assert(applicationPlan.duplicateDetected === false, "Application plan unexpectedly marked duplicate.");
   assert(applicationPlan.applied === false && applicationPlan.dryRun === true, "Application plan was not dry-run/unapplied.");
   const disabledApplicationResult = await applyRewardApplicationPlan(applicationPlan, {
     env: {
@@ -312,6 +315,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   });
   assert(disabledApplicationResult?.dryRun === true, "Disabled application adapter did not return dryRun true.");
   assert(disabledApplicationResult?.applied === false, "Disabled application adapter applied progression.");
+  assert(disabledApplicationResult?.idempotencyKey === "verified-player-a:reward-preview-stub", "Disabled application result did not include idempotency key.");
+  assert(disabledApplicationResult?.idempotencyReady === true, "Disabled application result was not idempotency-ready.");
   assert(disabledApplicationResult?.skippedReason === "progression_writes_disabled", `Unexpected disabled application reason: ${disabledApplicationResult?.skippedReason}`);
 
   const enabledApplicationResult = await applyRewardApplicationPlan(applicationPlan, {
@@ -321,6 +326,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   });
   assert(enabledApplicationResult?.dryRun === true, "Enabled placeholder application adapter did not stay dry-run.");
   assert(enabledApplicationResult?.applied === false, "Enabled placeholder application adapter applied progression.");
+  assert(enabledApplicationResult?.idempotencyReady === true, "Enabled placeholder application adapter did not keep idempotency ready.");
   assert(enabledApplicationResult?.skippedReason === "progression_write_adapter_not_implemented", `Unexpected enabled placeholder application reason: ${enabledApplicationResult?.skippedReason}`);
 
   const missingSaveEnvContext = await fetchPlayerSavePreviewContext("verified-player-a", {
@@ -406,6 +412,10 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(playerSavePatchPlan?.eligible === true, `Verified player_saves patch plan was not eligible: ${playerSavePatchPlan?.skippedReason}`);
   assert(playerSavePatchPlan?.applied === false && playerSavePatchPlan?.dryRun === true, "player_saves patch plan was not dry-run/unapplied.");
   assert(playerSavePatchPlan?.playerId === "verified-player-a", "player_saves patch plan did not include verified player id.");
+  assert(playerSavePatchPlan?.sourceEventId === "reward-preview-stub", "player_saves patch plan did not include stable source event id.");
+  assert(playerSavePatchPlan?.idempotencyKey === "verified-player-a:reward-preview-stub", `Unexpected player_saves idempotency key: ${playerSavePatchPlan?.idempotencyKey}`);
+  assert(playerSavePatchPlan?.idempotencyReady === true, "player_saves patch plan was not idempotency-ready.");
+  assert(playerSavePatchPlan?.duplicateDetected === false, "Initial player_saves patch plan reported a duplicate.");
   assert(playerSavePatchPlan?.xpPath === "playerProgress.combatXp", `Unexpected player_saves XP path: ${playerSavePatchPlan?.xpPath}`);
   assert(playerSavePatchPlan?.creditsPath === "credits", `Unexpected player_saves credits path: ${playerSavePatchPlan?.creditsPath}`);
   assert(playerSavePatchPlan?.xpBefore === 80 && playerSavePatchPlan?.xpAfter === 100, "player_saves patch plan did not calculate XP before/after.");
@@ -420,17 +430,77 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(disabledPlayerSavePatchResult?.dryRun === true, "Disabled player_saves patch adapter was not dry-run.");
   assert(disabledPlayerSavePatchResult?.applied === false, "Disabled player_saves patch adapter applied progression.");
   assert(disabledPlayerSavePatchResult?.progressionWritesEnabled === false, "Disabled player_saves patch adapter reported writes enabled.");
+  assert(disabledPlayerSavePatchResult?.idempotencyKey === "verified-player-a:reward-preview-stub", "Disabled player_saves patch result did not include idempotency key.");
+  assert(disabledPlayerSavePatchResult?.idempotencyReady === true, "Disabled player_saves patch result was not idempotency-ready.");
+  assert(disabledPlayerSavePatchResult?.duplicateDetected === false, "Disabled player_saves patch result reported duplicate.");
   assert(disabledPlayerSavePatchResult?.skippedReason === "progression_writes_disabled", `Unexpected disabled player_saves patch reason: ${disabledPlayerSavePatchResult?.skippedReason}`);
 
-  const enabledPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+  const missingAllowlistPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true"
     }
   });
-  assert(enabledPlayerSavePatchResult?.dryRun === true, "Enabled player_saves patch adapter did not stay dry-run.");
-  assert(enabledPlayerSavePatchResult?.applied === false, "Enabled player_saves patch adapter applied progression.");
-  assert(enabledPlayerSavePatchResult?.progressionWritesEnabled === true, "Enabled player_saves patch adapter did not report writes enabled.");
-  assert(enabledPlayerSavePatchResult?.skippedReason === "idempotency_not_ready", `Unexpected enabled player_saves patch reason: ${enabledPlayerSavePatchResult?.skippedReason}`);
+  assert(missingAllowlistPlayerSavePatchResult?.dryRun === true, "Missing-allowlist player_saves patch adapter did not stay dry-run.");
+  assert(missingAllowlistPlayerSavePatchResult?.applied === false, "Missing-allowlist player_saves patch adapter applied progression.");
+  assert(missingAllowlistPlayerSavePatchResult?.progressionWritesEnabled === true, "Missing-allowlist player_saves patch adapter did not report writes enabled.");
+  assert(missingAllowlistPlayerSavePatchResult?.stagingWriteAllowlistPresent === false, "Missing-allowlist player_saves patch adapter reported an allow-list.");
+  assert(missingAllowlistPlayerSavePatchResult?.playerInStagingWriteAllowlist === false, "Missing-allowlist player_saves patch adapter allow-listed player.");
+  assert(missingAllowlistPlayerSavePatchResult?.idempotencyReady === true, "Missing-allowlist player_saves patch adapter did not keep idempotency ready.");
+  assert(missingAllowlistPlayerSavePatchResult?.skippedReason === "staging_write_allowlist_missing", `Unexpected missing-allowlist player_saves patch reason: ${missingAllowlistPlayerSavePatchResult?.skippedReason}`);
+
+  const notAllowlistedPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_ALLOWLIST: "other-player-id"
+    }
+  });
+  assert(notAllowlistedPlayerSavePatchResult?.dryRun === true, "Non-allow-listed player_saves patch adapter was not dry-run.");
+  assert(notAllowlistedPlayerSavePatchResult?.applied === false, "Non-allow-listed player_saves patch adapter applied progression.");
+  assert(notAllowlistedPlayerSavePatchResult?.stagingWriteAllowlistPresent === true, "Non-allow-listed player_saves patch adapter did not report allow-list present.");
+  assert(notAllowlistedPlayerSavePatchResult?.playerInStagingWriteAllowlist === false, "Non-allow-listed player_saves patch adapter allowed the player.");
+  assert(notAllowlistedPlayerSavePatchResult?.skippedReason === "player_not_in_staging_write_allowlist", `Unexpected non-allow-listed player_saves patch reason: ${notAllowlistedPlayerSavePatchResult?.skippedReason}`);
+
+  const allowlistedPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_ALLOWLIST: "other-player-id, verified-player-a"
+    }
+  });
+  assert(allowlistedPlayerSavePatchResult?.dryRun === true, "Allow-listed player_saves patch adapter did not stay dry-run.");
+  assert(allowlistedPlayerSavePatchResult?.applied === false, "Allow-listed player_saves patch adapter applied progression.");
+  assert(allowlistedPlayerSavePatchResult?.stagingWriteAllowlistPresent === true, "Allow-listed player_saves patch adapter did not report allow-list present.");
+  assert(allowlistedPlayerSavePatchResult?.playerInStagingWriteAllowlist === true, "Allow-listed player_saves patch adapter did not allow the player.");
+  assert(allowlistedPlayerSavePatchResult?.idempotencyReady === true, "Allow-listed player_saves patch adapter did not keep idempotency ready.");
+  assert(allowlistedPlayerSavePatchResult?.skippedReason === "progression_write_adapter_not_implemented", `Unexpected allow-listed player_saves patch reason: ${allowlistedPlayerSavePatchResult?.skippedReason}`);
+
+  const duplicatePlayerSavePatchPlan = buildPlayerSavePatchPlan(validMockSaveData, applicationPlan, {
+    sourceEventId: "reward-preview-stub",
+    sourceLedgerId: "ledger-row-1",
+    duplicateDetected: true
+  });
+  assert(duplicatePlayerSavePatchPlan?.eligible === false, "Duplicate player_saves patch plan was eligible.");
+  assert(duplicatePlayerSavePatchPlan?.idempotencyKey === "verified-player-a:reward-preview-stub", "Duplicate player_saves patch plan did not preserve idempotency key.");
+  assert(duplicatePlayerSavePatchPlan?.idempotencyReady === true, "Duplicate player_saves patch plan was not idempotency-ready.");
+  assert(duplicatePlayerSavePatchPlan?.duplicateDetected === true, "Duplicate player_saves patch plan did not mark duplicate.");
+  assert(duplicatePlayerSavePatchPlan?.skippedReason === "duplicate_reward_application", `Unexpected duplicate player_saves patch reason: ${duplicatePlayerSavePatchPlan?.skippedReason}`);
+  const duplicatePlayerSavePatchResult = await applyPlayerSavePatchPlan(duplicatePlayerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true"
+    }
+  });
+  assert(duplicatePlayerSavePatchResult?.dryRun === true, "Duplicate player_saves patch result was not dry-run.");
+  assert(duplicatePlayerSavePatchResult?.applied === false, "Duplicate player_saves patch result applied progression.");
+  assert(duplicatePlayerSavePatchResult?.duplicateDetected === true, "Duplicate player_saves patch result did not mark duplicate.");
+  assert(duplicatePlayerSavePatchResult?.skippedReason === "duplicate_reward_application", `Unexpected duplicate player_saves patch result reason: ${duplicatePlayerSavePatchResult?.skippedReason}`);
+  const disabledDuplicatePlayerSavePatchResult = await applyPlayerSavePatchPlan(duplicatePlayerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "false"
+    }
+  });
+  assert(disabledDuplicatePlayerSavePatchResult?.dryRun === true, "Disabled duplicate player_saves patch result was not dry-run.");
+  assert(disabledDuplicatePlayerSavePatchResult?.applied === false, "Disabled duplicate player_saves patch result applied progression.");
+  assert(disabledDuplicatePlayerSavePatchResult?.duplicateDetected === true, "Disabled duplicate player_saves patch result did not mark duplicate.");
+  assert(disabledDuplicatePlayerSavePatchResult?.skippedReason === "duplicate_reward_application", `Unexpected disabled duplicate player_saves patch result reason: ${disabledDuplicatePlayerSavePatchResult?.skippedReason}`);
 
   const missingXpPatchPlan = buildPlayerSavePatchPlan({
     credits: 1200,
@@ -457,6 +527,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
     sourceLedgerId: ""
   });
   assert(missingIdempotencyPatchPlan?.eligible === false, "Missing idempotency player_saves patch plan was eligible.");
+  assert(missingIdempotencyPatchPlan?.idempotencyReady === false, "Missing idempotency player_saves patch plan was ready.");
   assert(missingIdempotencyPatchPlan?.skippedReason === "idempotency_not_ready", `Unexpected missing idempotency reason: ${missingIdempotencyPatchPlan?.skippedReason}`);
 
   const unavailableProgressionPreview = buildProgressionPreview(missingSaveContext, applicationPlan);
@@ -1301,6 +1372,8 @@ try {
   assert(claimPreviewResult?.playerSavePatchResult?.dryRun === true, "player_saves patch result was not dry-run.");
   assert(claimPreviewResult?.playerSavePatchResult?.applied === false, "player_saves patch result applied progression.");
   assert(claimPreviewResult?.playerSavePatchResult?.progressionWritesEnabled === false, "player_saves patch result reported writes enabled by default.");
+  assert(claimPreviewResult?.playerSavePatchResult?.stagingWriteAllowlistPresent === false, "player_saves patch result reported allow-list present by default.");
+  assert(claimPreviewResult?.playerSavePatchResult?.playerInStagingWriteAllowlist === false, "player_saves patch result allow-listed player by default.");
   assert(claimPreviewResult?.playerSavePatchResult?.skippedReason === "progression_writes_disabled", `Unexpected player_saves patch result reason: ${claimPreviewResult?.playerSavePatchResult?.skippedReason}`);
   assert(Array.isArray(claimPreviewResult?.contributors), "Reward claim result did not include contributors.");
   assert(claimPreviewResult?.contributors?.some((contributor) => contributor?.sessionId === roomA.sessionId), "Reward claim result missing claimant contribution.");
