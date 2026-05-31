@@ -7,6 +7,7 @@
   "use strict";
 
   const localServerUrl = "ws://localhost:2567";
+  const stagingServerUrl = "https://gb-man-e55e725e.colyseus.cloud";
   const localClientScriptUrl = "http://localhost:2567/colyseus.js";
   const serverStorageKey = "lupenMultiplayerServer";
   const productionHosts = new Set(["lupen.io", "www.lupen.io"]);
@@ -43,16 +44,28 @@
   const botsById = new Map();
 
   function hasDevFlag() {
+    return getMultiplayerMode() === "1";
+  }
+
+  function hasStagingFlag() {
+    return getMultiplayerMode() === "staging";
+  }
+
+  function getMultiplayerMode() {
     try {
-      return new URLSearchParams(global.location.search).get("mp") === "1";
+      return new URLSearchParams(global.location.search).get("mp") || "";
     } catch (_err) {
-      return false;
+      return "";
     }
   }
 
   function isLocalHost() {
     const host = global.location.hostname;
     return host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
+  }
+
+  function isProductionHost() {
+    return productionHosts.has(String(global.location.hostname || "").toLowerCase());
   }
 
   function getRuntimeConfig() {
@@ -97,8 +110,9 @@
   function resolveServerConfig() {
     const queryServerUrl = getSearchParam("mpServer");
     const storedServerUrl = getStoredServerUrl();
-    const rawServerUrl = String(queryServerUrl || storedServerUrl || localServerUrl).trim();
-    const source = queryServerUrl ? "query" : storedServerUrl ? "localStorage" : "default-local";
+    const useStagingDefault = hasStagingFlag();
+    const rawServerUrl = String(useStagingDefault ? stagingServerUrl : queryServerUrl || storedServerUrl || localServerUrl).trim();
+    const source = useStagingDefault ? "staging-default" : queryServerUrl ? "query" : storedServerUrl ? "localStorage" : "default-local";
 
     try {
       const parsedUrl = new URL(rawServerUrl);
@@ -135,13 +149,19 @@
     connection.serverUrl = serverConfig.serverUrl || localServerUrl;
     connection.serverUrlSource = serverConfig.source;
 
-    if (!hasDevFlag()) {
+    if (!hasDevFlag() && !hasStagingFlag()) {
       connection.enabled = false;
       connection.enabledReason = disabledReason;
       return;
     }
 
-    if (!isAllowedPageHost()) {
+    if (hasStagingFlag()) {
+      if (!isProductionHost() && !isLocalHost()) {
+        connection.enabled = false;
+        connection.enabledReason = notLocalReason;
+        return;
+      }
+    } else if (!isAllowedPageHost()) {
       connection.enabled = false;
       connection.enabledReason = notLocalReason;
       return;
@@ -155,7 +175,11 @@
     }
 
     connection.enabled = true;
-    connection.enabledReason = isLocalHost() ? "local_dev_enabled" : "allowed_staging_host_enabled";
+    connection.enabledReason = hasStagingFlag()
+      ? "staging_enabled"
+      : isLocalHost()
+        ? "local_dev_enabled"
+        : "allowed_staging_host_enabled";
     if (String(connection.lastError || "").startsWith("invalid_multiplayer_server_url:")) {
       connection.lastError = null;
     }
