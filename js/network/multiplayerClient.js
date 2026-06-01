@@ -1143,6 +1143,7 @@
       cargoCapacityBefore: Number.isFinite(Number(result.cargoCapacityBefore)) ? Number(result.cargoCapacityBefore) : null,
       cargoCapacityAfterPreview: Number.isFinite(Number(result.cargoCapacityAfterPreview)) ? Number(result.cargoCapacityAfterPreview) : null,
       cargoCapacityAfter: Number.isFinite(Number(result.cargoCapacityAfter)) ? Number(result.cargoCapacityAfter) : null,
+      gunSlots: Number.isFinite(Number(result.gunSlots)) ? Number(result.gunSlots) : null,
       validationMode: String(result.validationMode || "unknown"),
       trustedStateAvailable: result.trustedStateAvailable === true,
       blockReason: result.blockReason === null || result.blockReason === undefined ? null : String(result.blockReason || ""),
@@ -1851,6 +1852,18 @@
     equipStagingCargoPod(options = {}) {
       return sendRoomMessage("equipStagingCargoPod", "stagingLoadout:equipAttachment", {
         itemId: String(options.itemId || "attachment:cargoPod")
+      });
+    },
+
+    previewStagingPulseLaserEquip(options = {}) {
+      return sendRoomMessage("previewStagingPulseLaserEquip", "stagingLoadout:previewEquip", {
+        itemId: String(options.itemId || "gun:pulseLaser")
+      });
+    },
+
+    equipStagingPulseLaser(options = {}) {
+      return sendRoomMessage("equipStagingPulseLaser", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "gun:pulseLaser")
       });
     },
 

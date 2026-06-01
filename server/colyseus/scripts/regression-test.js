@@ -52,7 +52,9 @@ import {
 } from "../src/services/storeWriteService.js";
 import {
   applyStagingCargoPodEquipWrite,
+  applyStagingLoadoutEquipWrite,
   buildStagingCargoPodEquipPlan,
+  buildStagingPulseLaserEquipPlan,
   getLoadoutWriteEnvGate
 } from "../src/services/loadoutWriteService.js";
 
@@ -1247,6 +1249,7 @@ async function assertStagingStorePreviewHelpers() {
     marker: { keep: true }
   };
   const cargoPodItem = items.find((item) => item.itemId === "attachment:cargoPod");
+  const pulseLaserItem = items.find((item) => item.itemId === "gun:pulseLaser");
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
   assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 780, "Cargo Pod Store patch did not subtract the server price.");
@@ -1260,6 +1263,15 @@ async function assertStagingStorePreviewHelpers() {
   assert(patchPlan.patchedSaveData.activeBountyId === "keep-bounty", "Cargo Pod Store patch changed bounty state.");
   assert(patchPlan.patchedSaveData.marker.keep === true, "Cargo Pod Store patch changed unrelated fields.");
 
+  const pulseLaserPatch = buildStagingStorePurchasePatch(validSaveData, pulseLaserItem, 1);
+  assert(pulseLaserPatch.ok === true, `Valid Pulse Laser Store patch was blocked: ${pulseLaserPatch.blockReason}`);
+  assert(pulseLaserPatch.creditsBefore === 1000 && pulseLaserPatch.creditsAfter === 252, "Pulse Laser Store patch did not subtract the server price.");
+  assert(pulseLaserPatch.itemBefore === 1 && pulseLaserPatch.itemAfter === 2, "Pulse Laser Store patch did not increment ownedGuns.pulseLaser.");
+  assert(pulseLaserPatch.patchedSaveData.ownedAttachments.cargoPod === 1, "Pulse Laser Store patch changed attachment ownership.");
+  assert(pulseLaserPatch.patchedSaveData.shipLoadouts.lupenOrigin.guns[0] === "pulseLaser", "Pulse Laser Store patch changed shipLoadouts.");
+  assert(pulseLaserPatch.patchedSaveData.inventoryItems[0].id === "kept-item", "Pulse Laser Store patch changed inventoryItems.");
+  assert(pulseLaserPatch.patchedSaveData.playerProgress.combatXp === 33, "Pulse Laser Store patch changed progression.");
+
   const nonCargoItem = items.find((item) => item.itemId === "attachment:shieldBooster");
   const nonCargoPatch = buildStagingStorePurchasePatch(validSaveData, nonCargoItem, 1);
   assert(nonCargoPatch.ok === false && nonCargoPatch.blockReason === "store_item_preview_only", "Non-Cargo Pod Store write did not stay preview-only.");
@@ -1269,6 +1281,9 @@ async function assertStagingStorePreviewHelpers() {
 
   const insufficientCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, cargoPodItem, 1);
   assert(insufficientCreditPatch.ok === false && insufficientCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Cargo Pod write was not blocked.");
+
+  const insufficientPulseLaserCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, pulseLaserItem, 1);
+  assert(insufficientPulseLaserCreditPatch.ok === false && insufficientPulseLaserCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Pulse Laser write was not blocked.");
 
   const defaultWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
@@ -1390,7 +1405,45 @@ async function assertStagingStorePreviewHelpers() {
   assert(sequentialSave.activeBountyId === "keep-bounty", "Applied Store write changed bounty state.");
   assert(storeFetchCalls.join(",") === "GET,PATCH", `Store write expected read/write pair, got ${storeFetchCalls.join(",")}.`);
 
-  console.log("staging Store item list, previews, and gated Cargo Pod write helpers passed");
+  let weaponSave = JSON.parse(JSON.stringify(validSaveData));
+  const weaponFetchCalls = [];
+  const appliedWeaponWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "gun:pulseLaser",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "allowlist",
+      STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "gun:pulseLaser"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      weaponFetchCalls.push(options.method || "GET");
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: weaponSave }] };
+      weaponSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedWeaponWrite.applied === true && appliedWeaponWrite.mode === "store_write", `Gated Pulse Laser Store write did not apply: ${appliedWeaponWrite.blockReason}`);
+  assert(appliedWeaponWrite.creditsBefore === 1000 && appliedWeaponWrite.creditsAfter === 252, "Applied Pulse Laser Store write returned incorrect credits.");
+  assert(appliedWeaponWrite.itemBefore === 1 && appliedWeaponWrite.itemAfter === 2, "Applied Pulse Laser Store write returned incorrect weapon count.");
+  assert(appliedWeaponWrite.creditsWritten === true && appliedWeaponWrite.weaponWritten === true && appliedWeaponWrite.saveWritten === true, "Applied Pulse Laser Store write did not report allowed writes.");
+  assert(appliedWeaponWrite.attachmentWritten === false && appliedWeaponWrite.inventoryWritten === false && appliedWeaponWrite.shipWritten === false, "Applied Pulse Laser Store write reported forbidden writes.");
+  assert(weaponSave.credits === 252 && weaponSave.ownedGuns.pulseLaser === 2, "Applied Pulse Laser Store write did not update mocked save state.");
+  assert(weaponSave.ownedAttachments.cargoPod === 1, "Applied Pulse Laser Store write changed attachments.");
+  assert(weaponSave.shipLoadouts.lupenOrigin.guns[0] === "pulseLaser", "Applied Pulse Laser Store write changed loadout.");
+  assert(weaponSave.inventoryItems[0].id === "kept-item", "Applied Pulse Laser Store write changed inventoryItems.");
+  assert(weaponSave.playerProgress.combatXp === 33, "Applied Pulse Laser Store write changed progression.");
+  assert(weaponFetchCalls.join(",") === "GET,PATCH", `Pulse Laser Store write expected read/write pair, got ${weaponFetchCalls.join(",")}.`);
+
+  console.log("staging Store item list, previews, and gated Cargo Pod/Pulse Laser write helpers passed");
 }
 
 async function assertStagingCargoPodEquipHelpers() {
@@ -1444,6 +1497,32 @@ async function assertStagingCargoPodEquipHelpers() {
 
   const unknownPlan = buildStagingCargoPodEquipPlan(validSaveData, { itemId: "attachment:shieldBooster" });
   assert(unknownPlan.ok === false && unknownPlan.blockReason === "unknown_loadout_item", "Non-Cargo Pod loadout item was not blocked.");
+
+  const pulseLaserPlan = buildStagingPulseLaserEquipPlan(validSaveData, { itemId: "gun:pulseLaser" });
+  assert(pulseLaserPlan.ok === true, `Valid Pulse Laser equip plan was blocked: ${pulseLaserPlan.blockReason}`);
+  assert(pulseLaserPlan.ownedBefore === 1 && pulseLaserPlan.ownedAfter === 0, "Pulse Laser equip plan did not consume owned weapon.");
+  assert(pulseLaserPlan.equippedBefore === 1 && pulseLaserPlan.equippedAfter === 2, "Pulse Laser equip plan did not add equipped weapon.");
+  assert(pulseLaserPlan.gunSlots === 2, "Pulse Laser equip plan reported unexpected gun slots.");
+  assert(pulseLaserPlan.patchedSaveData.credits === 780, "Pulse Laser equip plan changed credits.");
+  assert(pulseLaserPlan.patchedSaveData.ownedAttachments.cargoPod === 2, "Pulse Laser equip plan changed attachment ownership.");
+  assert(pulseLaserPlan.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0].key === "shieldBooster", "Pulse Laser equip plan changed attachments.");
+  assert(pulseLaserPlan.patchedSaveData.inventoryItems[0].id === "kept-item", "Pulse Laser equip plan changed inventoryItems.");
+  assert(pulseLaserPlan.patchedSaveData.playerProgress.combatXp === 33, "Pulse Laser equip plan changed progression.");
+
+  const noOwnedWeaponPlan = buildStagingPulseLaserEquipPlan({ ...validSaveData, ownedGuns: { pulseLaser: 0 } }, { itemId: "gun:pulseLaser" });
+  assert(noOwnedWeaponPlan.ok === false && noOwnedWeaponPlan.blockReason === "pulse_laser_not_owned", "Pulse Laser equip without ownership was not blocked.");
+
+  const fullGunSlotsPlan = buildStagingPulseLaserEquipPlan({
+    ...validSaveData,
+    ownedGuns: { pulseLaser: 1 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "shieldBooster" }],
+        guns: [{ key: "pulseLaser" }, { key: "heavyPulseLaser" }]
+      }
+    }
+  }, { itemId: "gun:pulseLaser" });
+  assert(fullGunSlotsPlan.ok === false && fullGunSlotsPlan.blockReason === "gun_slots_full", "Pulse Laser equip with full slots was not blocked.");
 
   const defaultWrite = await applyStagingCargoPodEquipWrite({
     playerId: "verified-player-a",
@@ -1529,7 +1608,181 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(sequentialSave.playerProgress.combatXp === 33, "Applied Cargo Pod equip changed progression.");
   assert(fetchCalls.join(",") === "GET,PATCH", `Loadout write expected read/write pair, got ${fetchCalls.join(",")}.`);
 
-  console.log("staging Cargo Pod equip helpers and gated loadout write passed");
+  let weaponLoadoutSave = JSON.parse(JSON.stringify(validSaveData));
+  const weaponLoadoutFetchCalls = [];
+  const appliedWeaponEquip = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "gun:pulseLaser",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+      STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
+      STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "gun:pulseLaser"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      weaponLoadoutFetchCalls.push(options.method || "GET");
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: weaponLoadoutSave }] };
+      weaponLoadoutSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedWeaponEquip.applied === true && appliedWeaponEquip.mode === "loadout_write", `Gated Pulse Laser equip did not apply: ${appliedWeaponEquip.blockReason}`);
+  assert(appliedWeaponEquip.ownedBefore === 1 && appliedWeaponEquip.ownedAfter === 0, "Applied Pulse Laser equip returned incorrect ownership.");
+  assert(appliedWeaponEquip.equippedBefore === 1 && appliedWeaponEquip.equippedAfter === 2, "Applied Pulse Laser equip returned incorrect equipped count.");
+  assert(appliedWeaponEquip.loadoutWritten === true && appliedWeaponEquip.weaponWritten === true && appliedWeaponEquip.saveWritten === true, "Applied Pulse Laser equip did not report allowed writes.");
+  assert(appliedWeaponEquip.attachmentWritten === false && appliedWeaponEquip.creditsWritten === false && appliedWeaponEquip.inventoryWritten === false, "Applied Pulse Laser equip reported forbidden writes.");
+  assert(weaponLoadoutSave.credits === 780, "Applied Pulse Laser equip changed credits.");
+  assert(weaponLoadoutSave.ownedGuns.pulseLaser === 0, "Applied Pulse Laser equip did not decrement owned weapon.");
+  assert(weaponLoadoutSave.shipLoadouts.lupenOrigin.guns.length === 2, "Applied Pulse Laser equip did not append gun loadout entry.");
+  assert(weaponLoadoutSave.ownedAttachments.cargoPod === 2, "Applied Pulse Laser equip changed attachment ownership.");
+  assert(weaponLoadoutSave.inventoryItems[0].id === "kept-item", "Applied Pulse Laser equip changed inventoryItems.");
+  assert(weaponLoadoutSave.cargo.Iron === 2, "Applied Pulse Laser equip changed trade cargo.");
+  assert(weaponLoadoutSave.playerProgress.combatXp === 33, "Applied Pulse Laser equip changed progression.");
+  assert(weaponLoadoutFetchCalls.join(",") === "GET,PATCH", `Pulse Laser equip expected read/write pair, got ${weaponLoadoutFetchCalls.join(",")}.`);
+
+  console.log("staging Cargo Pod/Pulse Laser equip helpers and gated loadout write passed");
+}
+
+async function assertFullCargoPodTradeLoopHelpers() {
+  let loopSave = {
+    credits: 5000,
+    currentShipId: "lupenOrigin",
+    ownedAttachments: { cargoPod: 0, shieldBooster: 1 },
+    ownedGuns: { pulseLaser: 1 },
+    ownedShips: ["lupenOrigin"],
+    shipLoadouts: { lupenOrigin: { attachments: [], guns: [{ key: "pulseLaser", quality: "standard", level: 1 }] } },
+    inventoryItems: [{ id: "untouched-inventory", key: "cargoPod", quality: "rare" }],
+    cargo: { Iron: 0, Copper: 3 },
+    cargoCostBasis: { Copper: 30 },
+    activeBountyId: "untouched-bounty",
+    playerProgress: {
+      combatXp: 33,
+      totals: {
+        tradesCompleted: 4,
+        cargoSold: 9,
+        tradeProfit: 222
+      }
+    },
+    marker: { keep: true }
+  };
+
+  const fetchCalls = [];
+  const loopFetch = async (_url, options = {}) => {
+    fetchCalls.push(options.method || "GET");
+    if ((options.method || "GET") === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [{ save_data: loopSave }];
+        }
+      };
+    }
+
+    assert(options.method === "PATCH", "Full Cargo Pod loop used unexpected write method.");
+    loopSave = JSON.parse(options.body || "{}").save_data;
+    return { ok: true, status: 204, json: async () => [] };
+  };
+
+  const commonEnv = {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+    STAGING_STORE_WRITE_ENABLED: "true",
+    STAGING_STORE_WRITE_DRY_RUN: "false",
+    STAGING_STORE_WRITE_SCOPE: "allowlist",
+    STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
+    STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:cargoPod",
+    STAGING_LOADOUT_WRITE_ENABLED: "true",
+    STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+    STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
+    STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
+    STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:cargoPod",
+    STAGING_TRADE_WRITE_ENABLED: "true",
+    STAGING_TRADE_WRITE_DRY_RUN: "false",
+    STAGING_TRADE_WRITE_SCOPE: "allowlist",
+    STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+  };
+
+  const storePurchase = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: { available: true, validationState: { credits: 5000 } },
+    env: commonEnv,
+    fetchImpl: loopFetch
+  });
+  assert(storePurchase.applied === true, `Full loop Cargo Pod purchase failed: ${storePurchase.blockReason}`);
+  assert(loopSave.credits === 4780, "Full loop Cargo Pod purchase did not subtract CR.");
+  assert(loopSave.ownedAttachments.cargoPod === 1, "Full loop Cargo Pod purchase did not increment owned Cargo Pod.");
+  assert(loopSave.shipLoadouts.lupenOrigin.attachments.length === 0, "Full loop Cargo Pod purchase changed loadout before equip.");
+
+  const equip = await applyStagingCargoPodEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    trustedState: { available: true, validationState: { credits: 4780 } },
+    env: commonEnv,
+    fetchImpl: loopFetch
+  });
+  assert(equip.applied === true, `Full loop Cargo Pod equip failed: ${equip.blockReason}`);
+  assert(loopSave.ownedAttachments.cargoPod === 0, "Full loop Cargo Pod equip did not consume ownership count.");
+  assert(loopSave.shipLoadouts.lupenOrigin.attachments.some((entry) => entry.key === "cargoPod"), "Full loop Cargo Pod equip did not append loadout entry.");
+  assert(equip.cargoCapacityBefore === 150 && equip.cargoCapacityAfter === 175, "Full loop Cargo Pod equip did not report +25 cargo capacity.");
+
+  const ironOffer = {
+    offerId: "loop-iron",
+    resourceId: "iron",
+    resourceName: "Iron",
+    buyPrice: 18,
+    sellPrice: 25
+  };
+
+  const oldCapacityPlan = buildStagingTradeBuySavePatch(loopSave, ironOffer, 160, { cargoCapacity: 150 });
+  assert(oldCapacityPlan.ok === false && oldCapacityPlan.reason === "insufficient_cargo", "Full loop trade buy unexpectedly fit in old capacity.");
+
+  const buyAfterEquip = await applyStagingTradeBuyWrite({
+    playerId: "verified-player-a",
+    offer: ironOffer,
+    quantity: 160,
+    trustedState: { available: true, validationState: { cargoCapacity: 175 } },
+    env: commonEnv,
+    fetchImpl: loopFetch
+  });
+  assert(buyAfterEquip.applied === true, `Full loop trade buy after Cargo Pod failed: ${buyAfterEquip.reason}`);
+  assert(buyAfterEquip.cargoCapacity === 175, "Full loop trade buy did not use increased trusted capacity.");
+  assert(buyAfterEquip.cargoUsedBefore === 3 && buyAfterEquip.cargoUsedAfter === 163, "Full loop trade buy did not report expected hold usage.");
+  assert(loopSave.credits === 1900, "Full loop trade buy did not subtract expected credits.");
+  assert(loopSave.cargo.Iron === 160, "Full loop trade buy did not add expected Iron cargo.");
+  assert(loopSave.cargo.Copper === 3, "Full loop trade buy changed unrelated Copper cargo.");
+
+  const sellAfterBuy = await applyStagingTradeSellWrite({
+    playerId: "verified-player-a",
+    offer: ironOffer,
+    quantity: 160,
+    trustedState: { available: true, validationState: { cargoCapacity: 175 } },
+    env: commonEnv,
+    fetchImpl: loopFetch
+  });
+  assert(sellAfterBuy.applied === true, `Full loop trade sell failed: ${sellAfterBuy.reason}`);
+  assert(loopSave.credits === 5900, "Full loop trade sell did not add expected credits.");
+  assert(loopSave.cargo.Iron === 0, "Full loop trade sell did not remove Iron cargo.");
+  assert(loopSave.cargo.Copper === 3, "Full loop trade sell changed unrelated cargo.");
+  assert(loopSave.cargoCostBasis.Iron === undefined, "Full loop trade sell-all did not clear Iron cost basis.");
+  assert(loopSave.inventoryItems[0].id === "untouched-inventory", "Full loop changed inventory.");
+  assert(loopSave.ownedShips[0] === "lupenOrigin", "Full loop changed ships.");
+  assert(loopSave.ownedGuns.pulseLaser === 1, "Full loop changed weapons.");
+  assert(loopSave.activeBountyId === "untouched-bounty", "Full loop changed bounty state.");
+  assert(loopSave.playerProgress.combatXp === 33, "Full loop changed broad progression.");
+  assert(loopSave.playerProgress.totals.tradesCompleted === 4, "Full loop changed route completion totals.");
+  assert(loopSave.playerProgress.totals.cargoSold === 9, "Full loop changed cargo sold totals.");
+  assert(loopSave.playerProgress.totals.tradeProfit === 222, "Full loop changed trade profit totals.");
+  assert(loopSave.marker.keep === true, "Full loop changed unrelated save fields.");
+  assert(fetchCalls.join(",") === "GET,PATCH,GET,PATCH,GET,PATCH,GET,PATCH", `Full loop expected four read/write pairs, got ${fetchCalls.join(",")}.`);
+
+  console.log("full Cargo Pod purchase/equip/trade-more loop passed with mocked player_saves");
 }
 
 async function assertIdentityVerificationAndRewardPlanHelpers() {
@@ -2394,6 +2647,7 @@ try {
   await assertStagingTradeValidationHelpers();
   await assertStagingStorePreviewHelpers();
   await assertStagingCargoPodEquipHelpers();
+  await assertFullCargoPodTradeLoopHelpers();
   await assertIdentityVerificationAndRewardPlanHelpers();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {

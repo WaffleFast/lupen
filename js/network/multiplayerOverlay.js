@@ -2711,8 +2711,13 @@
         setDiagnosticsRow(panel, "store gates", `${storePurchase.gates?.scope || "disabled"} / enabled ${storePurchase.gates?.writeEnabled ? "yes" : "no"} / dry ${storePurchase.gates?.dryRun ? "yes" : "no"} / allow ${storePurchase.gates?.allowlisted ? "yes" : "no"}`);
       }
       if (loadoutEquip) {
-        setDiagnosticsRow(panel, "cargo pod equip", loadoutEquip.applied
-          ? `applied / cargo ${formatTradeNumber(loadoutEquip.cargoCapacityBefore)} -> ${formatTradeNumber(loadoutEquip.cargoCapacityAfter)}`
+        const isWeaponEquip = String(loadoutEquip.itemId || "").startsWith("gun:");
+        const equipLabel = isWeaponEquip ? "weapon equip" : "cargo pod equip";
+        const appliedLine = isWeaponEquip
+          ? `applied / guns ${formatTradeNumber(loadoutEquip.equippedBefore)} -> ${formatTradeNumber(loadoutEquip.equippedAfter)}`
+          : `applied / cargo ${formatTradeNumber(loadoutEquip.cargoCapacityBefore)} -> ${formatTradeNumber(loadoutEquip.cargoCapacityAfter)}`;
+        setDiagnosticsRow(panel, equipLabel, loadoutEquip.applied
+          ? appliedLine
           : `${loadoutEquip.blockReason || loadoutEquip.reason || "dry-run"} / writes ${loadoutEquip.saveWritten ? "yes" : "no"}`);
         setDiagnosticsRow(panel, "loadout gates", `${loadoutEquip.gates?.scope || "disabled"} / enabled ${loadoutEquip.gates?.writeEnabled ? "yes" : "no"} / dry ${loadoutEquip.gates?.dryRun ? "yes" : "no"} / allow ${loadoutEquip.gates?.allowlisted ? "yes" : "no"}`);
       }

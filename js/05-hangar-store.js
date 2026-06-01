@@ -16,6 +16,7 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
 let multiplayerStagingCargoPodEquipPending = false;
+let multiplayerStagingPulseLaserEquipPending = false;
 
 function isMultiplayerStagingStoreActive() {
   try {
@@ -107,8 +108,18 @@ function getLastStagingCargoPodEquipResult() {
   return preview?.itemId === "attachment:cargoPod" ? preview : null;
 }
 
+function getLastStagingPulseLaserEquipResult() {
+  const status = getMultiplayerStagingStoreStatus();
+  const equip = status.lastStagingLoadoutEquip;
+  if (equip?.itemId === "gun:pulseLaser") return equip;
+  const preview = status.lastStagingLoadoutPreview;
+  return preview?.itemId === "gun:pulseLaser" ? preview : null;
+}
+
 function getStagingStorePreviewLine(result) {
   if (!result) return "Server preview pending. No CR or inventory changed.";
+  if (result.applied && result.itemId === "gun:pulseLaser") return "Weapon purchased.";
+  if (result.applied && result.itemId === "attachment:cargoPod") return "Cargo Pod purchased.";
   if (result.applied) return "Staging purchase applied.";
   if (result.wouldPass) return "Would pass server Store validation.";
   if (result.blockReason === "insufficient_credits") return "Blocked: not enough credits.";
@@ -151,7 +162,8 @@ function renderStagingStorePreviewNote(item) {
 }
 
 function isStagingStoreWritableItem(item) {
-  return getStagingStoreItemId(item) === "attachment:cargoPod";
+  const itemId = getStagingStoreItemId(item);
+  return itemId === "attachment:cargoPod" || itemId === "gun:pulseLaser";
 }
 
 function getStagingCargoPodEquipLine(result) {
@@ -180,6 +192,34 @@ function renderStagingCargoPodEquipNote(item) {
     </div>`;
 }
 
+function getStagingPulseLaserEquipLine(result) {
+  if (!result) return "Pulse Laser equip preview pending.";
+  if (result.applied) return "Weapon equipped.";
+  if (result.mode === "dry_run" && result.ok) return "Would equip Pulse Laser.";
+  if (result.blockReason === "pulse_laser_not_owned") return "Blocked: no owned Pulse Laser.";
+  if (result.blockReason === "gun_slots_full") return "Blocked: no empty gun slot.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - loadout not changed.";
+  return `Blocked: ${result.blockReason || result.reason || "loadout unavailable"}.`;
+}
+
+function renderStagingPulseLaserEquipNote(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "gun:pulseLaser") return "";
+  const result = getLastStagingPulseLaserEquipResult();
+  const slotLine = result?.gunSlots !== null && result?.gunSlots !== undefined
+    ? ` / Guns ${formatNumber(result.equippedBefore)} -> ${formatNumber(result.equippedAfter)} of ${formatNumber(result.gunSlots)}`
+    : result?.equippedBefore !== null && result?.equippedBefore !== undefined
+      ? ` / Guns ${formatNumber(result.equippedBefore)} -> ${formatNumber(result.equippedAfter)}`
+      : "";
+  const ownedLine = result?.ownedBefore !== null && result?.ownedBefore !== undefined
+    ? ` / Owned ${formatNumber(result.ownedBefore)} -> ${formatNumber(result.ownedAfter)}`
+    : "";
+  return `
+    <div class="store-detail-owned-line">
+      <strong>${escapeHtml(getStagingPulseLaserEquipLine(result))}</strong>${escapeHtml(slotLine)}${escapeHtml(ownedLine)} /
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied weapon equip." : "Dry run only - no loadout, inventory, credits, ships, attachments, loot, or bounties changed.")}
+    </div>`;
+}
+
 async function requestStagingCargoPodEquip(item) {
   if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "attachment:cargoPod") return false;
   const client = window.LupenMultiplayerClient;
@@ -204,6 +244,39 @@ async function requestStagingCargoPodEquip(item) {
           if (loaded?.loaded && typeof addHudToast === "function") addHudToast("Save refreshed from server.");
         } catch (_err) {
           if (typeof addHudToast === "function") addHudToast("Cargo Pod equipped. Reload if loadout values look stale.");
+        }
+      }
+    }
+    renderStore();
+    if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
+  }, 900);
+  return true;
+}
+
+async function requestStagingPulseLaserEquip(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "gun:pulseLaser") return false;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.equipStagingPulseLaser || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging Pulse Laser equip is waiting for the multiplayer server connection.");
+    return true;
+  }
+  if (multiplayerStagingPulseLaserEquipPending) return true;
+  multiplayerStagingPulseLaserEquipPending = true;
+  renderStore();
+  client.equipStagingPulseLaser({ itemId: "gun:pulseLaser" });
+  if (typeof addHudToast === "function") addHudToast("Requested MP staging Pulse Laser equip.");
+  setTimeout(async () => {
+    multiplayerStagingPulseLaserEquipPending = false;
+    const latest = client.getStatus?.().lastStagingLoadoutEquip;
+    if (latest?.itemId === "gun:pulseLaser" && latest.applied) {
+      if (typeof addHudToast === "function") addHudToast(`Weapon equipped: ${latest.name || "Pulse Laser"}.`);
+      if (typeof loadGameFromSupabase === "function") {
+        try {
+          const loaded = await loadGameFromSupabase();
+          if (loaded?.loaded && typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+        } catch (_err) {
+          if (typeof addHudToast === "function") addHudToast("Weapon equipped. Reload if loadout values look stale.");
         }
       }
     }
@@ -2338,12 +2411,14 @@ function renderStoreDetail() {
         <div class="store-detail-owned-line">${ownershipLine} / ${getStoreStockLabel(item)}</div>
         ${renderStagingStorePreviewNote(item)}
         ${renderStagingCargoPodEquipNote(item)}
+        ${renderStagingPulseLaserEquipNote(item)}
         ${detailStatsHtml}
       </div>
 
       <div class="store-buy-footer store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
         ${buyButton}
         ${stagingStoreLocked && stagingStoreItemId === "attachment:cargoPod" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingCargoPodEquip(getStoreSelectedItem())" ${multiplayerStagingCargoPodEquipPending ? "disabled" : ""}>${multiplayerStagingCargoPodEquipPending ? "Applying..." : "Apply Cargo Pod"}</button>` : ""}
+        ${stagingStoreLocked && stagingStoreItemId === "gun:pulseLaser" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingPulseLaserEquip(getStoreSelectedItem())" ${multiplayerStagingPulseLaserEquipPending ? "disabled" : ""}>${multiplayerStagingPulseLaserEquipPending ? "Applying..." : "Apply Pulse Laser"}</button>` : ""}
         ${sellButton}
       </div>
     </div>`;
@@ -2625,7 +2700,14 @@ function removeAttachment(index) {
 }
 
 function equipGunFromInventory(key, quality = "standard", source = "owned") {
-  if (blockLoadoutMutationInMultiplayerStaging()) return;
+  if (isMultiplayerStagingStoreActive()) {
+    if (key === "pulseLaser" && quality === "standard" && source === "owned") {
+      requestStagingPulseLaserEquip({ kind: "gun", key: "pulseLaser" });
+      return;
+    }
+    blockLoadoutMutationInMultiplayerStaging();
+    return;
+  }
   const item = GUNS[key];
   const loadout = getShipLoadout(selectedHangarShipId);
 

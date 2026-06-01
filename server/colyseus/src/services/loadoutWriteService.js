@@ -1,26 +1,30 @@
-/* Staging-only Cargo Pod equip prototype.
-   This service mirrors the current local standard attachment equip behavior for
-   attachment:cargoPod only: decrement ownedAttachments.cargoPod, append a
-   standard level-1 Cargo Pod to the current ship loadout, and preserve every
-   unrelated save field. It never writes credits, inventoryItems, guns, ships,
-   loot, bounties, PvP/player damage, broad progression, schema, or RLS. */
+/* Staging-only loadout equip prototype.
+   This service mirrors the current local standard equip behavior for
+   attachment:cargoPod and gun:pulseLaser only. It decrements the matching
+   owned count, appends a standard level-1 entry to the current ship loadout,
+   and preserves every unrelated save field. It never writes credits,
+   inventoryItems, ships, loot, bounties, PvP/player damage, broad progression,
+   schema, or RLS. */
 
 const PLAYER_SAVES_TABLE = "player_saves";
 const CARGO_POD_ITEM_ID = "attachment:cargoPod";
 const CARGO_POD_KEY = "cargoPod";
 const CARGO_POD_CARGO_BONUS = 25;
+const PULSE_LASER_ITEM_ID = "gun:pulseLaser";
+const PULSE_LASER_KEY = "pulseLaser";
 const MAX_ATTACHMENT_COUNT = 9999;
+const MAX_GUN_COUNT = 9999;
 
 const STAGING_SHIP_CONFIG = Object.freeze({
-  lupenOrigin: Object.freeze({ cargo: 150, attachmentSlots: 3 }),
-  lupenHauler: Object.freeze({ cargo: 260, attachmentSlots: 4 }),
-  lupenStriker: Object.freeze({ cargo: 100, attachmentSlots: 3 }),
-  hermesCourier: Object.freeze({ cargo: 190, attachmentSlots: 3 }),
-  athenaSentinel: Object.freeze({ cargo: 140, attachmentSlots: 4 }),
-  aresVindicator: Object.freeze({ cargo: 90, attachmentSlots: 3 }),
-  hephaestusTrader: Object.freeze({ cargo: 360, attachmentSlots: 6 }),
-  poseidonAggressor: Object.freeze({ cargo: 120, attachmentSlots: 4 }),
-  zeusExplorer: Object.freeze({ cargo: 220, attachmentSlots: 6 })
+  lupenOrigin: Object.freeze({ cargo: 150, attachmentSlots: 3, gunSlots: 2 }),
+  lupenHauler: Object.freeze({ cargo: 260, attachmentSlots: 4, gunSlots: 1 }),
+  lupenStriker: Object.freeze({ cargo: 100, attachmentSlots: 3, gunSlots: 3 }),
+  hermesCourier: Object.freeze({ cargo: 190, attachmentSlots: 3, gunSlots: 2 }),
+  athenaSentinel: Object.freeze({ cargo: 140, attachmentSlots: 4, gunSlots: 2 }),
+  aresVindicator: Object.freeze({ cargo: 90, attachmentSlots: 3, gunSlots: 4 }),
+  hephaestusTrader: Object.freeze({ cargo: 360, attachmentSlots: 6, gunSlots: 2 }),
+  poseidonAggressor: Object.freeze({ cargo: 120, attachmentSlots: 4, gunSlots: 5 }),
+  zeusExplorer: Object.freeze({ cargo: 220, attachmentSlots: 6, gunSlots: 3 })
 });
 
 function getString(value, fallback = "") {
@@ -88,15 +92,15 @@ function getSaveDataFromRow(row = {}) {
     : null;
 }
 
-function getLoadoutWriteFlags(applied = false) {
+function getLoadoutWriteFlags(applied = false, writeKind = "") {
   return {
     loadoutWritten: applied,
-    attachmentWritten: applied,
+    attachmentWritten: applied && writeKind === "attachment",
     saveWritten: applied,
     inventoryWritten: false,
     creditsWritten: false,
     shipWritten: false,
-    weaponWritten: false,
+    weaponWritten: applied && writeKind === "weapon",
     lootWritten: false,
     bountyWritten: false
   };
@@ -119,9 +123,12 @@ function getUserReason(reason) {
     unsupported_ship_for_loadout_preview: "Current ship is not supported by staging loadout preview.",
     owned_attachments_path_missing_or_invalid: "Saved attachment ownership path is missing or invalid.",
     cargo_pod_not_owned: "No owned Cargo Pod is available to equip.",
+    owned_guns_path_missing_or_invalid: "Saved weapon ownership path is missing or invalid.",
+    pulse_laser_not_owned: "No owned Pulse Laser is available to equip.",
     ship_loadouts_path_missing_or_invalid: "Saved ship loadouts path is missing or invalid.",
     current_ship_loadout_missing_or_invalid: "Current ship loadout path is missing or invalid.",
     attachment_slots_full: "No empty attachment slot.",
+    gun_slots_full: "No empty gun slot.",
     supabase_config_missing: "Supabase server config unavailable."
   };
   return labels[reason] || `Blocked: ${reason || "loadout write unavailable"}.`;
@@ -146,6 +153,10 @@ function isCargoPodItem(itemId) {
   return getString(itemId) === CARGO_POD_ITEM_ID;
 }
 
+function isPulseLaserItem(itemId) {
+  return getString(itemId) === PULSE_LASER_ITEM_ID;
+}
+
 function normalizeLoadoutEntry(entry) {
   if (typeof entry === "string") return { key: entry, quality: "standard", level: 1 };
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
@@ -162,6 +173,13 @@ function getCargoPodCount(entries = []) {
   return entries.reduce((count, entry) => {
     const normalized = normalizeLoadoutEntry(entry);
     return count + (normalized?.key === CARGO_POD_KEY ? 1 : 0);
+  }, 0);
+}
+
+function getPulseLaserCount(entries = []) {
+  return entries.reduce((count, entry) => {
+    const normalized = normalizeLoadoutEntry(entry);
+    return count + (normalized?.key === PULSE_LASER_KEY ? 1 : 0);
   }, 0);
 }
 
@@ -265,6 +283,79 @@ export function buildStagingCargoPodEquipPlan(saveData = {}, { itemId = CARGO_PO
   };
 }
 
+export function buildStagingPulseLaserEquipPlan(saveData = {}, { itemId = PULSE_LASER_ITEM_ID } = {}) {
+  if (!isPulseLaserItem(itemId)) return blocked("unknown_loadout_item", { itemId });
+  if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) return blocked("save_data_missing_or_invalid", { itemId });
+
+  const currentShipId = getString(saveData.currentShipId);
+  const ship = STAGING_SHIP_CONFIG[currentShipId];
+  if (!currentShipId) return blocked("current_ship_missing_or_invalid", { itemId });
+  if (!ship) return blocked("unsupported_ship_for_loadout_preview", { itemId, currentShipId });
+
+  if (!saveData.ownedGuns || typeof saveData.ownedGuns !== "object" || Array.isArray(saveData.ownedGuns)) {
+    return blocked("owned_guns_path_missing_or_invalid", { itemId, currentShipId });
+  }
+
+  const ownedBefore = clampInteger(saveData.ownedGuns[PULSE_LASER_KEY], 0, MAX_GUN_COUNT);
+  if (ownedBefore === null || ownedBefore <= 0) return blocked("pulse_laser_not_owned", { itemId, currentShipId, ownedBefore: ownedBefore || 0 });
+
+  if (!saveData.shipLoadouts || typeof saveData.shipLoadouts !== "object" || Array.isArray(saveData.shipLoadouts)) {
+    return blocked("ship_loadouts_path_missing_or_invalid", { itemId, currentShipId, ownedBefore });
+  }
+
+  const loadout = saveData.shipLoadouts[currentShipId];
+  if (!loadout || typeof loadout !== "object" || Array.isArray(loadout) || !Array.isArray(loadout.attachments) || !Array.isArray(loadout.guns)) {
+    return blocked("current_ship_loadout_missing_or_invalid", { itemId, currentShipId, ownedBefore });
+  }
+
+  const normalizedGuns = loadout.guns.map(normalizeLoadoutEntry).filter(Boolean);
+  const equippedBefore = getPulseLaserCount(normalizedGuns);
+  if (normalizedGuns.length >= ship.gunSlots) {
+    return blocked("gun_slots_full", {
+      itemId,
+      currentShipId,
+      ownedBefore,
+      ownedAfter: ownedBefore,
+      equippedBefore,
+      equippedAfter: equippedBefore,
+      gunSlots: ship.gunSlots
+    });
+  }
+
+  const patchedSaveData = cloneJson(saveData);
+  patchedSaveData.ownedGuns[PULSE_LASER_KEY] = Math.max(0, ownedBefore - 1);
+  patchedSaveData.shipLoadouts[currentShipId].guns = [
+    ...normalizedGuns,
+    { key: PULSE_LASER_KEY, quality: "standard", level: 1 }
+  ];
+
+  return {
+    ok: true,
+    mode: "loadout_write_plan",
+    operation: "equip",
+    applied: false,
+    dryRun: true,
+    itemId: PULSE_LASER_ITEM_ID,
+    name: "Pulse Laser",
+    category: "weapon",
+    currentShipId,
+    ownedBefore,
+    ownedAfter: patchedSaveData.ownedGuns[PULSE_LASER_KEY],
+    equippedBefore,
+    equippedAfter: equippedBefore + 1,
+    gunSlots: ship.gunSlots,
+    patchedSaveData,
+    appliedFields: ["ownedGuns.pulseLaser", `shipLoadouts.${currentShipId}.guns`],
+    untouchedFields: ["credits", "inventoryItems", "ownedShips", "ownedAttachments", "attachments", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"]
+  };
+}
+
+export function buildStagingLoadoutEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM_ID } = {}) {
+  if (isCargoPodItem(itemId)) return buildStagingCargoPodEquipPlan(saveData, { itemId });
+  if (isPulseLaserItem(itemId)) return buildStagingPulseLaserEquipPlan(saveData, { itemId });
+  return blocked("unknown_loadout_item", { itemId });
+}
+
 async function fetchPlayerSaveRow(baseUrl, playerId, config, fetchImpl) {
   const response = await fetchImpl(getPlayerSaveReadUrl(baseUrl, playerId), {
     method: "GET",
@@ -298,7 +389,7 @@ async function patchPlayerSaveData(baseUrl, playerId, saveData, config, fetchImp
   return { ok: true, reason: "", status: Number(response.status || 200) };
 }
 
-export async function applyStagingCargoPodEquipWrite({
+export async function applyStagingLoadoutEquipWrite({
   playerId = "",
   itemId = CARGO_POD_ITEM_ID,
   trustedState = null,
@@ -307,7 +398,7 @@ export async function applyStagingCargoPodEquipWrite({
 } = {}) {
   const safePlayerId = getString(playerId);
   if (!safePlayerId) return blocked("verified_identity_required", { itemId });
-  if (!isCargoPodItem(itemId)) return blocked("unknown_loadout_item", { itemId });
+  if (!isCargoPodItem(itemId) && !isPulseLaserItem(itemId)) return blocked("unknown_loadout_item", { itemId });
   if (!trustedState?.available || !trustedState?.validationState) return blocked("trusted_save_required", { itemId });
   if (typeof fetchImpl !== "function") return blocked("fetch_unavailable", { itemId });
 
@@ -329,7 +420,7 @@ export async function applyStagingCargoPodEquipWrite({
     const readResult = await fetchPlayerSaveRow(baseUrl, safePlayerId, config, fetchImpl);
     if (!readResult.ok) return blocked(readResult.reason, { envGate, status: readResult.status, itemId });
     const saveData = getSaveDataFromRow(readResult.row);
-    const plan = buildStagingCargoPodEquipPlan(saveData, { itemId });
+    const plan = buildStagingLoadoutEquipPlan(saveData, { itemId });
     if (!plan.ok) return { ...plan, envGate, itemId };
     const patchResult = await patchPlayerSaveData(baseUrl, safePlayerId, plan.patchedSaveData, config, fetchImpl);
     if (!patchResult.ok) return blocked(patchResult.reason, { envGate, status: patchResult.status, itemId });
@@ -340,11 +431,13 @@ export async function applyStagingCargoPodEquipWrite({
       operation: "equip",
       applied: true,
       dryRun: false,
-      reason: "Cargo Pod equipped",
-      debugReason: "phase3_staging_cargo_pod_equip_applied",
-      itemId: CARGO_POD_ITEM_ID,
-      name: "Cargo Pod",
-      category: "equipment",
+      reason: isPulseLaserItem(itemId) ? "Pulse Laser equipped" : "Cargo Pod equipped",
+      debugReason: isPulseLaserItem(itemId)
+        ? "phase_weapon_staging_pulse_laser_equip_applied"
+        : "phase3_staging_cargo_pod_equip_applied",
+      itemId: plan.itemId,
+      name: plan.name,
+      category: plan.category,
       currentShipId: plan.currentShipId,
       ownedBefore: plan.ownedBefore,
       ownedAfter: plan.ownedAfter,
@@ -353,6 +446,7 @@ export async function applyStagingCargoPodEquipWrite({
       cargoCapacityBefore: plan.cargoCapacityBefore,
       cargoCapacityAfterPreview: plan.cargoCapacityAfterPreview,
       cargoCapacityAfter: plan.cargoCapacityAfter,
+      gunSlots: plan.gunSlots,
       validationMode: "trusted_save",
       trustedStateAvailable: true,
       status: patchResult.status,
@@ -366,8 +460,8 @@ export async function applyStagingCargoPodEquipWrite({
         itemAllowed: envGate.itemAllowed
       },
       envGate,
-      writes: getLoadoutWriteFlags(true),
-      ...getLoadoutWriteFlags(true),
+      writes: getLoadoutWriteFlags(true, isPulseLaserItem(itemId) ? "weapon" : "attachment"),
+      ...getLoadoutWriteFlags(true, isPulseLaserItem(itemId) ? "weapon" : "attachment"),
       appliedFields: plan.appliedFields
     };
   } catch (_err) {
@@ -375,8 +469,18 @@ export async function applyStagingCargoPodEquipWrite({
   }
 }
 
+export async function applyStagingCargoPodEquipWrite(options = {}) {
+  return applyStagingLoadoutEquipWrite({
+    ...options,
+    itemId: options.itemId || CARGO_POD_ITEM_ID
+  });
+}
+
 export const LoadoutWriteService = Object.freeze({
   getLoadoutWriteEnvGate,
   buildStagingCargoPodEquipPlan,
-  applyStagingCargoPodEquipWrite
+  buildStagingPulseLaserEquipPlan,
+  buildStagingLoadoutEquipPlan,
+  applyStagingCargoPodEquipWrite,
+  applyStagingLoadoutEquipWrite
 });

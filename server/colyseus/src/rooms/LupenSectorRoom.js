@@ -43,8 +43,8 @@ import {
   getStoreWriteEnvGate
 } from "../services/storeWriteService.js";
 import {
-  applyStagingCargoPodEquipWrite,
-  buildStagingCargoPodEquipPlan,
+  applyStagingLoadoutEquipWrite,
+  buildStagingLoadoutEquipPlan,
   getLoadoutWriteEnvGate
 } from "../services/loadoutWriteService.js";
 
@@ -89,6 +89,8 @@ const KNOWN_SECTOR_NODES = new Set([
   "Lower Gate Core",
   "Lower Gate East"
 ]);
+const STAGING_STORE_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "gun:pulseLaser"]);
+const STAGING_LOADOUT_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "gun:pulseLaser"]);
 
 export const STAGING_BOT_ALLOWED_NODE_IDS = [
   "Upper Apex",
@@ -1601,7 +1603,7 @@ export class LupenSectorRoom extends Room {
 
     const canAttemptWrite = preview.ok === true &&
       preview.wouldPass === true &&
-      item?.itemId === "attachment:cargoPod" &&
+      STAGING_STORE_WRITE_ITEM_IDS.has(item?.itemId) &&
       storeWriteQuantityValid &&
       gates.writeEnabled === true &&
       gates.dryRun === false &&
@@ -1634,7 +1636,7 @@ export class LupenSectorRoom extends Room {
 
     const previewOnlyReason = !storeWriteQuantityValid
       ? "invalid_store_quantity"
-      : item && item.itemId !== "attachment:cargoPod"
+      : item && !STAGING_STORE_WRITE_ITEM_IDS.has(item.itemId)
       ? "store_item_preview_only"
       : player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun
         ? "staging_mode_required_for_store_write"
@@ -1660,7 +1662,7 @@ export class LupenSectorRoom extends Room {
       dryRun: true,
       blockReason: previewOnlyReason === "invalid_store_quantity" ? "invalid_store_quantity" : preview.blockReason || previewOnlyReason,
       reason: previewOnlyReason,
-      userReason: item && item.itemId !== "attachment:cargoPod"
+      userReason: item && !STAGING_STORE_WRITE_ITEM_IDS.has(item.itemId)
         ? "This item is preview-only in staging."
         : previewOnlyReason === "staging_store_dry_run_enabled"
           ? "Dry run only - no credits or Store ownership changed."
@@ -1699,8 +1701,8 @@ export class LupenSectorRoom extends Room {
       applied: false,
       dryRun: true,
       itemId,
-      name: itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
-      category: "equipment",
+      name: itemId === "gun:pulseLaser" ? "Pulse Laser" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
+      category: itemId === "gun:pulseLaser" ? "weapon" : "equipment",
       validationMode: trustedState?.available ? "trusted_save" : "unknown",
       trustedStateAvailable: trustedState?.available === true,
       gates,
@@ -1726,7 +1728,7 @@ export class LupenSectorRoom extends Room {
     const messageType = wantsWrite ? "stagingLoadout:equipResult" : "stagingLoadout:previewResult";
 
     if (wantsWrite &&
-      itemId === "attachment:cargoPod" &&
+      STAGING_LOADOUT_WRITE_ITEM_IDS.has(itemId) &&
       gates.writeEnabled === true &&
       gates.dryRun === false &&
       gates.verified === true &&
@@ -1734,7 +1736,7 @@ export class LupenSectorRoom extends Room {
       gates.trustedSaveAvailable === true &&
       gates.itemAllowed === true &&
       player?.multiplayerMode === "staging") {
-      const writeResult = await applyStagingCargoPodEquipWrite({
+      const writeResult = await applyStagingLoadoutEquipWrite({
         playerId: identity.trustedPlayerId || identity.playerId,
         itemId,
         trustedState
@@ -1748,7 +1750,7 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
-    let reason = itemId !== "attachment:cargoPod"
+    let reason = !STAGING_LOADOUT_WRITE_ITEM_IDS.has(itemId)
       ? "unknown_loadout_item"
       : wantsWrite && player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun
         ? "staging_mode_required_for_loadout_write"
@@ -1768,7 +1770,7 @@ export class LupenSectorRoom extends Room {
 
     let plan = null;
     if (trustedState?.available && trustedState?.rawSaveData) {
-      plan = buildStagingCargoPodEquipPlan(trustedState.rawSaveData, { itemId });
+      plan = buildStagingLoadoutEquipPlan(trustedState.rawSaveData, { itemId });
       reason = plan.ok ? reason : plan.blockReason || reason;
     }
 
@@ -1782,7 +1784,7 @@ export class LupenSectorRoom extends Room {
       blockReason: plan?.blockReason || reason,
       reason,
       userReason: plan?.userReason || (reason === "staging_loadout_dry_run_enabled"
-        ? "Would equip Cargo Pod. Dry run only - loadout not changed."
+        ? `Would equip ${base.name || "staging item"}. Dry run only - loadout not changed.`
         : `Blocked: ${reason}.`),
       gates,
       writes: base.writes,
