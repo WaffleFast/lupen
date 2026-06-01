@@ -1801,6 +1801,14 @@
     return `${preview.botName || "Staging Bot"} / final ${finalHit} / top ${topContributor} / ${contributionLabel} / not applied`;
   }
 
+  function getLootPreviewLabel(status) {
+    const preview = status?.lastRewardPreview?.lootPreview;
+    if (!preview?.available) return "none";
+    const itemCount = Array.isArray(preview.items) ? preview.items.length : 0;
+    const eligible = isLootPreviewEligibleForSelf(status, status.lastRewardPreview) ? "eligible" : "not eligible";
+    return `${eligible} / ${itemCount} item${itemCount === 1 ? "" : "s"} / inventory write ${preview.inventoryWritten ? "yes" : "no"}`;
+  }
+
   function getPreviewIdentityLabel(displayName, playerId, sessionId) {
     const name = String(displayName || "").trim();
     if (name && name.toLowerCase() !== "pilot") return name.slice(0, 16);
@@ -1899,7 +1907,33 @@
       `Staging XP preview: ${Math.round(Number(preview.previewXp || 0))}`,
       `Your share: ${selfDamage} dmg (${selfPercent}%)`,
       `Final hit: ${finalHit} / Top: ${topContributor}`,
-      "Simulated reward. No credits, loot, bounties, or saves from preview."
+      "Simulated XP reward. No credits, bounty writes, or saves from preview."
+    ];
+  }
+
+  function isLootPreviewEligibleForSelf(status, preview = status?.lastRewardPreview) {
+    const eligibleSessionIds = Array.isArray(preview?.lootPreview?.eligibleSessionIds)
+      ? preview.lootPreview.eligibleSessionIds
+      : [];
+    return !eligibleSessionIds.length || eligibleSessionIds.includes(status?.sessionId);
+  }
+
+  function getLootPreviewPanelLines(status, selectedBot) {
+    const preview = status?.lastRewardPreview;
+    if (!isRewardPreviewForBot(status, selectedBot)) return [];
+    const lootPreview = preview?.lootPreview;
+    if (!lootPreview?.available || !isLootPreviewEligibleForSelf(status, preview)) return [];
+
+    const items = Array.isArray(lootPreview.items) ? lootPreview.items : [];
+    const itemLines = items.length
+      ? items.slice(0, 3).map((item) => `Would drop: ${Math.round(Number(item.quantity || 1))}x ${item.name || "Preview Loot"} (${item.rarity || "common"})`)
+      : ["Would drop: none"];
+
+    return [
+      "Loot preview",
+      ...itemLines,
+      "Preview only - inventory not changed.",
+      "Loot writes not enabled in staging."
     ];
   }
 
@@ -1965,19 +1999,19 @@
     if (playerSave.written || result.playerSavePatchResult?.applied) {
       const xpBefore = playerSave.xpBefore ?? result.playerSavePatchResult?.xpBefore;
       const xpAfter = playerSave.xpAfter ?? result.playerSavePatchResult?.xpAfter;
-      return `XP-only staging claim applied: ${formatPreviewValue(xpBefore)} -> ${formatPreviewValue(xpAfter)}. No credits or loot awarded.`;
+      return `XP-only staging claim applied: ${formatPreviewValue(xpBefore)} -> ${formatPreviewValue(xpAfter)}. No credits awarded; loot preview not applied.`;
     }
 
     if (claimStatus.mode === "blocked") {
-      return `Claim blocked: ${getFriendlyClaimReason(reason)}. XP preview +${xpDelta}; no credits or loot awarded.`;
+      return `Claim blocked: ${getFriendlyClaimReason(reason)}. XP preview +${xpDelta}; no credits awarded; loot preview not applied.`;
     }
 
     if (gates.xpWriteAllowed) {
-      return `XP-only claim available: +${xpDelta} XP if server gates remain enabled. No credits or loot awarded in staging.`;
+      return `XP-only claim available: +${xpDelta} XP if server gates remain enabled. No credits awarded; loot preview remains inventory-off.`;
     }
 
     if (claimStatus.mode === "dry_run") {
-      return `Simulated claim: +${xpDelta} XP dry-run only. Progression writes disabled; no credits or loot awarded.`;
+      return `Simulated claim: +${xpDelta} XP dry-run only. Progression writes disabled; loot preview not applied.`;
     }
 
     const rewardPlan = result.rewardWritePlan;
@@ -1999,7 +2033,7 @@
     }
 
     if (result.claimSimulated || result.dryRun) {
-      return "Claim simulated only. No save changed.";
+      return "Claim simulated only. Loot preview remains inventory-only future work; no save changed.";
     }
 
     return "Claim received. No save changed.";
@@ -2672,7 +2706,10 @@
     bars.appendChild(createStagingCombatBar("Hull", selectedBot.hull, selectedBot.hullMax, "lupen-mp-staging-hull"));
     inner.appendChild(bars);
 
-    const rewardLines = getRewardPreviewPanelLines(status, selectedBot);
+    const rewardLines = [
+      ...getRewardPreviewPanelLines(status, selectedBot),
+      ...getLootPreviewPanelLines(status, selectedBot)
+    ];
     if (rewardLines.length) {
       const reward = global.document.createElement("div");
       reward.className = "lupen-mp-staging-reward";
@@ -2862,6 +2899,7 @@
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
+      setDiagnosticsRow(panel, "loot preview", getLootPreviewLabel(status));
       setDiagnosticsRow(panel, "claim preview", getRewardClaimResultLabel(status));
       const bounty = getActiveStagingBounty(status);
       if (bounty) {

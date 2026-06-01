@@ -41,6 +41,9 @@ import {
   recordStagingBountyBotDestruction
 } from "../config/stagingBountyConfig.js";
 import {
+  buildStagingLootPreview
+} from "../config/stagingLootConfig.js";
+import {
   fetchPlayerTradeValidationState
 } from "../services/playerSaveReadService.js";
 import {
@@ -417,7 +420,8 @@ export function buildRewardWritePlan({
     contributionPercent,
     intendedXp: Math.round((Number(preview.previewXp || STAGING_REWARD_DRY_RUN_XP) * contributionPercent) / 100),
     intendedCredits: 0,
-    intendedLoot: Array.isArray(preview.previewLoot) ? preview.previewLoot.map((item) => getSafeIdentityValue(item)).filter(Boolean) : [],
+    intendedLoot: [],
+    lootPreview: preview.lootPreview || null,
     intendedReason: "staging_bot_disabled",
     eligible,
     blockedReason,
@@ -1241,9 +1245,19 @@ export class LupenSectorRoom extends Room {
     const botId = getStringValue(bot?.id);
     const finalHitIdentity = this.getPlayerIdentitySnapshot(disabledBySessionId);
     const topContributorIdentity = this.getPlayerIdentitySnapshot(contributionSummary.topContributorSessionId);
+    const eligibleSessionIds = (Array.isArray(contributionSummary?.contributors) ? contributionSummary.contributors : [])
+      .map((contributor) => getStringValue(contributor?.sessionId))
+      .filter(Boolean);
+    if (disabledBySessionId) eligibleSessionIds.push(getStringValue(disabledBySessionId));
+    const rewardPreviewId = `${botId}:${receivedAt}`;
+    const lootPreview = buildStagingLootPreview({
+      botId,
+      rewardPreviewId,
+      eligibleSessionIds
+    });
     return {
       ok: true,
-      rewardPreviewId: `${botId}:${receivedAt}`,
+      rewardPreviewId,
       botId,
       botName: bot?.name || bot?.type || "Staging Bot",
       disabledBySessionId,
@@ -1260,6 +1274,14 @@ export class LupenSectorRoom extends Room {
       previewXp: STAGING_REWARD_DRY_RUN_XP,
       previewCredits: STAGING_REWARD_DRY_RUN_CREDITS,
       previewLoot: [],
+      lootPreview,
+      inventoryWritten: false,
+      ownedGunsWritten: false,
+      ownedAttachmentsWritten: false,
+      cargoWritten: false,
+      creditsWritten: false,
+      bountyWritten: false,
+      saveWritten: false,
       applied: false,
       reason: "staging_preview_only",
       dryRun: true,

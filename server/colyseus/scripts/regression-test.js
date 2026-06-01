@@ -23,6 +23,9 @@ import {
   recordStagingBountyBotDestruction
 } from "../src/config/stagingBountyConfig.js";
 import {
+  buildStagingLootPreview
+} from "../src/config/stagingLootConfig.js";
+import {
   buildRewardLedgerEntry,
   checkRewardLedgerConnectivity,
   writeRewardLedgerEntry
@@ -1887,6 +1890,19 @@ async function assertStagingBountyHelpers() {
   assert(publicState.progress === 2 && publicState.completed === true && publicState.claimAvailable === true, "Completed staging bounty public state was incorrect.");
   assert(buildStagingBountySourceEventId(bountyState, "verified-player-a") === `${STAGING_BOUNTY_ID}:verified-player-a:1`, "Staging bounty source event id was not deterministic.");
 
+  const lootPreview = buildStagingLootPreview({
+    botId: "dev-bot-erebus-1",
+    rewardPreviewId: "dev-bot-erebus-1:1400",
+    eligibleSessionIds: ["session-a", "session-b", "session-a"]
+  });
+  assert(lootPreview.available === true, "Staging loot preview should be available to contributors.");
+  assert(lootPreview.mode === "preview_only", "Staging loot preview mode should be preview_only.");
+  assert(lootPreview.eligibleSessionIds.length === 2, "Staging loot preview did not de-duplicate eligible sessions.");
+  assert(Array.isArray(lootPreview.items) && lootPreview.items.length > 0, "Staging loot preview did not include preview items.");
+  assert(lootPreview.items.every((item) => item.lootId && item.name && item.inventoryWritable === false), "Staging loot preview item fields were not safe.");
+  assert(lootPreview.inventoryWritten === false && lootPreview.saveWritten === false, "Staging loot preview reported forbidden writes.");
+  assert(lootPreview.creditsWritten === false && lootPreview.cargoWritten === false && lootPreview.bountyWritten === false, "Staging loot preview reported economy/bounty writes.");
+
   const bountyRewardPlan = {
     playerId: "verified-player-a",
     trustedPlayerId: "verified-player-a",
@@ -3587,7 +3603,8 @@ try {
         event?.applied === false &&
         event?.dryRun === true &&
         event?.reason === "staging_preview_only" &&
-        Array.isArray(event?.previewLoot);
+        Array.isArray(event?.previewLoot) &&
+        event?.lootPreview?.mode === "preview_only";
     });
   });
   const rewardPreview = rewardPreviewEvents.find((event) => event?.botId === inspectedBotBeforeCombat.id && event?.finalHitBy === roomA.sessionId);
@@ -3611,6 +3628,15 @@ try {
   assert(contributorA?.displayName === "Regression Pilot A", "Contributor A display name was not included in preview.");
   assert(rewardPreview?.previewXp === 5, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
   assert(rewardPreview?.previewCredits === 0, `Unexpected reward preview credits: ${rewardPreview?.previewCredits}`);
+  assert(rewardPreview?.inventoryWritten === false && rewardPreview?.saveWritten === false, "Reward preview reported inventory/save writes.");
+  assert(rewardPreview?.creditsWritten === false && rewardPreview?.cargoWritten === false && rewardPreview?.bountyWritten === false, "Reward preview reported economy/bounty writes.");
+  assert(rewardPreview?.lootPreview?.available === true, "Reward preview did not include available loot preview.");
+  assert(rewardPreview?.lootPreview?.mode === "preview_only", "Reward preview loot mode was not preview_only.");
+  assert(rewardPreview?.lootPreview?.eligibleSessionIds?.includes(roomA.sessionId), "Final hitter was not eligible for loot preview.");
+  assert(rewardPreview?.lootPreview?.eligibleSessionIds?.includes(roomB.sessionId), "Contributor was not eligible for loot preview.");
+  assert(Array.isArray(rewardPreview?.lootPreview?.items) && rewardPreview.lootPreview.items.length > 0, "Reward preview loot items were missing.");
+  assert(rewardPreview.lootPreview.items.every((item) => item.lootId && item.name && item.inventoryWritable === false), "Reward preview loot items were not preview-only.");
+  assert(rewardPreview.lootPreview.inventoryWritten === false && rewardPreview.lootPreview.saveWritten === false, "Loot preview reported forbidden inventory/save writes.");
   const playerAfterRewardPreview = playerFrom(roomA, roomA.sessionId);
   assert(playerAfterRewardPreview && !("xp" in playerAfterRewardPreview), "Reward preview created player XP field.");
   assert(playerAfterRewardPreview && !("credits" in playerAfterRewardPreview), "Reward preview created player credits field.");
@@ -3644,6 +3670,9 @@ try {
   assert(claimPreviewResult?.rewardWritePlan?.blockedReason === "identity_unverified", `Unexpected unverified blocked reason: ${claimPreviewResult?.rewardWritePlan?.blockedReason}`);
   assert(claimPreviewResult?.rewardWritePlan?.intendedXp > 0, "Reward write plan did not include intended XP.");
   assert(claimPreviewResult?.rewardWritePlan?.intendedCredits === 0, "Reward write plan attempted to include intended credits.");
+  assert(Array.isArray(claimPreviewResult?.rewardWritePlan?.intendedLoot) && claimPreviewResult.rewardWritePlan.intendedLoot.length === 0, "Reward write plan attempted to include loot writes.");
+  assert(claimPreviewResult?.lootPreview?.mode === "preview_only", "Reward claim did not echo preview-only loot contract.");
+  assert(claimPreviewResult?.lootPreview?.inventoryWritten === false && claimPreviewResult?.lootPreview?.saveWritten === false, "Reward claim loot preview reported writes.");
   assert(claimPreviewResult?.rewardLedgerResult?.dryRun === true, "Reward ledger result was not dry-run.");
   assert(claimPreviewResult?.rewardLedgerResult?.applied === false, "Reward ledger result applied rewards.");
   assert(claimPreviewResult?.rewardLedgerResult?.skippedReason === "reward_writes_disabled", `Unexpected reward ledger skipped reason: ${claimPreviewResult?.rewardLedgerResult?.skippedReason}`);

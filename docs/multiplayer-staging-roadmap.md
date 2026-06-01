@@ -161,6 +161,8 @@ Current XP-only staging claim status: after a server-owned staging bot is disabl
 
 Staging bounty wrapper status: [multiplayer-bounty-staging-design.md](multiplayer-bounty-staging-design.md) defines `Erebus Patrol Sweep`, a room/session-scoped staging-only objective to destroy 2 server-owned Erebus bots. In `?mp=staging`, the real Bounty Board now renders this server-owned staging bounty instead of local daily contracts, while the floating overlay is only a compact status helper. The board refreshes status after accept/claim and from server progress messages. Progress increments only for players who accepted the staging bounty and contributed to the disabled staging bot. Claiming reuses the same XP-only claim/apply path and remains blocked/dry-run unless the existing verified identity, idempotency, progression write, and allow-list gates pass. No normal bounty state, bounty table, credits, loot, inventory, route completion, trade totals, PvP, player damage, schema, or RLS changes are enabled.
 
+Staging loot preview status: [multiplayer-loot-staging-design.md](multiplayer-loot-staging-design.md) defines a preview-only loot contract attached to server-owned staging bot destruction. Eligible contributors can see compact “would drop” copy in the staging combat panel, but the server and client report `inventoryWritten:false`, `saveWritten:false`, and no `ownedGuns`, `ownedAttachments`, cargo, credits, bounty, route-completion, trade-total, PvP, or player-damage writes. Local single-player loot helpers remain disconnected from staging.
+
 Classification:
 
 - Reward preview UI: client visual only.

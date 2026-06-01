@@ -910,6 +910,43 @@
     };
   }
 
+  function normalizeStagingLootPreviewItem(item) {
+    if (!item || typeof item !== "object") return null;
+
+    return {
+      lootId: String(item.lootId || ""),
+      name: String(item.name || "Preview Loot"),
+      type: String(item.type || "material"),
+      rarity: String(item.rarity || "common"),
+      quantity: Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : 1,
+      description: String(item.description || ""),
+      inventoryWritable: item.inventoryWritable === true
+    };
+  }
+
+  function normalizeStagingLootPreview(preview) {
+    if (!preview || typeof preview !== "object") return null;
+
+    return {
+      available: preview.available === true,
+      mode: String(preview.mode || "preview_only"),
+      items: Array.isArray(preview.items)
+        ? preview.items.map(normalizeStagingLootPreviewItem).filter(Boolean)
+        : [],
+      eligibleSessionIds: Array.isArray(preview.eligibleSessionIds)
+        ? preview.eligibleSessionIds.map((sessionId) => String(sessionId || "")).filter(Boolean)
+        : [],
+      inventoryWritten: preview.inventoryWritten === true,
+      ownedGunsWritten: preview.ownedGunsWritten === true,
+      ownedAttachmentsWritten: preview.ownedAttachmentsWritten === true,
+      cargoWritten: preview.cargoWritten === true,
+      creditsWritten: preview.creditsWritten === true,
+      bountyWritten: preview.bountyWritten === true,
+      saveWritten: preview.saveWritten === true,
+      reason: String(preview.reason || "preview_only")
+    };
+  }
+
   function normalizeStagingBounty(bounty) {
     if (!bounty || typeof bounty !== "object") return null;
 
@@ -1512,6 +1549,14 @@
         previewLoot: Array.isArray(message?.previewLoot)
           ? message.previewLoot.map((item) => String(item || "")).filter(Boolean)
           : [],
+        lootPreview: normalizeStagingLootPreview(message?.lootPreview),
+        inventoryWritten: message?.inventoryWritten === true,
+        ownedGunsWritten: message?.ownedGunsWritten === true,
+        ownedAttachmentsWritten: message?.ownedAttachmentsWritten === true,
+        cargoWritten: message?.cargoWritten === true,
+        creditsWritten: message?.creditsWritten === true,
+        bountyWritten: message?.bountyWritten === true,
+        saveWritten: message?.saveWritten === true,
         applied: message?.applied === true,
         dryRun: message?.dryRun === true,
         reason: String(message?.reason || "staging_preview_only"),
@@ -1546,6 +1591,14 @@
         previewLoot: Array.isArray(message?.previewLoot)
           ? message.previewLoot.map((item) => String(item || "")).filter(Boolean)
           : [],
+        lootPreview: normalizeStagingLootPreview(message?.lootPreview),
+        inventoryWritten: message?.inventoryWritten === true,
+        ownedGunsWritten: message?.ownedGunsWritten === true,
+        ownedAttachmentsWritten: message?.ownedAttachmentsWritten === true,
+        cargoWritten: message?.cargoWritten === true,
+        creditsWritten: message?.creditsWritten === true,
+        bountyWritten: message?.bountyWritten === true,
+        saveWritten: message?.saveWritten === true,
         applied: message?.applied === true,
         mode: String(message?.mode || message?.claimStatus?.mode || ""),
         xpDelta: Number.isFinite(Number(message?.xpDelta ?? message?.claimStatus?.xpDelta))
