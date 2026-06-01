@@ -50,6 +50,11 @@ import {
   buildStagingStorePurchasePatch,
   getStoreWriteEnvGate
 } from "../src/services/storeWriteService.js";
+import {
+  applyStagingCargoPodEquipWrite,
+  buildStagingCargoPodEquipPlan,
+  getLoadoutWriteEnvGate
+} from "../src/services/loadoutWriteService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -334,6 +339,21 @@ async function expectStagingStorePurchase(room, sendMessage) {
     }, 3000);
 
     room.onMessage("stagingStore:purchaseResult", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectStagingLoadoutResult(room, type, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Timed out waiting for staging loadout ${type}.`));
+    }, 3000);
+
+    room.onMessage(`stagingLoadout:${type}`, (message) => {
       clearTimeout(timeout);
       resolve(message);
     });
@@ -1373,6 +1393,145 @@ async function assertStagingStorePreviewHelpers() {
   console.log("staging Store item list, previews, and gated Cargo Pod write helpers passed");
 }
 
+async function assertStagingCargoPodEquipHelpers() {
+  const validSaveData = {
+    credits: 780,
+    currentShipId: "lupenOrigin",
+    ownedAttachments: { cargoPod: 2, shieldBooster: 1 },
+    ownedGuns: { pulseLaser: 1 },
+    ownedShips: ["lupenOrigin"],
+    shipLoadouts: { lupenOrigin: { attachments: [{ key: "shieldBooster", quality: "standard", level: 1 }], guns: [{ key: "pulseLaser", quality: "standard", level: 1 }] } },
+    inventoryItems: [{ id: "kept-item", key: "cargoPod", quality: "rare" }],
+    cargo: { Iron: 2 },
+    cargoCostBasis: { Iron: 12 },
+    playerProgress: { combatXp: 33, totals: { tradesCompleted: 4 } },
+    activeBountyId: "keep-bounty",
+    marker: { keep: true }
+  };
+
+  const defaultGate = getLoadoutWriteEnvGate("verified-player-a", "attachment:cargoPod", {});
+  assert(defaultGate.writeEnabled === false && defaultGate.dryRun === true, "Loadout write gate default was not safe.");
+  assert(defaultGate.itemAllowed === true, "Cargo Pod should be default allowed loadout item.");
+
+  const plan = buildStagingCargoPodEquipPlan(validSaveData, { itemId: "attachment:cargoPod" });
+  assert(plan.ok === true, `Valid Cargo Pod equip plan was blocked: ${plan.blockReason}`);
+  assert(plan.ownedBefore === 2 && plan.ownedAfter === 1, "Cargo Pod equip plan did not consume owned Cargo Pod.");
+  assert(plan.equippedBefore === 0 && plan.equippedAfter === 1, "Cargo Pod equip plan did not add equipped Cargo Pod.");
+  assert(plan.cargoCapacityBefore === 150 && plan.cargoCapacityAfter === 175, "Cargo Pod equip plan did not apply +25 cargo capacity.");
+  assert(plan.patchedSaveData.credits === 780, "Cargo Pod equip plan changed credits.");
+  assert(plan.patchedSaveData.inventoryItems[0].id === "kept-item", "Cargo Pod equip plan changed inventoryItems.");
+  assert(plan.patchedSaveData.shipLoadouts.lupenOrigin.guns[0].key === "pulseLaser", "Cargo Pod equip plan changed guns.");
+  assert(plan.patchedSaveData.ownedGuns.pulseLaser === 1, "Cargo Pod equip plan changed weapon ownership.");
+  assert(plan.patchedSaveData.ownedShips[0] === "lupenOrigin", "Cargo Pod equip plan changed ships.");
+  assert(plan.patchedSaveData.cargo.Iron === 2 && plan.patchedSaveData.cargoCostBasis.Iron === 12, "Cargo Pod equip plan changed trade cargo.");
+  assert(plan.patchedSaveData.playerProgress.combatXp === 33, "Cargo Pod equip plan changed progression.");
+  assert(plan.patchedSaveData.activeBountyId === "keep-bounty", "Cargo Pod equip plan changed bounty state.");
+
+  const noOwnedPlan = buildStagingCargoPodEquipPlan({ ...validSaveData, ownedAttachments: { cargoPod: 0 } }, { itemId: "attachment:cargoPod" });
+  assert(noOwnedPlan.ok === false && noOwnedPlan.blockReason === "cargo_pod_not_owned", "Cargo Pod equip without ownership was not blocked.");
+
+  const fullSlotsPlan = buildStagingCargoPodEquipPlan({
+    ...validSaveData,
+    ownedAttachments: { cargoPod: 1 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "shieldBooster" }, { key: "jumpDrive" }, { key: "evasionMatrix" }],
+        guns: [{ key: "pulseLaser" }]
+      }
+    }
+  }, { itemId: "attachment:cargoPod" });
+  assert(fullSlotsPlan.ok === false && fullSlotsPlan.blockReason === "attachment_slots_full", "Cargo Pod equip with full slots was not blocked.");
+
+  const unknownPlan = buildStagingCargoPodEquipPlan(validSaveData, { itemId: "attachment:shieldBooster" });
+  assert(unknownPlan.ok === false && unknownPlan.blockReason === "unknown_loadout_item", "Non-Cargo Pod loadout item was not blocked.");
+
+  const defaultWrite = await applyStagingCargoPodEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {},
+    fetchImpl: async () => {
+      throw new Error("Loadout write default should not fetch.");
+    }
+  });
+  assert(defaultWrite.applied === false && defaultWrite.blockReason === "staging_loadout_writes_disabled", "Default Cargo Pod equip write did not fail closed.");
+  assert(defaultWrite.saveWritten === false, "Default Cargo Pod equip reported save write.");
+
+  const dryRunWrite = await applyStagingCargoPodEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "true",
+      STAGING_LOADOUT_WRITE_SCOPE: "verified"
+    },
+    fetchImpl: async () => {
+      throw new Error("Loadout dry-run should not fetch.");
+    }
+  });
+  assert(dryRunWrite.applied === false && dryRunWrite.blockReason === "staging_loadout_dry_run_enabled", "Dry-run Cargo Pod equip did not skip safely.");
+
+  const notAllowlistedWrite = await applyStagingCargoPodEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+      STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
+      STAGING_LOADOUT_WRITE_ALLOWLIST: "somebody-else"
+    }
+  });
+  assert(notAllowlistedWrite.blockReason === "player_not_in_staging_loadout_write_allowlist", "Non-allowlisted Cargo Pod equip was not blocked.");
+
+  let sequentialSave = JSON.parse(JSON.stringify(validSaveData));
+  const fetchCalls = [];
+  const appliedWrite = await applyStagingCargoPodEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+      STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
+      STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:cargoPod"
+    },
+    fetchImpl: async (url, options = {}) => {
+      fetchCalls.push(options.method || "GET");
+      assert(options.headers?.apikey === "stub-service-key", "Loadout write did not use service role apikey.");
+      assert(options.headers?.Authorization === "Bearer stub-service-key", "Loadout write did not use service role bearer.");
+      if ((options.method || "GET") === "GET") {
+        assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a&select=save_data,updated_at&limit=1", `Unexpected Loadout read URL: ${url}`);
+        return { ok: true, status: 200, json: async () => [{ save_data: sequentialSave }] };
+      }
+      assert(options.method === "PATCH", "Loadout write expected PATCH after read.");
+      assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a", `Unexpected Loadout PATCH URL: ${url}`);
+      sequentialSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedWrite.applied === true && appliedWrite.mode === "loadout_write", `Gated Cargo Pod equip did not apply: ${appliedWrite.blockReason}`);
+  assert(appliedWrite.ownedBefore === 2 && appliedWrite.ownedAfter === 1, "Applied Cargo Pod equip returned incorrect ownership.");
+  assert(appliedWrite.equippedBefore === 0 && appliedWrite.equippedAfter === 1, "Applied Cargo Pod equip returned incorrect equipped count.");
+  assert(appliedWrite.cargoCapacityBefore === 150 && appliedWrite.cargoCapacityAfter === 175, "Applied Cargo Pod equip returned incorrect capacity.");
+  assert(appliedWrite.loadoutWritten === true && appliedWrite.attachmentWritten === true && appliedWrite.saveWritten === true, "Applied Cargo Pod equip did not report allowed writes.");
+  assert(appliedWrite.creditsWritten === false && appliedWrite.inventoryWritten === false && appliedWrite.shipWritten === false && appliedWrite.weaponWritten === false, "Applied Cargo Pod equip reported forbidden writes.");
+  assert(sequentialSave.credits === 780, "Applied Cargo Pod equip changed credits.");
+  assert(sequentialSave.ownedAttachments.cargoPod === 1, "Applied Cargo Pod equip did not decrement owned Cargo Pod.");
+  assert(sequentialSave.shipLoadouts.lupenOrigin.attachments.some((entry) => entry.key === "cargoPod"), "Applied Cargo Pod equip did not add loadout entry.");
+  assert(sequentialSave.inventoryItems[0].id === "kept-item", "Applied Cargo Pod equip changed inventoryItems.");
+  assert(sequentialSave.ownedGuns.pulseLaser === 1, "Applied Cargo Pod equip changed weapon ownership.");
+  assert(sequentialSave.cargo.Iron === 2, "Applied Cargo Pod equip changed trade cargo.");
+  assert(sequentialSave.playerProgress.combatXp === 33, "Applied Cargo Pod equip changed progression.");
+  assert(fetchCalls.join(",") === "GET,PATCH", `Loadout write expected read/write pair, got ${fetchCalls.join(",")}.`);
+
+  console.log("staging Cargo Pod equip helpers and gated loadout write passed");
+}
+
 async function assertIdentityVerificationAndRewardPlanHelpers() {
   const verified = await verifySupabaseAccessToken(
     "stub-valid-token",
@@ -2234,6 +2393,7 @@ async function leaveRoom(room) {
 try {
   await assertStagingTradeValidationHelpers();
   await assertStagingStorePreviewHelpers();
+  await assertStagingCargoPodEquipHelpers();
   await assertIdentityVerificationAndRewardPlanHelpers();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {

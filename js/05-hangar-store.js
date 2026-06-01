@@ -15,6 +15,7 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
 
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
+let multiplayerStagingCargoPodEquipPending = false;
 
 function isMultiplayerStagingStoreActive() {
   try {
@@ -34,6 +35,17 @@ function getMultiplayerStagingStoreStatus() {
 function blockStoreMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingStoreActive()) return false;
   const message = "Store purchases are server-preview only in multiplayer staging.";
+  if (typeof addHudToast === "function") addHudToast(message);
+  if (typeof addActivityLog === "function") addActivityLog(message);
+  if (typeof console !== "undefined" && typeof console.info === "function") {
+    console.info(`[Lupen multiplayer] ${message}`);
+  }
+  return true;
+}
+
+function blockLoadoutMutationInMultiplayerStaging() {
+  if (!isMultiplayerStagingStoreActive()) return false;
+  const message = "Loadout changes are server-preview only in multiplayer staging.";
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof console !== "undefined" && typeof console.info === "function") {
@@ -87,6 +99,14 @@ function getLastMatchingStagingStorePreview(itemId) {
   return result?.itemId === itemId ? result : null;
 }
 
+function getLastStagingCargoPodEquipResult() {
+  const status = getMultiplayerStagingStoreStatus();
+  const equip = status.lastStagingLoadoutEquip;
+  if (equip?.itemId === "attachment:cargoPod") return equip;
+  const preview = status.lastStagingLoadoutPreview;
+  return preview?.itemId === "attachment:cargoPod" ? preview : null;
+}
+
 function getStagingStorePreviewLine(result) {
   if (!result) return "Server preview pending. No CR or inventory changed.";
   if (result.applied) return "Staging purchase applied.";
@@ -132,6 +152,65 @@ function renderStagingStorePreviewNote(item) {
 
 function isStagingStoreWritableItem(item) {
   return getStagingStoreItemId(item) === "attachment:cargoPod";
+}
+
+function getStagingCargoPodEquipLine(result) {
+  if (!result) return "Cargo Pod equip preview pending.";
+  if (result.applied) return "Cargo Pod equipped.";
+  if (result.mode === "dry_run" && result.ok) return "Would equip Cargo Pod.";
+  if (result.blockReason === "cargo_pod_not_owned") return "Blocked: no owned Cargo Pod.";
+  if (result.blockReason === "attachment_slots_full") return "Blocked: no empty equipment slot.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - loadout not changed.";
+  return `Blocked: ${result.blockReason || result.reason || "loadout unavailable"}.`;
+}
+
+function renderStagingCargoPodEquipNote(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "attachment:cargoPod") return "";
+  const result = getLastStagingCargoPodEquipResult();
+  const capacityLine = result?.cargoCapacityBefore !== null && result?.cargoCapacityBefore !== undefined
+    ? ` / Cargo ${formatNumber(result.cargoCapacityBefore)} -> ${formatNumber(result.cargoCapacityAfter ?? result.cargoCapacityAfterPreview)}`
+    : "";
+  const ownedLine = result?.ownedBefore !== null && result?.ownedBefore !== undefined
+    ? ` / Owned ${formatNumber(result.ownedBefore)} -> ${formatNumber(result.ownedAfter)}`
+    : "";
+  return `
+    <div class="store-detail-owned-line">
+      <strong>${escapeHtml(getStagingCargoPodEquipLine(result))}</strong>${escapeHtml(capacityLine)}${escapeHtml(ownedLine)} /
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied equip." : "Dry run only - no loadout, inventory, credits, ships, weapons, loot, or bounties changed.")}
+    </div>`;
+}
+
+async function requestStagingCargoPodEquip(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "attachment:cargoPod") return false;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.equipStagingCargoPod || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging Cargo Pod equip is waiting for the multiplayer server connection.");
+    return true;
+  }
+  if (multiplayerStagingCargoPodEquipPending) return true;
+  multiplayerStagingCargoPodEquipPending = true;
+  renderStore();
+  client.equipStagingCargoPod({ itemId: "attachment:cargoPod" });
+  if (typeof addHudToast === "function") addHudToast("Requested MP staging Cargo Pod equip.");
+  setTimeout(async () => {
+    multiplayerStagingCargoPodEquipPending = false;
+    const latest = client.getStatus?.().lastStagingLoadoutEquip;
+    if (latest?.itemId === "attachment:cargoPod" && latest.applied) {
+      if (typeof addHudToast === "function") addHudToast(`Cargo Pod equipped: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`);
+      if (typeof loadGameFromSupabase === "function") {
+        try {
+          const loaded = await loadGameFromSupabase();
+          if (loaded?.loaded && typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+        } catch (_err) {
+          if (typeof addHudToast === "function") addHudToast("Cargo Pod equipped. Reload if loadout values look stale.");
+        }
+      }
+    }
+    renderStore();
+    if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
+  }, 900);
+  return true;
 }
 
 async function requestStagingStorePurchase(item) {
@@ -2258,11 +2337,13 @@ function renderStoreDetail() {
         <div class="store-detail-desc">${item.description}</div>
         <div class="store-detail-owned-line">${ownershipLine} / ${getStoreStockLabel(item)}</div>
         ${renderStagingStorePreviewNote(item)}
+        ${renderStagingCargoPodEquipNote(item)}
         ${detailStatsHtml}
       </div>
 
       <div class="store-buy-footer store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
         ${buyButton}
+        ${stagingStoreLocked && stagingStoreItemId === "attachment:cargoPod" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingCargoPodEquip(getStoreSelectedItem())" ${multiplayerStagingCargoPodEquipPending ? "disabled" : ""}>${multiplayerStagingCargoPodEquipPending ? "Applying..." : "Apply Cargo Pod"}</button>` : ""}
         ${sellButton}
       </div>
     </div>`;
@@ -2464,6 +2545,14 @@ function buyGun(key) {
 }
 
 function equipAttachmentFromInventory(key, quality = "standard", source = "owned") {
+  if (isMultiplayerStagingStoreActive()) {
+    if (key === "cargoPod" && quality === "standard" && source === "owned") {
+      requestStagingCargoPodEquip({ kind: "attachment", key: "cargoPod" });
+      return;
+    }
+    blockLoadoutMutationInMultiplayerStaging();
+    return;
+  }
   const item = attachments[key];
   const loadout = getShipLoadout(selectedHangarShipId);
 
@@ -2500,6 +2589,7 @@ function equipAttachmentFromInventory(key, quality = "standard", source = "owned
 }
 
 function removeAttachment(index) {
+  if (blockLoadoutMutationInMultiplayerStaging()) return;
   const loadout = getShipLoadout(selectedHangarShipId);
   if (!canAddInventoryItems(1)) {
     alert(INVENTORY_FULL_MESSAGE);
@@ -2535,6 +2625,7 @@ function removeAttachment(index) {
 }
 
 function equipGunFromInventory(key, quality = "standard", source = "owned") {
+  if (blockLoadoutMutationInMultiplayerStaging()) return;
   const item = GUNS[key];
   const loadout = getShipLoadout(selectedHangarShipId);
 
@@ -2570,6 +2661,7 @@ function equipGunFromInventory(key, quality = "standard", source = "owned") {
 }
 
 function removeGun(index) {
+  if (blockLoadoutMutationInMultiplayerStaging()) return;
   const loadout = getShipLoadout(selectedHangarShipId);
   if (!canAddInventoryItems(1)) {
     alert(INVENTORY_FULL_MESSAGE);

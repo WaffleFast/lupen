@@ -46,6 +46,8 @@
     lastStagingStoreItems: null,
     lastStagingStorePreview: null,
     lastStagingStorePurchase: null,
+    lastStagingLoadoutPreview: null,
+    lastStagingLoadoutEquip: null,
     lastError: null
   };
   const identity = {
@@ -1122,6 +1124,75 @@
     };
   }
 
+  function normalizeStagingLoadoutEquip(result) {
+    if (!result || typeof result !== "object") return null;
+
+    return {
+      ok: result.ok === true,
+      mode: String(result.mode || "dry_run"),
+      operation: String(result.operation || "equip"),
+      applied: result.applied === true,
+      itemId: String(result.itemId || ""),
+      name: String(result.name || "Cargo Pod"),
+      category: String(result.category || "equipment"),
+      currentShipId: String(result.currentShipId || ""),
+      ownedBefore: Number.isFinite(Number(result.ownedBefore)) ? Number(result.ownedBefore) : null,
+      ownedAfter: Number.isFinite(Number(result.ownedAfter)) ? Number(result.ownedAfter) : null,
+      equippedBefore: Number.isFinite(Number(result.equippedBefore)) ? Number(result.equippedBefore) : null,
+      equippedAfter: Number.isFinite(Number(result.equippedAfter)) ? Number(result.equippedAfter) : null,
+      cargoCapacityBefore: Number.isFinite(Number(result.cargoCapacityBefore)) ? Number(result.cargoCapacityBefore) : null,
+      cargoCapacityAfterPreview: Number.isFinite(Number(result.cargoCapacityAfterPreview)) ? Number(result.cargoCapacityAfterPreview) : null,
+      cargoCapacityAfter: Number.isFinite(Number(result.cargoCapacityAfter)) ? Number(result.cargoCapacityAfter) : null,
+      validationMode: String(result.validationMode || "unknown"),
+      trustedStateAvailable: result.trustedStateAvailable === true,
+      blockReason: result.blockReason === null || result.blockReason === undefined ? null : String(result.blockReason || ""),
+      userReason: String(result.userReason || ""),
+      gates: result.gates && typeof result.gates === "object"
+        ? {
+          verified: result.gates.verified === true,
+          writeEnabled: result.gates.writeEnabled === true,
+          dryRun: result.gates.dryRun === true,
+          allowlisted: result.gates.allowlisted === true,
+          scope: String(result.gates.scope || ""),
+          trustedSaveAvailable: result.gates.trustedSaveAvailable === true,
+          itemAllowed: result.gates.itemAllowed === true
+        }
+        : null,
+      writes: result.writes && typeof result.writes === "object"
+        ? {
+          loadoutWritten: result.writes.loadoutWritten === true,
+          attachmentWritten: result.writes.attachmentWritten === true,
+          inventoryWritten: result.writes.inventoryWritten === true,
+          creditsWritten: result.writes.creditsWritten === true,
+          shipWritten: result.writes.shipWritten === true,
+          weaponWritten: result.writes.weaponWritten === true,
+          saveWritten: result.writes.saveWritten === true
+        }
+        : {
+          loadoutWritten: result.loadoutWritten === true,
+          attachmentWritten: result.attachmentWritten === true,
+          inventoryWritten: result.inventoryWritten === true,
+          creditsWritten: result.creditsWritten === true,
+          shipWritten: result.shipWritten === true,
+          weaponWritten: result.weaponWritten === true,
+          saveWritten: result.saveWritten === true
+        },
+      loadoutWritten: result.loadoutWritten === true || result.writes?.loadoutWritten === true,
+      attachmentWritten: result.attachmentWritten === true || result.writes?.attachmentWritten === true,
+      inventoryWritten: result.inventoryWritten === true || result.writes?.inventoryWritten === true,
+      creditsWritten: result.creditsWritten === true || result.writes?.creditsWritten === true,
+      shipWritten: result.shipWritten === true || result.writes?.shipWritten === true,
+      weaponWritten: result.weaponWritten === true || result.writes?.weaponWritten === true,
+      saveWritten: result.saveWritten === true || result.writes?.saveWritten === true,
+      appliedFields: Array.isArray(result.appliedFields)
+        ? result.appliedFields.map((field) => String(field || "")).filter(Boolean)
+        : [],
+      reason: String(result.reason || ""),
+      debugReason: String(result.debugReason || ""),
+      receivedAt: Number.isFinite(Number(result.receivedAt)) ? Number(result.receivedAt) : Date.now()
+    };
+  }
+
   function getStagingStorePlayerSnapshot() {
     try {
       const creditsValue = typeof credits !== "undefined" ? Number(credits) : NaN;
@@ -1439,6 +1510,18 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("stagingLoadout:previewResult", (message) => {
+      connection.lastStagingLoadoutPreview = normalizeStagingLoadoutEquip(message);
+      logDev("server staging loadout preview", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingLoadout:equipResult", (message) => {
+      connection.lastStagingLoadoutEquip = normalizeStagingLoadoutEquip(message);
+      logDev("server staging loadout equip", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("target:selected", (message) => {
       connection.lastTargetResponse = {
         ok: message?.ok === true,
@@ -1533,6 +1616,8 @@
         : null,
       lastStagingStorePreview: connection.lastStagingStorePreview ? { ...connection.lastStagingStorePreview } : null,
       lastStagingStorePurchase: connection.lastStagingStorePurchase ? { ...connection.lastStagingStorePurchase } : null,
+      lastStagingLoadoutPreview: connection.lastStagingLoadoutPreview ? { ...connection.lastStagingLoadoutPreview } : null,
+      lastStagingLoadoutEquip: connection.lastStagingLoadoutEquip ? { ...connection.lastStagingLoadoutEquip } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
@@ -1754,6 +1839,18 @@
         itemId: String(options.itemId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity || 1,
         playerSnapshot: options.playerSnapshot || getStagingStorePlayerSnapshot()
+      });
+    },
+
+    previewStagingCargoPodEquip(options = {}) {
+      return sendRoomMessage("previewStagingCargoPodEquip", "stagingLoadout:previewEquip", {
+        itemId: String(options.itemId || "attachment:cargoPod")
+      });
+    },
+
+    equipStagingCargoPod(options = {}) {
+      return sendRoomMessage("equipStagingCargoPod", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "attachment:cargoPod")
       });
     },
 

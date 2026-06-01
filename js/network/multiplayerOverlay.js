@@ -2695,6 +2695,7 @@
       const storeItems = status.lastStagingStoreItems;
       const storePreview = status.lastStagingStorePreview;
       const storePurchase = status.lastStagingStorePurchase;
+      const loadoutEquip = status.lastStagingLoadoutEquip || status.lastStagingLoadoutPreview;
       setDiagnosticsRow(panel, "store items", `${storeItems?.items?.length || 0} dry-run`);
       if (storePreview) {
         setDiagnosticsRow(panel, "store preview", storePreview.wouldPass
@@ -2708,6 +2709,12 @@
           ? `${storePurchase.name || "item"} applied / CR ${formatTradeNumber(storePurchase.creditsBefore)} -> ${formatTradeNumber(afterCredits)}`
           : `${storePurchase.name || storePurchase.itemId || "item"} / ${storePurchase.blockReason || storePurchase.reason || "dry-run"}`);
         setDiagnosticsRow(panel, "store gates", `${storePurchase.gates?.scope || "disabled"} / enabled ${storePurchase.gates?.writeEnabled ? "yes" : "no"} / dry ${storePurchase.gates?.dryRun ? "yes" : "no"} / allow ${storePurchase.gates?.allowlisted ? "yes" : "no"}`);
+      }
+      if (loadoutEquip) {
+        setDiagnosticsRow(panel, "cargo pod equip", loadoutEquip.applied
+          ? `applied / cargo ${formatTradeNumber(loadoutEquip.cargoCapacityBefore)} -> ${formatTradeNumber(loadoutEquip.cargoCapacityAfter)}`
+          : `${loadoutEquip.blockReason || loadoutEquip.reason || "dry-run"} / writes ${loadoutEquip.saveWritten ? "yes" : "no"}`);
+        setDiagnosticsRow(panel, "loadout gates", `${loadoutEquip.gates?.scope || "disabled"} / enabled ${loadoutEquip.gates?.writeEnabled ? "yes" : "no"} / dry ${loadoutEquip.gates?.dryRun ? "yes" : "no"} / allow ${loadoutEquip.gates?.allowlisted ? "yes" : "no"}`);
       }
     }
     if (status.lastServerWarning) {

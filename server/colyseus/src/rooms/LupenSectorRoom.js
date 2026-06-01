@@ -42,6 +42,11 @@ import {
   applyStagingStorePurchaseWrite,
   getStoreWriteEnvGate
 } from "../services/storeWriteService.js";
+import {
+  applyStagingCargoPodEquipWrite,
+  buildStagingCargoPodEquipPlan,
+  getLoadoutWriteEnvGate
+} from "../services/loadoutWriteService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -808,6 +813,14 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("stagingStore:purchase", async (client, message = {}) => {
       await this.sendStagingStorePurchaseRequest(client, message);
+    });
+
+    this.onMessage("stagingLoadout:previewEquip", async (client, message = {}) => {
+      await this.sendStagingCargoPodEquipRequest(client, message, false);
+    });
+
+    this.onMessage("stagingLoadout:equipAttachment", async (client, message = {}) => {
+      await this.sendStagingCargoPodEquipRequest(client, message, true);
     });
 
     // Legacy local prototype alias. New clients should send movement:update.
@@ -1652,6 +1665,130 @@ export class LupenSectorRoom extends Room {
         : previewOnlyReason === "staging_store_dry_run_enabled"
           ? "Dry run only - no credits or Store ownership changed."
           : preview.userReason,
+      receivedAt: Date.now()
+    });
+  }
+
+  async sendStagingCargoPodEquipRequest(client, message = {}, wantsWrite = false) {
+    const player = this.touchPlayer(client.sessionId);
+    const identity = {
+      authStatus: player?.authStatus || "guest",
+      trustedPlayerId: player?.trustedPlayerId || "",
+      playerId: player?.playerId || ""
+    };
+    const itemId = getStringValue(message?.itemId || "attachment:cargoPod");
+    const trustedState = await fetchPlayerTradeValidationState({
+      authStatus: identity.authStatus,
+      trustedPlayerId: identity.trustedPlayerId,
+      playerId: identity.playerId
+    });
+    const envGate = getLoadoutWriteEnvGate(identity.trustedPlayerId || identity.playerId, itemId);
+    const gates = {
+      verified: identity.authStatus === "verified" && !!(identity.trustedPlayerId || identity.playerId),
+      writeEnabled: envGate.writeEnabled,
+      dryRun: envGate.dryRun,
+      allowlisted: envGate.playerAllowed,
+      scope: envGate.scope,
+      trustedSaveAvailable: trustedState?.available === true,
+      itemAllowed: envGate.itemAllowed
+    };
+    const base = {
+      ok: false,
+      mode: "blocked",
+      operation: "equip",
+      applied: false,
+      dryRun: true,
+      itemId,
+      name: itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
+      category: "equipment",
+      validationMode: trustedState?.available ? "trusted_save" : "unknown",
+      trustedStateAvailable: trustedState?.available === true,
+      gates,
+      writes: {
+        loadoutWritten: false,
+        attachmentWritten: false,
+        inventoryWritten: false,
+        creditsWritten: false,
+        shipWritten: false,
+        weaponWritten: false,
+        saveWritten: false
+      },
+      loadoutWritten: false,
+      attachmentWritten: false,
+      inventoryWritten: false,
+      creditsWritten: false,
+      shipWritten: false,
+      weaponWritten: false,
+      saveWritten: false,
+      sessionId: client.sessionId,
+      receivedAt: Date.now()
+    };
+    const messageType = wantsWrite ? "stagingLoadout:equipResult" : "stagingLoadout:previewResult";
+
+    if (wantsWrite &&
+      itemId === "attachment:cargoPod" &&
+      gates.writeEnabled === true &&
+      gates.dryRun === false &&
+      gates.verified === true &&
+      gates.allowlisted === true &&
+      gates.trustedSaveAvailable === true &&
+      gates.itemAllowed === true &&
+      player?.multiplayerMode === "staging") {
+      const writeResult = await applyStagingCargoPodEquipWrite({
+        playerId: identity.trustedPlayerId || identity.playerId,
+        itemId,
+        trustedState
+      });
+      client.send(messageType, {
+        ...base,
+        ...writeResult,
+        gates,
+        receivedAt: Date.now()
+      });
+      return;
+    }
+
+    let reason = itemId !== "attachment:cargoPod"
+      ? "unknown_loadout_item"
+      : wantsWrite && player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun
+        ? "staging_mode_required_for_loadout_write"
+        : !gates.writeEnabled
+          ? "staging_loadout_writes_disabled"
+          : gates.dryRun
+            ? "staging_loadout_dry_run_enabled"
+            : !gates.verified
+              ? "verified_identity_required"
+              : !gates.allowlisted
+                ? envGate.scope === "allowlist" && !envGate.allowlistPresent
+                  ? "staging_loadout_write_allowlist_missing"
+                  : "player_not_in_staging_loadout_write_allowlist"
+                : !gates.itemAllowed
+                  ? "loadout_item_not_allowed"
+                  : "trusted_save_required";
+
+    let plan = null;
+    if (trustedState?.available && trustedState?.rawSaveData) {
+      plan = buildStagingCargoPodEquipPlan(trustedState.rawSaveData, { itemId });
+      reason = plan.ok ? reason : plan.blockReason || reason;
+    }
+
+    client.send(messageType, {
+      ...base,
+      ...(plan || {}),
+      ok: plan?.ok === true && reason === "staging_loadout_dry_run_enabled",
+      mode: reason === "staging_loadout_dry_run_enabled" ? "dry_run" : "blocked",
+      applied: false,
+      dryRun: true,
+      blockReason: plan?.blockReason || reason,
+      reason,
+      userReason: plan?.userReason || (reason === "staging_loadout_dry_run_enabled"
+        ? "Would equip Cargo Pod. Dry run only - loadout not changed."
+        : `Blocked: ${reason}.`),
+      gates,
+      writes: base.writes,
+      loadoutWritten: false,
+      attachmentWritten: false,
+      saveWritten: false,
       receivedAt: Date.now()
     });
   }

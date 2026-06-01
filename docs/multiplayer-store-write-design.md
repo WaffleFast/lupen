@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document tracks the staging path for bringing the Store online without enabling broad real purchases. Phase 1 is preview-only: server-owned Store catalogue, server-side validation, and real Store UI integration in `?mp=staging`. Phase 2 adds one heavily gated write prototype for `attachment:cargoPod` only.
+This document tracks the staging path for bringing the Store online without enabling broad real purchases. Phase 1 is preview-only: server-owned Store catalogue, server-side validation, and real Store UI integration in `?mp=staging`. Phase 2 adds one heavily gated purchase write prototype for `attachment:cargoPod` only. Phase 3 adds one heavily gated Cargo Pod equip/loadout write.
 
 ## Current Phase 1/2
 
@@ -16,10 +16,12 @@ In `?mp=staging`:
 - Unmapped Store items show `Server preview unavailable`.
 - Colyseus exposes `stagingStore:listItems` and `stagingStore:previewPurchase`.
 - Colyseus also exposes `stagingStore:purchase` for `attachment:cargoPod` only.
+- Colyseus exposes `stagingLoadout:previewEquip` and `stagingLoadout:equipAttachment` for `attachment:cargoPod` only.
 - Preview responses are always `mode:"dry_run"` and `applied:false`.
 - Preview responses always report `creditsWritten:false`, `inventoryWritten:false`, `shipWritten:false`, `equipmentWritten:false`, `saveWritten:false`, `lootWritten:false`, and `bountyWritten:false`.
 - Purchase responses default to dry-run/blocked unless every Store write gate passes.
 - `gun:pulseLaser` and `attachment:shieldBooster` remain preview-only.
+- Local loadout mutation paths are fenced in `?mp=staging`; Cargo Pod equip routes through the server handler.
 
 Initial staging Store items:
 
@@ -49,6 +51,16 @@ Save paths used by Phase 2:
 - `storeDailyPurchases`: local daily stock metadata, intentionally skipped for the Phase 2 prototype.
 
 `cargoPod` is a standard attachment. Local `buyAttachment("cargoPod")` subtracts credits and increments `ownedAttachments.cargoPod`; it does not auto-equip or patch `shipLoadouts`. Duplicate purchases are allowed locally as ownership count increments, so the staging prototype also increments the count by one per allowed purchase.
+
+Cargo Pod equip flow:
+
+- `equipAttachmentFromInventory("cargoPod", "standard", "owned")` decrements `ownedAttachments.cargoPod`.
+- It appends `{ key:"cargoPod", quality:"standard", level:1 }` to `shipLoadouts[selectedHangarShipId].attachments`.
+- It calls `applyShipStats(true)` when the selected ship is current.
+- It calls `saveGame()`.
+- `removeAttachment()` returns standard level-1 attachments to `ownedAttachments`.
+
+Cargo capacity is derived, not stored. `getShipStats()` starts from `SHIPS[currentShipId].cargo`, then adds each equipped attachment effect from `attachments[key].effect`. Standard level-1 Cargo Pod adds `25` cargo. Multiple Cargo Pods stack, bounded by the current ship's attachment slots.
 
 Sell flow:
 
@@ -99,19 +111,46 @@ Forbidden in this phase:
 - daily Store stock
 - loot, bounties, PvP, player damage, broad progression, schema/RLS changes
 
+## Store Phase 3 Equip Gates
+
+Cargo Pod equip can be written only if every gate passes:
+
+- `?mp=staging` room context.
+- `STAGING_LOADOUT_WRITE_ENABLED=true`.
+- `STAGING_LOADOUT_WRITE_DRY_RUN=false`.
+- Verified Supabase identity.
+- `STAGING_LOADOUT_WRITE_SCOPE=verified` or `allowlist`.
+- If scope is `allowlist`, `STAGING_LOADOUT_WRITE_ALLOWLIST` contains the verified user id.
+- `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS` contains `attachment:cargoPod`.
+- Trusted `player_saves` read succeeds.
+- Saved `currentShipId` is one of the known staging ship ids.
+- Saved root `ownedAttachments.cargoPod` is numeric and greater than zero.
+- Saved root `shipLoadouts[currentShipId].attachments` and `.guns` are valid arrays.
+- The current ship has an empty attachment slot.
+- The patch touches only `ownedAttachments.cargoPod` and `shipLoadouts[currentShipId].attachments`.
+
+Missing env vars mean no equip write. Default state remains `STAGING_LOADOUT_WRITE_ENABLED=false` and `STAGING_LOADOUT_WRITE_DRY_RUN=true`.
+
+Allowed equip write when all gates pass:
+
+- `ownedAttachments.cargoPod -= 1`
+- `shipLoadouts[currentShipId].attachments.push({ key:"cargoPod", quality:"standard", level:1 })`
+
+The server derives cargo capacity from a narrow mirrored ship config plus `Cargo Pod +25`. It does not trust a client-provided cargo capacity for real equip writes.
+
 ## Future Store Phases
 
-Phase 3: ownership/write expansion
+Phase 4: ownership/write expansion
 
 - Add additional item types only after each path has its own narrow validator and tests.
 - Decide whether daily Store stock should become server-owned or ledger-backed.
 
-Phase 4: store ledger and idempotency
+Phase 5: store ledger and idempotency
 
 - Prefer a dedicated purchase ledger or transaction/RPC before broadening beyond tiny staging tests.
 - Add duplicate protection before any broad purchase rollout.
 
-Phase 5: normalized ownership
+Phase 6: normalized ownership
 
 - Expand into normalized or ledger-backed equipment/ship ownership.
 - Stop relying on full `player_saves.save_data` patches for multiplayer economy writes.
@@ -120,7 +159,7 @@ Phase 5: normalized ownership
 
 - Real CR spend in default staging/dry-run mode.
 - Inventory writes.
-- Equipment ownership writes except gated `ownedAttachments.cargoPod += 1`.
+- Equipment ownership/loadout writes except gated `ownedAttachments.cargoPod += 1` and gated Cargo Pod equip into `shipLoadouts[currentShipId].attachments`.
 - Ship ownership writes.
 - Loot.
 - Bounties.
