@@ -76,6 +76,16 @@ function getCargoUsedFromSave(saveData) {
   }, 0);
 }
 
+function getCargoByResourceFromSave(saveData) {
+  const cargo = saveData?.cargo;
+  if (!cargo || typeof cargo !== "object" || Array.isArray(cargo)) return null;
+
+  return CARGO_KEYS.reduce((summary, key) => {
+    summary[key] = clampInteger(cargo[key], 0, 999999) || 0;
+    return summary;
+  }, {});
+}
+
 function getTrustedCargoCapacityFromSave(saveData) {
   const candidates = [
     saveData?.cargoCapacity,
@@ -116,9 +126,10 @@ export function extractTradeValidationStateFromSave(saveData) {
 
   const credits = clampInteger(saveData.credits, 0, 999999999);
   const cargoUsed = getCargoUsedFromSave(saveData);
+  const cargoByResource = getCargoByResourceFromSave(saveData);
   const cargoCapacity = getTrustedCargoCapacityFromSave(saveData);
 
-  if (credits === null || cargoUsed === null) {
+  if (credits === null || cargoUsed === null || !cargoByResource) {
     return unavailable("trade_state_missing_or_invalid");
   }
 
@@ -131,6 +142,7 @@ export function extractTradeValidationStateFromSave(saveData) {
     validationState: {
       credits,
       cargoUsed,
+      cargoByResource,
       cargoCapacity
     },
     stateSources: {

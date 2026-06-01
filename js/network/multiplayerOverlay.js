@@ -2674,6 +2674,7 @@
       if (playerSavePatchLabel) setDiagnosticsRow(panel, "player_saves", playerSavePatchLabel);
       const tradeOffers = getTradeOffers(status);
       const tradePreview = status.lastStagingTradePreview;
+      const tradeWrite = status.lastStagingTradeWriteResult;
       setDiagnosticsRow(panel, "trade offers", `${tradeOffers.length} dry-run`);
       if (tradePreview) {
         setDiagnosticsRow(panel, "trade preview", tradePreview.ok
@@ -2682,6 +2683,10 @@
         setDiagnosticsRow(panel, "trade source", `${tradePreview.validationMode || "unknown"} / trusted ${tradePreview.trustedStateAvailable ? "yes" : "no"} / snapshot ${tradePreview.snapshotUsed ? "yes" : "no"}`);
         setDiagnosticsRow(panel, "trade state", getTradeStateSourceSummary(tradePreview));
         if (tradePreview.readStatus) setDiagnosticsRow(panel, "trade read", tradePreview.readStatus);
+      }
+      if (tradeWrite) {
+        setDiagnosticsRow(panel, "trade write", `${tradeWrite.operation || "trade"} / ${tradeWrite.mode || "dry_run"} / writes ${tradeWrite.saveWritten ? "yes" : "no"}`);
+        setDiagnosticsRow(panel, "trade gates", `verified ${tradeWrite.gates?.verified ? "yes" : "no"} / enabled ${tradeWrite.gates?.writeEnabled ? "yes" : "no"} / dry ${tradeWrite.gates?.dryRun ? "yes" : "no"}`);
       }
     }
     if (status.lastServerWarning) {

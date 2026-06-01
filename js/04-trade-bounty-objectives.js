@@ -87,7 +87,10 @@ function getMultiplayerStagingTradeValidationLabel(result) {
 }
 
 function getLastMatchingMultiplayerStagingTradePreview(offerId) {
-  const result = getMultiplayerStagingTradeStatus().lastStagingTradePreview;
+  const status = getMultiplayerStagingTradeStatus();
+  const writeResult = status.lastStagingTradeWriteResult;
+  if (writeResult?.offerId === offerId) return writeResult;
+  const result = status.lastStagingTradePreview;
   return result?.offerId === offerId ? result : null;
 }
 
@@ -108,7 +111,7 @@ function renderMultiplayerStagingTradePreviewResult(offerId) {
   return `
     <div class="trade-preview-note">
       <strong>MP staging: server preview only</strong>
-      <span>Cost CR ${formatNumber(result.totalCost)} / Revenue CR ${formatNumber(result.projectedRevenue)} / Profit ${result.projectedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(result.projectedProfit))}</span>
+      <span>${result.operation ? `${result.operation.toUpperCase()} dry-run / ` : ""}Cost CR ${formatNumber(result.totalCost ?? result.cost)} / Revenue CR ${formatNumber(result.projectedRevenue ?? result.revenue)} / Profit ${(result.projectedProfit ?? result.profitPreview) >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(result.projectedProfit ?? result.profitPreview))}</span>
       <span>${getMultiplayerStagingTradeValidationLabel(result)}</span>
       <span>${getMultiplayerStagingTradeSourceLabel(result)}</span>
       ${debugLine}
@@ -117,7 +120,7 @@ function renderMultiplayerStagingTradePreviewResult(offerId) {
   `;
 }
 
-function requestMultiplayerStagingTradePreview({ offerId = "", quantity = 1 } = {}) {
+function requestMultiplayerStagingTradeDryRun({ operation = "buy", offerId = "", quantity = 1 } = {}) {
   if (!isMultiplayerStagingActive()) return false;
   if (!isMultiplayerStagingTradeReady()) {
     const message = "MP staging trade preview is waiting for the multiplayer server connection.";
@@ -133,11 +136,14 @@ function requestMultiplayerStagingTradePreview({ offerId = "", quantity = 1 } = 
     return true;
   }
 
-  window.LupenMultiplayerClient.requestStagingTradePreview({
-    offerId,
-    quantity
-  });
-  if (typeof addHudToast === "function") addHudToast("Requested MP staging server trade preview. No credits or cargo changed.");
+  if (operation === "sell" && typeof window.LupenMultiplayerClient.stagingTradeSell === "function") {
+    window.LupenMultiplayerClient.stagingTradeSell({ offerId, quantity });
+  } else if (typeof window.LupenMultiplayerClient.stagingTradeBuy === "function") {
+    window.LupenMultiplayerClient.stagingTradeBuy({ offerId, quantity });
+  } else {
+    window.LupenMultiplayerClient.requestStagingTradePreview({ offerId, quantity });
+  }
+  if (typeof addHudToast === "function") addHudToast(`Requested MP staging ${operation} dry-run. No credits or cargo changed.`);
   window.setTimeout(() => {
     if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
   }, 350);
@@ -495,7 +501,7 @@ function renderMapOneMarketTerminal(goodsBox) {
             <div class="market-amount-control">
               <strong>${formatNumber(quantity)} units</strong>
               <button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
-              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? "Server Preview" : "Preview Unavailable" : "Buy Cargo"}</button>
+              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? "Dry-run Buy" : "Preview Unavailable" : "Buy Cargo"}</button>
             </div>
           </label>
         </div>
@@ -507,7 +513,7 @@ function renderMapOneMarketTerminal(goodsBox) {
         </div>
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
-          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? "Server Preview Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
+          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? "Dry-run Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
       </aside>
     </div>
@@ -560,7 +566,8 @@ function buyMarketCargo() {
       origin: currentPlanet,
       destination: selectedMarketTargetPlanet
     });
-    requestMultiplayerStagingTradePreview({
+    requestMultiplayerStagingTradeDryRun({
+      operation: "buy",
       offerId: offer?.offerId || "",
       quantity
     });
@@ -622,7 +629,8 @@ function sellMarketCargo() {
       origin,
       destination: currentPlanet
     });
-    requestMultiplayerStagingTradePreview({
+    requestMultiplayerStagingTradeDryRun({
+      operation: "sell",
       offerId: offer?.offerId || "",
       quantity: Math.max(1, held)
     });
@@ -2553,7 +2561,8 @@ function buyGood(good) {
         return normalizeTradeRouteValue(entry.resourceName || entry.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ") &&
           normalizeTradeRouteValue(entry.buyNode) === normalizeTradeRouteValue(currentNode);
       });
-    requestMultiplayerStagingTradePreview({
+    requestMultiplayerStagingTradeDryRun({
+      operation: "buy",
       offerId: offer?.offerId || "",
       quantity: Math.max(1, quantity)
     });
@@ -2620,7 +2629,8 @@ function sellGood(good) {
         return normalizeTradeRouteValue(entry.resourceName || entry.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ") &&
           normalizeTradeRouteValue(entry.sellNode) === normalizeTradeRouteValue(currentNode);
       });
-    requestMultiplayerStagingTradePreview({
+    requestMultiplayerStagingTradeDryRun({
+      operation: "sell",
       offerId: offer?.offerId || "",
       quantity: Math.max(1, maxSell || quantity)
     });

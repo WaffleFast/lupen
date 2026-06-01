@@ -42,6 +42,7 @@
     lastRewardClaimResult: null,
     lastStagingTradeOffers: null,
     lastStagingTradePreview: null,
+    lastStagingTradeWriteResult: null,
     lastError: null
   };
   const identity = {
@@ -257,6 +258,7 @@
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers ? { ...connection.lastStagingTradeOffers } : null,
       lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
+      lastStagingTradeWriteResult: connection.lastStagingTradeWriteResult ? { ...connection.lastStagingTradeWriteResult } : null,
       lastError: connection.lastError,
       ...extra
     };
@@ -937,6 +939,78 @@
     };
   }
 
+  function normalizeStagingTradeWriteResult(result) {
+    if (!result || typeof result !== "object") return null;
+
+    return {
+      ok: result.ok === true,
+      mode: String(result.mode || "dry_run"),
+      operation: String(result.operation || ""),
+      applied: result.applied === true,
+      offerId: String(result.offerId || ""),
+      resourceId: String(result.resourceId || ""),
+      resourceName: String(result.resourceName || ""),
+      quantity: Number.isFinite(Number(result.quantity)) ? Number(result.quantity) : 0,
+      buyNode: String(result.buyNode || ""),
+      sellNode: String(result.sellNode || ""),
+      cost: Number.isFinite(Number(result.cost)) ? Number(result.cost) : 0,
+      revenue: Number.isFinite(Number(result.revenue)) ? Number(result.revenue) : 0,
+      profitPreview: Number.isFinite(Number(result.profitPreview)) ? Number(result.profitPreview) : 0,
+      creditsDelta: Number.isFinite(Number(result.creditsDelta)) ? Number(result.creditsDelta) : 0,
+      cargoDelta: Number.isFinite(Number(result.cargoDelta)) ? Number(result.cargoDelta) : 0,
+      creditsBefore: Number.isFinite(Number(result.creditsBefore)) ? Number(result.creditsBefore) : null,
+      creditsAfter: Number.isFinite(Number(result.creditsAfter)) ? Number(result.creditsAfter) : null,
+      cargoBefore: Number.isFinite(Number(result.cargoBefore)) ? Number(result.cargoBefore) : null,
+      cargoAfter: Number.isFinite(Number(result.cargoAfter)) ? Number(result.cargoAfter) : null,
+      validationMode: String(result.validationMode || "unknown"),
+      trustedStateAvailable: result.trustedStateAvailable === true,
+      snapshotUsed: result.snapshotUsed === true,
+      wouldPass: result.wouldPass === true,
+      blockReason: result.blockReason === null || result.blockReason === undefined ? null : String(result.blockReason || ""),
+      userReason: String(result.userReason || ""),
+      gates: result.gates && typeof result.gates === "object"
+        ? {
+          verified: result.gates.verified === true,
+          writeEnabled: result.gates.writeEnabled === true,
+          dryRun: result.gates.dryRun !== false,
+          allowlisted: result.gates.allowlisted === true,
+          scope: String(result.gates.scope || "disabled"),
+          trustedSaveAvailable: result.gates.trustedSaveAvailable === true
+        }
+        : {
+          verified: false,
+          writeEnabled: false,
+          dryRun: true,
+          allowlisted: false,
+          scope: "disabled",
+          trustedSaveAvailable: false
+        },
+      writes: result.writes && typeof result.writes === "object"
+        ? {
+          creditsWritten: result.writes.creditsWritten === true,
+          cargoWritten: result.writes.cargoWritten === true,
+          saveWritten: result.writes.saveWritten === true,
+          inventoryWritten: result.writes.inventoryWritten === true,
+          lootWritten: result.writes.lootWritten === true,
+          bountyWritten: result.writes.bountyWritten === true
+        }
+        : {
+          creditsWritten: result.creditsWritten === true,
+          cargoWritten: result.cargoWritten === true,
+          saveWritten: result.saveWritten === true,
+          inventoryWritten: false,
+          lootWritten: false,
+          bountyWritten: false
+        },
+      creditsWritten: result.creditsWritten === true || result.writes?.creditsWritten === true,
+      cargoWritten: result.cargoWritten === true || result.writes?.cargoWritten === true,
+      saveWritten: result.saveWritten === true || result.writes?.saveWritten === true,
+      reason: String(result.reason || ""),
+      debugReason: String(result.debugReason || ""),
+      receivedAt: Number.isFinite(Number(result.receivedAt)) ? Number(result.receivedAt) : Date.now()
+    };
+  }
+
   function getStagingTradePlayerSnapshot() {
     try {
       const creditsValue = typeof credits !== "undefined" ? Number(credits) : NaN;
@@ -1195,6 +1269,18 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("stagingTrade:buyResult", (message) => {
+      connection.lastStagingTradeWriteResult = normalizeStagingTradeWriteResult(message);
+      logDev("server staging trade buy dry-run", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingTrade:sellResult", (message) => {
+      connection.lastStagingTradeWriteResult = normalizeStagingTradeWriteResult(message);
+      logDev("server staging trade sell dry-run", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("target:selected", (message) => {
       connection.lastTargetResponse = {
         ok: message?.ok === true,
@@ -1278,6 +1364,7 @@
         }
         : null,
       lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
+      lastStagingTradeWriteResult: connection.lastStagingTradeWriteResult ? { ...connection.lastStagingTradeWriteResult } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
@@ -1459,6 +1546,22 @@
 
     requestStagingTradePreview(options = {}) {
       return sendRoomMessage("requestStagingTradePreview", "stagingTrade:preview", {
+        offerId: String(options.offerId || ""),
+        quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity,
+        playerSnapshot: options.playerSnapshot || getStagingTradePlayerSnapshot()
+      });
+    },
+
+    stagingTradeBuy(options = {}) {
+      return sendRoomMessage("stagingTradeBuy", "stagingTrade:buy", {
+        offerId: String(options.offerId || ""),
+        quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity,
+        playerSnapshot: options.playerSnapshot || getStagingTradePlayerSnapshot()
+      });
+    },
+
+    stagingTradeSell(options = {}) {
+      return sendRoomMessage("stagingTradeSell", "stagingTrade:sell", {
         offerId: String(options.offerId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity,
         playerSnapshot: options.playerSnapshot || getStagingTradePlayerSnapshot()

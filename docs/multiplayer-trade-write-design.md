@@ -23,6 +23,7 @@ In `?mp=staging`:
 - Validation can use a verified service-role `player_saves` read, a sanitized client snapshot fallback, or unknown price-preview mode.
 - Preview results always report `applied:false`, `creditsWritten:false`, `cargoWritten:false`, and `saveWritten:false`.
 - The separate Staging Trade Preview overlay remains a dev helper.
+- Phase 5a scaffolding adds `stagingTrade:buy` and `stagingTrade:sell` handlers that return write-shaped dry-run results. They are contract preparation only and never call a save patch/write adapter.
 
 ## Existing Local Trade Mutation Path
 
@@ -68,12 +69,12 @@ It should expose pure planning helpers and a write adapter:
 - `buildTradeBuyPlan(input, context)`
 - `buildTradeSellPlan(input, context)`
 
-`LupenSectorRoom` should add staging messages only after the service exists:
+`LupenSectorRoom` has Phase 5a staging messages:
 
 - `stagingTrade:buy`
 - `stagingTrade:sell`
 
-The room should only pass verified player identity, offer id, operation, and quantity into the service. It should not trust client price, cargo, credits, or profit fields.
+For Phase 5a, the room passes identity, offer id, operation, quantity, trusted read state, and sanitized snapshot fallback into the staging trade helpers. It does not trust client price, cargo, credits, or profit fields, and it never calls any save patch/write method.
 
 ## Proposed Buy Path
 
@@ -169,6 +170,8 @@ Real write eligibility requires all of:
 Any failed gate returns a structured blocked result with all write flags false.
 
 ## Result Contracts
+
+Phase 5a buy/sell results now use this write-shaped dry-run contract. Real writes remain disabled.
 
 Future `stagingTrade:buy` and `stagingTrade:sell` responses should use a shared shape:
 
@@ -338,15 +341,13 @@ Normal local `npm test` must not require real Supabase secrets or perform real w
 
 ## Recommended Implementation Sequence
 
-1. Add `tradeWriteService.js` with plan builders only, returning dry-run blocked results by default.
-2. Add mocked tests for buy/sell plan validation and save patch boundaries.
-3. Add `stagingTrade:buy` and `stagingTrade:sell` room handlers that call the service but remain dry-run.
-4. Add client methods `requestStagingTradeBuy()` and `requestStagingTradeSell()` that keep current Trade Terminal mutation fences.
-5. Add UI result display in the existing Trade Terminal, matching current preview result style.
-6. Add env gates and allowlist reporting.
-7. Add mocked Supabase read/write adapter tests.
-8. Manually test with `STAGING_TRADE_WRITE_DRY_RUN=true`.
-9. Only after review, test tiny writes on a single allowlisted verified staging user with max quantity 1.
-10. Add a dedicated ledger or transactional RPC before any wider staging access.
+1. Phase 5a complete: add write-shaped dry-run contract helpers and `stagingTrade:buy` / `stagingTrade:sell` handlers with no save writes.
+2. Keep extending tests around buy/sell blocked reasons, gates, and no-write flags.
+3. Add `tradeWriteService.js` only when moving beyond scaffold helpers into a real write adapter design.
+4. Add mocked tests for save patch boundaries before any write adapter is connected.
+5. Add env gates and allowlist reporting to the UI in `?debug=mp`.
+6. Manually test with `STAGING_TRADE_WRITE_DRY_RUN=true`.
+7. Only after review, test tiny writes on a single allowlisted verified staging user with max quantity 1.
+8. Add a dedicated ledger or transactional RPC before any wider staging access.
 
 Until Phase 5 implementation is explicitly requested, no real credit/cargo/save write path should be added or enabled.

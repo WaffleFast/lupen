@@ -22,6 +22,7 @@ import {
 } from "../services/playerSaveWriteService.js";
 import {
   buildStagingTradePreview,
+  buildStagingTradeWriteDryRun,
   getStagingTradeOffers
 } from "../config/stagingTradeConfig.js";
 import {
@@ -740,6 +741,14 @@ export class LupenSectorRoom extends Room {
       });
     });
 
+    this.onMessage("stagingTrade:buy", async (client, message = {}) => {
+      await this.sendStagingTradeWriteDryRun(client, message, "buy");
+    });
+
+    this.onMessage("stagingTrade:sell", async (client, message = {}) => {
+      await this.sendStagingTradeWriteDryRun(client, message, "sell");
+    });
+
     // Legacy local prototype alias. New clients should send movement:update.
     this.onMessage("move", (client, message = {}) => {
       this.applyPresenceUpdate(client, message, "move");
@@ -1330,6 +1339,33 @@ export class LupenSectorRoom extends Room {
       progressionShadowResult,
       playerSavePatchPlan,
       playerSavePatchResult,
+      receivedAt: Date.now()
+    });
+  }
+
+  async sendStagingTradeWriteDryRun(client, message = {}, operation = "buy") {
+    const player = this.touchPlayer(client.sessionId);
+    const trustedState = await fetchPlayerTradeValidationState({
+      authStatus: player?.authStatus || "guest",
+      trustedPlayerId: player?.trustedPlayerId || "",
+      playerId: player?.playerId || ""
+    });
+    const result = buildStagingTradeWriteDryRun({
+      operation,
+      offerId: message?.offerId,
+      quantity: message?.quantity,
+      playerSnapshot: message?.playerSnapshot,
+      trustedState,
+      identity: {
+        authStatus: player?.authStatus || "guest",
+        trustedPlayerId: player?.trustedPlayerId || "",
+        playerId: player?.playerId || ""
+      }
+    });
+
+    client.send(`stagingTrade:${operation}Result`, {
+      ...result,
+      sessionId: client.sessionId,
       receivedAt: Date.now()
     });
   }

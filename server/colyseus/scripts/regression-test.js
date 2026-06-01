@@ -6,7 +6,8 @@ import {
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
 import {
-  buildStagingTradePreview
+  buildStagingTradePreview,
+  buildStagingTradeWriteDryRun
 } from "../src/config/stagingTradeConfig.js";
 import {
   buildRewardLedgerEntry,
@@ -266,6 +267,21 @@ async function expectStagingTradePreview(room, sendMessage) {
   });
 }
 
+async function expectStagingTradeWriteResult(room, operation, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Timed out waiting for staging trade ${operation} result.`));
+    }, 3000);
+
+    room.onMessage(`stagingTrade:${operation}Result`, (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
 async function assertStagingTradeValidationHelpers() {
   const extracted = extractTradeValidationStateFromSave({
     credits: 500,
@@ -449,6 +465,82 @@ async function assertStagingTradeValidationHelpers() {
   assert(unknownPreview.validationMode === "unknown", "Trade preview without trusted state or snapshot was not unknown.");
   assert(unknownPreview.wouldPass === false, "Unknown trade preview unexpectedly passed.");
   assert(unknownPreview.creditsWritten === false && unknownPreview.cargoWritten === false && unknownPreview.saveWritten === false, "Trade helper reported writes.");
+
+  const buyWriteDryRun = buildStagingTradeWriteDryRun({
+    operation: "buy",
+    offerId,
+    quantity: 3,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 4,
+        cargoCapacity: 12,
+        cargoByResource: {
+          Iron: 4
+        }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a"
+    }
+  });
+  assert(buyWriteDryRun.ok === true, `Buy write dry-run was blocked: ${buyWriteDryRun.reason}`);
+  assert(buyWriteDryRun.mode === "dry_run", `Unexpected buy write mode: ${buyWriteDryRun.mode}`);
+  assert(buyWriteDryRun.operation === "buy", "Buy write result did not report buy operation.");
+  assert(buyWriteDryRun.applied === false, "Buy write dry-run applied a trade.");
+  assert(buyWriteDryRun.cost === 54, `Unexpected buy write cost: ${buyWriteDryRun.cost}`);
+  assert(buyWriteDryRun.creditsDelta === -54, `Unexpected buy credits delta: ${buyWriteDryRun.creditsDelta}`);
+  assert(buyWriteDryRun.cargoDelta === 3, `Unexpected buy cargo delta: ${buyWriteDryRun.cargoDelta}`);
+  assert(buyWriteDryRun.writes.saveWritten === false, "Buy write dry-run reported save write.");
+
+  const sellWriteDryRun = buildStagingTradeWriteDryRun({
+    operation: "sell",
+    offerId,
+    quantity: 2,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 4,
+        cargoCapacity: null,
+        cargoByResource: {
+          Iron: 4
+        }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a"
+    }
+  });
+  assert(sellWriteDryRun.ok === true, `Sell write dry-run was blocked: ${sellWriteDryRun.reason}`);
+  assert(sellWriteDryRun.mode === "dry_run", `Unexpected sell write mode: ${sellWriteDryRun.mode}`);
+  assert(sellWriteDryRun.operation === "sell", "Sell write result did not report sell operation.");
+  assert(sellWriteDryRun.applied === false, "Sell write dry-run applied a trade.");
+  assert(sellWriteDryRun.revenue === 50, `Unexpected sell write revenue: ${sellWriteDryRun.revenue}`);
+  assert(sellWriteDryRun.creditsDelta === 50, `Unexpected sell credits delta: ${sellWriteDryRun.creditsDelta}`);
+  assert(sellWriteDryRun.cargoDelta === -2, `Unexpected sell cargo delta: ${sellWriteDryRun.cargoDelta}`);
+  assert(sellWriteDryRun.validationMode === "trusted_save_limited", `Unexpected limited sell validation mode: ${sellWriteDryRun.validationMode}`);
+  assert(sellWriteDryRun.writes.saveWritten === false, "Sell write dry-run reported save write.");
+
+  const sellUnknownResource = buildStagingTradeWriteDryRun({
+    operation: "sell",
+    offerId,
+    quantity: 2,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 4,
+        cargoCapacity: null
+      }
+    }
+  });
+  assert(sellUnknownResource.ok === false, "Sell write without resource cargo was not blocked.");
+  assert(sellUnknownResource.reason === "unknown_resource_cargo", `Unexpected unknown-resource sell reason: ${sellUnknownResource.reason}`);
+  assert(sellUnknownResource.writes.saveWritten === false, "Blocked sell write reported save write.");
 
   console.log("staging trade trusted-save validation helpers stayed read-only");
 }
@@ -1513,6 +1605,110 @@ try {
   assert(excessiveQuantityPreview?.reason === "quantity_exceeds_staging_offer_limit", `Unexpected excessive quantity reason: ${excessiveQuantityPreview?.reason}`);
   assert(excessiveQuantityPreview?.wouldPass === false, "Excessive staging trade quantity reported wouldPass.");
   assert(excessiveQuantityPreview?.blockReason === "invalid_quantity", `Unexpected excessive quantity block reason: ${excessiveQuantityPreview?.blockReason}`);
+
+  const buyDryRun = await expectStagingTradeWriteResult(roomA, "buy", () => {
+    roomA.send("stagingTrade:buy", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 3,
+      playerSnapshot: {
+        credits: 10000,
+        cargoUsed: 10,
+        cargoCapacity: 150
+      }
+    });
+  });
+  assert(buyDryRun?.ok === true, `stagingTrade:buy dry-run failed: ${buyDryRun?.reason}`);
+  assert(buyDryRun?.mode === "dry_run", `Unexpected buy dry-run mode: ${buyDryRun?.mode}`);
+  assert(buyDryRun?.operation === "buy", "Buy dry-run did not report buy operation.");
+  assert(buyDryRun?.applied === false, "Buy dry-run applied a trade.");
+  assert(buyDryRun?.creditsWritten === false && buyDryRun?.cargoWritten === false && buyDryRun?.saveWritten === false, "Buy dry-run reported writes.");
+  assert(buyDryRun?.writes?.inventoryWritten === false && buyDryRun?.writes?.lootWritten === false && buyDryRun?.writes?.bountyWritten === false, "Buy dry-run reported non-trade writes.");
+  assert(buyDryRun?.cost === firstTradeOffer.buyPrice * 3, "Buy dry-run cost was not server-calculated.");
+  assert(buyDryRun?.creditsDelta === -(firstTradeOffer.buyPrice * 3), "Buy dry-run credits delta was incorrect.");
+  assert(buyDryRun?.cargoDelta === 3, "Buy dry-run cargo delta was incorrect.");
+  assert(buyDryRun?.gates?.writeEnabled === false, "Buy dry-run reported write gate enabled by default.");
+  assert(buyDryRun?.gates?.dryRun === true, "Buy dry-run did not report dryRun gate.");
+
+  const sellDryRun = await expectStagingTradeWriteResult(roomA, "sell", () => {
+    roomA.send("stagingTrade:sell", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 3,
+      playerSnapshot: {
+        credits: 10000,
+        cargoUsed: 10,
+        cargoCapacity: 150
+      }
+    });
+  });
+  assert(sellDryRun?.ok === false, "Unverified sell dry-run unexpectedly claimed full validation.");
+  assert(sellDryRun?.mode === "blocked", `Unexpected sell dry-run mode: ${sellDryRun?.mode}`);
+  assert(sellDryRun?.operation === "sell", "Sell dry-run did not report sell operation.");
+  assert(sellDryRun?.applied === false, "Sell dry-run applied a trade.");
+  assert(sellDryRun?.reason === "unknown_resource_cargo", `Unexpected sell dry-run reason: ${sellDryRun?.reason}`);
+  assert(sellDryRun?.creditsWritten === false && sellDryRun?.cargoWritten === false && sellDryRun?.saveWritten === false, "Sell dry-run reported writes.");
+
+  const unknownBuy = await expectStagingTradeWriteResult(roomA, "buy", () => {
+    roomA.send("stagingTrade:buy", {
+      offerId: "not-a-real-offer",
+      quantity: 1
+    });
+  });
+  assert(unknownBuy?.ok === false && unknownBuy?.reason === "unknown_trade_offer", "Unknown buy offer did not block safely.");
+  assert(unknownBuy?.saveWritten === false, "Unknown buy offer reported save write.");
+
+  const unknownSell = await expectStagingTradeWriteResult(roomA, "sell", () => {
+    roomA.send("stagingTrade:sell", {
+      offerId: "not-a-real-offer",
+      quantity: 1
+    });
+  });
+  assert(unknownSell?.ok === false && unknownSell?.reason === "unknown_trade_offer", "Unknown sell offer did not block safely.");
+  assert(unknownSell?.saveWritten === false, "Unknown sell offer reported save write.");
+
+  const invalidBuyQuantity = await expectStagingTradeWriteResult(roomA, "buy", () => {
+    roomA.send("stagingTrade:buy", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 0
+    });
+  });
+  assert(invalidBuyQuantity?.ok === false && invalidBuyQuantity?.reason === "invalid_trade_quantity", "Invalid buy quantity did not block safely.");
+
+  const excessiveSellQuantity = await expectStagingTradeWriteResult(roomA, "sell", () => {
+    roomA.send("stagingTrade:sell", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 999
+    });
+  });
+  assert(excessiveSellQuantity?.ok === false && excessiveSellQuantity?.reason === "quantity_exceeds_staging_trade_write_limit", "Excessive sell quantity did not block safely.");
+
+  const insufficientBuyCredits = await expectStagingTradeWriteResult(roomA, "buy", () => {
+    roomA.send("stagingTrade:buy", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 3,
+      playerSnapshot: {
+        credits: firstTradeOffer.buyPrice - 1,
+        cargoUsed: 0,
+        cargoCapacity: 150
+      }
+    });
+  });
+  assert(insufficientBuyCredits?.ok === false && insufficientBuyCredits?.reason === "insufficient_credits", "Insufficient-credit buy did not block safely.");
+  assert(insufficientBuyCredits?.saveWritten === false, "Insufficient-credit buy reported save write.");
+
+  const insufficientBuyCargo = await expectStagingTradeWriteResult(roomA, "buy", () => {
+    roomA.send("stagingTrade:buy", {
+      offerId: firstTradeOffer.offerId,
+      quantity: 3,
+      playerSnapshot: {
+        credits: 10000,
+        cargoUsed: 149,
+        cargoCapacity: 150
+      }
+    });
+  });
+  assert(insufficientBuyCargo?.ok === false && insufficientBuyCargo?.reason === "insufficient_cargo", "Insufficient-cargo buy did not block safely.");
+  assert(insufficientBuyCargo?.saveWritten === false, "Insufficient-cargo buy reported save write.");
+
   console.log("staging trade dry-run offers and previews stayed write-free");
 
   const unsafeShipImageWarning = await expectPresenceWarning(roomA, () => {

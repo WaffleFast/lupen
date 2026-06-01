@@ -253,6 +253,287 @@ function getRejectedValidation({ playerSnapshot, trustedState }) {
   };
 }
 
+function getBooleanEnv(value, fallback = false) {
+  if (value === undefined || value === null || value === "") return fallback;
+  return String(value).trim().toLowerCase() === "true";
+}
+
+function getCsvSet(value = "") {
+  return new Set(
+    String(value || "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  );
+}
+
+export function getStagingTradeWriteConfig(env = process.env) {
+  const maxQuantity = normalizeTradeNumber(env.STAGING_TRADE_WRITE_MAX_QUANTITY, 999999) || 10;
+  const allowlist = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWLIST);
+  const allowedOffers = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWED_OFFERS);
+  const requestedScope = String(env.STAGING_TRADE_WRITE_SCOPE || "disabled").trim().toLowerCase();
+  const scope = requestedScope === "verified" || requestedScope === "allowlist" ? requestedScope : "disabled";
+
+  return {
+    writeEnabled: getBooleanEnv(env.STAGING_TRADE_WRITE_ENABLED, false),
+    // Phase 5a intentionally forces dry-run/write-free behavior even if env
+    // flags are accidentally enabled. A later phase must deliberately remove
+    // this force once a real write adapter has been reviewed.
+    dryRun: true,
+    envDryRun: getBooleanEnv(env.STAGING_TRADE_WRITE_DRY_RUN, true),
+    scope,
+    allowlistPresent: allowlist.size > 0,
+    allowlist,
+    maxQuantity,
+    allowedOffersPresent: allowedOffers.size > 0,
+    allowedOffers
+  };
+}
+
+function getTradeWriteGates({ identity = {}, trustedState = null, config = getStagingTradeWriteConfig() } = {}) {
+  const playerId = String(identity.trustedPlayerId || identity.playerId || "");
+  const verified = identity.authStatus === "verified" && !!playerId;
+  const allowlisted = config.scope === "verified"
+    ? verified
+    : verified && config.allowlist.has(playerId);
+
+  return {
+    verified,
+    writeEnabled: config.writeEnabled === true,
+    dryRun: true,
+    allowlisted,
+    scope: config.scope,
+    trustedSaveAvailable: trustedState?.available === true,
+    maxQuantity: config.maxQuantity,
+    allowedOffersPresent: config.allowedOffersPresent
+  };
+}
+
+function getWriteFlags() {
+  return {
+    creditsWritten: false,
+    cargoWritten: false,
+    saveWritten: false,
+    inventoryWritten: false,
+    lootWritten: false,
+    bountyWritten: false
+  };
+}
+
+function buildBlockedTradeWriteResult({
+  operation,
+  offerId = "",
+  quantity = 0,
+  reason,
+  debugReason,
+  offer = null,
+  validation = null,
+  gates = {}
+} = {}) {
+  return {
+    ok: false,
+    mode: "blocked",
+    operation,
+    applied: false,
+    offerId: offer?.offerId || String(offerId || ""),
+    resourceId: offer?.resourceId || "",
+    resourceName: offer?.resourceName || "",
+    quantity: Number.isFinite(Number(quantity)) ? Number(quantity) : 0,
+    cost: 0,
+    revenue: 0,
+    creditsDelta: 0,
+    cargoDelta: 0,
+    creditsBefore: validation?.creditsAvailable ?? null,
+    creditsAfter: validation?.creditsAvailable ?? null,
+    cargoBefore: null,
+    cargoAfter: null,
+    validationMode: validation?.validationMode || "unknown",
+    trustedStateAvailable: validation?.trustedStateAvailable === true,
+    snapshotUsed: validation?.snapshotUsed === true,
+    wouldPass: false,
+    blockReason: reason,
+    userReason: debugReason || reason,
+    gates,
+    writes: getWriteFlags(),
+    creditsWritten: false,
+    cargoWritten: false,
+    saveWritten: false,
+    reason,
+    debugReason
+  };
+}
+
+export function buildStagingTradeWriteDryRun({
+  operation = "buy",
+  offerId = "",
+  quantity = 1,
+  playerSnapshot = null,
+  trustedState = null,
+  identity = {},
+  env = process.env
+} = {}) {
+  const safeOperation = operation === "sell" ? "sell" : "buy";
+  const config = getStagingTradeWriteConfig(env);
+  const offer = getStagingTradeOfferById(offerId);
+  const requestedQuantity = Number(quantity);
+  const gates = getTradeWriteGates({ identity, trustedState, config });
+
+  if (!offer) {
+    return buildBlockedTradeWriteResult({
+      operation: safeOperation,
+      offerId,
+      quantity,
+      reason: "unknown_trade_offer",
+      debugReason: "unknown_trade_offer",
+      gates
+    });
+  }
+
+  if (config.allowedOffersPresent && !config.allowedOffers.has(offer.offerId)) {
+    return buildBlockedTradeWriteResult({
+      operation: safeOperation,
+      offerId,
+      quantity,
+      reason: "trade_offer_not_allowed",
+      debugReason: "offer_not_in_STAGING_TRADE_WRITE_ALLOWED_OFFERS",
+      offer,
+      gates
+    });
+  }
+
+  if (!Number.isInteger(requestedQuantity) || requestedQuantity <= 0) {
+    return buildBlockedTradeWriteResult({
+      operation: safeOperation,
+      offerId,
+      quantity,
+      reason: "invalid_trade_quantity",
+      debugReason: "quantity_must_be_positive_integer",
+      offer,
+      gates
+    });
+  }
+
+  if (requestedQuantity > offer.maxQuantity || requestedQuantity > config.maxQuantity) {
+    return buildBlockedTradeWriteResult({
+      operation: safeOperation,
+      offerId,
+      quantity: requestedQuantity,
+      reason: "quantity_exceeds_staging_trade_write_limit",
+      debugReason: `max_quantity_${Math.min(offer.maxQuantity, config.maxQuantity)}`,
+      offer,
+      gates
+    });
+  }
+
+  const preview = buildStagingTradePreview({
+    offerId: offer.offerId,
+    quantity: requestedQuantity,
+    playerSnapshot,
+    trustedState
+  });
+  const validation = {
+    ...preview,
+    creditsAvailable: preview.creditsAvailable,
+    trustedStateAvailable: preview.trustedStateAvailable,
+    snapshotUsed: preview.snapshotUsed
+  };
+
+  if (safeOperation === "buy" && preview.wouldPass !== true) {
+    return buildBlockedTradeWriteResult({
+      operation: safeOperation,
+      offerId,
+      quantity: requestedQuantity,
+      reason: preview.blockReason || "trade_validation_failed",
+      debugReason: preview.userReason || preview.debugReason || "buy_validation_failed",
+      offer,
+      validation,
+      gates
+    });
+  }
+
+  const cargoByResource = trustedState?.validationState?.cargoByResource;
+  const resourceHeld = cargoByResource && typeof cargoByResource === "object"
+    ? normalizeTradeNumber(cargoByResource[offer.resourceName], 999999)
+    : null;
+
+  if (safeOperation === "sell" && resourceHeld === null) {
+    return buildBlockedTradeWriteResult({
+      operation: safeOperation,
+      offerId,
+      quantity: requestedQuantity,
+      reason: "unknown_resource_cargo",
+      debugReason: "resource_level_cargo_validation_unavailable",
+      offer,
+      validation,
+      gates
+    });
+  }
+
+  if (safeOperation === "sell" && resourceHeld < requestedQuantity) {
+    return buildBlockedTradeWriteResult({
+      operation: safeOperation,
+      offerId,
+      quantity: requestedQuantity,
+      reason: "insufficient_resource_cargo",
+      debugReason: "not_enough_saved_resource_cargo",
+      offer,
+      validation,
+      gates
+    });
+  }
+
+  const cost = safeOperation === "buy" ? offer.buyPrice * requestedQuantity : 0;
+  const revenue = safeOperation === "sell" ? offer.sellPrice * requestedQuantity : 0;
+  const creditsBefore = preview.creditsAvailable ?? trustedState?.validationState?.credits ?? null;
+  const validationMode = safeOperation === "sell" && preview.validationMode === "unknown" && trustedState?.available
+    ? "trusted_save_limited"
+    : preview.validationMode;
+  const creditsDelta = safeOperation === "buy" ? -cost : revenue;
+  const cargoDelta = safeOperation === "buy" ? requestedQuantity : -requestedQuantity;
+  const cargoBefore = safeOperation === "sell" ? resourceHeld : null;
+
+  return {
+    ok: true,
+    mode: "dry_run",
+    operation: safeOperation,
+    applied: false,
+    offerId: offer.offerId,
+    resourceId: offer.resourceId,
+    resourceName: offer.resourceName,
+    quantity: requestedQuantity,
+    buyNode: offer.buyNode,
+    sellNode: offer.sellNode,
+    cost,
+    revenue,
+    profitPreview: safeOperation === "buy"
+      ? (offer.sellPrice - offer.buyPrice) * requestedQuantity
+      : revenue,
+    creditsDelta,
+    cargoDelta,
+    creditsBefore,
+    creditsAfter: creditsBefore === null ? null : Math.max(0, creditsBefore + creditsDelta),
+    cargoBefore,
+    cargoAfter: cargoBefore === null ? null : Math.max(0, cargoBefore + cargoDelta),
+    validationMode,
+    trustedStateAvailable: preview.trustedStateAvailable,
+    snapshotUsed: preview.snapshotUsed,
+    stateSources: preview.stateSources,
+    readStatus: preview.readStatus,
+    wouldPass: true,
+    blockReason: null,
+    userReason: safeOperation === "buy"
+      ? "Would buy if staging trade writes were enabled."
+      : "Would sell if staging trade writes were enabled.",
+    gates,
+    writes: getWriteFlags(),
+    creditsWritten: false,
+    cargoWritten: false,
+    saveWritten: false,
+    reason: `staging_trade_${safeOperation}_dry_run`,
+    debugReason: "phase5a_write_path_scaffold_no_save_write"
+  };
+}
+
 export function buildStagingTradePreview({
   offerId = "",
   quantity = 1,
