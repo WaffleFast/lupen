@@ -21,6 +21,10 @@ import {
   buildPlayerSavePatchPlan
 } from "../services/playerSaveWriteService.js";
 import {
+  applyStagingLootClaimWrite,
+  buildStagingLootClaimPlan
+} from "../services/lootWriteService.js";
+import {
   buildStagingTradePreview,
   buildStagingTradeWriteDryRun,
   getStagingTradeOfferById,
@@ -716,6 +720,10 @@ export class LupenSectorRoom extends Room {
     // Durable duplicate protection should later use a server-side ledger
     // uniqueness key such as source_event_id before real progression writes.
     this.rewardApplicationIdempotencyKeys = new Set();
+    // Separate material-loot idempotency guard. This only protects the
+    // staging Lupen Shard write path; durable protection should later move to
+    // a Supabase ledger uniqueness key before broader loot writes.
+    this.stagingLootClaimIdempotencyKeys = new Set();
     // Room/session scoped staging bounty state. This deliberately does not
     // touch local bounty arrays, Supabase bounty tables, route completion,
     // loot, credits, or normal single-player objective state.
@@ -780,6 +788,13 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("staging:claimRewardPreview", async (client, message = {}) => {
       await this.claimRewardPreview(client, message, "staging:claimRewardPreview");
+    });
+
+    // Staging-only material loot path. This is currently limited to
+    // save_data.upgradeMaterials.lupenShards and remains disabled/dry-run
+    // unless explicit server env gates are opened.
+    this.onMessage("stagingLoot:claim", async (client, message = {}) => {
+      await this.claimStagingLoot(client, message);
     });
 
     this.onMessage("stagingBounty:list", (client) => {
@@ -1777,6 +1792,175 @@ export class LupenSectorRoom extends Room {
       playerSavePatchPlan,
       playerSavePatchResult,
       receivedAt: Date.now()
+    });
+  }
+
+  sendStagingLootClaimResult(client, payload = {}) {
+    client.send("stagingLoot:claimResult", {
+      ok: payload.ok === true,
+      applied: payload.applied === true,
+      dryRun: payload.dryRun !== false,
+      mode: payload.applied === true ? "material_write" : payload.ok === false ? "blocked" : "dry_run",
+      reason: getStringValue(payload.reason || payload.skippedReason || (payload.ok === false ? "loot_claim_rejected" : "loot_claim_dry_run")),
+      botId: getStringValue(payload.botId),
+      botName: getStringValue(payload.botName || "Staging Bot", "Staging Bot"),
+      rewardPreviewId: getStringValue(payload.rewardPreviewId),
+      lootId: getStringValue(payload.lootId || "lupenShard"),
+      lootName: getStringValue(payload.lootName || "Lupen Shard", "Lupen Shard"),
+      quantity: Math.max(0, Math.round(Number(payload.quantity || 0))),
+      materialKey: getStringValue(payload.materialKey || "upgradeMaterials.lupenShards"),
+      materialBefore: Number.isFinite(Number(payload.materialBefore)) ? Number(payload.materialBefore) : null,
+      materialAfter: Number.isFinite(Number(payload.materialAfter)) ? Number(payload.materialAfter) : null,
+      idempotencyKey: getStringValue(payload.idempotencyKey),
+      idempotencyReady: payload.idempotencyReady === true,
+      duplicateDetected: payload.duplicateDetected === true,
+      gates: payload.gates || null,
+      plan: payload.plan || null,
+      writeResult: payload.writeResult || null,
+      writes: {
+        materialWritten: payload.writes?.materialWritten === true,
+        inventoryWritten: false,
+        ownedGunsWritten: false,
+        ownedAttachmentsWritten: false,
+        cargoWritten: false,
+        creditsWritten: false,
+        bountyWritten: false,
+        saveWritten: payload.writes?.saveWritten === true
+      },
+      inventoryWritten: false,
+      ownedGunsWritten: false,
+      ownedAttachmentsWritten: false,
+      cargoWritten: false,
+      creditsWritten: false,
+      bountyWritten: false,
+      saveWritten: payload.writes?.saveWritten === true,
+      receivedAt: Date.now()
+    });
+  }
+
+  async claimStagingLoot(client, message = {}) {
+    const player = this.touchPlayer(client.sessionId);
+    const botId = getStringValue(message.botId);
+    const rewardPreviewId = getStringValue(message.rewardPreviewId);
+    const preview = botId ? this.rewardPreviews.get(botId) : null;
+
+    if (!player || !botId || !preview) {
+      this.sendStagingLootClaimResult(client, {
+        ok: false,
+        reason: "reward_preview_not_found",
+        botId,
+        rewardPreviewId,
+        writes: {}
+      });
+      return;
+    }
+
+    if (rewardPreviewId && rewardPreviewId !== preview.rewardPreviewId) {
+      this.sendStagingLootClaimResult(client, {
+        ok: false,
+        reason: "reward_preview_id_mismatch",
+        botId,
+        botName: preview.botName,
+        rewardPreviewId,
+        writes: {}
+      });
+      return;
+    }
+
+    const contributors = Array.isArray(preview.contributors) ? preview.contributors : [];
+    const eligibleSessionIds = Array.isArray(preview.lootPreview?.eligibleSessionIds)
+      ? preview.lootPreview.eligibleSessionIds
+      : [];
+    const isEligible = preview.finalHitBy === client.sessionId ||
+      preview.disabledBySessionId === client.sessionId ||
+      preview.topContributorSessionId === client.sessionId ||
+      contributors.some((contributor) => contributor?.sessionId === client.sessionId) ||
+      eligibleSessionIds.includes(client.sessionId);
+
+    if (!isEligible) {
+      this.sendStagingLootClaimResult(client, {
+        ok: false,
+        reason: "reward_preview_not_eligible",
+        botId,
+        botName: preview.botName,
+        rewardPreviewId: preview.rewardPreviewId,
+        writes: {}
+      });
+      return;
+    }
+
+    const requestedLootId = getStringValue(message.lootId || "preview:lupenShard");
+    const lootItem = (Array.isArray(preview.lootPreview?.items) ? preview.lootPreview.items : [])
+      .find((item) => getStringValue(item?.lootId) === requestedLootId) ||
+      (requestedLootId === "lupenShard"
+        ? { lootId: "preview:lupenShard", name: "Lupen Shard", quantity: 1 }
+        : null);
+
+    if (!lootItem || !["preview:lupenShard", "lupenShard"].includes(getStringValue(lootItem.lootId))) {
+      this.sendStagingLootClaimResult(client, {
+        ok: false,
+        reason: "loot_item_not_allowed",
+        botId,
+        botName: preview.botName,
+        rewardPreviewId: preview.rewardPreviewId,
+        lootId: requestedLootId,
+        lootName: lootItem?.name || "Preview Loot",
+        writes: {}
+      });
+      return;
+    }
+
+    const identity = this.getPlayerIdentitySnapshot(client.sessionId);
+    const duplicateProbe = buildStagingLootClaimPlan({
+      player: {
+        ...identity,
+        sessionId: client.sessionId
+      },
+      preview,
+      lootId: lootItem.lootId,
+      quantity: lootItem.quantity || 1,
+      duplicateDetected: false
+    });
+    const duplicateDetected = duplicateProbe.idempotencyKey
+      ? this.stagingLootClaimIdempotencyKeys.has(duplicateProbe.idempotencyKey)
+      : false;
+    const plan = buildStagingLootClaimPlan({
+      player: {
+        ...identity,
+        sessionId: client.sessionId
+      },
+      preview,
+      lootId: lootItem.lootId,
+      quantity: lootItem.quantity || 1,
+      duplicateDetected
+    });
+    const writeResult = await applyStagingLootClaimWrite(plan);
+
+    if (writeResult.applied === true && plan.idempotencyKey) {
+      this.stagingLootClaimIdempotencyKeys.add(plan.idempotencyKey);
+    }
+
+    this.sendStagingLootClaimResult(client, {
+      ok: writeResult.ok === true,
+      applied: writeResult.applied === true,
+      dryRun: writeResult.dryRun !== false,
+      reason: writeResult.skippedReason || (writeResult.applied ? "lupen_shard_claim_applied" : "loot_claim_dry_run"),
+      botId,
+      botName: preview.botName,
+      rewardPreviewId: preview.rewardPreviewId,
+      lootId: plan.lootId,
+      lootName: lootItem.name || "Lupen Shard",
+      quantity: plan.quantity,
+      materialKey: writeResult.materialKey || "upgradeMaterials.lupenShards",
+      materialBefore: writeResult.materialBefore,
+      materialAfter: writeResult.materialAfter,
+      idempotencyKey: plan.idempotencyKey,
+      idempotencyReady: plan.idempotencyReady,
+      duplicateDetected: writeResult.duplicateDetected === true || plan.duplicateDetected === true,
+      gates: writeResult.gates,
+      plan,
+      writeResult,
+      writes: writeResult.writes || {}
     });
   }
 

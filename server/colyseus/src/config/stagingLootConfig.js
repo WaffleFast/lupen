@@ -74,8 +74,9 @@ export function buildStagingLootPreview({
     .map((sessionId) => getStringValue(sessionId))
     .filter(Boolean)));
   const seed = Math.abs(hashString(`${botId}:${rewardPreviewId}`));
-  const primary = STAGING_LOOT_PREVIEW_ITEMS[seed % 3] || STAGING_LOOT_PREVIEW_ITEMS[0];
-  const bonus = seed % 11 === 0 ? STAGING_LOOT_PREVIEW_ITEMS[3] : null;
+  const primary = STAGING_LOOT_PREVIEW_ITEMS[0];
+  const bonusPool = STAGING_LOOT_PREVIEW_ITEMS.slice(1);
+  const bonus = seed % 11 === 0 ? STAGING_LOOT_PREVIEW_ITEMS[3] : bonusPool[seed % bonusPool.length] || null;
   const items = [primary, bonus].filter(Boolean).map(sanitizeStagingLootPreviewItem);
 
   return {

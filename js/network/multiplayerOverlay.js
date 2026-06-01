@@ -1960,7 +1960,14 @@
       staging_bounty_not_complete: "staging bounty is not complete",
       staging_bounty_already_claimed: "staging bounty already claimed",
       unknown_staging_bounty: "unknown staging bounty",
-      staging_preview_only: "preview-only staging claim"
+      staging_preview_only: "preview-only staging claim",
+      loot_writes_disabled: "loot writes are disabled",
+      loot_write_dry_run: "loot claim is in dry-run mode",
+      duplicate_loot_claim: "duplicate Lupen Shard claim blocked",
+      loot_item_not_allowed: "loot item is not allowed",
+      staging_loot_write_allowlist_missing: "staging loot allow-list is missing",
+      player_not_in_staging_loot_write_allowlist: "player is not in the staging loot allow-list",
+      lupen_shards_path_missing_or_invalid: "Lupen Shards save path is unavailable"
     };
     return labels[safeReason] || safeReason || "not eligible";
   }
@@ -2037,6 +2044,30 @@
     }
 
     return "Claim received. No save changed.";
+  }
+
+  function getLootClaimPanelLabel(status, selectedBot) {
+    const result = status?.lastStagingLootClaimResult;
+    if (!isLootClaimResultForBot(status, selectedBot)) return "";
+
+    if (!result.ok) {
+      return `Lupen Shard claim blocked: ${getFriendlyClaimReason(result.reason)}. No material changed.`;
+    }
+
+    if (result.applied || result.writes?.saveWritten) {
+      return `Lupen Shard claimed: ${formatPreviewValue(result.materialBefore)} -> ${formatPreviewValue(result.materialAfter)}. Save refresh requested.`;
+    }
+
+    if (result.duplicateDetected) {
+      return "Lupen Shard claim already handled. Duplicate blocked.";
+    }
+
+    const gate = result.gates || {};
+    if (gate.writeEnabled && gate.dryRun === false && gate.playerAllowed) {
+      return "Lupen Shard claim eligible, but no material write applied yet.";
+    }
+
+    return `Lupen Shard dry-run only: ${getFriendlyClaimReason(result.reason)}. Material not changed.`;
   }
 
   function getClaimButtonState(status, selectedBot) {
@@ -2275,6 +2306,36 @@
     getClient()?.claimStagingRewardPreview?.({
       botId: status.lastRewardPreview.botId,
       rewardPreviewId: status.lastRewardPreview.rewardPreviewId || ""
+    });
+  }
+
+  function getLupenShardPreviewItem(status) {
+    const items = Array.isArray(status?.lastRewardPreview?.lootPreview?.items)
+      ? status.lastRewardPreview.lootPreview.items
+      : [];
+    return items.find((item) => item.lootId === "preview:lupenShard" || item.lootId === "lupenShard") || null;
+  }
+
+  function isLootClaimResultForBot(status, selectedBot) {
+    return !!selectedBot?.id && status?.lastStagingLootClaimResult?.botId === selectedBot.id;
+  }
+
+  function canClaimStagingLoot(status, selectedBot = null) {
+    return canClaimRewardPreview(status, selectedBot) &&
+      !!getLupenShardPreviewItem(status) &&
+      isLootPreviewEligibleForSelf(status, status.lastRewardPreview);
+  }
+
+  function sendStagingLootClaim(status) {
+    if (!canClaimStagingLoot(status)) return;
+    const item = getLupenShardPreviewItem(status);
+
+    // Staging-only material claim. This goes through Colyseus gates and never
+    // calls local inventory, reward, bounty, save, or notification systems.
+    getClient()?.claimStagingLoot?.({
+      botId: status.lastRewardPreview.botId,
+      rewardPreviewId: status.lastRewardPreview.rewardPreviewId || "",
+      lootId: item?.lootId || "preview:lupenShard"
     });
   }
 
@@ -2693,6 +2754,27 @@
       inner.appendChild(claimButton);
     }
 
+    if (canClaimStagingLoot(status, selectedBot)) {
+      const lootResult = isLootClaimResultForBot(status, selectedBot) ? status.lastStagingLootClaimResult : null;
+      const lootButton = global.document.createElement("button");
+      lootButton.type = "button";
+      lootButton.className = "lupen-mp-staging-fire";
+      lootButton.textContent = lootResult?.applied
+        ? "Shard Claimed"
+        : lootResult?.duplicateDetected
+          ? "Shard Claimed"
+          : "Claim Shard";
+      lootButton.title = "Staging-only Lupen Shard material claim. No equipment, credits, bounties, or broad inventory writes.";
+      lootButton.disabled = lootResult?.applied === true || lootResult?.duplicateDetected === true;
+      lootButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (lootButton.disabled) return;
+        sendStagingLootClaim(status);
+      });
+      inner.appendChild(lootButton);
+    }
+
     const combatMessage = getCombatPanelMessage(status, selectedBot);
     const message = global.document.createElement("div");
     message.className = "lupen-mp-staging-message";
@@ -2730,6 +2812,14 @@
       claim.className = "lupen-mp-staging-claim";
       claim.textContent = claimLabel;
       inner.appendChild(claim);
+    }
+
+    const lootClaimLabel = getLootClaimPanelLabel(status, selectedBot);
+    if (lootClaimLabel) {
+      const lootClaim = global.document.createElement("div");
+      lootClaim.className = "lupen-mp-staging-claim";
+      lootClaim.textContent = lootClaimLabel;
+      inner.appendChild(lootClaim);
     }
 
     panel.appendChild(inner);
@@ -2900,6 +2990,14 @@
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
       setDiagnosticsRow(panel, "loot preview", getLootPreviewLabel(status));
+      if (status.lastStagingLootClaimResult) {
+        const lootResult = status.lastStagingLootClaimResult;
+        const materialDelta = lootResult.applied
+          ? ` / ${formatPreviewValue(lootResult.materialBefore)} -> ${formatPreviewValue(lootResult.materialAfter)}`
+          : "";
+        setDiagnosticsRow(panel, "loot claim", `${lootResult.mode || "dry_run"} / applied ${lootResult.applied ? "yes" : "no"} / save ${lootResult.writes?.saveWritten ? "yes" : "no"} / ${lootResult.reason || "none"}${materialDelta}`);
+        setDiagnosticsRow(panel, "loot gates", `enabled ${lootResult.gates?.writeEnabled ? "yes" : "no"} / dry ${lootResult.gates?.dryRun !== false ? "yes" : "no"} / allow ${lootResult.gates?.playerAllowed ? "yes" : "no"} / idempotency ${lootResult.idempotencyReady ? "ready" : "not ready"}`);
+      }
       setDiagnosticsRow(panel, "claim preview", getRewardClaimResultLabel(status));
       const bounty = getActiveStagingBounty(status);
       if (bounty) {
@@ -2996,7 +3094,7 @@
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
     note.textContent = isStagingMode(status)
-      ? "Staging multiplayer reward path - XP only when verified and explicitly enabled; no credits, loot, normal bounty writes, or PvP."
+      ? "Staging reward path - XP and Lupen Shard material writes are gate-only; no credits, equipment loot, normal bounty writes, or PvP."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 

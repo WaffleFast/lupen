@@ -21,6 +21,7 @@ Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Col
 - Real client-side Trade Terminal buy/sell mutations are fenced in `?mp=staging`; testers can inspect the UI but must use the staging preview panel for trade dry-runs.
 - In `?mp=staging`, the real Trade Terminal routes matching buy/sell actions to Colyseus staging trade handlers so testers can see server-calculated dry-run or gated trade-write results in the normal trade UI.
 - In `?mp=staging`, real Store purchase/sell mutations are fenced and mapped Store items use Colyseus staging Store handlers. Cargo Pod and Pulse Laser have disabled-by-default gated server write prototypes; broad inventory, ship, stock, loot, bounty, or progression writes remain excluded.
+- Staging loot preview now has a disabled-by-default Lupen Shard material claim path. It can only patch `player_saves.save_data.upgradeMaterials.lupenShards` when explicit staging env gates, verified identity, idempotency, and allow-list/scope checks pass.
 - Playwright browser smoke tests cover normal start-screen loading, normal Trade Terminal visibility, and staging trade UI fences without performing real buy/sell actions or live writes.
 
 Diagnostics remain available with `?debug=mp`.
@@ -33,7 +34,7 @@ The following remain excluded from staging unless a later phase explicitly enabl
 - Player damage.
 - Credits writes.
 - Cargo writes.
-- Loot or item grants.
+- Broad loot or item grants.
 - Inventory writes.
 - Bounty completion.
 - Economy changes.
@@ -161,7 +162,7 @@ Current XP-only staging claim status: after a server-owned staging bot is disabl
 
 Staging bounty wrapper status: [multiplayer-bounty-staging-design.md](multiplayer-bounty-staging-design.md) defines `Erebus Patrol Sweep`, a room/session-scoped staging-only objective to destroy 2 server-owned Erebus bots. In `?mp=staging`, the real Bounty Board now renders this server-owned staging bounty instead of local daily contracts, while the floating overlay is only a compact status helper. The board refreshes status after accept/claim and from server progress messages. Progress increments only for players who accepted the staging bounty and contributed to the disabled staging bot. Claiming reuses the same XP-only claim/apply path and remains blocked/dry-run unless the existing verified identity, idempotency, progression write, and allow-list gates pass. No normal bounty state, bounty table, credits, loot, inventory, route completion, trade totals, PvP, player damage, schema, or RLS changes are enabled.
 
-Staging loot preview status: [multiplayer-loot-staging-design.md](multiplayer-loot-staging-design.md) defines a preview-only loot contract attached to server-owned staging bot destruction. Eligible contributors can see compact “would drop” copy in the staging combat panel, but the server and client report `inventoryWritten:false`, `saveWritten:false`, and no `ownedGuns`, `ownedAttachments`, cargo, credits, bounty, route-completion, trade-total, PvP, or player-damage writes. Local single-player loot helpers remain disconnected from staging.
+Staging loot status: [multiplayer-loot-staging-design.md](multiplayer-loot-staging-design.md) defines the loot contract attached to server-owned staging bot destruction. Eligible contributors can see compact "would drop" copy in the staging combat panel. Phase 2 adds a disabled-by-default `stagingLoot:claim` path for Lupen Shard only, mapped to `save_data.upgradeMaterials.lupenShards`. It requires verified identity, contributor eligibility, idempotency, exact `lupenShard` item id, quantity `1`, `STAGING_LOOT_WRITE_ENABLED=true`, `STAGING_LOOT_WRITE_DRY_RUN=false`, allow-list/scope approval, Supabase service-role config, and a valid numeric material path. It never writes `inventoryItems`, `ownedGuns`, `ownedAttachments`, cargo, credits, bounties, route completion, trade totals, XP, PvP, player damage, or broad progression. Local single-player loot helpers remain disconnected from staging.
 
 Classification:
 
@@ -188,7 +189,7 @@ Classification:
 ## Practical Next Steps
 
 - Keep refining staging combat readability and automated tests before broadening reward writes.
-- Next phase: test tiny XP-only writes only with explicit server env gates and an allow-listed verified account, then keep proving duplicate protection before any broader progression path.
+- Next phase: test tiny XP-only and Lupen Shard-only writes only with explicit server env gates and an allow-listed verified account, then keep proving duplicate protection before any broader progression or inventory path.
 - Manually test Phase 5b/5c/5d with writes disabled first, then enable trade write env vars only for a verified allowlisted test account and a tiny allowed offer. Confirm buy and sell buttons enter pending state, the server returns `applied:true`, the Trade Terminal shows server before/after values, and the UI refreshes from cloud save or clearly asks for reload.
 - Use the Playwright smoke suite before manual staging passes. Keep any authenticated or live-write browser checks opt-in and separate from the default read-only suite.
 - Next trade implementation pass: add durable trade idempotency/ledger or transactional RPC before broader credit/cargo writes. Keep route completion, realized profit, and trade totals dry-run until those systems are server-owned.

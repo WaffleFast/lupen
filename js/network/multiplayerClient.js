@@ -40,6 +40,7 @@
     lastShotEvent: null,
     lastRewardPreview: null,
     lastRewardClaimResult: null,
+    lastStagingLootClaimResult: null,
     lastStagingTradeOffers: null,
     lastStagingTradePreview: null,
     lastStagingTradeWriteResult: null,
@@ -264,6 +265,7 @@
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
+      lastStagingLootClaimResult: connection.lastStagingLootClaimResult ? { ...connection.lastStagingLootClaimResult } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers ? { ...connection.lastStagingTradeOffers } : null,
       lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
       lastStagingTradeWriteResult: connection.lastStagingTradeWriteResult ? { ...connection.lastStagingTradeWriteResult } : null,
@@ -520,6 +522,21 @@
       .catch((error) => {
         connection.lastServerWarning = "staging_xp_save_refresh_failed";
         logDev("staging XP save refresh failed", error?.message || error);
+      });
+  }
+
+  function refreshCloudSaveAfterStagingLootClaim(result) {
+    const saveWritten = result?.writes?.saveWritten === true || result?.saveWritten === true;
+    if (!isEnabled() || !saveWritten || typeof global.loadGameFromSupabase !== "function") return;
+
+    Promise.resolve()
+      .then(() => global.loadGameFromSupabase())
+      .then(() => {
+        logDev("refreshed cloud save after staging loot claim");
+      })
+      .catch((error) => {
+        connection.lastServerWarning = "staging_loot_save_refresh_failed";
+        logDev("staging loot save refresh failed", error?.message || error);
       });
   }
 
@@ -944,6 +961,56 @@
       bountyWritten: preview.bountyWritten === true,
       saveWritten: preview.saveWritten === true,
       reason: String(preview.reason || "preview_only")
+    };
+  }
+
+  function normalizeStagingLootClaimResult(message) {
+    if (!message || typeof message !== "object") return null;
+
+    return {
+      ok: message.ok === true,
+      applied: message.applied === true,
+      dryRun: message.dryRun !== false,
+      mode: String(message.mode || ""),
+      reason: String(message.reason || ""),
+      botId: String(message.botId || ""),
+      botName: String(message.botName || "Staging Bot"),
+      rewardPreviewId: String(message.rewardPreviewId || ""),
+      lootId: String(message.lootId || "lupenShard"),
+      lootName: String(message.lootName || "Lupen Shard"),
+      quantity: Number.isFinite(Number(message.quantity)) ? Number(message.quantity) : 0,
+      materialKey: String(message.materialKey || ""),
+      materialBefore: Number.isFinite(Number(message.materialBefore)) ? Number(message.materialBefore) : null,
+      materialAfter: Number.isFinite(Number(message.materialAfter)) ? Number(message.materialAfter) : null,
+      idempotencyKey: String(message.idempotencyKey || ""),
+      idempotencyReady: message.idempotencyReady === true,
+      duplicateDetected: message.duplicateDetected === true,
+      gates: message.gates && typeof message.gates === "object"
+        ? {
+          writeEnabled: message.gates.writeEnabled === true,
+          dryRun: message.gates.dryRun !== false,
+          scope: String(message.gates.scope || ""),
+          allowlistPresent: message.gates.allowlistPresent === true,
+          playerInAllowlist: message.gates.playerInAllowlist === true,
+          playerAllowed: message.gates.playerAllowed === true,
+          allowedItems: Array.isArray(message.gates.allowedItems)
+            ? message.gates.allowedItems.map((item) => String(item || "")).filter(Boolean)
+            : []
+        }
+        : null,
+      writes: {
+        materialWritten: message.writes?.materialWritten === true || message.materialWritten === true,
+        inventoryWritten: message.writes?.inventoryWritten === true || message.inventoryWritten === true,
+        ownedGunsWritten: message.writes?.ownedGunsWritten === true || message.ownedGunsWritten === true,
+        ownedAttachmentsWritten: message.writes?.ownedAttachmentsWritten === true || message.ownedAttachmentsWritten === true,
+        cargoWritten: message.writes?.cargoWritten === true || message.cargoWritten === true,
+        creditsWritten: message.writes?.creditsWritten === true || message.creditsWritten === true,
+        bountyWritten: message.writes?.bountyWritten === true || message.bountyWritten === true,
+        saveWritten: message.writes?.saveWritten === true || message.saveWritten === true
+      },
+      plan: message.plan || null,
+      writeResult: message.writeResult || null,
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
     };
   }
 
@@ -1628,6 +1695,13 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("stagingLoot:claimResult", (message) => {
+      connection.lastStagingLootClaimResult = normalizeStagingLootClaimResult(message);
+      refreshCloudSaveAfterStagingLootClaim(connection.lastStagingLootClaimResult);
+      logDev("server staging loot claim result", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("stagingBounty:listResult", (message) => {
       connection.lastStagingBountyList = normalizeStagingBountyList(message);
       if (connection.lastStagingBountyList?.active?.accepted) {
@@ -1819,6 +1893,7 @@
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
+      lastStagingLootClaimResult: connection.lastStagingLootClaimResult ? { ...connection.lastStagingLootClaimResult } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers
         ? {
           ...connection.lastStagingTradeOffers,
@@ -2039,6 +2114,19 @@
       return sendRoomMessage("claimStagingRewardPreview", "reward:claim_preview", {
         botId: options.botId || preview.botId || "",
         rewardPreviewId: options.rewardPreviewId || preview.rewardPreviewId || ""
+      });
+    },
+
+    claimStagingLoot(options = {}) {
+      const preview = connection.lastRewardPreview || {};
+      const lootPreview = preview.lootPreview || {};
+      const defaultLoot = Array.isArray(lootPreview.items)
+        ? lootPreview.items.find((item) => item?.lootId === "preview:lupenShard" || item?.lootId === "lupenShard") || lootPreview.items[0]
+        : null;
+      return sendRoomMessage("claimStagingLoot", "stagingLoot:claim", {
+        botId: options.botId || preview.botId || "",
+        rewardPreviewId: options.rewardPreviewId || preview.rewardPreviewId || "",
+        lootId: options.lootId || defaultLoot?.lootId || "preview:lupenShard"
       });
     },
 

@@ -48,6 +48,12 @@ import {
   buildPlayerSavePatchPlan
 } from "../src/services/playerSaveWriteService.js";
 import {
+  applyStagingLootClaimWrite,
+  buildStagingLootClaimPlan,
+  buildStagingLootSavePatch,
+  getLootWriteEnvGate
+} from "../src/services/lootWriteService.js";
+import {
   extractTradeValidationStateFromSave,
   fetchPlayerTradeValidationState
 } from "../src/services/playerSaveReadService.js";
@@ -389,6 +395,185 @@ async function expectStagingLoadoutResult(room, type, sendMessage) {
 
     sendMessage();
   });
+}
+
+async function assertStagingLootWriteHelpers() {
+  const defaultGate = getLootWriteEnvGate({}, "verified-player-a");
+  assert(defaultGate.writeEnabled === false, "Loot writes were enabled by default.");
+  assert(defaultGate.dryRun === true, "Loot writes were not dry-run by default.");
+  assert(defaultGate.allowedItems.includes("lupenShard"), "Default loot allow-list did not include Lupen Shard.");
+
+  const preview = {
+    rewardPreviewId: "bot-a:reward-1",
+    botId: "bot-a"
+  };
+  const verifiedPlayer = {
+    authStatus: "verified",
+    trustedPlayerId: "verified-player-a",
+    displayName: "Verified Pilot"
+  };
+  const basePlan = buildStagingLootClaimPlan({
+    player: verifiedPlayer,
+    preview,
+    lootId: "preview:lupenShard",
+    quantity: 1
+  });
+  assert(basePlan.eligible === true, `Verified Lupen Shard plan was not eligible: ${basePlan.skippedReason}`);
+  assert(basePlan.lootId === "lupenShard", "Lupen Shard loot id was not canonicalized.");
+  assert(basePlan.materialKey === "lupenShards", "Lupen Shard material key was not selected.");
+  assert(basePlan.idempotencyKey === "verified-player-a:bot-a:reward-1:loot:lupenShard", "Loot idempotency key was not stable.");
+
+  const duplicatePlan = buildStagingLootClaimPlan({
+    player: verifiedPlayer,
+    preview,
+    lootId: "preview:lupenShard",
+    duplicateDetected: true
+  });
+  assert(duplicatePlan.eligible === false, "Duplicate loot plan was not blocked.");
+  assert(duplicatePlan.skippedReason === "duplicate_loot_claim", `Unexpected duplicate loot reason: ${duplicatePlan.skippedReason}`);
+
+  const unknownLootPlan = buildStagingLootClaimPlan({
+    player: verifiedPlayer,
+    preview,
+    lootId: "preview:pulseLaser"
+  });
+  assert(unknownLootPlan.eligible === false, "Unsupported loot item was eligible.");
+  assert(unknownLootPlan.skippedReason === "loot_claim_not_eligible", `Unexpected unsupported loot reason: ${unknownLootPlan.skippedReason}`);
+
+  const guestPlan = buildStagingLootClaimPlan({
+    player: {
+      authStatus: "guest",
+      displayName: "Guest Pilot"
+    },
+    preview,
+    lootId: "preview:lupenShard"
+  });
+  assert(guestPlan.eligible === false, "Guest loot claim was eligible.");
+  assert(guestPlan.skippedReason === "identity_guest", `Unexpected guest loot reason: ${guestPlan.skippedReason}`);
+
+  const saveData = {
+    credits: 500,
+    upgradeMaterials: {
+      lupenShards: 2,
+      circuitBoards: 7
+    },
+    inventoryItems: [{ id: "item-1", key: "lupenCore", quality: "standard", level: 1 }],
+    ownedGuns: {
+      pulseLaser: {
+        owned: true
+      }
+    },
+    playerProgress: {
+      combatXp: 100
+    }
+  };
+  const patchPlan = buildStagingLootSavePatch(saveData, basePlan);
+  assert(patchPlan.ok === true, `Valid Lupen Shard save patch failed: ${patchPlan.skippedReason}`);
+  assert(patchPlan.materialBefore === 2 && patchPlan.materialAfter === 3, "Lupen Shard material delta was incorrect.");
+  assert(patchPlan.updatedSaveData.upgradeMaterials.lupenShards === 3, "Updated save data did not patch Lupen Shards.");
+  assert(patchPlan.updatedSaveData.inventoryItems.length === 1, "Loot patch changed inventoryItems.");
+  assert(patchPlan.updatedSaveData.ownedGuns.pulseLaser.owned === true, "Loot patch changed ownedGuns.");
+  assert(patchPlan.updatedSaveData.credits === 500, "Loot patch changed credits.");
+  assert(patchPlan.updatedSaveData.playerProgress.combatXp === 100, "Loot patch changed XP.");
+
+  const invalidSavePatch = buildStagingLootSavePatch({ upgradeMaterials: {} }, basePlan);
+  assert(invalidSavePatch.ok === false, "Invalid material path unexpectedly patched.");
+  assert(invalidSavePatch.skippedReason === "lupen_shards_path_missing_or_invalid", `Unexpected invalid material path reason: ${invalidSavePatch.skippedReason}`);
+
+  const disabledResult = await applyStagingLootClaimWrite(basePlan, {
+    env: {},
+    fetchImpl: async () => {
+      throw new Error("fetch should not run when loot writes are disabled");
+    }
+  });
+  assert(disabledResult.applied === false, "Disabled loot write applied.");
+  assert(disabledResult.skippedReason === "loot_writes_disabled", `Unexpected disabled loot reason: ${disabledResult.skippedReason}`);
+  assert(disabledResult.writes.saveWritten === false, "Disabled loot write reported save write.");
+
+  const dryRunResult = await applyStagingLootClaimWrite(basePlan, {
+    env: {
+      STAGING_LOOT_WRITE_ENABLED: "true",
+      STAGING_LOOT_WRITE_DRY_RUN: "true",
+      STAGING_LOOT_WRITE_SCOPE: "verified"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run during loot dry-run");
+    }
+  });
+  assert(dryRunResult.applied === false, "Dry-run loot write applied.");
+  assert(dryRunResult.skippedReason === "loot_write_dry_run", `Unexpected dry-run loot reason: ${dryRunResult.skippedReason}`);
+
+  const notAllowlisted = await applyStagingLootClaimWrite(basePlan, {
+    env: {
+      STAGING_LOOT_WRITE_ENABLED: "true",
+      STAGING_LOOT_WRITE_DRY_RUN: "false",
+      STAGING_LOOT_WRITE_ALLOWLIST: "other-player"
+    },
+    fetchImpl: async () => {
+      throw new Error("fetch should not run for non-allowlisted player");
+    }
+  });
+  assert(notAllowlisted.applied === false, "Non-allowlisted loot write applied.");
+  assert(notAllowlisted.skippedReason === "player_not_in_staging_loot_write_allowlist", `Unexpected non-allowlisted reason: ${notAllowlisted.skippedReason}`);
+
+  const missingEnv = await applyStagingLootClaimWrite(basePlan, {
+    env: {
+      STAGING_LOOT_WRITE_ENABLED: "true",
+      STAGING_LOOT_WRITE_DRY_RUN: "false",
+      STAGING_LOOT_WRITE_SCOPE: "verified"
+    }
+  });
+  assert(missingEnv.applied === false, "Loot write without Supabase env applied.");
+  assert(missingEnv.skippedReason === "supabase_config_missing", `Unexpected missing-env loot reason: ${missingEnv.skippedReason}`);
+
+  const calls = [];
+  const appliedResult = await applyStagingLootClaimWrite(basePlan, {
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_LOOT_WRITE_ENABLED: "true",
+      STAGING_LOOT_WRITE_DRY_RUN: "false",
+      STAGING_LOOT_WRITE_ALLOWLIST: "verified-player-a"
+    },
+    fetchImpl: async (url, options = {}) => {
+      calls.push({ url, options });
+      if (options.method === "GET") {
+        assert(options.headers?.Authorization === "Bearer stub-service-key", "Loot read did not use service role bearer auth.");
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return [{ save_data: saveData }];
+          }
+        };
+      }
+
+      if (options.method === "PATCH") {
+        const body = JSON.parse(options.body || "{}");
+        assert(body.save_data.upgradeMaterials.lupenShards === 3, "Loot patch did not send updated Lupen Shards.");
+        assert(body.save_data.inventoryItems.length === 1, "Loot patch mutated inventoryItems.");
+        assert(body.save_data.credits === 500, "Loot patch mutated credits.");
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return [];
+          }
+        };
+      }
+
+      throw new Error(`Unexpected loot write method ${options.method}`);
+    }
+  });
+  assert(appliedResult.applied === true, `Mocked loot write did not apply: ${appliedResult.skippedReason}`);
+  assert(appliedResult.dryRun === false, "Mocked loot write stayed dry-run.");
+  assert(appliedResult.materialBefore === 2 && appliedResult.materialAfter === 3, "Mocked loot write material delta was incorrect.");
+  assert(appliedResult.writes.materialWritten === true && appliedResult.writes.saveWritten === true, "Mocked loot write did not report material/save writes.");
+  assert(appliedResult.writes.inventoryWritten === false && appliedResult.writes.creditsWritten === false, "Mocked loot write reported forbidden writes.");
+  assert(calls.some((call) => call.options.method === "GET"), "Mocked loot write did not read save data.");
+  assert(calls.some((call) => call.options.method === "PATCH"), "Mocked loot write did not patch save data.");
+
+  console.log("staging Lupen Shard loot write helpers stayed material-only and gated");
 }
 
 async function assertStagingTradeValidationHelpers() {
@@ -2867,6 +3052,7 @@ async function leaveRoom(room) {
 
 try {
   await assertStagingTradeValidationHelpers();
+  await assertStagingLootWriteHelpers();
   await assertStagingStorePreviewHelpers();
   await assertStagingCargoPodEquipHelpers();
   await assertFullCargoPodTradeLoopHelpers();
@@ -3714,6 +3900,32 @@ try {
   assert(!("credits" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player credits field.");
   assert(!("inventory" in playerFrom(roomA, roomA.sessionId)), "Reward preview claim created player inventory field.");
 
+  const lootClaimResult = await expectRoomMessage(roomA, "stagingLoot:claimResult", () => {
+    roomA.send("stagingLoot:claim", {
+      botId: rewardPreview.botId,
+      rewardPreviewId: rewardPreview.rewardPreviewId,
+      lootId: "preview:lupenShard"
+    });
+  });
+  assert(lootClaimResult?.ok === false, "Unverified Lupen Shard claim was not blocked.");
+  assert(lootClaimResult?.applied === false, "Unverified Lupen Shard claim applied.");
+  assert(lootClaimResult?.writes?.materialWritten === false, "Unverified Lupen Shard claim reported material write.");
+  assert(lootClaimResult?.writes?.inventoryWritten === false, "Unverified Lupen Shard claim reported inventory write.");
+  assert(lootClaimResult?.writes?.creditsWritten === false, "Unverified Lupen Shard claim reported credits write.");
+  assert(lootClaimResult?.writes?.saveWritten === false, "Unverified Lupen Shard claim reported save write.");
+  assert(lootClaimResult?.reason === "identity_unverified", `Unexpected unverified Lupen Shard claim reason: ${lootClaimResult?.reason}`);
+
+  const unsupportedLootClaim = await expectRoomMessage(roomA, "stagingLoot:claimResult", () => {
+    roomA.send("stagingLoot:claim", {
+      botId: rewardPreview.botId,
+      rewardPreviewId: rewardPreview.rewardPreviewId,
+      lootId: "preview:pulseLaser"
+    });
+  });
+  assert(unsupportedLootClaim?.ok === false, "Unsupported staging loot claim was not blocked.");
+  assert(unsupportedLootClaim?.reason === "loot_item_not_allowed", `Unexpected unsupported staging loot reason: ${unsupportedLootClaim?.reason}`);
+  assert(unsupportedLootClaim?.ownedGunsWritten === false && unsupportedLootClaim?.saveWritten === false, "Unsupported staging loot reported writes.");
+
   roomC = await clientC.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot C",
     currentShipId: "lupenOrigin",
@@ -3739,9 +3951,20 @@ try {
   assert(nonContributorClaim?.playerSave?.written === false, "Rejected non-contributor claim reported player_saves write.");
   assert(nonContributorClaim?.playerSave?.creditsWritten === false, "Rejected non-contributor claim reported credits write.");
   assert(nonContributorClaim?.applied === false, "Rejected non-contributor reward claim applied rewards.");
+  const nonContributorLootClaim = await expectRoomMessage(roomC, "stagingLoot:claimResult", () => {
+    roomC.send("stagingLoot:claim", {
+      botId: rewardPreview.botId,
+      rewardPreviewId: rewardPreview.rewardPreviewId,
+      lootId: "preview:lupenShard"
+    });
+  });
+  assert(nonContributorLootClaim?.ok === false, "Non-contributor Lupen Shard claim was not rejected.");
+  assert(nonContributorLootClaim?.reason === "reward_preview_not_eligible", `Unexpected non-contributor Lupen Shard reason: ${nonContributorLootClaim?.reason}`);
+  assert(nonContributorLootClaim?.saveWritten === false && nonContributorLootClaim?.inventoryWritten === false, "Rejected non-contributor Lupen Shard claim reported writes.");
   await leaveRoom(roomC);
   roomC = null;
   console.log("reward preview claim simulation stayed preview-only");
+  console.log("staging Lupen Shard claim path stayed blocked/no-write for unverified and non-contributors");
   console.log("repeated valid hits disabled staging bot without rewards");
 
   await waitForFireReady(roomA, roomA.sessionId);
