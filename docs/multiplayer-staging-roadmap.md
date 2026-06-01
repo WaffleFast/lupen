@@ -17,8 +17,11 @@ Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Col
 - Heavily gated XP-only `player_saves` patch preparation.
 - XP-only claim diagnostics that summarize simulated, dry-run, blocked, duplicate, and applied staging outcomes without enabling credits or loot.
 - Server-side staging trade preview/dry-run offers with deterministic route math, untrusted player snapshot validation, and tiny disabled-by-default Phase 5b/5d buy/sell write prototypes.
+- Server-side staging Store item list and purchase preview/dry-run validation for a tiny static catalogue.
 - Real client-side Trade Terminal buy/sell mutations are fenced in `?mp=staging`; testers can inspect the UI but must use the staging preview panel for trade dry-runs.
 - In `?mp=staging`, the real Trade Terminal routes matching buy/sell actions to Colyseus staging trade handlers so testers can see server-calculated dry-run or gated trade-write results in the normal trade UI.
+- In `?mp=staging`, real Store purchase/sell mutations are fenced and mapped Store items use Colyseus staging Store preview handlers. No CR, inventory, equipment, ship, stock, or save writes are enabled.
+- Playwright browser smoke tests cover normal start-screen loading, normal Trade Terminal visibility, and staging trade UI fences without performing real buy/sell actions or live writes.
 
 Diagnostics remain available with `?debug=mp`.
 
@@ -65,6 +68,8 @@ Phase 5b/5d scaffold status: `stagingTrade:buy` and `stagingTrade:sell` can call
 
 Phase 5c reconciliation status: successful gated buys/sells return server before/after values for credits, resource cargo, cargo hold usage, and cargo capacity. The Trade Terminal displays those server values, prevents duplicate pending requests, and refreshes from the existing Supabase save reload path after `applied:true`. If a refresh is unavailable or fails, staging UI keeps the server result visible and tells testers to reload/reopen to sync full save display. The old local buy/sell mutation path remains fenced in staging.
 
+Trade loop hardening status: server regression tests now cover a mocked buy-then-sell sequence with strict gates enabled and confirm only credits, resource cargo, and cost basis change. Inventory, bounties, route completion, trade totals, loot, PvP, player damage, and broad progression stay untouched.
+
 Classification:
 
 - Market definitions: config/static data for now.
@@ -108,6 +113,10 @@ Ship definitions live in [js/01-core-state.js](../js/01-core-state.js) under `SH
 Purchases currently mutate `credits`, `ownedShips`, `ownedGuns`, `ownedAttachments`, `inventoryItems`, `shipLoadouts`, and `storeDailyPurchases`, then save locally/cloud via `saveGame()`.
 
 Multiplayer authority needs: server-side price/stock validation, ownership checks, daily purchase idempotency, credit spend validation, and inventory/ownership writes through a dedicated server path.
+
+Current staging Store prototype: `stagingStore:listItems` exposes a tiny static catalogue and `stagingStore:previewPurchase` validates item id, quantity, server price, and credits from trusted save or a sanitized snapshot. Results are dry-run only and always report no credit, inventory, equipment, ship, save, loot, or bounty writes. The real Store UI shows server-preview copy for mapped items and blocks real local purchase/sell mutations while `?mp=staging` is active.
+
+Store Phase 2 adds `stagingStore:purchase` for `attachment:cargoPod` only. It is disabled/dry-run by default and requires `STAGING_STORE_WRITE_ENABLED=true`, `STAGING_STORE_WRITE_DRY_RUN=false`, verified identity, Store write scope/allowlist approval, `STAGING_STORE_WRITE_ALLOWED_ITEMS` containing `attachment:cargoPod`, quantity `1`, trusted `player_saves`, enough root `credits`, and a valid root `ownedAttachments.cargoPod` count. When every gate passes, the server patches only root `credits` and `ownedAttachments.cargoPod`; `inventoryItems`, `shipLoadouts`, ships, weapons, daily stock, loot, bounties, PvP, player damage, broad progression, and schema/RLS remain excluded. `gun:pulseLaser` and `attachment:shieldBooster` remain preview-only.
 
 Classification:
 
@@ -171,6 +180,7 @@ Classification:
 - Keep refining staging combat readability and automated tests before broadening reward writes.
 - Next phase: test tiny XP-only writes only with explicit server env gates and an allow-listed verified account, then keep proving duplicate protection before any broader progression path.
 - Manually test Phase 5b/5c/5d with writes disabled first, then enable trade write env vars only for a verified allowlisted test account and a tiny allowed offer. Confirm buy and sell buttons enter pending state, the server returns `applied:true`, the Trade Terminal shows server before/after values, and the UI refreshes from cloud save or clearly asks for reload.
+- Use the Playwright smoke suite before manual staging passes. Keep any authenticated or live-write browser checks opt-in and separate from the default read-only suite.
 - Next trade implementation pass: add durable trade idempotency/ledger or transactional RPC before broader credit/cargo writes. Keep route completion, realized profit, and trade totals dry-run until those systems are server-owned.
 - Use dedicated ledgers for every real online reward or economic mutation.
 - Treat `player_saves` as an output of verified server actions, not as a client-trusted source for multiplayer rewards.

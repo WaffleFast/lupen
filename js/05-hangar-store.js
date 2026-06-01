@@ -7,6 +7,190 @@
   return "all";
 }
 
+const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
+  "gun:pulseLaser": "gun:pulseLaser",
+  "attachment:cargoPod": "attachment:cargoPod",
+  "attachment:shieldBooster": "attachment:shieldBooster"
+});
+
+let multiplayerStagingStoreSubscribed = false;
+let multiplayerStagingStorePurchasePending = false;
+
+function isMultiplayerStagingStoreActive() {
+  try {
+    if (typeof isMultiplayerStagingActive === "function") return isMultiplayerStagingActive();
+    return typeof window !== "undefined" &&
+      window.location &&
+      new URLSearchParams(window.location.search).get("mp") === "staging";
+  } catch (_err) {
+    return false;
+  }
+}
+
+function getMultiplayerStagingStoreStatus() {
+  return window.LupenMultiplayerClient?.getStatus?.() || {};
+}
+
+function blockStoreMutationInMultiplayerStaging() {
+  if (!isMultiplayerStagingStoreActive()) return false;
+  const message = "Store purchases are server-preview only in multiplayer staging.";
+  if (typeof addHudToast === "function") addHudToast(message);
+  if (typeof addActivityLog === "function") addActivityLog(message);
+  if (typeof console !== "undefined" && typeof console.info === "function") {
+    console.info(`[Lupen multiplayer] ${message}`);
+  }
+  return true;
+}
+
+function requestMultiplayerStagingStoreItemsIfNeeded() {
+  if (!isMultiplayerStagingStoreActive()) return;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.requestStagingStoreItems || !status?.enabled || !status?.isConnected) return;
+  if (status.lastStagingStoreItems?.items?.length) return;
+  client.requestStagingStoreItems();
+}
+
+function setupMultiplayerStagingStoreSubscription() {
+  if (!isMultiplayerStagingStoreActive()) return;
+  if (multiplayerStagingStoreSubscribed) return;
+  const client = window.LupenMultiplayerClient;
+  if (!client?.onServerState) return;
+  const subscription = client.onServerState(() => {
+    if (document.getElementById("storeScreen")?.classList.contains("active")) renderStore();
+  });
+  multiplayerStagingStoreSubscribed = Boolean(subscription?.unsubscribe);
+}
+
+function getStagingStoreLocalLookupKey(item) {
+  if (!item) return "";
+  return `${item.kind}:${item.key}`;
+}
+
+function getStagingStoreServerItem(item) {
+  const lookupKey = getStagingStoreLocalLookupKey(item);
+  const serverItems = getMultiplayerStagingStoreStatus().lastStagingStoreItems?.items || [];
+  return serverItems.find((entry) => `${entry.localKind}:${entry.localKey}` === lookupKey) || null;
+}
+
+function getStagingStoreItemId(item) {
+  const serverItem = getStagingStoreServerItem(item);
+  if (serverItem?.itemId) return serverItem.itemId;
+  return STAGING_STORE_LOCAL_ITEM_IDS[getStagingStoreLocalLookupKey(item)] || "";
+}
+
+function getLastMatchingStagingStorePreview(itemId) {
+  const status = getMultiplayerStagingStoreStatus();
+  const purchase = status.lastStagingStorePurchase;
+  if (purchase?.itemId === itemId) return purchase;
+  const result = status.lastStagingStorePreview;
+  return result?.itemId === itemId ? result : null;
+}
+
+function getStagingStorePreviewLine(result) {
+  if (!result) return "Server preview pending. No CR or inventory changed.";
+  if (result.applied) return "Staging purchase applied.";
+  if (result.wouldPass) return "Would pass server Store validation.";
+  if (result.blockReason === "insufficient_credits") return "Blocked: not enough credits.";
+  if (result.blockReason === "unknown_store_item") return "Server preview unavailable.";
+  if (result.blockReason === "invalid_store_quantity") return "Blocked: invalid quantity.";
+  if (result.blockReason === "store_item_preview_only" || result.reason === "store_item_preview_only") return "This item is preview-only in staging.";
+  if (result.reason === "staging_store_dry_run_enabled") return "Dry run only - no CR or Store ownership changed.";
+  return `Blocked: ${result.blockReason || result.reason || "validation unavailable"}.`;
+}
+
+function renderStagingStorePreviewNote(item) {
+  if (!isMultiplayerStagingStoreActive()) return "";
+  const itemId = getStagingStoreItemId(item);
+  const result = itemId ? getLastMatchingStagingStorePreview(itemId) : null;
+  if (!itemId) {
+    return `<div class="store-detail-owned-line">Server preview unavailable. Real Store purchase is blocked in MP staging.</div>`;
+  }
+  if (!result) {
+    return `<div class="store-detail-owned-line">MP staging Store: server preview only. No CR or inventory changed.</div>`;
+  }
+  const source = result.validationMode === "trusted_save"
+    ? "trusted save"
+    : result.validationMode === "snapshot"
+      ? "local snapshot"
+      : "price preview";
+  const afterCredits = result.creditsAfter ?? result.creditsAfterPreview;
+  const creditLine = result.creditsBefore === null
+    ? "CR unknown"
+    : `CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(afterCredits)}`;
+  const ownedLine = result.itemBefore === null || result.itemAfter === null
+    ? ""
+    : ` / Owned ${formatNumber(result.itemBefore)} -> ${formatNumber(result.itemAfter)}`;
+  return `
+    <div class="store-detail-owned-line">
+      <strong>${escapeHtml(getStagingStorePreviewLine(result))}</strong> /
+      ${escapeHtml(creditLine)} /
+      ${escapeHtml(source)} /
+      ${escapeHtml(result.applied ? "Server save refreshed after applied purchase." : "Dry run only - no CR, inventory, ships, equipment, saves, loot, or bounties changed.")}${escapeHtml(ownedLine)}
+    </div>`;
+}
+
+function isStagingStoreWritableItem(item) {
+  return getStagingStoreItemId(item) === "attachment:cargoPod";
+}
+
+async function requestStagingStorePurchase(item) {
+  if (!isMultiplayerStagingStoreActive()) return false;
+  const itemId = getStagingStoreItemId(item);
+  if (!itemId || !isStagingStoreWritableItem(item)) {
+    return requestStagingStorePurchasePreview(item);
+  }
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.purchaseStagingStoreItem || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging Store purchase is waiting for the multiplayer server connection.");
+    requestMultiplayerStagingStoreItemsIfNeeded();
+    return true;
+  }
+  if (multiplayerStagingStorePurchasePending) return true;
+  multiplayerStagingStorePurchasePending = true;
+  renderStore();
+  client.purchaseStagingStoreItem({ itemId, quantity: 1 });
+  if (typeof addHudToast === "function") addHudToast("Requested MP staging Store purchase.");
+  setTimeout(async () => {
+    multiplayerStagingStorePurchasePending = false;
+    const latest = client.getStatus?.().lastStagingStorePurchase;
+    if (latest?.itemId === itemId && latest.applied) {
+      if (typeof addHudToast === "function") addHudToast(`Staging purchase applied: ${latest.name || "Store item"}.`);
+      if (typeof loadGameFromSupabase === "function") {
+        try {
+          const loaded = await loadGameFromSupabase();
+          if (loaded?.loaded && typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+        } catch (_err) {
+          if (typeof addHudToast === "function") addHudToast("Staging purchase applied. Reload if Store values look stale.");
+        }
+      }
+    }
+    renderStore();
+  }, 900);
+  return true;
+}
+
+function requestStagingStorePurchasePreview(item) {
+  if (!isMultiplayerStagingStoreActive()) return false;
+  const itemId = getStagingStoreItemId(item);
+  if (!itemId) {
+    blockStoreMutationInMultiplayerStaging();
+    renderStore();
+    return true;
+  }
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.previewStagingStorePurchase || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging Store preview is waiting for the multiplayer server connection.");
+    requestMultiplayerStagingStoreItemsIfNeeded();
+    return true;
+  }
+  client.previewStagingStorePurchase({ itemId, quantity: 1 });
+  if (typeof addHudToast === "function") addHudToast("Requested MP staging Store server preview.");
+  return true;
+}
+
 function getVaultEntryDescription(entry) {
   if (!entry) return "";
   if (entry.categoryKey === "guns") {
@@ -1860,6 +2044,9 @@ function selectStoreQuality(quality) {
 }
 
 function renderStore() {
+  setupMultiplayerStagingStoreSubscription();
+  requestMultiplayerStagingStoreItemsIfNeeded();
+
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
     storeFilter = "attachments";
     selectedStoreQuality = "standard";
@@ -2020,24 +2207,38 @@ function renderStoreDetail() {
 
   let buyButton = "";
   let sellButton = "";
+  const stagingStoreLocked = isMultiplayerStagingStoreActive();
+  const stagingStoreItemId = getStagingStoreItemId(item);
+  const stagingWritableItem = isStagingStoreWritableItem(item);
+  const stagingPreviewButton = stagingStoreItemId
+    ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Staging Purchase") : "Server Preview") : "Sold Out"}</button>`
+    : `<button class="store-detail-buy-action" disabled>Server preview unavailable</button>`;
 
   if (item.kind === "core") {
-    buyButton = `<button class="store-detail-buy-action store-core-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="openUpgradeForge()">Open Upgrade Bay</button>`;
+    buyButton = stagingStoreLocked
+      ? `<button class="store-detail-buy-action store-core-action" disabled>Server preview unavailable</button>`
+      : `<button class="store-detail-buy-action store-core-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="openUpgradeForge()">Open Upgrade Bay</button>`;
   } else if (item.kind === "ship") {
     if (currentShipId === item.key) {
       buyButton = `<button disabled>Equipped</button>`;
     } else if (ownedShips.includes(item.key)) {
       buyButton = `<button disabled>Owned in Hangar</button>`;
     } else {
-      buyButton = `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
+      buyButton = stagingStoreLocked
+        ? stagingPreviewButton
+        : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
     }
   } else {
-    buyButton = `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
+    buyButton = stagingStoreLocked
+      ? stagingPreviewButton
+      : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
     if (sellPrice > 0) {
       const sellHandler = (item.kind === "attachment" || item.kind === "gun") && quality === "standard" && ownedReady > 0
         ? 'storeSellSelectedOwned()'
         : 'storeSellSelectedInventory(1)';
-      sellButton = `<button onclick="${sellHandler}">Sell / CR ${formatNumber(sellPrice)}</button>`;
+      sellButton = stagingStoreLocked
+        ? `<button disabled>Selling disabled in MP staging</button>`
+        : `<button onclick="${sellHandler}">Sell / CR ${formatNumber(sellPrice)}</button>`;
     }
   }
 
@@ -2056,6 +2257,7 @@ function renderStoreDetail() {
         <div class="store-detail-title">${item.name}</div>
         <div class="store-detail-desc">${item.description}</div>
         <div class="store-detail-owned-line">${ownershipLine} / ${getStoreStockLabel(item)}</div>
+        ${renderStagingStorePreviewNote(item)}
         ${detailStatsHtml}
       </div>
 
@@ -2069,6 +2271,10 @@ function renderStoreDetail() {
 function storeBuySelected() {
   const item = getStoreSelectedItem();
   if (!item) return;
+  if (isMultiplayerStagingStoreActive()) {
+    requestStagingStorePurchase(item);
+    return;
+  }
   if (item.kind === "core") {
     openUpgradeForge();
     return;
@@ -2153,6 +2359,7 @@ function storeBuySelected() {
 }
 
 function storeSellSelectedOwned() {
+  if (blockStoreMutationInMultiplayerStaging()) return;
   const item = getStoreSelectedItem();
   if (!item) return;
   if (item.kind === "attachment") {
@@ -2165,12 +2372,14 @@ function storeSellSelectedOwned() {
 }
 
 function storeSellSelectedInventory(amount = "all") {
+  if (blockStoreMutationInMultiplayerStaging()) return;
   const item = getStoreSelectedItem();
   if (!item) return;
   sellInventoryItemToNpc(item.key, getStoreItemDisplayQuality(item), amount, true);
 }
 
 function sellOwnedAttachment(key) {
+  if (blockStoreMutationInMultiplayerStaging()) return;
 
   const item = attachments[key];
   if (!item || (ownedAttachments[key] || 0) <= 0) return;
@@ -2181,6 +2390,7 @@ function sellOwnedAttachment(key) {
 }
 
 function sellOwnedGun(key) {
+  if (blockStoreMutationInMultiplayerStaging()) return;
   const item = GUNS[key];
   if (!item || (ownedGuns[key] || 0) <= 0) return;
   ownedGuns[key] -= 1;
@@ -2190,6 +2400,7 @@ function sellOwnedGun(key) {
 }
 
 function sellShipToStore(shipId) {
+  if (blockStoreMutationInMultiplayerStaging()) return;
   const ship = SHIPS[shipId];
   if (!ship || shipId === currentShipId || !ownedShips.includes(shipId)) return;
   ownedShips = ownedShips.filter(id => id !== shipId);
@@ -2200,6 +2411,7 @@ function sellShipToStore(shipId) {
 }
 
 function buyAttachment(key) {
+  if (blockStoreMutationInMultiplayerStaging()) return;
   const item = attachments[key];
   if (!item) return;
 
@@ -2226,6 +2438,7 @@ function buyAttachment(key) {
 }
 
 function buyGun(key) {
+  if (blockStoreMutationInMultiplayerStaging()) return;
   const item = GUNS[key];
   if (!item) return;
 
@@ -2393,6 +2606,7 @@ function removeGun(index) {
 }
 
 function buyShip(shipId) {
+  if (blockStoreMutationInMultiplayerStaging()) return;
   const ship = SHIPS[shipId];
   if (!ship || ownedShips.includes(shipId)) return;
 

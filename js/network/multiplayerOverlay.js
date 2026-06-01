@@ -2692,6 +2692,23 @@
           setDiagnosticsRow(panel, "trade hold", `${formatTradeNumber(tradeWrite.cargoUsedBefore)} -> ${formatTradeNumber(tradeWrite.cargoUsedAfter)} / ${formatTradeNumber(tradeWrite.cargoCapacity)}`);
         }
       }
+      const storeItems = status.lastStagingStoreItems;
+      const storePreview = status.lastStagingStorePreview;
+      const storePurchase = status.lastStagingStorePurchase;
+      setDiagnosticsRow(panel, "store items", `${storeItems?.items?.length || 0} dry-run`);
+      if (storePreview) {
+        setDiagnosticsRow(panel, "store preview", storePreview.wouldPass
+          ? `${storePreview.name || "item"} / CR ${formatTradeNumber(storePreview.totalCost)} / writes no`
+          : `${storePreview.blockReason || storePreview.reason || "blocked"} / writes no`);
+        setDiagnosticsRow(panel, "store source", `${storePreview.validationMode || "unknown"} / trusted ${storePreview.trustedStateAvailable ? "yes" : "no"} / applied ${storePreview.applied ? "yes" : "no"}`);
+      }
+      if (storePurchase) {
+        const afterCredits = storePurchase.creditsAfter ?? storePurchase.creditsAfterPreview;
+        setDiagnosticsRow(panel, "store purchase", storePurchase.applied
+          ? `${storePurchase.name || "item"} applied / CR ${formatTradeNumber(storePurchase.creditsBefore)} -> ${formatTradeNumber(afterCredits)}`
+          : `${storePurchase.name || storePurchase.itemId || "item"} / ${storePurchase.blockReason || storePurchase.reason || "dry-run"}`);
+        setDiagnosticsRow(panel, "store gates", `${storePurchase.gates?.scope || "disabled"} / enabled ${storePurchase.gates?.writeEnabled ? "yes" : "no"} / dry ${storePurchase.gates?.dryRun ? "yes" : "no"} / allow ${storePurchase.gates?.allowlisted ? "yes" : "no"}`);
+      }
     }
     if (status.lastServerWarning) {
       setDiagnosticsRow(panel, "warning", status.lastServerWarning);

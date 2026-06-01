@@ -27,12 +27,21 @@ import {
   getStagingTradeOffers
 } from "../config/stagingTradeConfig.js";
 import {
+  buildStagingStorePurchasePreview,
+  getStagingStoreItemById,
+  getStagingStoreItems
+} from "../config/stagingStoreConfig.js";
+import {
   fetchPlayerTradeValidationState
 } from "../services/playerSaveReadService.js";
 import {
   applyStagingTradeBuyWrite,
   applyStagingTradeSellWrite
 } from "../services/tradeWriteService.js";
+import {
+  applyStagingStorePurchaseWrite,
+  getStoreWriteEnvGate
+} from "../services/storeWriteService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -755,6 +764,52 @@ export class LupenSectorRoom extends Room {
       await this.sendStagingTradeWriteRequest(client, message, "sell");
     });
 
+    // Staging-only Store preview endpoints. These validate a tiny server-owned
+    // Store catalogue and never mutate credits, inventory, equipment, ships,
+    // player_saves, bounties, loot, PvP/player damage, or progression.
+    this.onMessage("stagingStore:listItems", (client) => {
+      this.touchPlayer(client.sessionId);
+      client.send("stagingStore:items", {
+        ok: true,
+        mode: "dry_run",
+        applied: false,
+        items: getStagingStoreItems(),
+        creditsWritten: false,
+        inventoryWritten: false,
+        shipWritten: false,
+        equipmentWritten: false,
+        saveWritten: false,
+        lootWritten: false,
+        bountyWritten: false,
+        reason: "staging_store_items",
+        receivedAt: Date.now()
+      });
+    });
+
+    this.onMessage("stagingStore:previewPurchase", async (client, message = {}) => {
+      const player = this.touchPlayer(client.sessionId);
+      const trustedState = await fetchPlayerTradeValidationState({
+        authStatus: player?.authStatus || "guest",
+        trustedPlayerId: player?.trustedPlayerId || "",
+        playerId: player?.playerId || ""
+      });
+      const preview = buildStagingStorePurchasePreview({
+        itemId: message?.itemId,
+        quantity: message?.quantity,
+        playerSnapshot: message?.playerSnapshot,
+        trustedState
+      });
+      client.send("stagingStore:previewResult", {
+        ...preview,
+        sessionId: client.sessionId,
+        receivedAt: Date.now()
+      });
+    });
+
+    this.onMessage("stagingStore:purchase", async (client, message = {}) => {
+      await this.sendStagingStorePurchaseRequest(client, message);
+    });
+
     // Legacy local prototype alias. New clients should send movement:update.
     this.onMessage("move", (client, message = {}) => {
       this.applyPresenceUpdate(client, message, "move");
@@ -1466,6 +1521,137 @@ export class LupenSectorRoom extends Room {
           ? `player_node_${playerNode || "unknown"}_does_not_match_${offer?.sellNode || "unknown"}`
           : result.debugReason,
       sessionId: client.sessionId,
+      receivedAt: Date.now()
+    });
+  }
+
+  async sendStagingStorePurchaseRequest(client, message = {}) {
+    const player = this.touchPlayer(client.sessionId);
+    const identity = {
+      authStatus: player?.authStatus || "guest",
+      trustedPlayerId: player?.trustedPlayerId || "",
+      playerId: player?.playerId || ""
+    };
+    const itemId = getStringValue(message?.itemId);
+    const item = getStagingStoreItemById(itemId);
+    const requestedQuantity = Number(message?.quantity);
+    const storeWriteQuantityValid = Number.isFinite(requestedQuantity) && Math.floor(requestedQuantity) === 1;
+    const trustedState = await fetchPlayerTradeValidationState({
+      authStatus: identity.authStatus,
+      trustedPlayerId: identity.trustedPlayerId,
+      playerId: identity.playerId
+    });
+    const preview = buildStagingStorePurchasePreview({
+      itemId,
+      quantity: message?.quantity,
+      playerSnapshot: message?.playerSnapshot,
+      trustedState
+    });
+    const envGate = getStoreWriteEnvGate(identity.trustedPlayerId || identity.playerId, itemId);
+    const gates = {
+      verified: identity.authStatus === "verified" && !!(identity.trustedPlayerId || identity.playerId),
+      writeEnabled: envGate.writeEnabled,
+      dryRun: envGate.dryRun,
+      allowlisted: envGate.playerAllowed,
+      scope: envGate.scope,
+      trustedSaveAvailable: trustedState?.available === true,
+      itemAllowed: envGate.itemAllowed
+    };
+
+    const baseResult = {
+      ...preview,
+      operation: "purchase",
+      gates,
+      writes: {
+        creditsWritten: false,
+        inventoryWritten: false,
+        attachmentWritten: false,
+        equipmentWritten: false,
+        shipWritten: false,
+        weaponWritten: false,
+        saveWritten: false,
+        lootWritten: false,
+        bountyWritten: false
+      },
+      creditsWritten: false,
+      inventoryWritten: false,
+      attachmentWritten: false,
+      equipmentWritten: false,
+      shipWritten: false,
+      weaponWritten: false,
+      saveWritten: false,
+      lootWritten: false,
+      bountyWritten: false,
+      sessionId: client.sessionId,
+      receivedAt: Date.now()
+    };
+
+    const canAttemptWrite = preview.ok === true &&
+      preview.wouldPass === true &&
+      item?.itemId === "attachment:cargoPod" &&
+      storeWriteQuantityValid &&
+      gates.writeEnabled === true &&
+      gates.dryRun === false &&
+      gates.verified === true &&
+      gates.allowlisted === true &&
+      gates.trustedSaveAvailable === true &&
+      gates.itemAllowed === true &&
+      player?.multiplayerMode === "staging";
+
+    if (canAttemptWrite) {
+      const writeResult = await applyStagingStorePurchaseWrite({
+        playerId: identity.trustedPlayerId || identity.playerId,
+        itemId,
+        quantity: message?.quantity,
+        trustedState
+      });
+
+      client.send("stagingStore:purchaseResult", {
+        ...baseResult,
+        ...writeResult,
+        gates,
+        validationMode: writeResult.validationMode || preview.validationMode,
+        trustedStateAvailable: true,
+        snapshotUsed: false,
+        sessionId: client.sessionId,
+        receivedAt: Date.now()
+      });
+      return;
+    }
+
+    const previewOnlyReason = !storeWriteQuantityValid
+      ? "invalid_store_quantity"
+      : item && item.itemId !== "attachment:cargoPod"
+      ? "store_item_preview_only"
+      : player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun
+        ? "staging_mode_required_for_store_write"
+        : !gates.writeEnabled
+          ? "staging_store_writes_disabled"
+          : gates.dryRun
+            ? "staging_store_dry_run_enabled"
+            : !gates.verified
+              ? "verified_identity_required"
+              : !gates.allowlisted
+                ? envGate.scope === "allowlist" && !envGate.allowlistPresent
+                  ? "staging_store_write_allowlist_missing"
+                  : "player_not_in_staging_store_write_allowlist"
+                : !gates.itemAllowed
+                  ? "store_item_not_allowed"
+                  : preview.blockReason || "store_write_unavailable";
+
+    client.send("stagingStore:purchaseResult", {
+      ...baseResult,
+      ok: preview.ok === true && previewOnlyReason === "staging_store_dry_run_enabled",
+      mode: previewOnlyReason === "staging_store_dry_run_enabled" ? "dry_run" : "blocked",
+      applied: false,
+      dryRun: true,
+      blockReason: previewOnlyReason === "invalid_store_quantity" ? "invalid_store_quantity" : preview.blockReason || previewOnlyReason,
+      reason: previewOnlyReason,
+      userReason: item && item.itemId !== "attachment:cargoPod"
+        ? "This item is preview-only in staging."
+        : previewOnlyReason === "staging_store_dry_run_enabled"
+          ? "Dry run only - no credits or Store ownership changed."
+          : preview.userReason,
       receivedAt: Date.now()
     });
   }

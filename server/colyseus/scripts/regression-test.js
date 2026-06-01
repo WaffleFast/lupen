@@ -10,6 +10,10 @@ import {
   buildStagingTradeWriteDryRun
 } from "../src/config/stagingTradeConfig.js";
 import {
+  buildStagingStorePurchasePreview,
+  getStagingStoreItems
+} from "../src/config/stagingStoreConfig.js";
+import {
   buildRewardLedgerEntry,
   checkRewardLedgerConnectivity,
   writeRewardLedgerEntry
@@ -41,6 +45,11 @@ import {
   buildStagingTradeBuySavePatch,
   buildStagingTradeSellSavePatch
 } from "../src/services/tradeWriteService.js";
+import {
+  applyStagingStorePurchaseWrite,
+  buildStagingStorePurchasePatch,
+  getStoreWriteEnvGate
+} from "../src/services/storeWriteService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -280,6 +289,51 @@ async function expectStagingTradeWriteResult(room, operation, sendMessage) {
     }, 3000);
 
     room.onMessage(`stagingTrade:${operation}Result`, (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectStagingStoreItems(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for staging Store items."));
+    }, 3000);
+
+    room.onMessage("stagingStore:items", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectStagingStorePreview(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for staging Store preview."));
+    }, 3000);
+
+    room.onMessage("stagingStore:previewResult", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectStagingStorePurchase(room, sendMessage) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out waiting for staging Store purchase."));
+    }, 3000);
+
+    room.onMessage("stagingStore:purchaseResult", (message) => {
       clearTimeout(timeout);
       resolve(message);
     });
@@ -962,7 +1016,361 @@ async function assertStagingTradeValidationHelpers() {
   assert(appliedSellWrite.creditsDelta === 50 && appliedSellWrite.cargoDelta === -2, "Trade sell write returned incorrect deltas.");
   assert(appliedSellWrite.inventoryWritten === false && appliedSellWrite.lootWritten === false && appliedSellWrite.bountyWritten === false, "Applied trade sell write reported forbidden writes.");
 
-  console.log("staging trade validation and gated buy write helpers passed");
+  let sequentialSave = {
+    credits: 1000,
+    cargo: { Iron: 0, Copper: 2 },
+    cargoCostBasis: {},
+    inventoryItems: [{ id: "untouched-inventory" }],
+    activeBountyId: "untouched-bounty",
+    playerProgress: {
+      totals: {
+        tradesCompleted: 3,
+        cargoSold: 8,
+        tradeProfit: 123
+      }
+    },
+    marker: {
+      shouldRemain: true
+    }
+  };
+  const sequentialOffer = {
+    offerId,
+    resourceId: "iron",
+    resourceName: "Iron",
+    buyPrice: 18,
+    sellPrice: 25
+  };
+  const sequentialFetchCalls = [];
+  const sequentialFetch = async (_url, options = {}) => {
+    sequentialFetchCalls.push(options.method || "GET");
+    if (options.method === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return [{ save_data: sequentialSave }];
+        }
+      };
+    }
+    assert(options.method === "PATCH", "Sequential trade test used unexpected write method.");
+    const body = JSON.parse(options.body || "{}");
+    sequentialSave = body.save_data;
+    return { ok: true, status: 204 };
+  };
+  const sequentialEnv = {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
+    STAGING_TRADE_WRITE_ENABLED: "true",
+    STAGING_TRADE_WRITE_DRY_RUN: "false",
+    STAGING_TRADE_WRITE_SCOPE: "allowlist",
+    STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+  };
+  const sequentialTrustedState = {
+    available: true,
+    validationState: {
+      cargoCapacity: 20
+    }
+  };
+  const sequentialBuy = await applyStagingTradeBuyWrite({
+    playerId: "verified-player-a",
+    offer: sequentialOffer,
+    quantity: 1,
+    trustedState: sequentialTrustedState,
+    env: sequentialEnv,
+    fetchImpl: sequentialFetch
+  });
+  assert(sequentialBuy.applied === true, `Sequential buy did not apply in mocked enabled path: ${sequentialBuy.reason}`);
+  assert(sequentialBuy.creditsBefore === 1000 && sequentialBuy.creditsAfter === 982, "Sequential buy did not subtract expected credits.");
+  assert(sequentialBuy.cargoBefore === 0 && sequentialBuy.cargoAfter === 1, "Sequential buy did not add expected cargo.");
+  assert(sequentialSave.credits === 982 && sequentialSave.cargo.Iron === 1, "Sequential buy did not update mocked save state.");
+  assert(sequentialSave.cargoCostBasis.Iron === 18, "Sequential buy did not set cost basis.");
+
+  const sequentialSell = await applyStagingTradeSellWrite({
+    playerId: "verified-player-a",
+    offer: sequentialOffer,
+    quantity: 1,
+    trustedState: sequentialTrustedState,
+    env: sequentialEnv,
+    fetchImpl: sequentialFetch
+  });
+  assert(sequentialSell.applied === true, `Sequential sell did not apply in mocked enabled path: ${sequentialSell.reason}`);
+  assert(sequentialSell.creditsBefore === 982 && sequentialSell.creditsAfter === 1007, "Sequential sell did not add expected credits.");
+  assert(sequentialSell.cargoBefore === 1 && sequentialSell.cargoAfter === 0, "Sequential sell did not remove expected cargo.");
+  assert(sequentialSave.credits === 1007 && sequentialSave.cargo.Iron === 0, "Sequential sell did not update mocked save state.");
+  assert(sequentialSave.cargoCostBasis.Iron === undefined, "Sequential sell-all did not clear cost basis.");
+  assert(sequentialSave.inventoryItems[0].id === "untouched-inventory", "Sequential buy/sell changed inventory.");
+  assert(sequentialSave.activeBountyId === "untouched-bounty", "Sequential buy/sell changed bounty.");
+  assert(sequentialSave.playerProgress.totals.tradesCompleted === 3, "Sequential buy/sell changed route completion totals.");
+  assert(sequentialSave.playerProgress.totals.cargoSold === 8, "Sequential buy/sell changed cargo sold totals.");
+  assert(sequentialSave.playerProgress.totals.tradeProfit === 123, "Sequential buy/sell changed trade profit totals.");
+  assert(sequentialSave.marker.shouldRemain === true, "Sequential buy/sell changed unrelated save fields.");
+  assert(sequentialFetchCalls.join(",") === "GET,PATCH,GET,PATCH", `Sequential trade expected read/write pairs, got ${sequentialFetchCalls.join(",")}.`);
+
+  console.log("staging trade validation and gated buy/sell write helpers passed");
+}
+
+async function assertStagingStorePreviewHelpers() {
+  const items = getStagingStoreItems();
+  assert(items.length >= 3, "Staging Store item list did not include deterministic test items.");
+  assert(items.some((item) => item.itemId === "gun:pulseLaser"), "Staging Store missing Pulse Laser.");
+  assert(items.some((item) => item.itemId === "attachment:cargoPod"), "Staging Store missing Cargo Pod.");
+  assert(items.some((item) => item.itemId === "attachment:shieldBooster"), "Staging Store missing Shield Booster.");
+
+  const validTrustedPreview = buildStagingStorePurchasePreview({
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000
+      }
+    }
+  });
+  assert(validTrustedPreview.ok === true, `Valid Store preview was blocked: ${validTrustedPreview.blockReason}`);
+  assert(validTrustedPreview.mode === "dry_run", `Unexpected Store preview mode: ${validTrustedPreview.mode}`);
+  assert(validTrustedPreview.operation === "purchase", "Store preview did not report purchase operation.");
+  assert(validTrustedPreview.applied === false, "Store preview applied a purchase.");
+  assert(validTrustedPreview.itemId === "attachment:cargoPod", "Store preview returned wrong item.");
+  assert(validTrustedPreview.totalCost === 220, `Unexpected Store preview total cost: ${validTrustedPreview.totalCost}`);
+  assert(validTrustedPreview.creditsBefore === 1000 && validTrustedPreview.creditsAfterPreview === 780, "Store preview before/after credits were wrong.");
+  assert(validTrustedPreview.validationMode === "trusted_save", `Unexpected Store validation mode: ${validTrustedPreview.validationMode}`);
+  assert(validTrustedPreview.creditsWritten === false, "Store preview reported credit write.");
+  assert(validTrustedPreview.inventoryWritten === false, "Store preview reported inventory write.");
+  assert(validTrustedPreview.shipWritten === false, "Store preview reported ship write.");
+  assert(validTrustedPreview.equipmentWritten === false, "Store preview reported equipment write.");
+  assert(validTrustedPreview.saveWritten === false, "Store preview reported save write.");
+  assert(validTrustedPreview.lootWritten === false, "Store preview reported loot write.");
+  assert(validTrustedPreview.bountyWritten === false, "Store preview reported bounty write.");
+
+  const insufficientCredits = buildStagingStorePurchasePreview({
+    itemId: "attachment:shieldBooster",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 100
+      }
+    }
+  });
+  assert(insufficientCredits.ok === false, "Insufficient-credit Store preview was not blocked.");
+  assert(insufficientCredits.blockReason === "insufficient_credits", `Unexpected insufficient Store reason: ${insufficientCredits.blockReason}`);
+  assert(insufficientCredits.creditsWritten === false && insufficientCredits.saveWritten === false, "Blocked Store preview reported writes.");
+
+  const invalidItem = buildStagingStorePurchasePreview({
+    itemId: "missing:item",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000
+      }
+    }
+  });
+  assert(invalidItem.ok === false, "Unknown Store item was not blocked.");
+  assert(invalidItem.blockReason === "unknown_store_item", `Unexpected unknown Store item reason: ${invalidItem.blockReason}`);
+
+  const invalidQuantity = buildStagingStorePurchasePreview({
+    itemId: "gun:pulseLaser",
+    quantity: 0,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000
+      }
+    }
+  });
+  assert(invalidQuantity.ok === false, "Invalid Store quantity was not blocked.");
+  assert(invalidQuantity.blockReason === "invalid_store_quantity", `Unexpected invalid quantity reason: ${invalidQuantity.blockReason}`);
+
+  const snapshotPreview = buildStagingStorePurchasePreview({
+    itemId: "gun:pulseLaser",
+    quantity: 1,
+    playerSnapshot: {
+      credits: 900
+    },
+    trustedState: {
+      available: false,
+      reason: "save_missing"
+    }
+  });
+  assert(snapshotPreview.ok === true, "Store preview did not fall back to snapshot credits.");
+  assert(snapshotPreview.validationMode === "snapshot", `Unexpected Store snapshot validation mode: ${snapshotPreview.validationMode}`);
+  assert(snapshotPreview.creditsAfterPreview === 152, `Unexpected Store snapshot after credits: ${snapshotPreview.creditsAfterPreview}`);
+
+  const unknownPreview = buildStagingStorePurchasePreview({
+    itemId: "gun:pulseLaser",
+    quantity: 1,
+    trustedState: {
+      available: false,
+      reason: "save_missing"
+    }
+  });
+  assert(unknownPreview.ok === false, "Store preview without trusted state or snapshot unexpectedly passed.");
+  assert(unknownPreview.validationMode === "unknown", `Unexpected unknown Store validation mode: ${unknownPreview.validationMode}`);
+  assert(unknownPreview.applied === false && unknownPreview.saveWritten === false, "Unknown Store preview reported writes.");
+
+  const writeGateDefault = getStoreWriteEnvGate("verified-player-a", "attachment:cargoPod", {});
+  assert(writeGateDefault.writeEnabled === false && writeGateDefault.dryRun === true, "Store write gate default was not safe.");
+  assert(writeGateDefault.itemAllowed === true, "Cargo Pod should be the default allowed Store write item.");
+
+  const validSaveData = {
+    credits: 1000,
+    ownedAttachments: { cargoPod: 1, shieldBooster: 2 },
+    ownedGuns: { pulseLaser: 1 },
+    ownedShips: ["lupenOrigin"],
+    shipLoadouts: { lupenOrigin: { attachments: ["shieldBooster"], guns: ["pulseLaser"] } },
+    inventoryItems: [{ id: "kept-item", key: "cargoPod", quality: "rare" }],
+    cargo: { Iron: 2 },
+    cargoCostBasis: { Iron: 12 },
+    playerProgress: { combatXp: 33, totals: { tradesCompleted: 4 } },
+    activeBountyId: "keep-bounty",
+    marker: { keep: true }
+  };
+  const cargoPodItem = items.find((item) => item.itemId === "attachment:cargoPod");
+  const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
+  assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
+  assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 780, "Cargo Pod Store patch did not subtract the server price.");
+  assert(patchPlan.itemBefore === 1 && patchPlan.itemAfter === 2, "Cargo Pod Store patch did not increment ownedAttachments.cargoPod.");
+  assert(patchPlan.patchedSaveData.ownedAttachments.shieldBooster === 2, "Cargo Pod Store patch changed unrelated attachment ownership.");
+  assert(patchPlan.patchedSaveData.inventoryItems[0].id === "kept-item", "Cargo Pod Store patch changed inventoryItems.");
+  assert(patchPlan.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Cargo Pod Store patch changed shipLoadouts.");
+  assert(patchPlan.patchedSaveData.ownedGuns.pulseLaser === 1, "Cargo Pod Store patch changed weapon ownership.");
+  assert(patchPlan.patchedSaveData.cargo.Iron === 2, "Cargo Pod Store patch changed trade cargo.");
+  assert(patchPlan.patchedSaveData.playerProgress.combatXp === 33, "Cargo Pod Store patch changed progression.");
+  assert(patchPlan.patchedSaveData.activeBountyId === "keep-bounty", "Cargo Pod Store patch changed bounty state.");
+  assert(patchPlan.patchedSaveData.marker.keep === true, "Cargo Pod Store patch changed unrelated fields.");
+
+  const nonCargoItem = items.find((item) => item.itemId === "attachment:shieldBooster");
+  const nonCargoPatch = buildStagingStorePurchasePatch(validSaveData, nonCargoItem, 1);
+  assert(nonCargoPatch.ok === false && nonCargoPatch.blockReason === "store_item_preview_only", "Non-Cargo Pod Store write did not stay preview-only.");
+
+  const invalidQuantityPatch = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 2);
+  assert(invalidQuantityPatch.ok === false && invalidQuantityPatch.blockReason === "invalid_store_quantity", "Quantity above one was not blocked.");
+
+  const insufficientCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, cargoPodItem, 1);
+  assert(insufficientCreditPatch.ok === false && insufficientCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Cargo Pod write was not blocked.");
+
+  const defaultWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {},
+    fetchImpl: async () => {
+      throw new Error("Store write default should not fetch.");
+    }
+  });
+  assert(defaultWrite.applied === false && defaultWrite.blockReason === "staging_store_writes_disabled", "Default Store write did not fail closed.");
+  assert(defaultWrite.saveWritten === false, "Default Store write reported save write.");
+
+  const dryRunWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "true",
+      STAGING_STORE_WRITE_SCOPE: "verified"
+    },
+    fetchImpl: async () => {
+      throw new Error("Store write dry-run should not fetch.");
+    }
+  });
+  assert(dryRunWrite.applied === false && dryRunWrite.blockReason === "staging_store_dry_run_enabled", "Dry-run Store write did not skip safely.");
+
+  const unverifiedWrite = await applyStagingStorePurchaseWrite({
+    playerId: "",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "verified"
+    }
+  });
+  assert(unverifiedWrite.blockReason === "verified_identity_required", "Unverified Store write was not blocked.");
+
+  const notAllowlistedWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "allowlist",
+      STAGING_STORE_WRITE_ALLOWLIST: "somebody-else"
+    }
+  });
+  assert(notAllowlistedWrite.blockReason === "player_not_in_staging_store_write_allowlist", "Non-allowlisted Store write was not blocked.");
+
+  let sequentialSave = JSON.parse(JSON.stringify(validSaveData));
+  const storeFetchCalls = [];
+  const appliedWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "allowlist",
+      STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:cargoPod"
+    },
+    fetchImpl: async (url, options = {}) => {
+      storeFetchCalls.push(options.method || "GET");
+      assert(options.headers?.apikey === "stub-service-key", "Store write did not use service role apikey.");
+      assert(options.headers?.Authorization === "Bearer stub-service-key", "Store write did not use service role bearer.");
+      if ((options.method || "GET") === "GET") {
+        assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a&select=save_data,updated_at&limit=1", `Unexpected Store read URL: ${url}`);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => [{ save_data: sequentialSave }]
+        };
+      }
+      assert(options.method === "PATCH", "Store write expected PATCH after read.");
+      assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a", `Unexpected Store PATCH URL: ${url}`);
+      const body = JSON.parse(options.body || "{}");
+      sequentialSave = body.save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedWrite.applied === true && appliedWrite.mode === "store_write", `Gated Cargo Pod Store write did not apply: ${appliedWrite.blockReason}`);
+  assert(appliedWrite.creditsBefore === 1000 && appliedWrite.creditsAfter === 780, "Applied Store write returned incorrect credits.");
+  assert(appliedWrite.itemBefore === 1 && appliedWrite.itemAfter === 2, "Applied Store write returned incorrect Cargo Pod count.");
+  assert(appliedWrite.creditsWritten === true && appliedWrite.attachmentWritten === true && appliedWrite.saveWritten === true, "Applied Store write did not report allowed writes.");
+  assert(appliedWrite.inventoryWritten === false && appliedWrite.shipWritten === false && appliedWrite.weaponWritten === false, "Applied Store write reported forbidden writes.");
+  assert(sequentialSave.credits === 780 && sequentialSave.ownedAttachments.cargoPod === 2, "Applied Store write did not update mocked save state.");
+  assert(sequentialSave.inventoryItems[0].id === "kept-item", "Applied Store write changed inventoryItems.");
+  assert(sequentialSave.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Applied Store write changed shipLoadouts.");
+  assert(sequentialSave.ownedGuns.pulseLaser === 1, "Applied Store write changed weapon ownership.");
+  assert(sequentialSave.cargo.Iron === 2 && sequentialSave.cargoCostBasis.Iron === 12, "Applied Store write changed trade cargo.");
+  assert(sequentialSave.playerProgress.combatXp === 33, "Applied Store write changed progression.");
+  assert(sequentialSave.activeBountyId === "keep-bounty", "Applied Store write changed bounty state.");
+  assert(storeFetchCalls.join(",") === "GET,PATCH", `Store write expected read/write pair, got ${storeFetchCalls.join(",")}.`);
+
+  console.log("staging Store item list, previews, and gated Cargo Pod write helpers passed");
 }
 
 async function assertIdentityVerificationAndRewardPlanHelpers() {
@@ -1825,6 +2233,7 @@ async function leaveRoom(room) {
 
 try {
   await assertStagingTradeValidationHelpers();
+  await assertStagingStorePreviewHelpers();
   await assertIdentityVerificationAndRewardPlanHelpers();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
@@ -1930,6 +2339,111 @@ try {
   assert(validTradePreview?.maxCargoQuantity === 140, "Staging trade max cargo quantity was incorrect.");
   assert(validTradePreview?.maxValidQuantity === Math.min(Math.floor(10000 / firstTradeOffer.buyPrice), 140, firstTradeOffer.maxQuantity), "Staging trade max valid quantity was incorrect.");
   assert(validTradePreview?.creditsWritten === false && validTradePreview?.cargoWritten === false && validTradePreview?.saveWritten === false, "Staging trade preview reported writes.");
+
+  const storeItems = await expectStagingStoreItems(roomA, () => {
+    roomA.send("stagingStore:listItems", {});
+  });
+  assert(storeItems?.ok === true, "Staging Store items did not return ok.");
+  assert(storeItems?.mode === "dry_run", `Unexpected Store item list mode: ${storeItems?.mode}`);
+  assert(storeItems?.applied === false, "Staging Store item list reported applied.");
+  assert(Array.isArray(storeItems?.items) && storeItems.items.length >= 3, "Staging Store item list was not deterministic/non-empty.");
+  assert(storeItems.items.some((item) => item.itemId === "attachment:cargoPod"), "Staging Store item list missing Cargo Pod.");
+  assert(storeItems?.creditsWritten === false && storeItems?.inventoryWritten === false && storeItems?.saveWritten === false, "Staging Store item list reported writes.");
+
+  const validStorePreview = await expectStagingStorePreview(roomA, () => {
+    roomA.send("stagingStore:previewPurchase", {
+      itemId: "attachment:cargoPod",
+      quantity: 1,
+      playerSnapshot: {
+        credits: 1000
+      }
+    });
+  });
+  assert(validStorePreview?.ok === true, `Valid staging Store preview failed: ${validStorePreview?.blockReason}`);
+  assert(validStorePreview?.mode === "dry_run", `Unexpected Store preview mode: ${validStorePreview?.mode}`);
+  assert(validStorePreview?.applied === false, "Staging Store preview applied a purchase.");
+  assert(validStorePreview?.operation === "purchase", "Staging Store preview did not report purchase operation.");
+  assert(validStorePreview?.itemId === "attachment:cargoPod", "Staging Store preview returned wrong item.");
+  assert(validStorePreview?.totalCost === 220, "Staging Store preview did not calculate server cost.");
+  assert(validStorePreview?.creditsBefore === 1000 && validStorePreview?.creditsAfterPreview === 780, "Staging Store preview before/after credits were wrong.");
+  assert(validStorePreview?.validationMode === "snapshot", `Unexpected Store validation mode: ${validStorePreview?.validationMode}`);
+  assert(validStorePreview?.wouldPass === true, "Valid Store preview did not pass.");
+  assert(validStorePreview?.creditsWritten === false && validStorePreview?.inventoryWritten === false && validStorePreview?.shipWritten === false && validStorePreview?.equipmentWritten === false && validStorePreview?.saveWritten === false, "Staging Store preview reported writes.");
+
+  const invalidStoreItem = await expectStagingStorePreview(roomA, () => {
+    roomA.send("stagingStore:previewPurchase", {
+      itemId: "missing:item",
+      quantity: 1,
+      playerSnapshot: {
+        credits: 1000
+      }
+    });
+  });
+  assert(invalidStoreItem?.ok === false && invalidStoreItem?.blockReason === "unknown_store_item", "Unknown Store item did not block safely.");
+  assert(invalidStoreItem?.saveWritten === false, "Unknown Store item reported save write.");
+
+  const invalidStoreQuantity = await expectStagingStorePreview(roomA, () => {
+    roomA.send("stagingStore:previewPurchase", {
+      itemId: "attachment:cargoPod",
+      quantity: 0,
+      playerSnapshot: {
+        credits: 1000
+      }
+    });
+  });
+  assert(invalidStoreQuantity?.ok === false && invalidStoreQuantity?.blockReason === "invalid_store_quantity", "Invalid Store quantity did not block safely.");
+
+  const insufficientStoreCredits = await expectStagingStorePreview(roomA, () => {
+    roomA.send("stagingStore:previewPurchase", {
+      itemId: "attachment:shieldBooster",
+      quantity: 1,
+      playerSnapshot: {
+        credits: 100
+      }
+    });
+  });
+  assert(insufficientStoreCredits?.ok === false && insufficientStoreCredits?.blockReason === "insufficient_credits", "Insufficient-credit Store preview did not block safely.");
+  assert(insufficientStoreCredits?.creditsWritten === false && insufficientStoreCredits?.inventoryWritten === false && insufficientStoreCredits?.saveWritten === false, "Insufficient-credit Store preview reported writes.");
+
+  const defaultStorePurchase = await expectStagingStorePurchase(roomA, () => {
+    roomA.send("stagingStore:purchase", {
+      itemId: "attachment:cargoPod",
+      quantity: 1,
+      playerSnapshot: {
+        credits: 1000
+      }
+    });
+  });
+  assert(defaultStorePurchase?.applied === false, "Default staging Store purchase unexpectedly applied.");
+  assert(defaultStorePurchase?.mode === "blocked" || defaultStorePurchase?.mode === "dry_run", `Unexpected default Store purchase mode: ${defaultStorePurchase?.mode}`);
+  assert(defaultStorePurchase?.creditsWritten === false && defaultStorePurchase?.attachmentWritten === false && defaultStorePurchase?.saveWritten === false, "Default Store purchase reported writes.");
+  assert(defaultStorePurchase?.gates?.writeEnabled === false, "Default Store purchase gate should report writes disabled.");
+
+  const previewOnlyStorePurchase = await expectStagingStorePurchase(roomA, () => {
+    roomA.send("stagingStore:purchase", {
+      itemId: "attachment:shieldBooster",
+      quantity: 1,
+      playerSnapshot: {
+        credits: 1000
+      }
+    });
+  });
+  assert(previewOnlyStorePurchase?.applied === false, "Preview-only Store purchase unexpectedly applied.");
+  assert(previewOnlyStorePurchase?.reason === "store_item_preview_only" || previewOnlyStorePurchase?.blockReason === "store_item_preview_only", "Non-Cargo Pod Store purchase did not stay preview-only.");
+  assert(previewOnlyStorePurchase?.saveWritten === false, "Preview-only Store purchase reported save write.");
+
+  const invalidStorePurchaseQuantity = await expectStagingStorePurchase(roomA, () => {
+    roomA.send("stagingStore:purchase", {
+      itemId: "attachment:cargoPod",
+      quantity: 2,
+      playerSnapshot: {
+        credits: 1000
+      }
+    });
+  });
+  assert(invalidStorePurchaseQuantity?.applied === false, "Invalid-quantity Store purchase unexpectedly applied.");
+  assert(invalidStorePurchaseQuantity?.blockReason === "invalid_store_quantity", "Quantity above one Store purchase did not block.");
+  console.log("staging Store list, previews, and default purchase path stayed safe");
 
   const insufficientCreditsPreview = await expectStagingTradePreview(roomA, () => {
     roomA.send("stagingTrade:preview", {

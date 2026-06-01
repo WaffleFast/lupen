@@ -43,6 +43,9 @@
     lastStagingTradeOffers: null,
     lastStagingTradePreview: null,
     lastStagingTradeWriteResult: null,
+    lastStagingStoreItems: null,
+    lastStagingStorePreview: null,
+    lastStagingStorePurchase: null,
     lastError: null
   };
   const identity = {
@@ -1022,6 +1025,116 @@
     };
   }
 
+  function normalizeStagingStoreItem(item) {
+    if (!item || typeof item !== "object") return null;
+
+    return {
+      itemId: String(item.itemId || ""),
+      name: String(item.name || "Store Item"),
+      category: String(item.category || "equipment"),
+      localKind: String(item.localKind || ""),
+      localKey: String(item.localKey || ""),
+      price: Number.isFinite(Number(item.price)) ? Number(item.price) : 0,
+      levelRequirement: Number.isFinite(Number(item.levelRequirement)) ? Number(item.levelRequirement) : 0,
+      stockType: String(item.stockType || "fixed"),
+      description: String(item.description || ""),
+      reference: String(item.reference || "")
+    };
+  }
+
+  function normalizeStagingStorePreview(preview) {
+    if (!preview || typeof preview !== "object") return null;
+
+    return {
+      ok: preview.ok === true,
+      mode: String(preview.mode || "dry_run"),
+      operation: String(preview.operation || "purchase"),
+      applied: preview.applied === true,
+      itemId: String(preview.itemId || ""),
+      name: String(preview.name || "Store Item"),
+      category: String(preview.category || "equipment"),
+      localKind: String(preview.localKind || ""),
+      localKey: String(preview.localKey || ""),
+      quantity: Number.isFinite(Number(preview.quantity)) ? Number(preview.quantity) : 0,
+      unitPrice: Number.isFinite(Number(preview.unitPrice)) ? Number(preview.unitPrice) : 0,
+      totalCost: Number.isFinite(Number(preview.totalCost)) ? Number(preview.totalCost) : 0,
+      creditsAvailable: Number.isFinite(Number(preview.creditsAvailable)) ? Number(preview.creditsAvailable) : null,
+      creditsBefore: Number.isFinite(Number(preview.creditsBefore)) ? Number(preview.creditsBefore) : null,
+      creditsAfterPreview: Number.isFinite(Number(preview.creditsAfterPreview)) ? Number(preview.creditsAfterPreview) : null,
+      creditsAfter: Number.isFinite(Number(preview.creditsAfter)) ? Number(preview.creditsAfter) : null,
+      itemBefore: Number.isFinite(Number(preview.itemBefore)) ? Number(preview.itemBefore) : null,
+      itemAfter: Number.isFinite(Number(preview.itemAfter)) ? Number(preview.itemAfter) : null,
+      wouldPass: preview.wouldPass === true,
+      validationMode: String(preview.validationMode || "unknown"),
+      trustedStateAvailable: preview.trustedStateAvailable === true,
+      snapshotUsed: preview.snapshotUsed === true,
+      gates: preview.gates && typeof preview.gates === "object"
+        ? {
+          verified: preview.gates.verified === true,
+          writeEnabled: preview.gates.writeEnabled === true,
+          dryRun: preview.gates.dryRun === true,
+          allowlisted: preview.gates.allowlisted === true,
+          scope: String(preview.gates.scope || ""),
+          trustedSaveAvailable: preview.gates.trustedSaveAvailable === true,
+          itemAllowed: preview.gates.itemAllowed === true
+        }
+        : null,
+      blockReason: preview.blockReason === null || preview.blockReason === undefined ? null : String(preview.blockReason || ""),
+      userReason: String(preview.userReason || ""),
+      writes: preview.writes && typeof preview.writes === "object"
+        ? {
+          creditsWritten: preview.writes.creditsWritten === true,
+          inventoryWritten: preview.writes.inventoryWritten === true,
+          attachmentWritten: preview.writes.attachmentWritten === true,
+          shipWritten: preview.writes.shipWritten === true,
+          weaponWritten: preview.writes.weaponWritten === true,
+          equipmentWritten: preview.writes.equipmentWritten === true,
+          saveWritten: preview.writes.saveWritten === true,
+          lootWritten: preview.writes.lootWritten === true,
+          bountyWritten: preview.writes.bountyWritten === true
+        }
+        : {
+          creditsWritten: preview.creditsWritten === true,
+          inventoryWritten: preview.inventoryWritten === true,
+          attachmentWritten: preview.attachmentWritten === true,
+          shipWritten: preview.shipWritten === true,
+          weaponWritten: preview.weaponWritten === true,
+          equipmentWritten: preview.equipmentWritten === true,
+          saveWritten: preview.saveWritten === true,
+          lootWritten: preview.lootWritten === true,
+          bountyWritten: preview.bountyWritten === true
+        },
+      creditsWritten: preview.creditsWritten === true || preview.writes?.creditsWritten === true,
+      inventoryWritten: preview.inventoryWritten === true || preview.writes?.inventoryWritten === true,
+      attachmentWritten: preview.attachmentWritten === true || preview.writes?.attachmentWritten === true,
+      shipWritten: preview.shipWritten === true || preview.writes?.shipWritten === true,
+      weaponWritten: preview.weaponWritten === true || preview.writes?.weaponWritten === true,
+      equipmentWritten: preview.equipmentWritten === true || preview.writes?.equipmentWritten === true,
+      saveWritten: preview.saveWritten === true || preview.writes?.saveWritten === true,
+      lootWritten: preview.lootWritten === true || preview.writes?.lootWritten === true,
+      bountyWritten: preview.bountyWritten === true || preview.writes?.bountyWritten === true,
+      appliedFields: Array.isArray(preview.appliedFields)
+        ? preview.appliedFields.map((field) => String(field || "")).filter(Boolean)
+        : [],
+      reason: String(preview.reason || ""),
+      debugReason: String(preview.debugReason || ""),
+      receivedAt: Number.isFinite(Number(preview.receivedAt)) ? Number(preview.receivedAt) : Date.now()
+    };
+  }
+
+  function getStagingStorePlayerSnapshot() {
+    try {
+      const creditsValue = typeof credits !== "undefined" ? Number(credits) : NaN;
+      if (!Number.isFinite(creditsValue)) return null;
+      return {
+        credits: Math.max(0, Math.floor(creditsValue))
+      };
+    } catch (err) {
+      logDev("staging store player snapshot unavailable", err);
+      return null;
+    }
+  }
+
   function getStagingTradePlayerSnapshot() {
     try {
       const creditsValue = typeof credits !== "undefined" ? Number(credits) : NaN;
@@ -1292,6 +1405,40 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("stagingStore:items", (message) => {
+      connection.lastStagingStoreItems = {
+        ok: message?.ok === true,
+        mode: String(message?.mode || "dry_run"),
+        applied: message?.applied === true,
+        items: Array.isArray(message?.items)
+          ? message.items.map(normalizeStagingStoreItem).filter(Boolean)
+          : [],
+        creditsWritten: message?.creditsWritten === true,
+        inventoryWritten: message?.inventoryWritten === true,
+        shipWritten: message?.shipWritten === true,
+        equipmentWritten: message?.equipmentWritten === true,
+        saveWritten: message?.saveWritten === true,
+        lootWritten: message?.lootWritten === true,
+        bountyWritten: message?.bountyWritten === true,
+        reason: String(message?.reason || ""),
+        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+      };
+      logDev("server staging store items", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingStore:previewResult", (message) => {
+      connection.lastStagingStorePreview = normalizeStagingStorePreview(message);
+      logDev("server staging store preview", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingStore:purchaseResult", (message) => {
+      connection.lastStagingStorePurchase = normalizeStagingStorePreview(message);
+      logDev("server staging store purchase", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("target:selected", (message) => {
       connection.lastTargetResponse = {
         ok: message?.ok === true,
@@ -1376,6 +1523,16 @@
         : null,
       lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
       lastStagingTradeWriteResult: connection.lastStagingTradeWriteResult ? { ...connection.lastStagingTradeWriteResult } : null,
+      lastStagingStoreItems: connection.lastStagingStoreItems
+        ? {
+          ...connection.lastStagingStoreItems,
+          items: Array.isArray(connection.lastStagingStoreItems.items)
+            ? connection.lastStagingStoreItems.items.map((item) => ({ ...item }))
+            : []
+        }
+        : null,
+      lastStagingStorePreview: connection.lastStagingStorePreview ? { ...connection.lastStagingStorePreview } : null,
+      lastStagingStorePurchase: connection.lastStagingStorePurchase ? { ...connection.lastStagingStorePurchase } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
@@ -1577,6 +1734,26 @@
         offerId: String(options.offerId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity,
         playerSnapshot: options.playerSnapshot || getStagingTradePlayerSnapshot()
+      });
+    },
+
+    requestStagingStoreItems() {
+      return sendRoomMessage("requestStagingStoreItems", "stagingStore:listItems", {});
+    },
+
+    previewStagingStorePurchase(options = {}) {
+      return sendRoomMessage("previewStagingStorePurchase", "stagingStore:previewPurchase", {
+        itemId: String(options.itemId || ""),
+        quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity || 1,
+        playerSnapshot: options.playerSnapshot || getStagingStorePlayerSnapshot()
+      });
+    },
+
+    purchaseStagingStoreItem(options = {}) {
+      return sendRoomMessage("purchaseStagingStoreItem", "stagingStore:purchase", {
+        itemId: String(options.itemId || ""),
+        quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity || 1,
+        playerSnapshot: options.playerSnapshot || getStagingStorePlayerSnapshot()
       });
     },
 
