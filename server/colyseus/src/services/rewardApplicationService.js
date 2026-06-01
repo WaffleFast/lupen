@@ -104,16 +104,16 @@ export async function applyRewardApplicationPlan(plan = {}, options = {}) {
     };
   }
 
-  // Fail closed until a later sprint deliberately implements trusted
-  // server-side writes to the chosen progression storage target.
+  // The concrete staging write path lives in playerSaveWriteService so this
+  // planning adapter never mutates player_saves directly.
   return {
-    ok: false,
+    ok: true,
     applied: false,
     dryRun: true,
     idempotencyKey: getStringValue(plan?.idempotencyKey),
     idempotencyReady: plan?.idempotencyReady === true,
     duplicateDetected: plan?.duplicateDetected === true,
-    skippedReason: "progression_write_adapter_not_implemented",
+    skippedReason: "player_save_patch_required",
     plan
   };
 }

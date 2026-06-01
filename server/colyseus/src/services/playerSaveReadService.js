@@ -221,7 +221,8 @@ export async function fetchPlayerTradeValidationState(identity = {}, options = {
       ...extracted,
       playerId,
       status,
-      updatedAt: getString(row?.updated_at)
+      updatedAt: getString(row?.updated_at),
+      rawSaveData: saveData
     };
   } catch (_err) {
     return unavailable("player_save_read_failed", {

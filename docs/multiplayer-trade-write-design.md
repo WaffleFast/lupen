@@ -27,6 +27,7 @@ In `?mp=staging`:
 - Phase 5b adds a tiny, heavily gated `stagingTrade:buy` write prototype. It is disabled by default and can patch only root `credits`, root `cargo[resourceName]`, and root `cargoCostBasis[resourceName]` when every staging gate passes.
 - Phase 5c adds post-write reconciliation polish. Successful writes return server after-values, the client displays those values, blocks duplicate pending clicks, and refreshes from Supabase instead of using local trade mutation shortcuts.
 - Phase 5d adds a gated `stagingTrade:sell` write prototype for root `credits`, root `cargo[resourceName]`, and root `cargoCostBasis[resourceName]`. Sell route completion, realized profit, and trade totals remain excluded.
+- Regression coverage now includes a full mocked buy-then-sell sequence with strict gates enabled. It verifies CR/cargo/cost-basis before/after values, read/write sequencing, and preservation of unrelated inventory, bounty, route-total, trade-total, and progression fields.
 
 ## Existing Local Trade Mutation Path
 
@@ -58,6 +59,8 @@ Local sell paths:
 - `sellGood()` removes selected cargo quantity, adds revenue to `credits`, increments `playerProgress.totals.cargoSold`, updates route realized profit, clears cost basis when the resource reaches zero, may complete the route, then calls `saveGame()`.
 
 Cargo capacity is not saved as a direct canonical field. It is derived client-side from `currentShipId`, `SHIPS`, `shipLoadouts`, and attachment effects in `getShipStats()`. A server write path must either share that rules data server-side or reject capacity validation if the derived value is ambiguous.
+
+For the current staging Cargo Pod loop, the equip handler returns the server-derived capacity increase and the client refreshes from Supabase after applied equip. The next staging trade validation then reads the refreshed loadout/capacity path, so buy validation can use the increased hold size. Regression coverage confirms a post-equip buy can use `+25` capacity while trade writes still patch only `credits`, `cargo`, and `cargoCostBasis`.
 
 ## Proposed Server Boundary
 
@@ -200,6 +203,8 @@ Phase 5c/5d client reconciliation rules:
 - disable the staging buy/sell button while the request is pending
 - after `applied:true`, call the existing safe cloud save reload path when available
 - if reload fails or is unavailable, keep showing the server result and tell the tester to reload/reopen to sync full save display
+- keep messaging compact and operation-specific, such as `Server buy applied`, `Server sell applied`, `Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed`, `Blocked: not enough credits`, `Blocked: not enough cargo`, and `Blocked: wrong sell node`
+- keep browser tests smoke/read-only by default; authenticated or live-write browser checks must be separate and explicitly opt-in
 
 ## Result Contracts
 
@@ -213,6 +218,7 @@ Successful Phase 5b/5c/5d buy/sell responses must include sanitized reconciliati
 - `cargoUsedBefore`, `cargoUsedAfter`, `cargoCapacity`
 - `writes.creditsWritten:true`, `writes.cargoWritten:true`, `writes.saveWritten:true`
 - `writes.inventoryWritten:false`, `writes.lootWritten:false`, `writes.bountyWritten:false`
+- no route completion, realized profit, playerProgress trade totals, loot, inventory, bounty, PvP, player damage, schema, RLS, or broad progression writes
 
 Future `stagingTrade:buy` and `stagingTrade:sell` responses should use a shared shape:
 

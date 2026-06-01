@@ -26,14 +26,41 @@ Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Col
 
 Diagnostics remain available with `?debug=mp`.
 
+## Current Capabilities Snapshot
+
+Working server-authoritative staging systems:
+
+- Player presence, remote ship visuals, and server-owned staging bots.
+- Staging bot lock-on, server damage, cooldown, disabled/respawn, contribution, and synced shot visuals.
+- Server-backed trade buy/sell through strict staging gates.
+- Cargo Pod, Pulse Laser, and Shield Booster purchase/equip through strict staging gates.
+- Erebus Patrol Sweep staging bounty progress.
+- XP-only and Lupen Shard claim paths through strict staging gates.
+
+Dry-run or preview systems:
+
+- Store/trade previews when write gates are disabled or unavailable.
+- Reward preview, loot preview, ledger/shadow diagnostics, and most debug details behind `?debug=mp`.
+- Shield Booster shield stat is reflected in loadout/status diagnostics, but player shield damage is not enabled.
+
+Excluded systems:
+
+- PvP, player damage, combat/bounty credits, Store sell, ship writes, weapon/attachment loot writes, broad inventory writes, schema/RLS changes, and broad progression.
+
+Next recommended phases:
+
+- Polish player shield/stat display for equipped Shield Booster in staging.
+- Add durable ledgers/idempotency before any broader economy or loot expansion.
+- Keep PvP/player damage for a much later phase.
+
 ## Player-Facing Staging Loop
 
 Normal `?mp=staging` now shows a compact Multiplayer Staging Loop helper while detailed raw diagnostics stay behind `?debug=mp`. The intended tester path is:
 
 1. Visit the Trade Terminal and earn CR through the server-backed staging trade path.
 2. Buy and equip Cargo Pod through the staging Store/loadout path to increase cargo capacity.
-3. Buy and equip Shield Booster through the staging Store/loadout path to reflect +50 shield in server loadout diagnostics.
-4. Buy and equip Pulse Laser through the staging Store/loadout path to activate server-known Pulse Laser staging damage.
+3. Buy and equip Pulse Laser through the staging Store/loadout path to activate server-known Pulse Laser staging damage.
+4. Buy and equip Shield Booster through the staging Store/loadout path to reflect +50 shield in server loadout diagnostics.
 5. Accept Erebus Patrol Sweep from the staging Bounty Board.
 6. Lock and destroy server-owned staging bots.
 7. Claim XP and Lupen Shard through the gated staging claim buttons.
