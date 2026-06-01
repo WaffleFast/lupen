@@ -2685,8 +2685,11 @@
         if (tradePreview.readStatus) setDiagnosticsRow(panel, "trade read", tradePreview.readStatus);
       }
       if (tradeWrite) {
-        setDiagnosticsRow(panel, "trade write", `${tradeWrite.operation || "trade"} / ${tradeWrite.mode || "dry_run"} / writes ${tradeWrite.saveWritten ? "yes" : "no"}`);
+        setDiagnosticsRow(panel, "trade write", `${tradeWrite.operation || "trade"} / ${tradeWrite.mode || "dry_run"} / applied ${tradeWrite.applied ? "yes" : "no"} / writes ${tradeWrite.saveWritten ? "yes" : "no"}`);
         setDiagnosticsRow(panel, "trade gates", `verified ${tradeWrite.gates?.verified ? "yes" : "no"} / enabled ${tradeWrite.gates?.writeEnabled ? "yes" : "no"} / dry ${tradeWrite.gates?.dryRun ? "yes" : "no"}`);
+        if (tradeWrite.applied) {
+          setDiagnosticsRow(panel, "trade delta", `CR ${formatTradeNumber(tradeWrite.creditsDelta)} / cargo +${formatTradeNumber(tradeWrite.cargoDelta)} ${tradeWrite.resourceName || ""}`);
+        }
       }
     }
     if (status.lastServerWarning) {

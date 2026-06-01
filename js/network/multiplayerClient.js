@@ -962,6 +962,8 @@
       creditsAfter: Number.isFinite(Number(result.creditsAfter)) ? Number(result.creditsAfter) : null,
       cargoBefore: Number.isFinite(Number(result.cargoBefore)) ? Number(result.cargoBefore) : null,
       cargoAfter: Number.isFinite(Number(result.cargoAfter)) ? Number(result.cargoAfter) : null,
+      cargoCostBasisBefore: Number.isFinite(Number(result.cargoCostBasisBefore)) ? Number(result.cargoCostBasisBefore) : null,
+      cargoCostBasisAfter: Number.isFinite(Number(result.cargoCostBasisAfter)) ? Number(result.cargoCostBasisAfter) : null,
       validationMode: String(result.validationMode || "unknown"),
       trustedStateAvailable: result.trustedStateAvailable === true,
       snapshotUsed: result.snapshotUsed === true,
@@ -1005,6 +1007,12 @@
       creditsWritten: result.creditsWritten === true || result.writes?.creditsWritten === true,
       cargoWritten: result.cargoWritten === true || result.writes?.cargoWritten === true,
       saveWritten: result.saveWritten === true || result.writes?.saveWritten === true,
+      inventoryWritten: result.inventoryWritten === true || result.writes?.inventoryWritten === true,
+      lootWritten: result.lootWritten === true || result.writes?.lootWritten === true,
+      bountyWritten: result.bountyWritten === true || result.writes?.bountyWritten === true,
+      appliedFields: Array.isArray(result.appliedFields)
+        ? result.appliedFields.map((field) => String(field || "")).filter(Boolean)
+        : [],
       reason: String(result.reason || ""),
       debugReason: String(result.debugReason || ""),
       receivedAt: Number.isFinite(Number(result.receivedAt)) ? Number(result.receivedAt) : Date.now()
@@ -1271,13 +1279,13 @@
 
     activeRoom.onMessage("stagingTrade:buyResult", (message) => {
       connection.lastStagingTradeWriteResult = normalizeStagingTradeWriteResult(message);
-      logDev("server staging trade buy dry-run", message);
+      logDev("server staging trade buy result", message);
       notifyServerState(activeRoom.state || null);
     });
 
     activeRoom.onMessage("stagingTrade:sellResult", (message) => {
       connection.lastStagingTradeWriteResult = normalizeStagingTradeWriteResult(message);
-      logDev("server staging trade sell dry-run", message);
+      logDev("server staging trade sell result", message);
       notifyServerState(activeRoom.state || null);
     });
 
@@ -1434,6 +1442,7 @@
         room = await colyseusClient.joinOrCreate(connection.roomName, {
           ...localPresence,
           ...identityOptions,
+          multiplayerMode: getMultiplayerMode(),
           displayName: options.displayName || identityOptions.displayName || localPresence.displayName || "Pilot",
           currentNode: options.currentNode || localPresence.currentNode || "Asteron Prime"
         });

@@ -35,6 +35,10 @@ import {
   extractTradeValidationStateFromSave,
   fetchPlayerTradeValidationState
 } from "../src/services/playerSaveReadService.js";
+import {
+  applyStagingTradeBuyWrite,
+  buildStagingTradeBuySavePatch
+} from "../src/services/tradeWriteService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
 const clientA = new Client(endpoint);
@@ -542,7 +546,293 @@ async function assertStagingTradeValidationHelpers() {
   assert(sellUnknownResource.reason === "unknown_resource_cargo", `Unexpected unknown-resource sell reason: ${sellUnknownResource.reason}`);
   assert(sellUnknownResource.writes.saveWritten === false, "Blocked sell write reported save write.");
 
-  console.log("staging trade trusted-save validation helpers stayed read-only");
+  const enabledDryRunGate = buildStagingTradeWriteDryRun({
+    operation: "buy",
+    offerId,
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 0,
+        cargoCapacity: 12,
+        cargoByResource: { Iron: 0 }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a"
+    },
+    env: {
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "true",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_TRADE_WRITE_ALLOWED_OFFERS: offerId
+    }
+  });
+  assert(enabledDryRunGate.gates.writeEnabled === true, "Trade write gate did not see enabled env.");
+  assert(enabledDryRunGate.gates.dryRun === true, "Trade write dry-run env was not preserved.");
+  assert(enabledDryRunGate.applied === false && enabledDryRunGate.saveWritten === false, "Enabled dry-run gate wrote unexpectedly.");
+
+  const enabledWriteGate = buildStagingTradeWriteDryRun({
+    operation: "buy",
+    offerId,
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 0,
+        cargoCapacity: 12,
+        cargoByResource: { Iron: 0 }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a"
+    },
+    env: {
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_TRADE_WRITE_ALLOWED_OFFERS: offerId
+    }
+  });
+  assert(enabledWriteGate.gates.writeEnabled === true, "Trade write gate did not enable writes.");
+  assert(enabledWriteGate.gates.dryRun === false, "Trade write gate did not disable dry-run.");
+  assert(enabledWriteGate.gates.allowlisted === true, "Trade write gate did not allow verified allowlisted player.");
+
+  const notAllowlistedGate = buildStagingTradeWriteDryRun({
+    operation: "buy",
+    offerId,
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 0,
+        cargoCapacity: 12,
+        cargoByResource: { Iron: 0 }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-b"
+    },
+    env: {
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+    }
+  });
+  assert(notAllowlistedGate.gates.allowlisted === false, "Trade write gate allowed a non-allowlisted player.");
+
+  const originalSave = {
+    credits: 1000,
+    cargo: {
+      Iron: 2,
+      Copper: 9
+    },
+    cargoCostBasis: {
+      Iron: 10,
+      Copper: 30
+    },
+    inventoryItems: [{ id: "keep" }],
+    activeBountyId: "bounty-1",
+    playerProgress: {
+      combatXp: 77
+    },
+    nested: {
+      untouched: true
+    }
+  };
+  const patchPlan = buildStagingTradeBuySavePatch(originalSave, {
+    offerId,
+    resourceId: "iron",
+    resourceName: "Iron",
+    buyPrice: 18
+  }, 3, {
+    cargoCapacity: 20
+  });
+  assert(patchPlan.ok === true, `Trade buy patch plan failed: ${patchPlan.reason}`);
+  assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 946, "Trade buy patch did not subtract server cost.");
+  assert(patchPlan.cargoBefore === 2 && patchPlan.cargoAfter === 5, "Trade buy patch did not add cargo resource.");
+  assert(patchPlan.cargoCostBasisAfter === 15, `Unexpected cargo cost basis after buy: ${patchPlan.cargoCostBasisAfter}`);
+  assert(originalSave.credits === 1000 && originalSave.cargo.Iron === 2, "Trade buy patch mutated the original save object.");
+  assert(patchPlan.patchedSaveData.inventoryItems[0].id === "keep", "Trade buy patch changed inventory.");
+  assert(patchPlan.patchedSaveData.activeBountyId === "bounty-1", "Trade buy patch changed bounty state.");
+  assert(patchPlan.patchedSaveData.playerProgress.combatXp === 77, "Trade buy patch changed progression.");
+  assert(patchPlan.patchedSaveData.nested.untouched === true, "Trade buy patch changed unrelated fields.");
+
+  const invalidPatch = buildStagingTradeBuySavePatch({
+    credits: 1000,
+    cargo: { Iron: 0 }
+  }, {
+    offerId,
+    resourceId: "iron",
+    resourceName: "Iron",
+    buyPrice: 18
+  }, 1, {
+    cargoCapacity: 20
+  });
+  assert(invalidPatch.ok === false, "Trade buy patch allowed missing cargoCostBasis.");
+  assert(invalidPatch.reason === "cargo_cost_basis_path_missing_or_invalid", `Unexpected missing cost basis reason: ${invalidPatch.reason}`);
+
+  let fetchCalls = [];
+  const blockedWrite = await applyStagingTradeBuyWrite({
+    playerId: "verified-player-a",
+    offer: {
+      offerId,
+      resourceId: "iron",
+      resourceName: "Iron",
+      buyPrice: 18
+    },
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        cargoCapacity: 20
+      }
+    },
+    env: {},
+    fetchImpl: async (...args) => {
+      fetchCalls.push(args);
+      return { ok: true, status: 200, async json() { return []; } };
+    }
+  });
+  assert(blockedWrite.applied === false, "Trade write applied without Supabase env.");
+  assert(blockedWrite.reason === "staging_trade_writes_disabled", `Unexpected disabled write reason: ${blockedWrite.reason}`);
+  assert(fetchCalls.length === 0, "Trade write attempted fetch without Supabase env.");
+
+  const dryRunBlockedWrite = await applyStagingTradeBuyWrite({
+    playerId: "verified-player-a",
+    offer: {
+      offerId,
+      resourceId: "iron",
+      resourceName: "Iron",
+      buyPrice: 18
+    },
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        cargoCapacity: 20
+      }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "true",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+    },
+    fetchImpl: async (...args) => {
+      fetchCalls.push(args);
+      return { ok: true, status: 200, async json() { return []; } };
+    }
+  });
+  assert(dryRunBlockedWrite.applied === false, "Trade write applied while dry-run env was true.");
+  assert(dryRunBlockedWrite.reason === "staging_trade_dry_run_enabled", `Unexpected dry-run write reason: ${dryRunBlockedWrite.reason}`);
+
+  const allowlistBlockedWrite = await applyStagingTradeBuyWrite({
+    playerId: "verified-player-b",
+    offer: {
+      offerId,
+      resourceId: "iron",
+      resourceName: "Iron",
+      buyPrice: 18
+    },
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        cargoCapacity: 20
+      }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+    },
+    fetchImpl: async (...args) => {
+      fetchCalls.push(args);
+      return { ok: true, status: 200, async json() { return []; } };
+    }
+  });
+  assert(allowlistBlockedWrite.applied === false, "Trade write applied for non-allowlisted player.");
+  assert(allowlistBlockedWrite.reason === "player_not_in_staging_trade_write_allowlist", `Unexpected allowlist write reason: ${allowlistBlockedWrite.reason}`);
+
+  fetchCalls = [];
+  const appliedWrite = await applyStagingTradeBuyWrite({
+    playerId: "verified-player-a",
+    offer: {
+      offerId,
+      resourceId: "iron",
+      resourceName: "Iron",
+      buyPrice: 18
+    },
+    quantity: 2,
+    trustedState: {
+      available: true,
+      validationState: {
+        cargoCapacity: 20
+      }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+    },
+    fetchImpl: async (url, options = {}) => {
+      fetchCalls.push({ url, options });
+      assert(options.headers?.apikey === "stub-service-role", "Trade write did not use service role apikey.");
+      assert((options.headers?.Authorization || options.headers?.authorization) === "Bearer stub-service-role", "Trade write did not use bearer service role.");
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return [{
+              save_data: {
+                credits: 1000,
+                cargo: { Iron: 1, Copper: 4 },
+                cargoCostBasis: { Iron: 12, Copper: 32 },
+                inventoryItems: [{ id: "safe" }],
+                activeBountyId: "unchanged",
+                playerProgress: { combatXp: 10 }
+              }
+            }];
+          }
+        };
+      }
+      assert(options.method === "PATCH", "Trade write used unexpected method.");
+      const body = JSON.parse(options.body);
+      assert(body.save_data.credits === 964, "Trade write PATCH did not contain updated credits.");
+      assert(body.save_data.cargo.Iron === 3, "Trade write PATCH did not contain updated cargo.");
+      assert(body.save_data.cargo.Copper === 4, "Trade write PATCH changed unrelated cargo.");
+      assert(body.save_data.inventoryItems[0].id === "safe", "Trade write PATCH changed inventory.");
+      assert(body.save_data.activeBountyId === "unchanged", "Trade write PATCH changed bounty.");
+      assert(body.save_data.playerProgress.combatXp === 10, "Trade write PATCH changed progression.");
+      return { ok: true, status: 204 };
+    }
+  });
+  assert(fetchCalls.length === 2, `Trade write expected read+patch, got ${fetchCalls.length} calls.`);
+  assert(appliedWrite.applied === true, `Trade write did not apply in mocked enabled path: ${appliedWrite.reason}`);
+  assert(appliedWrite.mode === "trade_write", `Unexpected trade write mode: ${appliedWrite.mode}`);
+  assert(appliedWrite.creditsWritten === true && appliedWrite.cargoWritten === true && appliedWrite.saveWritten === true, "Applied trade write did not report expected writes.");
+  assert(appliedWrite.inventoryWritten === false && appliedWrite.lootWritten === false && appliedWrite.bountyWritten === false, "Applied trade write reported forbidden writes.");
+
+  console.log("staging trade validation and gated buy write helpers passed");
 }
 
 async function assertIdentityVerificationAndRewardPlanHelpers() {

@@ -23,11 +23,15 @@ import {
 import {
   buildStagingTradePreview,
   buildStagingTradeWriteDryRun,
+  getStagingTradeOfferById,
   getStagingTradeOffers
 } from "../config/stagingTradeConfig.js";
 import {
   fetchPlayerTradeValidationState
 } from "../services/playerSaveReadService.js";
+import {
+  applyStagingTradeBuyWrite
+} from "../services/tradeWriteService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -173,6 +177,7 @@ type("string")(LupenSectorPlayer.prototype, "currentShipId");
 type("string")(LupenSectorPlayer.prototype, "shipName");
 type("string")(LupenSectorPlayer.prototype, "shipImage");
 type("string")(LupenSectorPlayer.prototype, "shipClass");
+type("string")(LupenSectorPlayer.prototype, "multiplayerMode");
 type("string")(LupenSectorPlayer.prototype, "currentNode");
 type("string")(LupenSectorPlayer.prototype, "selectedTargetBotId");
 type("number")(LupenSectorPlayer.prototype, "x");
@@ -742,11 +747,11 @@ export class LupenSectorRoom extends Room {
     });
 
     this.onMessage("stagingTrade:buy", async (client, message = {}) => {
-      await this.sendStagingTradeWriteDryRun(client, message, "buy");
+      await this.sendStagingTradeWriteRequest(client, message, "buy");
     });
 
     this.onMessage("stagingTrade:sell", async (client, message = {}) => {
-      await this.sendStagingTradeWriteDryRun(client, message, "sell");
+      await this.sendStagingTradeWriteRequest(client, message, "sell");
     });
 
     // Legacy local prototype alias. New clients should send movement:update.
@@ -778,6 +783,7 @@ export class LupenSectorRoom extends Room {
       shipName: getShipName(options),
       shipImage: getSafeShipImagePath(getShipImageValue(options)),
       shipClass: getSafeShipClass(options),
+      multiplayerMode: getSafeIdentityValue(options.multiplayerMode, "dev"),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
       selectedTargetBotId: "",
       x: getNumberValue(options.x, 50),
@@ -1343,12 +1349,17 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  async sendStagingTradeWriteDryRun(client, message = {}, operation = "buy") {
+  async sendStagingTradeWriteRequest(client, message = {}, operation = "buy") {
     const player = this.touchPlayer(client.sessionId);
-    const trustedState = await fetchPlayerTradeValidationState({
+    const identity = {
       authStatus: player?.authStatus || "guest",
       trustedPlayerId: player?.trustedPlayerId || "",
       playerId: player?.playerId || ""
+    };
+    const trustedState = await fetchPlayerTradeValidationState({
+      authStatus: identity.authStatus,
+      trustedPlayerId: identity.trustedPlayerId,
+      playerId: identity.playerId
     });
     const result = buildStagingTradeWriteDryRun({
       operation,
@@ -1356,15 +1367,62 @@ export class LupenSectorRoom extends Room {
       quantity: message?.quantity,
       playerSnapshot: message?.playerSnapshot,
       trustedState,
-      identity: {
-        authStatus: player?.authStatus || "guest",
-        trustedPlayerId: player?.trustedPlayerId || "",
-        playerId: player?.playerId || ""
-      }
+      identity
     });
+
+    // Phase 5b enables only buy writes, and only after every staging gate is
+    // explicit. Sell remains dry-run until resource/cost-basis validation and
+    // route completion semantics are server-owned.
+    const canAttemptBuyWrite = operation === "buy" &&
+      result.ok === true &&
+      result.wouldPass === true &&
+      result.gates?.writeEnabled === true &&
+      result.gates?.dryRun === false &&
+      result.gates?.verified === true &&
+      result.gates?.allowlisted === true &&
+      result.gates?.trustedSaveAvailable === true &&
+      player?.multiplayerMode === "staging";
+    const stagingModeBlockedBuyWrite = operation === "buy" &&
+      result.ok === true &&
+      result.wouldPass === true &&
+      result.gates?.writeEnabled === true &&
+      result.gates?.dryRun === false &&
+      player?.multiplayerMode !== "staging";
+
+    if (canAttemptBuyWrite) {
+      const offer = getStagingTradeOfferById(message?.offerId);
+      const writeResult = await applyStagingTradeBuyWrite({
+        playerId: identity.trustedPlayerId || identity.playerId,
+        offer,
+        quantity: message?.quantity,
+        trustedState
+      });
+
+      client.send("stagingTrade:buyResult", {
+        ...result,
+        ...writeResult,
+        gates: result.gates,
+        validationMode: result.validationMode,
+        trustedStateAvailable: result.trustedStateAvailable,
+        snapshotUsed: result.snapshotUsed,
+        sessionId: client.sessionId,
+        receivedAt: Date.now()
+      });
+      return;
+    }
 
     client.send(`stagingTrade:${operation}Result`, {
       ...result,
+      reason: stagingModeBlockedBuyWrite
+        ? "staging_mode_required_for_trade_write"
+        : operation === "sell" && result.ok === true
+          ? "staging_trade_sell_dry_run_only"
+          : result.reason,
+      debugReason: stagingModeBlockedBuyWrite
+        ? "client_join_mode_was_not_staging"
+        : operation === "sell" && result.ok === true
+          ? "sell_write_not_enabled_in_phase5b"
+          : result.debugReason,
       sessionId: client.sessionId,
       receivedAt: Date.now()
     });

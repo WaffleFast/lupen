@@ -23,7 +23,9 @@ In `?mp=staging`:
 - Validation can use a verified service-role `player_saves` read, a sanitized client snapshot fallback, or unknown price-preview mode.
 - Preview results always report `applied:false`, `creditsWritten:false`, `cargoWritten:false`, and `saveWritten:false`.
 - The separate Staging Trade Preview overlay remains a dev helper.
-- Phase 5a scaffolding adds `stagingTrade:buy` and `stagingTrade:sell` handlers that return write-shaped dry-run results. They are contract preparation only and never call a save patch/write adapter.
+- Phase 5a scaffolding added `stagingTrade:buy` and `stagingTrade:sell` handlers that return write-shaped dry-run results.
+- Phase 5b adds a tiny, heavily gated `stagingTrade:buy` write prototype. It is disabled by default and can patch only root `credits`, root `cargo[resourceName]`, and root `cargoCostBasis[resourceName]` when every staging gate passes.
+- `stagingTrade:sell` remains dry-run only. Sell route completion, realized profit, trade totals, and cost-basis cleanup are not server-authoritative enough yet.
 
 ## Existing Local Trade Mutation Path
 
@@ -69,12 +71,14 @@ It should expose pure planning helpers and a write adapter:
 - `buildTradeBuyPlan(input, context)`
 - `buildTradeSellPlan(input, context)`
 
-`LupenSectorRoom` has Phase 5a staging messages:
+`LupenSectorRoom` has staging messages:
 
 - `stagingTrade:buy`
 - `stagingTrade:sell`
 
-For Phase 5a, the room passes identity, offer id, operation, quantity, trusted read state, and sanitized snapshot fallback into the staging trade helpers. It does not trust client price, cargo, credits, or profit fields, and it never calls any save patch/write method.
+The room passes identity, offer id, operation, quantity, trusted read state, and sanitized snapshot fallback into the staging trade helpers. It does not trust client price, cargo, credits, or profit fields.
+
+For Phase 5b, `stagingTrade:buy` may call `tradeWriteService.js` only when all gates pass. Otherwise it returns the same dry-run/blocked result shape with write flags false. `stagingTrade:sell` does not call the write adapter.
 
 ## Proposed Buy Path
 
@@ -139,7 +143,7 @@ Phase 5 should not complete bounties, grant loot, write inventory, or alter stor
 
 ## Gate And Env Design
 
-Future env vars:
+Trade write env vars:
 
 - `STAGING_TRADE_WRITE_ENABLED=false`
 - `STAGING_TRADE_WRITE_ALLOWLIST=`
@@ -148,13 +152,13 @@ Future env vars:
 - `STAGING_TRADE_WRITE_ALLOWED_OFFERS=`
 - `STAGING_TRADE_WRITE_DRY_RUN=true`
 
-Default behavior must remain dry-run only.
+Default behavior remains dry-run only.
 
 Real write eligibility requires all of:
 
 - request originated from the staging multiplayer path
 - room is `lupen_sector`
-- operation is `buy` or `sell`
+- operation is `buy`
 - Supabase identity is verified
 - trusted player id exists
 - `STAGING_TRADE_WRITE_ENABLED=true`
@@ -165,13 +169,27 @@ Real write eligibility requires all of:
 - trusted `player_saves` read succeeds
 - cargo capacity can be safely derived server-side
 - credit/cargo validation passes
-- idempotency key is present and not already applied
 
 Any failed gate returns a structured blocked result with all write flags false.
 
+Phase 5b exact gates for a real buy write:
+
+- Colyseus request reaches the staging `lupen_sector` room.
+- `STAGING_TRADE_WRITE_ENABLED=true`.
+- `STAGING_TRADE_WRITE_DRY_RUN=false`.
+- Supabase identity is verified.
+- trusted player id exists.
+- `STAGING_TRADE_WRITE_SCOPE=allowlist` and the verified player id appears in `STAGING_TRADE_WRITE_ALLOWLIST`, or scope is intentionally set to `verified`.
+- `offerId` is known.
+- if `STAGING_TRADE_WRITE_ALLOWED_OFFERS` is present, `offerId` is included.
+- quantity is a positive integer within the offer limit and `STAGING_TRADE_WRITE_MAX_QUANTITY`.
+- trusted service-role `player_saves` read succeeds.
+- root `credits`, root `cargo`, root `cargoCostBasis`, and trusted cargo capacity are valid.
+- server-calculated cost and cargo capacity validation pass.
+
 ## Result Contracts
 
-Phase 5a buy/sell results now use this write-shaped dry-run contract. Real writes remain disabled.
+Phase 5a buy/sell results use this write-shaped dry-run contract. Phase 5b buy results may return `mode:"trade_write"` and `applied:true` only for the gated buy path.
 
 Future `stagingTrade:buy` and `stagingTrade:sell` responses should use a shared shape:
 
@@ -223,15 +241,11 @@ Future `stagingTrade:buy` and `stagingTrade:sell` responses should use a shared 
 
 ## Save Patch Boundaries
 
-Phase 5 prototype may patch only:
+Phase 5b prototype may patch only:
 
 - `credits`
 - `cargo[resourceName]`
 - `cargoCostBasis[resourceName]`
-- optional `activeTradeRoute` fields scoped to the selected offer
-- optional `activeObjective` trade mirror
-- optional `playerProgress.totals.cargoSold`
-- optional `playerProgress.totals.tradeProfit`
 
 It must not patch:
 
@@ -247,7 +261,7 @@ It must not patch:
 - bounty progress
 - player damage or PvP state
 
-The safest first implementation should write only `credits`, `cargo`, and `cargoCostBasis`. Trade totals can remain dry-run until buy/sell behavior is proven.
+The first implementation writes only `credits`, `cargo`, and `cargoCostBasis`. Trade routes, active objectives, trade totals, inventory, loot, bounties, PvP, and player damage remain excluded.
 
 ## Atomicity And Concurrency Risks
 
@@ -283,7 +297,7 @@ This is not true cross-process atomicity. Colyseus Cloud scaling, restarts, and 
 - compare-and-swap using `updated_at` or a save revision column
 - normalized wallet/cargo tables with row-level locks
 
-Recommended least risky first implementation: gated, allowlisted `player_saves` JSON patch for tiny quantities on one staging account, with explicit warnings that it is a prototype, not the final economy model.
+Current least risky implementation: gated, allowlisted `player_saves` JSON patch for tiny buy quantities on staging accounts only, with explicit warnings that it is a prototype, not the final economy model. Because this is a full JSON snapshot patch, it is still vulnerable to cross-process races and should not be broadened without a ledger/RPC/normalized economy design.
 
 ## Supabase And Data Model Considerations
 

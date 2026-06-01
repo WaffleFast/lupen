@@ -276,10 +276,9 @@ export function getStagingTradeWriteConfig(env = process.env) {
 
   return {
     writeEnabled: getBooleanEnv(env.STAGING_TRADE_WRITE_ENABLED, false),
-    // Phase 5a intentionally forces dry-run/write-free behavior even if env
-    // flags are accidentally enabled. A later phase must deliberately remove
-    // this force once a real write adapter has been reviewed.
-    dryRun: true,
+    // Defaults to dry-run. Phase 5b real buy writes require this env flag to
+    // be explicitly false plus all other staging identity/save gates.
+    dryRun: getBooleanEnv(env.STAGING_TRADE_WRITE_DRY_RUN, true),
     envDryRun: getBooleanEnv(env.STAGING_TRADE_WRITE_DRY_RUN, true),
     scope,
     allowlistPresent: allowlist.size > 0,
@@ -300,7 +299,7 @@ function getTradeWriteGates({ identity = {}, trustedState = null, config = getSt
   return {
     verified,
     writeEnabled: config.writeEnabled === true,
-    dryRun: true,
+    dryRun: config.dryRun !== false,
     allowlisted,
     scope: config.scope,
     trustedSaveAvailable: trustedState?.available === true,

@@ -17,7 +17,7 @@ function isMultiplayerStagingActive() {
 function blockRealTradeMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingActive()) return false;
 
-  const message = "Real trade is disabled in multiplayer staging. Server preview is dry-run only.";
+  const message = "Local trade writes are disabled in multiplayer staging. Server staging trade handles validation.";
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof console !== "undefined" && typeof console.info === "function") {
@@ -107,15 +107,24 @@ function renderMultiplayerStagingTradePreviewResult(offerId) {
   const debugLine = new URLSearchParams(window.location.search).get("debug") === "mp"
     ? `<span>${result.validationMode || "unknown"} / trusted ${result.trustedStateAvailable ? "yes" : "no"} / snapshot ${result.snapshotUsed ? "yes" : "no"}</span>`
     : "";
+  const applied = result.applied === true && result.mode === "trade_write";
+  const resultTitle = applied ? "MP staging: server buy applied" : "MP staging: server preview only";
+  const operationLabel = result.operation
+    ? `${result.operation.toUpperCase()} ${applied ? "write" : "dry-run"} / `
+    : "";
+  const writeLine = applied
+    ? `<span>Staging buy applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))} / Cargo +${formatNumber(result.cargoDelta)} ${result.resourceName || "resource"}</span>
+      <span>Reload or cloud-save refresh may be needed for the local UI to reflect the patched save.</span>`
+    : `<span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>`;
 
   return `
     <div class="trade-preview-note">
-      <strong>MP staging: server preview only</strong>
-      <span>${result.operation ? `${result.operation.toUpperCase()} dry-run / ` : ""}Cost CR ${formatNumber(result.totalCost ?? result.cost)} / Revenue CR ${formatNumber(result.projectedRevenue ?? result.revenue)} / Profit ${(result.projectedProfit ?? result.profitPreview) >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(result.projectedProfit ?? result.profitPreview))}</span>
+      <strong>${resultTitle}</strong>
+      <span>${operationLabel}Cost CR ${formatNumber(result.totalCost ?? result.cost)} / Revenue CR ${formatNumber(result.projectedRevenue ?? result.revenue)} / Profit ${(result.projectedProfit ?? result.profitPreview) >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(result.projectedProfit ?? result.profitPreview))}</span>
       <span>${getMultiplayerStagingTradeValidationLabel(result)}</span>
       <span>${getMultiplayerStagingTradeSourceLabel(result)}</span>
       ${debugLine}
-      <span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>
+      ${writeLine}
     </div>
   `;
 }
@@ -143,7 +152,7 @@ function requestMultiplayerStagingTradeDryRun({ operation = "buy", offerId = "",
   } else {
     window.LupenMultiplayerClient.requestStagingTradePreview({ offerId, quantity });
   }
-  if (typeof addHudToast === "function") addHudToast(`Requested MP staging ${operation} dry-run. No credits or cargo changed.`);
+  if (typeof addHudToast === "function") addHudToast(`Requested MP staging ${operation} server validation.`);
   window.setTimeout(() => {
     if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
   }, 350);
@@ -501,7 +510,7 @@ function renderMapOneMarketTerminal(goodsBox) {
             <div class="market-amount-control">
               <strong>${formatNumber(quantity)} units</strong>
               <button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
-              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? "Dry-run Buy" : "Preview Unavailable" : "Buy Cargo"}</button>
+              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? "Server Buy" : "Preview Unavailable" : "Buy Cargo"}</button>
             </div>
           </label>
         </div>
