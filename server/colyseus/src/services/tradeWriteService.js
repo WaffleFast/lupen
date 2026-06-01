@@ -1,8 +1,8 @@
 /* Staging-only server-authoritative trade write prototype.
    This service is deliberately narrow: it can patch verified player_saves for
-   a buy operation only, and only after the room/config gates have already
-   passed. It never writes inventory, loot, bounties, PvP/player damage, or
-   broad progression fields. */
+   allowlisted buy/sell operations only after the room/config gates pass. It
+   never writes inventory, loot, bounties, PvP/player damage, or broad
+   progression fields. */
 
 const PLAYER_SAVES_TABLE = "player_saves";
 const MAX_CREDITS = 999999999;
@@ -103,10 +103,11 @@ function getTradeWriteFlags(applied = false) {
 }
 
 function getBlockedResult(reason, extra = {}) {
+  const operation = extra.operation || "buy";
   return {
     ok: false,
     mode: "blocked",
-    operation: "buy",
+    operation,
     applied: false,
     dryRun: true,
     reason,
@@ -118,7 +119,8 @@ function getBlockedResult(reason, extra = {}) {
     inventoryWritten: false,
     lootWritten: false,
     bountyWritten: false,
-    ...extra
+    ...extra,
+    operation
   };
 }
 
@@ -195,6 +197,80 @@ export function buildStagingTradeBuySavePatch(saveData = {}, offer = {}, quantit
     patchedSaveData,
     appliedFields: ["credits", "cargo", "cargoCostBasis"],
     untouchedFields: ["inventory", "loot", "bounties", "PvP", "playerDamage", "progression"]
+  };
+}
+
+export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quantity = 1, context = {}) {
+  if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) {
+    return getBlockedResult("save_data_missing_or_invalid", { operation: "sell" });
+  }
+
+  const safeQuantity = clampInteger(quantity, 1, MAX_CARGO);
+  const sellPrice = clampInteger(offer.sellPrice, 0, MAX_CREDITS);
+  const resourceName = getString(offer.resourceName);
+  const resourceId = getString(offer.resourceId);
+  const offerId = getString(offer.offerId);
+  if (!safeQuantity || !resourceName || !offerId || sellPrice === null || sellPrice <= 0) {
+    return getBlockedResult("trade_offer_invalid", { operation: "sell" });
+  }
+
+  const creditsBefore = clampInteger(saveData.credits, 0, MAX_CREDITS);
+  const cargo = saveData.cargo;
+  const cargoCostBasis = saveData.cargoCostBasis;
+  if (creditsBefore === null) return getBlockedResult("credits_path_missing_or_invalid", { operation: "sell" });
+  if (!cargo || typeof cargo !== "object" || Array.isArray(cargo)) return getBlockedResult("cargo_path_missing_or_invalid", { operation: "sell" });
+  if (!cargoCostBasis || typeof cargoCostBasis !== "object" || Array.isArray(cargoCostBasis)) {
+    return getBlockedResult("cargo_cost_basis_path_missing_or_invalid", { operation: "sell" });
+  }
+
+  const cargoCapacity = clampInteger(context.cargoCapacity, 0, MAX_CARGO);
+  if (cargoCapacity === null) return getBlockedResult("trusted_cargo_capacity_required", { operation: "sell" });
+
+  const resourceBefore = clampInteger(cargo[resourceName], 0, MAX_CARGO) || 0;
+  if (resourceBefore < safeQuantity) return getBlockedResult("insufficient_resource_cargo", { operation: "sell" });
+
+  const cargoUsedBefore = getCargoUsed(cargo);
+  const basisBefore = clampInteger(cargoCostBasis[resourceName], 0, MAX_CREDITS);
+  if (basisBefore === null) return getBlockedResult("cargo_cost_basis_resource_missing_or_invalid", { operation: "sell" });
+
+  const revenue = sellPrice * safeQuantity;
+  const resourceAfter = Math.max(0, resourceBefore - safeQuantity);
+  const patchedSaveData = cloneJson(saveData);
+  patchedSaveData.credits = Math.min(MAX_CREDITS, creditsBefore + revenue);
+  patchedSaveData.cargo[resourceName] = resourceAfter;
+  if (resourceAfter <= 0) {
+    delete patchedSaveData.cargoCostBasis[resourceName];
+  } else {
+    // cargoCostBasis is an average unit basis in the local save. A partial
+    // sale leaves the remaining cargo's unit basis unchanged.
+    patchedSaveData.cargoCostBasis[resourceName] = basisBefore;
+  }
+
+  return {
+    ok: true,
+    mode: "trade_write_plan",
+    operation: "sell",
+    applied: false,
+    dryRun: true,
+    offerId,
+    resourceId,
+    resourceName,
+    quantity: safeQuantity,
+    revenue,
+    creditsDelta: revenue,
+    cargoDelta: -safeQuantity,
+    creditsBefore,
+    creditsAfter: patchedSaveData.credits,
+    cargoBefore: resourceBefore,
+    cargoAfter: resourceAfter,
+    cargoUsedBefore,
+    cargoUsedAfter: Math.max(0, cargoUsedBefore - safeQuantity),
+    cargoCapacity,
+    cargoCostBasisBefore: basisBefore,
+    cargoCostBasisAfter: resourceAfter <= 0 ? null : basisBefore,
+    patchedSaveData,
+    appliedFields: ["credits", "cargo", "cargoCostBasis"],
+    untouchedFields: ["inventory", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeTotals"]
   };
 }
 
@@ -364,7 +440,112 @@ export async function applyStagingTradeBuyWrite({
   }
 }
 
+export async function applyStagingTradeSellWrite({
+  playerId = "",
+  offer = null,
+  quantity = 1,
+  trustedState = null,
+  env = process.env,
+  fetchImpl = globalThis.fetch
+} = {}) {
+  const safePlayerId = getString(playerId);
+  if (!safePlayerId) return getBlockedResult("verified_player_required", { operation: "sell" });
+  if (!offer) return getBlockedResult("unknown_trade_offer", { operation: "sell" });
+  if (!trustedState?.available || !trustedState?.validationState) {
+    return getBlockedResult("trusted_save_required", { operation: "sell" });
+  }
+  if (typeof fetchImpl !== "function") return getBlockedResult("fetch_unavailable", { operation: "sell" });
+
+  const envGate = getTradeWriteEnvGate(safePlayerId, env);
+  if (!envGate.writeEnabled) return getBlockedResult("staging_trade_writes_disabled", { operation: "sell", envGate });
+  if (envGate.dryRun) return getBlockedResult("staging_trade_dry_run_enabled", { operation: "sell", envGate });
+  if (!envGate.playerAllowed) {
+    return getBlockedResult(envGate.scope === "allowlist" && !envGate.allowlistPresent
+      ? "staging_trade_write_allowlist_missing"
+      : "player_not_in_staging_trade_write_allowlist", { operation: "sell", envGate });
+  }
+
+  const config = getSupabaseConfig(env);
+  const baseUrl = getValidSupabaseUrl(config.url);
+  if (!baseUrl || !config.serviceRoleKey) return getBlockedResult("supabase_config_missing", { operation: "sell" });
+
+  try {
+    const readResult = await fetchPlayerSaveRow(baseUrl, safePlayerId, config, fetchImpl);
+    if (!readResult.ok) {
+      return getBlockedResult(readResult.reason, { operation: "sell", status: readResult.status });
+    }
+
+    const saveData = getSaveDataFromRow(readResult.row);
+    const patchPlan = buildStagingTradeSellSavePatch(saveData, offer, quantity, {
+      cargoCapacity: trustedState.validationState.cargoCapacity
+    });
+    if (!patchPlan.ok) {
+      return {
+        ...patchPlan,
+        offerId: offer.offerId || "",
+        resourceId: offer.resourceId || "",
+        resourceName: offer.resourceName || "",
+        quantity: Number(quantity) || 0
+      };
+    }
+
+    const patchResult = await patchPlayerSaveData(baseUrl, safePlayerId, patchPlan.patchedSaveData, config, fetchImpl);
+    if (!patchResult.ok) {
+      return getBlockedResult(patchResult.reason, {
+        operation: "sell",
+        status: patchResult.status,
+        offerId: offer.offerId,
+        resourceId: offer.resourceId,
+        resourceName: offer.resourceName,
+        quantity: patchPlan.quantity
+      });
+    }
+
+    return {
+      ok: true,
+      mode: "trade_write",
+      operation: "sell",
+      applied: true,
+      dryRun: false,
+      reason: "Staging trade sell applied",
+      debugReason: "phase5d_staging_trade_sell_write_applied",
+      offerId: offer.offerId,
+      resourceId: offer.resourceId,
+      resourceName: offer.resourceName,
+      quantity: patchPlan.quantity,
+      revenue: patchPlan.revenue,
+      creditsDelta: patchPlan.creditsDelta,
+      cargoDelta: patchPlan.cargoDelta,
+      creditsBefore: patchPlan.creditsBefore,
+      creditsAfter: patchPlan.creditsAfter,
+      cargoBefore: patchPlan.cargoBefore,
+      cargoAfter: patchPlan.cargoAfter,
+      cargoUsedBefore: patchPlan.cargoUsedBefore,
+      cargoUsedAfter: patchPlan.cargoUsedAfter,
+      cargoCapacity: patchPlan.cargoCapacity,
+      cargoCostBasisBefore: patchPlan.cargoCostBasisBefore,
+      cargoCostBasisAfter: patchPlan.cargoCostBasisAfter,
+      status: patchResult.status,
+      appliedFields: patchPlan.appliedFields,
+      writes: getTradeWriteFlags(true),
+      creditsWritten: true,
+      cargoWritten: true,
+      saveWritten: true,
+      inventoryWritten: false,
+      lootWritten: false,
+      bountyWritten: false
+    };
+  } catch (_err) {
+    return getBlockedResult("staging_trade_write_failed", {
+      operation: "sell",
+      status: 0
+    });
+  }
+}
+
 export const TradeWriteService = Object.freeze({
   buildStagingTradeBuySavePatch,
-  applyStagingTradeBuyWrite
+  buildStagingTradeSellSavePatch,
+  applyStagingTradeBuyWrite,
+  applyStagingTradeSellWrite
 });

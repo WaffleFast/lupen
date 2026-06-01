@@ -25,8 +25,8 @@ In `?mp=staging`:
 - The separate Staging Trade Preview overlay remains a dev helper.
 - Phase 5a scaffolding added `stagingTrade:buy` and `stagingTrade:sell` handlers that return write-shaped dry-run results.
 - Phase 5b adds a tiny, heavily gated `stagingTrade:buy` write prototype. It is disabled by default and can patch only root `credits`, root `cargo[resourceName]`, and root `cargoCostBasis[resourceName]` when every staging gate passes.
-- Phase 5c adds post-write reconciliation polish. Successful buy writes return server after-values, the client displays those values, blocks duplicate pending clicks, and refreshes from Supabase instead of using local trade mutation shortcuts.
-- `stagingTrade:sell` remains dry-run only. Sell route completion, realized profit, trade totals, and cost-basis cleanup are not server-authoritative enough yet.
+- Phase 5c adds post-write reconciliation polish. Successful writes return server after-values, the client displays those values, blocks duplicate pending clicks, and refreshes from Supabase instead of using local trade mutation shortcuts.
+- Phase 5d adds a gated `stagingTrade:sell` write prototype for root `credits`, root `cargo[resourceName]`, and root `cargoCostBasis[resourceName]`. Sell route completion, realized profit, and trade totals remain excluded.
 
 ## Existing Local Trade Mutation Path
 
@@ -79,7 +79,7 @@ It should expose pure planning helpers and a write adapter:
 
 The room passes identity, offer id, operation, quantity, trusted read state, and sanitized snapshot fallback into the staging trade helpers. It does not trust client price, cargo, credits, or profit fields.
 
-For Phase 5b, `stagingTrade:buy` may call `tradeWriteService.js` only when all gates pass. Otherwise it returns the same dry-run/blocked result shape with write flags false. `stagingTrade:sell` does not call the write adapter.
+For Phase 5b/5d, `stagingTrade:buy` and `stagingTrade:sell` may call `tradeWriteService.js` only when all gates pass. Otherwise they return the same dry-run/blocked result shape with write flags false.
 
 ## Proposed Buy Path
 
@@ -159,7 +159,7 @@ Real write eligibility requires all of:
 
 - request originated from the staging multiplayer path
 - room is `lupen_sector`
-- operation is `buy`
+- operation is `buy` or `sell`
 - Supabase identity is verified
 - trusted player id exists
 - `STAGING_TRADE_WRITE_ENABLED=true`
@@ -173,7 +173,7 @@ Real write eligibility requires all of:
 
 Any failed gate returns a structured blocked result with all write flags false.
 
-Phase 5b exact gates for a real buy write:
+Phase 5b/5d exact gates for a real buy or sell write:
 
 - Colyseus request reaches the staging `lupen_sector` room.
 - `STAGING_TRADE_WRITE_ENABLED=true`.
@@ -187,24 +187,27 @@ Phase 5b exact gates for a real buy write:
 - trusted service-role `player_saves` read succeeds.
 - root `credits`, root `cargo`, root `cargoCostBasis`, and trusted cargo capacity are valid.
 - server-calculated cost and cargo capacity validation pass.
+- sell-specific: the player's server presence node must match the offer's `sellNode`.
+- sell-specific: `cargo[resourceName] >= quantity`.
+- sell-specific: `cargoCostBasis[resourceName]` must be numeric.
 
-Phase 5c client reconciliation rules:
+Phase 5c/5d client reconciliation rules:
 
 - never call the old local buy/sell mutation path after a server write
 - show server `creditsBefore` -> `creditsAfter`
 - show server resource cargo `cargoBefore` -> `cargoAfter`
 - show server hold usage `cargoUsedBefore` -> `cargoUsedAfter` of `cargoCapacity`
-- disable the staging buy button while the request is pending
+- disable the staging buy/sell button while the request is pending
 - after `applied:true`, call the existing safe cloud save reload path when available
 - if reload fails or is unavailable, keep showing the server result and tell the tester to reload/reopen to sync full save display
 
 ## Result Contracts
 
-Phase 5a buy/sell results use this write-shaped dry-run contract. Phase 5b buy results may return `mode:"trade_write"` and `applied:true` only for the gated buy path.
+Phase 5a buy/sell results use this write-shaped dry-run contract. Phase 5b/5d buy and sell results may return `mode:"trade_write"` and `applied:true` only for gated paths.
 
-Successful Phase 5b/5c buy responses must include sanitized reconciliation fields:
+Successful Phase 5b/5c/5d buy/sell responses must include sanitized reconciliation fields:
 
-- `resourceId`, `resourceName`, `quantity`, `cost`
+- `resourceId`, `resourceName`, `quantity`, `cost` for buy or `revenue` for sell
 - `creditsBefore`, `creditsAfter`
 - `cargoBefore`, `cargoAfter`
 - `cargoUsedBefore`, `cargoUsedAfter`, `cargoCapacity`
@@ -261,7 +264,7 @@ Future `stagingTrade:buy` and `stagingTrade:sell` responses should use a shared 
 
 ## Save Patch Boundaries
 
-Phase 5b prototype may patch only:
+Phase 5b/5d prototype may patch only:
 
 - `credits`
 - `cargo[resourceName]`
@@ -281,7 +284,7 @@ It must not patch:
 - bounty progress
 - player damage or PvP state
 
-The first implementation writes only `credits`, `cargo`, and `cargoCostBasis`. Trade routes, active objectives, trade totals, inventory, loot, bounties, PvP, and player damage remain excluded.
+The first implementation writes only `credits`, `cargo`, and `cargoCostBasis`. For partial sells, the average unit cost basis remains unchanged. When all units of a resource are sold, the resource cargo is set to `0` and that resource cost basis is removed. Trade routes, active objectives, trade totals, inventory, loot, bounties, PvP, and player damage remain excluded.
 
 ## Atomicity And Concurrency Risks
 
@@ -317,7 +320,7 @@ This is not true cross-process atomicity. Colyseus Cloud scaling, restarts, and 
 - compare-and-swap using `updated_at` or a save revision column
 - normalized wallet/cargo tables with row-level locks
 
-Current least risky implementation: gated, allowlisted `player_saves` JSON patch for tiny buy quantities on staging accounts only, with explicit warnings that it is a prototype, not the final economy model. Because this is a full JSON snapshot patch, it is still vulnerable to cross-process races and should not be broadened without a ledger/RPC/normalized economy design.
+Current least risky implementation: gated, allowlisted `player_saves` JSON patch for tiny buy/sell quantities on staging accounts only, with explicit warnings that it is a prototype, not the final economy model. Because this is a full JSON snapshot patch, it is still vulnerable to cross-process races and should not be broadened without a ledger/RPC/normalized economy design.
 
 ## Supabase And Data Model Considerations
 

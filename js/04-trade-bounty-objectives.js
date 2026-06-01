@@ -119,7 +119,7 @@ function getMultiplayerStagingTradeSyncLine(result) {
 }
 
 async function reconcileMultiplayerStagingTradeWrite(result) {
-  if (!isMultiplayerStagingActive() || !result?.applied || result.operation !== "buy") return;
+  if (!isMultiplayerStagingActive() || !result?.applied || !["buy", "sell"].includes(result.operation)) return;
   if (multiplayerStagingTradeLastHandledAt >= Number(result.receivedAt || 0)) return;
   multiplayerStagingTradeLastHandledAt = Number(result.receivedAt || Date.now());
   multiplayerStagingTradePending = null;
@@ -129,7 +129,8 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
     reason: ""
   };
 
-  const summary = `Staging buy applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))}, cargo +${formatNumber(result.cargoDelta)} ${result.resourceName || "resource"}.`;
+  const cargoSign = result.cargoDelta < 0 ? "-" : "+";
+  const summary = `Staging ${result.operation} applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))}, cargo ${cargoSign}${formatNumber(Math.abs(result.cargoDelta))} ${result.resourceName || "resource"}.`;
   if (typeof addHudToast === "function") addHudToast(summary);
   if (typeof addActivityLog === "function") addActivityLog(`${summary} Refreshing cloud save.`);
 
@@ -188,12 +189,12 @@ function renderMultiplayerStagingTradePreviewResult(offerId) {
     ? `<span>${result.validationMode || "unknown"} / trusted ${result.trustedStateAvailable ? "yes" : "no"} / snapshot ${result.snapshotUsed ? "yes" : "no"}</span>`
     : "";
   const applied = result.applied === true && result.mode === "trade_write";
-  const resultTitle = applied ? "MP staging: server buy applied" : "MP staging: server preview only";
+  const resultTitle = applied ? `MP staging: server ${result.operation || "trade"} applied` : "MP staging: server preview only";
   const operationLabel = result.operation
     ? `${result.operation.toUpperCase()} ${applied ? "write" : "dry-run"} / `
     : "";
   const writeLine = applied
-    ? `<span>Staging buy applied: CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(result.creditsAfter)} (${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))})</span>
+    ? `<span>Staging ${result.operation || "trade"} applied: CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(result.creditsAfter)} (${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))})</span>
       <span>${result.resourceName || "Cargo"} ${formatNumber(result.cargoBefore)} -> ${formatNumber(result.cargoAfter)} / hold ${formatNumber(result.cargoUsedBefore)} -> ${formatNumber(result.cargoUsedAfter)} of ${formatNumber(result.cargoCapacity)}</span>
       <span>${getMultiplayerStagingTradeSyncLine(result)}</span>`
     : `<span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>`;
@@ -628,7 +629,7 @@ function renderMapOneMarketTerminal(goodsBox) {
         </div>
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
-          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer && !sellPending ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? sellPending ? "Checking..." : "Dry-run Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
+          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer && !sellPending ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? sellPending ? "Applying..." : "Server Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
       </aside>
     </div>

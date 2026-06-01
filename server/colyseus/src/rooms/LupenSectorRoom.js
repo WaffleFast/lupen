@@ -30,7 +30,8 @@ import {
   fetchPlayerTradeValidationState
 } from "../services/playerSaveReadService.js";
 import {
-  applyStagingTradeBuyWrite
+  applyStagingTradeBuyWrite,
+  applyStagingTradeSellWrite
 } from "../services/tradeWriteService.js";
 
 const KNOWN_SECTOR_NODES = new Set([
@@ -1370,9 +1371,13 @@ export class LupenSectorRoom extends Room {
       identity
     });
 
-    // Phase 5b enables only buy writes, and only after every staging gate is
-    // explicit. Sell remains dry-run until resource/cost-basis validation and
-    // route completion semantics are server-owned.
+    const offer = getStagingTradeOfferById(message?.offerId);
+    const playerNode = String(player?.currentNode || "");
+    const sellDestinationValid = operation !== "sell" || (offer?.sellNode && playerNode === offer.sellNode);
+
+    // Phase 5b/5d writes are only attempted after every staging gate is
+    // explicit. Sell additionally requires the player's server presence node
+    // to match the server offer's sell destination.
     const canAttemptBuyWrite = operation === "buy" &&
       result.ok === true &&
       result.wouldPass === true &&
@@ -1382,15 +1387,31 @@ export class LupenSectorRoom extends Room {
       result.gates?.allowlisted === true &&
       result.gates?.trustedSaveAvailable === true &&
       player?.multiplayerMode === "staging";
-    const stagingModeBlockedBuyWrite = operation === "buy" &&
+    const canAttemptSellWrite = operation === "sell" &&
+      result.ok === true &&
+      result.wouldPass === true &&
+      result.gates?.writeEnabled === true &&
+      result.gates?.dryRun === false &&
+      result.gates?.verified === true &&
+      result.gates?.allowlisted === true &&
+      result.gates?.trustedSaveAvailable === true &&
+      player?.multiplayerMode === "staging" &&
+      sellDestinationValid;
+    const stagingModeBlockedWrite = (operation === "buy" || operation === "sell") &&
       result.ok === true &&
       result.wouldPass === true &&
       result.gates?.writeEnabled === true &&
       result.gates?.dryRun === false &&
       player?.multiplayerMode !== "staging";
+    const sellDestinationBlocked = operation === "sell" &&
+      result.ok === true &&
+      result.wouldPass === true &&
+      result.gates?.writeEnabled === true &&
+      result.gates?.dryRun === false &&
+      player?.multiplayerMode === "staging" &&
+      !sellDestinationValid;
 
     if (canAttemptBuyWrite) {
-      const offer = getStagingTradeOfferById(message?.offerId);
       const writeResult = await applyStagingTradeBuyWrite({
         playerId: identity.trustedPlayerId || identity.playerId,
         offer,
@@ -1411,17 +1432,38 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
+    if (canAttemptSellWrite) {
+      const writeResult = await applyStagingTradeSellWrite({
+        playerId: identity.trustedPlayerId || identity.playerId,
+        offer,
+        quantity: message?.quantity,
+        trustedState
+      });
+
+      client.send("stagingTrade:sellResult", {
+        ...result,
+        ...writeResult,
+        gates: result.gates,
+        validationMode: result.validationMode,
+        trustedStateAvailable: result.trustedStateAvailable,
+        snapshotUsed: result.snapshotUsed,
+        sessionId: client.sessionId,
+        receivedAt: Date.now()
+      });
+      return;
+    }
+
     client.send(`stagingTrade:${operation}Result`, {
       ...result,
-      reason: stagingModeBlockedBuyWrite
+      reason: stagingModeBlockedWrite
         ? "staging_mode_required_for_trade_write"
-        : operation === "sell" && result.ok === true
-          ? "staging_trade_sell_dry_run_only"
+        : sellDestinationBlocked
+          ? "invalid_staging_trade_sell_destination"
           : result.reason,
-      debugReason: stagingModeBlockedBuyWrite
+      debugReason: stagingModeBlockedWrite
         ? "client_join_mode_was_not_staging"
-        : operation === "sell" && result.ok === true
-          ? "sell_write_not_enabled_in_phase5b"
+        : sellDestinationBlocked
+          ? `player_node_${playerNode || "unknown"}_does_not_match_${offer?.sellNode || "unknown"}`
           : result.debugReason,
       sessionId: client.sessionId,
       receivedAt: Date.now()

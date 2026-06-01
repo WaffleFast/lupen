@@ -37,7 +37,9 @@ import {
 } from "../src/services/playerSaveReadService.js";
 import {
   applyStagingTradeBuyWrite,
-  buildStagingTradeBuySavePatch
+  applyStagingTradeSellWrite,
+  buildStagingTradeBuySavePatch,
+  buildStagingTradeSellSavePatch
 } from "../src/services/tradeWriteService.js";
 
 const endpoint = process.env.COLYSEUS_ENDPOINT || "ws://localhost:2567";
@@ -293,12 +295,17 @@ async function assertStagingTradeValidationHelpers() {
       Iron: 3,
       "Crystal Shards": 2
     },
+    cargoCostBasis: {
+      Iron: 12,
+      "Crystal Shards": 80
+    },
     cargoCapacity: 20
   });
   assert(extracted.available === true, "Trusted trade save state was not extracted.");
   assert(extracted.validationState.credits === 500, "Trusted trade credits were not extracted.");
   assert(extracted.validationState.cargoUsed === 5, "Trusted trade cargo used was not summed.");
   assert(extracted.validationState.cargoCapacity === 20, "Trusted trade cargo capacity was not extracted.");
+  assert(extracted.validationState.cargoCostBasisByResource.Iron === 12, "Trusted trade cargo cost basis was not extracted.");
   assert(extracted.stateSources.credits === "trusted_save", "Trusted trade credits source was not marked trusted.");
 
   const malformed = extractTradeValidationStateFromSave({
@@ -333,6 +340,9 @@ async function assertStagingTradeValidationHelpers() {
               credits: 1000,
               cargo: {
                 Iron: 4
+              },
+              cargoCostBasis: {
+                Iron: 18
               },
               cargoCapacity: 12
             }
@@ -834,6 +844,123 @@ async function assertStagingTradeValidationHelpers() {
   assert(appliedWrite.creditsBefore === 1000 && appliedWrite.creditsAfter === 964, "Applied trade write did not include credit after-values.");
   assert(appliedWrite.cargoBefore === 1 && appliedWrite.cargoAfter === 3, "Applied trade write did not include resource cargo after-values.");
   assert(appliedWrite.cargoUsedBefore === 5 && appliedWrite.cargoUsedAfter === 7 && appliedWrite.cargoCapacity === 20, "Applied trade write did not include cargo hold after-values.");
+
+  const sellPatchPlan = buildStagingTradeSellSavePatch({
+    credits: 1000,
+    cargo: { Iron: 5, Copper: 2 },
+    cargoCostBasis: { Iron: 15, Copper: 32 },
+    inventoryItems: [{ id: "kept" }],
+    activeBountyId: "bounty-safe",
+    playerProgress: { combatXp: 22 }
+  }, {
+    offerId,
+    resourceId: "iron",
+    resourceName: "Iron",
+    sellPrice: 25
+  }, 3, {
+    cargoCapacity: 20
+  });
+  assert(sellPatchPlan.ok === true, `Trade sell patch plan failed: ${sellPatchPlan.reason}`);
+  assert(sellPatchPlan.creditsBefore === 1000 && sellPatchPlan.creditsAfter === 1075, "Trade sell patch did not add server revenue.");
+  assert(sellPatchPlan.cargoBefore === 5 && sellPatchPlan.cargoAfter === 2, "Trade sell patch did not subtract cargo resource.");
+  assert(sellPatchPlan.cargoCostBasisAfter === 15, "Trade sell partial patch changed unit cost basis.");
+  assert(sellPatchPlan.patchedSaveData.inventoryItems[0].id === "kept", "Trade sell patch changed inventory.");
+  assert(sellPatchPlan.patchedSaveData.activeBountyId === "bounty-safe", "Trade sell patch changed bounty.");
+  assert(sellPatchPlan.patchedSaveData.playerProgress.combatXp === 22, "Trade sell patch changed progression.");
+
+  const sellAllPatchPlan = buildStagingTradeSellSavePatch({
+    credits: 1000,
+    cargo: { Iron: 3 },
+    cargoCostBasis: { Iron: 15 }
+  }, {
+    offerId,
+    resourceId: "iron",
+    resourceName: "Iron",
+    sellPrice: 25
+  }, 3, {
+    cargoCapacity: 20
+  });
+  assert(sellAllPatchPlan.ok === true, "Trade sell-all patch did not succeed.");
+  assert(sellAllPatchPlan.patchedSaveData.cargo.Iron === 0, "Trade sell-all patch did not zero cargo.");
+  assert(sellAllPatchPlan.patchedSaveData.cargoCostBasis.Iron === undefined, "Trade sell-all patch did not clear cost basis.");
+
+  const sellInsufficientPatchPlan = buildStagingTradeSellSavePatch({
+    credits: 1000,
+    cargo: { Iron: 1 },
+    cargoCostBasis: { Iron: 15 }
+  }, {
+    offerId,
+    resourceId: "iron",
+    resourceName: "Iron",
+    sellPrice: 25
+  }, 3, {
+    cargoCapacity: 20
+  });
+  assert(sellInsufficientPatchPlan.ok === false && sellInsufficientPatchPlan.reason === "insufficient_resource_cargo", "Trade sell patch allowed overselling cargo.");
+
+  fetchCalls = [];
+  const appliedSellWrite = await applyStagingTradeSellWrite({
+    playerId: "verified-player-a",
+    offer: {
+      offerId,
+      resourceId: "iron",
+      resourceName: "Iron",
+      sellPrice: 25
+    },
+    quantity: 2,
+    trustedState: {
+      available: true,
+      validationState: {
+        cargoCapacity: 20
+      }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+    },
+    fetchImpl: async (url, options = {}) => {
+      fetchCalls.push({ url, options });
+      assert(options.headers?.apikey === "stub-service-role", "Trade sell write did not use service role apikey.");
+      assert((options.headers?.Authorization || options.headers?.authorization) === "Bearer stub-service-role", "Trade sell write did not use bearer service role.");
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return [{
+              save_data: {
+                credits: 1000,
+                cargo: { Iron: 5, Copper: 4 },
+                cargoCostBasis: { Iron: 12, Copper: 32 },
+                inventoryItems: [{ id: "safe" }],
+                activeBountyId: "unchanged",
+                playerProgress: { combatXp: 10 }
+              }
+            }];
+          }
+        };
+      }
+      assert(options.method === "PATCH", "Trade sell write used unexpected method.");
+      const body = JSON.parse(options.body);
+      assert(body.save_data.credits === 1050, "Trade sell PATCH did not contain updated credits.");
+      assert(body.save_data.cargo.Iron === 3, "Trade sell PATCH did not contain updated cargo.");
+      assert(body.save_data.cargo.Copper === 4, "Trade sell PATCH changed unrelated cargo.");
+      assert(body.save_data.cargoCostBasis.Iron === 12, "Trade sell PATCH changed partial remaining cost basis.");
+      assert(body.save_data.inventoryItems[0].id === "safe", "Trade sell PATCH changed inventory.");
+      assert(body.save_data.activeBountyId === "unchanged", "Trade sell PATCH changed bounty.");
+      assert(body.save_data.playerProgress.combatXp === 10, "Trade sell PATCH changed progression.");
+      return { ok: true, status: 204 };
+    }
+  });
+  assert(fetchCalls.length === 2, `Trade sell write expected read+patch, got ${fetchCalls.length} calls.`);
+  assert(appliedSellWrite.applied === true, `Trade sell write did not apply in mocked enabled path: ${appliedSellWrite.reason}`);
+  assert(appliedSellWrite.mode === "trade_write", `Unexpected trade sell write mode: ${appliedSellWrite.mode}`);
+  assert(appliedSellWrite.creditsDelta === 50 && appliedSellWrite.cargoDelta === -2, "Trade sell write returned incorrect deltas.");
+  assert(appliedSellWrite.inventoryWritten === false && appliedSellWrite.lootWritten === false && appliedSellWrite.bountyWritten === false, "Applied trade sell write reported forbidden writes.");
 
   console.log("staging trade validation and gated buy write helpers passed");
 }

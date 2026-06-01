@@ -16,9 +16,9 @@ Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Col
 - Reward ledger and progression shadow dry-run/write adapters.
 - Heavily gated XP-only `player_saves` patch preparation.
 - XP-only claim diagnostics that summarize simulated, dry-run, blocked, duplicate, and applied staging outcomes without enabling credits or loot.
-- Server-side staging trade preview/dry-run offers with deterministic route math, untrusted player snapshot validation, and a tiny disabled-by-default Phase 5b buy write prototype.
+- Server-side staging trade preview/dry-run offers with deterministic route math, untrusted player snapshot validation, and tiny disabled-by-default Phase 5b/5d buy/sell write prototypes.
 - Real client-side Trade Terminal buy/sell mutations are fenced in `?mp=staging`; testers can inspect the UI but must use the staging preview panel for trade dry-runs.
-- In `?mp=staging`, the real Trade Terminal routes matching buy/sell actions to Colyseus staging trade handlers so testers can see server-calculated dry-run or gated buy-write results in the normal trade UI.
+- In `?mp=staging`, the real Trade Terminal routes matching buy/sell actions to Colyseus staging trade handlers so testers can see server-calculated dry-run or gated trade-write results in the normal trade UI.
 
 Diagnostics remain available with `?debug=mp`.
 
@@ -51,19 +51,19 @@ Multiplayer authority needs: server-side price calculation or signed market snap
 
 Current staging trade prototype: Colyseus exposes static trade offers and a `stagingTrade:preview` dry-run response that calculates cost, revenue, and projected profit server-side. For verified staging players, Colyseus may read `player_saves` with the service role to validate saved credits and cargo used without exposing raw save data. If trusted save state is unavailable, preview falls back to a minimal untrusted snapshot of credits, cargo used, and cargo capacity; if neither is available it returns price preview only.
 
-Phase 5b adds a tiny real write prototype for `stagingTrade:buy` only. It is disabled by default and requires `STAGING_TRADE_WRITE_ENABLED=true`, `STAGING_TRADE_WRITE_DRY_RUN=false`, verified Supabase identity, allowlist/scope approval, an allowed offer, strict quantity limits, trusted save read, valid root `credits`, `cargo`, `cargoCostBasis`, trusted cargo capacity, enough credits, and enough cargo space. When all gates pass, it patches only `credits`, `cargo[resourceName]`, and `cargoCostBasis[resourceName]` in `player_saves.save_data`. Sell remains dry-run only.
+Phase 5b/5d adds tiny real write prototypes for `stagingTrade:buy` and `stagingTrade:sell`. They are disabled by default and require `STAGING_TRADE_WRITE_ENABLED=true`, `STAGING_TRADE_WRITE_DRY_RUN=false`, verified Supabase identity, allowlist/scope approval, an allowed offer, strict quantity limits, trusted save read, valid root `credits`, `cargo`, `cargoCostBasis`, and trusted cargo capacity. Buy requires enough credits and cargo space. Sell requires the player presence node to match the offer sell node and enough saved resource cargo. When all gates pass, the server patches only `credits`, `cargo[resourceName]`, and `cargoCostBasis[resourceName]` in `player_saves.save_data`.
 
-While staging is active, real Trade Terminal buy/sell handlers return before local mutation of credits, cargo, cargo cost basis, trade totals, or saves. Normal single-player trading remains unchanged outside `?mp=staging`. Server staging trade handlers are the only path allowed to validate or write, and only the gated buy prototype can write.
+While staging is active, real Trade Terminal buy/sell handlers return before local mutation of credits, cargo, cargo cost basis, trade totals, or saves. Normal single-player trading remains unchanged outside `?mp=staging`. Server staging trade handlers are the only path allowed to validate or write, and only the gated trade prototypes can write.
 
 Phase 4c Trade Terminal integration: the normal Trade Builder remains the primary staging trade surface. If the selected resource/origin/destination maps to a static staging offer, its button requests the server-side dry-run preview and renders the result in the Trade Terminal. Unknown routes remain blocked with a preview-unavailable message. The separate Staging Trade Preview overlay remains a compact dev helper for now.
 
-Phase 5 design status: [multiplayer-trade-write-design.md](multiplayer-trade-write-design.md) defines the heavily gated server-authoritative trade write prototype. Phase 5b implements the first buy-only `player_saves` JSON patch path, still off by default. No inventory, loot, bounty, PvP, player damage, schema, sell write, or broad progression writes are enabled.
+Phase 5 design status: [multiplayer-trade-write-design.md](multiplayer-trade-write-design.md) defines the heavily gated server-authoritative trade write prototype. Phase 5b implements the first buy `player_saves` JSON patch path, and Phase 5d implements the matching narrow sell path. Both remain off by default. No inventory, loot, bounty, PvP, player damage, schema, route-completion write, trade-total write, or broad progression writes are enabled.
 
 Phase 5a scaffold status: `stagingTrade:buy` and `stagingTrade:sell` handlers now exist and return write-shaped dry-run results with gates and write flags. They never call player save patch/write methods and always report `applied:false`, `creditsWritten:false`, `cargoWritten:false`, and `saveWritten:false`. The Trade Terminal uses these handlers for mapped staging buy/sell actions while keeping local mutations fenced.
 
-Phase 5b scaffold status: `stagingTrade:buy` can call `tradeWriteService.js` only after all staging gates pass. Default env state still returns dry-run/no-write. `stagingTrade:sell` remains dry-run because sell-side resource, route completion, realized profit, and cost-basis semantics still need server ownership.
+Phase 5b/5d scaffold status: `stagingTrade:buy` and `stagingTrade:sell` can call `tradeWriteService.js` only after all staging gates pass. Default env state still returns dry-run/no-write. Sell writes update credits, cargo, and cost basis only; route completion, realized profit, and trade totals are deliberately excluded.
 
-Phase 5c reconciliation status: successful gated buys return server before/after values for credits, resource cargo, cargo hold usage, and cargo capacity. The Trade Terminal displays those server values, prevents duplicate pending buy requests, and refreshes from the existing Supabase save reload path after `applied:true`. If a refresh is unavailable or fails, staging UI keeps the server result visible and tells testers to reload/reopen to sync full save display. The old local buy/sell mutation path remains fenced in staging.
+Phase 5c reconciliation status: successful gated buys/sells return server before/after values for credits, resource cargo, cargo hold usage, and cargo capacity. The Trade Terminal displays those server values, prevents duplicate pending requests, and refreshes from the existing Supabase save reload path after `applied:true`. If a refresh is unavailable or fails, staging UI keeps the server result visible and tells testers to reload/reopen to sync full save display. The old local buy/sell mutation path remains fenced in staging.
 
 Classification:
 
@@ -157,7 +157,7 @@ Classification:
 2. Phase 2: Combat loop clarity, bot destruction feedback, contribution, XP preview.
 3. Phase 3: Safe XP-only online reward writes.
 4. Phase 4: Server-side resource/trade prototype with credits and cargo still gated or dry-run. Started with static staging trade offers, server-calculated previews, player-state-aware dry-run validation, read-only trusted `player_saves` checks for verified staging players, and Phase 4c Trade Terminal integration for staging-only dry-run previews.
-5. Phase 5: Server-authoritative trade write prototype with strict validation. Design complete, Phase 5a dry-run contract scaffold added, Phase 5b buy-only gated write prototype added, and Phase 5c post-write reconciliation added. Default remains dry-run/no-write; sell remains dry-run.
+5. Phase 5: Server-authoritative trade write prototype with strict validation. Design complete, Phase 5a dry-run contract scaffold added, Phase 5b buy gated write prototype added, Phase 5c post-write reconciliation added, and Phase 5d sell gated write prototype added. Default remains dry-run/no-write.
 6. Phase 6: Store purchases and ship/equipment ownership.
 7. Phase 7: Inventory/loadout persistence.
 8. Phase 8: Asteroids/resource finding.
@@ -170,8 +170,8 @@ Classification:
 
 - Keep refining staging combat readability and automated tests before broadening reward writes.
 - Next phase: test tiny XP-only writes only with explicit server env gates and an allow-listed verified account, then keep proving duplicate protection before any broader progression path.
-- Manually test Phase 5b/5c with writes disabled first, then enable trade write env vars only for a verified allowlisted test account and a tiny allowed offer. Confirm the button enters pending state, the server returns `applied:true`, the Trade Terminal shows server before/after values, and the UI refreshes from cloud save or clearly asks for reload.
-- Next trade implementation pass: add durable trade idempotency/ledger or transactional RPC before broader credit/cargo writes. Keep sell dry-run until server-owned route/trade-total semantics are implemented.
+- Manually test Phase 5b/5c/5d with writes disabled first, then enable trade write env vars only for a verified allowlisted test account and a tiny allowed offer. Confirm buy and sell buttons enter pending state, the server returns `applied:true`, the Trade Terminal shows server before/after values, and the UI refreshes from cloud save or clearly asks for reload.
+- Next trade implementation pass: add durable trade idempotency/ledger or transactional RPC before broader credit/cargo writes. Keep route completion, realized profit, and trade totals dry-run until those systems are server-owned.
 - Use dedicated ledgers for every real online reward or economic mutation.
 - Treat `player_saves` as an output of verified server actions, not as a client-trusted source for multiplayer rewards.
 - Keep `?debug=mp` as the place for raw server diagnostics; keep normal `?mp=staging` focused on tester flow.

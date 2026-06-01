@@ -86,6 +86,16 @@ function getCargoByResourceFromSave(saveData) {
   }, {});
 }
 
+function getCargoCostBasisByResourceFromSave(saveData) {
+  const cargoCostBasis = saveData?.cargoCostBasis;
+  if (!cargoCostBasis || typeof cargoCostBasis !== "object" || Array.isArray(cargoCostBasis)) return null;
+
+  return CARGO_KEYS.reduce((summary, key) => {
+    summary[key] = clampInteger(cargoCostBasis[key], 0, 999999999) || 0;
+    return summary;
+  }, {});
+}
+
 function getTrustedCargoCapacityFromSave(saveData) {
   const candidates = [
     saveData?.cargoCapacity,
@@ -127,9 +137,10 @@ export function extractTradeValidationStateFromSave(saveData) {
   const credits = clampInteger(saveData.credits, 0, 999999999);
   const cargoUsed = getCargoUsedFromSave(saveData);
   const cargoByResource = getCargoByResourceFromSave(saveData);
+  const cargoCostBasisByResource = getCargoCostBasisByResourceFromSave(saveData);
   const cargoCapacity = getTrustedCargoCapacityFromSave(saveData);
 
-  if (credits === null || cargoUsed === null || !cargoByResource) {
+  if (credits === null || cargoUsed === null || !cargoByResource || !cargoCostBasisByResource) {
     return unavailable("trade_state_missing_or_invalid");
   }
 
@@ -143,6 +154,7 @@ export function extractTradeValidationStateFromSave(saveData) {
       credits,
       cargoUsed,
       cargoByResource,
+      cargoCostBasisByResource,
       cargoCapacity
     },
     stateSources: {
