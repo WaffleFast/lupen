@@ -72,6 +72,7 @@ import {
   applyStagingCargoPodEquipWrite,
   applyStagingLoadoutEquipWrite,
   buildStagingCargoPodEquipPlan,
+  buildStagingShieldBoosterEquipPlan,
   buildStagingPulseLaserEquipPlan,
   getLoadoutWriteEnvGate
 } from "../src/services/loadoutWriteService.js";
@@ -1484,9 +1485,16 @@ async function assertStagingStorePreviewHelpers() {
   assert(pulseLaserPatch.patchedSaveData.inventoryItems[0].id === "kept-item", "Pulse Laser Store patch changed inventoryItems.");
   assert(pulseLaserPatch.patchedSaveData.playerProgress.combatXp === 33, "Pulse Laser Store patch changed progression.");
 
-  const nonCargoItem = items.find((item) => item.itemId === "attachment:shieldBooster");
-  const nonCargoPatch = buildStagingStorePurchasePatch(validSaveData, nonCargoItem, 1);
-  assert(nonCargoPatch.ok === false && nonCargoPatch.blockReason === "store_item_preview_only", "Non-Cargo Pod Store write did not stay preview-only.");
+  const shieldBoosterItem = items.find((item) => item.itemId === "attachment:shieldBooster");
+  const shieldBoosterPatch = buildStagingStorePurchasePatch(validSaveData, shieldBoosterItem, 1);
+  assert(shieldBoosterPatch.ok === true, `Valid Shield Booster Store patch was blocked: ${shieldBoosterPatch.blockReason}`);
+  assert(shieldBoosterPatch.creditsBefore === 1000 && shieldBoosterPatch.creditsAfter === 690, "Shield Booster Store patch did not subtract the server price.");
+  assert(shieldBoosterPatch.itemBefore === 2 && shieldBoosterPatch.itemAfter === 3, "Shield Booster Store patch did not increment ownedAttachments.shieldBooster.");
+  assert(shieldBoosterPatch.patchedSaveData.ownedAttachments.cargoPod === 1, "Shield Booster Store patch changed Cargo Pod ownership.");
+  assert(shieldBoosterPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Shield Booster Store patch changed shipLoadouts.");
+  assert(shieldBoosterPatch.patchedSaveData.ownedGuns.pulseLaser === 1, "Shield Booster Store patch changed weapon ownership.");
+  assert(shieldBoosterPatch.patchedSaveData.cargo.Iron === 2, "Shield Booster Store patch changed trade cargo.");
+  assert(shieldBoosterPatch.patchedSaveData.playerProgress.combatXp === 33, "Shield Booster Store patch changed progression.");
 
   const invalidQuantityPatch = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 2);
   assert(invalidQuantityPatch.ok === false && invalidQuantityPatch.blockReason === "invalid_store_quantity", "Quantity above one was not blocked.");
@@ -1496,6 +1504,9 @@ async function assertStagingStorePreviewHelpers() {
 
   const insufficientPulseLaserCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, pulseLaserItem, 1);
   assert(insufficientPulseLaserCreditPatch.ok === false && insufficientPulseLaserCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Pulse Laser write was not blocked.");
+
+  const insufficientShieldBoosterCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, shieldBoosterItem, 1);
+  assert(insufficientShieldBoosterCreditPatch.ok === false && insufficientShieldBoosterCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Shield Booster write was not blocked.");
 
   const defaultWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
@@ -1564,6 +1575,23 @@ async function assertStagingStorePreviewHelpers() {
     }
   });
   assert(notAllowlistedWrite.blockReason === "player_not_in_staging_store_write_allowlist", "Non-allowlisted Store write was not blocked.");
+
+  const shieldItemNotAllowedWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:shieldBooster",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "verified",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:cargoPod"
+    }
+  });
+  assert(shieldItemNotAllowedWrite.blockReason === "store_item_not_allowed", "Shield Booster Store write without item allowlist was not blocked.");
 
   let sequentialSave = JSON.parse(JSON.stringify(validSaveData));
   const storeFetchCalls = [];
@@ -1655,7 +1683,46 @@ async function assertStagingStorePreviewHelpers() {
   assert(weaponSave.playerProgress.combatXp === 33, "Applied Pulse Laser Store write changed progression.");
   assert(weaponFetchCalls.join(",") === "GET,PATCH", `Pulse Laser Store write expected read/write pair, got ${weaponFetchCalls.join(",")}.`);
 
-  console.log("staging Store item list, previews, and gated Cargo Pod/Pulse Laser write helpers passed");
+  let shieldSave = JSON.parse(JSON.stringify(validSaveData));
+  const shieldFetchCalls = [];
+  const appliedShieldWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:shieldBooster",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "allowlist",
+      STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:shieldBooster"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      shieldFetchCalls.push(options.method || "GET");
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: shieldSave }] };
+      shieldSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedShieldWrite.applied === true && appliedShieldWrite.mode === "store_write", `Gated Shield Booster Store write did not apply: ${appliedShieldWrite.blockReason}`);
+  assert(appliedShieldWrite.creditsBefore === 1000 && appliedShieldWrite.creditsAfter === 690, "Applied Shield Booster Store write returned incorrect credits.");
+  assert(appliedShieldWrite.itemBefore === 2 && appliedShieldWrite.itemAfter === 3, "Applied Shield Booster Store write returned incorrect ownership count.");
+  assert(appliedShieldWrite.creditsWritten === true && appliedShieldWrite.attachmentWritten === true && appliedShieldWrite.saveWritten === true, "Applied Shield Booster Store write did not report allowed writes.");
+  assert(appliedShieldWrite.weaponWritten === false && appliedShieldWrite.inventoryWritten === false && appliedShieldWrite.shipWritten === false, "Applied Shield Booster Store write reported forbidden writes.");
+  assert(shieldSave.credits === 690 && shieldSave.ownedAttachments.shieldBooster === 3, "Applied Shield Booster Store write did not update mocked save state.");
+  assert(shieldSave.ownedAttachments.cargoPod === 1, "Applied Shield Booster Store write changed Cargo Pod ownership.");
+  assert(shieldSave.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Applied Shield Booster Store write changed loadout.");
+  assert(shieldSave.ownedGuns.pulseLaser === 1, "Applied Shield Booster Store write changed weapon ownership.");
+  assert(shieldSave.inventoryItems[0].id === "kept-item", "Applied Shield Booster Store write changed inventoryItems.");
+  assert(shieldSave.playerProgress.combatXp === 33, "Applied Shield Booster Store write changed progression.");
+  assert(shieldFetchCalls.join(",") === "GET,PATCH", `Shield Booster Store write expected read/write pair, got ${shieldFetchCalls.join(",")}.`);
+
+  console.log("staging Store item list, previews, and gated Cargo Pod/Pulse Laser/Shield Booster write helpers passed");
 }
 
 async function assertStagingCargoPodEquipHelpers() {
@@ -1709,6 +1776,22 @@ async function assertStagingCargoPodEquipHelpers() {
 
   const unknownPlan = buildStagingCargoPodEquipPlan(validSaveData, { itemId: "attachment:shieldBooster" });
   assert(unknownPlan.ok === false && unknownPlan.blockReason === "unknown_loadout_item", "Non-Cargo Pod loadout item was not blocked.");
+
+  const shieldPlan = buildStagingShieldBoosterEquipPlan(validSaveData, { itemId: "attachment:shieldBooster" });
+  assert(shieldPlan.ok === true, `Valid Shield Booster equip plan was blocked: ${shieldPlan.blockReason}`);
+  assert(shieldPlan.ownedBefore === 1 && shieldPlan.ownedAfter === 0, "Shield Booster equip plan did not consume owned Shield Booster.");
+  assert(shieldPlan.equippedBefore === 1 && shieldPlan.equippedAfter === 2, "Shield Booster equip plan did not add equipped Shield Booster.");
+  assert(shieldPlan.shieldBefore === 150 && shieldPlan.shieldAfter === 200, "Shield Booster equip plan did not apply +50 shield.");
+  assert(shieldPlan.patchedSaveData.credits === 780, "Shield Booster equip plan changed credits.");
+  assert(shieldPlan.patchedSaveData.ownedAttachments.cargoPod === 2, "Shield Booster equip plan changed Cargo Pod ownership.");
+  assert(shieldPlan.patchedSaveData.shipLoadouts.lupenOrigin.guns[0].key === "pulseLaser", "Shield Booster equip plan changed guns.");
+  assert(shieldPlan.patchedSaveData.ownedGuns.pulseLaser === 1, "Shield Booster equip plan changed weapon ownership.");
+  assert(shieldPlan.patchedSaveData.inventoryItems[0].id === "kept-item", "Shield Booster equip plan changed inventoryItems.");
+  assert(shieldPlan.patchedSaveData.cargo.Iron === 2, "Shield Booster equip plan changed trade cargo.");
+  assert(shieldPlan.patchedSaveData.playerProgress.combatXp === 33, "Shield Booster equip plan changed progression.");
+
+  const noOwnedShieldPlan = buildStagingShieldBoosterEquipPlan({ ...validSaveData, ownedAttachments: { cargoPod: 2, shieldBooster: 0 } }, { itemId: "attachment:shieldBooster" });
+  assert(noOwnedShieldPlan.ok === false && noOwnedShieldPlan.blockReason === "shield_booster_not_owned", "Shield Booster equip without ownership was not blocked.");
 
   const pulseLaserPlan = buildStagingPulseLaserEquipPlan(validSaveData, { itemId: "gun:pulseLaser" });
   assert(pulseLaserPlan.ok === true, `Valid Pulse Laser equip plan was blocked: ${pulseLaserPlan.blockReason}`);
@@ -1775,6 +1858,19 @@ async function assertStagingCargoPodEquipHelpers() {
     }
   });
   assert(notAllowlistedWrite.blockReason === "player_not_in_staging_loadout_write_allowlist", "Non-allowlisted Cargo Pod equip was not blocked.");
+
+  const shieldLoadoutItemNotAllowed = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:shieldBooster",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+      STAGING_LOADOUT_WRITE_SCOPE: "verified",
+      STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:cargoPod"
+    }
+  });
+  assert(shieldLoadoutItemNotAllowed.blockReason === "loadout_item_not_allowed", "Shield Booster loadout write without item allowlist was not blocked.");
 
   let sequentialSave = JSON.parse(JSON.stringify(validSaveData));
   const fetchCalls = [];
@@ -1856,7 +1952,44 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(weaponLoadoutSave.playerProgress.combatXp === 33, "Applied Pulse Laser equip changed progression.");
   assert(weaponLoadoutFetchCalls.join(",") === "GET,PATCH", `Pulse Laser equip expected read/write pair, got ${weaponLoadoutFetchCalls.join(",")}.`);
 
-  console.log("staging Cargo Pod/Pulse Laser equip helpers and gated loadout write passed");
+  let shieldLoadoutSave = JSON.parse(JSON.stringify(validSaveData));
+  const shieldLoadoutFetchCalls = [];
+  const appliedShieldEquip = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:shieldBooster",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+      STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
+      STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:shieldBooster"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      shieldLoadoutFetchCalls.push(options.method || "GET");
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: shieldLoadoutSave }] };
+      shieldLoadoutSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedShieldEquip.applied === true && appliedShieldEquip.mode === "loadout_write", `Gated Shield Booster equip did not apply: ${appliedShieldEquip.blockReason}`);
+  assert(appliedShieldEquip.ownedBefore === 1 && appliedShieldEquip.ownedAfter === 0, "Applied Shield Booster equip returned incorrect ownership.");
+  assert(appliedShieldEquip.equippedBefore === 1 && appliedShieldEquip.equippedAfter === 2, "Applied Shield Booster equip returned incorrect equipped count.");
+  assert(appliedShieldEquip.shieldBefore === 150 && appliedShieldEquip.shieldAfter === 200, "Applied Shield Booster equip returned incorrect shield.");
+  assert(appliedShieldEquip.loadoutWritten === true && appliedShieldEquip.attachmentWritten === true && appliedShieldEquip.saveWritten === true, "Applied Shield Booster equip did not report allowed writes.");
+  assert(appliedShieldEquip.weaponWritten === false && appliedShieldEquip.creditsWritten === false && appliedShieldEquip.inventoryWritten === false, "Applied Shield Booster equip reported forbidden writes.");
+  assert(shieldLoadoutSave.credits === 780, "Applied Shield Booster equip changed credits.");
+  assert(shieldLoadoutSave.ownedAttachments.shieldBooster === 0, "Applied Shield Booster equip did not decrement owned Shield Booster.");
+  assert(shieldLoadoutSave.shipLoadouts.lupenOrigin.attachments.filter((entry) => entry.key === "shieldBooster").length === 2, "Applied Shield Booster equip did not append loadout entry.");
+  assert(shieldLoadoutSave.ownedGuns.pulseLaser === 1, "Applied Shield Booster equip changed weapon ownership.");
+  assert(shieldLoadoutSave.inventoryItems[0].id === "kept-item", "Applied Shield Booster equip changed inventoryItems.");
+  assert(shieldLoadoutSave.cargo.Iron === 2, "Applied Shield Booster equip changed trade cargo.");
+  assert(shieldLoadoutSave.playerProgress.combatXp === 33, "Applied Shield Booster equip changed progression.");
+  assert(shieldLoadoutFetchCalls.join(",") === "GET,PATCH", `Shield Booster equip expected read/write pair, got ${shieldLoadoutFetchCalls.join(",")}.`);
+
+  console.log("staging Cargo Pod/Pulse Laser/Shield Booster equip helpers and gated loadout write passed");
 }
 
 async function assertFullCargoPodTradeLoopHelpers() {
@@ -3270,7 +3403,7 @@ try {
   assert(defaultStorePurchase?.creditsWritten === false && defaultStorePurchase?.attachmentWritten === false && defaultStorePurchase?.saveWritten === false, "Default Store purchase reported writes.");
   assert(defaultStorePurchase?.gates?.writeEnabled === false, "Default Store purchase gate should report writes disabled.");
 
-  const previewOnlyStorePurchase = await expectStagingStorePurchase(roomA, () => {
+  const defaultShieldBoosterPurchase = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {
       itemId: "attachment:shieldBooster",
       quantity: 1,
@@ -3279,9 +3412,9 @@ try {
       }
     });
   });
-  assert(previewOnlyStorePurchase?.applied === false, "Preview-only Store purchase unexpectedly applied.");
-  assert(previewOnlyStorePurchase?.reason === "store_item_preview_only" || previewOnlyStorePurchase?.blockReason === "store_item_preview_only", "Non-Cargo Pod Store purchase did not stay preview-only.");
-  assert(previewOnlyStorePurchase?.saveWritten === false, "Preview-only Store purchase reported save write.");
+  assert(defaultShieldBoosterPurchase?.applied === false, "Default Shield Booster Store purchase unexpectedly applied.");
+  assert(defaultShieldBoosterPurchase?.reason === "staging_store_writes_disabled" || defaultShieldBoosterPurchase?.blockReason === "staging_store_writes_disabled", "Default Shield Booster purchase did not stay gated.");
+  assert(defaultShieldBoosterPurchase?.saveWritten === false, "Default Shield Booster Store purchase reported save write.");
 
   const invalidStorePurchaseQuantity = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {

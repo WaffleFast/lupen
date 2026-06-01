@@ -2589,7 +2589,7 @@
   }
 
   function getStagingFlowHint(status, selectedBot, players, bots) {
-    const loop = "1 Trade for CR -> 2 Buy/equip Cargo Pod -> 3 Buy/equip Pulse Laser -> 4 Accept Erebus Patrol -> 5 Destroy staging bots -> 6 Claim XP + Lupen Shard.";
+    const loop = "1 Trade for CR -> 2 Buy/equip Cargo Pod -> 3 Buy/equip Shield Booster -> 4 Buy/equip Pulse Laser -> 5 Accept Erebus Patrol -> 6 Destroy staging bots -> 7 Claim XP + Lupen Shard.";
 
     if (!status?.isConnected) {
       return `Connecting to Multiplayer Staging. ${loop}`;
@@ -2601,7 +2601,7 @@
 
     if (!selectedBot?.id) {
       const pilotText = players.length ? `${players.length} remote pilot${players.length === 1 ? "" : "s"} connected. ` : "";
-      return `${pilotText}Server-backed trade, gated Store purchases, Cargo Pod capacity, Pulse Laser damage, Erebus Patrol progress, XP, and Lupen Shard claims are staged here. ${loop}`;
+      return `${pilotText}Server-backed trade, gated Store purchases, Cargo Pod capacity, Shield Booster shield stats, Pulse Laser damage, Erebus Patrol progress, XP, and Lupen Shard claims are staged here. ${loop}`;
     }
 
     if (selectedBot.disabled) {
@@ -3116,9 +3116,12 @@
       }
       if (loadoutEquip) {
         const isWeaponEquip = String(loadoutEquip.itemId || "").startsWith("gun:");
-        const equipLabel = isWeaponEquip ? "weapon equip" : "cargo pod equip";
+        const isShieldEquip = String(loadoutEquip.itemId || "") === "attachment:shieldBooster";
+        const equipLabel = isWeaponEquip ? "weapon equip" : isShieldEquip ? "shield equip" : "cargo pod equip";
         const appliedLine = isWeaponEquip
           ? `applied / guns ${formatTradeNumber(loadoutEquip.equippedBefore)} -> ${formatTradeNumber(loadoutEquip.equippedAfter)}`
+          : isShieldEquip
+            ? `applied / shield ${formatTradeNumber(loadoutEquip.shieldBefore)} -> ${formatTradeNumber(loadoutEquip.shieldAfter)}`
           : `applied / cargo ${formatTradeNumber(loadoutEquip.cargoCapacityBefore)} -> ${formatTradeNumber(loadoutEquip.cargoCapacityAfter)}`;
         setDiagnosticsRow(panel, equipLabel, loadoutEquip.applied
           ? appliedLine

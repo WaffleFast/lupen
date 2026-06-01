@@ -105,8 +105,8 @@ const KNOWN_SECTOR_NODES = new Set([
   "Lower Gate Core",
   "Lower Gate East"
 ]);
-const STAGING_STORE_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "gun:pulseLaser"]);
-const STAGING_LOADOUT_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "gun:pulseLaser"]);
+const STAGING_STORE_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "attachment:shieldBooster", "gun:pulseLaser"]);
+const STAGING_LOADOUT_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "attachment:shieldBooster", "gun:pulseLaser"]);
 
 export const STAGING_BOT_ALLOWED_NODE_IDS = [
   "Upper Apex",
@@ -2245,7 +2245,7 @@ export class LupenSectorRoom extends Room {
       applied: false,
       dryRun: true,
       itemId,
-      name: itemId === "gun:pulseLaser" ? "Pulse Laser" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
+      name: itemId === "gun:pulseLaser" ? "Pulse Laser" : itemId === "attachment:shieldBooster" ? "Shield Booster" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
       category: itemId === "gun:pulseLaser" ? "weapon" : "equipment",
       validationMode: trustedState?.available ? "trusted_save" : "unknown",
       trustedStateAvailable: trustedState?.available === true,

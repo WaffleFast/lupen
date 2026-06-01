@@ -1375,6 +1375,9 @@
       cargoCapacityBefore: Number.isFinite(Number(result.cargoCapacityBefore)) ? Number(result.cargoCapacityBefore) : null,
       cargoCapacityAfterPreview: Number.isFinite(Number(result.cargoCapacityAfterPreview)) ? Number(result.cargoCapacityAfterPreview) : null,
       cargoCapacityAfter: Number.isFinite(Number(result.cargoCapacityAfter)) ? Number(result.cargoCapacityAfter) : null,
+      shieldBefore: Number.isFinite(Number(result.shieldBefore)) ? Number(result.shieldBefore) : null,
+      shieldAfterPreview: Number.isFinite(Number(result.shieldAfterPreview)) ? Number(result.shieldAfterPreview) : null,
+      shieldAfter: Number.isFinite(Number(result.shieldAfter)) ? Number(result.shieldAfter) : null,
       gunSlots: Number.isFinite(Number(result.gunSlots)) ? Number(result.gunSlots) : null,
       validationMode: String(result.validationMode || "unknown"),
       trustedStateAvailable: result.trustedStateAvailable === true,
@@ -2208,6 +2211,18 @@
     equipStagingCargoPod(options = {}) {
       return sendRoomMessage("equipStagingCargoPod", "stagingLoadout:equipAttachment", {
         itemId: String(options.itemId || "attachment:cargoPod")
+      });
+    },
+
+    previewStagingShieldBoosterEquip(options = {}) {
+      return sendRoomMessage("previewStagingShieldBoosterEquip", "stagingLoadout:previewEquip", {
+        itemId: String(options.itemId || "attachment:shieldBooster")
+      });
+    },
+
+    equipStagingShieldBooster(options = {}) {
+      return sendRoomMessage("equipStagingShieldBooster", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "attachment:shieldBooster")
       });
     },
 

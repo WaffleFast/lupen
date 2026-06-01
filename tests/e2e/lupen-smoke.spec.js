@@ -85,7 +85,7 @@ test.describe("Lupen browser smoke", () => {
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText("Multiplayer Staging Loop", { timeout: 15000 });
-    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*Cargo Pod[\s\S]*Pulse Laser[\s\S]*Erebus Patrol[\s\S]*Claim XP[\s\S]*Lupen Shard/i);
+    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*Cargo Pod[\s\S]*Shield Booster[\s\S]*Pulse Laser[\s\S]*Erebus Patrol[\s\S]*Claim XP[\s\S]*Lupen Shard/i);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/No PvP[\s\S]*player damage[\s\S]*loot items/i);
 
     await openTradeTerminal(page);
@@ -119,6 +119,7 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#storeScreen")).toContainText(/Staging Purchase|Server Preview|Server preview unavailable/);
     await expect(page.locator("#storeScreen")).toContainText(/Pulse Laser/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Shield Booster/i);
     await expect(page.locator("#storeScreen")).toContainText(/Apply Cargo Pod|Cargo Pod equip preview|server preview/i);
     await expect(page.locator("#storeScreen")).toContainText(/server preview only|Real Store purchase is blocked|No CR or inventory changed/i);
     await expect(page.locator("#storeScreen")).not.toContainText("Buy / CR");

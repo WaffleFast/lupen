@@ -16,6 +16,7 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
 let multiplayerStagingCargoPodEquipPending = false;
+let multiplayerStagingShieldBoosterEquipPending = false;
 let multiplayerStagingPulseLaserEquipPending = false;
 
 function isMultiplayerStagingStoreActive() {
@@ -108,6 +109,14 @@ function getLastStagingCargoPodEquipResult() {
   return preview?.itemId === "attachment:cargoPod" ? preview : null;
 }
 
+function getLastStagingShieldBoosterEquipResult() {
+  const status = getMultiplayerStagingStoreStatus();
+  const equip = status.lastStagingLoadoutEquip;
+  if (equip?.itemId === "attachment:shieldBooster") return equip;
+  const preview = status.lastStagingLoadoutPreview;
+  return preview?.itemId === "attachment:shieldBooster" ? preview : null;
+}
+
 function getLastStagingPulseLaserEquipResult() {
   const status = getMultiplayerStagingStoreStatus();
   const equip = status.lastStagingLoadoutEquip;
@@ -119,6 +128,7 @@ function getLastStagingPulseLaserEquipResult() {
 function getStagingStorePreviewLine(result) {
   if (!result) return "Server preview pending. No CR or inventory changed.";
   if (result.applied && result.itemId === "gun:pulseLaser") return "Weapon purchased.";
+  if (result.applied && result.itemId === "attachment:shieldBooster") return "Shield Booster purchased.";
   if (result.applied && result.itemId === "attachment:cargoPod") return "Cargo Pod purchased.";
   if (result.applied) return "Staging purchase applied.";
   if (result.wouldPass) return "Would pass server Store validation.";
@@ -163,7 +173,7 @@ function renderStagingStorePreviewNote(item) {
 
 function isStagingStoreWritableItem(item) {
   const itemId = getStagingStoreItemId(item);
-  return itemId === "attachment:cargoPod" || itemId === "gun:pulseLaser";
+  return itemId === "attachment:cargoPod" || itemId === "attachment:shieldBooster" || itemId === "gun:pulseLaser";
 }
 
 function getStagingCargoPodEquipLine(result) {
@@ -189,6 +199,32 @@ function renderStagingCargoPodEquipNote(item) {
     <div class="store-detail-owned-line">
       <strong>${escapeHtml(getStagingCargoPodEquipLine(result))}</strong>${escapeHtml(capacityLine)}${escapeHtml(ownedLine)} /
       ${escapeHtml(result?.applied ? "Server save refreshed after applied equip." : "Dry run only - no loadout, inventory, credits, ships, weapons, loot, or bounties changed.")}
+    </div>`;
+}
+
+function getStagingShieldBoosterEquipLine(result) {
+  if (!result) return "Shield Booster equip preview pending.";
+  if (result.applied) return "Shield Booster equipped.";
+  if (result.mode === "dry_run" && result.ok) return "Would equip Shield Booster.";
+  if (result.blockReason === "shield_booster_not_owned") return "Blocked: no owned Shield Booster.";
+  if (result.blockReason === "attachment_slots_full") return "Blocked: no empty equipment slot.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - loadout not changed.";
+  return `Blocked: ${result.blockReason || result.reason || "loadout unavailable"}.`;
+}
+
+function renderStagingShieldBoosterEquipNote(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "attachment:shieldBooster") return "";
+  const result = getLastStagingShieldBoosterEquipResult();
+  const shieldLine = result?.shieldBefore !== null && result?.shieldBefore !== undefined
+    ? ` / Shield ${formatNumber(result.shieldBefore)} -> ${formatNumber(result.shieldAfter ?? result.shieldAfterPreview)}`
+    : "";
+  const ownedLine = result?.ownedBefore !== null && result?.ownedBefore !== undefined
+    ? ` / Owned ${formatNumber(result.ownedBefore)} -> ${formatNumber(result.ownedAfter)}`
+    : "";
+  return `
+    <div class="store-detail-owned-line">
+      <strong>${escapeHtml(getStagingShieldBoosterEquipLine(result))}</strong>${escapeHtml(shieldLine)}${escapeHtml(ownedLine)} /
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied shield equip." : "Dry run only - no loadout, inventory, credits, ships, weapons, loot, or bounties changed.")}
     </div>`;
 }
 
@@ -247,6 +283,42 @@ async function requestStagingCargoPodEquip(item) {
           }
         } catch (_err) {
           if (typeof addHudToast === "function") addHudToast("Cargo Pod equipped. Reload if loadout values look stale.");
+        }
+      }
+    }
+    renderStore();
+    if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
+  }, 900);
+  return true;
+}
+
+async function requestStagingShieldBoosterEquip(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "attachment:shieldBooster") return false;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.equipStagingShieldBooster || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging Shield Booster equip is waiting for the multiplayer server connection.");
+    return true;
+  }
+  if (multiplayerStagingShieldBoosterEquipPending) return true;
+  multiplayerStagingShieldBoosterEquipPending = true;
+  renderStore();
+  client.equipStagingShieldBooster({ itemId: "attachment:shieldBooster" });
+  if (typeof addHudToast === "function") addHudToast("Requested MP staging Shield Booster equip.");
+  setTimeout(async () => {
+    multiplayerStagingShieldBoosterEquipPending = false;
+    const latest = client.getStatus?.().lastStagingLoadoutEquip;
+    if (latest?.itemId === "attachment:shieldBooster" && latest.applied) {
+      if (typeof addHudToast === "function") addHudToast(`Shield Booster equipped: shield ${formatNumber(latest.shieldBefore)} -> ${formatNumber(latest.shieldAfter)}.`);
+      if (typeof loadGameFromSupabase === "function") {
+        try {
+          const loaded = await loadGameFromSupabase();
+          if (loaded?.loaded) {
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("shield_booster_equipped");
+            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          }
+        } catch (_err) {
+          if (typeof addHudToast === "function") addHudToast("Shield Booster equipped. Reload if shield values look stale.");
         }
       }
     }
@@ -2417,6 +2489,7 @@ function renderStoreDetail() {
         <div class="store-detail-owned-line">${ownershipLine} / ${getStoreStockLabel(item)}</div>
         ${renderStagingStorePreviewNote(item)}
         ${renderStagingCargoPodEquipNote(item)}
+        ${renderStagingShieldBoosterEquipNote(item)}
         ${renderStagingPulseLaserEquipNote(item)}
         ${detailStatsHtml}
       </div>
@@ -2424,6 +2497,7 @@ function renderStoreDetail() {
       <div class="store-buy-footer store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
         ${buyButton}
         ${stagingStoreLocked && stagingStoreItemId === "attachment:cargoPod" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingCargoPodEquip(getStoreSelectedItem())" ${multiplayerStagingCargoPodEquipPending ? "disabled" : ""}>${multiplayerStagingCargoPodEquipPending ? "Applying..." : "Apply Cargo Pod"}</button>` : ""}
+        ${stagingStoreLocked && stagingStoreItemId === "attachment:shieldBooster" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingShieldBoosterEquip(getStoreSelectedItem())" ${multiplayerStagingShieldBoosterEquipPending ? "disabled" : ""}>${multiplayerStagingShieldBoosterEquipPending ? "Applying..." : "Apply Shield Booster"}</button>` : ""}
         ${stagingStoreLocked && stagingStoreItemId === "gun:pulseLaser" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingPulseLaserEquip(getStoreSelectedItem())" ${multiplayerStagingPulseLaserEquipPending ? "disabled" : ""}>${multiplayerStagingPulseLaserEquipPending ? "Applying..." : "Apply Pulse Laser"}</button>` : ""}
         ${sellButton}
       </div>
@@ -2629,6 +2703,10 @@ function equipAttachmentFromInventory(key, quality = "standard", source = "owned
   if (isMultiplayerStagingStoreActive()) {
     if (key === "cargoPod" && quality === "standard" && source === "owned") {
       requestStagingCargoPodEquip({ kind: "attachment", key: "cargoPod" });
+      return;
+    }
+    if (key === "shieldBooster" && quality === "standard" && source === "owned") {
+      requestStagingShieldBoosterEquip({ kind: "attachment", key: "shieldBooster" });
       return;
     }
     blockLoadoutMutationInMultiplayerStaging();

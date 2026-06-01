@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document tracks the staging path for bringing the Store online without enabling broad real purchases. Phase 1 is preview-only: server-owned Store catalogue, server-side validation, and real Store UI integration in `?mp=staging`. Phase 2 adds heavily gated purchase write prototypes for `attachment:cargoPod` and `gun:pulseLaser` only. Phase 3 adds heavily gated Cargo Pod and Pulse Laser equip/loadout writes.
+This document tracks the staging path for bringing the Store online without enabling broad real purchases. Phase 1 is preview-only: server-owned Store catalogue, server-side validation, and real Store UI integration in `?mp=staging`. Phase 2 adds heavily gated purchase write prototypes for `attachment:cargoPod`, `attachment:shieldBooster`, and `gun:pulseLaser` only. Phase 3 adds heavily gated Cargo Pod, Shield Booster, and Pulse Laser equip/loadout writes.
 
 ## Current Phase 1/2
 
@@ -15,13 +15,12 @@ In `?mp=staging`:
 - Mapped Store items show `Server Preview`.
 - Unmapped Store items show `Server preview unavailable`.
 - Colyseus exposes `stagingStore:listItems` and `stagingStore:previewPurchase`.
-- Colyseus also exposes `stagingStore:purchase` for `attachment:cargoPod` and `gun:pulseLaser` only.
-- Colyseus exposes `stagingLoadout:previewEquip` and `stagingLoadout:equipAttachment` for `attachment:cargoPod` and `gun:pulseLaser` only.
+- Colyseus also exposes `stagingStore:purchase` for `attachment:cargoPod`, `attachment:shieldBooster`, and `gun:pulseLaser` only.
+- Colyseus exposes `stagingLoadout:previewEquip` and `stagingLoadout:equipAttachment` for `attachment:cargoPod`, `attachment:shieldBooster`, and `gun:pulseLaser` only.
 - Preview responses are always `mode:"dry_run"` and `applied:false`.
 - Preview responses always report `creditsWritten:false`, `inventoryWritten:false`, `shipWritten:false`, `equipmentWritten:false`, `saveWritten:false`, `lootWritten:false`, and `bountyWritten:false`.
 - Purchase responses default to dry-run/blocked unless every Store write gate passes.
-- `attachment:shieldBooster` remains preview-only.
-- Local loadout mutation paths are fenced in `?mp=staging`; Cargo Pod and Pulse Laser equip route through the server handler.
+- Local loadout mutation paths are fenced in `?mp=staging`; Cargo Pod, Shield Booster, and Pulse Laser equip route through the server handler.
 
 Initial staging Store items:
 
@@ -46,6 +45,7 @@ Save paths used by Phase 2:
 - `credits`: root number in `player_saves.save_data`.
 - `ownedAttachments`: root object in `player_saves.save_data`.
 - `ownedAttachments.cargoPod`: standard Cargo Pod ownership count.
+- `ownedAttachments.shieldBooster`: standard Shield Booster ownership count.
 - `ownedGuns`: root object in `player_saves.save_data`.
 - `ownedGuns.pulseLaser`: standard Pulse Laser ownership count.
 - `inventoryItems`: root array, not used for standard Cargo Pod purchase.
@@ -53,6 +53,8 @@ Save paths used by Phase 2:
 - `storeDailyPurchases`: local daily stock metadata, intentionally skipped for the Phase 2 prototype.
 
 `cargoPod` is a standard attachment. Local `buyAttachment("cargoPod")` subtracts credits and increments `ownedAttachments.cargoPod`; it does not auto-equip or patch `shipLoadouts`. Duplicate purchases are allowed locally as ownership count increments, so the staging prototype also increments the count by one per allowed purchase.
+
+`shieldBooster` is a standard attachment. Local `buyAttachment("shieldBooster")` subtracts credits and increments `ownedAttachments.shieldBooster`; it does not auto-equip or patch `shipLoadouts`. Duplicate purchases are allowed locally as ownership count increments, so the staging prototype also increments the count by one per allowed purchase.
 
 `pulseLaser` is a standard starter gun. Local `buyGun("pulseLaser")` subtracts credits and increments `ownedGuns.pulseLaser`; it does not auto-equip or patch `shipLoadouts`. Duplicate purchases are allowed locally as ownership count increments, so the staging prototype also increments the count by one per allowed purchase.
 
@@ -65,6 +67,16 @@ Cargo Pod equip flow:
 - `removeAttachment()` returns standard level-1 attachments to `ownedAttachments`.
 
 Cargo capacity is derived, not stored. `getShipStats()` starts from `SHIPS[currentShipId].cargo`, then adds each equipped attachment effect from `attachments[key].effect`. Standard level-1 Cargo Pod adds `25` cargo. Multiple Cargo Pods stack, bounded by the current ship's attachment slots.
+
+Shield Booster equip flow:
+
+- `equipAttachmentFromInventory("shieldBooster", "standard", "owned")` decrements `ownedAttachments.shieldBooster`.
+- It appends `{ key:"shieldBooster", quality:"standard", level:1 }` to `shipLoadouts[selectedHangarShipId].attachments`.
+- It calls `applyShipStats(true)` when the selected ship is current.
+- It calls `saveGame()`.
+- `removeAttachment()` returns standard level-1 attachments to `ownedAttachments`.
+
+Shield capacity is derived, not stored. `getShipStats()` starts from `SHIPS[currentShipId].shield`, then adds each equipped attachment effect from `attachments[key].effect`. Standard level-1 Shield Booster adds `50` shield. Multiple Shield Boosters stack, bounded by the current ship's attachment slots. Staging currently persists/equips the Shield Booster and returns shield before/after diagnostics; server-owned bots do not damage player shields yet.
 
 Pulse Laser equip flow:
 
@@ -91,7 +103,7 @@ Pricing and stock:
 
 ## Store Phase 2 Gates
 
-`attachment:cargoPod` or `gun:pulseLaser` can be written only if every gate passes:
+`attachment:cargoPod`, `attachment:shieldBooster`, or `gun:pulseLaser` can be written only if every gate passes:
 
 - `?mp=staging` room context.
 - `STAGING_STORE_WRITE_ENABLED=true`.
@@ -99,11 +111,12 @@ Pricing and stock:
 - Verified Supabase identity.
 - `STAGING_STORE_WRITE_SCOPE=verified` or `allowlist`.
 - If scope is `allowlist`, `STAGING_STORE_WRITE_ALLOWLIST` contains the verified user id.
-- `STAGING_STORE_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod` or `gun:pulseLaser`.
+- `STAGING_STORE_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod`, `attachment:shieldBooster`, or `gun:pulseLaser`.
 - Quantity is exactly `1`.
 - Trusted `player_saves` read succeeds.
 - Saved root `credits` is numeric and sufficient.
 - For Cargo Pod, saved root `ownedAttachments.cargoPod` is numeric.
+- For Shield Booster, saved root `ownedAttachments.shieldBooster` is numeric.
 - For Pulse Laser, saved root `ownedGuns.pulseLaser` is numeric.
 - The patch touches only `credits` and the matching ownership count.
 
@@ -115,6 +128,8 @@ Allowed writes when all gates pass:
 
 - `credits -= 220`
 - `ownedAttachments.cargoPod += 1`
+- `credits -= 310`
+- `ownedAttachments.shieldBooster += 1`
 - `credits -= 748`
 - `ownedGuns.pulseLaser += 1`
 
@@ -124,14 +139,14 @@ Forbidden in this phase:
 - `shipLoadouts`
 - `ownedShips`
 - `ownedGuns` except gated `ownedGuns.pulseLaser += 1`
-- non-Cargo Pod attachments
+- attachments except gated `ownedAttachments.cargoPod += 1` and `ownedAttachments.shieldBooster += 1`
 - non-Pulse Laser weapons
 - daily Store stock
 - loot, bounties, PvP, player damage, broad progression, schema/RLS changes
 
 ## Store Phase 3 Equip Gates
 
-Cargo Pod or Pulse Laser equip can be written only if every gate passes:
+Cargo Pod, Shield Booster, or Pulse Laser equip can be written only if every gate passes:
 
 - `?mp=staging` room context.
 - `STAGING_LOADOUT_WRITE_ENABLED=true`.
@@ -139,10 +154,11 @@ Cargo Pod or Pulse Laser equip can be written only if every gate passes:
 - Verified Supabase identity.
 - `STAGING_LOADOUT_WRITE_SCOPE=verified` or `allowlist`.
 - If scope is `allowlist`, `STAGING_LOADOUT_WRITE_ALLOWLIST` contains the verified user id.
-- `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod` or `gun:pulseLaser`.
+- `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod`, `attachment:shieldBooster`, or `gun:pulseLaser`.
 - Trusted `player_saves` read succeeds.
 - Saved `currentShipId` is one of the known staging ship ids.
 - For Cargo Pod, saved root `ownedAttachments.cargoPod` is numeric and greater than zero.
+- For Shield Booster, saved root `ownedAttachments.shieldBooster` is numeric and greater than zero.
 - For Pulse Laser, saved root `ownedGuns.pulseLaser` is numeric and greater than zero.
 - Saved root `shipLoadouts[currentShipId].attachments` and `.guns` are valid arrays.
 - Cargo Pod requires an empty attachment slot.
@@ -155,10 +171,12 @@ Allowed equip write when all gates pass:
 
 - `ownedAttachments.cargoPod -= 1`
 - `shipLoadouts[currentShipId].attachments.push({ key:"cargoPod", quality:"standard", level:1 })`
+- `ownedAttachments.shieldBooster -= 1`
+- `shipLoadouts[currentShipId].attachments.push({ key:"shieldBooster", quality:"standard", level:1 })`
 - `ownedGuns.pulseLaser -= 1`
 - `shipLoadouts[currentShipId].guns.push({ key:"pulseLaser", quality:"standard", level:1 })`
 
-The server derives cargo capacity from a narrow mirrored ship config plus `Cargo Pod +25`. It does not trust a client-provided cargo capacity for real equip writes.
+The server derives cargo capacity from a narrow mirrored ship config plus `Cargo Pod +25`, and shield capacity from a narrow mirrored ship config plus `Shield Booster +50`. It does not trust a client-provided cargo or shield capacity for real equip writes.
 
 ## Cargo Pod Loop Validation
 
@@ -171,7 +189,7 @@ The current validated staging loop is:
 5. Refresh from Supabase after applied equip.
 6. Use the returned +25 cargo capacity in later staging trade validation.
 
-Regression coverage uses mocked `player_saves` to prove the sequence can buy Cargo Pod, equip it, trade with the increased capacity, sell the cargo, and preserve unrelated save fields. It also covers Pulse Laser purchase/equip with mocked `player_saves`, including ownership count changes, gun slot validation, and unrelated-field preservation. Live-write browser testing remains manual, allowlisted, and opt-in only.
+Regression coverage uses mocked `player_saves` to prove the sequence can buy Cargo Pod, equip it, trade with the increased capacity, sell the cargo, buy Pulse Laser, equip Pulse Laser, and preserve unrelated save fields. Shield Booster regression coverage proves the narrow purchase/equip path changes only credits, `ownedAttachments.shieldBooster`, and the current ship attachment loadout, returning shield before/after diagnostics. Live room regression separately confirms staging combat uses the server-known Pulse Laser damage value instead of trusting client-reported damage. Live-write browser testing remains manual, allowlisted, and opt-in only.
 
 ## Future Store Phases
 
@@ -194,7 +212,7 @@ Phase 6: normalized ownership
 
 - Real CR spend in default staging/dry-run mode.
 - Inventory writes.
-- Equipment ownership/loadout writes except gated `ownedAttachments.cargoPod += 1`, gated `ownedGuns.pulseLaser += 1`, gated Cargo Pod equip into `shipLoadouts[currentShipId].attachments`, and gated Pulse Laser equip into `shipLoadouts[currentShipId].guns`.
+- Equipment ownership/loadout writes except gated `ownedAttachments.cargoPod += 1`, gated `ownedAttachments.shieldBooster += 1`, gated `ownedGuns.pulseLaser += 1`, gated Cargo Pod/Shield Booster equip into `shipLoadouts[currentShipId].attachments`, and gated Pulse Laser equip into `shipLoadouts[currentShipId].guns`.
 - Ship ownership writes.
 - Loot.
 - Bounties.
