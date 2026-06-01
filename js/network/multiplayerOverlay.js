@@ -29,6 +29,7 @@
   let stagingTradeQuantity = 5;
   let stagingTradeOffersRequested = false;
   let stagingBountyRequested = false;
+  let stagingFlowHintDismissed = false;
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const shipImageById = {
@@ -778,7 +779,7 @@
         left: 14px;
         bottom: 14px;
         z-index: 77;
-        max-width: min(310px, calc(100vw - 28px));
+        max-width: min(360px, calc(100vw - 28px));
         padding: 8px 10px;
         border: 1px solid rgba(127, 223, 255, 0.26);
         border-radius: 6px;
@@ -786,7 +787,7 @@
         color: #d9fbff;
         box-shadow: 0 0 14px rgba(0, 150, 220, 0.14);
         font: 800 10px/1.3 Arial, sans-serif;
-        pointer-events: none;
+        pointer-events: auto;
         text-transform: uppercase;
       }
 
@@ -802,6 +803,25 @@
         display: block;
         color: rgba(229, 252, 255, 0.82);
         text-transform: none;
+      }
+
+      #${stagingFlowHintId} .lupen-mp-flow-note {
+        margin-top: 4px;
+        color: rgba(255, 225, 172, 0.82);
+      }
+
+      #${stagingFlowHintId} button {
+        position: absolute;
+        top: 5px;
+        right: 6px;
+        width: 20px;
+        height: 20px;
+        border: 1px solid rgba(127, 223, 255, 0.24);
+        border-radius: 4px;
+        background: rgba(3, 10, 18, 0.46);
+        color: rgba(229, 252, 255, 0.76);
+        cursor: pointer;
+        font: 900 12px/1 Arial, sans-serif;
       }
 
       @keyframes lupen-mp-staging-hit {
@@ -990,6 +1010,25 @@
 
   function removeStagingFlowHint() {
     global.document?.getElementById(stagingFlowHintId)?.remove();
+  }
+
+  function isStagingFlowHintDismissed() {
+    if (stagingFlowHintDismissed) return true;
+    try {
+      return global.localStorage?.getItem("lupenStagingFlowHintDismissed") === "1";
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function dismissStagingFlowHint() {
+    stagingFlowHintDismissed = true;
+    try {
+      global.localStorage?.setItem("lupenStagingFlowHintDismissed", "1");
+    } catch (_error) {
+      // The staging guide is cosmetic; storage failures should never affect gameplay.
+    }
+    removeStagingFlowHint();
   }
 
   function removeStagingCombatPanel() {
@@ -2550,23 +2589,25 @@
   }
 
   function getStagingFlowHint(status, selectedBot, players, bots) {
+    const loop = "1 Trade for CR -> 2 Buy/equip Cargo Pod -> 3 Buy/equip Pulse Laser -> 4 Accept Erebus Patrol -> 5 Destroy staging bots -> 6 Claim XP + Lupen Shard.";
+
     if (!status?.isConnected) {
-      return "Connecting to the staging room. Multiplayer is still presence-only outside this test flow.";
+      return `Connecting to Multiplayer Staging. ${loop}`;
     }
 
     if (!bots.length) {
-      return "Waiting for server-owned staging bots.";
+      return `Server-backed trade, Store, loadout, combat, XP, and Lupen Shard test loop. Waiting for server-owned staging bots. ${loop}`;
     }
 
     if (!selectedBot?.id) {
       const pilotText = players.length ? `${players.length} remote pilot${players.length === 1 ? "" : "s"} connected. ` : "";
-      return `${pilotText}Select a staging bot to test server-owned lock-on and damage.`;
+      return `${pilotText}Server-backed trade, gated Store purchases, Cargo Pod capacity, Pulse Laser damage, Erebus Patrol progress, XP, and Lupen Shard claims are staged here. ${loop}`;
     }
 
     if (selectedBot.disabled) {
       return status?.lastRewardPreview?.botId === selectedBot.id
-        ? "Target destroyed. Review the XP preview, then use the claim button to test the gated reward path."
-        : "Target destroyed. Waiting for the server to respawn it.";
+        ? "Target destroyed. Claim XP and Lupen Shard from the staging combat panel. Rewards stay behind staging gates."
+        : "Target destroyed. Waiting for the server to respawn it. Use the loop guide for the next staging pass.";
     }
 
     const cooldown = Math.max(0, Number(status.fireCooldownRemainingMs || 0));
@@ -2574,26 +2615,42 @@
       return `Server cooldown active: ${formatCooldown(cooldown)} remaining. Damage is server-owned.`;
     }
 
-    return "Target locked. Use Staging Fire to test server damage. No credits, loot, bounties, PvP, or broad progression are enabled.";
+    return "Target locked. Use Staging Fire to test server damage. No PvP, player damage, credits from combat, loot items, or broad progression are enabled.";
   }
 
   function renderStagingFlowHint(status, selectedBot, players, bots) {
     removeStagingFlowHint();
-    if (!isStagingMode(status) || !status?.enabled || isMpDebugEnabled()) return;
+    if (!isStagingMode(status) || !status?.enabled || isMpDebugEnabled() || isStagingFlowHintDismissed()) return;
 
     ensureStyles();
 
     const hint = global.document.createElement("div");
     hint.id = stagingFlowHintId;
-    hint.setAttribute("aria-hidden", "true");
+    hint.setAttribute("aria-label", "Multiplayer staging loop");
+
+    const closeButton = global.document.createElement("button");
+    closeButton.type = "button";
+    closeButton.setAttribute("aria-label", "Hide staging loop guide");
+    closeButton.textContent = "x";
+    closeButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      dismissStagingFlowHint();
+    });
+    hint.appendChild(closeButton);
 
     const title = global.document.createElement("strong");
-    title.textContent = "Staging Test Flow";
+    title.textContent = "Multiplayer Staging Loop";
     hint.appendChild(title);
 
     const text = global.document.createElement("span");
     text.textContent = getStagingFlowHint(status, selectedBot, players, bots);
     hint.appendChild(text);
+
+    const note = global.document.createElement("span");
+    note.className = "lupen-mp-flow-note";
+    note.textContent = "Server-backed trade/store/loadout/combat. No PvP, player damage, combat credits, or loot items yet.";
+    hint.appendChild(note);
 
     global.document.body.appendChild(hint);
   }
