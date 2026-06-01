@@ -63,6 +63,8 @@ Phase 5a scaffold status: `stagingTrade:buy` and `stagingTrade:sell` handlers no
 
 Phase 5b scaffold status: `stagingTrade:buy` can call `tradeWriteService.js` only after all staging gates pass. Default env state still returns dry-run/no-write. `stagingTrade:sell` remains dry-run because sell-side resource, route completion, realized profit, and cost-basis semantics still need server ownership.
 
+Phase 5c reconciliation status: successful gated buys return server before/after values for credits, resource cargo, cargo hold usage, and cargo capacity. The Trade Terminal displays those server values, prevents duplicate pending buy requests, and refreshes from the existing Supabase save reload path after `applied:true`. If a refresh is unavailable or fails, staging UI keeps the server result visible and tells testers to reload/reopen to sync full save display. The old local buy/sell mutation path remains fenced in staging.
+
 Classification:
 
 - Market definitions: config/static data for now.
@@ -155,7 +157,7 @@ Classification:
 2. Phase 2: Combat loop clarity, bot destruction feedback, contribution, XP preview.
 3. Phase 3: Safe XP-only online reward writes.
 4. Phase 4: Server-side resource/trade prototype with credits and cargo still gated or dry-run. Started with static staging trade offers, server-calculated previews, player-state-aware dry-run validation, read-only trusted `player_saves` checks for verified staging players, and Phase 4c Trade Terminal integration for staging-only dry-run previews.
-5. Phase 5: Server-authoritative trade write prototype with strict validation. Design complete, Phase 5a dry-run contract scaffold added, and Phase 5b buy-only gated write prototype added. Default remains dry-run/no-write; sell remains dry-run.
+5. Phase 5: Server-authoritative trade write prototype with strict validation. Design complete, Phase 5a dry-run contract scaffold added, Phase 5b buy-only gated write prototype added, and Phase 5c post-write reconciliation added. Default remains dry-run/no-write; sell remains dry-run.
 6. Phase 6: Store purchases and ship/equipment ownership.
 7. Phase 7: Inventory/loadout persistence.
 8. Phase 8: Asteroids/resource finding.
@@ -168,7 +170,7 @@ Classification:
 
 - Keep refining staging combat readability and automated tests before broadening reward writes.
 - Next phase: test tiny XP-only writes only with explicit server env gates and an allow-listed verified account, then keep proving duplicate protection before any broader progression path.
-- Manually test Phase 5b with writes disabled first, then enable trade write env vars only for a verified allowlisted test account and a tiny allowed offer.
+- Manually test Phase 5b/5c with writes disabled first, then enable trade write env vars only for a verified allowlisted test account and a tiny allowed offer. Confirm the button enters pending state, the server returns `applied:true`, the Trade Terminal shows server before/after values, and the UI refreshes from cloud save or clearly asks for reload.
 - Next trade implementation pass: add durable trade idempotency/ledger or transactional RPC before broader credit/cargo writes. Keep sell dry-run until server-owned route/trade-total semantics are implemented.
 - Use dedicated ledgers for every real online reward or economic mutation.
 - Treat `player_saves` as an output of verified server actions, not as a client-trusted source for multiplayer rewards.

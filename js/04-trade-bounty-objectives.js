@@ -14,6 +14,10 @@ function isMultiplayerStagingActive() {
   }
 }
 
+let multiplayerStagingTradePending = null;
+let multiplayerStagingTradeLastHandledAt = 0;
+let multiplayerStagingTradeSyncStatus = null;
+
 function blockRealTradeMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingActive()) return false;
 
@@ -94,6 +98,82 @@ function getLastMatchingMultiplayerStagingTradePreview(offerId) {
   return result?.offerId === offerId ? result : null;
 }
 
+function isMultiplayerStagingTradePending(operation = "", offerId = "") {
+  if (!multiplayerStagingTradePending) return false;
+  if (Date.now() - Number(multiplayerStagingTradePending.startedAt || 0) > 10000) {
+    multiplayerStagingTradePending = null;
+    return false;
+  }
+  return (!operation || multiplayerStagingTradePending.operation === operation) &&
+    (!offerId || multiplayerStagingTradePending.offerId === offerId);
+}
+
+function getMultiplayerStagingTradeSyncLine(result) {
+  if (!result?.applied) return "";
+  if (multiplayerStagingTradeSyncStatus?.receivedAt !== result.receivedAt) {
+    return "Cloud save refresh pending.";
+  }
+  if (multiplayerStagingTradeSyncStatus.status === "synced") return "Cloud save refreshed; UI synced from server save.";
+  if (multiplayerStagingTradeSyncStatus.status === "syncing") return "Refreshing cloud save...";
+  return "Server buy applied. Reload or reopen to sync full save display.";
+}
+
+async function reconcileMultiplayerStagingTradeWrite(result) {
+  if (!isMultiplayerStagingActive() || !result?.applied || result.operation !== "buy") return;
+  if (multiplayerStagingTradeLastHandledAt >= Number(result.receivedAt || 0)) return;
+  multiplayerStagingTradeLastHandledAt = Number(result.receivedAt || Date.now());
+  multiplayerStagingTradePending = null;
+  multiplayerStagingTradeSyncStatus = {
+    status: "syncing",
+    receivedAt: result.receivedAt,
+    reason: ""
+  };
+
+  const summary = `Staging buy applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))}, cargo +${formatNumber(result.cargoDelta)} ${result.resourceName || "resource"}.`;
+  if (typeof addHudToast === "function") addHudToast(summary);
+  if (typeof addActivityLog === "function") addActivityLog(`${summary} Refreshing cloud save.`);
+
+  if (typeof loadGameFromSupabase !== "function") {
+    multiplayerStagingTradeSyncStatus = {
+      status: "unavailable",
+      receivedAt: result.receivedAt,
+      reason: "loadGameFromSupabase unavailable"
+    };
+    if (typeof addHudToast === "function") addHudToast("Server buy applied. Reload or reopen to sync full save display.");
+    return;
+  }
+
+  try {
+    const loadResult = await loadGameFromSupabase();
+    if (loadResult?.loaded) {
+      multiplayerStagingTradeSyncStatus = {
+        status: "synced",
+        receivedAt: result.receivedAt,
+        reason: "cloud save refreshed"
+      };
+      if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+      if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
+      return;
+    }
+
+    multiplayerStagingTradeSyncStatus = {
+      status: "failed",
+      receivedAt: result.receivedAt,
+      reason: loadResult?.reason || "cloud save refresh failed"
+    };
+    if (typeof addHudToast === "function") addHudToast("Server buy applied. Reload or reopen to sync full save display.");
+  } catch (_err) {
+    multiplayerStagingTradeSyncStatus = {
+      status: "failed",
+      receivedAt: result.receivedAt,
+      reason: "cloud save refresh failed"
+    };
+    if (typeof addHudToast === "function") addHudToast("Server buy applied. Reload or reopen to sync full save display.");
+  } finally {
+    if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
+  }
+}
+
 function renderMultiplayerStagingTradePreviewResult(offerId) {
   if (!isMultiplayerStagingActive()) return "";
   const result = getLastMatchingMultiplayerStagingTradePreview(offerId);
@@ -113,8 +193,9 @@ function renderMultiplayerStagingTradePreviewResult(offerId) {
     ? `${result.operation.toUpperCase()} ${applied ? "write" : "dry-run"} / `
     : "";
   const writeLine = applied
-    ? `<span>Staging buy applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))} / Cargo +${formatNumber(result.cargoDelta)} ${result.resourceName || "resource"}</span>
-      <span>Reload or cloud-save refresh may be needed for the local UI to reflect the patched save.</span>`
+    ? `<span>Staging buy applied: CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(result.creditsAfter)} (${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))})</span>
+      <span>${result.resourceName || "Cargo"} ${formatNumber(result.cargoBefore)} -> ${formatNumber(result.cargoAfter)} / hold ${formatNumber(result.cargoUsedBefore)} -> ${formatNumber(result.cargoUsedAfter)} of ${formatNumber(result.cargoCapacity)}</span>
+      <span>${getMultiplayerStagingTradeSyncLine(result)}</span>`
     : `<span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>`;
 
   return `
@@ -144,13 +225,29 @@ function requestMultiplayerStagingTradeDryRun({ operation = "buy", offerId = "",
     if (typeof addActivityLog === "function") addActivityLog(message);
     return true;
   }
+  if (isMultiplayerStagingTradePending(operation, offerId)) {
+    if (typeof addHudToast === "function") addHudToast("Server trade request already pending.");
+    return true;
+  }
 
+  multiplayerStagingTradePending = {
+    operation,
+    offerId,
+    quantity,
+    startedAt: Date.now()
+  };
+  let sent = false;
   if (operation === "sell" && typeof window.LupenMultiplayerClient.stagingTradeSell === "function") {
-    window.LupenMultiplayerClient.stagingTradeSell({ offerId, quantity });
+    sent = window.LupenMultiplayerClient.stagingTradeSell({ offerId, quantity });
   } else if (typeof window.LupenMultiplayerClient.stagingTradeBuy === "function") {
-    window.LupenMultiplayerClient.stagingTradeBuy({ offerId, quantity });
+    sent = window.LupenMultiplayerClient.stagingTradeBuy({ offerId, quantity });
   } else {
-    window.LupenMultiplayerClient.requestStagingTradePreview({ offerId, quantity });
+    sent = window.LupenMultiplayerClient.requestStagingTradePreview({ offerId, quantity });
+  }
+  if (!sent || sent.ok === false) {
+    multiplayerStagingTradePending = null;
+    if (typeof addHudToast === "function") addHudToast("MP staging trade request could not be sent.");
+    return true;
   }
   if (typeof addHudToast === "function") addHudToast(`Requested MP staging ${operation} server validation.`);
   window.setTimeout(() => {
@@ -166,6 +263,13 @@ function setupMultiplayerStagingTradeTerminalSubscription() {
   if (!client?.onServerState) return;
 
   const subscription = client.onServerState(() => {
+    const result = getMultiplayerStagingTradeStatus().lastStagingTradeWriteResult;
+    if (result?.receivedAt && multiplayerStagingTradePending &&
+      result.operation === multiplayerStagingTradePending.operation &&
+      result.offerId === multiplayerStagingTradePending.offerId) {
+      multiplayerStagingTradePending = null;
+    }
+    reconcileMultiplayerStagingTradeWrite(result);
     if (document.getElementById("marketScreen")?.classList.contains("active")) {
       renderMarketplace();
     }
@@ -445,6 +549,8 @@ function renderMapOneMarketTerminal(goodsBox) {
   const sellStagingOffer = stagingTradeLocked && held > 0
     ? findMultiplayerStagingTradeOffer({ good: resource, origin: sellStagingOrigin, destination: currentPlanet })
     : null;
+  const buyPending = stagingTradeLocked && buyStagingOffer && isMultiplayerStagingTradePending("buy", buyStagingOffer.offerId);
+  const sellPending = stagingTradeLocked && sellStagingOffer && isMultiplayerStagingTradePending("sell", sellStagingOffer.offerId);
   const canBuy = !stagingTradeLocked && quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
   const info = commodityInfo[resource] || {};
   const stagingTradeNotice = stagingTradeLocked
@@ -510,7 +616,7 @@ function renderMapOneMarketTerminal(goodsBox) {
             <div class="market-amount-control">
               <strong>${formatNumber(quantity)} units</strong>
               <button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
-              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? "Server Buy" : "Preview Unavailable" : "Buy Cargo"}</button>
+              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Server Buy" : "Preview Unavailable" : "Buy Cargo"}</button>
             </div>
           </label>
         </div>
@@ -522,7 +628,7 @@ function renderMapOneMarketTerminal(goodsBox) {
         </div>
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
-          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? "Dry-run Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
+          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer && !sellPending ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? sellPending ? "Checking..." : "Dry-run Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
       </aside>
     </div>

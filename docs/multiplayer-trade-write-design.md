@@ -25,6 +25,7 @@ In `?mp=staging`:
 - The separate Staging Trade Preview overlay remains a dev helper.
 - Phase 5a scaffolding added `stagingTrade:buy` and `stagingTrade:sell` handlers that return write-shaped dry-run results.
 - Phase 5b adds a tiny, heavily gated `stagingTrade:buy` write prototype. It is disabled by default and can patch only root `credits`, root `cargo[resourceName]`, and root `cargoCostBasis[resourceName]` when every staging gate passes.
+- Phase 5c adds post-write reconciliation polish. Successful buy writes return server after-values, the client displays those values, blocks duplicate pending clicks, and refreshes from Supabase instead of using local trade mutation shortcuts.
 - `stagingTrade:sell` remains dry-run only. Sell route completion, realized profit, trade totals, and cost-basis cleanup are not server-authoritative enough yet.
 
 ## Existing Local Trade Mutation Path
@@ -187,9 +188,28 @@ Phase 5b exact gates for a real buy write:
 - root `credits`, root `cargo`, root `cargoCostBasis`, and trusted cargo capacity are valid.
 - server-calculated cost and cargo capacity validation pass.
 
+Phase 5c client reconciliation rules:
+
+- never call the old local buy/sell mutation path after a server write
+- show server `creditsBefore` -> `creditsAfter`
+- show server resource cargo `cargoBefore` -> `cargoAfter`
+- show server hold usage `cargoUsedBefore` -> `cargoUsedAfter` of `cargoCapacity`
+- disable the staging buy button while the request is pending
+- after `applied:true`, call the existing safe cloud save reload path when available
+- if reload fails or is unavailable, keep showing the server result and tell the tester to reload/reopen to sync full save display
+
 ## Result Contracts
 
 Phase 5a buy/sell results use this write-shaped dry-run contract. Phase 5b buy results may return `mode:"trade_write"` and `applied:true` only for the gated buy path.
+
+Successful Phase 5b/5c buy responses must include sanitized reconciliation fields:
+
+- `resourceId`, `resourceName`, `quantity`, `cost`
+- `creditsBefore`, `creditsAfter`
+- `cargoBefore`, `cargoAfter`
+- `cargoUsedBefore`, `cargoUsedAfter`, `cargoCapacity`
+- `writes.creditsWritten:true`, `writes.cargoWritten:true`, `writes.saveWritten:true`
+- `writes.inventoryWritten:false`, `writes.lootWritten:false`, `writes.bountyWritten:false`
 
 Future `stagingTrade:buy` and `stagingTrade:sell` responses should use a shared shape:
 

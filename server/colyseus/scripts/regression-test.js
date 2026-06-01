@@ -831,6 +831,9 @@ async function assertStagingTradeValidationHelpers() {
   assert(appliedWrite.mode === "trade_write", `Unexpected trade write mode: ${appliedWrite.mode}`);
   assert(appliedWrite.creditsWritten === true && appliedWrite.cargoWritten === true && appliedWrite.saveWritten === true, "Applied trade write did not report expected writes.");
   assert(appliedWrite.inventoryWritten === false && appliedWrite.lootWritten === false && appliedWrite.bountyWritten === false, "Applied trade write reported forbidden writes.");
+  assert(appliedWrite.creditsBefore === 1000 && appliedWrite.creditsAfter === 964, "Applied trade write did not include credit after-values.");
+  assert(appliedWrite.cargoBefore === 1 && appliedWrite.cargoAfter === 3, "Applied trade write did not include resource cargo after-values.");
+  assert(appliedWrite.cargoUsedBefore === 5 && appliedWrite.cargoUsedAfter === 7 && appliedWrite.cargoCapacity === 20, "Applied trade write did not include cargo hold after-values.");
 
   console.log("staging trade validation and gated buy write helpers passed");
 }

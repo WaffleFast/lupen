@@ -2688,7 +2688,8 @@
         setDiagnosticsRow(panel, "trade write", `${tradeWrite.operation || "trade"} / ${tradeWrite.mode || "dry_run"} / applied ${tradeWrite.applied ? "yes" : "no"} / writes ${tradeWrite.saveWritten ? "yes" : "no"}`);
         setDiagnosticsRow(panel, "trade gates", `verified ${tradeWrite.gates?.verified ? "yes" : "no"} / enabled ${tradeWrite.gates?.writeEnabled ? "yes" : "no"} / dry ${tradeWrite.gates?.dryRun ? "yes" : "no"}`);
         if (tradeWrite.applied) {
-          setDiagnosticsRow(panel, "trade delta", `CR ${formatTradeNumber(tradeWrite.creditsDelta)} / cargo +${formatTradeNumber(tradeWrite.cargoDelta)} ${tradeWrite.resourceName || ""}`);
+          setDiagnosticsRow(panel, "trade delta", `CR ${formatTradeNumber(tradeWrite.creditsBefore)} -> ${formatTradeNumber(tradeWrite.creditsAfter)} / ${tradeWrite.resourceName || "cargo"} ${formatTradeNumber(tradeWrite.cargoBefore)} -> ${formatTradeNumber(tradeWrite.cargoAfter)}`);
+          setDiagnosticsRow(panel, "trade hold", `${formatTradeNumber(tradeWrite.cargoUsedBefore)} -> ${formatTradeNumber(tradeWrite.cargoUsedAfter)} / ${formatTradeNumber(tradeWrite.cargoCapacity)}`);
         }
       }
     }
