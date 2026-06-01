@@ -19,6 +19,7 @@
   const stagingFlowHintId = "lupenMultiplayerStagingFlowHint";
   const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
   const stagingCombatPanelId = "lupenMultiplayerStagingCombatPanel";
+  const stagingBountyPanelId = "lupenMultiplayerStagingBountyPanel";
   const stagingTradePanelId = "lupenMultiplayerStagingTradePanel";
   const styleId = "lupenMultiplayerOverlayStyles";
   let unsubscribe = null;
@@ -27,6 +28,7 @@
   let stagingTradeOfferId = "";
   let stagingTradeQuantity = 5;
   let stagingTradeOffersRequested = false;
+  let stagingBountyRequested = false;
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const shipImageById = {
@@ -332,6 +334,77 @@
         opacity: 0.48;
         cursor: default;
         box-shadow: none;
+      }
+
+      #${stagingBountyPanelId} {
+        position: fixed;
+        left: 14px;
+        bottom: 236px;
+        z-index: 75;
+        width: min(318px, calc(100vw - 28px));
+        border: 1px solid rgba(111, 221, 255, 0.34);
+        border-radius: 6px;
+        background: linear-gradient(180deg, rgba(9, 21, 31, 0.9), rgba(7, 10, 17, 0.88));
+        box-shadow: 0 0 18px rgba(66, 195, 255, 0.14), inset 0 0 20px rgba(99, 211, 255, 0.05);
+        color: #d9f7ff;
+        font-family: Arial, sans-serif;
+        pointer-events: auto;
+        text-transform: uppercase;
+      }
+
+      #${stagingBountyPanelId} .lupen-mp-bounty-inner {
+        display: grid;
+        gap: 7px;
+        padding: 9px 10px;
+      }
+
+      #${stagingBountyPanelId} .lupen-mp-bounty-kicker {
+        color: rgba(142, 225, 255, 0.72);
+        font: 900 9px/1 Arial, sans-serif;
+        letter-spacing: 0.08em;
+      }
+
+      #${stagingBountyPanelId} strong {
+        color: #effcff;
+        font: 900 14px/1.1 Arial, sans-serif;
+      }
+
+      #${stagingBountyPanelId} span {
+        color: rgba(221, 247, 255, 0.82);
+        font: 800 10px/1.3 Arial, sans-serif;
+      }
+
+      #${stagingBountyPanelId} .lupen-mp-bounty-progress {
+        height: 7px;
+        overflow: hidden;
+        border: 1px solid rgba(127, 220, 255, 0.28);
+        border-radius: 999px;
+        background: rgba(10, 21, 32, 0.88);
+      }
+
+      #${stagingBountyPanelId} .lupen-mp-bounty-progress i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #58d7ff, #f2e58d);
+        box-shadow: 0 0 10px rgba(94, 213, 255, 0.52);
+      }
+
+      #${stagingBountyPanelId} button {
+        justify-self: start;
+        border: 1px solid rgba(139, 231, 255, 0.48);
+        border-radius: 4px;
+        background: rgba(83, 198, 255, 0.14);
+        color: #effcff;
+        cursor: pointer;
+        font: 900 10px/1 Arial, sans-serif;
+        padding: 7px 10px;
+        text-transform: uppercase;
+      }
+
+      #${stagingBountyPanelId} button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
       }
 
       #${stagingTradePanelId} {
@@ -923,6 +996,10 @@
     global.document?.getElementById(stagingCombatPanelId)?.remove();
   }
 
+  function removeStagingBountyPanel() {
+    global.document?.getElementById(stagingBountyPanelId)?.remove();
+  }
+
   function removeStagingTradePanel() {
     global.document?.getElementById(stagingTradePanelId)?.remove();
   }
@@ -934,6 +1011,7 @@
     removeStatusChip();
     removeStagingFlowHint();
     removeStagingCombatPanel();
+    removeStagingBountyPanel();
     removeStagingTradePanel();
   }
 
@@ -1844,6 +1922,10 @@
       reward_preview_not_eligible: "not eligible for this preview",
       reward_preview_not_found: "reward preview was not found",
       reward_preview_id_mismatch: "reward preview id mismatch",
+      staging_bounty_not_accepted: "staging bounty is not accepted",
+      staging_bounty_not_complete: "staging bounty is not complete",
+      staging_bounty_already_claimed: "staging bounty already claimed",
+      unknown_staging_bounty: "unknown staging bounty",
       staging_preview_only: "preview-only staging claim"
     };
     return labels[safeReason] || safeReason || "not eligible";
@@ -2005,6 +2087,11 @@
     const plan = status?.lastRewardClaimResult?.rewardWritePlan;
     if (!plan) return "";
 
+    const playerSave = status?.lastRewardClaimResult?.playerSavePatchResult;
+    if (playerSave?.applied) {
+      return `XP applied ${formatPreviewValue(playerSave.xpBefore)} -> ${formatPreviewValue(playerSave.xpAfter)} / Credits unchanged / Loot none / Save refresh requested`;
+    }
+
     const ledger = status?.lastRewardClaimResult?.rewardLedgerResult;
     const application = status?.lastRewardClaimResult?.rewardApplicationResult;
     const eligibility = plan.eligible ? "Eligible" : `Blocked: ${plan.blockedReason || "not verified"}`;
@@ -2024,6 +2111,10 @@
     const result = status?.lastRewardClaimResult?.rewardApplicationResult;
     const plan = status?.lastRewardClaimResult?.rewardApplicationPlan || result?.plan;
     if (!plan && !result) return "";
+
+    if (status?.lastRewardClaimResult?.playerSavePatchResult?.applied) {
+      return `eligible / idempotency ready / XP +${plan?.xpDelta || 0} / credits not applied / loot none / player_saves XP-only patch applied`;
+    }
 
     const eligibility = plan?.eligible ? "eligible" : `blocked ${plan?.blockedReason || result?.skippedReason || "not verified"}`;
     const loot = plan?.lootAdditions?.length ? plan.lootAdditions.join(", ") : "none";
@@ -2046,7 +2137,8 @@
     if (!preview.available) return `Save preview unavailable / ${preview.reason || "unknown"} / not saved`;
 
     const loot = preview.intendedLootAdditions?.length ? preview.intendedLootAdditions.join(", ") : "none";
-    return `XP ${formatPreviewValue(preview.currentXp)} -> ${formatPreviewValue(preview.previewXp)} / C ${formatPreviewValue(preview.currentCredits)} -> ${formatPreviewValue(preview.previewCredits)} / loot ${loot} / not saved`;
+    const playerSaveApplied = status?.lastRewardClaimResult?.playerSavePatchResult?.applied === true;
+    return `XP ${formatPreviewValue(preview.currentXp)} -> ${formatPreviewValue(preview.previewXp)} / C ${formatPreviewValue(preview.currentCredits)} -> ${formatPreviewValue(preview.previewCredits)} / loot ${loot} / ${playerSaveApplied ? "XP saved only" : "not saved"}`;
   }
 
   function getProgressionShadowLabel(status) {
@@ -2607,6 +2699,123 @@
     spaceScreen.appendChild(panel);
   }
 
+  function getActiveStagingBounty(status) {
+    return status?.lastStagingBountyStatus?.active ||
+      status?.lastStagingBountyList?.active ||
+      status?.lastStagingBountyList?.bounties?.[0] ||
+      null;
+  }
+
+  function getStagingBountyClaimLabel(status) {
+    const result = status?.lastStagingBountyClaimResult;
+    if (!result) return "";
+    const bounty = result.bounty || {};
+    const xp = Math.round(Number(result.xpDelta || bounty.xpReward || 0));
+    if (result.applied || result.playerSavePatchResult?.applied || result.playerSave?.written) {
+      const before = result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore;
+      const after = result.playerSavePatchResult?.xpAfter ?? result.playerSave?.xpAfter;
+      return `XP applied ${formatPreviewValue(before)} -> ${formatPreviewValue(after)}. No credits or loot.`;
+    }
+    if (result.reason === "staging_bounty_already_claimed") return "Already claimed. Duplicate reward blocked.";
+    if (result.mode === "blocked" || result.ok === false) return `Blocked: ${getFriendlyClaimReason(result.debugReason || result.reason)}.`;
+    return `Simulated: +${xp} XP preview. No credits or loot.`;
+  }
+
+  function requestStagingBountyIfNeeded(status) {
+    if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) {
+      stagingBountyRequested = false;
+      return;
+    }
+    const client = getClient();
+    if (!client?.requestStagingBounties) return;
+    if (stagingBountyRequested && (status.lastStagingBountyList || status.lastStagingBountyStatus)) return;
+    stagingBountyRequested = true;
+    client.requestStagingBounties();
+    client.requestStagingBountyStatus?.();
+  }
+
+  function renderStagingBountyPanel(status) {
+    removeStagingBountyPanel();
+    requestStagingBountyIfNeeded(status);
+    if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) return;
+
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return;
+
+    const bounty = getActiveStagingBounty(status);
+    if (!bounty?.id) return;
+
+    ensureStyles();
+
+    const panel = global.document.createElement("div");
+    panel.id = stagingBountyPanelId;
+    panel.setAttribute("aria-label", "Staging bounty objective");
+
+    const inner = global.document.createElement("div");
+    inner.className = "lupen-mp-bounty-inner";
+
+    const kicker = global.document.createElement("div");
+    kicker.className = "lupen-mp-bounty-kicker";
+    kicker.textContent = "STAGING BOUNTY";
+    inner.appendChild(kicker);
+
+    const title = global.document.createElement("strong");
+    title.textContent = bounty.title || "Erebus Patrol Sweep";
+    inner.appendChild(title);
+
+    const objective = global.document.createElement("span");
+    objective.textContent = bounty.accepted
+      ? `Destroy staging Erebus bots: ${Math.round(Number(bounty.progress || 0))}/${Math.round(Number(bounty.requiredKills || 2))}`
+      : "Destroy 2 staging Erebus bots";
+    inner.appendChild(objective);
+
+    const progress = global.document.createElement("div");
+    progress.className = "lupen-mp-bounty-progress";
+    const fill = global.document.createElement("i");
+    fill.style.width = `${getPercent(Number(bounty.progress || 0), Number(bounty.requiredKills || 2))}%`;
+    progress.appendChild(fill);
+    inner.appendChild(progress);
+
+    const reward = global.document.createElement("span");
+    reward.textContent = `XP-only reward +${Math.round(Number(bounty.xpReward || 0))}. No credits or loot.`;
+    inner.appendChild(reward);
+
+    const claimLabel = getStagingBountyClaimLabel(status);
+    if (claimLabel) {
+      const result = global.document.createElement("span");
+      result.textContent = claimLabel;
+      inner.appendChild(result);
+    }
+
+    const button = global.document.createElement("button");
+    button.type = "button";
+    if (!bounty.accepted) {
+      button.textContent = "Accept";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        getClient()?.acceptStagingBounty?.({ bountyId: bounty.id });
+      });
+    } else if (bounty.claimed) {
+      button.textContent = "Claimed";
+      button.disabled = true;
+    } else if (bounty.claimAvailable || bounty.completed) {
+      button.textContent = "Claim XP";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        getClient()?.claimStagingBounty?.({ bountyId: bounty.id });
+      });
+    } else {
+      button.textContent = "In Progress";
+      button.disabled = true;
+    }
+    inner.appendChild(button);
+
+    panel.appendChild(inner);
+    spaceScreen.appendChild(panel);
+  }
+
   function renderDiagnostics(players, bots) {
     removeDiagnosticsPanel();
     if (!isEnabled()) return;
@@ -2669,6 +2878,13 @@
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
       setDiagnosticsRow(panel, "claim preview", getRewardClaimResultLabel(status));
+      const bounty = getActiveStagingBounty(status);
+      if (bounty) {
+        setDiagnosticsRow(panel, "bounty", `${bounty.accepted ? "accepted" : "available"} / ${Math.round(Number(bounty.progress || 0))}/${Math.round(Number(bounty.requiredKills || 0))} / claim ${bounty.claimAvailable ? "yes" : "no"}`);
+      }
+      if (status.lastStagingBountyClaimResult) {
+        setDiagnosticsRow(panel, "bounty claim", `${status.lastStagingBountyClaimResult.mode || "unknown"} / XP +${Math.round(Number(status.lastStagingBountyClaimResult.xpDelta || 0))} / ${status.lastStagingBountyClaimResult.reason || "none"}`);
+      }
       if (status.lastRewardClaimResult) {
         const claimStatus = getClaimStatusSummary(status.lastRewardClaimResult);
         setDiagnosticsRow(panel, "claim mode", `${claimStatus.mode || "unknown"} / XP +${Math.round(Number(claimStatus.xpDelta || 0))}`);
@@ -2757,7 +2973,7 @@
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
     note.textContent = isStagingMode(status)
-      ? "Staging multiplayer reward path - XP only when verified and explicitly enabled; no credits, loot, bounties, or PvP."
+      ? "Staging multiplayer reward path - XP only when verified and explicitly enabled; no credits, loot, normal bounty writes, or PvP."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 
@@ -2781,6 +2997,7 @@
     const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
     renderStatusChip(status);
     renderStagingFlowHint(status, selectedBot, players, bots);
+    renderStagingBountyPanel(status);
     renderStagingTradePanel(status);
     renderSectorGhosts(players);
     renderSectorBots(bots);

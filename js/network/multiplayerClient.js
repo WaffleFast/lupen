@@ -48,6 +48,9 @@
     lastStagingStorePurchase: null,
     lastStagingLoadoutPreview: null,
     lastStagingLoadoutEquip: null,
+    lastStagingBountyList: null,
+    lastStagingBountyStatus: null,
+    lastStagingBountyClaimResult: null,
     lastError: null
   };
   const identity = {
@@ -503,6 +506,23 @@
     });
   }
 
+  function refreshCloudSaveAfterStagingXpClaim(result) {
+    const playerSaveWritten = result?.playerSave?.written === true ||
+      result?.claimStatus?.playerSave?.written === true ||
+      result?.playerSavePatchResult?.applied === true;
+    if (!isEnabled() || !playerSaveWritten || typeof global.loadGameFromSupabase !== "function") return;
+
+    Promise.resolve()
+      .then(() => global.loadGameFromSupabase())
+      .then(() => {
+        logDev("refreshed cloud save after staging XP claim");
+      })
+      .catch((error) => {
+        connection.lastServerWarning = "staging_xp_save_refresh_failed";
+        logDev("staging XP save refresh failed", error?.message || error);
+      });
+  }
+
   function normalizeNodeKey(value) {
     return String(value || "")
       .trim()
@@ -887,6 +907,98 @@
       ledger: normalizeClaimLedger(status.ledger),
       progressionShadow: normalizeClaimProgressionShadow(status.progressionShadow),
       playerSave: normalizeClaimPlayerSave(status.playerSave)
+    };
+  }
+
+  function normalizeStagingBounty(bounty) {
+    if (!bounty || typeof bounty !== "object") return null;
+
+    return {
+      id: String(bounty.id || bounty.bountyId || ""),
+      title: String(bounty.title || "Staging Bounty"),
+      description: String(bounty.description || ""),
+      targetType: String(bounty.targetType || ""),
+      requiredKills: Number.isFinite(Number(bounty.requiredKills)) ? Number(bounty.requiredKills) : 0,
+      progress: Number.isFinite(Number(bounty.progress)) ? Number(bounty.progress) : 0,
+      xpReward: Number.isFinite(Number(bounty.xpReward)) ? Number(bounty.xpReward) : 0,
+      creditsReward: Number.isFinite(Number(bounty.creditsReward)) ? Number(bounty.creditsReward) : 0,
+      lootReward: Array.isArray(bounty.lootReward)
+        ? bounty.lootReward.map((item) => String(item || "")).filter(Boolean)
+        : [],
+      accepted: bounty.accepted === true,
+      completed: bounty.completed === true,
+      claimAvailable: bounty.claimAvailable === true,
+      claimed: bounty.claimed === true,
+      completionSequence: Number.isFinite(Number(bounty.completionSequence)) ? Number(bounty.completionSequence) : 0,
+      repeatable: bounty.repeatable === true,
+      stagingOnly: bounty.stagingOnly !== false,
+      lastReason: String(bounty.lastReason || ""),
+      updatedAt: Number.isFinite(Number(bounty.updatedAt)) ? Number(bounty.updatedAt) : 0
+    };
+  }
+
+  function normalizeStagingBountyList(message) {
+    if (!message || typeof message !== "object") return null;
+
+    return {
+      ok: message.ok === true,
+      mode: String(message.mode || "staging_only"),
+      applied: message.applied === true,
+      bounties: Array.isArray(message.bounties)
+        ? message.bounties.map(normalizeStagingBounty).filter(Boolean)
+        : [],
+      active: normalizeStagingBounty(message.active),
+      reason: String(message.reason || ""),
+      creditsWritten: message.creditsWritten === true,
+      lootWritten: message.lootWritten === true,
+      bountyWritten: message.bountyWritten === true,
+      saveWritten: message.saveWritten === true,
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
+    };
+  }
+
+  function normalizeStagingBountyStatus(message) {
+    if (!message || typeof message !== "object") return null;
+
+    return {
+      ok: message.ok === true,
+      reason: String(message.reason || ""),
+      botId: String(message.botId || ""),
+      active: normalizeStagingBounty(message.active),
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
+    };
+  }
+
+  function normalizeStagingBountyClaimResult(message) {
+    if (!message || typeof message !== "object") return null;
+
+    return {
+      ok: message.ok === true,
+      applied: message.applied === true,
+      dryRun: message.dryRun !== false,
+      mode: String(message.mode || ""),
+      reason: String(message.reason || ""),
+      debugReason: String(message.debugReason || ""),
+      bounty: normalizeStagingBounty(message.bounty),
+      xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
+      creditsWritten: message.creditsWritten === true,
+      lootWritten: message.lootWritten === true,
+      bountyWritten: message.bountyWritten === true,
+      saveWritten: message.saveWritten === true,
+      gates: normalizeClaimGates(message.gates || message.claimStatus?.gates),
+      ledger: normalizeClaimLedger(message.ledger || message.claimStatus?.ledger),
+      progressionShadow: normalizeClaimProgressionShadow(message.progressionShadow || message.claimStatus?.progressionShadow),
+      playerSave: normalizeClaimPlayerSave(message.playerSave || message.claimStatus?.playerSave),
+      claimStatus: normalizeRewardClaimStatus(message.claimStatus),
+      rewardWritePlan: normalizeRewardWritePlan(message.rewardWritePlan),
+      rewardLedgerResult: normalizeRewardLedgerResult(message.rewardLedgerResult),
+      rewardApplicationPlan: normalizeRewardApplicationPlan(message.rewardApplicationPlan),
+      rewardApplicationResult: normalizeRewardApplicationResult(message.rewardApplicationResult),
+      progressionPreview: normalizeProgressionPreview(message.progressionPreview),
+      progressionShadowResult: normalizeProgressionShadowResult(message.progressionShadowResult),
+      playerSavePatchPlan: normalizePlayerSavePatchPlan(message.playerSavePatchPlan),
+      playerSavePatchResult: normalizePlayerSavePatchResult(message.playerSavePatchResult),
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
     };
   }
 
@@ -1458,7 +1570,43 @@
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
+      refreshCloudSaveAfterStagingXpClaim(connection.lastRewardClaimResult);
       logDev("server staging reward claim preview result", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingBounty:listResult", (message) => {
+      connection.lastStagingBountyList = normalizeStagingBountyList(message);
+      if (connection.lastStagingBountyList?.active?.accepted) {
+        connection.lastStagingBountyStatus = {
+          ok: true,
+          reason: connection.lastStagingBountyList.reason,
+          active: connection.lastStagingBountyList.active,
+          receivedAt: connection.lastStagingBountyList.receivedAt
+        };
+      }
+      logDev("server staging bounty list", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingBounty:statusResult", (message) => {
+      connection.lastStagingBountyStatus = normalizeStagingBountyStatus(message);
+      logDev("server staging bounty status", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingBounty:claimResult", (message) => {
+      connection.lastStagingBountyClaimResult = normalizeStagingBountyClaimResult(message);
+      if (connection.lastStagingBountyClaimResult?.bounty) {
+        connection.lastStagingBountyStatus = {
+          ok: true,
+          reason: connection.lastStagingBountyClaimResult.reason,
+          active: connection.lastStagingBountyClaimResult.bounty,
+          receivedAt: connection.lastStagingBountyClaimResult.receivedAt
+        };
+      }
+      refreshCloudSaveAfterStagingXpClaim(connection.lastStagingBountyClaimResult);
+      logDev("server staging bounty claim result", message);
       notifyServerState(activeRoom.state || null);
     });
 
@@ -1640,6 +1788,27 @@
       lastStagingStorePurchase: connection.lastStagingStorePurchase ? { ...connection.lastStagingStorePurchase } : null,
       lastStagingLoadoutPreview: connection.lastStagingLoadoutPreview ? { ...connection.lastStagingLoadoutPreview } : null,
       lastStagingLoadoutEquip: connection.lastStagingLoadoutEquip ? { ...connection.lastStagingLoadoutEquip } : null,
+      lastStagingBountyList: connection.lastStagingBountyList
+        ? {
+          ...connection.lastStagingBountyList,
+          bounties: Array.isArray(connection.lastStagingBountyList.bounties)
+            ? connection.lastStagingBountyList.bounties.map((bounty) => ({ ...bounty }))
+            : [],
+          active: connection.lastStagingBountyList.active ? { ...connection.lastStagingBountyList.active } : null
+        }
+        : null,
+      lastStagingBountyStatus: connection.lastStagingBountyStatus
+        ? {
+          ...connection.lastStagingBountyStatus,
+          active: connection.lastStagingBountyStatus.active ? { ...connection.lastStagingBountyStatus.active } : null
+        }
+        : null,
+      lastStagingBountyClaimResult: connection.lastStagingBountyClaimResult
+        ? {
+          ...connection.lastStagingBountyClaimResult,
+          bounty: connection.lastStagingBountyClaimResult.bounty ? { ...connection.lastStagingBountyClaimResult.bounty } : null
+        }
+        : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
@@ -1817,6 +1986,27 @@
       return sendRoomMessage("claimStagingRewardPreview", "reward:claim_preview", {
         botId: options.botId || preview.botId || "",
         rewardPreviewId: options.rewardPreviewId || preview.rewardPreviewId || ""
+      });
+    },
+
+    requestStagingBounties() {
+      return sendRoomMessage("requestStagingBounties", "stagingBounty:list", {});
+    },
+
+    acceptStagingBounty(options = {}) {
+      return sendRoomMessage("acceptStagingBounty", "stagingBounty:accept", {
+        bountyId: String(options.bountyId || "staging_erebus_patrol_2")
+      });
+    },
+
+    requestStagingBountyStatus() {
+      return sendRoomMessage("requestStagingBountyStatus", "stagingBounty:status", {});
+    },
+
+    claimStagingBounty(options = {}) {
+      const active = connection.lastStagingBountyStatus?.active || connection.lastStagingBountyList?.active || {};
+      return sendRoomMessage("claimStagingBounty", "stagingBounty:claim", {
+        bountyId: String(options.bountyId || active.id || "staging_erebus_patrol_2")
       });
     },
 

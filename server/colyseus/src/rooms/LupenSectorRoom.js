@@ -32,6 +32,15 @@ import {
   getStagingStoreItems
 } from "../config/stagingStoreConfig.js";
 import {
+  STAGING_BOUNTY,
+  STAGING_BOUNTY_ID,
+  buildStagingBountySourceEventId,
+  createStagingBountyState,
+  getPublicStagingBountyState,
+  getStagingBounties,
+  recordStagingBountyBotDestruction
+} from "../config/stagingBountyConfig.js";
+import {
   fetchPlayerTradeValidationState
 } from "../services/playerSaveReadService.js";
 import {
@@ -448,7 +457,7 @@ function getClaimDebugReason({
   );
 }
 
-function buildRewardClaimStatus({
+export function buildRewardClaimStatus({
   ok = true,
   reason = "",
   rewardWritePlan = null,
@@ -685,8 +694,9 @@ function validateTargetSelectionPayload(message = {}) {
 // This room mirrors local player display/location data and server-owned dummy
 // bot positions for dev ghosts only. It does not persist state, grant rewards,
 // run real combat, or control the real single-player game. Staging combat
-// intents may apply tiny server-owned test damage to visual bots only; this
-// never grants progression, loot, saves, bounties, XP, credits, or rewards.
+// intents may apply tiny server-owned test damage to visual bots only. The
+// staging bounty wrapper is room/session scoped; it never writes normal bounty
+// state, loot, credits, PvP, player damage, or broad progression.
 export class LupenSectorRoom extends Room {
   onCreate() {
     this.setState(new LupenSectorState());
@@ -702,6 +712,10 @@ export class LupenSectorRoom extends Room {
     // Durable duplicate protection should later use a server-side ledger
     // uniqueness key such as source_event_id before real progression writes.
     this.rewardApplicationIdempotencyKeys = new Set();
+    // Room/session scoped staging bounty state. This deliberately does not
+    // touch local bounty arrays, Supabase bounty tables, route completion,
+    // loot, credits, or normal single-player objective state.
+    this.stagingBountyStates = new Map();
 
     this.spawnDummyBots();
     this.botInterval = this.clock.setInterval(() => {
@@ -762,6 +776,22 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("staging:claimRewardPreview", async (client, message = {}) => {
       await this.claimRewardPreview(client, message, "staging:claimRewardPreview");
+    });
+
+    this.onMessage("stagingBounty:list", (client) => {
+      this.sendStagingBountyList(client);
+    });
+
+    this.onMessage("stagingBounty:accept", (client, message = {}) => {
+      this.acceptStagingBounty(client, message);
+    });
+
+    this.onMessage("stagingBounty:status", (client) => {
+      this.sendStagingBountyStatus(client);
+    });
+
+    this.onMessage("stagingBounty:claim", async (client, message = {}) => {
+      await this.claimStagingBounty(client, message);
     });
 
     // Staging-only trade dry-run endpoints. These preview deterministic
@@ -911,6 +941,7 @@ export class LupenSectorRoom extends Room {
 
   onLeave(client) {
     this.state.players.delete(client.sessionId);
+    this.stagingBountyStates.delete(client.sessionId);
   }
 
   onDispose() {
@@ -1236,6 +1267,270 @@ export class LupenSectorRoom extends Room {
     };
   }
 
+  getStagingBountyState(sessionId) {
+    return this.stagingBountyStates.get(getStringValue(sessionId)) || null;
+  }
+
+  sendStagingBountyList(client) {
+    this.touchPlayer(client.sessionId);
+    client.send("stagingBounty:listResult", {
+      ok: true,
+      mode: "staging_only",
+      applied: false,
+      bounties: getStagingBounties(),
+      active: getPublicStagingBountyState(this.getStagingBountyState(client.sessionId)),
+      reason: "staging_bounty_list",
+      creditsWritten: false,
+      lootWritten: false,
+      bountyWritten: false,
+      saveWritten: false,
+      receivedAt: Date.now()
+    });
+  }
+
+  acceptStagingBounty(client, message = {}) {
+    this.touchPlayer(client.sessionId);
+    const bountyId = getStringValue(message.bountyId || STAGING_BOUNTY_ID);
+    if (bountyId !== STAGING_BOUNTY_ID) {
+      client.send("stagingBounty:statusResult", {
+        ok: false,
+        reason: "unknown_staging_bounty",
+        bountyId,
+        active: getPublicStagingBountyState(this.getStagingBountyState(client.sessionId)),
+        receivedAt: Date.now()
+      });
+      return;
+    }
+
+    const existing = this.getStagingBountyState(client.sessionId);
+    if (existing?.claimed) {
+      client.send("stagingBounty:statusResult", {
+        ok: true,
+        reason: "staging_bounty_already_claimed",
+        active: getPublicStagingBountyState(existing),
+        receivedAt: Date.now()
+      });
+      return;
+    }
+
+    if (existing?.accepted && !existing.claimed) {
+      client.send("stagingBounty:statusResult", {
+        ok: true,
+        reason: "staging_bounty_already_active",
+        active: getPublicStagingBountyState(existing),
+        receivedAt: Date.now()
+      });
+      return;
+    }
+
+    const nextState = createStagingBountyState(client.sessionId, Date.now());
+    this.stagingBountyStates.set(client.sessionId, nextState);
+    client.send("stagingBounty:statusResult", {
+      ok: true,
+      reason: "staging_bounty_accepted",
+      active: getPublicStagingBountyState(nextState),
+      receivedAt: Date.now()
+    });
+  }
+
+  sendStagingBountyStatus(client, reason = "staging_bounty_status") {
+    this.touchPlayer(client.sessionId);
+    client.send("stagingBounty:statusResult", {
+      ok: true,
+      reason,
+      active: getPublicStagingBountyState(this.getStagingBountyState(client.sessionId)),
+      receivedAt: Date.now()
+    });
+  }
+
+  updateStagingBountyProgressForDisabledBot(bot, contributionSummary, disabledBySessionId) {
+    const contributorSessionIds = (Array.isArray(contributionSummary?.contributors) ? contributionSummary.contributors : [])
+      .map((contributor) => getStringValue(contributor?.sessionId))
+      .filter(Boolean);
+    if (disabledBySessionId) contributorSessionIds.push(getStringValue(disabledBySessionId));
+    const uniqueContributors = Array.from(new Set(contributorSessionIds));
+
+    uniqueContributors.forEach((sessionId) => {
+      const currentState = this.getStagingBountyState(sessionId);
+      const result = recordStagingBountyBotDestruction(currentState, {
+        botId: bot?.id,
+        contributorSessionIds: uniqueContributors,
+        now: Date.now()
+      });
+      if (!result.changed) return;
+      this.stagingBountyStates.set(sessionId, result.state);
+      const targetClient = this.clients.find((candidate) => candidate.sessionId === sessionId);
+      targetClient?.send("stagingBounty:statusResult", {
+        ok: true,
+        reason: result.reason,
+        active: getPublicStagingBountyState(result.state),
+        botId: bot?.id || "",
+        receivedAt: Date.now()
+      });
+    });
+  }
+
+  buildStagingBountyRewardWritePlan(client, bountyState) {
+    const identity = this.getPlayerIdentitySnapshot(client.sessionId);
+    const trustedPlayerId = identity.trustedPlayerId || identity.playerId || identity.supabaseUserId || "";
+    const eligible = identity.authStatus === "verified" && !!trustedPlayerId;
+    const sourceEventId = buildStagingBountySourceEventId(bountyState, trustedPlayerId || client.sessionId);
+    return {
+      playerId: eligible ? trustedPlayerId : "",
+      trustedPlayerId: eligible ? trustedPlayerId : "",
+      authStatus: identity.authStatus || "guest",
+      displayName: identity.displayName || "Pilot",
+      botId: STAGING_BOUNTY.id,
+      botName: STAGING_BOUNTY.title,
+      node: this.state.players.get(client.sessionId)?.currentNode || "",
+      finalHitBy: client.sessionId,
+      topContributorSessionId: client.sessionId,
+      contributorSessionId: client.sessionId,
+      contributionPercent: 100,
+      intendedXp: STAGING_BOUNTY.xpReward,
+      intendedCredits: 0,
+      intendedLoot: [],
+      intendedReason: "staging_bounty_completed",
+      rewardPreviewId: sourceEventId,
+      eligible,
+      blockedReason: eligible ? "" : identity.authStatus === "guest" ? "identity_guest" : "identity_unverified",
+      applied: false,
+      dryRun: true
+    };
+  }
+
+  async claimStagingBounty(client, message = {}) {
+    const player = this.touchPlayer(client.sessionId);
+    const bountyId = getStringValue(message.bountyId || STAGING_BOUNTY_ID);
+    const bountyState = this.getStagingBountyState(client.sessionId);
+    const publicState = getPublicStagingBountyState(bountyState);
+    const blockedReason = !player
+      ? "session_player_not_found"
+      : bountyId !== STAGING_BOUNTY_ID
+        ? "unknown_staging_bounty"
+        : !bountyState?.accepted
+          ? "staging_bounty_not_accepted"
+          : bountyState.claimed
+            ? "staging_bounty_already_claimed"
+            : !publicState.completed
+              ? "staging_bounty_not_complete"
+              : "";
+
+    if (blockedReason) {
+      client.send("stagingBounty:claimResult", {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        mode: "blocked",
+        reason: blockedReason,
+        bounty: publicState,
+        creditsWritten: false,
+        lootWritten: false,
+        bountyWritten: false,
+        saveWritten: false,
+        receivedAt: Date.now()
+      });
+      return;
+    }
+
+    const rewardWritePlan = this.buildStagingBountyRewardWritePlan(client, bountyState);
+    const sourceEventId = rewardWritePlan.rewardPreviewId;
+    const rewardLedgerEntry = buildRewardLedgerEntry(rewardWritePlan, {
+      roomName: this.roomName || "lupen_sector",
+      sourceEventId
+    });
+    const rewardLedgerResult = await writeRewardLedgerEntry(rewardLedgerEntry);
+    const rewardApplicationPlan = buildRewardApplicationPlan(rewardWritePlan, {
+      sourceLedgerId: rewardLedgerResult?.ledgerId || "",
+      sourceEventId
+    });
+    const rewardApplicationResult = await applyRewardApplicationPlan(rewardApplicationPlan);
+    const savePreviewContext = rewardApplicationPlan.eligible
+      ? await fetchPlayerSavePreviewContext(rewardApplicationPlan.playerId)
+      : {
+        ok: false,
+        available: false,
+        reason: rewardApplicationPlan.blockedReason || "reward_application_not_eligible",
+        playerId: rewardApplicationPlan.playerId || "",
+        saveSummary: null
+      };
+    const progressionPreview = buildProgressionPreview(savePreviewContext, rewardApplicationPlan);
+    const progressionShadowEntry = buildProgressionShadowEntry(rewardApplicationPlan, progressionPreview, rewardLedgerResult);
+    const progressionShadowResult = await writeProgressionShadowEntry(progressionShadowEntry);
+    const previewSaveData = progressionPreview.available
+      ? {
+        credits: progressionPreview.currentCredits,
+        playerProgress: {
+          combatXp: progressionPreview.currentXp
+        }
+      }
+      : {};
+    const idempotencyKey = rewardApplicationPlan.playerId && rewardApplicationPlan.sourceEventId
+      ? `${rewardApplicationPlan.playerId}:${rewardApplicationPlan.sourceEventId}`
+      : "";
+    const duplicateDetected = idempotencyKey ? this.rewardApplicationIdempotencyKeys.has(idempotencyKey) : false;
+    const playerSavePatchPlan = buildPlayerSavePatchPlan(previewSaveData, rewardApplicationPlan, {
+      sourceEventId,
+      sourceLedgerId: rewardLedgerResult?.ledgerId || "",
+      duplicateDetected
+    });
+    const playerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan);
+    if (playerSavePatchPlan.idempotencyReady &&
+      !playerSavePatchPlan.duplicateDetected &&
+      playerSavePatchResult.applied === true) {
+      this.rewardApplicationIdempotencyKeys.add(playerSavePatchPlan.idempotencyKey);
+      bountyState.claimed = true;
+      bountyState.claimedAt = Date.now();
+      bountyState.updatedAt = bountyState.claimedAt;
+      bountyState.lastReason = "claimed";
+      this.stagingBountyStates.set(client.sessionId, bountyState);
+    }
+
+    const claimStatus = buildRewardClaimStatus({
+      ok: true,
+      reason: "staging_bounty_claim",
+      rewardWritePlan,
+      rewardLedgerResult,
+      rewardApplicationPlan,
+      rewardApplicationResult,
+      progressionShadowResult,
+      playerSavePatchPlan,
+      playerSavePatchResult
+    });
+    const updatedPublicState = getPublicStagingBountyState(this.getStagingBountyState(client.sessionId));
+    client.send("stagingBounty:claimResult", {
+      ok: true,
+      applied: claimStatus.applied === true,
+      dryRun: claimStatus.applied !== true,
+      mode: claimStatus.mode,
+      reason: claimStatus.reason,
+      debugReason: claimStatus.debugReason,
+      bounty: updatedPublicState,
+      xpDelta: claimStatus.xpDelta,
+      creditsWritten: false,
+      lootWritten: false,
+      bountyWritten: false,
+      saveWritten: playerSavePatchResult.applied === true,
+      gates: claimStatus.gates,
+      ledger: claimStatus.ledger,
+      progressionShadow: claimStatus.progressionShadow,
+      playerSave: claimStatus.playerSave,
+      claimStatus,
+      rewardWritePlan,
+      rewardLedgerEntry,
+      rewardLedgerResult,
+      rewardApplicationPlan,
+      rewardApplicationResult,
+      progressionPreview,
+      progressionShadowEntry,
+      progressionShadowResult,
+      playerSavePatchPlan,
+      playerSavePatchResult,
+      receivedAt: Date.now()
+    });
+    this.sendStagingBountyStatus(client, claimStatus.applied ? "staging_bounty_claimed" : "staging_bounty_claim_dry_run");
+  }
+
   sendRewardPreviewRejected(client, reason, message = {}, messageType = "reward:claim_preview") {
     const botId = getStringValue(message.botId);
     const rewardApplicationPlan = buildRewardApplicationPlan({
@@ -1434,16 +1729,16 @@ export class LupenSectorRoom extends Room {
     client.send("reward:claim_preview_result", {
       ...preview,
       ok: true,
-      applied: false,
+      applied: claimStatus.applied === true,
       mode: claimStatus.mode,
       xpDelta: claimStatus.xpDelta,
-      dryRun: true,
-      reason: "staging_preview_only",
+      dryRun: claimStatus.applied !== true,
+      reason: claimStatus.reason,
       debugReason: claimStatus.debugReason,
       messageType,
       sessionId: client.sessionId,
       claimedBySessionId: client.sessionId,
-      claimSimulated: true,
+      claimSimulated: claimStatus.applied !== true,
       gates: claimStatus.gates,
       ledger: claimStatus.ledger,
       progressionShadow: claimStatus.progressionShadow,
@@ -1988,6 +2283,7 @@ export class LupenSectorRoom extends Room {
 
     if (result.disabled) {
       const contributionSummary = this.getContributionSummary(targetBot.id);
+      this.updateStagingBountyProgressForDisabledBot(targetBot, contributionSummary, client.sessionId);
       const rewardPreview = this.buildRewardPreviewPayload(targetBot, client.sessionId, contributionSummary, Date.now());
       this.rewardPreviews.set(targetBot.id, rewardPreview);
 

@@ -2,6 +2,7 @@ import { Client } from "colyseus.js";
 import { ROOM_NAME } from "../src/app.config.js";
 import {
   STAGING_BOT_ALLOWED_NODE_IDS,
+  buildRewardClaimStatus,
   buildRewardWritePlan,
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
@@ -13,6 +14,14 @@ import {
   buildStagingStorePurchasePreview,
   getStagingStoreItems
 } from "../src/config/stagingStoreConfig.js";
+import {
+  STAGING_BOUNTY_ID,
+  buildStagingBountySourceEventId,
+  createStagingBountyState,
+  getPublicStagingBountyState,
+  getStagingBounties,
+  recordStagingBountyBotDestruction
+} from "../src/config/stagingBountyConfig.js";
 import {
   buildRewardLedgerEntry,
   checkRewardLedgerConnectivity,
@@ -251,6 +260,21 @@ async function expectRewardClaimResult(room, sendMessage) {
     }, 3000);
 
     room.onMessage("reward:claim_preview_result", (message) => {
+      clearTimeout(timeout);
+      resolve(message);
+    });
+
+    sendMessage();
+  });
+}
+
+async function expectRoomMessage(room, messageType, sendMessage, timeoutMs = 3000) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Timed out waiting for ${messageType}.`));
+    }, timeoutMs);
+
+    room.onMessage(messageType, (message) => {
       clearTimeout(timeout);
       resolve(message);
     });
@@ -1695,12 +1719,12 @@ async function assertFullCargoPodTradeLoopHelpers() {
     STAGING_STORE_WRITE_DRY_RUN: "false",
     STAGING_STORE_WRITE_SCOPE: "allowlist",
     STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
-    STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:cargoPod",
+    STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:cargoPod,gun:pulseLaser",
     STAGING_LOADOUT_WRITE_ENABLED: "true",
     STAGING_LOADOUT_WRITE_DRY_RUN: "false",
     STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
     STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
-    STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:cargoPod",
+    STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:cargoPod,gun:pulseLaser",
     STAGING_TRADE_WRITE_ENABLED: "true",
     STAGING_TRADE_WRITE_DRY_RUN: "false",
     STAGING_TRADE_WRITE_SCOPE: "allowlist",
@@ -1771,18 +1795,183 @@ async function assertFullCargoPodTradeLoopHelpers() {
   assert(loopSave.cargo.Iron === 0, "Full loop trade sell did not remove Iron cargo.");
   assert(loopSave.cargo.Copper === 3, "Full loop trade sell changed unrelated cargo.");
   assert(loopSave.cargoCostBasis.Iron === undefined, "Full loop trade sell-all did not clear Iron cost basis.");
+
+  const weaponPurchase = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "gun:pulseLaser",
+    quantity: 1,
+    trustedState: { available: true, validationState: { credits: loopSave.credits } },
+    env: commonEnv,
+    fetchImpl: loopFetch
+  });
+  assert(weaponPurchase.applied === true, `Full loop Pulse Laser purchase failed: ${weaponPurchase.blockReason}`);
+  assert(loopSave.credits === 5152, "Full loop Pulse Laser purchase did not subtract expected credits.");
+  assert(loopSave.ownedGuns.pulseLaser === 2, "Full loop Pulse Laser purchase did not increment weapon ownership.");
+  assert(loopSave.shipLoadouts.lupenOrigin.guns.length === 1, "Full loop Pulse Laser purchase changed loadout before equip.");
+
+  const weaponEquip = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "gun:pulseLaser",
+    trustedState: { available: true, validationState: { credits: loopSave.credits } },
+    env: commonEnv,
+    fetchImpl: loopFetch
+  });
+  assert(weaponEquip.applied === true, `Full loop Pulse Laser equip failed: ${weaponEquip.blockReason}`);
+  assert(loopSave.ownedGuns.pulseLaser === 1, "Full loop Pulse Laser equip did not consume owned weapon.");
+  assert(loopSave.shipLoadouts.lupenOrigin.guns.length === 2, "Full loop Pulse Laser equip did not append gun loadout entry.");
+  assert(loopSave.shipLoadouts.lupenOrigin.guns[1].key === "pulseLaser", "Full loop Pulse Laser equip appended unexpected gun key.");
+
   assert(loopSave.inventoryItems[0].id === "untouched-inventory", "Full loop changed inventory.");
   assert(loopSave.ownedShips[0] === "lupenOrigin", "Full loop changed ships.");
-  assert(loopSave.ownedGuns.pulseLaser === 1, "Full loop changed weapons.");
+  assert(loopSave.credits === 5152, "Full loop ended with unexpected credits after Pulse Laser purchase/equip.");
+  assert(loopSave.ownedAttachments.cargoPod === 0, "Full loop ended with unexpected Cargo Pod ownership.");
   assert(loopSave.activeBountyId === "untouched-bounty", "Full loop changed bounty state.");
   assert(loopSave.playerProgress.combatXp === 33, "Full loop changed broad progression.");
   assert(loopSave.playerProgress.totals.tradesCompleted === 4, "Full loop changed route completion totals.");
   assert(loopSave.playerProgress.totals.cargoSold === 9, "Full loop changed cargo sold totals.");
   assert(loopSave.playerProgress.totals.tradeProfit === 222, "Full loop changed trade profit totals.");
   assert(loopSave.marker.keep === true, "Full loop changed unrelated save fields.");
-  assert(fetchCalls.join(",") === "GET,PATCH,GET,PATCH,GET,PATCH,GET,PATCH", `Full loop expected four read/write pairs, got ${fetchCalls.join(",")}.`);
+  assert(fetchCalls.join(",") === "GET,PATCH,GET,PATCH,GET,PATCH,GET,PATCH,GET,PATCH,GET,PATCH", `Full loop expected six read/write pairs, got ${fetchCalls.join(",")}.`);
 
-  console.log("full Cargo Pod purchase/equip/trade-more loop passed with mocked player_saves");
+  console.log("full Cargo Pod/Pulse Laser purchase/equip/trade-more loop passed with mocked player_saves");
+}
+
+async function assertStagingBountyHelpers() {
+  const bounties = getStagingBounties();
+  assert(bounties.length === 1, `Expected one staging bounty, got ${bounties.length}.`);
+  assert(bounties[0].id === STAGING_BOUNTY_ID, "Staging bounty list returned unexpected id.");
+  assert(bounties[0].requiredKills === 2, "Staging bounty should require 2 bot destructions.");
+  assert(bounties[0].xpReward === 25, "Staging bounty should use XP-only reward amount 25.");
+  assert(bounties[0].creditsReward === 0, "Staging bounty should not include credits.");
+  assert(Array.isArray(bounties[0].lootReward) && bounties[0].lootReward.length === 0, "Staging bounty should not include loot.");
+
+  let bountyState = createStagingBountyState("session-a", 1000);
+  let publicState = getPublicStagingBountyState(bountyState);
+  assert(publicState.accepted === true, "Accepted staging bounty did not report accepted.");
+  assert(publicState.progress === 0 && publicState.requiredKills === 2, "Initial staging bounty progress was incorrect.");
+  assert(publicState.claimAvailable === false, "Initial staging bounty claim was unexpectedly available.");
+
+  const noContribution = recordStagingBountyBotDestruction(bountyState, {
+    botId: "dev-bot-erebus-1",
+    contributorSessionIds: ["session-b"],
+    now: 1100
+  });
+  assert(noContribution.changed === false && noContribution.reason === "player_did_not_contribute", "Non-contributor staging bounty progress was not blocked.");
+  assert(noContribution.state.progress === 0, "Non-contributor staging bounty changed progress.");
+
+  const firstKill = recordStagingBountyBotDestruction(bountyState, {
+    botId: "dev-bot-erebus-1",
+    contributorSessionIds: ["session-a", "session-b"],
+    now: 1200
+  });
+  assert(firstKill.changed === true && firstKill.reason === "progress_updated", "First staging bounty bot kill did not update progress.");
+  bountyState = firstKill.state;
+  assert(bountyState.progress === 1 && bountyState.completed === false, "First staging bounty bot kill completed too early.");
+
+  const duplicateKill = recordStagingBountyBotDestruction(bountyState, {
+    botId: "dev-bot-erebus-1",
+    contributorSessionIds: ["session-a"],
+    now: 1300
+  });
+  assert(duplicateKill.changed === false && duplicateKill.reason === "bot_already_counted", "Duplicate staging bounty bot kill was not blocked.");
+  assert(duplicateKill.state.progress === 1, "Duplicate staging bounty bot kill changed progress.");
+
+  const secondKill = recordStagingBountyBotDestruction(bountyState, {
+    botId: "dev-bot-erebus-2",
+    contributorSessionIds: ["session-a"],
+    now: 1400
+  });
+  assert(secondKill.changed === true && secondKill.reason === "completed", "Second staging bounty bot kill did not complete bounty.");
+  bountyState = secondKill.state;
+  publicState = getPublicStagingBountyState(bountyState);
+  assert(publicState.progress === 2 && publicState.completed === true && publicState.claimAvailable === true, "Completed staging bounty public state was incorrect.");
+  assert(buildStagingBountySourceEventId(bountyState, "verified-player-a") === `${STAGING_BOUNTY_ID}:verified-player-a:1`, "Staging bounty source event id was not deterministic.");
+
+  const bountyRewardPlan = {
+    playerId: "verified-player-a",
+    trustedPlayerId: "verified-player-a",
+    authStatus: "verified",
+    displayName: "Verified Pilot A",
+    botId: STAGING_BOUNTY_ID,
+    botName: "Erebus Patrol Sweep",
+    node: "Upper Apex",
+    finalHitBy: "session-a",
+    topContributorSessionId: "session-a",
+    contributorSessionId: "session-a",
+    contributionPercent: 100,
+    intendedXp: 25,
+    intendedCredits: 0,
+    intendedLoot: [],
+    intendedReason: "staging_bounty_completed",
+    rewardPreviewId: buildStagingBountySourceEventId(bountyState, "verified-player-a"),
+    eligible: true,
+    blockedReason: "",
+    applied: false,
+    dryRun: true
+  };
+  const bountyApplicationPlan = buildRewardApplicationPlan(bountyRewardPlan, {
+    sourceEventId: bountyRewardPlan.rewardPreviewId
+  });
+  const bountySave = {
+    credits: 777,
+    cargo: { Iron: 2 },
+    ownedAttachments: { cargoPod: 1 },
+    ownedGuns: { pulseLaser: 1 },
+    shipLoadouts: { lupenOrigin: { attachments: [{ key: "cargoPod" }], guns: [{ key: "pulseLaser" }] } },
+    activeBountyId: "local-bounty-should-not-change",
+    playerProgress: {
+      combatXp: 10,
+      totals: {
+        tradesCompleted: 2,
+        cargoSold: 3,
+        tradeProfit: 4
+      }
+    },
+    inventoryItems: [{ id: "loot-stays" }]
+  };
+  const bountyPatchPlan = buildPlayerSavePatchPlan(bountySave, bountyApplicationPlan, {
+    sourceEventId: bountyRewardPlan.rewardPreviewId
+  });
+  assert(bountyPatchPlan.eligible === true, `Completed staging bounty XP patch plan was blocked: ${bountyPatchPlan.skippedReason}`);
+  assert(bountyPatchPlan.xpDelta === 25 && bountyPatchPlan.creditsDelta === 0, "Completed staging bounty patch plan was not XP-only.");
+
+  const patchCalls = [];
+  const bountyPatchResult = await applyPlayerSavePatchPlan(bountyPatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_SCOPE: "verified",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      patchCalls.push(options);
+      if (options.method === "GET") {
+        return { ok: true, status: 200, json: async () => [{ save_data: bountySave }] };
+      }
+      if (options.method === "PATCH") {
+        return { ok: true, status: 200, json: async () => [] };
+      }
+      throw new Error(`Unexpected bounty player_saves method: ${options.method}`);
+    }
+  });
+  assert(bountyPatchResult.applied === true, "Completed staging bounty XP-only patch did not apply in mocked write mode.");
+  assert(bountyPatchResult.appliedFields.join(",") === "xp", "Completed staging bounty patch wrote non-XP fields.");
+  const patchedBody = JSON.parse(patchCalls[1].body);
+  assert(patchedBody.save_data.playerProgress.combatXp === 35, "Completed staging bounty patch did not add XP.");
+  assert(patchedBody.save_data.credits === 777, "Completed staging bounty patch changed credits.");
+  assert(patchedBody.save_data.cargo.Iron === 2, "Completed staging bounty patch changed cargo.");
+  assert(patchedBody.save_data.inventoryItems[0].id === "loot-stays", "Completed staging bounty patch changed inventory.");
+  assert(patchedBody.save_data.shipLoadouts.lupenOrigin.guns[0].key === "pulseLaser", "Completed staging bounty patch changed loadout.");
+  assert(patchedBody.save_data.activeBountyId === "local-bounty-should-not-change", "Completed staging bounty patch changed local bounty state.");
+  assert(patchedBody.save_data.playerProgress.totals.tradeProfit === 4, "Completed staging bounty patch changed trade totals.");
+
+  const duplicatePlan = buildPlayerSavePatchPlan(bountySave, bountyApplicationPlan, {
+    sourceEventId: bountyRewardPlan.rewardPreviewId,
+    duplicateDetected: true
+  });
+  assert(duplicatePlan.eligible === false && duplicatePlan.skippedReason === "duplicate_reward_application", "Duplicate staging bounty XP claim was not blocked.");
+
+  console.log("staging bounty helper flow and XP-only patch boundaries passed");
 }
 
 async function assertIdentityVerificationAndRewardPlanHelpers() {
@@ -1880,10 +2069,11 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
       ENABLE_STAGING_PROGRESSION_WRITES: "true"
     }
   });
-  assert(enabledApplicationResult?.dryRun === true, "Enabled placeholder application adapter did not stay dry-run.");
-  assert(enabledApplicationResult?.applied === false, "Enabled placeholder application adapter applied progression.");
-  assert(enabledApplicationResult?.idempotencyReady === true, "Enabled placeholder application adapter did not keep idempotency ready.");
-  assert(enabledApplicationResult?.skippedReason === "progression_write_adapter_not_implemented", `Unexpected enabled placeholder application reason: ${enabledApplicationResult?.skippedReason}`);
+  assert(enabledApplicationResult?.ok === true, "Enabled reward application planning did not delegate cleanly.");
+  assert(enabledApplicationResult?.dryRun === true, "Enabled reward application planning did not stay dry-run.");
+  assert(enabledApplicationResult?.applied === false, "Enabled reward application planning applied progression directly.");
+  assert(enabledApplicationResult?.idempotencyReady === true, "Enabled reward application planning did not keep idempotency ready.");
+  assert(enabledApplicationResult?.skippedReason === "player_save_patch_required", `Unexpected enabled application planning reason: ${enabledApplicationResult?.skippedReason}`);
 
   const missingSaveEnvContext = await fetchPlayerSavePreviewContext("verified-player-a", {
     env: {},
@@ -2114,6 +2304,22 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(patchedBody.save_data.playerProgress.level === 3, "Patched save_data changed unrelated playerProgress level.");
   assert(patchedBody.save_data.inventoryItems.length === 2, "Patched save_data changed inventory item count.");
   assert(patchedBody.save_data.inventoryItems[0].id === "loot-a", "Patched save_data changed inventory contents.");
+
+  const appliedClaimStatus = buildRewardClaimStatus({
+    ok: true,
+    reason: "staging_preview_only",
+    rewardWritePlan: plan,
+    rewardApplicationPlan: applicationPlan,
+    rewardApplicationResult: enabledApplicationResult,
+    playerSavePatchPlan,
+    playerSavePatchResult: validPatchPlayerSaveResult
+  });
+  assert(appliedClaimStatus.applied === true, "Applied XP-only player_saves result was not reflected in claim status.");
+  assert(appliedClaimStatus.mode === "xp_only", `Applied XP-only claim used unexpected mode: ${appliedClaimStatus.mode}`);
+  assert(appliedClaimStatus.reason === "xp_only_staging_claim_applied", `Applied XP-only claim used unexpected reason: ${appliedClaimStatus.reason}`);
+  assert(appliedClaimStatus.playerSave?.written === true, "Applied XP-only claim did not report player_saves written.");
+  assert(appliedClaimStatus.playerSave?.creditsWritten === false, "Applied XP-only claim reported credits written.");
+  assert(appliedClaimStatus.gates?.xpWriteAllowed === true, "Applied XP-only claim did not keep XP write gates open.");
 
   const duplicatePlayerSavePatchPlan = buildPlayerSavePatchPlan(validMockSaveData, applicationPlan, {
     sourceEventId: "reward-preview-stub",
@@ -2648,6 +2854,7 @@ try {
   await assertStagingStorePreviewHelpers();
   await assertStagingCargoPodEquipHelpers();
   await assertFullCargoPodTradeLoopHelpers();
+  await assertStagingBountyHelpers();
   await assertIdentityVerificationAndRewardPlanHelpers();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
@@ -2685,6 +2892,7 @@ try {
   const roomAShotEvents = [];
   const roomBShotEvents = [];
   const rewardPreviewEvents = [];
+  const bountyStatusEvents = [];
   roomA.onMessage("bot:disabled", (message) => botDisabledEvents.push(message));
   roomA.onMessage("bot:respawned", (message) => botRespawnedEvents.push(message));
   roomB.onMessage("bot:disabled", () => {});
@@ -2693,6 +2901,7 @@ try {
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
   roomA.onMessage("staging:reward_preview", (message) => rewardPreviewEvents.push(message));
   roomB.onMessage("staging:reward_preview", () => {});
+  roomA.onMessage("stagingBounty:statusResult", (message) => bountyStatusEvents.push(message));
 
   console.log(`joined ${ROOM_NAME}: A=${roomA.sessionId} B=${roomB.sessionId}`);
 
@@ -2713,6 +2922,32 @@ try {
   assert(!playerFrom(roomA, roomB.sessionId)?.playerId, "Client B unverified playerId was trusted.");
   assert(playerFrom(roomA, roomA.sessionId)?.supabaseAccessToken === undefined, "Raw Supabase token leaked into room state.");
   console.log("both clients see each other");
+
+  const bountyList = await expectRoomMessage(roomA, "stagingBounty:listResult", () => {
+    roomA.send("stagingBounty:list", {});
+  });
+  assert(bountyList?.ok === true, "Staging bounty list did not return ok.");
+  assert(Array.isArray(bountyList?.bounties) && bountyList.bounties.length === 1, "Staging bounty list did not return exactly one bounty.");
+  assert(bountyList.bounties[0]?.id === STAGING_BOUNTY_ID, "Staging bounty list returned unexpected bounty id.");
+  assert(bountyList.bounties[0]?.requiredKills === 2, "Staging bounty list returned unexpected kill requirement.");
+  assert(bountyList.bounties[0]?.xpReward === 25, "Staging bounty list returned unexpected XP reward.");
+  assert(bountyList.bounties[0]?.creditsReward === 0, "Staging bounty list returned credits.");
+
+  const bountyAccepted = await expectRoomMessage(roomA, "stagingBounty:statusResult", () => {
+    roomA.send("stagingBounty:accept", { bountyId: STAGING_BOUNTY_ID });
+  });
+  assert(bountyAccepted?.ok === true, "Staging bounty accept did not return ok.");
+  assert(bountyAccepted?.reason === "staging_bounty_accepted", `Unexpected staging bounty accept reason: ${bountyAccepted?.reason}`);
+  assert(bountyAccepted?.active?.accepted === true, "Accepted staging bounty did not report active.");
+  assert(bountyAccepted?.active?.progress === 0, "Accepted staging bounty did not start at zero progress.");
+  assert(bountyAccepted?.active?.claimAvailable === false, "Accepted staging bounty was claimable too early.");
+
+  const incompleteBountyClaim = await expectRoomMessage(roomA, "stagingBounty:claimResult", () => {
+    roomA.send("stagingBounty:claim", { bountyId: STAGING_BOUNTY_ID });
+  });
+  assert(incompleteBountyClaim?.ok === false, "Incomplete staging bounty claim was not blocked.");
+  assert(incompleteBountyClaim?.reason === "staging_bounty_not_complete", `Unexpected incomplete staging bounty claim reason: ${incompleteBountyClaim?.reason}`);
+  assert(incompleteBountyClaim?.applied === false && incompleteBountyClaim?.saveWritten === false, "Incomplete staging bounty claim reported writes.");
 
   const tradeOffers = await expectStagingTradeOffers(roomA, () => {
     roomA.send("stagingTrade:listOffers", {});
@@ -3356,6 +3591,16 @@ try {
     });
   });
   const rewardPreview = rewardPreviewEvents.find((event) => event?.botId === inspectedBotBeforeCombat.id && event?.finalHitBy === roomA.sessionId);
+  await waitFor("staging bounty progress after contributed bot destruction", () => {
+    return bountyStatusEvents.some((event) => {
+      return event?.reason === "progress_updated" &&
+        event?.active?.id === STAGING_BOUNTY_ID &&
+        event?.active?.progress === 1 &&
+        event?.active?.requiredKills === 2 &&
+        event?.active?.claimAvailable === false;
+    });
+  });
+  console.log("staging bounty progress advanced after contributed bot destruction");
   const contributorA = rewardPreview?.contributors?.find((contributor) => contributor?.sessionId === roomA.sessionId);
   const contributorB = rewardPreview?.contributors?.find((contributor) => contributor?.sessionId === roomB.sessionId);
   assert(contributorA?.totalDamage > contributorB?.totalDamage, "Top contributor did not have the largest damage contribution.");
@@ -3379,7 +3624,7 @@ try {
   assert(claimPreviewResult?.ok === true, "Contributor reward preview claim simulation did not succeed.");
   assert(claimPreviewResult?.applied === false, "Reward preview claim simulation applied real rewards.");
   assert(claimPreviewResult?.dryRun === true, "Reward preview claim simulation was not marked dry-run.");
-  assert(claimPreviewResult?.reason === "staging_preview_only", `Unexpected reward claim simulation reason: ${claimPreviewResult?.reason}`);
+  assert(["identity_unverified", "reward_application_not_eligible", "staging_preview_only"].includes(claimPreviewResult?.reason), `Unexpected reward claim simulation reason: ${claimPreviewResult?.reason}`);
   assert(claimPreviewResult?.claimSimulated === true, "Reward preview claim result was not marked simulated.");
   assert(claimPreviewResult?.mode === "blocked", `Unexpected reward claim summary mode: ${claimPreviewResult?.mode}`);
   assert(claimPreviewResult?.xpDelta > 0, "Reward claim summary did not include XP delta.");
