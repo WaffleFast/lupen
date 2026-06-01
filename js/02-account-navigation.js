@@ -1131,7 +1131,9 @@ function openBountyBoard() {
     currentNode = lastPlanetNode || "Asteron Prime";
   }
 
-  ensureDailyBounties();
+  if (typeof isMultiplayerStagingActive !== "function" || !isMultiplayerStagingActive()) {
+    ensureDailyBounties();
+  }
   renderBountyBoard();
   showScreen("bountyScreen");
 }

@@ -17,6 +17,185 @@ function isMultiplayerStagingActive() {
 let multiplayerStagingTradePending = null;
 let multiplayerStagingTradeLastHandledAt = 0;
 let multiplayerStagingTradeSyncStatus = null;
+let multiplayerStagingBountySelectedId = "staging_erebus_patrol_2";
+let multiplayerStagingBountyLastHandledAt = 0;
+let multiplayerStagingBountyPending = null;
+let multiplayerStagingBountySubscribed = false;
+
+function getMultiplayerStagingBountyFallback() {
+  return {
+    id: "staging_erebus_patrol_2",
+    title: "Erebus Patrol Sweep",
+    description: "Destroy 2 server-owned staging Erebus bots.",
+    targetType: "server_bot_destroy",
+    targetFaction: "Erebus",
+    requiredKills: 2,
+    progress: 0,
+    xpReward: 25,
+    creditsReward: 0,
+    lootReward: [],
+    accepted: false,
+    completed: false,
+    claimAvailable: false,
+    claimed: false,
+    stagingOnly: true
+  };
+}
+
+function getMultiplayerStagingBountyStatus() {
+  return window.LupenMultiplayerClient?.getStatus?.() || {};
+}
+
+function isMultiplayerStagingBountyReady() {
+  const status = getMultiplayerStagingBountyStatus();
+  return isMultiplayerStagingActive() && status?.enabled && status?.isConnected;
+}
+
+function getMultiplayerStagingBountyActiveState() {
+  const status = getMultiplayerStagingBountyStatus();
+  return status.lastStagingBountyStatus?.active ||
+    status.lastStagingBountyClaimResult?.bounty ||
+    status.lastStagingBountyList?.active ||
+    null;
+}
+
+function mergeMultiplayerStagingBountyState(bounty) {
+  const active = getMultiplayerStagingBountyActiveState();
+  if (!active?.id || active.id !== bounty?.id) return bounty;
+  return {
+    ...bounty,
+    ...active,
+    title: bounty.title || active.title,
+    description: bounty.description || active.description,
+    requiredKills: Number(active.requiredKills || bounty.requiredKills || 2),
+    xpReward: Number(active.xpReward ?? bounty.xpReward ?? 25),
+    creditsReward: 0,
+    lootReward: []
+  };
+}
+
+function getMultiplayerStagingBounties() {
+  const status = getMultiplayerStagingBountyStatus();
+  const bounties = Array.isArray(status.lastStagingBountyList?.bounties)
+    ? status.lastStagingBountyList.bounties
+    : [];
+  const source = bounties.length ? bounties : [getMultiplayerStagingBountyFallback()];
+  return source.map((bounty) => mergeMultiplayerStagingBountyState({
+    ...getMultiplayerStagingBountyFallback(),
+    ...bounty,
+    creditsReward: 0,
+    lootReward: []
+  }));
+}
+
+function getSelectedMultiplayerStagingBounty() {
+  const bounties = getMultiplayerStagingBounties();
+  const active = getMultiplayerStagingBountyActiveState();
+  if (active?.id) multiplayerStagingBountySelectedId = active.id;
+  if (!multiplayerStagingBountySelectedId || !bounties.some((bounty) => bounty.id === multiplayerStagingBountySelectedId)) {
+    multiplayerStagingBountySelectedId = bounties[0]?.id || "staging_erebus_patrol_2";
+  }
+  return bounties.find((bounty) => bounty.id === multiplayerStagingBountySelectedId) || bounties[0] || getMultiplayerStagingBountyFallback();
+}
+
+function requestMultiplayerStagingBountiesIfNeeded() {
+  if (!isMultiplayerStagingActive()) return;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.requestStagingBounties || !status?.enabled || !status?.isConnected) return;
+  if (!status.lastStagingBountyList) client.requestStagingBounties();
+  if (!status.lastStagingBountyStatus) client.requestStagingBountyStatus?.();
+}
+
+function getMultiplayerStagingBountyStateKey(bounty) {
+  if (bounty?.claimed) return "claimed";
+  if (bounty?.claimAvailable || bounty?.completed) return "completed";
+  if (bounty?.accepted) return "active";
+  return "available";
+}
+
+function getMultiplayerStagingBountyStatusLabel(bounty) {
+  if (bounty?.claimed) return "CLAIMED";
+  if (bounty?.claimAvailable || bounty?.completed) return "READY";
+  if (bounty?.accepted) return "ACTIVE";
+  if (!isMultiplayerStagingBountyReady()) return "OFFLINE";
+  return "AVAILABLE";
+}
+
+function getMultiplayerStagingBountyClaimLine() {
+  const result = getMultiplayerStagingBountyStatus().lastStagingBountyClaimResult;
+  if (!result) return "";
+  const xp = Math.round(Number(result.xpDelta || result.bounty?.xpReward || 0));
+  if (result.applied || result.playerSavePatchResult?.applied || result.playerSave?.written) {
+    const before = result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore;
+    const after = result.playerSavePatchResult?.xpAfter ?? result.playerSave?.xpAfter;
+    return `XP applied ${formatNumber(before)} -> ${formatNumber(after)}. Save refreshed from server.`;
+  }
+  if (result.reason === "staging_bounty_already_claimed") return "Already claimed. Duplicate reward blocked.";
+  if (result.mode === "blocked" || result.ok === false) return `Blocked: ${result.debugReason || result.reason || "server validation failed"}.`;
+  return `Preview only: +${formatNumber(xp)} XP. No credits, loot, cargo, or bounty save writes.`;
+}
+
+function selectMultiplayerStagingBounty(bountyId) {
+  multiplayerStagingBountySelectedId = bountyId || "staging_erebus_patrol_2";
+  renderBountyBoard();
+}
+
+function acceptMultiplayerStagingBounty(bountyId) {
+  if (!isMultiplayerStagingBountyReady()) {
+    if (typeof addHudToast === "function") addHudToast("MP staging bounty is waiting for the multiplayer server.");
+    return;
+  }
+  multiplayerStagingBountyPending = { action: "accept", bountyId, startedAt: Date.now() };
+  window.LupenMultiplayerClient?.acceptStagingBounty?.({ bountyId });
+  if (typeof addHudToast === "function") addHudToast("Staging bounty accept sent to server.");
+  renderBountyBoard();
+}
+
+function claimMultiplayerStagingBounty(bountyId) {
+  if (!isMultiplayerStagingBountyReady()) {
+    if (typeof addHudToast === "function") addHudToast("MP staging bounty is waiting for the multiplayer server.");
+    return;
+  }
+  multiplayerStagingBountyPending = { action: "claim", bountyId, startedAt: Date.now() };
+  window.LupenMultiplayerClient?.claimStagingBounty?.({ bountyId });
+  if (typeof addHudToast === "function") addHudToast("Staging bounty claim sent to server.");
+  renderBountyBoard();
+}
+
+function isMultiplayerStagingBountyPending(action = "", bountyId = "") {
+  if (!multiplayerStagingBountyPending) return false;
+  if (Date.now() - Number(multiplayerStagingBountyPending.startedAt || 0) > 10000) {
+    multiplayerStagingBountyPending = null;
+    return false;
+  }
+  return (!action || multiplayerStagingBountyPending.action === action) &&
+    (!bountyId || multiplayerStagingBountyPending.bountyId === bountyId);
+}
+
+function reconcileMultiplayerStagingBountyResult() {
+  const status = getMultiplayerStagingBountyStatus();
+  const result = status.lastStagingBountyClaimResult || status.lastStagingBountyStatus;
+  const receivedAt = Number(result?.receivedAt || 0);
+  if (!receivedAt || multiplayerStagingBountyLastHandledAt >= receivedAt) return;
+  multiplayerStagingBountyLastHandledAt = receivedAt;
+  multiplayerStagingBountyPending = null;
+  const claimLine = getMultiplayerStagingBountyClaimLine();
+  if (claimLine && typeof addActivityLog === "function") addActivityLog(`MP staging bounty: ${claimLine}`);
+}
+
+function setupMultiplayerStagingBountyBoardSubscription() {
+  if (multiplayerStagingBountySubscribed || !isMultiplayerStagingActive()) return;
+  const client = window.LupenMultiplayerClient;
+  if (!client?.onServerState) return;
+  multiplayerStagingBountySubscribed = true;
+  client.onServerState(() => {
+    reconcileMultiplayerStagingBountyResult();
+    if (document.getElementById("bountyScreen")?.classList.contains("active")) {
+      renderBountyBoard();
+    }
+  });
+}
 
 function blockRealTradeMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingActive()) return false;
@@ -110,12 +289,13 @@ function isMultiplayerStagingTradePending(operation = "", offerId = "") {
 
 function getMultiplayerStagingTradeSyncLine(result) {
   if (!result?.applied) return "";
+  const actionLabel = result.operation === "sell" ? "Server sell applied" : "Server buy applied";
   if (multiplayerStagingTradeSyncStatus?.receivedAt !== result.receivedAt) {
     return "Cloud save refresh pending.";
   }
   if (multiplayerStagingTradeSyncStatus.status === "synced") return "Cloud save refreshed; UI synced from server save.";
   if (multiplayerStagingTradeSyncStatus.status === "syncing") return "Refreshing cloud save...";
-  return "Server buy applied. Reload or reopen to sync full save display.";
+  return `${actionLabel}. Reload or reopen to sync full save display.`;
 }
 
 async function reconcileMultiplayerStagingTradeWrite(result) {
@@ -140,7 +320,7 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
       receivedAt: result.receivedAt,
       reason: "loadGameFromSupabase unavailable"
     };
-    if (typeof addHudToast === "function") addHudToast("Server buy applied. Reload or reopen to sync full save display.");
+    if (typeof addHudToast === "function") addHudToast(`Server ${result.operation} applied. Reload or reopen to sync full save display.`);
     return;
   }
 
@@ -162,14 +342,14 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
       receivedAt: result.receivedAt,
       reason: loadResult?.reason || "cloud save refresh failed"
     };
-    if (typeof addHudToast === "function") addHudToast("Server buy applied. Reload or reopen to sync full save display.");
+    if (typeof addHudToast === "function") addHudToast(`Server ${result.operation} applied. Reload or reopen to sync full save display.`);
   } catch (_err) {
     multiplayerStagingTradeSyncStatus = {
       status: "failed",
       receivedAt: result.receivedAt,
       reason: "cloud save refresh failed"
     };
-    if (typeof addHudToast === "function") addHudToast("Server buy applied. Reload or reopen to sync full save display.");
+    if (typeof addHudToast === "function") addHudToast(`Server ${result.operation} applied. Reload or reopen to sync full save display.`);
   } finally {
     if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
   }
@@ -1749,7 +1929,133 @@ function getBountyStatusLabel(contract) {
   return "AVAILABLE";
 }
 
+function renderMultiplayerStagingBountyBoard() {
+  setupMultiplayerStagingBountyBoardSubscription();
+  requestMultiplayerStagingBountiesIfNeeded();
+
+  const title = document.getElementById("bountyLocationTitle");
+  const grid = document.getElementById("bountyContractGrid");
+  const countdown = document.getElementById("bountyResetCountdown");
+  const countLabel = document.querySelector(".bounty-list-count");
+  const bounties = getMultiplayerStagingBounties();
+
+  if (title) title.textContent = "MP STAGING BOUNTIES";
+  if (countdown) countdown.textContent = "SERVER STAGING";
+  if (countLabel) countLabel.textContent = `${formatNumber(bounties.length)} SERVER CONTRACT${bounties.length === 1 ? "" : "S"}`;
+
+  if (grid) {
+    grid.innerHTML = bounties.map((bounty) => {
+      const isSelected = multiplayerStagingBountySelectedId === bounty.id;
+      const statusKey = getMultiplayerStagingBountyStateKey(bounty);
+      const status = getMultiplayerStagingBountyStatusLabel(bounty);
+      const requiredKills = Number(bounty.requiredKills || 2);
+      const progress = Math.min(requiredKills, Math.max(0, Number(bounty.progress || 0)));
+      const ready = statusKey === "completed";
+      const complete = statusKey === "claimed";
+      const active = statusKey === "active";
+      return `
+        <button class="bounty-card bounty-contract-card bounty-card--staging bounty-card--${statusKey} ${isSelected ? "selected bounty-card--selected" : ""} ${complete ? "completed" : ""} ${ready ? "ready-to-claim" : ""} ${active ? "active" : ""}" onclick="selectMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">
+          ${ready || complete ? `<span class="bounty-card__status-check" aria-hidden="true">✓</span>` : ""}
+          <span class="bounty-card__icon-frame bounty-card-icon"><img src="assets/bots/erebus-attacker.png" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></span>
+          <span class="bounty-card__body bounty-card-copy">
+            <strong class="bounty-card__title">${escapeHtml(bounty.title || "Erebus Patrol Sweep")}</strong>
+            <span class="bounty-card__subtitle">${escapeHtml(bounty.description || "Destroy server-owned staging Erebus bots.")}</span>
+            <span class="bounty-card__chips">
+              <span class="bounty-chip bounty-chip--special">STAGING</span>
+              <span class="bounty-chip bounty-chip--target">${formatNumber(requiredKills)} SERVER BOTS</span>
+              <span class="bounty-chip bounty-card-threat">XP ONLY</span>
+            </span>
+          </span>
+          <span class="bounty-reward-box bounty-card-reward bounty-reward">
+            <span class="bounty-reward-box__label">REWARD</span>
+            <strong class="bounty-reward-box__value">+${formatNumber(bounty.xpReward || 25)} XP</strong>
+            <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
+            <small>${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
+          </span>
+        </button>
+      `;
+    }).join("");
+  }
+
+  renderMultiplayerStagingBountyDetail();
+}
+
+function renderMultiplayerStagingBountyDetail() {
+  const panel = document.getElementById("bountyDetailPanel");
+  if (!panel) return;
+
+  const bounty = getSelectedMultiplayerStagingBounty();
+  const statusKey = getMultiplayerStagingBountyStateKey(bounty);
+  const requiredKills = Number(bounty.requiredKills || 2);
+  const progress = Math.min(requiredKills, Math.max(0, Number(bounty.progress || 0)));
+  const progressPct = Math.max(0, Math.min(100, Math.round((progress / Math.max(1, requiredKills)) * 100)));
+  const connected = isMultiplayerStagingBountyReady();
+  const pendingAccept = isMultiplayerStagingBountyPending("accept", bounty.id);
+  const pendingClaim = isMultiplayerStagingBountyPending("claim", bounty.id);
+  const claimLine = getMultiplayerStagingBountyClaimLine();
+  const shell = panel.closest(".selected-contract-panel");
+  if (shell) {
+    ["available", "active", "completed", "claimed", "failed"].forEach(state => shell.classList.remove(`selected-contract-panel--${state}`));
+    shell.classList.add(`selected-contract-panel--${statusKey}`);
+  }
+
+  const actionHtml = bounty.claimed
+    ? `<button class="selected-contract-action bounty-accept-btn" disabled>Claimed</button>`
+    : bounty.claimAvailable || bounty.completed
+      ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claim Pending" : "Claim XP"}</button>`
+      : bounty.accepted
+        ? `<button class="selected-contract-action bounty-accept-btn" disabled>Active Staging Bounty</button>`
+        : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accept Pending" : connected ? "Accept Staging Bounty" : "Waiting For Server"}</button>`;
+
+  const connectionNote = connected
+    ? "Server-owned staging bounty. Local bounty state and rewards are not used."
+    : "Waiting for staging multiplayer server. No local bounty state will be changed.";
+
+  const infoRows = [
+    ["TYPE", "Server-owned staging bounty"],
+    ["TARGET", "Staging Erebus bots"],
+    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} staging bots`],
+    ["REWARD", `+${formatNumber(bounty.xpReward || 25)} XP only`],
+    ["EXCLUDED", "No credits / loot / inventory / local bounty save writes"]
+  ];
+
+  panel.innerHTML = `
+    <div class="selected-contract-top bounty-detail-hero selected-bounty-header selected-contract-top--${statusKey} ${bounty.claimAvailable || bounty.completed ? "reward-ready" : ""} ${bounty.claimed ? "completed" : ""}">
+      <div class="selected-contract-icon bounty-detail-icon"><img src="assets/bots/erebus-attacker.png" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></div>
+      <div class="selected-contract-copy">
+        <span class="bounty-chip bounty-chip--special">MP STAGING</span>
+        ${bounty.claimAvailable || bounty.completed || bounty.claimed ? `<span class="selected-contract-check" aria-hidden="true">✓</span>` : ""}
+        <strong>${escapeHtml(bounty.title || "Erebus Patrol Sweep")}</strong>
+        <span>${escapeHtml(bounty.description || "Destroy server-owned staging Erebus bots.")}</span>
+      </div>
+    </div>
+
+    ${bounty.claimAvailable || bounty.completed ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Claim sends an XP-only staging request to the server.</span></div>` : ""}
+    ${bounty.claimed ? `<div class="bounty-complete-note claimed"><strong>Claimed</strong><span>Duplicate staging XP claims are blocked server-side.</span></div>` : ""}
+
+    <div class="selected-contract-progress bounty-detail-progress-block selected-bounty-progress">
+      <div class="bounty-progress-heading"><span>Server Progress</span><strong>${formatNumber(progress)} / ${formatNumber(requiredKills)}</strong></div>
+      <div class="bounty-progress-bar"><span style="width:${progressPct}%"></span></div>
+    </div>
+
+    <div class="selected-contract-rows bounty-detail-grid">
+      ${infoRows.map(([label, value]) => `<div class="selected-contract-row bounty-detail-stat selected-bounty-info-row"><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}
+    </div>
+
+    <div class="selected-contract-actions bounty-detail-actions">
+      ${actionHtml}
+    </div>
+    <p class="bounty-detail-note compact">${escapeHtml(connectionNote)}</p>
+    ${claimLine ? `<p class="bounty-detail-note compact">${escapeHtml(claimLine)}</p>` : ""}
+  `;
+}
+
 function renderBountyBoard() {
+  if (isMultiplayerStagingActive()) {
+    renderMultiplayerStagingBountyBoard();
+    return;
+  }
+
   ensureDailyBounties();
   updateBountyResetCountdown();
 

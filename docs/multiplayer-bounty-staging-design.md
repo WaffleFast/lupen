@@ -34,15 +34,21 @@ When the XP-only patch applies, it touches only `playerProgress.combatXp`. Credi
 
 ## Client UX
 
-The staging overlay shows a compact bounty panel:
+The real Bounty Board now switches to a staging-backed mode when `?mp=staging` is active:
 
-- Accept
+- `MP STAGING BOUNTIES`
+- `Erebus Patrol Sweep`
+- Server-owned progress `0/2`, `1/2`, `2/2`
+- Accept staging bounty
 - Progress `0/2`, `1/2`, `2/2`
 - Claim XP
 - Claim state: simulated, blocked, applied, or already claimed
+- Clear copy that the bounty is server-owned and excludes credits, loot, inventory, and local bounty save writes
+
+The floating staging bounty overlay remains a compact status helper only. It no longer acts as the primary accept/claim UI, which avoids running two full bounty interfaces at once.
 
 Detailed gates, ledger/shadow, and player-save diagnostics remain behind `?debug=mp`.
 
 ## Next Phase
 
-The next sensible phase is broader bounty-board integration or a loot dry-run preview. Do not do both at once, and do not enable real credits or loot until they have dedicated ledgers, idempotency, and validators.
+The next sensible phase is a loot dry-run preview or more durable bounty idempotency. Do not enable real credits or loot until they have dedicated ledgers, idempotency, and validators.

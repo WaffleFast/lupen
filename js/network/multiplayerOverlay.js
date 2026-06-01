@@ -2739,6 +2739,8 @@
     requestStagingBountyIfNeeded(status);
     if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) return;
 
+    if (global.document?.getElementById("bountyScreen")?.classList.contains("active") && !isMpDebugEnabled()) return;
+
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
@@ -2777,7 +2779,7 @@
     inner.appendChild(progress);
 
     const reward = global.document.createElement("span");
-    reward.textContent = `XP-only reward +${Math.round(Number(bounty.xpReward || 0))}. No credits or loot.`;
+    reward.textContent = `Open Bounty Board for server accept/claim. +${Math.round(Number(bounty.xpReward || 0))} XP only.`;
     inner.appendChild(reward);
 
     const claimLabel = getStagingBountyClaimLabel(status);
@@ -2787,30 +2789,13 @@
       inner.appendChild(result);
     }
 
-    const button = global.document.createElement("button");
-    button.type = "button";
-    if (!bounty.accepted) {
-      button.textContent = "Accept";
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        getClient()?.acceptStagingBounty?.({ bountyId: bounty.id });
-      });
-    } else if (bounty.claimed) {
-      button.textContent = "Claimed";
-      button.disabled = true;
-    } else if (bounty.claimAvailable || bounty.completed) {
-      button.textContent = "Claim XP";
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        getClient()?.claimStagingBounty?.({ bountyId: bounty.id });
-      });
-    } else {
-      button.textContent = "In Progress";
-      button.disabled = true;
-    }
-    inner.appendChild(button);
+    const boardHint = global.document.createElement("span");
+    boardHint.textContent = bounty.claimAvailable || bounty.completed
+      ? "Ready to claim from Bounty Board."
+      : bounty.accepted
+        ? "Server progress only; local bounties stay untouched."
+        : "Accept from Bounty Board; no local bounty writes.";
+    inner.appendChild(boardHint);
 
     panel.appendChild(inner);
     spaceScreen.appendChild(panel);
