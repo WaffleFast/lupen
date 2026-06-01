@@ -716,6 +716,10 @@ function getPilotName() {
 function getMultiplayerPresencePayload() {
   const node = sectorNodes[currentNode] || {};
   const ship = SHIPS[currentShipId] || {};
+  const loadout = typeof getShipLoadout === "function" ? getShipLoadout(currentShipId) : { guns: [] };
+  const equippedWeaponKeys = Array.isArray(loadout?.guns)
+    ? loadout.guns.map((entry) => typeof entry === "string" ? entry : entry?.key).filter(Boolean)
+    : [];
   const shipName = ship.name || "";
   return {
     currentNode,
@@ -728,7 +732,9 @@ function getMultiplayerPresencePayload() {
     shipImagePath: ship.image || "",
     shipClass: ship.roleSubtitle || "",
     shipName,
-    ship: shipName
+    ship: shipName,
+    equippedWeaponKey: equippedWeaponKeys[0] || "",
+    equippedWeaponKeys
   };
 }
 

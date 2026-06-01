@@ -164,6 +164,16 @@ const STAGING_DAMAGE_MAX = 50;
 const STAGING_FIRE_COOLDOWN_MS = 900;
 const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
+const STAGING_WEAPON_STATS = Object.freeze({
+  pulseLaser: Object.freeze({
+    key: "pulseLaser",
+    name: "Pulse Laser",
+    family: "pulse",
+    type: "pulse",
+    damage: 10,
+    cooldownMs: 1000
+  })
+});
 const STAGING_BOT_DISABLED_RESET_MS = 6500;
 const SUPABASE_VERIFY_TIMEOUT_MS = 4000;
 const STAGING_REWARD_DRY_RUN_XP = 5;
@@ -194,6 +204,8 @@ type("string")(LupenSectorPlayer.prototype, "currentShipId");
 type("string")(LupenSectorPlayer.prototype, "shipName");
 type("string")(LupenSectorPlayer.prototype, "shipImage");
 type("string")(LupenSectorPlayer.prototype, "shipClass");
+type("string")(LupenSectorPlayer.prototype, "equippedWeaponKey");
+type("string")(LupenSectorPlayer.prototype, "equippedWeaponKeys");
 type("string")(LupenSectorPlayer.prototype, "multiplayerMode");
 type("string")(LupenSectorPlayer.prototype, "currentNode");
 type("string")(LupenSectorPlayer.prototype, "selectedTargetBotId");
@@ -591,39 +603,66 @@ function validateCombatIntentPayload(message = {}) {
   return "";
 }
 
-function getStagingDamageFromPayload(message = {}) {
-  const directDamage = Number(message.damage ?? message.weaponDamage);
-  const damageLayers = message.damageLayers && typeof message.damageLayers === "object"
-    ? message.damageLayers
-    : null;
-  const layeredDamage = damageLayers
-    ? Math.round((
-      Number(damageLayers.shield || 0) +
-      Number(damageLayers.armor || damageLayers.armour || 0) +
-      Number(damageLayers.hull || 0)
-    ) / 3)
-    : NaN;
-  const rawDamage = Number.isFinite(directDamage) && directDamage > 0
-    ? directDamage
-    : Number.isFinite(layeredDamage) && layeredDamage > 0
-      ? layeredDamage
-      : STAGING_TEST_DAMAGE;
-
-  return clampNumber(Math.round(rawDamage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
+function getSafeWeaponKey(value = "") {
+  const key = getStringValue(value);
+  return /^[A-Za-z0-9_-]{1,48}$/.test(key) ? key : "";
 }
 
-function getStagingCooldownFromPayload(message = {}) {
-  const directCooldown = Number(message.cooldownMs ?? message.cooldown ?? message.weaponCooldownMs);
-  if (Number.isFinite(directCooldown) && directCooldown > 0) {
-    return clampNumber(Math.round(directCooldown), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS);
+function getFirstWeaponKeyFromList(value) {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const key = getSafeWeaponKey(entry);
+      if (key) return key;
+    }
+    return "";
   }
 
-  const fireRate = Number(message.fireRate);
-  if (Number.isFinite(fireRate) && fireRate > 0) {
-    return clampNumber(Math.round(1000 / fireRate), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS);
+  return String(value || "")
+    .split(",")
+    .map((entry) => getSafeWeaponKey(entry))
+    .find(Boolean) || "";
+}
+
+function getRequestedDamageFromPayload(message = {}) {
+  const directDamage = Number(message.damage ?? message.weaponDamage);
+  return Number.isFinite(directDamage) ? directDamage : 0;
+}
+
+function resolveStagingWeapon(message = {}, player = null) {
+  const payloadKey = getSafeWeaponKey(message.weaponKey || message.weaponId || message.equippedWeaponKey);
+  const payloadListKey = getFirstWeaponKeyFromList(message.equippedWeaponKeys);
+  const presenceKey = getSafeWeaponKey(player?.equippedWeaponKey);
+  const presenceListKey = getFirstWeaponKeyFromList(player?.equippedWeaponKeys);
+  const weaponKey = payloadKey || payloadListKey || presenceKey || presenceListKey;
+  const known = STAGING_WEAPON_STATS[weaponKey] || null;
+
+  if (known) {
+    return {
+      weaponKey: known.key,
+      weaponName: known.name,
+      weaponFamily: known.family,
+      weaponType: known.type,
+      damage: clampNumber(Math.round(known.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX),
+      cooldownMs: clampNumber(Math.round(known.cooldownMs), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS),
+      damageSource: "server_known_weapon",
+      fallbackDamageUsed: false,
+      pulseLaserDetected: known.key === "pulseLaser",
+      requestedDamage: getRequestedDamageFromPayload(message)
+    };
   }
 
-  return STAGING_FIRE_COOLDOWN_MS;
+  return {
+    weaponKey,
+    weaponName: getStringValue(message.weaponName, "Staging Fallback") || "Staging Fallback",
+    weaponFamily: getStringValue(message.weaponFamily || message.weaponType || "staging-fallback"),
+    weaponType: getStringValue(message.weaponType || message.weaponFamily || "staging-fallback"),
+    damage: STAGING_TEST_DAMAGE,
+    cooldownMs: STAGING_FIRE_COOLDOWN_MS,
+    damageSource: weaponKey ? "fallback_unknown_weapon" : "fallback_no_weapon",
+    fallbackDamageUsed: true,
+    pulseLaserDetected: false,
+    requestedDamage: getRequestedDamageFromPayload(message)
+  };
 }
 
 function validateTargetSelectionPayload(message = {}) {
@@ -854,6 +893,10 @@ export class LupenSectorRoom extends Room {
       shipName: getShipName(options),
       shipImage: getSafeShipImagePath(getShipImageValue(options)),
       shipClass: getSafeShipClass(options),
+      equippedWeaponKey: getSafeWeaponKey(options.equippedWeaponKey || options.weaponKey),
+      equippedWeaponKeys: Array.isArray(options.equippedWeaponKeys)
+        ? options.equippedWeaponKeys.map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 6).join(",")
+        : String(options.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 6).join(","),
       multiplayerMode: getSafeIdentityValue(options.multiplayerMode, "dev"),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
       selectedTargetBotId: "",
@@ -1875,14 +1918,15 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
-    const stagingDamage = getStagingDamageFromPayload(message);
-    const stagingCooldownMs = getStagingCooldownFromPayload(message);
+    const resolvedWeapon = resolveStagingWeapon(message, player);
+    const stagingDamage = resolvedWeapon.damage;
+    const stagingCooldownMs = resolvedWeapon.cooldownMs;
     const result = this.applyStagingTestDamage(targetBot, stagingDamage);
     player.lastFireAt = now;
     player.nextFireAt = now + stagingCooldownMs;
 
-    const weaponName = getStringValue(message.weaponName, "Staging Test Weapon") || "Staging Test Weapon";
-    const weaponFamily = getStringValue(message.weaponFamily || message.weaponType);
+    const weaponName = resolvedWeapon.weaponName;
+    const weaponFamily = resolvedWeapon.weaponFamily;
     const resolvedAt = Date.now();
     this.recordBotContribution(targetBot.id, client.sessionId, result.damage, resolvedAt);
 
@@ -1894,14 +1938,19 @@ export class LupenSectorRoom extends Room {
       targetBotId,
       targetNode: targetBot.currentNode,
       currentNode: player.currentNode,
-      weaponId: getStringValue(message.weaponId),
+      weaponId: resolvedWeapon.weaponKey,
+      weaponKey: resolvedWeapon.weaponKey,
       weaponName,
       weaponFamily,
       weaponQuality: getStringValue(message.quality),
       weaponLevel: getNumberValue(message.level, 0),
       damage: result.damage,
-      requestedDamage: Number.isFinite(Number(message.damage ?? message.weaponDamage)) ? Number(message.damage ?? message.weaponDamage) : 0,
+      requestedDamage: resolvedWeapon.requestedDamage,
       stagingDamage,
+      serverDamageUsed: stagingDamage,
+      damageSource: resolvedWeapon.damageSource,
+      fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
+      pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
       shieldDamage: result.shieldDamage,
       hullDamage: result.hullDamage,
       shield: result.shield,
@@ -1922,9 +1971,13 @@ export class LupenSectorRoom extends Room {
       targetBotId,
       currentNode: player.currentNode,
       damage: result.damage,
+      weaponKey: resolvedWeapon.weaponKey,
       weaponName,
       weaponFamily,
-      weaponType: getStringValue(message.weaponType || message.weaponFamily),
+      weaponType: resolvedWeapon.weaponType,
+      damageSource: resolvedWeapon.damageSource,
+      fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
+      pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
       shield: result.shield,
       hull: result.hull,
       disabled: result.disabled,
@@ -1991,6 +2044,14 @@ export class LupenSectorRoom extends Room {
     if (typeof message.shipClass === "string" || typeof message.shipType === "string" || typeof message.shipRole === "string") {
       player.shipClass = getSafeShipClass(message);
     }
+
+    const weaponKey = getSafeWeaponKey(message.equippedWeaponKey || message.weaponKey);
+    if (weaponKey) player.equippedWeaponKey = weaponKey;
+
+    const weaponKeys = Array.isArray(message.equippedWeaponKeys)
+      ? message.equippedWeaponKeys.map((entry) => getSafeWeaponKey(entry)).filter(Boolean)
+      : String(message.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean);
+    if (weaponKeys.length) player.equippedWeaponKeys = weaponKeys.slice(0, 6).join(",");
 
     const currentNode = getStringValue(message.currentNode);
     if (currentNode) player.currentNode = currentNode;

@@ -97,6 +97,8 @@ Local combat flow is in [js/06-combat.js](../js/06-combat.js): `selectedTarget`,
 
 Current staging combat is in [server/colyseus/src/rooms/LupenSectorRoom.js](../server/colyseus/src/rooms/LupenSectorRoom.js) and [js/network/multiplayerOverlay.js](../js/network/multiplayerOverlay.js). It is server-owned for staging bots and damage, but rewards remain preview/dry-run except for heavily gated XP-only preparation.
 
+Staging weapon source of truth: the browser sends equipped weapon keys from `shipLoadouts[currentShipId].guns` through presence/combat intent metadata, but the server does not trust raw client damage values. For this starter weapon phase, `gun:pulseLaser` maps to server-known Pulse Laser test damage (`10`) and cooldown. Missing or unknown weapon keys fall back to the existing safe staging damage (`5`) and report fallback diagnostics. Server-authoritative combat stat derivation from saved loadouts is still a later phase.
+
 Reusable now: ship/bot visuals, target panel styling, weapon display metadata, pure damage helper concepts, shot/hit presentation. Must remain server-authoritative: target validity, cooldowns, damage, bot disabled/respawn, contribution, reward eligibility, and any future drops.
 
 Classification:

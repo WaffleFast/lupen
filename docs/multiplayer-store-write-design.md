@@ -74,7 +74,7 @@ Pulse Laser equip flow:
 - It calls `saveGame()`.
 - `removeGun()` returns standard level-1 guns to `ownedGuns`.
 
-Staging combat still uses a safe client-sent equipped weapon intent for damage display. The Pulse Laser loadout write prepares server-owned weapon state, but server-authoritative combat stat derivation from saved loadouts is still a later phase.
+Staging combat now treats the equipped weapon key as a staging hint, not damage authority. The client sends equipped keys from `shipLoadouts[currentShipId].guns`; the server maps `pulseLaser` to server-known Pulse Laser test damage (`10`) and cooldown. Missing or unknown keys fall back to safe staging damage (`5`). Server-authoritative combat stat derivation from saved loadouts is still a later phase.
 
 Sell flow:
 

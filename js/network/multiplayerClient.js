@@ -330,9 +330,17 @@
 
   function getStagingWeaponIntent() {
     try {
+      const localPresence = getLocalPresenceOptions();
+      const equippedWeaponKeys = Array.isArray(localPresence.equippedWeaponKeys)
+        ? localPresence.equippedWeaponKeys.map((key) => String(key || "")).filter(Boolean)
+        : String(localPresence.equippedWeaponKeys || "").split(",").map((key) => key.trim()).filter(Boolean);
+      const equippedWeaponKey = String(localPresence.equippedWeaponKey || equippedWeaponKeys[0] || "");
       if (typeof global.getEquippedWeapon !== "function") {
         return {
-          weaponId: "stagingFallback",
+          weaponId: equippedWeaponKey || "stagingFallback",
+          weaponKey: equippedWeaponKey,
+          equippedWeaponKey,
+          equippedWeaponKeys,
           weaponName: "Staging Fallback",
           weaponFamily: "staging-fallback",
           damage: 5,
@@ -343,7 +351,10 @@
 
       const weapon = global.getEquippedWeapon() || {};
       return {
-        weaponId: String(weapon.id || weapon.key || weapon.familyId || weapon.fireStyle || "equippedWeapon"),
+        weaponId: String(equippedWeaponKey || weapon.id || weapon.key || weapon.familyId || weapon.fireStyle || "equippedWeapon"),
+        weaponKey: equippedWeaponKey || String(weapon.key || weapon.id || ""),
+        equippedWeaponKey,
+        equippedWeaponKeys,
         weaponName: String(weapon.name || "Equipped Weapon").slice(0, 80),
         weaponFamily: String(weapon.familyId || weapon.family || weapon.fireStyle || weapon.type || ""),
         weaponType: String(weapon.type || weapon.fireStyle || ""),
@@ -365,6 +376,9 @@
       logDev("staging weapon payload fallback", err);
       return {
         weaponId: "stagingFallback",
+        weaponKey: "",
+        equippedWeaponKey: "",
+        equippedWeaponKeys: [],
         weaponName: "Staging Fallback",
         weaponFamily: "staging-fallback",
         damage: 5,
@@ -518,6 +532,8 @@
       shipImageSrc: String(player.shipImageSrc || player.shipImage || player.shipImagePath || ""),
       shipImagePath: String(player.shipImagePath || player.shipImage || player.shipImageSrc || ""),
       shipClass: String(player.shipClass || ""),
+      equippedWeaponKey: String(player.equippedWeaponKey || ""),
+      equippedWeaponKeys: String(player.equippedWeaponKeys || "").split(",").map((key) => key.trim()).filter(Boolean),
       selectedTargetBotId: String(player.selectedTargetBotId || ""),
       x: Number.isFinite(Number(player.x)) ? Number(player.x) : 50,
       y: Number.isFinite(Number(player.y)) ? Number(player.y) : 50,
@@ -1290,6 +1306,11 @@
         targetNode: String(message?.targetNode || ""),
         weaponName: String(message?.weaponName || ""),
         weaponFamily: String(message?.weaponFamily || ""),
+        weaponKey: String(message?.weaponKey || message?.weaponId || ""),
+        damageSource: String(message?.damageSource || ""),
+        fallbackDamageUsed: message?.fallbackDamageUsed === true,
+        pulseLaserDetected: message?.pulseLaserDetected === true,
+        serverDamageUsed: Number.isFinite(Number(message?.serverDamageUsed)) ? Number(message.serverDamageUsed) : null,
         damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
         stagingDamage: Number.isFinite(Number(message?.stagingDamage)) ? Number(message.stagingDamage) : 0,
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
@@ -1632,6 +1653,10 @@
       displayName: selfPlayer?.displayName || identity.displayName || localPresence.displayName || "Pilot",
       localShipId: localPresence.currentShipId || "",
       localShipImage: localPresence.shipImage || localPresence.shipImageSrc || localPresence.shipImagePath || "",
+      localEquippedWeaponKey: localPresence.equippedWeaponKey || "",
+      localEquippedWeaponKeys: Array.isArray(localPresence.equippedWeaponKeys)
+        ? localPresence.equippedWeaponKeys.map((key) => String(key || "")).filter(Boolean)
+        : String(localPresence.equippedWeaponKeys || "").split(",").map((key) => key.trim()).filter(Boolean),
       originalServerUrl: connection.originalServerUrl,
       serverUrl: connection.serverUrl,
       serverUrlSource: connection.serverUrlSource,

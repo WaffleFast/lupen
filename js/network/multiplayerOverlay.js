@@ -2517,13 +2517,19 @@
     const cooldownText = formatCooldown(status.fireCooldownRemainingMs);
     const weaponIntent = getClient()?.getStagingWeaponIntent?.() || {};
     const weaponName = status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "Equipped Weapon";
-    const stagingDamage = status.lastCombatResponse?.stagingDamage || weaponIntent.damage || 5;
+    const stagingDamage = status.lastCombatResponse?.serverDamageUsed || status.lastCombatResponse?.stagingDamage || weaponIntent.damage || 5;
+    const weaponKey = status.lastCombatResponse?.weaponKey || weaponIntent.weaponKey || weaponIntent.equippedWeaponKey || "";
+    const sourceText = status.lastCombatResponse?.damageSource
+      ? ` / ${status.lastCombatResponse.damageSource}${status.lastCombatResponse.fallbackDamageUsed ? " fallback" : ""}`
+      : weaponKey
+        ? ` / key ${weaponKey}`
+        : "";
     const lastDamage = status.lastCombatResponse?.ok && status.lastCombatResponse.targetBotId === selectedBot.id
       ? ` / last -${Math.round(Number(status.lastCombatResponse.damage || 0))}`
       : "";
     note.textContent = selectedBot.disabled
       ? "Server disabled state - no rewards applied"
-      : `${weaponName} / staging dmg ${Math.round(Number(stagingDamage || 0))} / ${cooldownText}${lastDamage}`;
+      : `${weaponName}${weaponKey ? ` (${weaponKey})` : ""} / server dmg ${Math.round(Number(stagingDamage || 0))}${sourceText} / ${cooldownText}${lastDamage}`;
     summary.appendChild(note);
     inner.appendChild(summary);
 
@@ -2653,7 +2659,11 @@
       setDiagnosticsRow(panel, "bot status", getBotHullSummary(inspectedBot));
       setDiagnosticsRow(panel, "bot image", compactPath(getStagingBotImage(inspectedBot)));
       setDiagnosticsRow(panel, "bot img status", `${getBotImageLoadLabel(inspectedBot)} / fallback ${isBotFallbackActive(inspectedBot) ? "yes" : "no"}`);
-      setDiagnosticsRow(panel, "weapon", `${status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "unknown"} / dmg ${Math.round(Number(status.lastCombatResponse?.stagingDamage || weaponIntent.damage || 0))}`);
+      const weaponKey = status.lastCombatResponse?.weaponKey || status.localEquippedWeaponKey || weaponIntent.weaponKey || weaponIntent.equippedWeaponKey || "";
+      const damageSource = status.lastCombatResponse?.damageSource || "pending";
+      const serverDamage = status.lastCombatResponse?.serverDamageUsed ?? status.lastCombatResponse?.stagingDamage ?? weaponIntent.damage ?? 0;
+      setDiagnosticsRow(panel, "weapon", `${status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "unknown"}${weaponKey ? ` / ${weaponKey}` : ""} / server dmg ${Math.round(Number(serverDamage || 0))}`);
+      setDiagnosticsRow(panel, "weapon source", `${damageSource} / fallback ${status.lastCombatResponse?.fallbackDamageUsed ? "yes" : "no"} / pulse ${status.lastCombatResponse?.pulseLaserDetected ? "yes" : "no"}`);
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));

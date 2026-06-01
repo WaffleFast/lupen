@@ -241,7 +241,10 @@ async function requestStagingCargoPodEquip(item) {
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded && typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          if (loaded?.loaded) {
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("cargo_pod_equipped");
+            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          }
         } catch (_err) {
           if (typeof addHudToast === "function") addHudToast("Cargo Pod equipped. Reload if loadout values look stale.");
         }
@@ -274,7 +277,10 @@ async function requestStagingPulseLaserEquip(item) {
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded && typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          if (loaded?.loaded) {
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("pulse_laser_equipped");
+            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          }
         } catch (_err) {
           if (typeof addHudToast === "function") addHudToast("Weapon equipped. Reload if loadout values look stale.");
         }
