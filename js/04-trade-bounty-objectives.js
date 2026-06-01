@@ -21,6 +21,7 @@ let multiplayerStagingBountySelectedId = "staging_erebus_patrol_2";
 let multiplayerStagingBountyLastHandledAt = 0;
 let multiplayerStagingBountyPending = null;
 let multiplayerStagingBountySubscribed = false;
+let multiplayerStagingBountyLastRefreshAt = 0;
 
 function getMultiplayerStagingBountyFallback() {
   return {
@@ -98,13 +99,20 @@ function getSelectedMultiplayerStagingBounty() {
   return bounties.find((bounty) => bounty.id === multiplayerStagingBountySelectedId) || bounties[0] || getMultiplayerStagingBountyFallback();
 }
 
-function requestMultiplayerStagingBountiesIfNeeded() {
+function requestMultiplayerStagingBountiesIfNeeded(force = false) {
   if (!isMultiplayerStagingActive()) return;
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.();
   if (!client?.requestStagingBounties || !status?.enabled || !status?.isConnected) return;
-  if (!status.lastStagingBountyList) client.requestStagingBounties();
-  if (!status.lastStagingBountyStatus) client.requestStagingBountyStatus?.();
+  const now = Date.now();
+  const stale = now - multiplayerStagingBountyLastRefreshAt > 5000;
+  if (force || stale || !status.lastStagingBountyList) {
+    client.requestStagingBounties();
+  }
+  if (force || stale || !status.lastStagingBountyStatus) {
+    client.requestStagingBountyStatus?.();
+  }
+  if (force || stale) multiplayerStagingBountyLastRefreshAt = now;
 }
 
 function getMultiplayerStagingBountyStateKey(bounty) {
@@ -149,6 +157,7 @@ function acceptMultiplayerStagingBounty(bountyId) {
   multiplayerStagingBountyPending = { action: "accept", bountyId, startedAt: Date.now() };
   window.LupenMultiplayerClient?.acceptStagingBounty?.({ bountyId });
   if (typeof addHudToast === "function") addHudToast("Staging bounty accept sent to server.");
+  refreshMultiplayerStagingBountyStatusSoon();
   renderBountyBoard();
 }
 
@@ -160,7 +169,15 @@ function claimMultiplayerStagingBounty(bountyId) {
   multiplayerStagingBountyPending = { action: "claim", bountyId, startedAt: Date.now() };
   window.LupenMultiplayerClient?.claimStagingBounty?.({ bountyId });
   if (typeof addHudToast === "function") addHudToast("Staging bounty claim sent to server.");
+  refreshMultiplayerStagingBountyStatusSoon();
   renderBountyBoard();
+}
+
+function refreshMultiplayerStagingBountyStatusSoon() {
+  window.setTimeout(() => {
+    requestMultiplayerStagingBountiesIfNeeded(true);
+    if (document.getElementById("bountyScreen")?.classList.contains("active")) renderBountyBoard();
+  }, 650);
 }
 
 function isMultiplayerStagingBountyPending(action = "", bountyId = "") {
@@ -1962,15 +1979,15 @@ function renderMultiplayerStagingBountyBoard() {
             <span class="bounty-card__subtitle">${escapeHtml(bounty.description || "Destroy server-owned staging Erebus bots.")}</span>
             <span class="bounty-card__chips">
               <span class="bounty-chip bounty-chip--special">STAGING</span>
-              <span class="bounty-chip bounty-chip--target">${formatNumber(requiredKills)} SERVER BOTS</span>
-              <span class="bounty-chip bounty-card-threat">XP ONLY</span>
+              <span class="bounty-chip bounty-chip--target">PROGRESS ${formatNumber(progress)}/${formatNumber(requiredKills)}</span>
+              <span class="bounty-chip bounty-card-threat">NO CR / LOOT</span>
             </span>
           </span>
           <span class="bounty-reward-box bounty-card-reward bounty-reward">
             <span class="bounty-reward-box__label">REWARD</span>
-            <strong class="bounty-reward-box__value">+${formatNumber(bounty.xpReward || 25)} XP</strong>
+            <strong class="bounty-reward-box__value">XP-ONLY ${formatNumber(bounty.xpReward || 25)}</strong>
             <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
-            <small>${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
+            <small>Progress: ${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
           </span>
         </button>
       `;
@@ -2014,9 +2031,9 @@ function renderMultiplayerStagingBountyDetail() {
   const infoRows = [
     ["TYPE", "Server-owned staging bounty"],
     ["TARGET", "Staging Erebus bots"],
-    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} staging bots`],
-    ["REWARD", `+${formatNumber(bounty.xpReward || 25)} XP only`],
-    ["EXCLUDED", "No credits / loot / inventory / local bounty save writes"]
+    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} staging Erebus bots`],
+    ["REWARD", `XP-only reward: ${formatNumber(bounty.xpReward || 25)}`],
+    ["EXCLUDED", "No CR or loot in staging"]
   ];
 
   panel.innerHTML = `
@@ -2030,11 +2047,11 @@ function renderMultiplayerStagingBountyDetail() {
       </div>
     </div>
 
-    ${bounty.claimAvailable || bounty.completed ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Claim sends an XP-only staging request to the server.</span></div>` : ""}
-    ${bounty.claimed ? `<div class="bounty-complete-note claimed"><strong>Claimed</strong><span>Duplicate staging XP claims are blocked server-side.</span></div>` : ""}
+    ${bounty.claimAvailable || bounty.completed ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Claim XP sends an XP-only staging request to the server.</span></div>` : ""}
+    ${bounty.claimed ? `<div class="bounty-complete-note claimed"><strong>Already claimed</strong><span>Duplicate staging XP claims are blocked server-side.</span></div>` : ""}
 
     <div class="selected-contract-progress bounty-detail-progress-block selected-bounty-progress">
-      <div class="bounty-progress-heading"><span>Server Progress</span><strong>${formatNumber(progress)} / ${formatNumber(requiredKills)}</strong></div>
+      <div class="bounty-progress-heading"><span>Progress</span><strong>${formatNumber(progress)} / ${formatNumber(requiredKills)}</strong></div>
       <div class="bounty-progress-bar"><span style="width:${progressPct}%"></span></div>
     </div>
 

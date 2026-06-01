@@ -2767,7 +2767,7 @@
 
     const objective = global.document.createElement("span");
     objective.textContent = bounty.accepted
-      ? `Destroy staging Erebus bots: ${Math.round(Number(bounty.progress || 0))}/${Math.round(Number(bounty.requiredKills || 2))}`
+      ? `Progress: ${Math.round(Number(bounty.progress || 0))}/${Math.round(Number(bounty.requiredKills || 2))} staging Erebus bots`
       : "Destroy 2 staging Erebus bots";
     inner.appendChild(objective);
 
@@ -2779,7 +2779,7 @@
     inner.appendChild(progress);
 
     const reward = global.document.createElement("span");
-    reward.textContent = `Open Bounty Board for server accept/claim. +${Math.round(Number(bounty.xpReward || 0))} XP only.`;
+    reward.textContent = `XP-only reward: ${Math.round(Number(bounty.xpReward || 0))}. No CR or loot.`;
     inner.appendChild(reward);
 
     const claimLabel = getStagingBountyClaimLabel(status);

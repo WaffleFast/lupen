@@ -133,7 +133,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toContainText("MP STAGING BOUNTIES");
     await expect(page.locator("#bountyScreen")).toContainText("Erebus Patrol Sweep");
     await expect(page.locator("#bountyScreen")).toContainText(/Server-owned staging bounty|Waiting for staging multiplayer server/);
-    await expect(page.locator("#bountyScreen")).toContainText(/No credits|loot|local bounty save writes/i);
+    await expect(page.locator("#bountyScreen")).toContainText(/XP-only reward|No CR or loot/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

@@ -47,7 +47,11 @@ The real Bounty Board now switches to a staging-backed mode when `?mp=staging` i
 
 The floating staging bounty overlay remains a compact status helper only. It no longer acts as the primary accept/claim UI, which avoids running two full bounty interfaces at once.
 
+The board refreshes staging bounty status from Colyseus after accept and claim actions, and uses a light stale-status refresh while the Bounty Board is open. Server messages from bot destruction still drive the primary progress updates.
+
 Detailed gates, ledger/shadow, and player-save diagnostics remain behind `?debug=mp`.
+
+Local Colyseus `npm.cmd test` still expects a server listening on port `2567`; the browser smoke suite is safe by default and does not require a live staging write.
 
 ## Next Phase
 
