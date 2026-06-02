@@ -1,8 +1,9 @@
 /* Staging-only loadout equip prototype.
    This service mirrors the current local standard equip behavior for
-   attachment:cargoPod, attachment:shieldBooster, and gun:pulseLaser only. It decrements the matching
-   owned count, appends a standard level-1 entry to the current ship loadout,
-   and preserves every unrelated save field. It never writes credits,
+   attachment:cargoPod, attachment:shieldBooster, gun:pulseLaser, and
+   ship:lupenHauler only. Equipment writes decrement the matching owned count
+   and append a standard level-1 entry. Ship selection writes only current ship
+   selection fields. It preserves every unrelated save field and never writes credits,
    inventoryItems, ships, loot, bounties, PvP/player damage, broad progression,
    schema, or RLS. */
 
@@ -15,6 +16,8 @@ const SHIELD_BOOSTER_KEY = "shieldBooster";
 const SHIELD_BOOSTER_SHIELD_BONUS = 50;
 const PULSE_LASER_ITEM_ID = "gun:pulseLaser";
 const PULSE_LASER_KEY = "pulseLaser";
+const LUPEN_HAULER_ITEM_ID = "ship:lupenHauler";
+const LUPEN_HAULER_KEY = "lupenHauler";
 const MAX_ATTACHMENT_COUNT = 9999;
 const MAX_GUN_COUNT = 9999;
 
@@ -97,12 +100,12 @@ function getSaveDataFromRow(row = {}) {
 
 function getLoadoutWriteFlags(applied = false, writeKind = "") {
   return {
-    loadoutWritten: applied,
+    loadoutWritten: applied && writeKind !== "ship",
     attachmentWritten: applied && writeKind === "attachment",
     saveWritten: applied,
     inventoryWritten: false,
     creditsWritten: false,
-    shipWritten: false,
+    shipWritten: applied && writeKind === "ship",
     weaponWritten: applied && writeKind === "weapon",
     lootWritten: false,
     bountyWritten: false
@@ -129,6 +132,9 @@ function getUserReason(reason) {
     shield_booster_not_owned: "No owned Shield Booster is available to equip.",
     owned_guns_path_missing_or_invalid: "Saved weapon ownership path is missing or invalid.",
     pulse_laser_not_owned: "No owned Pulse Laser is available to equip.",
+    owned_ships_path_missing_or_invalid: "Saved ship ownership path is missing or invalid.",
+    ship_not_owned: "Ship is not owned yet.",
+    ship_already_equipped: "Ship is already active.",
     ship_loadouts_path_missing_or_invalid: "Saved ship loadouts path is missing or invalid.",
     current_ship_loadout_missing_or_invalid: "Current ship loadout path is missing or invalid.",
     attachment_slots_full: "No empty attachment slot.",
@@ -163,6 +169,10 @@ function isShieldBoosterItem(itemId) {
 
 function isPulseLaserItem(itemId) {
   return getString(itemId) === PULSE_LASER_ITEM_ID;
+}
+
+function isLupenHaulerShipItem(itemId) {
+  return getString(itemId) === LUPEN_HAULER_ITEM_ID;
 }
 
 function normalizeLoadoutEntry(entry) {
@@ -444,10 +454,58 @@ export function buildStagingPulseLaserEquipPlan(saveData = {}, { itemId = PULSE_
   };
 }
 
+export function buildStagingLupenHaulerSelectPlan(saveData = {}, { itemId = LUPEN_HAULER_ITEM_ID } = {}) {
+  if (!isLupenHaulerShipItem(itemId)) return blocked("unknown_loadout_item", { itemId });
+  if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) return blocked("save_data_missing_or_invalid", { itemId });
+
+  const currentShipId = getString(saveData.currentShipId);
+  const currentShip = STAGING_SHIP_CONFIG[currentShipId] || null;
+  const targetShip = STAGING_SHIP_CONFIG[LUPEN_HAULER_KEY];
+  if (!currentShipId) return blocked("current_ship_missing_or_invalid", { itemId });
+  if (!targetShip) return blocked("unsupported_ship_for_loadout_preview", { itemId, currentShipId });
+  if (!Array.isArray(saveData.ownedShips)) return blocked("owned_ships_path_missing_or_invalid", { itemId, currentShipId });
+  if (!saveData.ownedShips.includes(LUPEN_HAULER_KEY)) return blocked("ship_not_owned", { itemId, currentShipId, targetShipId: LUPEN_HAULER_KEY });
+  if (currentShipId === LUPEN_HAULER_KEY) return blocked("ship_already_equipped", { itemId, currentShipId, targetShipId: LUPEN_HAULER_KEY });
+
+  const patchedSaveData = cloneJson(saveData);
+  patchedSaveData.currentShipId = LUPEN_HAULER_KEY;
+  patchedSaveData.selectedHangarShipId = LUPEN_HAULER_KEY;
+  if (Object.prototype.hasOwnProperty.call(patchedSaveData, "selectedFleetShipId")) {
+    patchedSaveData.selectedFleetShipId = LUPEN_HAULER_KEY;
+  }
+
+  return {
+    ok: true,
+    mode: "loadout_write_plan",
+    operation: "equip",
+    applied: false,
+    dryRun: true,
+    itemId: LUPEN_HAULER_ITEM_ID,
+    name: "LF-2 Hauler",
+    category: "ship",
+    currentShipId,
+    targetShipId: LUPEN_HAULER_KEY,
+    selectedShipBefore: currentShipId,
+    selectedShipAfter: LUPEN_HAULER_KEY,
+    cargoCapacityBefore: currentShip ? currentShip.cargo : null,
+    cargoCapacityAfterPreview: targetShip.cargo,
+    cargoCapacityAfter: targetShip.cargo,
+    shieldBefore: currentShip ? currentShip.shield : null,
+    shieldAfterPreview: targetShip.shield,
+    shieldAfter: targetShip.shield,
+    patchedSaveData,
+    appliedFields: Object.prototype.hasOwnProperty.call(patchedSaveData, "selectedFleetShipId")
+      ? ["currentShipId", "selectedHangarShipId", "selectedFleetShipId"]
+      : ["currentShipId", "selectedHangarShipId"],
+    untouchedFields: ["credits", "inventoryItems", "ownedShips", "ownedAttachments", "ownedGuns", "shipLoadouts", "attachments", "guns", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"]
+  };
+}
+
 export function buildStagingLoadoutEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM_ID } = {}) {
   if (isCargoPodItem(itemId)) return buildStagingCargoPodEquipPlan(saveData, { itemId });
   if (isShieldBoosterItem(itemId)) return buildStagingShieldBoosterEquipPlan(saveData, { itemId });
   if (isPulseLaserItem(itemId)) return buildStagingPulseLaserEquipPlan(saveData, { itemId });
+  if (isLupenHaulerShipItem(itemId)) return buildStagingLupenHaulerSelectPlan(saveData, { itemId });
   return blocked("unknown_loadout_item", { itemId });
 }
 
@@ -493,7 +551,7 @@ export async function applyStagingLoadoutEquipWrite({
 } = {}) {
   const safePlayerId = getString(playerId);
   if (!safePlayerId) return blocked("verified_identity_required", { itemId });
-  if (!isCargoPodItem(itemId) && !isShieldBoosterItem(itemId) && !isPulseLaserItem(itemId)) return blocked("unknown_loadout_item", { itemId });
+  if (!isCargoPodItem(itemId) && !isShieldBoosterItem(itemId) && !isPulseLaserItem(itemId) && !isLupenHaulerShipItem(itemId)) return blocked("unknown_loadout_item", { itemId });
   if (!trustedState?.available || !trustedState?.validationState) return blocked("trusted_save_required", { itemId });
   if (typeof fetchImpl !== "function") return blocked("fetch_unavailable", { itemId });
 
@@ -526,12 +584,16 @@ export async function applyStagingLoadoutEquipWrite({
       operation: "equip",
       applied: true,
       dryRun: false,
-      reason: isPulseLaserItem(itemId)
+      reason: isLupenHaulerShipItem(itemId)
+        ? "LF-2 Hauler selected"
+        : isPulseLaserItem(itemId)
         ? "Pulse Laser equipped"
         : isShieldBoosterItem(itemId)
           ? "Shield Booster equipped"
           : "Cargo Pod equipped",
-      debugReason: isPulseLaserItem(itemId)
+      debugReason: isLupenHaulerShipItem(itemId)
+        ? "phase_ship_staging_lf2_hauler_select_applied"
+        : isPulseLaserItem(itemId)
         ? "phase_weapon_staging_pulse_laser_equip_applied"
         : isShieldBoosterItem(itemId)
           ? "phase_shield_booster_staging_equip_applied"
@@ -540,6 +602,9 @@ export async function applyStagingLoadoutEquipWrite({
       name: plan.name,
       category: plan.category,
       currentShipId: plan.currentShipId,
+      targetShipId: plan.targetShipId,
+      selectedShipBefore: plan.selectedShipBefore,
+      selectedShipAfter: plan.selectedShipAfter,
       ownedBefore: plan.ownedBefore,
       ownedAfter: plan.ownedAfter,
       equippedBefore: plan.equippedBefore,
@@ -564,8 +629,8 @@ export async function applyStagingLoadoutEquipWrite({
         itemAllowed: envGate.itemAllowed
       },
       envGate,
-      writes: getLoadoutWriteFlags(true, isPulseLaserItem(itemId) ? "weapon" : "attachment"),
-      ...getLoadoutWriteFlags(true, isPulseLaserItem(itemId) ? "weapon" : "attachment"),
+      writes: getLoadoutWriteFlags(true, isLupenHaulerShipItem(itemId) ? "ship" : isPulseLaserItem(itemId) ? "weapon" : "attachment"),
+      ...getLoadoutWriteFlags(true, isLupenHaulerShipItem(itemId) ? "ship" : isPulseLaserItem(itemId) ? "weapon" : "attachment"),
       appliedFields: plan.appliedFields
     };
   } catch (_err) {
@@ -585,6 +650,7 @@ export const LoadoutWriteService = Object.freeze({
   buildStagingCargoPodEquipPlan,
   buildStagingShieldBoosterEquipPlan,
   buildStagingPulseLaserEquipPlan,
+  buildStagingLupenHaulerSelectPlan,
   buildStagingLoadoutEquipPlan,
   applyStagingCargoPodEquipWrite,
   applyStagingLoadoutEquipWrite

@@ -1,8 +1,8 @@
 /* Staging-only Store write prototype.
    This service is intentionally tiny: it can patch only attachment:cargoPod,
-   attachment:shieldBooster, and gun:pulseLaser ownership after strict staging gates pass. It never
-   writes ships, loadouts, loot, bounties, PvP/player damage, broad progression,
-   or schemas. */
+   attachment:shieldBooster, gun:pulseLaser, and ship:lupenHauler ownership
+   after strict staging gates pass. It never writes loadouts, loot, bounties,
+   PvP/player damage, broad progression, or schemas. */
 
 import { getStagingStoreItemById } from "../config/stagingStoreConfig.js";
 
@@ -13,6 +13,8 @@ const SHIELD_BOOSTER_ITEM_ID = "attachment:shieldBooster";
 const SHIELD_BOOSTER_KEY = "shieldBooster";
 const PULSE_LASER_ITEM_ID = "gun:pulseLaser";
 const PULSE_LASER_KEY = "pulseLaser";
+const LUPEN_HAULER_ITEM_ID = "ship:lupenHauler";
+const LUPEN_HAULER_KEY = "lupenHauler";
 const MAX_CREDITS = 999999999;
 const MAX_ATTACHMENT_COUNT = 9999;
 const MAX_GUN_COUNT = 9999;
@@ -102,13 +104,17 @@ function isPulseLaserItem(item) {
   return item?.itemId === PULSE_LASER_ITEM_ID && item?.localKey === PULSE_LASER_KEY;
 }
 
+function isLupenHaulerItem(item) {
+  return item?.itemId === LUPEN_HAULER_ITEM_ID && item?.localKey === LUPEN_HAULER_KEY;
+}
+
 function getStoreWriteFlags(applied = false, writeKind = "") {
   return {
     creditsWritten: applied,
     inventoryWritten: false,
     attachmentWritten: applied && writeKind === "attachment",
-    equipmentWritten: applied,
-    shipWritten: false,
+    equipmentWritten: applied && writeKind !== "ship",
+    shipWritten: applied && writeKind === "ship",
     weaponWritten: applied && writeKind === "weapon",
     saveWritten: applied,
     lootWritten: false,
@@ -149,6 +155,8 @@ function getStoreUserReason(reason) {
     shield_booster_count_missing_or_invalid: "Saved Shield Booster ownership count is missing or invalid.",
     owned_guns_path_missing_or_invalid: "Saved weapon ownership path is missing or invalid.",
     pulse_laser_count_missing_or_invalid: "Saved Pulse Laser ownership count is missing or invalid.",
+    owned_ships_path_missing_or_invalid: "Saved ship ownership path is missing or invalid.",
+    ship_already_owned: "Ship is already owned.",
     supabase_config_missing: "Supabase server config unavailable.",
     player_save_missing: "Player save not found.",
     player_save_read_failed: "Player save read failed.",
@@ -189,7 +197,8 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
   const writesAttachment = isCargoPodItem(selectedItem);
   const writesShieldBooster = isShieldBoosterItem(selectedItem);
   const writesWeapon = isPulseLaserItem(selectedItem);
-  if (!selectedItem || (!writesAttachment && !writesShieldBooster && !writesWeapon)) {
+  const writesShip = isLupenHaulerItem(selectedItem);
+  if (!selectedItem || (!writesAttachment && !writesShieldBooster && !writesWeapon && !writesShip)) {
     return getBlockedResult("store_item_preview_only", {
       itemId: selectedItem?.itemId || "",
       name: selectedItem?.name || ""
@@ -225,7 +234,7 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
   let itemBefore = null;
   let itemAfter = null;
   let appliedFields = ["credits"];
-  const untouchedFields = ["inventoryItems", "shipLoadouts", "ships", "loot", "bounties", "PvP", "playerDamage", "progression"];
+  const untouchedFields = ["inventoryItems", "shipLoadouts", "loot", "bounties", "PvP", "playerDamage", "progression"];
 
   if (writesAttachment || writesShieldBooster) {
     if (!saveData.ownedAttachments || typeof saveData.ownedAttachments !== "object" || Array.isArray(saveData.ownedAttachments)) {
@@ -238,7 +247,7 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     patchedSaveData.ownedAttachments[attachmentKey] = itemAfter;
     appliedFields.push(`ownedAttachments.${attachmentKey}`);
     untouchedFields.push("ownedGuns", "guns");
-  } else {
+  } else if (writesWeapon) {
     if (!saveData.ownedGuns || typeof saveData.ownedGuns !== "object" || Array.isArray(saveData.ownedGuns)) {
       return getBlockedResult("owned_guns_path_missing_or_invalid");
     }
@@ -248,7 +257,30 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     patchedSaveData.ownedGuns[PULSE_LASER_KEY] = itemAfter;
     appliedFields.push("ownedGuns.pulseLaser");
     untouchedFields.push("ownedAttachments", "attachments");
+  } else {
+    if (!Array.isArray(saveData.ownedShips)) {
+      return getBlockedResult("owned_ships_path_missing_or_invalid");
+    }
+    if (saveData.ownedShips.includes(LUPEN_HAULER_KEY)) {
+      return getBlockedResult("ship_already_owned", {
+        itemId: selectedItem.itemId,
+        name: selectedItem.name,
+        category: selectedItem.category,
+        quantity: safeQuantity,
+        unitPrice,
+        totalCost: unitPrice,
+        creditsBefore,
+        creditsAfter: creditsBefore
+      });
+    }
+    itemBefore = saveData.ownedShips.length;
+    patchedSaveData.ownedShips = [...saveData.ownedShips, LUPEN_HAULER_KEY];
+    itemAfter = patchedSaveData.ownedShips.length;
+    appliedFields.push("ownedShips");
+    untouchedFields.push("ownedAttachments", "ownedGuns", "attachments", "guns");
   }
+
+  const writeKind = writesShip ? "ship" : writesWeapon ? "weapon" : "attachment";
 
   return {
     ok: true,
@@ -271,8 +303,8 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     patchedSaveData,
     appliedFields,
     untouchedFields,
-    writes: getStoreWriteFlags(false, writesAttachment ? "attachment" : "weapon"),
-    ...getStoreWriteFlags(false, writesAttachment ? "attachment" : "weapon")
+    writes: getStoreWriteFlags(false, writeKind),
+    ...getStoreWriteFlags(false, writeKind)
   };
 }
 
@@ -355,7 +387,7 @@ export async function applyStagingStorePurchaseWrite({
 
   if (!safePlayerId) return getBlockedResult("verified_identity_required", { itemId, quantity: safeQuantity || 0 });
   if (!selectedItem) return getBlockedResult("unknown_store_item", { itemId, quantity: safeQuantity || 0 });
-  if (!isCargoPodItem(selectedItem) && !isShieldBoosterItem(selectedItem) && !isPulseLaserItem(selectedItem)) {
+  if (!isCargoPodItem(selectedItem) && !isShieldBoosterItem(selectedItem) && !isPulseLaserItem(selectedItem) && !isLupenHaulerItem(selectedItem)) {
     return getBlockedResult("store_item_preview_only", {
       itemId: selectedItem.itemId,
       name: selectedItem.name,
@@ -427,7 +459,9 @@ export async function applyStagingStorePurchaseWrite({
       applied: true,
       dryRun: false,
       reason: "Staging Store purchase applied",
-      debugReason: isPulseLaserItem(selectedItem)
+      debugReason: isLupenHaulerItem(selectedItem)
+        ? "phase_ship_staging_lf2_hauler_purchase_applied"
+        : isPulseLaserItem(selectedItem)
         ? "phase_weapon_staging_pulse_laser_purchase_applied"
         : isShieldBoosterItem(selectedItem)
           ? "phase_shield_booster_staging_purchase_applied"
@@ -457,8 +491,8 @@ export async function applyStagingStorePurchaseWrite({
         itemAllowed: envGate.itemAllowed
       },
       envGate,
-      writes: getStoreWriteFlags(true, isPulseLaserItem(selectedItem) ? "weapon" : "attachment"),
-      ...getStoreWriteFlags(true, isPulseLaserItem(selectedItem) ? "weapon" : "attachment"),
+      writes: getStoreWriteFlags(true, isLupenHaulerItem(selectedItem) ? "ship" : isPulseLaserItem(selectedItem) ? "weapon" : "attachment"),
+      ...getStoreWriteFlags(true, isLupenHaulerItem(selectedItem) ? "ship" : isPulseLaserItem(selectedItem) ? "weapon" : "attachment"),
       appliedFields: patchPlan.appliedFields
     };
   } catch (_err) {

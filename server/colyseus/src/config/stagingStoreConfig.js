@@ -41,6 +41,18 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     stockType: "fixed",
     description: "+50 shield",
     reference: "attachments.shieldBooster"
+  }),
+  Object.freeze({
+    itemId: "ship:lupenHauler",
+    name: "LF-2 Hauler",
+    category: "ship",
+    localKind: "ship",
+    localKey: "lupenHauler",
+    price: 12000,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Cargo-forward pilot hull for staging trade loops.",
+    reference: "SHIPS.lupenHauler"
   })
 ]);
 

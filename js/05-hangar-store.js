@@ -10,7 +10,8 @@
 const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
   "gun:pulseLaser": "gun:pulseLaser",
   "attachment:cargoPod": "attachment:cargoPod",
-  "attachment:shieldBooster": "attachment:shieldBooster"
+  "attachment:shieldBooster": "attachment:shieldBooster",
+  "ship:lupenHauler": "ship:lupenHauler"
 });
 
 let multiplayerStagingStoreSubscribed = false;
@@ -18,6 +19,7 @@ let multiplayerStagingStorePurchasePending = false;
 let multiplayerStagingCargoPodEquipPending = false;
 let multiplayerStagingShieldBoosterEquipPending = false;
 let multiplayerStagingPulseLaserEquipPending = false;
+let multiplayerStagingShipEquipPending = false;
 
 function isMultiplayerStagingStoreActive() {
   try {
@@ -125,8 +127,17 @@ function getLastStagingPulseLaserEquipResult() {
   return preview?.itemId === "gun:pulseLaser" ? preview : null;
 }
 
+function getLastStagingShipEquipResult() {
+  const status = getMultiplayerStagingStoreStatus();
+  const equip = status.lastStagingLoadoutEquip;
+  if (equip?.itemId === "ship:lupenHauler") return equip;
+  const preview = status.lastStagingLoadoutPreview;
+  return preview?.itemId === "ship:lupenHauler" ? preview : null;
+}
+
 function getStagingStorePreviewLine(result) {
   if (!result) return "Server preview pending. No CR or inventory changed.";
+  if (result.applied && result.itemId === "ship:lupenHauler") return "LF-2 Hauler purchased.";
   if (result.applied && result.itemId === "gun:pulseLaser") return "Weapon purchased.";
   if (result.applied && result.itemId === "attachment:shieldBooster") return "Shield Booster purchased.";
   if (result.applied && result.itemId === "attachment:cargoPod") return "Cargo Pod purchased.";
@@ -173,7 +184,7 @@ function renderStagingStorePreviewNote(item) {
 
 function isStagingStoreWritableItem(item) {
   const itemId = getStagingStoreItemId(item);
-  return itemId === "attachment:cargoPod" || itemId === "attachment:shieldBooster" || itemId === "gun:pulseLaser";
+  return itemId === "attachment:cargoPod" || itemId === "attachment:shieldBooster" || itemId === "gun:pulseLaser" || itemId === "ship:lupenHauler";
 }
 
 function getStagingCargoPodEquipLine(result) {
@@ -254,6 +265,68 @@ function renderStagingPulseLaserEquipNote(item) {
       <strong>${escapeHtml(getStagingPulseLaserEquipLine(result))}</strong>${escapeHtml(slotLine)}${escapeHtml(ownedLine)} /
       ${escapeHtml(result?.applied ? "Server save refreshed after applied weapon equip." : "Dry run only - no loadout, inventory, credits, ships, attachments, loot, or bounties changed.")}
     </div>`;
+}
+
+function getStagingShipEquipLine(result) {
+  if (!result) return "LF-2 Hauler selection preview pending.";
+  if (result.applied) return "LF-2 Hauler selected.";
+  if (result.mode === "dry_run" && result.ok) return "Would fly LF-2 Hauler.";
+  if (result.blockReason === "ship_not_owned") return "Blocked: LF-2 Hauler is not owned.";
+  if (result.blockReason === "ship_already_equipped") return "LF-2 Hauler already active.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - active ship not changed.";
+  return `Blocked: ${result.blockReason || result.reason || "ship selection unavailable"}.`;
+}
+
+function renderStagingShipEquipNote(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "ship:lupenHauler") return "";
+  const result = getLastStagingShipEquipResult();
+  const shipLine = result?.selectedShipBefore && result?.selectedShipAfter
+    ? ` / Ship ${result.selectedShipBefore} -> ${result.selectedShipAfter}`
+    : "";
+  const capacityLine = result?.cargoCapacityBefore !== null && result?.cargoCapacityBefore !== undefined
+    ? ` / Cargo ${formatNumber(result.cargoCapacityBefore)} -> ${formatNumber(result.cargoCapacityAfter ?? result.cargoCapacityAfterPreview)}`
+    : "";
+  return `
+    <div class="store-detail-owned-line">
+      <strong>${escapeHtml(getStagingShipEquipLine(result))}</strong>${escapeHtml(shipLine)}${escapeHtml(capacityLine)} /
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied ship selection." : "Dry run only - no loadout, cargo, weapons, equipment, loot, or bounties changed.")}
+    </div>`;
+}
+
+async function requestStagingShipEquip(item) {
+  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "ship:lupenHauler") return false;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!client?.equipStagingShip || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging LF-2 Hauler selection is waiting for the multiplayer server connection.");
+    return true;
+  }
+  if (multiplayerStagingShipEquipPending) return true;
+  multiplayerStagingShipEquipPending = true;
+  renderStore();
+  client.equipStagingShip({ itemId: "ship:lupenHauler" });
+  if (typeof addHudToast === "function") addHudToast("Requested MP staging LF-2 Hauler selection.");
+  setTimeout(async () => {
+    multiplayerStagingShipEquipPending = false;
+    const latest = client.getStatus?.().lastStagingLoadoutEquip;
+    if (latest?.itemId === "ship:lupenHauler" && latest.applied) {
+      if (typeof addHudToast === "function") addHudToast(`LF-2 Hauler ready: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`);
+      if (typeof loadGameFromSupabase === "function") {
+        try {
+          const loaded = await loadGameFromSupabase();
+          if (loaded?.loaded) {
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("lf2_hauler_selected");
+            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          }
+        } catch (_err) {
+          if (typeof addHudToast === "function") addHudToast("LF-2 Hauler selected. Reload if ship values look stale.");
+        }
+      }
+    }
+    renderStore();
+    if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
+  }, 900);
+  return true;
 }
 
 async function requestStagingCargoPodEquip(item) {
@@ -390,13 +463,17 @@ async function requestStagingStorePurchase(item) {
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded && typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          if (loaded?.loaded) {
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_store_purchase");
+            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          }
         } catch (_err) {
           if (typeof addHudToast === "function") addHudToast("Staging purchase applied. Reload if Store values look stale.");
         }
       }
     }
     renderStore();
+    if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
   }, 900);
   return true;
 }
@@ -2024,12 +2101,34 @@ function getStoreCatalogItems() {
     });
   });
 
+  if (isMultiplayerStagingStoreActive() && SHIPS.lupenHauler) {
+    const ship = SHIPS.lupenHauler;
+    items.push({
+      id: "ship:lupenHauler",
+      kind: "ship",
+      key: "lupenHauler",
+      name: ship.name,
+      category: "ships",
+      image: ship.image,
+      description: "Cargo-focused staging pilot hull for the online trade loop.",
+      basePrice: ship.price,
+      qualityEnabled: false,
+      storeTier: "Staging Hull",
+      stats: [
+        { label: "Cargo", value: ship.cargo },
+        { label: "Shield", value: ship.shield },
+        { label: "Gun Slots", value: ship.gunSlots },
+        { label: "Equip Slots", value: ship.attachmentSlots }
+      ]
+    });
+  }
+
   const dailyItem = getDailyStoreItem(items);
   if (dailyItem) {
     items.push(dailyItem);
   }
 
-  const order = { attachments: 0, guns: 1 };
+  const order = { ships: 0, attachments: 1, guns: 2 };
   return items.sort((a, b) => {
     if (a.dailyStock !== b.dailyStock) return a.dailyStock ? 1 : -1;
     const delta = (order[a.category] ?? 99) - (order[b.category] ?? 99);
@@ -2491,6 +2590,7 @@ function renderStoreDetail() {
         ${renderStagingCargoPodEquipNote(item)}
         ${renderStagingShieldBoosterEquipNote(item)}
         ${renderStagingPulseLaserEquipNote(item)}
+        ${renderStagingShipEquipNote(item)}
         ${detailStatsHtml}
       </div>
 
@@ -2499,6 +2599,7 @@ function renderStoreDetail() {
         ${stagingStoreLocked && stagingStoreItemId === "attachment:cargoPod" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingCargoPodEquip(getStoreSelectedItem())" ${multiplayerStagingCargoPodEquipPending ? "disabled" : ""}>${multiplayerStagingCargoPodEquipPending ? "Applying..." : "Apply Cargo Pod"}</button>` : ""}
         ${stagingStoreLocked && stagingStoreItemId === "attachment:shieldBooster" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingShieldBoosterEquip(getStoreSelectedItem())" ${multiplayerStagingShieldBoosterEquipPending ? "disabled" : ""}>${multiplayerStagingShieldBoosterEquipPending ? "Applying..." : "Apply Shield Booster"}</button>` : ""}
         ${stagingStoreLocked && stagingStoreItemId === "gun:pulseLaser" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingPulseLaserEquip(getStoreSelectedItem())" ${multiplayerStagingPulseLaserEquipPending ? "disabled" : ""}>${multiplayerStagingPulseLaserEquipPending ? "Applying..." : "Apply Pulse Laser"}</button>` : ""}
+        ${stagingStoreLocked && stagingStoreItemId === "ship:lupenHauler" && totalOwned > 0 && currentShipId !== item.key ? `<button class="store-detail-buy-action" onclick="requestStagingShipEquip(getStoreSelectedItem())" ${multiplayerStagingShipEquipPending ? "disabled" : ""}>${multiplayerStagingShipEquipPending ? "Applying..." : "Fly LF-2 Hauler"}</button>` : ""}
         ${sellButton}
       </div>
     </div>`;
@@ -2864,6 +2965,13 @@ function removeGun(index) {
 }
 
 function buyShip(shipId) {
+  if (isMultiplayerStagingStoreActive()) {
+    const ship = SHIPS[shipId];
+    if (shipId === "lupenHauler" && ship && !ownedShips.includes(shipId)) {
+      requestStagingStorePurchase({ kind: "ship", key: shipId });
+      return;
+    }
+  }
   if (blockStoreMutationInMultiplayerStaging()) return;
   const ship = SHIPS[shipId];
   if (!ship || ownedShips.includes(shipId)) return;
@@ -2895,6 +3003,14 @@ function buyShip(shipId) {
 }
 
 function equipShip(shipId) {
+  if (isMultiplayerStagingStoreActive()) {
+    const ship = SHIPS[shipId];
+    if (shipId === "lupenHauler" && ship && ownedShips.includes(shipId) && currentShipId !== shipId) {
+      requestStagingShipEquip({ kind: "ship", key: shipId });
+      return;
+    }
+  }
+  if (blockLoadoutMutationInMultiplayerStaging()) return;
   if (!ownedShips.includes(shipId)) return;
 
   currentShipId = shipId;

@@ -2,6 +2,10 @@
 
 This note captures the current path from local single-player gameplay to hosted, multiplayer-safe gameplay. It is intentionally a migration guide, not an implementation plan for enabling every system at once.
 
+## Browser Pilot Scope
+
+Lupen is currently being prepared as a browser-first website game. The pilot focus is the desktop/web experience on `https://www.lupen.io` and `https://www.lupen.io/?mp=staging`: clear login/start flow, reliable navigation between hub screens, visible staging status, and repeatable online test paths. Mobile/PWA/app wrapping remains out of scope for this phase.
+
 ## Current Staging State
 
 Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Colyseus `lupen_sector` room. It currently supports:
@@ -20,7 +24,7 @@ Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Col
 - Server-side staging Store item list and purchase preview/dry-run validation for a tiny static catalogue.
 - Real client-side Trade Terminal buy/sell mutations are fenced in `?mp=staging`; testers can inspect the UI but must use the staging preview panel for trade dry-runs.
 - In `?mp=staging`, the real Trade Terminal routes matching buy/sell actions to Colyseus staging trade handlers so testers can see server-calculated dry-run or gated trade-write results in the normal trade UI.
-- In `?mp=staging`, real Store purchase/sell mutations are fenced and mapped Store items use Colyseus staging Store handlers. Cargo Pod, Shield Booster, and Pulse Laser have disabled-by-default gated server write prototypes; broad inventory, ship, stock, loot, bounty, or progression writes remain excluded.
+- In `?mp=staging`, real Store purchase/sell mutations are fenced and mapped Store items use Colyseus staging Store handlers. Cargo Pod, Shield Booster, Pulse Laser, and LF-2 Hauler have disabled-by-default gated server write prototypes; broad inventory, other ships, stock, loot, bounty, or progression writes remain excluded.
 - Staging loot preview now has a disabled-by-default Lupen Shard material claim path. It can only patch `player_saves.save_data.upgradeMaterials.lupenShards` when explicit staging env gates, verified identity, idempotency, and allow-list/scope checks pass.
 - Playwright browser smoke tests cover normal start-screen loading, normal Trade Terminal visibility, staging guide copy, Store/Bounty staging copy, and staging trade UI fences without performing real buy/sell actions or live writes.
 
@@ -33,7 +37,7 @@ Working server-authoritative staging systems:
 - Player presence, remote ship visuals, and server-owned staging bots.
 - Staging bot lock-on, server damage, cooldown, disabled/respawn, contribution, and synced shot visuals.
 - Server-backed trade buy/sell through strict staging gates.
-- Cargo Pod, Pulse Laser, and Shield Booster purchase/equip through strict staging gates.
+- LF-2 Hauler purchase/select, plus Cargo Pod, Pulse Laser, and Shield Booster purchase/equip through strict staging gates.
 - Erebus Patrol Sweep staging bounty progress.
 - XP-only and Lupen Shard claim paths through strict staging gates.
 
@@ -45,7 +49,7 @@ Dry-run or preview systems:
 
 Excluded systems:
 
-- PvP, player damage, combat/bounty credits, Store sell, ship writes, weapon/attachment loot writes, broad inventory writes, schema/RLS changes, and broad progression.
+- PvP, player damage, combat/bounty credits, Store sell, broad ship writes beyond LF-2 Hauler, weapon/attachment loot writes, broad inventory writes, schema/RLS changes, and broad progression.
 
 Next recommended phases:
 
@@ -58,14 +62,15 @@ Next recommended phases:
 Normal `?mp=staging` now shows a compact Multiplayer Staging Loop helper while detailed raw diagnostics stay behind `?debug=mp`. The intended tester path is:
 
 1. Visit the Trade Terminal and earn CR through the server-backed staging trade path.
-2. Buy and equip Cargo Pod through the staging Store/loadout path to increase cargo capacity.
-3. Buy and equip Pulse Laser through the staging Store/loadout path to activate server-known Pulse Laser staging damage.
-4. Buy and equip Shield Booster through the staging Store/loadout path to reflect +50 shield in server loadout diagnostics.
-5. Accept Erebus Patrol Sweep from the staging Bounty Board.
-6. Lock and destroy server-owned staging bots.
-7. Claim XP and Lupen Shard through the gated staging claim buttons.
+2. Buy and fly LF-2 Hauler through the staging Store/ship selection path to test a cargo-focused hull.
+3. Buy and equip Cargo Pod through the staging Store/loadout path to increase cargo capacity.
+4. Buy and equip Pulse Laser through the staging Store/loadout path to activate server-known Pulse Laser staging damage.
+5. Buy and equip Shield Booster through the staging Store/loadout path to reflect +50 shield in server loadout diagnostics.
+6. Accept Erebus Patrol Sweep from the staging Bounty Board.
+7. Lock and destroy server-owned staging bots.
+8. Claim XP and Lupen Shard through the gated staging claim buttons.
 
-The helper and status copy should keep clear that this is Multiplayer Staging, not normal single-player progression. Server-backed trade, Store, loadout, combat, XP, and Lupen Shard paths remain gated; PvP, player damage, combat credits, normal loot items, broad inventory writes, bounty completion, and broad progression remain excluded.
+The helper and status copy should keep clear that this is Multiplayer Staging, not normal single-player progression. Server-backed trade, Store, ship selection, loadout, combat, XP, and Lupen Shard paths remain gated; PvP, player damage, combat credits, normal loot items, broad inventory writes, broad ship writes, bounty completion, and broad progression remain excluded.
 
 ## Intentionally Excluded
 
@@ -160,9 +165,9 @@ Multiplayer authority needs: server-side price/stock validation, ownership check
 
 Current staging Store prototype: `stagingStore:listItems` exposes a tiny static catalogue and `stagingStore:previewPurchase` validates item id, quantity, server price, and credits from trusted save or a sanitized snapshot. Preview results are dry-run only and always report no credit, inventory, equipment, ship, save, loot, or bounty writes. The real Store UI shows server-preview copy for mapped items and blocks real local purchase/sell mutations while `?mp=staging` is active.
 
-Store Phase 2 adds `stagingStore:purchase` for `attachment:cargoPod`, `attachment:shieldBooster`, and `gun:pulseLaser` only. It is disabled/dry-run by default and requires `STAGING_STORE_WRITE_ENABLED=true`, `STAGING_STORE_WRITE_DRY_RUN=false`, verified identity, Store write scope/allowlist approval, `STAGING_STORE_WRITE_ALLOWED_ITEMS` containing the exact item id, quantity `1`, trusted `player_saves`, enough root `credits`, and a valid matching ownership count. When every gate passes, the server patches only root `credits` plus `ownedAttachments.cargoPod`, `ownedAttachments.shieldBooster`, or `ownedGuns.pulseLaser`; `inventoryItems`, `shipLoadouts`, ships, non-Pulse weapons, daily stock, loot, bounties, PvP, player damage, broad progression, and schema/RLS remain excluded.
+Store Phase 2 adds `stagingStore:purchase` for `attachment:cargoPod`, `attachment:shieldBooster`, `gun:pulseLaser`, and `ship:lupenHauler` only. It is disabled/dry-run by default and requires `STAGING_STORE_WRITE_ENABLED=true`, `STAGING_STORE_WRITE_DRY_RUN=false`, verified identity, Store write scope/allowlist approval, `STAGING_STORE_WRITE_ALLOWED_ITEMS` containing the exact item id, quantity `1`, trusted `player_saves`, enough root `credits`, and a valid matching ownership count/path. When every gate passes, the server patches only root `credits` plus `ownedAttachments.cargoPod`, `ownedAttachments.shieldBooster`, `ownedGuns.pulseLaser`, or `ownedShips` for LF-2 Hauler; `inventoryItems`, `shipLoadouts`, other ships, non-Pulse weapons, daily stock, loot, bounties, PvP, player damage, broad progression, and schema/RLS remain excluded.
 
-Store Phase 3 adds Cargo Pod and Shield Booster equip/apply for `attachment:cargoPod` and `attachment:shieldBooster`, plus starter weapon equip/apply for `gun:pulseLaser` only. Local loadout mutation paths are fenced in `?mp=staging`; Cargo Pod, Shield Booster, and Pulse Laser equip route through `stagingLoadout:equipAttachment`. It is disabled/dry-run by default and requires `STAGING_LOADOUT_WRITE_ENABLED=true`, `STAGING_LOADOUT_WRITE_DRY_RUN=false`, verified identity, loadout write scope/allowlist approval, `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS` containing the exact item id, trusted `player_saves`, valid `currentShipId`, matching owned count greater than zero, valid current ship loadout arrays, and an empty matching slot. When every gate passes, the server decrements `ownedAttachments.cargoPod` and appends a standard level-1 Cargo Pod, decrements `ownedAttachments.shieldBooster` and appends a standard level-1 Shield Booster, or decrements `ownedGuns.pulseLaser` and appends a standard level-1 Pulse Laser to the current ship loadout. The server derives Cargo Pod capacity with a narrow mirrored ship config and +25 Cargo Pod bonus, and Shield Booster diagnostics with a +50 shield bonus. Credits, inventory, ships, non-Pulse weapons, loot, bounties, PvP, player damage, trade cargo/totals, broad progression, and schema/RLS remain excluded.
+Store Phase 3 adds Cargo Pod and Shield Booster equip/apply for `attachment:cargoPod` and `attachment:shieldBooster`, starter weapon equip/apply for `gun:pulseLaser`, and LF-2 Hauler ship selection for `ship:lupenHauler` only. Local loadout and ship selection mutation paths are fenced in `?mp=staging`; Cargo Pod, Shield Booster, Pulse Laser, and LF-2 Hauler selection route through `stagingLoadout:equipAttachment`. It is disabled/dry-run by default and requires `STAGING_LOADOUT_WRITE_ENABLED=true`, `STAGING_LOADOUT_WRITE_DRY_RUN=false`, verified identity, loadout write scope/allowlist approval, `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS` containing the exact item id, trusted `player_saves`, and item-specific ownership/slot validation. When every gate passes, the server decrements `ownedAttachments.cargoPod` and appends a standard level-1 Cargo Pod, decrements `ownedAttachments.shieldBooster` and appends a standard level-1 Shield Booster, decrements `ownedGuns.pulseLaser` and appends a standard level-1 Pulse Laser to the current ship loadout, or updates only `currentShipId`/selected ship ids to fly owned LF-2 Hauler. The server derives Cargo Pod capacity with a narrow mirrored ship config and +25 Cargo Pod bonus, and Shield Booster diagnostics with a +50 shield bonus. Credits, inventory, broad ship ownership, non-Pulse weapons, loot, bounties, PvP, player damage, trade cargo/totals, broad progression, and schema/RLS remain excluded.
 
 Current online progression loop validation status: server regression now covers a mocked end-to-end staging sequence where a verified allowlisted player buys Cargo Pod, equips it, receives the +25 cargo capacity result, uses the increased capacity to buy more cargo than the pre-equip hold would allow, sells that cargo, buys Pulse Laser, equips Pulse Laser, and preserves unrelated save fields. Live room regression separately confirms staging combat uses the server-known Pulse Laser damage value and ignores fake client damage inflation. Manual live-write validation remains allowlisted and opt-in only.
 

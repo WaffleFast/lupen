@@ -64,3 +64,12 @@ These tests do not validate CSS polish, authenticated cloud saves, or live stagi
 - Colyseus server, staging gate, trade, Store, loadout, combat, bounty, XP, or loot service changes: run `npm.cmd run build` and `npm.cmd test` from `server/colyseus`, then run `npm.cmd run test:e2e` from the repo root if browser UI changed.
 - Docs-only changes: `git diff --check` is enough unless the docs describe a changed workflow that should be smoke-tested.
 - Live-write staging checks remain manual, allowlisted, and opt-in only. Do not add or run live-write Playwright tests by default.
+
+## Pilot Website Checks
+
+After a browser/client deploy, manually verify:
+
+- `https://www.lupen.io` loads normally with no multiplayer staging chip or guide.
+- `https://www.lupen.io/?mp=staging` shows the Multiplayer Staging chip and loop guide.
+- Trade Terminal, Store, Hangar, Bounty Board, Pilot, Planet, and Sector navigation still opens from the browser game hub.
+- `https://www.lupen.io/?mp=staging&debug=mp` shows diagnostics, while normal staging stays cleaner.

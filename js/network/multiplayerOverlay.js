@@ -2589,19 +2589,19 @@
   }
 
   function getStagingFlowHint(status, selectedBot, players, bots) {
-    const loop = "1 Trade for CR -> 2 Buy/equip Cargo Pod -> 3 Buy/equip Pulse Laser -> 4 Buy/equip Shield Booster -> 5 Accept Erebus Patrol -> 6 Destroy staging bots -> 7 Claim XP + Lupen Shard.";
+    const loop = "1 Trade for CR -> 2 Buy/fly LF-2 Hauler -> 3 Buy/equip Cargo Pod -> 4 Buy/equip Pulse Laser -> 5 Buy/equip Shield Booster -> 6 Accept Erebus Patrol -> 7 Destroy staging bots -> 8 Claim XP + Lupen Shard.";
 
     if (!status?.isConnected) {
       return `Connecting to Multiplayer Staging. ${loop}`;
     }
 
     if (!bots.length) {
-      return `Server-backed trade, Store, loadout, combat, XP, and Lupen Shard test loop. Waiting for server-owned staging bots. ${loop}`;
+      return `Server-backed trade, Store, ship, loadout, combat, XP, and Lupen Shard test loop. Waiting for server-owned staging bots. ${loop}`;
     }
 
     if (!selectedBot?.id) {
       const pilotText = players.length ? `${players.length} remote pilot${players.length === 1 ? "" : "s"} connected. ` : "";
-      return `${pilotText}Server-backed trade, gated Store purchases, Cargo Pod capacity, Pulse Laser damage, Shield Booster shield stats, Erebus Patrol progress, XP, and Lupen Shard claims are staged here. ${loop}`;
+      return `${pilotText}Server-backed trade, gated Store purchases, LF-2 Hauler cargo hull, Cargo Pod capacity, Pulse Laser damage, Shield Booster shield stats, Erebus Patrol progress, XP, and Lupen Shard claims are staged here. ${loop}`;
     }
 
     if (selectedBot.disabled) {
@@ -2649,7 +2649,7 @@
 
     const note = global.document.createElement("span");
     note.className = "lupen-mp-flow-note";
-    note.textContent = "Server-backed trade/store/loadout/combat. No PvP, player damage, combat credits, or loot items yet.";
+    note.textContent = "Server-backed trade/store/ship/loadout/combat. No PvP, player damage, combat credits, or loot items yet.";
     hint.appendChild(note);
 
     global.document.body.appendChild(hint);
@@ -3117,9 +3117,12 @@
       if (loadoutEquip) {
         const isWeaponEquip = String(loadoutEquip.itemId || "").startsWith("gun:");
         const isShieldEquip = String(loadoutEquip.itemId || "") === "attachment:shieldBooster";
-        const equipLabel = isWeaponEquip ? "weapon equip" : isShieldEquip ? "shield equip" : "cargo pod equip";
+        const isShipEquip = String(loadoutEquip.itemId || "") === "ship:lupenHauler";
+        const equipLabel = isShipEquip ? "ship select" : isWeaponEquip ? "weapon equip" : isShieldEquip ? "shield equip" : "cargo pod equip";
         const appliedLine = isWeaponEquip
           ? `applied / guns ${formatTradeNumber(loadoutEquip.equippedBefore)} -> ${formatTradeNumber(loadoutEquip.equippedAfter)}`
+          : isShipEquip
+            ? `applied / ${loadoutEquip.selectedShipBefore || loadoutEquip.currentShipId || "ship"} -> ${loadoutEquip.selectedShipAfter || loadoutEquip.targetShipId || "lupenHauler"}`
           : isShieldEquip
             ? `applied / shield ${formatTradeNumber(loadoutEquip.shieldBefore)} -> ${formatTradeNumber(loadoutEquip.shieldAfter)}`
           : `applied / cargo ${formatTradeNumber(loadoutEquip.cargoCapacityBefore)} -> ${formatTradeNumber(loadoutEquip.cargoCapacityAfter)}`;

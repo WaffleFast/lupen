@@ -74,6 +74,7 @@ import {
   buildStagingCargoPodEquipPlan,
   buildStagingShieldBoosterEquipPlan,
   buildStagingPulseLaserEquipPlan,
+  buildStagingLupenHaulerSelectPlan,
   getLoadoutWriteEnvGate
 } from "../src/services/loadoutWriteService.js";
 
@@ -1350,6 +1351,7 @@ async function assertStagingStorePreviewHelpers() {
   assert(items.some((item) => item.itemId === "gun:pulseLaser"), "Staging Store missing Pulse Laser.");
   assert(items.some((item) => item.itemId === "attachment:cargoPod"), "Staging Store missing Cargo Pod.");
   assert(items.some((item) => item.itemId === "attachment:shieldBooster"), "Staging Store missing Shield Booster.");
+  assert(items.some((item) => item.itemId === "ship:lupenHauler"), "Staging Store missing LF-2 Hauler.");
 
   const validTrustedPreview = buildStagingStorePurchasePreview({
     itemId: "attachment:cargoPod",
@@ -1463,6 +1465,7 @@ async function assertStagingStorePreviewHelpers() {
   };
   const cargoPodItem = items.find((item) => item.itemId === "attachment:cargoPod");
   const pulseLaserItem = items.find((item) => item.itemId === "gun:pulseLaser");
+  const haulerItem = items.find((item) => item.itemId === "ship:lupenHauler");
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
   assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 780, "Cargo Pod Store patch did not subtract the server price.");
@@ -1496,6 +1499,23 @@ async function assertStagingStorePreviewHelpers() {
   assert(shieldBoosterPatch.patchedSaveData.cargo.Iron === 2, "Shield Booster Store patch changed trade cargo.");
   assert(shieldBoosterPatch.patchedSaveData.playerProgress.combatXp === 33, "Shield Booster Store patch changed progression.");
 
+  const haulerSaveData = { ...validSaveData, credits: 13000 };
+  const haulerPatch = buildStagingStorePurchasePatch(haulerSaveData, haulerItem, 1);
+  assert(haulerPatch.ok === true, `Valid LF-2 Hauler Store patch was blocked: ${haulerPatch.blockReason}`);
+  assert(haulerPatch.creditsBefore === 13000 && haulerPatch.creditsAfter === 1000, "LF-2 Hauler Store patch did not subtract the server price.");
+  assert(haulerPatch.itemBefore === 1 && haulerPatch.itemAfter === 2, "LF-2 Hauler Store patch did not append ownedShips.");
+  assert(haulerPatch.patchedSaveData.ownedShips.includes("lupenHauler"), "LF-2 Hauler Store patch did not add the ship.");
+  assert(haulerPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "LF-2 Hauler Store patch changed loadouts.");
+  assert(haulerPatch.patchedSaveData.ownedAttachments.cargoPod === 1, "LF-2 Hauler Store patch changed attachments.");
+  assert(haulerPatch.patchedSaveData.ownedGuns.pulseLaser === 1, "LF-2 Hauler Store patch changed weapons.");
+  assert(haulerPatch.patchedSaveData.inventoryItems[0].id === "kept-item", "LF-2 Hauler Store patch changed inventoryItems.");
+  assert(haulerPatch.patchedSaveData.cargo.Iron === 2, "LF-2 Hauler Store patch changed trade cargo.");
+  assert(haulerPatch.patchedSaveData.playerProgress.combatXp === 33, "LF-2 Hauler Store patch changed progression.");
+  assert(haulerPatch.shipWritten === false && haulerPatch.saveWritten === false, "LF-2 Hauler dry-run plan reported writes.");
+
+  const alreadyOwnedHaulerPatch = buildStagingStorePurchasePatch({ ...haulerSaveData, ownedShips: ["lupenOrigin", "lupenHauler"] }, haulerItem, 1);
+  assert(alreadyOwnedHaulerPatch.ok === false && alreadyOwnedHaulerPatch.blockReason === "ship_already_owned", "Already-owned LF-2 Hauler purchase was not blocked.");
+
   const invalidQuantityPatch = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 2);
   assert(invalidQuantityPatch.ok === false && invalidQuantityPatch.blockReason === "invalid_store_quantity", "Quantity above one was not blocked.");
 
@@ -1507,6 +1527,9 @@ async function assertStagingStorePreviewHelpers() {
 
   const insufficientShieldBoosterCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, shieldBoosterItem, 1);
   assert(insufficientShieldBoosterCreditPatch.ok === false && insufficientShieldBoosterCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Shield Booster write was not blocked.");
+
+  const insufficientHaulerCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, haulerItem, 1);
+  assert(insufficientHaulerCreditPatch.ok === false && insufficientHaulerCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit LF-2 Hauler write was not blocked.");
 
   const defaultWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
@@ -1722,7 +1745,45 @@ async function assertStagingStorePreviewHelpers() {
   assert(shieldSave.playerProgress.combatXp === 33, "Applied Shield Booster Store write changed progression.");
   assert(shieldFetchCalls.join(",") === "GET,PATCH", `Shield Booster Store write expected read/write pair, got ${shieldFetchCalls.join(",")}.`);
 
-  console.log("staging Store item list, previews, and gated Cargo Pod/Pulse Laser/Shield Booster write helpers passed");
+  let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 13000 }));
+  const haulerFetchCalls = [];
+  const appliedHaulerWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "ship:lupenHauler",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 13000 }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "allowlist",
+      STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "ship:lupenHauler"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      haulerFetchCalls.push(options.method || "GET");
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: haulerSave }] };
+      haulerSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedHaulerWrite.applied === true && appliedHaulerWrite.mode === "store_write", `Gated LF-2 Hauler Store write did not apply: ${appliedHaulerWrite.blockReason}`);
+  assert(appliedHaulerWrite.creditsBefore === 13000 && appliedHaulerWrite.creditsAfter === 1000, "Applied LF-2 Hauler Store write returned incorrect credits.");
+  assert(appliedHaulerWrite.creditsWritten === true && appliedHaulerWrite.shipWritten === true && appliedHaulerWrite.saveWritten === true, "Applied LF-2 Hauler Store write did not report allowed writes.");
+  assert(appliedHaulerWrite.inventoryWritten === false && appliedHaulerWrite.attachmentWritten === false && appliedHaulerWrite.weaponWritten === false, "Applied LF-2 Hauler Store write reported forbidden writes.");
+  assert(haulerSave.credits === 1000 && haulerSave.ownedShips.includes("lupenHauler"), "Applied LF-2 Hauler Store write did not update mocked save state.");
+  assert(haulerSave.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Applied LF-2 Hauler Store write changed loadout.");
+  assert(haulerSave.ownedAttachments.cargoPod === 1, "Applied LF-2 Hauler Store write changed attachments.");
+  assert(haulerSave.ownedGuns.pulseLaser === 1, "Applied LF-2 Hauler Store write changed weapons.");
+  assert(haulerSave.inventoryItems[0].id === "kept-item", "Applied LF-2 Hauler Store write changed inventoryItems.");
+  assert(haulerSave.playerProgress.combatXp === 33, "Applied LF-2 Hauler Store write changed progression.");
+  assert(haulerFetchCalls.join(",") === "GET,PATCH", `LF-2 Hauler Store write expected read/write pair, got ${haulerFetchCalls.join(",")}.`);
+
+  console.log("staging Store item list, previews, and gated Cargo Pod/Pulse Laser/Shield Booster/LF-2 Hauler write helpers passed");
 }
 
 async function assertStagingCargoPodEquipHelpers() {
@@ -1818,6 +1879,36 @@ async function assertStagingCargoPodEquipHelpers() {
     }
   }, { itemId: "gun:pulseLaser" });
   assert(fullGunSlotsPlan.ok === false && fullGunSlotsPlan.blockReason === "gun_slots_full", "Pulse Laser equip with full slots was not blocked.");
+
+  const haulerSelectPlan = buildStagingLupenHaulerSelectPlan({
+    ...validSaveData,
+    ownedShips: ["lupenOrigin", "lupenHauler"],
+    selectedHangarShipId: "lupenOrigin",
+    selectedFleetShipId: "lupenOrigin"
+  }, { itemId: "ship:lupenHauler" });
+  assert(haulerSelectPlan.ok === true, `Valid LF-2 Hauler select plan was blocked: ${haulerSelectPlan.blockReason}`);
+  assert(haulerSelectPlan.selectedShipBefore === "lupenOrigin" && haulerSelectPlan.selectedShipAfter === "lupenHauler", "LF-2 Hauler select plan did not report ship change.");
+  assert(haulerSelectPlan.cargoCapacityBefore === 150 && haulerSelectPlan.cargoCapacityAfter === 260, "LF-2 Hauler select plan did not report cargo capacity change.");
+  assert(haulerSelectPlan.patchedSaveData.currentShipId === "lupenHauler", "LF-2 Hauler select plan did not set currentShipId.");
+  assert(haulerSelectPlan.patchedSaveData.selectedHangarShipId === "lupenHauler", "LF-2 Hauler select plan did not set selectedHangarShipId.");
+  assert(haulerSelectPlan.patchedSaveData.selectedFleetShipId === "lupenHauler", "LF-2 Hauler select plan did not set selectedFleetShipId.");
+  assert(haulerSelectPlan.patchedSaveData.credits === 780, "LF-2 Hauler select plan changed credits.");
+  assert(haulerSelectPlan.patchedSaveData.ownedShips.length === 2, "LF-2 Hauler select plan changed ship ownership.");
+  assert(haulerSelectPlan.patchedSaveData.shipLoadouts.lupenOrigin.guns[0].key === "pulseLaser", "LF-2 Hauler select plan changed loadouts.");
+  assert(haulerSelectPlan.patchedSaveData.ownedAttachments.cargoPod === 2, "LF-2 Hauler select plan changed attachment ownership.");
+  assert(haulerSelectPlan.patchedSaveData.ownedGuns.pulseLaser === 1, "LF-2 Hauler select plan changed weapon ownership.");
+  assert(haulerSelectPlan.patchedSaveData.inventoryItems[0].id === "kept-item", "LF-2 Hauler select plan changed inventoryItems.");
+  assert(haulerSelectPlan.patchedSaveData.playerProgress.combatXp === 33, "LF-2 Hauler select plan changed progression.");
+
+  const haulerNotOwnedPlan = buildStagingLupenHaulerSelectPlan(validSaveData, { itemId: "ship:lupenHauler" });
+  assert(haulerNotOwnedPlan.ok === false && haulerNotOwnedPlan.blockReason === "ship_not_owned", "LF-2 Hauler select without ownership was not blocked.");
+
+  const haulerAlreadyActivePlan = buildStagingLupenHaulerSelectPlan({
+    ...validSaveData,
+    currentShipId: "lupenHauler",
+    ownedShips: ["lupenOrigin", "lupenHauler"]
+  }, { itemId: "ship:lupenHauler" });
+  assert(haulerAlreadyActivePlan.ok === false && haulerAlreadyActivePlan.blockReason === "ship_already_equipped", "Already-active LF-2 Hauler select was not blocked.");
 
   const defaultWrite = await applyStagingCargoPodEquipWrite({
     playerId: "verified-player-a",
@@ -1989,7 +2080,47 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(shieldLoadoutSave.playerProgress.combatXp === 33, "Applied Shield Booster equip changed progression.");
   assert(shieldLoadoutFetchCalls.join(",") === "GET,PATCH", `Shield Booster equip expected read/write pair, got ${shieldLoadoutFetchCalls.join(",")}.`);
 
-  console.log("staging Cargo Pod/Pulse Laser/Shield Booster equip helpers and gated loadout write passed");
+  let shipSelectSave = JSON.parse(JSON.stringify({
+    ...validSaveData,
+    ownedShips: ["lupenOrigin", "lupenHauler"],
+    selectedHangarShipId: "lupenOrigin",
+    selectedFleetShipId: "lupenOrigin"
+  }));
+  const shipSelectFetchCalls = [];
+  const appliedShipSelect = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "ship:lupenHauler",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+      STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
+      STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "ship:lupenHauler"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      shipSelectFetchCalls.push(options.method || "GET");
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: shipSelectSave }] };
+      shipSelectSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedShipSelect.applied === true && appliedShipSelect.mode === "loadout_write", `Gated LF-2 Hauler select did not apply: ${appliedShipSelect.blockReason}`);
+  assert(appliedShipSelect.loadoutWritten === false && appliedShipSelect.shipWritten === true && appliedShipSelect.saveWritten === true, "Applied LF-2 Hauler select did not report allowed ship write.");
+  assert(appliedShipSelect.creditsWritten === false && appliedShipSelect.inventoryWritten === false && appliedShipSelect.attachmentWritten === false && appliedShipSelect.weaponWritten === false, "Applied LF-2 Hauler select reported forbidden writes.");
+  assert(shipSelectSave.currentShipId === "lupenHauler" && shipSelectSave.selectedHangarShipId === "lupenHauler", "Applied LF-2 Hauler select did not update ship selection.");
+  assert(shipSelectSave.credits === 780, "Applied LF-2 Hauler select changed credits.");
+  assert(shipSelectSave.ownedShips.length === 2, "Applied LF-2 Hauler select changed ship ownership.");
+  assert(shipSelectSave.shipLoadouts.lupenOrigin.attachments[0].key === "shieldBooster", "Applied LF-2 Hauler select changed loadouts.");
+  assert(shipSelectSave.ownedAttachments.cargoPod === 2, "Applied LF-2 Hauler select changed attachments.");
+  assert(shipSelectSave.ownedGuns.pulseLaser === 1, "Applied LF-2 Hauler select changed weapons.");
+  assert(shipSelectSave.inventoryItems[0].id === "kept-item", "Applied LF-2 Hauler select changed inventoryItems.");
+  assert(shipSelectSave.playerProgress.combatXp === 33, "Applied LF-2 Hauler select changed progression.");
+  assert(shipSelectFetchCalls.join(",") === "GET,PATCH", `LF-2 Hauler select expected read/write pair, got ${shipSelectFetchCalls.join(",")}.`);
+
+  console.log("staging Cargo Pod/Pulse Laser/Shield Booster/LF-2 Hauler equip helpers and gated loadout write passed");
 }
 
 async function assertFullCargoPodTradeLoopHelpers() {

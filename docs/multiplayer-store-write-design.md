@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document tracks the staging path for bringing the Store online without enabling broad real purchases. Phase 1 is preview-only: server-owned Store catalogue, server-side validation, and real Store UI integration in `?mp=staging`. Phase 2 adds heavily gated purchase write prototypes for `attachment:cargoPod`, `attachment:shieldBooster`, and `gun:pulseLaser` only. Phase 3 adds heavily gated Cargo Pod, Shield Booster, and Pulse Laser equip/loadout writes.
+This document tracks the staging path for bringing the Store online without enabling broad real purchases. Phase 1 is preview-only: server-owned Store catalogue, server-side validation, and real Store UI integration in `?mp=staging`. Phase 2 adds heavily gated purchase write prototypes for `attachment:cargoPod`, `attachment:shieldBooster`, `gun:pulseLaser`, and `ship:lupenHauler` only. Phase 3 adds heavily gated Cargo Pod, Shield Booster, Pulse Laser equip/loadout writes, plus LF-2 Hauler ship selection.
 
 ## Current Phase 1/2
 
@@ -15,8 +15,8 @@ In `?mp=staging`:
 - Mapped Store items show `Server Preview`.
 - Unmapped Store items show `Server preview unavailable`.
 - Colyseus exposes `stagingStore:listItems` and `stagingStore:previewPurchase`.
-- Colyseus also exposes `stagingStore:purchase` for `attachment:cargoPod`, `attachment:shieldBooster`, and `gun:pulseLaser` only.
-- Colyseus exposes `stagingLoadout:previewEquip` and `stagingLoadout:equipAttachment` for `attachment:cargoPod`, `attachment:shieldBooster`, and `gun:pulseLaser` only.
+- Colyseus also exposes `stagingStore:purchase` for `attachment:cargoPod`, `attachment:shieldBooster`, `gun:pulseLaser`, and `ship:lupenHauler` only.
+- Colyseus exposes `stagingLoadout:previewEquip` and `stagingLoadout:equipAttachment` for `attachment:cargoPod`, `attachment:shieldBooster`, `gun:pulseLaser`, and `ship:lupenHauler` only.
 - Preview responses are always `mode:"dry_run"` and `applied:false`.
 - Preview responses always report `creditsWritten:false`, `inventoryWritten:false`, `shipWritten:false`, `equipmentWritten:false`, `saveWritten:false`, `lootWritten:false`, and `bountyWritten:false`.
 - Purchase responses default to dry-run/blocked unless every Store write gate passes.
@@ -27,6 +27,7 @@ Initial staging Store items:
 - `gun:pulseLaser`
 - `attachment:cargoPod`
 - `attachment:shieldBooster`
+- `ship:lupenHauler`
 
 ## Local Store Audit
 
@@ -57,6 +58,8 @@ Save paths used by Phase 2:
 `shieldBooster` is a standard attachment. Local `buyAttachment("shieldBooster")` subtracts credits and increments `ownedAttachments.shieldBooster`; it does not auto-equip or patch `shipLoadouts`. Duplicate purchases are allowed locally as ownership count increments, so the staging prototype also increments the count by one per allowed purchase.
 
 `pulseLaser` is a standard starter gun. Local `buyGun("pulseLaser")` subtracts credits and increments `ownedGuns.pulseLaser`; it does not auto-equip or patch `shipLoadouts`. Duplicate purchases are allowed locally as ownership count increments, so the staging prototype also increments the count by one per allowed purchase.
+
+`lupenHauler` is the existing LF-2 Hauler ship. Local `buyShip("lupenHauler")` subtracts credits, appends to `ownedShips`, creates `shipLoadouts.lupenHauler`, updates ship selection state, renders Hangar, and calls `saveGame()`. The staging purchase prototype is intentionally narrower: it subtracts credits and appends `lupenHauler` to `ownedShips` only. The staging ship selection prototype later updates only `currentShipId` and selected ship ids, leaving loadouts untouched so no weapon, attachment, cargo, loot, bounty, or progression fields are mixed into this pilot ship path.
 
 Cargo Pod equip flow:
 
@@ -103,7 +106,7 @@ Pricing and stock:
 
 ## Store Phase 2 Gates
 
-`attachment:cargoPod`, `attachment:shieldBooster`, or `gun:pulseLaser` can be written only if every gate passes:
+`attachment:cargoPod`, `attachment:shieldBooster`, `gun:pulseLaser`, or `ship:lupenHauler` can be written only if every gate passes:
 
 - `?mp=staging` room context.
 - `STAGING_STORE_WRITE_ENABLED=true`.
@@ -111,13 +114,14 @@ Pricing and stock:
 - Verified Supabase identity.
 - `STAGING_STORE_WRITE_SCOPE=verified` or `allowlist`.
 - If scope is `allowlist`, `STAGING_STORE_WRITE_ALLOWLIST` contains the verified user id.
-- `STAGING_STORE_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod`, `attachment:shieldBooster`, or `gun:pulseLaser`.
+- `STAGING_STORE_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod`, `attachment:shieldBooster`, `gun:pulseLaser`, or `ship:lupenHauler`.
 - Quantity is exactly `1`.
 - Trusted `player_saves` read succeeds.
 - Saved root `credits` is numeric and sufficient.
 - For Cargo Pod, saved root `ownedAttachments.cargoPod` is numeric.
 - For Shield Booster, saved root `ownedAttachments.shieldBooster` is numeric.
 - For Pulse Laser, saved root `ownedGuns.pulseLaser` is numeric.
+- For LF-2 Hauler, saved root `ownedShips` is an array and does not already include `lupenHauler`.
 - The patch touches only `credits` and the matching ownership count.
 
 Missing env vars mean no write. Default state remains `STAGING_STORE_WRITE_ENABLED=false` and `STAGING_STORE_WRITE_DRY_RUN=true`.
@@ -132,12 +136,14 @@ Allowed writes when all gates pass:
 - `ownedAttachments.shieldBooster += 1`
 - `credits -= 748`
 - `ownedGuns.pulseLaser += 1`
+- `credits -= 12000`
+- `ownedShips.push("lupenHauler")`
 
 Forbidden in this phase:
 
 - `inventoryItems`
 - `shipLoadouts`
-- `ownedShips`
+- `ownedShips` except gated `ownedShips.push("lupenHauler")`
 - `ownedGuns` except gated `ownedGuns.pulseLaser += 1`
 - attachments except gated `ownedAttachments.cargoPod += 1` and `ownedAttachments.shieldBooster += 1`
 - non-Pulse Laser weapons
@@ -146,7 +152,7 @@ Forbidden in this phase:
 
 ## Store Phase 3 Equip Gates
 
-Cargo Pod, Shield Booster, or Pulse Laser equip can be written only if every gate passes:
+Cargo Pod, Shield Booster, Pulse Laser, or LF-2 Hauler ship selection can be written only if every gate passes:
 
 - `?mp=staging` room context.
 - `STAGING_LOADOUT_WRITE_ENABLED=true`.
@@ -154,16 +160,17 @@ Cargo Pod, Shield Booster, or Pulse Laser equip can be written only if every gat
 - Verified Supabase identity.
 - `STAGING_LOADOUT_WRITE_SCOPE=verified` or `allowlist`.
 - If scope is `allowlist`, `STAGING_LOADOUT_WRITE_ALLOWLIST` contains the verified user id.
-- `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod`, `attachment:shieldBooster`, or `gun:pulseLaser`.
+- `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS` contains the exact item id, e.g. `attachment:cargoPod`, `attachment:shieldBooster`, `gun:pulseLaser`, or `ship:lupenHauler`.
 - Trusted `player_saves` read succeeds.
 - Saved `currentShipId` is one of the known staging ship ids.
 - For Cargo Pod, saved root `ownedAttachments.cargoPod` is numeric and greater than zero.
 - For Shield Booster, saved root `ownedAttachments.shieldBooster` is numeric and greater than zero.
 - For Pulse Laser, saved root `ownedGuns.pulseLaser` is numeric and greater than zero.
+- For LF-2 Hauler, saved root `ownedShips` includes `lupenHauler` and current ship is not already `lupenHauler`.
 - Saved root `shipLoadouts[currentShipId].attachments` and `.guns` are valid arrays.
 - Cargo Pod requires an empty attachment slot.
 - Pulse Laser requires an empty gun slot.
-- The patch touches only the matching ownership count and matching current-ship loadout array.
+- The equipment patch touches only the matching ownership count and matching current-ship loadout array. The LF-2 Hauler selection patch touches only `currentShipId` and selected ship ids.
 
 Missing env vars mean no equip write. Default state remains `STAGING_LOADOUT_WRITE_ENABLED=false` and `STAGING_LOADOUT_WRITE_DRY_RUN=true`.
 
@@ -175,6 +182,9 @@ Allowed equip write when all gates pass:
 - `shipLoadouts[currentShipId].attachments.push({ key:"shieldBooster", quality:"standard", level:1 })`
 - `ownedGuns.pulseLaser -= 1`
 - `shipLoadouts[currentShipId].guns.push({ key:"pulseLaser", quality:"standard", level:1 })`
+- `currentShipId = "lupenHauler"`
+- `selectedHangarShipId = "lupenHauler"`
+- `selectedFleetShipId = "lupenHauler"` when that path exists
 
 The server derives cargo capacity from a narrow mirrored ship config plus `Cargo Pod +25`, and shield capacity from a narrow mirrored ship config plus `Shield Booster +50`. It does not trust a client-provided cargo or shield capacity for real equip writes.
 
@@ -212,8 +222,8 @@ Phase 6: normalized ownership
 
 - Real CR spend in default staging/dry-run mode.
 - Inventory writes.
-- Equipment ownership/loadout writes except gated `ownedAttachments.cargoPod += 1`, gated `ownedAttachments.shieldBooster += 1`, gated `ownedGuns.pulseLaser += 1`, gated Cargo Pod/Shield Booster equip into `shipLoadouts[currentShipId].attachments`, and gated Pulse Laser equip into `shipLoadouts[currentShipId].guns`.
-- Ship ownership writes.
+- Equipment ownership/loadout writes except gated `ownedAttachments.cargoPod += 1`, gated `ownedAttachments.shieldBooster += 1`, gated `ownedGuns.pulseLaser += 1`, gated `ownedShips.push("lupenHauler")`, gated Cargo Pod/Shield Booster equip into `shipLoadouts[currentShipId].attachments`, gated Pulse Laser equip into `shipLoadouts[currentShipId].guns`, and gated LF-2 Hauler ship selection fields.
+- Broad ship ownership writes beyond LF-2 Hauler.
 - Loot.
 - Bounties.
 - PvP.

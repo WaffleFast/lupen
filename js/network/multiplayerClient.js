@@ -1368,6 +1368,9 @@
       name: String(result.name || "Cargo Pod"),
       category: String(result.category || "equipment"),
       currentShipId: String(result.currentShipId || ""),
+      targetShipId: String(result.targetShipId || ""),
+      selectedShipBefore: String(result.selectedShipBefore || ""),
+      selectedShipAfter: String(result.selectedShipAfter || ""),
       ownedBefore: Number.isFinite(Number(result.ownedBefore)) ? Number(result.ownedBefore) : null,
       ownedAfter: Number.isFinite(Number(result.ownedAfter)) ? Number(result.ownedAfter) : null,
       equippedBefore: Number.isFinite(Number(result.equippedBefore)) ? Number(result.equippedBefore) : null,
@@ -2235,6 +2238,18 @@
     equipStagingPulseLaser(options = {}) {
       return sendRoomMessage("equipStagingPulseLaser", "stagingLoadout:equipAttachment", {
         itemId: String(options.itemId || "gun:pulseLaser")
+      });
+    },
+
+    previewStagingShipEquip(options = {}) {
+      return sendRoomMessage("previewStagingShipEquip", "stagingLoadout:previewEquip", {
+        itemId: String(options.itemId || "ship:lupenHauler")
+      });
+    },
+
+    equipStagingShip(options = {}) {
+      return sendRoomMessage("equipStagingShip", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "ship:lupenHauler")
       });
     },
 
