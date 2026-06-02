@@ -13,6 +13,30 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 - Dry-run flags are deliberately set for the intended test mode.
 - No secrets, auth state, traces, or screenshots with private data are committed.
 
+### Colyseus Cloud Env Checklist
+
+For real allowlisted Trade Terminal buy/sell writes, Colyseus Cloud needs all of:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `STAGING_TRADE_WRITE_ENABLED=true`
+- `STAGING_TRADE_WRITE_DRY_RUN=false`
+- `STAGING_TRADE_WRITE_SCOPE=allowlist`
+- `STAGING_TRADE_WRITE_ALLOWLIST=<verified Supabase auth user UUID>`
+
+`STAGING_TRADE_WRITE_ALLOWLIST` is a comma-separated list of verified Supabase user ids, for example `uuid1,uuid2`. It is not an email allowlist, and there is no wildcard. `STAGING_TRADE_WRITE_SCOPE=verified` allows any verified staging player, so use `allowlist` for live pilot tests. Optional trade gates are `STAGING_TRADE_WRITE_MAX_QUANTITY=10` and `STAGING_TRADE_WRITE_ALLOWED_OFFERS=<offerId1,offerId2>`; leaving allowed offers unset allows the current staging trade offers.
+
+`ENABLE_STAGING_REWARD_WRITES` is still used, but only for the dedicated reward ledger path. It does not enable Trade Terminal writes.
+
+Later systems use separate gates:
+
+- Store purchases: `STAGING_STORE_WRITE_ENABLED`, `STAGING_STORE_WRITE_DRY_RUN`, `STAGING_STORE_WRITE_SCOPE`, `STAGING_STORE_WRITE_ALLOWLIST`, `STAGING_STORE_WRITE_ALLOWED_ITEMS`.
+- Loadout equip/ship select: `STAGING_LOADOUT_WRITE_ENABLED`, `STAGING_LOADOUT_WRITE_DRY_RUN`, `STAGING_LOADOUT_WRITE_SCOPE`, `STAGING_LOADOUT_WRITE_ALLOWLIST`, `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS`.
+- XP/progression: `ENABLE_STAGING_PROGRESSION_WRITES`, `STAGING_PROGRESSION_WRITE_SCOPE`, `STAGING_PROGRESSION_WRITE_ALLOWLIST`.
+- Lupen Shard loot: `STAGING_LOOT_WRITE_ENABLED`, `STAGING_LOOT_WRITE_DRY_RUN`, `STAGING_LOOT_WRITE_SCOPE`, `STAGING_LOOT_WRITE_ALLOWLIST`.
+- Reward ledger only: `ENABLE_STAGING_REWARD_WRITES`.
+- Progression shadow only: `ENABLE_STAGING_PROGRESSION_SHADOW_WRITES`.
+
 ## Pilot Build Flow
 
 1. Log in to `https://www.lupen.io/?mp=staging`.
