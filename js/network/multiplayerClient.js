@@ -57,6 +57,13 @@
   const identity = {
     authStatus: "guest",
     playerIdPresent: false,
+    sessionPresent: false,
+    tokenPresent: false,
+    tokenSent: false,
+    tokenVerificationAttempted: false,
+    tokenVerificationReason: "",
+    authReconnectAttempted: false,
+    sessionWaitTimedOut: false,
     displayName: "",
     lastCheckedAt: 0
   };
@@ -309,16 +316,21 @@
     };
 
     try {
-      const supabaseClient = typeof global.getSupabaseClient === "function" ? global.getSupabaseClient() : global.lupenSupabase;
-      const sessionResponse = supabaseClient?.auth?.getSession ? await supabaseClient.auth.getSession() : null;
+      const supabaseClient = await waitForSupabaseClient(hasStagingFlag() ? 3000 : 0);
+      const sessionResponse = await waitForSupabaseSession(supabaseClient, hasStagingFlag() ? 3500 : 0);
       const session = sessionResponse?.data?.session || null;
       const user = session?.user || null;
 
       if (user?.id) {
+        const supabaseDisplayName = user.user_metadata?.pilot_name ||
+          user.user_metadata?.displayName ||
+          user.user_metadata?.name ||
+          user.email?.split?.("@")?.[0] ||
+          fallbackDisplayName;
         identityOptions.authStatus = "authenticated";
         identityOptions.playerId = String(user.id);
         identityOptions.supabaseUserId = String(user.id);
-        identityOptions.displayName = String(account.pilot_name || account.username || user.user_metadata?.pilot_name || fallbackDisplayName).slice(0, 80);
+        identityOptions.displayName = String(supabaseDisplayName).slice(0, 80);
         identityOptions.supabaseAccessToken = String(session.access_token || "");
       }
     } catch (err) {
@@ -327,10 +339,83 @@
 
     identity.authStatus = identityOptions.authStatus;
     identity.playerIdPresent = !!identityOptions.playerId;
+    identity.sessionPresent = !!identityOptions.supabaseUserId;
+    identity.tokenPresent = !!identityOptions.supabaseAccessToken;
+    identity.sessionWaitTimedOut = hasStagingFlag() && !identityOptions.supabaseAccessToken;
     identity.displayName = identityOptions.displayName || fallbackDisplayName;
     identity.lastCheckedAt = Date.now();
 
     return identityOptions;
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => global.setTimeout(resolve, ms));
+  }
+
+  async function waitForSupabaseClient(timeoutMs = 0) {
+    const startedAt = Date.now();
+    const getClient = () => {
+      if (typeof global.getSupabaseClient === "function") return global.getSupabaseClient();
+      return global.lupenSupabase || null;
+    };
+
+    let supabaseClient = getClient();
+    if (supabaseClient?.auth?.getSession || timeoutMs <= 0) return supabaseClient;
+
+    while (Date.now() - startedAt < timeoutMs) {
+      await delay(150);
+      supabaseClient = getClient();
+      if (supabaseClient?.auth?.getSession) return supabaseClient;
+    }
+
+    return supabaseClient;
+  }
+
+  async function waitForSupabaseSession(supabaseClient, timeoutMs = 0) {
+    if (!supabaseClient?.auth?.getSession) return null;
+    const startedAt = Date.now();
+    let lastResponse = await supabaseClient.auth.getSession();
+    if (lastResponse?.data?.session || timeoutMs <= 0) return lastResponse;
+
+    while (Date.now() - startedAt < timeoutMs) {
+      await delay(150);
+      lastResponse = await supabaseClient.auth.getSession();
+      if (lastResponse?.data?.session) return lastResponse;
+    }
+
+    return lastResponse;
+  }
+
+  function scheduleStagingAuthReconnect() {
+    if (!hasStagingFlag() || identity.authReconnectAttempted) return;
+
+    const startedAt = Date.now();
+    const tryReconnect = async () => {
+      if (!connection.isConnected || !room || identity.tokenSent || identity.authReconnectAttempted) return;
+      const identityOptions = await getMultiplayerIdentityOptions(getLocalPresenceOptions());
+      if (!identityOptions.supabaseAccessToken) {
+        if (Date.now() - startedAt < 12000) global.setTimeout(tryReconnect, 900);
+        return;
+      }
+
+      identity.authReconnectAttempted = true;
+      logDev("reconnecting with Supabase staging token");
+      try {
+        const previousRoom = room;
+        await Promise.resolve(previousRoom.leave());
+      } catch (_err) {
+        // Best-effort reconnect only; failed leave will be followed by a new join.
+      }
+      room = null;
+      connection.isConnected = false;
+      connection.isConnecting = false;
+      connection.sessionId = null;
+      playersById.clear();
+      botsById.clear();
+      await client.connect({ sendInitialPing: false });
+    };
+
+    global.setTimeout(tryReconnect, 900);
   }
 
   function getStagingWeaponIntent() {
@@ -563,6 +648,9 @@
       playerId: String(player.playerId || player.supabaseUserId || ""),
       supabaseUserId: String(player.supabaseUserId || player.playerId || ""),
       trustedPlayerId: String(player.trustedPlayerId || ""),
+      authTokenReceived: player.authTokenReceived === true,
+      authVerificationAttempted: player.authVerificationAttempted === true,
+      authVerificationReason: String(player.authVerificationReason || ""),
       currentShipId: String(player.currentShipId || ""),
       shipName: String(player.shipName || player.ship || ""),
       shipImage: String(player.shipImage || player.shipImageSrc || player.shipImagePath || ""),
@@ -1953,6 +2041,12 @@
       authStatus: selfPlayer?.authStatus || identity.authStatus,
       playerIdPresent: !!(selfPlayer?.trustedPlayerId || selfPlayer?.playerId || identity.playerIdPresent),
       trustedPlayerIdPresent: !!selfPlayer?.trustedPlayerId,
+      supabaseSessionPresent: identity.sessionPresent,
+      supabaseTokenPresent: identity.tokenPresent,
+      supabaseTokenSent: identity.tokenSent || selfPlayer?.authTokenReceived === true,
+      supabaseSessionWaitTimedOut: identity.sessionWaitTimedOut,
+      supabaseTokenVerificationAttempted: selfPlayer?.authVerificationAttempted === true || identity.tokenVerificationAttempted,
+      supabaseTokenVerificationReason: selfPlayer?.authVerificationReason || identity.tokenVerificationReason || "",
       displayName: selfPlayer?.displayName || identity.displayName || localPresence.displayName || "Pilot",
       localShipId: localPresence.currentShipId || "",
       localShipImage: localPresence.shipImage || localPresence.shipImageSrc || localPresence.shipImagePath || "",
@@ -2012,6 +2106,9 @@
         const Colyseus = await ensureBrowserClientLoaded();
         const localPresence = getLocalPresenceOptions();
         const identityOptions = await getMultiplayerIdentityOptions(localPresence);
+        identity.tokenSent = !!identityOptions.supabaseAccessToken;
+        identity.tokenVerificationAttempted = false;
+        identity.tokenVerificationReason = identity.tokenSent ? "token_sent_for_join" : "token_missing_at_join";
         colyseusClient = new Colyseus.Client(serverUrl);
         room = await colyseusClient.joinOrCreate(connection.roomName, {
           ...localPresence,
@@ -2040,6 +2137,7 @@
             });
           }
         }, 300);
+        scheduleStagingAuthReconnect();
 
         return statusResult("connect");
       } catch (err) {

@@ -215,6 +215,9 @@ type("string")(LupenSectorPlayer.prototype, "authStatus");
 type("string")(LupenSectorPlayer.prototype, "playerId");
 type("string")(LupenSectorPlayer.prototype, "supabaseUserId");
 type("string")(LupenSectorPlayer.prototype, "trustedPlayerId");
+type("boolean")(LupenSectorPlayer.prototype, "authTokenReceived");
+type("boolean")(LupenSectorPlayer.prototype, "authVerificationAttempted");
+type("string")(LupenSectorPlayer.prototype, "authVerificationReason");
 type("string")(LupenSectorPlayer.prototype, "displayName");
 type("string")(LupenSectorPlayer.prototype, "currentShipId");
 type("string")(LupenSectorPlayer.prototype, "shipName");
@@ -1002,6 +1005,7 @@ export class LupenSectorRoom extends Room {
     const verifiedIdentity = await verifySupabaseAccessToken(options.supabaseAccessToken);
     const displayName = verifiedIdentity.displayName || getSafeIdentityValue(options.displayName, "Pilot") || "Pilot";
     const trustedPlayerId = verifiedIdentity.trustedPlayerId || "";
+    const authTokenReceived = !!getStringValue(options.supabaseAccessToken);
     this.state.players.set(client.sessionId, new LupenSectorPlayer({
       id: client.sessionId,
       sessionId: client.sessionId,
@@ -1012,6 +1016,9 @@ export class LupenSectorRoom extends Room {
       playerId: trustedPlayerId,
       supabaseUserId: verifiedIdentity.supabaseUserId || trustedPlayerId,
       trustedPlayerId,
+      authTokenReceived,
+      authVerificationAttempted: authTokenReceived,
+      authVerificationReason: verifiedIdentity.reason || (trustedPlayerId ? "supabase_token_verified" : authTokenReceived ? "supabase_token_unverified" : "supabase_token_missing"),
       displayName,
       currentShipId: getSafeIdentityValue(options.currentShipId),
       shipName: getShipName(options),

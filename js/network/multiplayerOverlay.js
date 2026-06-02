@@ -3013,6 +3013,10 @@
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
     if (isStagingMode(status)) {
       setDiagnosticsRow(panel, "auth", `${status.authStatus || "guest"} / trusted id ${status.trustedPlayerIdPresent ? "present" : "missing"}`);
+      setDiagnosticsRow(panel, "auth handoff", `session ${status.supabaseSessionPresent ? "yes" : "no"} / token sent ${status.supabaseTokenSent ? "yes" : "no"} / verify ${status.supabaseTokenVerificationAttempted ? "yes" : "no"} / wait ${status.supabaseSessionWaitTimedOut ? "timed out" : "ok"}`);
+      if (status.supabaseTokenVerificationReason) {
+        setDiagnosticsRow(panel, "auth reason", String(status.supabaseTokenVerificationReason).slice(0, 42));
+      }
       setDiagnosticsRow(panel, "identity", String(status.displayName || "Pilot").slice(0, 24));
     }
     setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);
