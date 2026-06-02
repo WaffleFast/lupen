@@ -112,6 +112,7 @@ function getBlockedResult(reason, extra = {}) {
     dryRun: true,
     reason,
     debugReason: reason,
+    userReason: getTradeWriteUserReason(reason),
     writes: getTradeWriteFlags(false),
     creditsWritten: false,
     cargoWritten: false,
@@ -122,6 +123,34 @@ function getBlockedResult(reason, extra = {}) {
     ...extra,
     operation
   };
+}
+
+function getTradeWriteUserReason(reason = "") {
+  const labels = {
+    verified_player_required: "Verified Supabase identity is required for staging trade writes.",
+    unknown_trade_offer: "This staging trade offer is not available.",
+    trusted_save_required: "Trusted player_saves read is required before writing trade changes.",
+    fetch_unavailable: "Server fetch is unavailable for the trade write.",
+    staging_trade_writes_disabled: "Staging trade writes are disabled on the server.",
+    staging_trade_dry_run_enabled: "Staging trade dry-run is enabled on the server.",
+    staging_trade_write_allowlist_missing: "Staging trade write allowlist is missing.",
+    player_not_in_staging_trade_write_allowlist: "This verified player is not allowlisted for staging trade writes.",
+    supabase_config_missing: "Supabase service-role configuration is missing or invalid.",
+    player_save_read_failed: "Trusted player_saves read failed.",
+    player_save_missing: "No matching player_saves row was found.",
+    player_save_patch_failed: "player_saves patch failed.",
+    save_data_missing_or_invalid: "Saved game data is missing or invalid.",
+    credits_path_missing_or_invalid: "Saved credits path is missing or invalid.",
+    cargo_path_missing_or_invalid: "Saved cargo path is missing or invalid.",
+    cargo_cost_basis_path_missing_or_invalid: "Saved cargo cost-basis path is missing or invalid.",
+    trusted_cargo_capacity_required: "Trusted cargo capacity is required before writing trade changes.",
+    trade_offer_invalid: "The staging trade offer payload is invalid.",
+    insufficient_credits: "Blocked: not enough credits.",
+    insufficient_cargo: "Blocked: not enough cargo space.",
+    insufficient_resource_cargo: "Blocked: not enough saved cargo to sell.",
+    staging_trade_write_failed: "Staging trade write failed safely."
+  };
+  return labels[reason] || `Blocked: ${reason || "staging trade write unavailable"}.`;
 }
 
 function getCargoUsed(cargo = {}) {

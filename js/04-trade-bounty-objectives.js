@@ -347,6 +347,26 @@ function getMultiplayerStagingTradeValidationLabel(result) {
   return `Blocked: ${result.blockReason || result.reason || "validation failed"}`;
 }
 
+function escapeMultiplayerStagingTradeText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getMultiplayerStagingTradeWriteBlockLine(result) {
+  if (!result || result.applied === true) return "";
+  const reason = result.userReason || result.writeBlockReason || result.blockReason || result.reason || "";
+  const code = result.writeBlockReason || result.blockReason || result.reason || "";
+  if (!reason && !code) return "";
+  const codeLine = code && new URLSearchParams(window.location.search).get("debug") === "mp"
+    ? ` <span>Gate: ${escapeMultiplayerStagingTradeText(code)}</span>`
+    : "";
+  return `<span>${escapeMultiplayerStagingTradeText(reason || `Blocked: ${code}`)}</span>${codeLine}`;
+}
+
 function getLastMatchingMultiplayerStagingTradePreview(offerId) {
   const status = getMultiplayerStagingTradeStatus();
   const writeResult = status.lastStagingTradeWriteResult;
@@ -455,7 +475,8 @@ function renderMultiplayerStagingTradePreviewResult(offerId) {
     ? `<span>Staging ${result.operation || "trade"} applied: CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(result.creditsAfter)} (${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))})</span>
       <span>${result.resourceName || "Cargo"} ${formatNumber(result.cargoBefore)} -> ${formatNumber(result.cargoAfter)} / hold ${formatNumber(result.cargoUsedBefore)} -> ${formatNumber(result.cargoUsedAfter)} of ${formatNumber(result.cargoCapacity)}</span>
       <span>${getMultiplayerStagingTradeSyncLine(result)}</span>`
-    : `<span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>`;
+    : `${getMultiplayerStagingTradeWriteBlockLine(result)}
+      <span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>`;
 
   return `
     <div class="trade-preview-note">

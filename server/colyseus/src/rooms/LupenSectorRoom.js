@@ -277,6 +277,81 @@ function getNumberValue(value, fallback) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function getStagingTradeWriteBlockReason({
+  result = {},
+  player = null,
+  trustedState = null,
+  sellDestinationValid = true
+} = {}) {
+  const gates = result.gates || {};
+  if (result.ok !== true || result.wouldPass !== true) {
+    return result.blockReason || result.reason || "trade_validation_failed";
+  }
+  if (gates.writeEnabled !== true) return "staging_trade_writes_disabled";
+  if (gates.dryRun !== false) return "staging_trade_dry_run_enabled";
+  if (gates.verified !== true) return "missing_verified_supabase_identity";
+  if (gates.allowlisted !== true) {
+    return gates.scope === "allowlist"
+      ? "player_not_in_staging_trade_write_allowlist"
+      : "staging_trade_write_scope_disabled";
+  }
+  if (gates.trustedSaveAvailable !== true || trustedState?.available !== true) {
+    return "trusted_player_saves_read_unavailable";
+  }
+  if (player?.multiplayerMode !== "staging") return "staging_mode_required_for_trade_write";
+  if (sellDestinationValid !== true) return "invalid_staging_trade_sell_destination";
+  return "staging_trade_write_gate_not_satisfied";
+}
+
+function getStagingTradeWriteBlockUserReason(reason = "") {
+  const labels = {
+    staging_trade_writes_disabled: "Staging trade writes are disabled on the server.",
+    staging_trade_dry_run_enabled: "Staging trade dry-run is enabled on the server.",
+    missing_verified_supabase_identity: "Verified Supabase identity is missing.",
+    player_not_in_staging_trade_write_allowlist: "This verified player is not allowlisted for staging trade writes.",
+    staging_trade_write_scope_disabled: "Staging trade write scope is disabled.",
+    trusted_player_saves_read_unavailable: "Trusted player_saves read is unavailable.",
+    staging_mode_required_for_trade_write: "The room join mode is not staging.",
+    invalid_staging_trade_sell_destination: "Blocked: wrong sell node.",
+    unknown_trade_offer: "Unknown staging trade offer.",
+    trade_offer_not_allowed: "This staging trade offer is not allowlisted on the server.",
+    invalid_trade_quantity: "Invalid trade quantity.",
+    quantity_exceeds_staging_trade_write_limit: "Quantity exceeds the staging trade write limit.",
+    insufficient_credits: "Blocked: not enough credits.",
+    insufficient_cargo: "Blocked: not enough cargo space.",
+    insufficient_resource_cargo: "Blocked: not enough saved cargo to sell.",
+    trade_validation_failed: "Staging trade validation failed."
+  };
+  return labels[reason] || `Staging trade write blocked: ${reason || "unknown reason"}.`;
+}
+
+function logStagingTradeWriteBlocked({
+  operation = "trade",
+  reason = "",
+  result = {},
+  identity = {},
+  player = null,
+  offerId = "",
+  quantity = 0
+} = {}) {
+  const gates = result.gates || {};
+  console.warn("[lupen staging trade] write blocked", {
+    operation,
+    reason,
+    offerId: getStringValue(offerId),
+    quantity: Number(quantity) || 0,
+    authStatus: identity.authStatus || "guest",
+    trustedPlayerIdPresent: !!identity.trustedPlayerId,
+    playerIdPresent: !!identity.playerId,
+    roomMode: player?.multiplayerMode || "",
+    writeEnabled: gates.writeEnabled === true,
+    dryRun: gates.dryRun !== false,
+    scope: gates.scope || "",
+    allowlisted: gates.allowlisted === true,
+    trustedSaveAvailable: gates.trustedSaveAvailable === true
+  });
+}
+
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -2032,6 +2107,17 @@ export class LupenSectorRoom extends Room {
         quantity: message?.quantity,
         trustedState
       });
+      if (writeResult?.applied !== true) {
+        logStagingTradeWriteBlocked({
+          operation,
+          reason: writeResult?.reason || writeResult?.debugReason || "staging_trade_write_failed",
+          result,
+          identity,
+          player,
+          offerId: message?.offerId,
+          quantity: message?.quantity
+        });
+      }
 
       client.send("stagingTrade:buyResult", {
         ...result,
@@ -2053,6 +2139,17 @@ export class LupenSectorRoom extends Room {
         quantity: message?.quantity,
         trustedState
       });
+      if (writeResult?.applied !== true) {
+        logStagingTradeWriteBlocked({
+          operation,
+          reason: writeResult?.reason || writeResult?.debugReason || "staging_trade_write_failed",
+          result,
+          identity,
+          player,
+          offerId: message?.offerId,
+          quantity: message?.quantity
+        });
+      }
 
       client.send("stagingTrade:sellResult", {
         ...result,
@@ -2067,18 +2164,38 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
+    const writeBlockReason = getStagingTradeWriteBlockReason({
+      result,
+      player,
+      trustedState,
+      sellDestinationValid
+    });
+    const writeBlockUserReason = getStagingTradeWriteBlockUserReason(writeBlockReason);
+    logStagingTradeWriteBlocked({
+      operation,
+      reason: writeBlockReason,
+      result,
+      identity,
+      player,
+      offerId: message?.offerId,
+      quantity: message?.quantity
+    });
+
     client.send(`stagingTrade:${operation}Result`, {
       ...result,
       reason: stagingModeBlockedWrite
         ? "staging_mode_required_for_trade_write"
         : sellDestinationBlocked
           ? "invalid_staging_trade_sell_destination"
-          : result.reason,
+          : writeBlockReason,
       debugReason: stagingModeBlockedWrite
         ? "client_join_mode_was_not_staging"
         : sellDestinationBlocked
           ? `player_node_${playerNode || "unknown"}_does_not_match_${offer?.sellNode || "unknown"}`
-          : result.debugReason,
+          : writeBlockReason,
+      blockReason: writeBlockReason,
+      writeBlockReason,
+      userReason: writeBlockUserReason,
       sessionId: client.sessionId,
       receivedAt: Date.now()
     });
