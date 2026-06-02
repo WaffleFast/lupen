@@ -2440,15 +2440,16 @@ async function assertStagingBountyHelpers() {
 }
 
 async function assertIdentityVerificationAndRewardPlanHelpers() {
+  const longServiceRoleKey = `stub-service-key-${"x".repeat(180)}`;
   const verified = await verifySupabaseAccessToken(
     "stub-valid-token",
     {
       SUPABASE_URL: "https://example.supabase.co",
-      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+      SUPABASE_SERVICE_ROLE_KEY: longServiceRoleKey
     },
     async (_url, options = {}) => {
       assert(options.headers?.authorization === "Bearer stub-valid-token", "Verification did not use bearer token.");
-      assert(options.headers?.apikey === "stub-service-key", "Verification did not use service key.");
+      assert(options.headers?.apikey === longServiceRoleKey, "Verification truncated or changed Supabase apikey.");
       return {
         ok: true,
         async json() {
@@ -2465,6 +2466,24 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
 
   assert(verified.authStatus === "verified", "Stubbed Supabase verification did not return verified.");
   assert(verified.trustedPlayerId === "verified-player-a", "Stubbed verification did not return trusted player id.");
+
+  const rejected = await verifySupabaseAccessToken(
+    "stub-invalid-token",
+    {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_ANON_KEY: "stub-anon-key"
+    },
+    async (_url, options = {}) => {
+      assert(options.headers?.authorization === "Bearer stub-invalid-token", "Rejected verification did not use bearer token.");
+      assert(options.headers?.apikey === "stub-anon-key", "Verification did not use configured anon key fallback.");
+      return {
+        ok: false,
+        status: 401
+      };
+    }
+  );
+  assert(rejected.authStatus === "unverified", "Invalid token should stay unverified.");
+  assert(rejected.reason === "supabase_verification_http_401", `Unexpected invalid token reason: ${rejected.reason}`);
 
   const plan = buildRewardWritePlan({
     preview: {

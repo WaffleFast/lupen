@@ -395,9 +395,16 @@ function getAuthStatus(options = {}) {
 }
 
 function getSupabaseVerifyConfig(env = process.env) {
+  const authApiKey = getStringValue(
+    env.SUPABASE_AUTH_VERIFY_API_KEY ||
+    env.SUPABASE_ANON_KEY ||
+    env.SUPABASE_PUBLISHABLE_KEY ||
+    env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
   return {
-    url: getSafeIdentityValue(env.SUPABASE_URL),
-    serviceRoleKey: getSafeIdentityValue(env.SUPABASE_SERVICE_ROLE_KEY)
+    url: getStringValue(env.SUPABASE_URL),
+    authApiKey
   };
 }
 
@@ -413,7 +420,27 @@ export async function verifySupabaseAccessToken(accessToken, env = process.env, 
   }
 
   const config = getSupabaseVerifyConfig(env);
-  if (!config.url || !config.serviceRoleKey || typeof fetchImpl !== "function") {
+  if (!config.url) {
+    return {
+      authStatus: "unverified",
+      trustedPlayerId: "",
+      supabaseUserId: "",
+      displayName: "",
+      reason: "supabase_url_missing"
+    };
+  }
+
+  if (!config.authApiKey) {
+    return {
+      authStatus: "unverified",
+      trustedPlayerId: "",
+      supabaseUserId: "",
+      displayName: "",
+      reason: "supabase_auth_apikey_missing"
+    };
+  }
+
+  if (typeof fetchImpl !== "function") {
     return {
       authStatus: "unverified",
       trustedPlayerId: "",
@@ -430,19 +457,25 @@ export async function verifySupabaseAccessToken(accessToken, env = process.env, 
     const response = await fetchImpl(`${config.url.replace(/\/$/, "")}/auth/v1/user`, {
       method: "GET",
       headers: {
-        apikey: config.serviceRoleKey,
+        apikey: config.authApiKey,
         authorization: `Bearer ${token}`
       },
       signal: controller.signal
     });
 
     if (!response.ok) {
+      const status = Number(response.status || 0);
       return {
         authStatus: "unverified",
         trustedPlayerId: "",
         supabaseUserId: "",
         displayName: "",
-        reason: "supabase_token_invalid"
+        reason: status === 401
+          ? "supabase_verification_http_401"
+          : status === 403
+            ? "supabase_verification_http_403"
+            : "supabase_token_invalid",
+        verificationStatus: status
       };
     }
 
