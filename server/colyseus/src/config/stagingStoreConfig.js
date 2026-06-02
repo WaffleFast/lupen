@@ -48,7 +48,7 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     category: "ship",
     localKind: "ship",
     localKey: "lupenHauler",
-    price: 12000,
+    price: 10500,
     levelRequirement: 0,
     stockType: "fixed",
     description: "Cargo-forward pilot hull for staging trade loops.",

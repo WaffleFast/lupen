@@ -87,6 +87,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText("Multiplayer Staging Loop", { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*LF-2 Hauler[\s\S]*Cargo Pod[\s\S]*Pulse Laser[\s\S]*Shield Booster[\s\S]*Erebus Patrol[\s\S]*Claim XP[\s\S]*Lupen Shard/i);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/No PvP[\s\S]*player damage[\s\S]*loot items/i);
+    await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
 
     await openTradeTerminal(page);
 
@@ -105,6 +106,58 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("MP Staging", { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText(/offline|connecting|connected/i);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("multiplayer staging trade builder shows server-backed routes when offers are available", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+    await page.waitForFunction(() => !!window.LupenMultiplayerClient?.getStatus, null, { timeout: 15000 });
+    await openTradeTerminal(page);
+    await page.evaluate(() => {
+      const client = window.LupenMultiplayerClient;
+      const originalGetStatus = client.getStatus.bind(client);
+      client.getStatus = () => ({
+        ...originalGetStatus(),
+        enabled: true,
+        isConnected: true,
+        enabledReason: "staging_enabled",
+        lastStagingTradeOffers: {
+          ok: true,
+          offers: [
+            {
+              offerId: "staging-iron-asteron-virella",
+              resourceId: "iron",
+              resourceName: "Iron",
+              buyNode: "Asteron Prime",
+              sellNode: "Virella",
+              buyPrice: 18,
+              sellPrice: 30,
+              maxQuantity: 40
+            },
+            {
+              offerId: "staging-crystal-asteron-nyxara",
+              resourceId: "crystal_shards",
+              resourceName: "Crystal Shards",
+              buyNode: "Asteron Prime",
+              sellNode: "Nyxara",
+              buyPrice: 95,
+              sellPrice: 145,
+              maxQuantity: 10
+            }
+          ]
+        }
+      });
+      if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+    });
+
+    await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
+    await expect(page.locator("#marketScreen")).toContainText("Server Buy");
+    await expect(page.locator("#marketScreen")).not.toContainText("Preview Unavailable");
+    await expect(page.locator("#marketScreen")).toContainText(/Crystal Shards[\s\S]*Asteron Prime > Nyxara|Iron[\s\S]*Asteron Prime > Virella/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

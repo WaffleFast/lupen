@@ -10,7 +10,7 @@ This document tracks the narrow `?mp=staging` bounty wrapper for server-owned st
 - Objective: destroy 2 server-owned staging Erebus bots.
 - Eligible kills: disabled server-owned staging bots where the player contributed damage.
 - Reward: XP only.
-- XP amount: 25.
+- XP amount: 40.
 - Credits: 0.
 - Loot: none.
 - Persistence: room/session only for bounty progress.

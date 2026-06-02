@@ -21,8 +21,9 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 4. Buy cargo through the staging trade path.
 5. Sell cargo through the staging trade path.
 6. Refresh and confirm CR/cargo persisted.
+   - The floating Staging Trade Preview is debug-only; normal testers should use the real Trade Terminal.
 7. Open the Store.
-8. Buy LF-2 Hauler.
+8. Buy LF-2 Hauler (`10,500 CR` staging pilot price).
 9. Fly LF-2 Hauler.
 10. Confirm cargo baseline reflects the Hauler after refresh/relogin.
 11. Buy Cargo Pod.
@@ -35,7 +36,7 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 18. Equip Shield Booster.
 19. Confirm shield stat or equipped Shield Booster state persists.
 20. Open the Bounty Board.
-21. Accept Erebus Patrol Sweep.
+21. Accept Erebus Patrol Sweep (`40 XP` staging bounty reward).
 22. Destroy two staging bots.
 23. Claim XP.
 24. Claim Lupen Shard.

@@ -136,7 +136,7 @@ Allowed writes when all gates pass:
 - `ownedAttachments.shieldBooster += 1`
 - `credits -= 748`
 - `ownedGuns.pulseLaser += 1`
-- `credits -= 12000`
+- `credits -= 10500`
 - `ownedShips.push("lupenHauler")`
 
 Forbidden in this phase:

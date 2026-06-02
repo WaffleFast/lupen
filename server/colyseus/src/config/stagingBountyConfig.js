@@ -12,7 +12,7 @@ export const STAGING_BOUNTY = Object.freeze({
   targetType: "server_bot_destroy",
   targetFaction: "Erebus",
   requiredKills: 2,
-  xpReward: 25,
+  xpReward: 40,
   creditsReward: 0,
   lootReward: [],
   repeatable: false,

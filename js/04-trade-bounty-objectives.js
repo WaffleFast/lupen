@@ -22,6 +22,12 @@ let multiplayerStagingBountyLastHandledAt = 0;
 let multiplayerStagingBountyPending = null;
 let multiplayerStagingBountySubscribed = false;
 let multiplayerStagingBountyLastRefreshAt = 0;
+const MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS = Object.freeze([
+  Object.freeze({ offerId: "staging-iron-asteron-virella", resourceId: "iron", resourceName: "Iron", buyNode: "Asteron Prime", sellNode: "Virella", buyPrice: 18, sellPrice: 30, maxQuantity: 40 }),
+  Object.freeze({ offerId: "staging-copper-virella-nyxara", resourceId: "copper", resourceName: "Copper", buyNode: "Virella", sellNode: "Nyxara", buyPrice: 32, sellPrice: 50, maxQuantity: 30 }),
+  Object.freeze({ offerId: "staging-cobalt-nyxara-asteron", resourceId: "cobalt", resourceName: "Cobalt", buyNode: "Nyxara", sellNode: "Asteron Prime", buyPrice: 62, sellPrice: 90, maxQuantity: 18 }),
+  Object.freeze({ offerId: "staging-crystal-asteron-nyxara", resourceId: "crystal_shards", resourceName: "Crystal Shards", buyNode: "Asteron Prime", sellNode: "Nyxara", buyPrice: 95, sellPrice: 145, maxQuantity: 10 })
+]);
 
 function getMultiplayerStagingBountyFallback() {
   return {
@@ -32,7 +38,7 @@ function getMultiplayerStagingBountyFallback() {
     targetFaction: "Erebus",
     requiredKills: 2,
     progress: 0,
-    xpReward: 25,
+    xpReward: 40,
     creditsReward: 0,
     lootReward: [],
     accepted: false,
@@ -69,7 +75,7 @@ function mergeMultiplayerStagingBountyState(bounty) {
     title: bounty.title || active.title,
     description: bounty.description || active.description,
     requiredKills: Number(active.requiredKills || bounty.requiredKills || 2),
-    xpReward: Number(active.xpReward ?? bounty.xpReward ?? 25),
+    xpReward: Number(active.xpReward ?? bounty.xpReward ?? 40),
     creditsReward: 0,
     lootReward: []
   };
@@ -238,9 +244,11 @@ function getMultiplayerStagingTradeStatus() {
 
 function getMultiplayerStagingTradeOffers() {
   const status = getMultiplayerStagingTradeStatus();
-  return Array.isArray(status.lastStagingTradeOffers?.offers)
+  return Array.isArray(status.lastStagingTradeOffers?.offers) && status.lastStagingTradeOffers.offers.length
     ? status.lastStagingTradeOffers.offers
-    : [];
+    : isMultiplayerStagingActive()
+      ? MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS.map((offer) => ({ ...offer }))
+      : [];
 }
 
 function requestMultiplayerStagingTradeOffersIfNeeded() {
@@ -265,6 +273,59 @@ function findMultiplayerStagingTradeOffer({ good = "", origin = "", destination 
       normalizeTradeRouteValue(offer.buyNode) === normalizedOrigin &&
       normalizeTradeRouteValue(offer.sellNode) === normalizedDestination;
   }) || null;
+}
+
+function getMultiplayerStagingBuyOffersAt(origin = getCurrentMarketPlanet()) {
+  const normalizedOrigin = normalizeTradeRouteValue(origin);
+  return getMultiplayerStagingTradeOffers().filter((offer) => normalizeTradeRouteValue(offer.buyNode) === normalizedOrigin);
+}
+
+function getMultiplayerStagingSellOffersAt(destination = getCurrentMarketPlanet()) {
+  const normalizedDestination = normalizeTradeRouteValue(destination);
+  return getMultiplayerStagingTradeOffers().filter((offer) => normalizeTradeRouteValue(offer.sellNode) === normalizedDestination);
+}
+
+function getMultiplayerStagingTargetPlanetsForResource(good, origin = getCurrentMarketPlanet()) {
+  const normalizedGood = normalizeTradeRouteValue(good).replace(/_/g, " ");
+  return getMultiplayerStagingBuyOffersAt(origin)
+    .filter((offer) => normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizedGood)
+    .map((offer) => offer.sellNode)
+    .filter((node, index, nodes) => node && nodes.indexOf(node) === index);
+}
+
+function hasMultiplayerStagingBuyRoute(good, origin = getCurrentMarketPlanet()) {
+  return getMultiplayerStagingTargetPlanetsForResource(good, origin).length > 0;
+}
+
+function hasMultiplayerStagingSellRoute(good, destination = getCurrentMarketPlanet()) {
+  const normalizedGood = normalizeTradeRouteValue(good).replace(/_/g, " ");
+  return getMultiplayerStagingSellOffersAt(destination).some((offer) => {
+    return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizedGood;
+  });
+}
+
+function canSelectMultiplayerStagingMarketResource(good, currentPlanet = getCurrentMarketPlanet()) {
+  if (!isMultiplayerStagingActive()) return true;
+  const offers = getMultiplayerStagingTradeOffers();
+  if (!offers.length) return true;
+  return hasMultiplayerStagingBuyRoute(good, currentPlanet) ||
+    ((cargo[good] || 0) > 0 && hasMultiplayerStagingSellRoute(good, currentPlanet));
+}
+
+function getMultiplayerStagingMarketPrice(good, planet, currentPlanet = getCurrentMarketPlanet()) {
+  if (!isMultiplayerStagingActive()) return null;
+  if (planet === currentPlanet) {
+    const buyOffer = getMultiplayerStagingBuyOffersAt(currentPlanet).find((offer) => {
+      return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ");
+    });
+    if (buyOffer) return buyOffer.buyPrice;
+    const sellOffer = getMultiplayerStagingSellOffersAt(currentPlanet).find((offer) => {
+      return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ");
+    });
+    return sellOffer ? sellOffer.sellPrice : null;
+  }
+  const offer = findMultiplayerStagingTradeOffer({ good, origin: currentPlanet, destination: planet });
+  return offer ? offer.sellPrice : null;
 }
 
 function getMultiplayerStagingTradeSourceLabel(result) {
@@ -621,6 +682,7 @@ function getOrderedMapOneMarketPlanets(currentPlanet = getCurrentMarketPlanet())
 
 function normalizeMarketBuilderState() {
   const currentPlanet = getCurrentMarketPlanet();
+  if (isMultiplayerStagingActive()) requestMultiplayerStagingTradeOffersIfNeeded();
   if (activeTradeRoute?.marketTrade && MAP_ONE_TRADE_RESOURCES.includes(activeTradeRoute.good)) {
     selectedMarketResource = activeTradeRoute.good;
   }
@@ -632,7 +694,15 @@ function normalizeMarketBuilderState() {
     selectedMarketResource = "Crystal Shards";
   }
 
-  if (activeMarketTrade?.destination && MAP_ONE_MARKET_PLANETS.includes(activeMarketTrade.destination)) {
+  if (isMultiplayerStagingActive() && getMultiplayerStagingTradeOffers().length) {
+    if (!canSelectMultiplayerStagingMarketResource(selectedMarketResource, currentPlanet)) {
+      selectedMarketResource = getMultiplayerStagingBuyOffersAt(currentPlanet)[0]?.resourceName || selectedMarketResource;
+    }
+    const stagingTargets = getMultiplayerStagingTargetPlanetsForResource(selectedMarketResource, currentPlanet);
+    if (stagingTargets.length && (!stagingTargets.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === currentPlanet)) {
+      selectedMarketTargetPlanet = stagingTargets[0];
+    }
+  } else if (activeMarketTrade?.destination && MAP_ONE_MARKET_PLANETS.includes(activeMarketTrade.destination)) {
     selectedMarketTargetPlanet = activeMarketTrade.destination;
   } else if (!MAP_ONE_MARKET_PLANETS.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === currentPlanet) {
     selectedMarketTargetPlanet = MAP_ONE_MARKET_PLANETS.find(planet => planet !== currentPlanet) || "Nyxara";
@@ -723,6 +793,12 @@ function renderMapOneMarketTerminal(goodsBox) {
   const orderedMarketPlanets = getOrderedMapOneMarketPlanets(currentPlanet);
   const resource = selectedMarketResource;
   const targetPlanet = selectedMarketTargetPlanet;
+  const stagingTargetPlanets = stagingTradeLocked && getMultiplayerStagingTradeOffers().length
+    ? getMultiplayerStagingTargetPlanetsForResource(resource, currentPlanet)
+    : [];
+  const targetPlanetOptions = stagingTradeLocked && stagingTargetPlanets.length
+    ? stagingTargetPlanets
+    : MAP_ONE_MARKET_PLANETS.filter(planet => planet !== currentPlanet || planet === targetPlanet);
   const quantity = selectedMarketQuantity;
   const buyPrice = getMapOneMarketPrice(resource, currentPlanet);
   const estimatedSellPrice = getMapOneMarketPrice(resource, targetPlanet);
@@ -769,8 +845,9 @@ function renderMapOneMarketTerminal(goodsBox) {
             <tbody>
               ${MAP_ONE_TRADE_RESOURCES.map(good => {
                 const rowInfo = commodityInfo[good] || {};
+                const stagingResourceSupported = canSelectMultiplayerStagingMarketResource(good, currentPlanet);
                 return `
-                  <tr class="${good === resource ? "selected-market-row" : ""}" onclick="setMarketResource('${escapeJsString(good)}')">
+                  <tr class="${good === resource ? "selected-market-row" : ""} ${stagingTradeLocked && !stagingResourceSupported ? "route-preview-only" : ""}" onclick="setMarketResource('${escapeJsString(good)}')">
                     <td>
                       <div class="market-resource-cell">
                         <span class="commodity-icon market-board-icon">
@@ -780,7 +857,13 @@ function renderMapOneMarketTerminal(goodsBox) {
                       </div>
                     </td>
                     ${orderedMarketPlanets.map(planet => `
-                      <td class="${planet === currentPlanet ? "current-market-planet" : ""}">CR ${formatNumber(getMapOneMarketPrice(good, planet))}</td>
+                      <td class="${planet === currentPlanet ? "current-market-planet" : ""}">
+                        ${stagingTradeLocked
+                          ? (getMultiplayerStagingMarketPrice(good, planet, currentPlanet) === null
+                            ? "—"
+                            : `CR ${formatNumber(getMultiplayerStagingMarketPrice(good, planet, currentPlanet))}`)
+                          : `CR ${formatNumber(getMapOneMarketPrice(good, planet))}`}
+                      </td>
                     `).join("")}
                   </tr>
                 `;
@@ -806,7 +889,7 @@ function renderMapOneMarketTerminal(goodsBox) {
           <label>
             <span>Target Planet</span>
             <select class="market-target-select" onchange="setMarketTargetPlanet(this.value)">
-              ${MAP_ONE_MARKET_PLANETS.filter(planet => planet !== currentPlanet || planet === targetPlanet).map(planet => `<option value="${planet}" ${planet === targetPlanet ? "selected" : ""}>${planet}</option>`).join("")}
+              ${targetPlanetOptions.map(planet => `<option value="${planet}" ${planet === targetPlanet ? "selected" : ""}>${planet}</option>`).join("")}
             </select>
           </label>
           <label>
@@ -835,13 +918,28 @@ function renderMapOneMarketTerminal(goodsBox) {
 
 function setMarketResource(good) {
   if (!MAP_ONE_TRADE_RESOURCES.includes(good)) return;
+  if (isMultiplayerStagingActive() && !canSelectMultiplayerStagingMarketResource(good, getCurrentMarketPlanet())) {
+    if (typeof addHudToast === "function") addHudToast("No server-backed staging route for that resource at this planet.");
+    return;
+  }
   selectedMarketResource = good;
+  if (isMultiplayerStagingActive()) {
+    const targets = getMultiplayerStagingTargetPlanetsForResource(good, getCurrentMarketPlanet());
+    if (targets.length) selectedMarketTargetPlanet = targets[0];
+  }
   tutorialEvent("selectedMarketResource");
   renderMarketplace();
 }
 
 function setMarketTargetPlanet(planet) {
   if (!MAP_ONE_MARKET_PLANETS.includes(planet)) return;
+  if (isMultiplayerStagingActive() && getMultiplayerStagingTradeOffers().length) {
+    const targets = getMultiplayerStagingTargetPlanetsForResource(selectedMarketResource, getCurrentMarketPlanet());
+    if (targets.length && !targets.includes(planet)) {
+      if (typeof addHudToast === "function") addHudToast("That target is not part of the server-backed staging route.");
+      return;
+    }
+  }
   selectedMarketTargetPlanet = planet;
   tutorialEvent("selectedMarketTarget");
   renderMarketplace();

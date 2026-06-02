@@ -823,8 +823,8 @@ async function assertStagingTradeValidationHelpers() {
   assert(sellWriteDryRun.mode === "dry_run", `Unexpected sell write mode: ${sellWriteDryRun.mode}`);
   assert(sellWriteDryRun.operation === "sell", "Sell write result did not report sell operation.");
   assert(sellWriteDryRun.applied === false, "Sell write dry-run applied a trade.");
-  assert(sellWriteDryRun.revenue === 50, `Unexpected sell write revenue: ${sellWriteDryRun.revenue}`);
-  assert(sellWriteDryRun.creditsDelta === 50, `Unexpected sell credits delta: ${sellWriteDryRun.creditsDelta}`);
+  assert(sellWriteDryRun.revenue === 60, `Unexpected sell write revenue: ${sellWriteDryRun.revenue}`);
+  assert(sellWriteDryRun.creditsDelta === 60, `Unexpected sell credits delta: ${sellWriteDryRun.creditsDelta}`);
   assert(sellWriteDryRun.cargoDelta === -2, `Unexpected sell cargo delta: ${sellWriteDryRun.cargoDelta}`);
   assert(sellWriteDryRun.validationMode === "trusted_save_limited", `Unexpected limited sell validation mode: ${sellWriteDryRun.validationMode}`);
   assert(sellWriteDryRun.writes.saveWritten === false, "Sell write dry-run reported save write.");
@@ -1499,10 +1499,10 @@ async function assertStagingStorePreviewHelpers() {
   assert(shieldBoosterPatch.patchedSaveData.cargo.Iron === 2, "Shield Booster Store patch changed trade cargo.");
   assert(shieldBoosterPatch.patchedSaveData.playerProgress.combatXp === 33, "Shield Booster Store patch changed progression.");
 
-  const haulerSaveData = { ...validSaveData, credits: 13000 };
+  const haulerSaveData = { ...validSaveData, credits: 11000 };
   const haulerPatch = buildStagingStorePurchasePatch(haulerSaveData, haulerItem, 1);
   assert(haulerPatch.ok === true, `Valid LF-2 Hauler Store patch was blocked: ${haulerPatch.blockReason}`);
-  assert(haulerPatch.creditsBefore === 13000 && haulerPatch.creditsAfter === 1000, "LF-2 Hauler Store patch did not subtract the server price.");
+  assert(haulerPatch.creditsBefore === 11000 && haulerPatch.creditsAfter === 500, "LF-2 Hauler Store patch did not subtract the server price.");
   assert(haulerPatch.itemBefore === 1 && haulerPatch.itemAfter === 2, "LF-2 Hauler Store patch did not append ownedShips.");
   assert(haulerPatch.patchedSaveData.ownedShips.includes("lupenHauler"), "LF-2 Hauler Store patch did not add the ship.");
   assert(haulerPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "LF-2 Hauler Store patch changed loadouts.");
@@ -1745,7 +1745,7 @@ async function assertStagingStorePreviewHelpers() {
   assert(shieldSave.playerProgress.combatXp === 33, "Applied Shield Booster Store write changed progression.");
   assert(shieldFetchCalls.join(",") === "GET,PATCH", `Shield Booster Store write expected read/write pair, got ${shieldFetchCalls.join(",")}.`);
 
-  let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 13000 }));
+  let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 11000 }));
   const haulerFetchCalls = [];
   const appliedHaulerWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
@@ -1753,7 +1753,7 @@ async function assertStagingStorePreviewHelpers() {
     quantity: 1,
     trustedState: {
       available: true,
-      validationState: { credits: 13000 }
+      validationState: { credits: 11000 }
     },
     env: {
       SUPABASE_URL: "https://example.supabase.co",
@@ -1772,10 +1772,10 @@ async function assertStagingStorePreviewHelpers() {
     }
   });
   assert(appliedHaulerWrite.applied === true && appliedHaulerWrite.mode === "store_write", `Gated LF-2 Hauler Store write did not apply: ${appliedHaulerWrite.blockReason}`);
-  assert(appliedHaulerWrite.creditsBefore === 13000 && appliedHaulerWrite.creditsAfter === 1000, "Applied LF-2 Hauler Store write returned incorrect credits.");
+  assert(appliedHaulerWrite.creditsBefore === 11000 && appliedHaulerWrite.creditsAfter === 500, "Applied LF-2 Hauler Store write returned incorrect credits.");
   assert(appliedHaulerWrite.creditsWritten === true && appliedHaulerWrite.shipWritten === true && appliedHaulerWrite.saveWritten === true, "Applied LF-2 Hauler Store write did not report allowed writes.");
   assert(appliedHaulerWrite.inventoryWritten === false && appliedHaulerWrite.attachmentWritten === false && appliedHaulerWrite.weaponWritten === false, "Applied LF-2 Hauler Store write reported forbidden writes.");
-  assert(haulerSave.credits === 1000 && haulerSave.ownedShips.includes("lupenHauler"), "Applied LF-2 Hauler Store write did not update mocked save state.");
+  assert(haulerSave.credits === 500 && haulerSave.ownedShips.includes("lupenHauler"), "Applied LF-2 Hauler Store write did not update mocked save state.");
   assert(haulerSave.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Applied LF-2 Hauler Store write changed loadout.");
   assert(haulerSave.ownedAttachments.cargoPod === 1, "Applied LF-2 Hauler Store write changed attachments.");
   assert(haulerSave.ownedGuns.pulseLaser === 1, "Applied LF-2 Hauler Store write changed weapons.");
@@ -2293,7 +2293,7 @@ async function assertStagingBountyHelpers() {
   assert(bounties.length === 1, `Expected one staging bounty, got ${bounties.length}.`);
   assert(bounties[0].id === STAGING_BOUNTY_ID, "Staging bounty list returned unexpected id.");
   assert(bounties[0].requiredKills === 2, "Staging bounty should require 2 bot destructions.");
-  assert(bounties[0].xpReward === 25, "Staging bounty should use XP-only reward amount 25.");
+  assert(bounties[0].xpReward === 40, "Staging bounty should use XP-only reward amount 40.");
   assert(bounties[0].creditsReward === 0, "Staging bounty should not include credits.");
   assert(Array.isArray(bounties[0].lootReward) && bounties[0].lootReward.length === 0, "Staging bounty should not include loot.");
 
@@ -3396,7 +3396,7 @@ try {
   assert(Array.isArray(bountyList?.bounties) && bountyList.bounties.length === 1, "Staging bounty list did not return exactly one bounty.");
   assert(bountyList.bounties[0]?.id === STAGING_BOUNTY_ID, "Staging bounty list returned unexpected bounty id.");
   assert(bountyList.bounties[0]?.requiredKills === 2, "Staging bounty list returned unexpected kill requirement.");
-  assert(bountyList.bounties[0]?.xpReward === 25, "Staging bounty list returned unexpected XP reward.");
+  assert(bountyList.bounties[0]?.xpReward === 40, "Staging bounty list returned unexpected XP reward.");
   assert(bountyList.bounties[0]?.creditsReward === 0, "Staging bounty list returned credits.");
 
   const bountyAccepted = await expectRoomMessage(roomA, "stagingBounty:statusResult", () => {
@@ -4076,7 +4076,7 @@ try {
   assert(!contributorA?.trustedPlayerId && !contributorA?.playerId, "Contributor A unverified identity was trusted.");
   assert(!contributorB?.trustedPlayerId && !contributorB?.playerId, "Contributor B unverified identity was trusted.");
   assert(contributorA?.displayName === "Regression Pilot A", "Contributor A display name was not included in preview.");
-  assert(rewardPreview?.previewXp === 5, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
+  assert(rewardPreview?.previewXp === 8, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
   assert(rewardPreview?.previewCredits === 0, `Unexpected reward preview credits: ${rewardPreview?.previewCredits}`);
   assert(rewardPreview?.inventoryWritten === false && rewardPreview?.saveWritten === false, "Reward preview reported inventory/save writes.");
   assert(rewardPreview?.creditsWritten === false && rewardPreview?.cargoWritten === false && rewardPreview?.bountyWritten === false, "Reward preview reported economy/bounty writes.");

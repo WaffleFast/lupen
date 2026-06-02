@@ -40,6 +40,7 @@ Working server-authoritative staging systems:
 - LF-2 Hauler purchase/select, plus Cargo Pod, Pulse Laser, and Shield Booster purchase/equip through strict staging gates.
 - Erebus Patrol Sweep staging bounty progress.
 - XP-only and Lupen Shard claim paths through strict staging gates.
+- First 20-minute pilot tuning: stronger staging trade margins, `10,500 CR` LF-2 Hauler, `40 XP` Erebus Patrol Sweep, lighter server-owned bot shields/hulls, and `8 XP` reward-preview baseline for disabled staging bots.
 
 Dry-run or preview systems:
 

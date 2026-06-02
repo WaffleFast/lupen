@@ -2449,7 +2449,7 @@
 
   function renderStagingTradePanel(status) {
     removeStagingTradePanel();
-    if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) return;
+    if (!isStagingMode(status) || !status?.enabled || !status?.isConnected || !isMpDebugEnabled()) return;
 
     ensureStyles();
     requestStagingTradeOffersIfNeeded(status);
@@ -2589,7 +2589,7 @@
   }
 
   function getStagingFlowHint(status, selectedBot, players, bots) {
-    const loop = "1 Trade for CR -> 2 Buy/fly LF-2 Hauler -> 3 Buy/equip Cargo Pod -> 4 Buy/equip Pulse Laser -> 5 Buy/equip Shield Booster -> 6 Accept Erebus Patrol -> 7 Destroy staging bots -> 8 Claim XP + Lupen Shard.";
+    const loop = "1 Trade for CR -> 2 Buy/fly LF-2 Hauler (10.5k CR) -> 3 Buy/equip Cargo Pod -> 4 Buy/equip Pulse Laser -> 5 Buy/equip Shield Booster -> 6 Accept Erebus Patrol (40 XP) -> 7 Destroy staging bots -> 8 Claim XP + Lupen Shard.";
 
     if (!status?.isConnected) {
       return `Connecting to Multiplayer Staging. ${loop}`;

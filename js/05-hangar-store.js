@@ -13,6 +13,7 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
   "attachment:shieldBooster": "attachment:shieldBooster",
   "ship:lupenHauler": "ship:lupenHauler"
 });
+const STAGING_LF2_HAULER_PRICE = 10500;
 
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
@@ -2111,7 +2112,7 @@ function getStoreCatalogItems() {
       category: "ships",
       image: ship.image,
       description: "Cargo-focused staging pilot hull for the online trade loop.",
-      basePrice: ship.price,
+      basePrice: STAGING_LF2_HAULER_PRICE,
       qualityEnabled: false,
       storeTier: "Staging Hull",
       stats: [

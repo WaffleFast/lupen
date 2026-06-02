@@ -192,14 +192,14 @@ const STAGING_WEAPON_STATS = Object.freeze({
 });
 const STAGING_BOT_DISABLED_RESET_MS = 6500;
 const SUPABASE_VERIFY_TIMEOUT_MS = 4000;
-const STAGING_REWARD_DRY_RUN_XP = 5;
+const STAGING_REWARD_DRY_RUN_XP = 8;
 const STAGING_REWARD_DRY_RUN_CREDITS = 0;
 
 const DUMMY_BOT_DEFINITIONS = [
-  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 35, hull: 70 },
-  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Lane East B", level: 1, shield: 28, hull: 58 },
-  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B", level: 2, shield: 42, hull: 82 },
-  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East", level: 2, shield: 38, hull: 76 }
+  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 22, hull: 48 },
+  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Lane East B", level: 1, shield: 18, hull: 44 },
+  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B", level: 2, shield: 28, hull: 56 },
+  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East", level: 2, shield: 24, hull: 52 }
 ];
 
 export class LupenSectorPlayer extends Schema {

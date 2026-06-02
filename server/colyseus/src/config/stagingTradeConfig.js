@@ -12,7 +12,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     buyNode: "Asteron Prime",
     sellNode: "Virella",
     buyPrice: 18,
-    sellPrice: 25,
+    sellPrice: 30,
     maxQuantity: 40,
     refreshSeconds: 300
   }),
@@ -23,7 +23,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     buyNode: "Virella",
     sellNode: "Nyxara",
     buyPrice: 32,
-    sellPrice: 43,
+    sellPrice: 50,
     maxQuantity: 30,
     refreshSeconds: 300
   }),
@@ -34,7 +34,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     buyNode: "Nyxara",
     sellNode: "Asteron Prime",
     buyPrice: 62,
-    sellPrice: 79,
+    sellPrice: 90,
     maxQuantity: 18,
     refreshSeconds: 300
   }),
@@ -45,7 +45,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     buyNode: "Asteron Prime",
     sellNode: "Nyxara",
     buyPrice: 95,
-    sellPrice: 128,
+    sellPrice: 145,
     maxQuantity: 10,
     refreshSeconds: 300
   })
