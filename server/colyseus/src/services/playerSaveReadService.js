@@ -17,6 +17,20 @@ const CARGO_KEYS = Object.freeze([
   "Dark Matter Residue"
 ]);
 
+const STAGING_SHIP_CARGO = Object.freeze({
+  lupenOrigin: 150,
+  lupenHauler: 260,
+  lupenStriker: 100,
+  hermesCourier: 190,
+  athenaSentinel: 140,
+  aresVindicator: 90,
+  hephaestusTrader: 360,
+  poseidonAggressor: 120,
+  zeusExplorer: 220
+});
+
+const CARGO_POD_CARGO_BONUS = 25;
+
 function getString(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
@@ -96,6 +110,39 @@ function getCargoCostBasisByResourceFromSave(saveData) {
   }, {});
 }
 
+function normalizeLoadoutEntry(entry) {
+  if (typeof entry === "string") return { key: entry };
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+  const key = getString(entry.key);
+  return key ? { key } : null;
+}
+
+function getCargoPodCountFromLoadout(loadout) {
+  const attachments = Array.isArray(loadout?.attachments) ? loadout.attachments : [];
+  return attachments.reduce((count, entry) => {
+    const normalized = normalizeLoadoutEntry(entry);
+    return count + (normalized?.key === "cargoPod" ? 1 : 0);
+  }, 0);
+}
+
+function getTrustedCargoCapacityFromShipLoadout(saveData) {
+  const savedShipId = getString(saveData?.currentShipId)
+    || getString(saveData?.selectedFleetShipId)
+    || getString(saveData?.selectedHangarShipId);
+  const shipCargo = STAGING_SHIP_CARGO[savedShipId];
+  if (!savedShipId || shipCargo === undefined) return null;
+
+  const ownedShips = Array.isArray(saveData?.ownedShips) ? saveData.ownedShips : [];
+  if (ownedShips.length && !ownedShips.includes(savedShipId)) return null;
+
+  const shipLoadouts = saveData?.shipLoadouts;
+  const loadout = shipLoadouts && typeof shipLoadouts === "object" && !Array.isArray(shipLoadouts)
+    ? shipLoadouts[savedShipId]
+    : null;
+  const cargoPodCount = getCargoPodCountFromLoadout(loadout);
+  return shipCargo + cargoPodCount * CARGO_POD_CARGO_BONUS;
+}
+
 function getTrustedCargoCapacityFromSave(saveData) {
   const candidates = [
     saveData?.cargoCapacity,
@@ -109,7 +156,10 @@ function getTrustedCargoCapacityFromSave(saveData) {
     if (capacity !== null) return capacity;
   }
 
-  return null;
+  // The browser save does not normally persist a flat cargoCapacity field.
+  // Derive it from trusted save-owned ship/loadout fields using the same
+  // narrow staging ship + Cargo Pod rules used by loadout writes.
+  return getTrustedCargoCapacityFromShipLoadout(saveData);
 }
 
 function unavailable(reason, extra = {}) {
@@ -139,6 +189,14 @@ export function extractTradeValidationStateFromSave(saveData) {
   const cargoByResource = getCargoByResourceFromSave(saveData);
   const cargoCostBasisByResource = getCargoCostBasisByResourceFromSave(saveData);
   const cargoCapacity = getTrustedCargoCapacityFromSave(saveData);
+  const cargoCapacitySource = cargoCapacity === null
+    ? "unknown"
+    : (clampInteger(saveData?.cargoCapacity, 0, 999999) !== null ||
+      clampInteger(saveData?.shipStats?.cargo, 0, 999999) !== null ||
+      clampInteger(saveData?.currentShipStats?.cargo, 0, 999999) !== null ||
+      clampInteger(saveData?.ship?.cargo, 0, 999999) !== null
+      ? "trusted_save"
+      : "trusted_save_derived");
 
   if (credits === null || cargoUsed === null || !cargoByResource || !cargoCostBasisByResource) {
     return unavailable("trade_state_missing_or_invalid");
@@ -160,7 +218,7 @@ export function extractTradeValidationStateFromSave(saveData) {
     stateSources: {
       credits: "trusted_save",
       cargoUsed: "trusted_save",
-      cargoCapacity: cargoCapacity === null ? "unknown" : "trusted_save"
+      cargoCapacity: cargoCapacitySource
     }
   };
 }

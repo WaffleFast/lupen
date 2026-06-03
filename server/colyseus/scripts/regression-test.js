@@ -598,6 +598,43 @@ async function assertStagingTradeValidationHelpers() {
   assert(extracted.validationState.cargoCostBasisByResource.Iron === 12, "Trusted trade cargo cost basis was not extracted.");
   assert(extracted.stateSources.credits === "trusted_save", "Trusted trade credits source was not marked trusted.");
 
+  const derivedStarterCapacity = extractTradeValidationStateFromSave({
+    credits: 10000,
+    cargo: {
+      Iron: 0
+    },
+    cargoCostBasis: {},
+    currentShipId: "lupenOrigin",
+    ownedShips: ["lupenOrigin"],
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  });
+  assert(derivedStarterCapacity.available === true, "Starter trade save state with derived cargo capacity was not available.");
+  assert(derivedStarterCapacity.validationState.cargoCapacity === 150, "Starter cargo capacity was not derived from currentShipId.");
+  assert(derivedStarterCapacity.stateSources.cargoCapacity === "trusted_save_derived", "Derived starter cargo capacity source was not marked.");
+
+  const derivedCargoPodCapacity = extractTradeValidationStateFromSave({
+    credits: 10000,
+    cargo: {
+      Iron: 0
+    },
+    cargoCostBasis: {},
+    currentShipId: "lupenOrigin",
+    ownedShips: ["lupenOrigin"],
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "cargoPod", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  });
+  assert(derivedCargoPodCapacity.available === true, "Cargo Pod trade save state with derived capacity was not available.");
+  assert(derivedCargoPodCapacity.validationState.cargoCapacity === 175, "Cargo Pod capacity was not derived from saved loadout.");
+
   const malformed = extractTradeValidationStateFromSave({
     cargo: {
       Iron: 2
@@ -634,7 +671,14 @@ async function assertStagingTradeValidationHelpers() {
               cargoCostBasis: {
                 Iron: 18
               },
-              cargoCapacity: 12
+              currentShipId: "lupenOrigin",
+              ownedShips: ["lupenOrigin"],
+              shipLoadouts: {
+                lupenOrigin: {
+                  attachments: [{ key: "cargoPod", quality: "standard", level: 1 }],
+                  guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+                }
+              }
             }
           }];
         }
@@ -646,6 +690,8 @@ async function assertStagingTradeValidationHelpers() {
   assert(fetched.available === true, "Fetched trusted trade state was not available.");
   assert(fetched.validationState.credits === 1000, "Fetched trusted trade credits were incorrect.");
   assert(fetched.validationState.cargoUsed === 4, "Fetched trusted trade cargo used was incorrect.");
+  assert(fetched.validationState.cargoCapacity === 175, "Fetched trusted trade cargo capacity was not derived from saved ship/loadout.");
+  assert(fetched.stateSources.cargoCapacity === "trusted_save_derived", "Fetched trusted trade capacity source was not marked as derived.");
 
   const unverified = await fetchPlayerTradeValidationState({
     authStatus: "unverified",
