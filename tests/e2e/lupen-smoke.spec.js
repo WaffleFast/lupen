@@ -162,6 +162,67 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("multiplayer staging trade builder shows server sell for carried cargo at destination", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+    await page.waitForFunction(() => !!window.LupenMultiplayerClient?.getStatus, null, { timeout: 15000 });
+    await openTradeTerminal(page);
+    await page.evaluate(() => {
+      const client = window.LupenMultiplayerClient;
+      const originalGetStatus = client.getStatus.bind(client);
+      client.getStatus = () => ({
+        ...originalGetStatus(),
+        enabled: true,
+        isConnected: true,
+        enabledReason: "staging_enabled",
+        lastStagingTradeOffers: {
+          ok: true,
+          offers: [
+            {
+              offerId: "staging-iron-asteron-virella",
+              resourceId: "iron",
+              resourceName: "Iron",
+              buyNode: "Asteron Prime",
+              sellNode: "Virella",
+              buyPrice: 18,
+              sellPrice: 30,
+              maxQuantity: 40
+            },
+            {
+              offerId: "staging-copper-virella-nyxara",
+              resourceId: "copper",
+              resourceName: "Copper",
+              buyNode: "Virella",
+              sellNode: "Nyxara",
+              buyPrice: 32,
+              sellPrice: 50,
+              maxQuantity: 30
+            }
+          ]
+        }
+      });
+      window.eval(`
+        currentNode = "Virella";
+        lastPlanetNode = "Virella";
+        cargo.Iron = 6;
+        cargoCostBasis.Iron = 18;
+        selectedMarketResource = "Iron";
+        selectedMarketTargetPlanet = "Virella";
+      `);
+      if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+    });
+
+    await expect(page.locator("#marketScreen")).toContainText("Server Sell");
+    await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Virella/);
+    await expect(page.locator("#marketScreen")).toContainText(/Carrying 6 Iron/);
+    await expect(page.locator("#marketScreen")).toContainText(/Revenue CR 180|Profit \+CR 72/);
+    await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging store shows server-preview dry-run wording", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

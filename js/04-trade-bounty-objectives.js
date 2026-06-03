@@ -304,6 +304,13 @@ function hasMultiplayerStagingSellRoute(good, destination = getCurrentMarketPlan
   });
 }
 
+function getMultiplayerStagingSellableCargoAt(destination = getCurrentMarketPlanet()) {
+  if (!isMultiplayerStagingActive()) return [];
+  return MAP_ONE_TRADE_RESOURCES.filter((good) => {
+    return Number(cargo[good] || 0) > 0 && hasMultiplayerStagingSellRoute(good, destination);
+  });
+}
+
 function canSelectMultiplayerStagingMarketResource(good, currentPlanet = getCurrentMarketPlanet()) {
   if (!isMultiplayerStagingActive()) return true;
   const offers = getMultiplayerStagingTradeOffers();
@@ -716,11 +723,20 @@ function normalizeMarketBuilderState() {
   }
 
   if (isMultiplayerStagingActive() && getMultiplayerStagingTradeOffers().length) {
-    if (!canSelectMultiplayerStagingMarketResource(selectedMarketResource, currentPlanet)) {
-      selectedMarketResource = getMultiplayerStagingBuyOffersAt(currentPlanet)[0]?.resourceName || selectedMarketResource;
+    const sellableCargo = getMultiplayerStagingSellableCargoAt(currentPlanet);
+    if (sellableCargo.length && !sellableCargo.includes(selectedMarketResource)) {
+      selectedMarketResource = sellableCargo[0];
     }
-    const stagingTargets = getMultiplayerStagingTargetPlanetsForResource(selectedMarketResource, currentPlanet);
-    if (stagingTargets.length && (!stagingTargets.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === currentPlanet)) {
+    if (!canSelectMultiplayerStagingMarketResource(selectedMarketResource, currentPlanet)) {
+      selectedMarketResource = sellableCargo[0] || getMultiplayerStagingBuyOffersAt(currentPlanet)[0]?.resourceName || selectedMarketResource;
+    }
+    const selectedSellOffer = sellableCargo.includes(selectedMarketResource)
+      ? getMultiplayerStagingSellOffersAt(currentPlanet).find((offer) => normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(selectedMarketResource).replace(/_/g, " "))
+      : null;
+    const stagingTargets = selectedSellOffer ? [currentPlanet] : getMultiplayerStagingTargetPlanetsForResource(selectedMarketResource, currentPlanet);
+    if (selectedSellOffer) {
+      selectedMarketTargetPlanet = currentPlanet;
+    } else if (stagingTargets.length && (!stagingTargets.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === currentPlanet)) {
       selectedMarketTargetPlanet = stagingTargets[0];
     }
   } else if (activeMarketTrade?.destination && MAP_ONE_MARKET_PLANETS.includes(activeMarketTrade.destination)) {
@@ -814,8 +830,21 @@ function renderMapOneMarketTerminal(goodsBox) {
   const orderedMarketPlanets = getOrderedMapOneMarketPlanets(currentPlanet);
   const resource = selectedMarketResource;
   const targetPlanet = selectedMarketTargetPlanet;
+  const activeMarketTrade = activeTradeRoute?.marketTrade && activeTradeRoute.good === resource
+    ? activeTradeRoute
+    : null;
+  const held = cargo[resource] || 0;
+  const sellStagingOrigin = stagingTradeLocked && held > 0
+    ? (activeMarketTrade?.origin || MAP_ONE_MARKET_PLANETS.find((planet) => {
+      return findMultiplayerStagingTradeOffer({ good: resource, origin: planet, destination: currentPlanet });
+    }) || currentPlanet)
+    : currentPlanet;
+  const sellStagingOffer = stagingTradeLocked && held > 0
+    ? findMultiplayerStagingTradeOffer({ good: resource, origin: sellStagingOrigin, destination: currentPlanet })
+    : null;
+  const stagingSellMode = Boolean(stagingTradeLocked && sellStagingOffer);
   const stagingTargetPlanets = stagingTradeLocked && getMultiplayerStagingTradeOffers().length
-    ? getMultiplayerStagingTargetPlanetsForResource(resource, currentPlanet)
+    ? (stagingSellMode ? [currentPlanet] : getMultiplayerStagingTargetPlanetsForResource(resource, currentPlanet))
     : [];
   const targetPlanetOptions = stagingTradeLocked && stagingTargetPlanets.length
     ? stagingTargetPlanets
@@ -823,34 +852,31 @@ function renderMapOneMarketTerminal(goodsBox) {
   const quantity = selectedMarketQuantity;
   const buyPrice = getMapOneMarketPrice(resource, currentPlanet);
   const estimatedSellPrice = getMapOneMarketPrice(resource, targetPlanet);
-  const activeMarketTrade = activeTradeRoute?.marketTrade && activeTradeRoute.good === resource
-    ? activeTradeRoute
-    : null;
   const totalCost = buyPrice * quantity;
   const estimatedRevenue = estimatedSellPrice * quantity;
   const estimatedProfit = estimatedRevenue - totalCost;
   const profitMargin = totalCost > 0 ? Math.round((estimatedProfit / totalCost) * 100) : 0;
   const cargoSpaceUsed = quantity;
   const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
-  const held = cargo[resource] || 0;
   const atTargetWithCargo = held > 0 && currentPlanet === targetPlanet;
   const maxBuy = getMarketMaxBuyQuantity(resource, currentPlanet);
   const buyStagingOffer = stagingTradeLocked
     ? findMultiplayerStagingTradeOffer({ good: resource, origin: currentPlanet, destination: targetPlanet })
-    : null;
-  const sellStagingOrigin = activeMarketTrade?.origin || MAP_ONE_MARKET_PLANETS.find((planet) => {
-    return findMultiplayerStagingTradeOffer({ good: resource, origin: planet, destination: currentPlanet });
-  }) || currentPlanet;
-  const sellStagingOffer = stagingTradeLocked && held > 0
-    ? findMultiplayerStagingTradeOffer({ good: resource, origin: sellStagingOrigin, destination: currentPlanet })
     : null;
   const buyPending = stagingTradeLocked && buyStagingOffer && isMultiplayerStagingTradePending("buy", buyStagingOffer.offerId);
   const sellPending = stagingTradeLocked && sellStagingOffer && isMultiplayerStagingTradePending("sell", sellStagingOffer.offerId);
   const canBuy = !stagingTradeLocked && quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
   const info = commodityInfo[resource] || {};
   const stagingTradeNotice = stagingTradeLocked
-    ? renderMultiplayerStagingTradePreviewResult(buyStagingOffer?.offerId || sellStagingOffer?.offerId || "")
+    ? renderMultiplayerStagingTradePreviewResult((stagingSellMode ? sellStagingOffer?.offerId : buyStagingOffer?.offerId) || "")
     : "";
+  const sellUnitPrice = stagingTradeLocked && sellStagingOffer ? sellStagingOffer.sellPrice : getEffectiveSellPrice(resource, currentPlanet);
+  const sellUnitBasis = cargoCostBasis[resource] || (stagingTradeLocked && sellStagingOffer ? sellStagingOffer.buyPrice : getEffectiveBuyPrice(resource, currentPlanet)) || sellUnitPrice;
+  const sellRevenue = Math.max(0, held) * Math.max(0, sellUnitPrice || 0);
+  const sellProfit = Math.max(0, held) * ((sellUnitPrice || 0) - (sellUnitBasis || 0));
+  const builderRouteText = stagingSellMode
+    ? `${sellStagingOrigin} > ${currentPlanet}`
+    : `${currentPlanet} > ${targetPlanet}`;
 
   goodsBox.innerHTML = `
     <div class="map-one-market-terminal">
@@ -902,7 +928,7 @@ function renderMapOneMarketTerminal(goodsBox) {
           </span>
           <div>
             <h3>${resource}</h3>
-            <p>${currentPlanet} &gt; ${targetPlanet}</p>
+            <p>${builderRouteText}</p>
           </div>
         </div>
 
@@ -914,11 +940,13 @@ function renderMapOneMarketTerminal(goodsBox) {
             </select>
           </label>
           <label>
-            <span>Buy Amount</span>
+            <span>${stagingSellMode ? "Sell Amount" : "Buy Amount"}</span>
             <div class="market-amount-control">
-              <strong>${formatNumber(quantity)} units</strong>
-              <button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
-              <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Server Buy" : "Preview Unavailable" : "Buy Cargo"}</button>
+              <strong>${formatNumber(stagingSellMode ? held : quantity)} ${stagingSellMode ? "carried" : "units"}</strong>
+              ${stagingSellMode
+                ? ""
+                : `<button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
+                  <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Server Buy" : "Preview Unavailable" : "Buy Cargo"}</button>`}
             </div>
           </label>
         </div>
@@ -930,6 +958,11 @@ function renderMapOneMarketTerminal(goodsBox) {
         </div>
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
+          <div class="trade-preview-note">
+            <strong>${stagingTradeLocked ? "Server sell cargo" : "Cargo ready to sell"}</strong>
+            <span>Carrying ${formatNumber(held)} ${resource} / ${stagingSellMode ? `sell at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `current route sell support unavailable here`}</span>
+            ${stagingSellMode ? `<span>Revenue CR ${formatNumber(sellRevenue)} / Profit ${sellProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(sellProfit))}</span>` : ""}
+          </div>
           <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer && !sellPending ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? sellPending ? "Applying..." : "Server Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
       </aside>
@@ -945,8 +978,16 @@ function setMarketResource(good) {
   }
   selectedMarketResource = good;
   if (isMultiplayerStagingActive()) {
-    const targets = getMultiplayerStagingTargetPlanetsForResource(good, getCurrentMarketPlanet());
-    if (targets.length) selectedMarketTargetPlanet = targets[0];
+    const currentPlanet = getCurrentMarketPlanet();
+    const sellOffer = Number(cargo[good] || 0) > 0
+      ? getMultiplayerStagingSellOffersAt(currentPlanet).find((offer) => normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " "))
+      : null;
+    if (sellOffer) {
+      selectedMarketTargetPlanet = currentPlanet;
+    } else {
+      const targets = getMultiplayerStagingTargetPlanetsForResource(good, currentPlanet);
+      if (targets.length) selectedMarketTargetPlanet = targets[0];
+    }
   }
   tutorialEvent("selectedMarketResource");
   renderMarketplace();
