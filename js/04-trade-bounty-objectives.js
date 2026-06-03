@@ -264,12 +264,21 @@ function normalizeTradeRouteValue(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function normalizeMultiplayerStagingResourceKey(value) {
+  return normalizeTradeRouteValue(value).replace(/_/g, " ");
+}
+
+function isMultiplayerStagingOfferForResource(offer, good) {
+  const normalizedGood = normalizeMultiplayerStagingResourceKey(good);
+  return normalizeMultiplayerStagingResourceKey(offer?.resourceName) === normalizedGood ||
+    normalizeMultiplayerStagingResourceKey(offer?.resourceId) === normalizedGood;
+}
+
 function findMultiplayerStagingTradeOffer({ good = "", origin = "", destination = "" } = {}) {
-  const normalizedGood = normalizeTradeRouteValue(good).replace(/_/g, " ");
   const normalizedOrigin = normalizeTradeRouteValue(origin);
   const normalizedDestination = normalizeTradeRouteValue(destination);
   return getMultiplayerStagingTradeOffers().find((offer) => {
-    return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizedGood &&
+    return isMultiplayerStagingOfferForResource(offer, good) &&
       normalizeTradeRouteValue(offer.buyNode) === normalizedOrigin &&
       normalizeTradeRouteValue(offer.sellNode) === normalizedDestination;
   }) || null;
@@ -285,10 +294,13 @@ function getMultiplayerStagingSellOffersAt(destination = getCurrentMarketPlanet(
   return getMultiplayerStagingTradeOffers().filter((offer) => normalizeTradeRouteValue(offer.sellNode) === normalizedDestination);
 }
 
+function findMultiplayerStagingSellOffer({ good = "", destination = getCurrentMarketPlanet() } = {}) {
+  return getMultiplayerStagingSellOffersAt(destination).find((offer) => isMultiplayerStagingOfferForResource(offer, good)) || null;
+}
+
 function getMultiplayerStagingTargetPlanetsForResource(good, origin = getCurrentMarketPlanet()) {
-  const normalizedGood = normalizeTradeRouteValue(good).replace(/_/g, " ");
   return getMultiplayerStagingBuyOffersAt(origin)
-    .filter((offer) => normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizedGood)
+    .filter((offer) => isMultiplayerStagingOfferForResource(offer, good))
     .map((offer) => offer.sellNode)
     .filter((node, index, nodes) => node && nodes.indexOf(node) === index);
 }
@@ -298,10 +310,7 @@ function hasMultiplayerStagingBuyRoute(good, origin = getCurrentMarketPlanet()) 
 }
 
 function hasMultiplayerStagingSellRoute(good, destination = getCurrentMarketPlanet()) {
-  const normalizedGood = normalizeTradeRouteValue(good).replace(/_/g, " ");
-  return getMultiplayerStagingSellOffersAt(destination).some((offer) => {
-    return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizedGood;
-  });
+  return Boolean(findMultiplayerStagingSellOffer({ good, destination }));
 }
 
 function getMultiplayerStagingSellableCargoAt(destination = getCurrentMarketPlanet()) {
@@ -323,12 +332,10 @@ function getMultiplayerStagingMarketPrice(good, planet, currentPlanet = getCurre
   if (!isMultiplayerStagingActive()) return null;
   if (planet === currentPlanet) {
     const buyOffer = getMultiplayerStagingBuyOffersAt(currentPlanet).find((offer) => {
-      return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ");
+      return isMultiplayerStagingOfferForResource(offer, good);
     });
     if (buyOffer) return buyOffer.buyPrice;
-    const sellOffer = getMultiplayerStagingSellOffersAt(currentPlanet).find((offer) => {
-      return normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ");
-    });
+    const sellOffer = findMultiplayerStagingSellOffer({ good, destination: currentPlanet });
     return sellOffer ? sellOffer.sellPrice : null;
   }
   const offer = findMultiplayerStagingTradeOffer({ good, origin: currentPlanet, destination: planet });
@@ -755,7 +762,7 @@ function normalizeMarketBuilderState() {
       selectedMarketResource = sellableCargo[0] || getMultiplayerStagingBuyOffersAt(currentPlanet)[0]?.resourceName || selectedMarketResource;
     }
     const selectedSellOffer = sellableCargo.includes(selectedMarketResource)
-      ? getMultiplayerStagingSellOffersAt(currentPlanet).find((offer) => normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(selectedMarketResource).replace(/_/g, " "))
+      ? findMultiplayerStagingSellOffer({ good: selectedMarketResource, destination: currentPlanet })
       : null;
     const stagingTargets = selectedSellOffer ? [currentPlanet] : getMultiplayerStagingTargetPlanetsForResource(selectedMarketResource, currentPlanet);
     if (selectedSellOffer) {
@@ -858,14 +865,10 @@ function renderMapOneMarketTerminal(goodsBox) {
     ? activeTradeRoute
     : null;
   const held = cargo[resource] || 0;
-  const sellStagingOrigin = stagingTradeLocked && held > 0
-    ? (activeMarketTrade?.origin || MAP_ONE_MARKET_PLANETS.find((planet) => {
-      return findMultiplayerStagingTradeOffer({ good: resource, origin: planet, destination: currentPlanet });
-    }) || currentPlanet)
-    : currentPlanet;
   const sellStagingOffer = stagingTradeLocked && held > 0
-    ? findMultiplayerStagingTradeOffer({ good: resource, origin: sellStagingOrigin, destination: currentPlanet })
+    ? findMultiplayerStagingSellOffer({ good: resource, destination: currentPlanet })
     : null;
+  const sellStagingOrigin = sellStagingOffer?.buyNode || currentPlanet;
   const stagingSellMode = Boolean(stagingTradeLocked && sellStagingOffer);
   const stagingTargetPlanets = stagingTradeLocked && getMultiplayerStagingTradeOffers().length
     ? (stagingSellMode ? [currentPlanet] : getMultiplayerStagingTargetPlanetsForResource(resource, currentPlanet))
@@ -1006,7 +1009,7 @@ function setMarketResource(good) {
   if (isMultiplayerStagingActive()) {
     const currentPlanet = getCurrentMarketPlanet();
     const sellOffer = Number(cargo[good] || 0) > 0
-      ? getMultiplayerStagingSellOffersAt(currentPlanet).find((offer) => normalizeTradeRouteValue(offer.resourceName || offer.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " "))
+      ? findMultiplayerStagingSellOffer({ good, destination: currentPlanet })
       : null;
     if (sellOffer) {
       selectedMarketTargetPlanet = currentPlanet;
@@ -1120,14 +1123,8 @@ function sellMarketCargo() {
     const currentPlanet = getCurrentMarketPlanet();
     const origin = activeTradeRoute?.marketTrade && activeTradeRoute.good === good
       ? activeTradeRoute.origin
-      : MAP_ONE_MARKET_PLANETS.find((planet) => {
-        return findMultiplayerStagingTradeOffer({ good, origin: planet, destination: currentPlanet });
-      }) || "";
-    const offer = findMultiplayerStagingTradeOffer({
-      good,
-      origin,
-      destination: currentPlanet
-    });
+      : findMultiplayerStagingSellOffer({ good, destination: currentPlanet })?.buyNode || "";
+    const offer = findMultiplayerStagingTradeOffer({ good, origin, destination: currentPlanet });
     requestMultiplayerStagingTradeDryRun({
       operation: "sell",
       offerId: offer?.offerId || "",
@@ -3183,7 +3180,7 @@ function buyGood(good) {
         destination: activeTrade.destination
       })
       : getMultiplayerStagingTradeOffers().find((entry) => {
-        return normalizeTradeRouteValue(entry.resourceName || entry.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ") &&
+        return isMultiplayerStagingOfferForResource(entry, good) &&
           normalizeTradeRouteValue(entry.buyNode) === normalizeTradeRouteValue(currentNode);
       });
     requestMultiplayerStagingTradeDryRun({
@@ -3251,7 +3248,7 @@ function sellGood(good) {
         destination: activeTrade.destination
       })
       : getMultiplayerStagingTradeOffers().find((entry) => {
-        return normalizeTradeRouteValue(entry.resourceName || entry.resourceId).replace(/_/g, " ") === normalizeTradeRouteValue(good).replace(/_/g, " ") &&
+        return isMultiplayerStagingOfferForResource(entry, good) &&
           normalizeTradeRouteValue(entry.sellNode) === normalizeTradeRouteValue(currentNode);
       });
     requestMultiplayerStagingTradeDryRun({

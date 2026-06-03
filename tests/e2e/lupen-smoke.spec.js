@@ -199,6 +199,16 @@ test.describe("Lupen browser smoke", () => {
               buyPrice: 32,
               sellPrice: 50,
               maxQuantity: 30
+            },
+            {
+              offerId: "staging-crystal-asteron-nyxara",
+              resourceId: "crystal_shards",
+              resourceName: "Crystal Shards",
+              buyNode: "Asteron Prime",
+              sellNode: "Nyxara",
+              buyPrice: 95,
+              sellPrice: 145,
+              maxQuantity: 10
             }
           ]
         }
@@ -220,6 +230,27 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
     await expect(page.locator("#marketScreen")).toContainText("CR 180");
     await expect(page.locator("#marketScreen")).toContainText("+CR 72");
+    await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
+
+    await page.evaluate(() => {
+      window.eval(`
+        currentNode = "Nyxara";
+        lastPlanetNode = "Nyxara";
+        cargo.Iron = 0;
+        cargo["Crystal Shards"] = 4;
+        cargoCostBasis["Crystal Shards"] = 95;
+        selectedMarketResource = "Crystal Shards";
+        selectedMarketTargetPlanet = "Nyxara";
+      `);
+      if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+    });
+
+    await expect(page.locator("#marketScreen")).toContainText("Server Sell");
+    await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Nyxara/);
+    await expect(page.locator("#marketScreen")).toContainText(/Carrying 4 Crystal Shards/);
+    await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
+    await expect(page.locator("#marketScreen")).toContainText("CR 580");
+    await expect(page.locator("#marketScreen")).toContainText("+CR 200");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
     await expectNoUnexpectedBrowserErrors(failures);
