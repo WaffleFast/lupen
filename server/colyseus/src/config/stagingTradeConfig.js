@@ -73,6 +73,31 @@ function normalizeTradeNumber(value, max = 999999999) {
   return Math.max(0, Math.min(max, Math.floor(number)));
 }
 
+function normalizeTradeResourceKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function getOfferResourceKeys(offer = {}) {
+  return [
+    String(offer?.resourceName || "").trim(),
+    String(offer?.resourceId || "").trim()
+  ].filter(Boolean);
+}
+
+function readResourceAmount(resourceMap = {}, offer = {}) {
+  if (!resourceMap || typeof resourceMap !== "object" || Array.isArray(resourceMap)) return null;
+  const directKey = getOfferResourceKeys(offer).find((key) => Object.prototype.hasOwnProperty.call(resourceMap, key));
+  if (directKey) return normalizeTradeNumber(resourceMap[directKey], 999999);
+
+  const normalizedOfferKeys = new Set(getOfferResourceKeys(offer).map(normalizeTradeResourceKey));
+  const compatibleKey = Object.keys(resourceMap).find((key) => normalizedOfferKeys.has(normalizeTradeResourceKey(key)));
+  return compatibleKey ? normalizeTradeNumber(resourceMap[compatibleKey], 999999) : null;
+}
+
 function getUnknownValidation(reason = "unknown_player_state", readStatus = "") {
   return {
     validationMode: "unknown",
@@ -451,9 +476,7 @@ export function buildStagingTradeWriteDryRun({
   }
 
   const cargoByResource = trustedState?.validationState?.cargoByResource;
-  const resourceHeld = cargoByResource && typeof cargoByResource === "object"
-    ? normalizeTradeNumber(cargoByResource[offer.resourceName], 999999)
-    : null;
+  const resourceHeld = readResourceAmount(cargoByResource, offer);
 
   if (safeOperation === "sell" && resourceHeld === null) {
     return buildBlockedTradeWriteResult({

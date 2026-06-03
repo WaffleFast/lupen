@@ -596,7 +596,24 @@ async function assertStagingTradeValidationHelpers() {
   assert(extracted.validationState.cargoUsed === 5, "Trusted trade cargo used was not summed.");
   assert(extracted.validationState.cargoCapacity === 20, "Trusted trade cargo capacity was not extracted.");
   assert(extracted.validationState.cargoCostBasisByResource.Iron === 12, "Trusted trade cargo cost basis was not extracted.");
+  assert(extracted.validationState.cargoByResource["crystal shards"] === 2, "Trusted trade cargo did not expose normalized Crystal Shards key.");
+  assert(extracted.validationState.cargoCostBasisByResource["crystal shards"] === 80, "Trusted trade cost basis did not expose normalized Crystal Shards key.");
   assert(extracted.stateSources.credits === "trusted_save", "Trusted trade credits source was not marked trusted.");
+
+  const extractedCanonicalCargo = extractTradeValidationStateFromSave({
+    credits: 500,
+    cargo: {
+      crystal_shards: 7
+    },
+    cargoCostBasis: {
+      crystal_shards: 95
+    },
+    cargoCapacity: 20
+  });
+  assert(extractedCanonicalCargo.available === true, "Trusted trade save state with canonical cargo key was not extracted.");
+  assert(extractedCanonicalCargo.validationState.cargoUsed === 7, "Trusted trade cargo used did not include canonical cargo key.");
+  assert(extractedCanonicalCargo.validationState.cargoByResource["crystal shards"] === 7, "Trusted trade cargo did not normalize canonical Crystal Shards key.");
+  assert(extractedCanonicalCargo.validationState.cargoCostBasisByResource["crystal shards"] === 95, "Trusted trade cost basis did not normalize canonical Crystal Shards key.");
 
   const derivedStarterCapacity = extractTradeValidationStateFromSave({
     credits: 10000,
@@ -874,6 +891,30 @@ async function assertStagingTradeValidationHelpers() {
   assert(sellWriteDryRun.cargoDelta === -2, `Unexpected sell cargo delta: ${sellWriteDryRun.cargoDelta}`);
   assert(sellWriteDryRun.validationMode === "trusted_save_limited", `Unexpected limited sell validation mode: ${sellWriteDryRun.validationMode}`);
   assert(sellWriteDryRun.writes.saveWritten === false, "Sell write dry-run reported save write.");
+
+  const crystalSellWriteDryRun = buildStagingTradeWriteDryRun({
+    operation: "sell",
+    offerId: "staging-crystal-asteron-nyxara",
+    quantity: 4,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 64,
+        cargoCapacity: null,
+        cargoByResource: {
+          crystal_shards: 64
+        }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a"
+    }
+  });
+  assert(crystalSellWriteDryRun.ok === true, `Crystal Shards sell dry-run was blocked: ${crystalSellWriteDryRun.reason}`);
+  assert(crystalSellWriteDryRun.revenue === 580, `Unexpected Crystal Shards sell revenue: ${crystalSellWriteDryRun.revenue}`);
+  assert(crystalSellWriteDryRun.cargoBefore === 64 && crystalSellWriteDryRun.cargoAfter === 60, "Crystal Shards sell dry-run did not use normalized cargo.");
 
   const sellUnknownResource = buildStagingTradeWriteDryRun({
     operation: "sell",
@@ -1233,6 +1274,30 @@ async function assertStagingTradeValidationHelpers() {
     cargoCapacity: 20
   });
   assert(sellInsufficientPatchPlan.ok === false && sellInsufficientPatchPlan.reason === "insufficient_resource_cargo", "Trade sell patch allowed overselling cargo.");
+
+  const crystalSellPatchPlan = buildStagingTradeSellSavePatch({
+    credits: 1000,
+    cargo: { crystal_shards: 64, Iron: 2 },
+    cargoCostBasis: { crystal_shards: 95, Iron: 18 },
+    inventoryItems: [{ id: "kept" }],
+    activeBountyId: "bounty-safe"
+  }, {
+    offerId: "staging-crystal-asteron-nyxara",
+    resourceId: "crystal_shards",
+    resourceName: "Crystal Shards",
+    sellPrice: 145
+  }, 4, {
+    cargoCapacity: 150
+  });
+  assert(crystalSellPatchPlan.ok === true, `Crystal Shards sell patch plan failed: ${crystalSellPatchPlan.reason}`);
+  assert(crystalSellPatchPlan.resourceKey === "crystal_shards", "Crystal Shards sell patch did not preserve canonical saved cargo key.");
+  assert(crystalSellPatchPlan.creditsBefore === 1000 && crystalSellPatchPlan.creditsAfter === 1580, "Crystal Shards sell patch did not add server revenue.");
+  assert(crystalSellPatchPlan.cargoBefore === 64 && crystalSellPatchPlan.cargoAfter === 60, "Crystal Shards sell patch did not subtract canonical cargo.");
+  assert(crystalSellPatchPlan.patchedSaveData.cargo.crystal_shards === 60, "Crystal Shards sell patch did not update canonical cargo key.");
+  assert(crystalSellPatchPlan.patchedSaveData.cargo["Crystal Shards"] === undefined, "Crystal Shards sell patch created a display-name cargo key.");
+  assert(crystalSellPatchPlan.patchedSaveData.cargo.Iron === 2, "Crystal Shards sell patch changed unrelated cargo.");
+  assert(crystalSellPatchPlan.patchedSaveData.inventoryItems[0].id === "kept", "Crystal Shards sell patch changed inventory.");
+  assert(crystalSellPatchPlan.patchedSaveData.activeBountyId === "bounty-safe", "Crystal Shards sell patch changed bounty.");
 
   fetchCalls = [];
   const appliedSellWrite = await applyStagingTradeSellWrite({

@@ -17,6 +17,14 @@ const CARGO_KEYS = Object.freeze([
   "Dark Matter Residue"
 ]);
 
+function normalizeCargoResourceKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
 const STAGING_SHIP_CARGO = Object.freeze({
   lupenOrigin: 150,
   lupenHauler: 260,
@@ -84,8 +92,8 @@ function getCargoUsedFromSave(saveData) {
   const cargo = saveData?.cargo;
   if (!cargo || typeof cargo !== "object" || Array.isArray(cargo)) return null;
 
-  return CARGO_KEYS.reduce((total, key) => {
-    const amount = clampInteger(cargo[key], 0, 999999);
+  return Object.values(cargo).reduce((total, value) => {
+    const amount = clampInteger(value, 0, 999999);
     return total + (amount || 0);
   }, 0);
 }
@@ -94,8 +102,10 @@ function getCargoByResourceFromSave(saveData) {
   const cargo = saveData?.cargo;
   if (!cargo || typeof cargo !== "object" || Array.isArray(cargo)) return null;
 
-  return CARGO_KEYS.reduce((summary, key) => {
-    summary[key] = clampInteger(cargo[key], 0, 999999) || 0;
+  return Object.entries(cargo).reduce((summary, [key, value]) => {
+    const amount = clampInteger(value, 0, 999999) || 0;
+    summary[key] = amount;
+    summary[normalizeCargoResourceKey(key)] = amount;
     return summary;
   }, {});
 }
@@ -104,8 +114,10 @@ function getCargoCostBasisByResourceFromSave(saveData) {
   const cargoCostBasis = saveData?.cargoCostBasis;
   if (!cargoCostBasis || typeof cargoCostBasis !== "object" || Array.isArray(cargoCostBasis)) return null;
 
-  return CARGO_KEYS.reduce((summary, key) => {
-    summary[key] = clampInteger(cargoCostBasis[key], 0, 999999999) || 0;
+  return Object.entries(cargoCostBasis).reduce((summary, [key, value]) => {
+    const basis = clampInteger(value, 0, 999999999) || 0;
+    summary[key] = basis;
+    summary[normalizeCargoResourceKey(key)] = basis;
     return summary;
   }, {});
 }

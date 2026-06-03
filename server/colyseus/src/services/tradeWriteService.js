@@ -28,6 +28,37 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function normalizeCargoResourceKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function getOfferResourceKeys(offer = {}) {
+  return [
+    getString(offer.resourceName),
+    getString(offer.resourceId)
+  ].filter(Boolean);
+}
+
+function findCargoResourceKey(container = {}, offer = {}) {
+  if (!container || typeof container !== "object" || Array.isArray(container)) return "";
+  const directKey = getOfferResourceKeys(offer).find((key) => Object.prototype.hasOwnProperty.call(container, key));
+  if (directKey) return directKey;
+
+  const normalizedOfferKeys = new Set(getOfferResourceKeys(offer).map(normalizeCargoResourceKey));
+  return Object.keys(container).find((key) => normalizedOfferKeys.has(normalizeCargoResourceKey(key))) || "";
+}
+
+function getCargoResourceAmount(container = {}, offer = {}, max = MAX_CARGO) {
+  const key = findCargoResourceKey(container, offer);
+  if (!key) return { key: getString(offer.resourceName), amount: 0, found: false };
+  const amount = clampInteger(container[key], 0, max);
+  return { key, amount: amount || 0, found: amount !== null };
+}
+
 function getSupabaseConfig(env = process.env) {
   return {
     url: getString(env.SUPABASE_URL),
@@ -186,20 +217,22 @@ export function buildStagingTradeBuySavePatch(saveData = {}, offer = {}, quantit
   const cargoCapacity = clampInteger(context.cargoCapacity, 0, MAX_CARGO);
   if (cargoCapacity === null) return getBlockedResult("trusted_cargo_capacity_required");
 
-  const resourceBefore = clampInteger(cargo[resourceName], 0, MAX_CARGO) || 0;
+  const resourceKey = findCargoResourceKey(cargo, offer) || resourceName;
+  const resourceBefore = clampInteger(cargo[resourceKey], 0, MAX_CARGO) || 0;
   const cargoUsedBefore = getCargoUsed(cargo);
   const cargoFree = Math.max(0, cargoCapacity - Math.min(cargoUsedBefore, cargoCapacity));
   const cost = buyPrice * safeQuantity;
   if (creditsBefore < cost) return getBlockedResult("insufficient_credits");
   if (safeQuantity > cargoFree) return getBlockedResult("insufficient_cargo");
 
-  const previousBasis = clampInteger(cargoCostBasis[resourceName], 0, MAX_CREDITS) || buyPrice;
+  const basisKey = findCargoResourceKey(cargoCostBasis, offer) || resourceKey;
+  const previousBasis = clampInteger(cargoCostBasis[basisKey], 0, MAX_CREDITS) || buyPrice;
   const resourceAfter = resourceBefore + safeQuantity;
   const weightedBasis = Math.round(((resourceBefore * previousBasis) + (safeQuantity * buyPrice)) / Math.max(1, resourceAfter));
   const patchedSaveData = cloneJson(saveData);
   patchedSaveData.credits = creditsBefore - cost;
-  patchedSaveData.cargo[resourceName] = resourceAfter;
-  patchedSaveData.cargoCostBasis[resourceName] = weightedBasis;
+  patchedSaveData.cargo[resourceKey] = resourceAfter;
+  patchedSaveData.cargoCostBasis[basisKey] = weightedBasis;
 
   return {
     ok: true,
@@ -210,6 +243,7 @@ export function buildStagingTradeBuySavePatch(saveData = {}, offer = {}, quantit
     offerId,
     resourceId,
     resourceName,
+    resourceKey,
     quantity: safeQuantity,
     cost,
     creditsDelta: -cost,
@@ -255,24 +289,37 @@ export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quanti
   const cargoCapacity = clampInteger(context.cargoCapacity, 0, MAX_CARGO);
   if (cargoCapacity === null) return getBlockedResult("trusted_cargo_capacity_required", { operation: "sell" });
 
-  const resourceBefore = clampInteger(cargo[resourceName], 0, MAX_CARGO) || 0;
-  if (resourceBefore < safeQuantity) return getBlockedResult("insufficient_resource_cargo", { operation: "sell" });
+  const { key: resourceKey, amount: resourceBefore, found: resourceFound } = getCargoResourceAmount(cargo, offer);
+  if (!resourceFound || resourceBefore < safeQuantity) {
+    return getBlockedResult("insufficient_resource_cargo", {
+      operation: "sell",
+      resourceKey,
+      expectedResourceKeys: getOfferResourceKeys(offer)
+    });
+  }
 
   const cargoUsedBefore = getCargoUsed(cargo);
-  const basisBefore = clampInteger(cargoCostBasis[resourceName], 0, MAX_CREDITS);
-  if (basisBefore === null) return getBlockedResult("cargo_cost_basis_resource_missing_or_invalid", { operation: "sell" });
+  const basisKey = findCargoResourceKey(cargoCostBasis, offer) || resourceKey;
+  const basisBefore = clampInteger(cargoCostBasis[basisKey], 0, MAX_CREDITS);
+  if (basisBefore === null) {
+    return getBlockedResult("cargo_cost_basis_resource_missing_or_invalid", {
+      operation: "sell",
+      resourceKey,
+      expectedResourceKeys: getOfferResourceKeys(offer)
+    });
+  }
 
   const revenue = sellPrice * safeQuantity;
   const resourceAfter = Math.max(0, resourceBefore - safeQuantity);
   const patchedSaveData = cloneJson(saveData);
   patchedSaveData.credits = Math.min(MAX_CREDITS, creditsBefore + revenue);
-  patchedSaveData.cargo[resourceName] = resourceAfter;
+  patchedSaveData.cargo[resourceKey] = resourceAfter;
   if (resourceAfter <= 0) {
-    delete patchedSaveData.cargoCostBasis[resourceName];
+    delete patchedSaveData.cargoCostBasis[basisKey];
   } else {
     // cargoCostBasis is an average unit basis in the local save. A partial
     // sale leaves the remaining cargo's unit basis unchanged.
-    patchedSaveData.cargoCostBasis[resourceName] = basisBefore;
+    patchedSaveData.cargoCostBasis[basisKey] = basisBefore;
   }
 
   return {
@@ -284,6 +331,7 @@ export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quanti
     offerId,
     resourceId,
     resourceName,
+    resourceKey,
     quantity: safeQuantity,
     revenue,
     creditsDelta: revenue,
