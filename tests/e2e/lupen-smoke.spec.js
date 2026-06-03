@@ -217,7 +217,9 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("Server Sell");
     await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Virella/);
     await expect(page.locator("#marketScreen")).toContainText(/Carrying 6 Iron/);
-    await expect(page.locator("#marketScreen")).toContainText(/Revenue CR 180|Profit \+CR 72/);
+    await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
+    await expect(page.locator("#marketScreen")).toContainText("CR 180");
+    await expect(page.locator("#marketScreen")).toContainText("+CR 72");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
     await expectNoUnexpectedBrowserErrors(failures);

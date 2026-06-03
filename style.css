@@ -12695,6 +12695,55 @@ input::placeholder {
   padding: 8px 10px;
 }
 
+.market-builder-panel.staging-sell-builder {
+  gap: 6px;
+  padding: 10px;
+  align-content: start;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-selected {
+  gap: 7px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-icon {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-controls {
+  gap: 5px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-controls label {
+  gap: 3px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-controls select {
+  min-height: 28px;
+}
+
+.market-builder-panel.staging-sell-builder .market-amount-control {
+  grid-template-columns: 1fr;
+}
+
+.market-builder-panel.staging-sell-builder .market-amount-control strong {
+  min-height: 30px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-summary div {
+  padding: 7px 8px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-actions {
+  gap: 6px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-actions button {
+  min-height: 42px;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 980px) {
   .trade-terminal-summary,
   .map-one-market-terminal {
@@ -19153,6 +19202,12 @@ input::placeholder {
 
 .market-builder-panel .staging-trade-status.compact strong {
   color: #f1f8ff;
+}
+
+.market-builder-panel .staging-trade-status.detailed {
+  max-height: 76px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .market-builder-panel .staging-sell-summary {

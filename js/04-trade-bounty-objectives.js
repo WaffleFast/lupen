@@ -944,7 +944,7 @@ function renderMapOneMarketTerminal(goodsBox) {
         </div>
       </div>
 
-      <aside class="market-builder-panel ${getCommodityRarityClass(resource)}">
+      <aside class="market-builder-panel ${getCommodityRarityClass(resource)} ${stagingSellMode ? "staging-sell-builder" : ""}">
         <div class="trade-panel-kicker">Trade Builder</div>
         <div class="market-builder-selected">
           <span class="commodity-icon market-builder-icon">
@@ -987,7 +987,6 @@ function renderMapOneMarketTerminal(goodsBox) {
           <div class="trade-preview-note staging-sell-summary">
             <strong>${stagingTradeLocked ? "Server sell cargo" : "Cargo ready to sell"}</strong>
             <span>Carrying ${formatNumber(held)} ${resource} / ${stagingSellMode ? `sell at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `current route sell support unavailable here`}</span>
-            ${stagingSellMode ? `<span>Revenue CR ${formatNumber(sellRevenue)} / Profit ${sellProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(sellProfit))}</span>` : ""}
           </div>
           <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer && !sellPending ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? sellPending ? "Applying..." : "Server Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
