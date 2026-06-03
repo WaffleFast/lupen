@@ -19140,6 +19140,28 @@ input::placeholder {
   line-height: 1.35;
 }
 
+.market-builder-panel .staging-trade-status.compact {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid rgba(127, 223, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(2, 10, 22, 0.46);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.market-builder-panel .staging-trade-status.compact strong {
+  color: #f1f8ff;
+}
+
+.market-builder-panel .staging-sell-summary {
+  display: grid;
+  gap: 2px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .accept-route-action {
   min-height: 42px;
   border-radius: 12px;

@@ -354,6 +354,10 @@ function getMultiplayerStagingTradeValidationLabel(result) {
   return `Blocked: ${result.blockReason || result.reason || "validation failed"}`;
 }
 
+function isMultiplayerStagingDebugActive() {
+  return new URLSearchParams(window.location.search).get("debug") === "mp";
+}
+
 function escapeMultiplayerStagingTradeText(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -368,16 +372,16 @@ function getMultiplayerStagingTradeWriteBlockLine(result) {
   const reason = result.userReason || result.writeBlockReason || result.blockReason || result.reason || "";
   const code = result.writeBlockReason || result.blockReason || result.reason || "";
   if (!reason && !code) return "";
-  const codeLine = code && new URLSearchParams(window.location.search).get("debug") === "mp"
+  const codeLine = code && isMultiplayerStagingDebugActive()
     ? ` <span>Gate: ${escapeMultiplayerStagingTradeText(code)}</span>`
     : "";
   return `<span>${escapeMultiplayerStagingTradeText(reason || `Blocked: ${code}`)}</span>${codeLine}`;
 }
 
-function getLastMatchingMultiplayerStagingTradePreview(offerId) {
+function getLastMatchingMultiplayerStagingTradePreview(offerId, operation = "") {
   const status = getMultiplayerStagingTradeStatus();
   const writeResult = status.lastStagingTradeWriteResult;
-  if (writeResult?.offerId === offerId) return writeResult;
+  if (writeResult?.offerId === offerId && (!operation || writeResult.operation === operation)) return writeResult;
   const result = status.lastStagingTradePreview;
   return result?.offerId === offerId ? result : null;
 }
@@ -460,35 +464,55 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
   }
 }
 
-function renderMultiplayerStagingTradePreviewResult(offerId) {
+function renderMultiplayerStagingTradePreviewResult(offerId, { operation = "buy" } = {}) {
   if (!isMultiplayerStagingActive()) return "";
-  const result = getLastMatchingMultiplayerStagingTradePreview(offerId);
+  const result = getLastMatchingMultiplayerStagingTradePreview(offerId, operation);
+  const operationLabel = operation === "sell" ? "sell" : "buy";
   if (!offerId) {
-    return `<div class="trade-preview-note">MP staging: server preview not available for this route yet. No credits or cargo changed.</div>`;
+    return `<div class="trade-preview-note staging-trade-status compact">Server ${operationLabel} unavailable for this route.</div>`;
   }
   if (!result) {
-    return `<div class="trade-preview-note">MP staging: server preview only. Click Server Preview to validate this route.</div>`;
+    return `<div class="trade-preview-note staging-trade-status compact">Server ${operationLabel} ready.</div>`;
   }
 
-  const debugLine = new URLSearchParams(window.location.search).get("debug") === "mp"
+  const debugMode = isMultiplayerStagingDebugActive();
+  const debugLine = debugMode
     ? `<span>${result.validationMode || "unknown"} / trusted ${result.trustedStateAvailable ? "yes" : "no"} / snapshot ${result.snapshotUsed ? "yes" : "no"}</span>`
     : "";
   const applied = result.applied === true && result.mode === "trade_write";
-  const resultTitle = applied ? `MP staging: server ${result.operation || "trade"} applied` : "MP staging: server preview only";
-  const operationLabel = result.operation
-    ? `${result.operation.toUpperCase()} ${applied ? "write" : "dry-run"} / `
-    : "";
+  const resultOperation = result.operation || operationLabel;
+  if (!debugMode) {
+    if (applied) {
+      return `
+        <div class="trade-preview-note staging-trade-status compact">
+          <strong>Server ${resultOperation} applied.</strong>
+          <span>${getMultiplayerStagingTradeSyncLine(result) || "Cloud save refresh pending."}</span>
+        </div>
+      `;
+    }
+    if (result.mode === "blocked" || result.ok === false || result.wouldPass === false) {
+      return `
+        <div class="trade-preview-note staging-trade-status compact">
+          <strong>Server ${operationLabel} blocked.</strong>
+          ${getMultiplayerStagingTradeWriteBlockLine(result) || `<span>${getMultiplayerStagingTradeValidationLabel(result)}</span>`}
+        </div>
+      `;
+    }
+    return `<div class="trade-preview-note staging-trade-status compact">Server ${operationLabel} ready.</div>`;
+  }
+
+  const resultTitle = applied ? `MP staging: server ${resultOperation} applied` : "MP staging: server preview only";
   const writeLine = applied
-    ? `<span>Staging ${result.operation || "trade"} applied: CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(result.creditsAfter)} (${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))})</span>
+    ? `<span>Staging ${resultOperation} applied: CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(result.creditsAfter)} (${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))})</span>
       <span>${result.resourceName || "Cargo"} ${formatNumber(result.cargoBefore)} -> ${formatNumber(result.cargoAfter)} / hold ${formatNumber(result.cargoUsedBefore)} -> ${formatNumber(result.cargoUsedAfter)} of ${formatNumber(result.cargoCapacity)}</span>
       <span>${getMultiplayerStagingTradeSyncLine(result)}</span>`
     : `${getMultiplayerStagingTradeWriteBlockLine(result)}
       <span>Dry run only - no credits, cargo, saves, inventory, bounties, loot, or economy changed.</span>`;
 
   return `
-    <div class="trade-preview-note">
+    <div class="trade-preview-note staging-trade-status detailed">
       <strong>${resultTitle}</strong>
-      <span>${operationLabel}Cost CR ${formatNumber(result.totalCost ?? result.cost)} / Revenue CR ${formatNumber(result.projectedRevenue ?? result.revenue)} / Profit ${(result.projectedProfit ?? result.profitPreview) >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(result.projectedProfit ?? result.profitPreview))}</span>
+      <span>${resultOperation.toUpperCase()} ${applied ? "write" : "dry-run"} / Cost CR ${formatNumber(result.totalCost ?? result.cost)} / Revenue CR ${formatNumber(result.projectedRevenue ?? result.revenue)} / Profit ${(result.projectedProfit ?? result.profitPreview) >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(result.projectedProfit ?? result.profitPreview))}</span>
       <span>${getMultiplayerStagingTradeValidationLabel(result)}</span>
       <span>${getMultiplayerStagingTradeSourceLabel(result)}</span>
       ${debugLine}
@@ -868,7 +892,7 @@ function renderMapOneMarketTerminal(goodsBox) {
   const canBuy = !stagingTradeLocked && quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
   const info = commodityInfo[resource] || {};
   const stagingTradeNotice = stagingTradeLocked
-    ? renderMultiplayerStagingTradePreviewResult((stagingSellMode ? sellStagingOffer?.offerId : buyStagingOffer?.offerId) || "")
+    ? renderMultiplayerStagingTradePreviewResult((stagingSellMode ? sellStagingOffer?.offerId : buyStagingOffer?.offerId) || "", { operation: stagingSellMode ? "sell" : "buy" })
     : "";
   const sellUnitPrice = stagingTradeLocked && sellStagingOffer ? sellStagingOffer.sellPrice : getEffectiveSellPrice(resource, currentPlanet);
   const sellUnitBasis = cargoCostBasis[resource] || (stagingTradeLocked && sellStagingOffer ? sellStagingOffer.buyPrice : getEffectiveBuyPrice(resource, currentPlanet)) || sellUnitPrice;
@@ -950,21 +974,24 @@ function renderMapOneMarketTerminal(goodsBox) {
             </div>
           </label>
         </div>
-        ${stagingTradeNotice}
 
         <div class="market-builder-summary">
-          <div><span>Total Cost</span><strong>CR ${formatNumber(totalCost)}</strong></div>
-          <div class="profit-summary-card"><span>Estimated Profit</span><strong class="${estimatedProfit >= 0 ? "profit-good" : "profit-bad"}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>
+          ${stagingSellMode
+            ? `<div><span>Sell Revenue</span><strong>CR ${formatNumber(sellRevenue)}</strong></div>
+              <div class="profit-summary-card"><span>Sell Profit</span><strong class="${sellProfit >= 0 ? "profit-good" : "profit-bad"}">${sellProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(sellProfit))}</strong></div>`
+            : `<div><span>Total Cost</span><strong>CR ${formatNumber(totalCost)}</strong></div>
+              <div class="profit-summary-card"><span>Estimated Profit</span><strong class="${estimatedProfit >= 0 ? "profit-good" : "profit-bad"}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>`}
         </div>
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
-          <div class="trade-preview-note">
+          <div class="trade-preview-note staging-sell-summary">
             <strong>${stagingTradeLocked ? "Server sell cargo" : "Cargo ready to sell"}</strong>
             <span>Carrying ${formatNumber(held)} ${resource} / ${stagingSellMode ? `sell at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `current route sell support unavailable here`}</span>
             ${stagingSellMode ? `<span>Revenue CR ${formatNumber(sellRevenue)} / Profit ${sellProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(sellProfit))}</span>` : ""}
           </div>
           <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer && !sellPending ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? sellPending ? "Applying..." : "Server Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
         </div>` : ""}
+        ${stagingTradeNotice}
       </aside>
     </div>
   `;
