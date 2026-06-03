@@ -32,8 +32,18 @@ For real allowlisted Trade Terminal buy/sell writes, Colyseus Cloud needs all of
 
 Later systems use separate gates:
 
-- Store purchases: `STAGING_STORE_WRITE_ENABLED`, `STAGING_STORE_WRITE_DRY_RUN`, `STAGING_STORE_WRITE_SCOPE`, `STAGING_STORE_WRITE_ALLOWLIST`, `STAGING_STORE_WRITE_ALLOWED_ITEMS`.
-- Loadout equip/ship select: `STAGING_LOADOUT_WRITE_ENABLED`, `STAGING_LOADOUT_WRITE_DRY_RUN`, `STAGING_LOADOUT_WRITE_SCOPE`, `STAGING_LOADOUT_WRITE_ALLOWLIST`, `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS`.
+- Store purchases:
+  - `STAGING_STORE_WRITE_ENABLED=true`
+  - `STAGING_STORE_WRITE_DRY_RUN=false`
+  - `STAGING_STORE_WRITE_SCOPE=allowlist`
+  - `STAGING_STORE_WRITE_ALLOWLIST=<verified Supabase auth user UUID>`
+  - `STAGING_STORE_WRITE_ALLOWED_ITEMS=attachment:cargoPod,attachment:shieldBooster,gun:pulseLaser,ship:lupenHauler`
+- Loadout equip/ship select:
+  - `STAGING_LOADOUT_WRITE_ENABLED=true`
+  - `STAGING_LOADOUT_WRITE_DRY_RUN=false`
+  - `STAGING_LOADOUT_WRITE_SCOPE=allowlist`
+  - `STAGING_LOADOUT_WRITE_ALLOWLIST=<verified Supabase auth user UUID>`
+  - `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS=attachment:cargoPod,attachment:shieldBooster,gun:pulseLaser,ship:lupenHauler`
 - XP/progression: `ENABLE_STAGING_PROGRESSION_WRITES`, `STAGING_PROGRESSION_WRITE_SCOPE`, `STAGING_PROGRESSION_WRITE_ALLOWLIST`.
 - Lupen Shard loot: `STAGING_LOOT_WRITE_ENABLED`, `STAGING_LOOT_WRITE_DRY_RUN`, `STAGING_LOOT_WRITE_SCOPE`, `STAGING_LOOT_WRITE_ALLOWLIST`.
 - Reward ledger only: `ENABLE_STAGING_REWARD_WRITES`.

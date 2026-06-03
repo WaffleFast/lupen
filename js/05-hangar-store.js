@@ -39,7 +39,7 @@ function getMultiplayerStagingStoreStatus() {
 
 function blockStoreMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingStoreActive()) return false;
-  const message = "Store purchases are server-preview only in multiplayer staging.";
+  const message = "Local Store writes are disabled in multiplayer staging. Server staging Store handles validation.";
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof console !== "undefined" && typeof console.info === "function") {
@@ -50,7 +50,7 @@ function blockStoreMutationInMultiplayerStaging() {
 
 function blockLoadoutMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingStoreActive()) return false;
-  const message = "Loadout changes are server-preview only in multiplayer staging.";
+  const message = "Local loadout writes are disabled in multiplayer staging. Server staging loadout handles validation.";
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof console !== "undefined" && typeof console.info === "function") {
@@ -160,7 +160,7 @@ function renderStagingStorePreviewNote(item) {
     return `<div class="store-detail-owned-line">Server preview unavailable. Real Store purchase is blocked in MP staging.</div>`;
   }
   if (!result) {
-    return `<div class="store-detail-owned-line">MP staging Store: server preview only. No CR or inventory changed.</div>`;
+    return `<div class="store-detail-owned-line">MP staging Store: server-backed validation. Writes require live Colyseus gates.</div>`;
   }
   const source = result.validationMode === "trusted_save"
     ? "trusted save"
