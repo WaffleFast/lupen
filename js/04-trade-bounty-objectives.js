@@ -22,6 +22,9 @@ let multiplayerStagingBountyLastHandledAt = 0;
 let multiplayerStagingBountyPending = null;
 let multiplayerStagingBountySubscribed = false;
 let multiplayerStagingBountyLastRefreshAt = 0;
+// Mirrors the current Colyseus STAGING_TRADE_WRITE_MAX_QUANTITY gate so the
+// Trade Builder never asks staging to write more than the server will accept.
+const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 10;
 const MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS = Object.freeze([
   Object.freeze({ offerId: "staging-iron-asteron-virella", resourceId: "iron", resourceName: "Iron", buyNode: "Asteron Prime", sellNode: "Virella", buyPrice: 18, sellPrice: 30, maxQuantity: 40 }),
   Object.freeze({ offerId: "staging-copper-virella-nyxara", resourceId: "copper", resourceName: "Copper", buyNode: "Virella", sellNode: "Nyxara", buyPrice: 32, sellPrice: 50, maxQuantity: 30 }),
@@ -298,6 +301,32 @@ function findMultiplayerStagingSellOffer({ good = "", destination = getCurrentMa
   return getMultiplayerStagingSellOffersAt(destination).find((offer) => isMultiplayerStagingOfferForResource(offer, good)) || null;
 }
 
+function getMultiplayerStagingOfferQuantityLimit(offer) {
+  const offerLimit = Number(offer?.maxQuantity || MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY);
+  return Math.max(1, Math.min(
+    MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY,
+    Number.isFinite(offerLimit) && offerLimit > 0 ? Math.floor(offerLimit) : MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY
+  ));
+}
+
+function getMultiplayerStagingTradeQuantityLimit({
+  operation = "buy",
+  good = selectedMarketResource,
+  origin = getCurrentMarketPlanet(),
+  destination = selectedMarketTargetPlanet
+} = {}) {
+  if (!isMultiplayerStagingActive()) return Math.max(1, getMarketMaxBuyQuantity(good, origin));
+  const sellMode = operation === "sell";
+  const offer = sellMode
+    ? findMultiplayerStagingSellOffer({ good, destination: origin })
+    : findMultiplayerStagingTradeOffer({ good, origin, destination });
+  const serverLimit = getMultiplayerStagingOfferQuantityLimit(offer);
+  if (sellMode) {
+    return Math.max(0, Math.min(Number(cargo[good] || 0), serverLimit));
+  }
+  return Math.max(0, Math.min(getMarketMaxBuyQuantity(good, origin), serverLimit));
+}
+
 function getMultiplayerStagingTargetPlanetsForResource(good, origin = getCurrentMarketPlanet()) {
   return getMultiplayerStagingBuyOffersAt(origin)
     .filter((offer) => isMultiplayerStagingOfferForResource(offer, good))
@@ -358,6 +387,9 @@ function getMultiplayerStagingTradeValidationLabel(result) {
   if (result.blockReason === "insufficient_credits") return "Blocked: not enough credits";
   if (result.blockReason === "insufficient_cargo") return "Blocked: not enough cargo space";
   if (result.blockReason === "invalid_quantity") return "Blocked: invalid quantity";
+  if (result.reason === "quantity_exceeds_staging_trade_write_limit" || result.blockReason === "quantity_exceeds_staging_trade_write_limit") {
+    return "Blocked: quantity exceeds staging limit";
+  }
   return `Blocked: ${result.blockReason || result.reason || "validation failed"}`;
 }
 
@@ -379,10 +411,13 @@ function getMultiplayerStagingTradeWriteBlockLine(result) {
   const reason = result.userReason || result.writeBlockReason || result.blockReason || result.reason || "";
   const code = result.writeBlockReason || result.blockReason || result.reason || "";
   if (!reason && !code) return "";
+  const playerReason = code === "quantity_exceeds_staging_trade_write_limit"
+    ? "Quantity exceeds staging limit."
+    : reason;
   const codeLine = code && isMultiplayerStagingDebugActive()
     ? ` <span>Gate: ${escapeMultiplayerStagingTradeText(code)}</span>`
     : "";
-  return `<span>${escapeMultiplayerStagingTradeText(reason || `Blocked: ${code}`)}</span>${codeLine}`;
+  return `<span>${escapeMultiplayerStagingTradeText(playerReason || `Blocked: ${code}`)}</span>${codeLine}`;
 }
 
 function getLastMatchingMultiplayerStagingTradePreview(offerId, operation = "") {
@@ -776,8 +811,21 @@ function normalizeMarketBuilderState() {
     selectedMarketTargetPlanet = MAP_ONE_MARKET_PLANETS.find(planet => planet !== currentPlanet) || "Nyxara";
   }
 
+  const stagingSellOffer = isMultiplayerStagingActive() && Number(cargo[selectedMarketResource] || 0) > 0
+    ? findMultiplayerStagingSellOffer({ good: selectedMarketResource, destination: currentPlanet })
+    : null;
   const maxBuy = getMarketMaxBuyQuantity(selectedMarketResource, currentPlanet);
-  selectedMarketQuantity = clampNumber(selectedMarketQuantity || 1, 1, Math.max(1, maxBuy || getShipStats().cargo || 1));
+  const maxQuantity = isMultiplayerStagingActive()
+    ? getMultiplayerStagingTradeQuantityLimit({
+      operation: stagingSellOffer ? "sell" : "buy",
+      good: selectedMarketResource,
+      origin: currentPlanet,
+      destination: selectedMarketTargetPlanet
+    })
+    : Math.max(1, maxBuy || getShipStats().cargo || 1);
+  selectedMarketQuantity = stagingSellOffer
+    ? Math.max(1, maxQuantity)
+    : clampNumber(selectedMarketQuantity || 1, 1, Math.max(1, maxQuantity));
 }
 
 function getMarketMaxBuyQuantity(good = selectedMarketResource, planet = getCurrentMarketPlanet()) {
@@ -879,28 +927,38 @@ function renderMapOneMarketTerminal(goodsBox) {
   const quantity = selectedMarketQuantity;
   const buyPrice = getMapOneMarketPrice(resource, currentPlanet);
   const estimatedSellPrice = getMapOneMarketPrice(resource, targetPlanet);
-  const totalCost = buyPrice * quantity;
-  const estimatedRevenue = estimatedSellPrice * quantity;
-  const estimatedProfit = estimatedRevenue - totalCost;
-  const profitMargin = totalCost > 0 ? Math.round((estimatedProfit / totalCost) * 100) : 0;
-  const cargoSpaceUsed = quantity;
   const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
   const atTargetWithCargo = held > 0 && currentPlanet === targetPlanet;
   const maxBuy = getMarketMaxBuyQuantity(resource, currentPlanet);
   const buyStagingOffer = stagingTradeLocked
     ? findMultiplayerStagingTradeOffer({ good: resource, origin: currentPlanet, destination: targetPlanet })
     : null;
+  const buyQuantityLimit = stagingTradeLocked
+    ? getMultiplayerStagingTradeQuantityLimit({ operation: "buy", good: resource, origin: currentPlanet, destination: targetPlanet })
+    : Math.max(1, maxBuy);
+  const sellQuantityLimit = stagingSellMode
+    ? getMultiplayerStagingTradeQuantityLimit({ operation: "sell", good: resource, origin: currentPlanet, destination: currentPlanet })
+    : 1;
+  const effectiveQuantity = stagingSellMode
+    ? clampNumber(quantity || 1, 1, Math.max(1, sellQuantityLimit))
+    : clampNumber(quantity || 1, 1, Math.max(1, stagingTradeLocked ? buyQuantityLimit : maxBuy));
+  const totalCost = buyPrice * effectiveQuantity;
+  const estimatedRevenue = estimatedSellPrice * effectiveQuantity;
+  const estimatedProfit = estimatedRevenue - totalCost;
+  const profitMargin = totalCost > 0 ? Math.round((estimatedProfit / totalCost) * 100) : 0;
+  const cargoSpaceUsed = effectiveQuantity;
   const buyPending = stagingTradeLocked && buyStagingOffer && isMultiplayerStagingTradePending("buy", buyStagingOffer.offerId);
   const sellPending = stagingTradeLocked && sellStagingOffer && isMultiplayerStagingTradePending("sell", sellStagingOffer.offerId);
-  const canBuy = !stagingTradeLocked && quantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
+  const canBuy = !stagingTradeLocked && effectiveQuantity > 0 && buyPrice > 0 && credits >= totalCost && freeCargo >= cargoSpaceUsed;
   const info = commodityInfo[resource] || {};
   const stagingTradeNotice = stagingTradeLocked
     ? renderMultiplayerStagingTradePreviewResult((stagingSellMode ? sellStagingOffer?.offerId : buyStagingOffer?.offerId) || "", { operation: stagingSellMode ? "sell" : "buy" })
     : "";
   const sellUnitPrice = stagingTradeLocked && sellStagingOffer ? sellStagingOffer.sellPrice : getEffectiveSellPrice(resource, currentPlanet);
   const sellUnitBasis = cargoCostBasis[resource] || (stagingTradeLocked && sellStagingOffer ? sellStagingOffer.buyPrice : getEffectiveBuyPrice(resource, currentPlanet)) || sellUnitPrice;
-  const sellRevenue = Math.max(0, held) * Math.max(0, sellUnitPrice || 0);
-  const sellProfit = Math.max(0, held) * ((sellUnitPrice || 0) - (sellUnitBasis || 0));
+  const sellRevenue = Math.max(0, effectiveQuantity) * Math.max(0, sellUnitPrice || 0);
+  const sellProfit = Math.max(0, effectiveQuantity) * ((sellUnitPrice || 0) - (sellUnitBasis || 0));
+  const buyActionQuantityLimit = stagingTradeLocked ? buyQuantityLimit : maxBuy;
   const builderRouteText = stagingSellMode
     ? `${sellStagingOrigin} > ${currentPlanet}`
     : `${currentPlanet} > ${targetPlanet}`;
@@ -969,10 +1027,11 @@ function renderMapOneMarketTerminal(goodsBox) {
           <label>
             <span>${stagingSellMode ? "Sell Amount" : "Buy Amount"}</span>
             <div class="market-amount-control">
-              <strong>${formatNumber(stagingSellMode ? held : quantity)} ${stagingSellMode ? "carried" : "units"}</strong>
+              <strong>${stagingSellMode ? `Sell ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} carried` : `${formatNumber(effectiveQuantity)} units`}</strong>
               ${stagingSellMode
-                ? ""
-                : `<button type="button" onclick="setMarketQuantityMax()" ${maxBuy <= 0 ? "disabled" : ""}>MAX</button>
+                ? `<button type="button" onclick="setMarketQuantityMax()" ${sellQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
+                  <button class="trade-primary-action" onclick="sellMarketCargo()" ${sellStagingOffer && !sellPending ? "" : "disabled"}>${sellStagingOffer ? sellPending ? "Applying..." : "Server Sell" : "Preview Unavailable"}</button>`
+                : `<button type="button" onclick="setMarketQuantityMax()" ${buyActionQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
                   <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Server Buy" : "Preview Unavailable" : "Buy Cargo"}</button>`}
             </div>
           </label>
@@ -989,9 +1048,11 @@ function renderMapOneMarketTerminal(goodsBox) {
         ${held > 0 ? `<div class="market-builder-actions has-sell">
           <div class="trade-preview-note staging-sell-summary">
             <strong>${stagingTradeLocked ? "Server sell cargo" : "Cargo ready to sell"}</strong>
-            <span>Carrying ${formatNumber(held)} ${resource} / ${stagingSellMode ? `sell at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `current route sell support unavailable here`}</span>
+            <span>${stagingSellMode ? `Selling ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} ${resource} at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `Carrying ${formatNumber(held)} ${resource} / current route sell support unavailable here`}</span>
           </div>
-          <button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${stagingTradeLocked ? sellStagingOffer && !sellPending ? "" : "disabled" : ""}>${stagingTradeLocked ? sellStagingOffer ? sellPending ? "Applying..." : "Server Sell" : "Preview Unavailable" : atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>
+          ${stagingTradeLocked
+            ? ""
+            : `<button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${atTargetWithCargo ? "" : "disabled"}>${atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>`}
         </div>` : ""}
         ${stagingTradeNotice}
       </aside>
@@ -1037,23 +1098,40 @@ function setMarketTargetPlanet(planet) {
 }
 
 function syncMarketQuantity(value) {
-  selectedMarketQuantity = clampNumber(value, 1, 999999);
+  normalizeMarketBuilderState();
+  selectedMarketQuantity = clampNumber(value, 1, Math.max(1, getMarketQuantityLimit()));
   tutorialEvent("selectedBuyAmount");
   renderMarketplace();
 }
 
 function adjustMarketQuantity(delta) {
   normalizeMarketBuilderState();
-  const maxBuy = getMarketMaxBuyQuantity();
-  selectedMarketQuantity = clampNumber((selectedMarketQuantity || 1) + delta, 1, Math.max(1, maxBuy));
+  selectedMarketQuantity = clampNumber((selectedMarketQuantity || 1) + delta, 1, Math.max(1, getMarketQuantityLimit()));
   tutorialEvent("selectedBuyAmount");
   renderMarketplace();
 }
 
 function setMarketQuantityMax() {
-  selectedMarketQuantity = Math.max(1, getMarketMaxBuyQuantity());
+  normalizeMarketBuilderState();
+  selectedMarketQuantity = Math.max(1, getMarketQuantityLimit());
   tutorialEvent("selectedBuyAmount");
   renderMarketplace();
+}
+
+function getMarketQuantityLimit() {
+  if (isMultiplayerStagingActive()) {
+    const currentPlanet = getCurrentMarketPlanet();
+    const sellOffer = Number(cargo[selectedMarketResource] || 0) > 0
+      ? findMultiplayerStagingSellOffer({ good: selectedMarketResource, destination: currentPlanet })
+      : null;
+    return getMultiplayerStagingTradeQuantityLimit({
+      operation: sellOffer ? "sell" : "buy",
+      good: selectedMarketResource,
+      origin: currentPlanet,
+      destination: selectedMarketTargetPlanet
+    });
+  }
+  return Math.max(1, getMarketMaxBuyQuantity());
 }
 
 function buyMarketCargo() {
@@ -1061,7 +1139,14 @@ function buyMarketCargo() {
 
   const currentPlanet = getCurrentMarketPlanet();
   const good = selectedMarketResource;
-  const quantity = selectedMarketQuantity;
+  const quantity = isMultiplayerStagingActive()
+    ? clampNumber(selectedMarketQuantity || 1, 1, getMultiplayerStagingTradeQuantityLimit({
+      operation: "buy",
+      good,
+      origin: currentPlanet,
+      destination: selectedMarketTargetPlanet
+    }))
+    : selectedMarketQuantity;
   if (isMultiplayerStagingActive()) {
     const offer = findMultiplayerStagingTradeOffer({
       good,
@@ -1125,10 +1210,16 @@ function sellMarketCargo() {
       ? activeTradeRoute.origin
       : findMultiplayerStagingSellOffer({ good, destination: currentPlanet })?.buyNode || "";
     const offer = findMultiplayerStagingTradeOffer({ good, origin, destination: currentPlanet });
+    const quantity = clampNumber(selectedMarketQuantity || 1, 1, getMultiplayerStagingTradeQuantityLimit({
+      operation: "sell",
+      good,
+      origin: currentPlanet,
+      destination: currentPlanet
+    }));
     requestMultiplayerStagingTradeDryRun({
       operation: "sell",
       offerId: offer?.offerId || "",
-      quantity: Math.max(1, held)
+      quantity
     });
     blockRealTradeMutationInMultiplayerStaging();
     return;

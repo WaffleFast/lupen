@@ -226,7 +226,7 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#marketScreen")).toContainText("Server Sell");
     await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Virella/);
-    await expect(page.locator("#marketScreen")).toContainText(/Carrying 6 Iron/);
+    await expect(page.locator("#marketScreen")).toContainText(/Sell 6 of 6 carried/);
     await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
     await expect(page.locator("#marketScreen")).toContainText("CR 180");
     await expect(page.locator("#marketScreen")).toContainText("+CR 72");
@@ -237,20 +237,21 @@ test.describe("Lupen browser smoke", () => {
         currentNode = "Nyxara";
         lastPlanetNode = "Nyxara";
         cargo.Iron = 0;
-        cargo["Crystal Shards"] = 4;
+        cargo["Crystal Shards"] = 64;
         cargoCostBasis["Crystal Shards"] = 95;
         selectedMarketResource = "Crystal Shards";
         selectedMarketTargetPlanet = "Nyxara";
+        selectedMarketQuantity = 200;
       `);
       if (typeof window.renderMarketplace === "function") window.renderMarketplace();
     });
 
     await expect(page.locator("#marketScreen")).toContainText("Server Sell");
     await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Nyxara/);
-    await expect(page.locator("#marketScreen")).toContainText(/Carrying 4 Crystal Shards/);
+    await expect(page.locator("#marketScreen")).toContainText(/Sell 10 of 64 carried/);
     await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
-    await expect(page.locator("#marketScreen")).toContainText("CR 580");
-    await expect(page.locator("#marketScreen")).toContainText("+CR 200");
+    await expect(page.locator("#marketScreen")).toContainText("CR 1,450");
+    await expect(page.locator("#marketScreen")).toContainText("+CR 500");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
     await expectNoUnexpectedBrowserErrors(failures);
