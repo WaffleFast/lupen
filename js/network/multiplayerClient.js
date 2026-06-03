@@ -71,6 +71,7 @@
   let colyseusClient = null;
   let room = null;
   let clientScriptPromise = null;
+  let authStateListenerRegistered = false;
   const playersById = new Map();
   const botsById = new Map();
 
@@ -371,6 +372,15 @@
     return supabaseClient;
   }
 
+  function getSupabaseClientIfAvailable() {
+    try {
+      if (typeof global.getSupabaseClient === "function") return global.getSupabaseClient();
+      return global.lupenSupabase || null;
+    } catch (_err) {
+      return null;
+    }
+  }
+
   async function waitForSupabaseSession(supabaseClient, timeoutMs = 0) {
     if (!supabaseClient?.auth?.getSession) return null;
     const startedAt = Date.now();
@@ -416,6 +426,67 @@
     };
 
     global.setTimeout(tryReconnect, 900);
+  }
+
+  async function reconnectWithStagingAuth(reason = "auth_state_change") {
+    if (!hasStagingFlag() || !connection.enabled) return;
+
+    const identityOptions = await getMultiplayerIdentityOptions(getLocalPresenceOptions());
+    if (!identityOptions.supabaseAccessToken) {
+      connection.lastServerWarning = "staging_login_required";
+      if (!connection.isConnected) {
+        connection.lastError = "Supabase session unavailable; login required for staging writes.";
+      }
+      return;
+    }
+
+    const shouldReconnect = !connection.isConnected ||
+      !room ||
+      !identity.tokenSent ||
+      playersById.get(connection.sessionId)?.authStatus !== "verified";
+    if (!shouldReconnect) return;
+
+    logDev("reconnecting staging multiplayer after Supabase auth update", { reason });
+    try {
+      const previousRoom = room;
+      if (previousRoom) await Promise.resolve(previousRoom.leave());
+    } catch (_err) {
+      // Best-effort reconnect; the new join below is authoritative for client state.
+    }
+
+    room = null;
+    colyseusClient = null;
+    connection.isConnected = false;
+    connection.isConnecting = false;
+    connection.sessionId = null;
+    identity.authReconnectAttempted = true;
+    playersById.clear();
+    botsById.clear();
+    await client.connect({ sendInitialPing: false });
+  }
+
+  function registerSupabaseAuthReconnect() {
+    if (authStateListenerRegistered || !hasStagingFlag()) return;
+
+    const supabaseClient = getSupabaseClientIfAvailable();
+    if (!supabaseClient?.auth?.onAuthStateChange) {
+      global.setTimeout(registerSupabaseAuthReconnect, 500);
+      return;
+    }
+
+    authStateListenerRegistered = true;
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (!hasStagingFlag()) return;
+      const hasToken = !!session?.access_token;
+      identity.sessionPresent = !!session?.user?.id;
+      identity.tokenPresent = hasToken;
+      if (!hasToken) return;
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+        reconnectWithStagingAuth(event).catch((err) => {
+          setError(err);
+        });
+      }
+    });
   }
 
   function getStagingWeaponIntent() {
@@ -2413,6 +2484,8 @@
   global.LupenMultiplayerClient = Object.freeze(client);
 
   if (connection.enabled) {
+    registerSupabaseAuthReconnect();
+
     const connectWhenReady = () => {
       client.connect().catch((err) => {
         setError(err);

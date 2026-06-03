@@ -6,6 +6,8 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 
 - `?mp=staging` is used on `https://www.lupen.io`.
 - Normal `https://www.lupen.io` is tested separately and should not connect to multiplayer.
+- Browser Supabase config points to `https://ylzglwiehkypetcdkqxd.supabase.co` with the matching `supabase-sky-park` publishable/anon browser key.
+- `js/00-supabase-client.js` uses the matching `supabase-sky-park` publishable browser key, not a placeholder or service-role key.
 - The tester is logged in with a verified Supabase account.
 - The account is included in the relevant staging allowlists.
 - Colyseus Cloud has the intended staging env vars set.
@@ -17,8 +19,8 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 
 For real allowlisted Trade Terminal buy/sell writes, Colyseus Cloud needs all of:
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_URL=https://ylzglwiehkypetcdkqxd.supabase.co`
+- `SUPABASE_SERVICE_ROLE_KEY` from the same `ylzglwiehkypetcdkqxd` project
 - `STAGING_TRADE_WRITE_ENABLED=true`
 - `STAGING_TRADE_WRITE_DRY_RUN=false`
 - `STAGING_TRADE_WRITE_SCOPE=allowlist`

@@ -1,11 +1,16 @@
 /* Supabase browser client setup */
 
-const LUPEN_SUPABASE_URL = "https://gxfskpclwnbopzceduff.supabase.co";
-const LUPEN_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_yTNhGGaRuft5UlBE7at3aw_O9xxlPZ4";
+const LUPEN_SUPABASE_URL = "https://ylzglwiehkypetcdkqxd.supabase.co";
+const LUPEN_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_xJbfxDbK4dLWosZDy9qEEQ_kUuFa1Zd";
 
 function getSupabaseClient() {
   if (!window.supabase?.createClient) {
     console.warn("Supabase client library is not loaded.");
+    return null;
+  }
+
+  if (!LUPEN_SUPABASE_PUBLISHABLE_KEY || LUPEN_SUPABASE_PUBLISHABLE_KEY.startsWith("REPLACE_WITH_")) {
+    console.warn("Supabase publishable key is not configured for the live project.");
     return null;
   }
 
