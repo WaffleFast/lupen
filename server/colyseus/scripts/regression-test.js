@@ -2497,6 +2497,7 @@ async function assertStagingBountyHelpers() {
     activeBountyId: "local-bounty-should-not-change",
     playerProgress: {
       combatXp: 10,
+      zoneCombatXp: { "sector-one": 10 },
       totals: {
         tradesCompleted: 2,
         cargoSold: 3,
@@ -2534,6 +2535,7 @@ async function assertStagingBountyHelpers() {
   assert(bountyPatchResult.appliedFields.join(",") === "xp", "Completed staging bounty patch wrote non-XP fields.");
   const patchedBody = JSON.parse(patchCalls[1].body);
   assert(patchedBody.save_data.playerProgress.combatXp === 35, "Completed staging bounty patch did not add XP.");
+  assert(patchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 35, "Completed staging bounty patch did not mirror sector-one XP.");
   assert(patchedBody.save_data.credits === 777, "Completed staging bounty patch changed credits.");
   assert(patchedBody.save_data.cargo.Iron === 2, "Completed staging bounty patch changed cargo.");
   assert(patchedBody.save_data.inventoryItems[0].id === "loot-stays", "Completed staging bounty patch changed inventory.");
@@ -2895,6 +2897,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(patchedCalls[1].options.method === "PATCH", "Valid mocked player_saves second call was not PATCH.");
   const patchedBody = JSON.parse(patchedCalls[1].options.body);
   assert(patchedBody.save_data.playerProgress.combatXp === 84, "Patched save_data did not update combat XP.");
+  assert(patchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 84, "Patched save_data did not update sector-one combat XP.");
   assert(patchedBody.save_data.credits === 1200, "Patched save_data changed credits.");
   assert(patchedBody.save_data.playerProgress.level === 3, "Patched save_data changed unrelated playerProgress level.");
   assert(patchedBody.save_data.inventoryItems.length === 2, "Patched save_data changed inventory item count.");

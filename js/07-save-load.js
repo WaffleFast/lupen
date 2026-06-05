@@ -145,6 +145,36 @@ async function loadGameFromSupabase() {
   return { loaded: applied, exists: true, reason: applied ? "loaded" : "invalid" };
 }
 
+function applyStagingXpClaimToLoadedState(result = {}) {
+  const xpAfter = Number(
+    result.playerSavePatchResult?.xpAfter ??
+    result.playerSave?.xpAfter ??
+    result.claimStatus?.playerSave?.xpAfter
+  );
+  const applied = result.playerSavePatchResult?.applied === true ||
+    result.playerSave?.written === true ||
+    result.claimStatus?.playerSave?.written === true;
+  if (!applied || !Number.isFinite(xpAfter)) return false;
+
+  const progress = normalizePlayerProgress(playerProgress);
+  if (xpAfter < Number(progress.combatXp || 0)) return false;
+  progress.combatXp = Math.max(0, Math.round(xpAfter));
+  progress.zoneCombatXp = {
+    ...(progress.zoneCombatXp || {}),
+    [XP_CONFIG.combatZoneKey]: Math.max(
+      Number(progress.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0),
+      progress.combatXp
+    )
+  };
+  playerProgress = normalizePlayerProgress(progress);
+  LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
+  if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (typeof renderPilotProfile === "function" && document.getElementById("pilotProfileScreen")?.classList.contains("active")) {
+    renderPilotProfile();
+  }
+  return true;
+}
+
 function getLocalSavePayloadForCloudMigration() {
   return migrateSavedGame(LupenSaveService.readJsonLocalStorage(STORAGE_GAME_KEY));
 }
@@ -463,6 +493,12 @@ function applyLoadedGameState(rawSaved) {
 
   if (shield < shieldMax) {
     scheduleShieldRegen();
+  }
+
+  if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (typeof updateHudDock === "function") updateHudDock();
+  if (typeof renderPilotProfile === "function" && document.getElementById("pilotProfileScreen")?.classList.contains("active")) {
+    renderPilotProfile();
   }
 
   return true;

@@ -81,6 +81,32 @@ function setValueAtPath(source = {}, path = [], value) {
   return copy;
 }
 
+function setCombatXpOnly(source = {}, xpAfter = 0) {
+  const updated = setValueAtPath(source, ["playerProgress", "combatXp"], xpAfter);
+  const progress = updated.playerProgress && typeof updated.playerProgress === "object"
+    ? updated.playerProgress
+    : {};
+  const zoneCombatXp = progress.zoneCombatXp && typeof progress.zoneCombatXp === "object"
+    ? { ...progress.zoneCombatXp }
+    : {};
+
+  // Mirror the normal browser XP shape for the Pilot Profile/progression UI.
+  // This remains an XP-only staging patch: no credits, loot, bounties, cargo,
+  // inventory, equipment, or broader progression fields are changed.
+  const zoneKey = "sector-one";
+  const previousCombatXp = getIntegerValue(source?.playerProgress?.combatXp, 0);
+  const xpDelta = Math.max(0, getIntegerValue(xpAfter, 0) - previousCombatXp);
+  zoneCombatXp[zoneKey] = Number.isFinite(Number(zoneCombatXp[zoneKey]))
+    ? Math.max(0, getIntegerValue(zoneCombatXp[zoneKey], 0) + xpDelta)
+    : Math.max(0, getIntegerValue(xpAfter, 0));
+  updated.playerProgress = {
+    ...progress,
+    zoneCombatXp
+  };
+
+  return updated;
+}
+
 function getIdempotencyKey(playerId, sourceEventId, sourceLedgerId) {
   const sourceKey = sourceEventId || sourceLedgerId;
   return playerId && sourceKey ? `${playerId}:${sourceKey}` : "";
@@ -454,7 +480,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       };
     }
 
-    const updatedSaveData = setValueAtPath(saveData, ["playerProgress", "combatXp"], refreshedPlan.xpAfter);
+    const updatedSaveData = setCombatXpOnly(saveData, refreshedPlan.xpAfter);
     const patchResult = await patchPlayerSaveData(supabaseUrl, plan.playerId, updatedSaveData, config, fetchImpl);
 
     if (!patchResult.ok) {

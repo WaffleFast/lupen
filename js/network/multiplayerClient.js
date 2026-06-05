@@ -673,6 +673,9 @@
     Promise.resolve()
       .then(() => global.loadGameFromSupabase())
       .then(() => {
+        if (typeof global.applyStagingXpClaimToLoadedState === "function") {
+          global.applyStagingXpClaimToLoadedState(result);
+        }
         logDev("refreshed cloud save after staging XP claim");
       })
       .catch((error) => {

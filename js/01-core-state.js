@@ -1845,14 +1845,24 @@ function createDefaultPlayerProgress() {
 function normalizePlayerProgress(progress) {
   const defaults = createDefaultPlayerProgress();
   const safe = progress && typeof progress === "object" ? progress : {};
-  const combatXp = Math.max(0, Number(safe.combatXp || 0));
+  const combatXp = Math.max(0, Number(
+    safe.combatXp ??
+    safe.xp ??
+    safe.totalXp ??
+    0
+  ));
+  const rawZoneCombatXp = safe.zoneCombatXp && typeof safe.zoneCombatXp === "object" ? safe.zoneCombatXp : {};
+  const zoneCombatXp = {
+    ...defaults.zoneCombatXp,
+    ...rawZoneCombatXp
+  };
+  if (!Number(zoneCombatXp[XP_CONFIG.combatZoneKey] || 0) && combatXp > 0) {
+    zoneCombatXp[XP_CONFIG.combatZoneKey] = combatXp;
+  }
 
   return {
     combatXp,
-    zoneCombatXp: {
-      ...defaults.zoneCombatXp,
-      ...(safe.zoneCombatXp && typeof safe.zoneCombatXp === "object" ? safe.zoneCombatXp : {})
-    },
+    zoneCombatXp,
     totals: {
       ...defaults.totals,
       ...(safe.totals && typeof safe.totals === "object" ? safe.totals : {})
