@@ -2335,6 +2335,15 @@
     return `${statusLabel} / ${idempotencyLabel} / ${allowlistLabel} / XP ${xpBefore} -> ${xpAfter} / C ${creditsBefore} -> ${creditsAfter} / ${warning}`;
   }
 
+  function getStagingXpRefreshLabel(status) {
+    const refresh = status?.lastStagingXpRefresh;
+    if (!refresh) return "";
+    const trusted = formatPreviewValue(refresh.trustedXpAfter);
+    const loaded = formatPreviewValue(refresh.refreshXp);
+    const match = refresh.matched ? "matched" : refresh.stale ? "stale guarded" : "pending";
+    return `${refresh.source || "xp"} / ${match} / trusted ${trusted} / refresh ${loaded} / ${refresh.reason || refresh.status || "unknown"}`;
+  }
+
   function setDiagnosticsRow(panel, label, value) {
     const row = global.document.createElement("div");
     row.className = "lupen-mp-diagnostics-row";
@@ -3126,10 +3135,15 @@
       if (status.lastStagingBotXpResult) {
         const botXp = status.lastStagingBotXpResult;
         const botXpStatus = botXp.applied ? "applied" : getFriendlyBotXpReason(botXp);
-        setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP +${Math.round(Number(botXp.xpDelta || 0))} / ${botXpStatus}`);
+        const persisted = botXp.persistenceVerified
+          ? `persisted ${formatPreviewValue(botXp.persistedXp)} / zone ${formatPreviewValue(botXp.persistedZoneXp)}`
+          : botXp.botXpBlockReason || botXp.debugReason || botXp.reason || "not verified";
+        setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP ${formatPreviewValue(botXp.xpBefore)} -> ${formatPreviewValue(botXp.xpAfter)} / ${botXpStatus} / ${persisted}`);
       } else if (status.lastRewardPreview?.botId) {
         setDiagnosticsRow(panel, "bot XP", `preview only / XP +${Math.round(Number(status.lastRewardPreview.previewXp || 0))} / no apply result`);
       }
+      const xpRefreshLabel = getStagingXpRefreshLabel(status);
+      if (xpRefreshLabel) setDiagnosticsRow(panel, "XP refresh", xpRefreshLabel);
       if (status.lastRewardClaimResult) {
         const claimStatus = getClaimStatusSummary(status.lastRewardClaimResult);
         setDiagnosticsRow(panel, "claim mode", `${claimStatus.mode || "unknown"} / XP +${Math.round(Number(claimStatus.xpDelta || 0))}`);

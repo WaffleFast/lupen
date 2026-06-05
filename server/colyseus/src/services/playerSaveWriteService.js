@@ -148,6 +148,14 @@ function getSaveDataFromRow(row = {}) {
   return row?.save_data && typeof row.save_data === "object" ? row.save_data : null;
 }
 
+function getCombatXpFromSaveData(saveData = {}) {
+  return getIntegerValue(saveData?.playerProgress?.combatXp, 0);
+}
+
+function getZoneCombatXpFromSaveData(saveData = {}, zoneKey = "sector-one") {
+  return getIntegerValue(saveData?.playerProgress?.zoneCombatXp?.[zoneKey], 0);
+}
+
 async function fetchPlayerSaveRow(supabaseUrl, playerId, config, fetchImpl) {
   const response = await fetchImpl(getPlayerSaveReadUrl(supabaseUrl, playerId), {
     method: "GET",
@@ -208,10 +216,13 @@ async function patchPlayerSaveData(supabaseUrl, playerId, saveData, config, fetc
     };
   }
 
+  const rows = typeof response.json === "function" ? await response.json().catch(() => []) : [];
+  const row = Array.isArray(rows) ? rows[0] : rows;
   return {
     ok: true,
     skippedReason: "",
-    status: response.status || 200
+    status: response.status || 200,
+    row: row || null
   };
 }
 
@@ -499,6 +510,41 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       };
     }
 
+    let verifiedSaveData = getSaveDataFromRow(patchResult.row);
+    let verifyStatus = patchResult.status;
+    if (!verifiedSaveData) {
+      const verifyRead = await fetchPlayerSaveRow(supabaseUrl, plan.playerId, config, fetchImpl);
+      verifyStatus = verifyRead.status;
+      verifiedSaveData = verifyRead.ok ? getSaveDataFromRow(verifyRead.row) : null;
+    }
+
+    const verifiedXp = getCombatXpFromSaveData(verifiedSaveData);
+    const verifiedZoneXp = getZoneCombatXpFromSaveData(verifiedSaveData);
+    const persistenceVerified = !!verifiedSaveData &&
+      verifiedXp >= refreshedPlan.xpAfter &&
+      verifiedZoneXp >= refreshedPlan.xpAfter;
+
+    if (!persistenceVerified) {
+      return {
+        ok: false,
+        applied: false,
+        dryRun: true,
+        progressionWritesEnabled: true,
+        idempotencyKey: getStringValue(plan.idempotencyKey),
+        idempotencyReady: true,
+        duplicateDetected: false,
+        ...allowlistStatus,
+        skippedReason: "player_save_patch_verify_failed",
+        status: verifyStatus,
+        xpBefore: refreshedPlan.xpBefore,
+        xpAfter: refreshedPlan.xpAfter,
+        persistedXp: verifiedSaveData ? verifiedXp : null,
+        persistedZoneXp: verifiedSaveData ? verifiedZoneXp : null,
+        persistenceVerified: false,
+        plan: refreshedPlan
+      };
+    }
+
     return {
       ok: true,
       applied: true,
@@ -512,6 +558,9 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       status: patchResult.status,
       xpBefore: refreshedPlan.xpBefore,
       xpAfter: refreshedPlan.xpAfter,
+      persistedXp: verifiedXp,
+      persistedZoneXp: verifiedZoneXp,
+      persistenceVerified: true,
       creditsBefore: refreshedPlan.creditsBefore,
       creditsAfter: refreshedPlan.creditsAfter,
       appliedFields: ["xp"],

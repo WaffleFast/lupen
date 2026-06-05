@@ -41,6 +41,7 @@
     lastRewardPreview: null,
     lastRewardClaimResult: null,
     lastStagingBotXpResult: null,
+    lastStagingXpRefresh: null,
     lastStagingLootClaimResult: null,
     lastStagingTradeOffers: null,
     lastStagingTradePreview: null,
@@ -275,6 +276,7 @@
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
       lastStagingBotXpResult: connection.lastStagingBotXpResult ? { ...connection.lastStagingBotXpResult } : null,
+      lastStagingXpRefresh: connection.lastStagingXpRefresh ? { ...connection.lastStagingXpRefresh } : null,
       lastStagingLootClaimResult: connection.lastStagingLootClaimResult ? { ...connection.lastStagingLootClaimResult } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers ? { ...connection.lastStagingTradeOffers } : null,
       lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
@@ -672,23 +674,70 @@
       result?.playerSavePatchResult?.applied === true;
     if (!isEnabled() || !playerSaveWritten) return;
 
+    const trustedXpAfter = Number(
+      result?.playerSavePatchResult?.xpAfter ??
+      result?.playerSave?.xpAfter ??
+      result?.claimStatus?.playerSave?.xpAfter
+    );
+    const source = result?.botId ? "botKill" : "bountyClaim";
+
     if (typeof global.applyStagingXpClaimToLoadedState === "function") {
       global.applyStagingXpClaimToLoadedState(result);
     }
 
-    if (typeof global.loadGameFromSupabase !== "function") return;
+    if (typeof global.loadGameFromSupabase !== "function") {
+      connection.lastStagingXpRefresh = {
+        source,
+        status: "local_applied",
+        trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
+        refreshXp: null,
+        matched: false,
+        stale: false,
+        reason: "loadGameFromSupabase_unavailable",
+        checkedAt: Date.now()
+      };
+      notifyServerState(room?.state || null);
+      return;
+    }
 
     Promise.resolve()
       .then(() => global.loadGameFromSupabase())
-      .then(() => {
+      .then((loadResult) => {
         if (typeof global.applyStagingXpClaimToLoadedState === "function") {
           global.applyStagingXpClaimToLoadedState(result);
         }
+        const snapshot = typeof global.getLupenCombatXpSnapshot === "function"
+          ? global.getLupenCombatXpSnapshot()
+          : null;
+        const refreshXp = Number(loadResult?.combatXp ?? snapshot?.combatXp);
+        const staleInfo = snapshot?.lastStagingXpRefresh || null;
+        connection.lastStagingXpRefresh = {
+          source,
+          status: "refreshed",
+          trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
+          refreshXp: Number.isFinite(refreshXp) ? refreshXp : null,
+          matched: Number.isFinite(trustedXpAfter) && Number.isFinite(refreshXp) ? refreshXp >= trustedXpAfter : false,
+          stale: staleInfo?.stale === true || loadResult?.staleStagingXpRefresh === true,
+          reason: staleInfo?.stale === true || loadResult?.staleStagingXpRefresh === true ? "xp_refresh_stale_guarded" : "xp_refresh_loaded",
+          checkedAt: Date.now()
+        };
         logDev("refreshed cloud save after staging XP claim");
+        notifyServerState(room?.state || null);
       })
       .catch((error) => {
         connection.lastServerWarning = "staging_xp_save_refresh_failed";
+        connection.lastStagingXpRefresh = {
+          source,
+          status: "failed",
+          trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
+          refreshXp: null,
+          matched: false,
+          stale: false,
+          reason: "staging_xp_save_refresh_failed",
+          checkedAt: Date.now()
+        };
         logDev("staging XP save refresh failed", error?.message || error);
+        notifyServerState(room?.state || null);
       });
   }
 
@@ -1023,6 +1072,9 @@
       duplicateDetected: result.duplicateDetected === true,
       xpBefore: Number.isFinite(Number(result.xpBefore)) ? Number(result.xpBefore) : null,
       xpAfter: Number.isFinite(Number(result.xpAfter)) ? Number(result.xpAfter) : null,
+      persistedXp: Number.isFinite(Number(result.persistedXp)) ? Number(result.persistedXp) : null,
+      persistedZoneXp: Number.isFinite(Number(result.persistedZoneXp)) ? Number(result.persistedZoneXp) : null,
+      persistenceVerified: result.persistenceVerified === true,
       creditsBefore: Number.isFinite(Number(result.creditsBefore)) ? Number(result.creditsBefore) : null,
       creditsAfter: Number.isFinite(Number(result.creditsAfter)) ? Number(result.creditsAfter) : null,
       progressionWritesEnabled: result.progressionWritesEnabled === true,
@@ -1140,6 +1192,9 @@
     return {
       ok: message.ok === true,
       applied: message.applied === true,
+      botXpAttempted: message.botXpAttempted === true,
+      botXpApplied: message.botXpApplied === true,
+      botXpBlockReason: String(message.botXpBlockReason || ""),
       dryRun: message.dryRun !== false,
       mode: String(message.mode || ""),
       reason: String(message.reason || ""),
@@ -1291,6 +1346,12 @@
       rewardPreviewId: String(message.rewardPreviewId || ""),
       destructionInstanceId: String(message.destructionInstanceId || ""),
       xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
+      xpBefore: Number.isFinite(Number(message.xpBefore)) ? Number(message.xpBefore) : null,
+      xpAfter: Number.isFinite(Number(message.xpAfter)) ? Number(message.xpAfter) : null,
+      persistedXp: Number.isFinite(Number(message.persistedXp)) ? Number(message.persistedXp) : null,
+      persistedZoneXp: Number.isFinite(Number(message.persistedZoneXp)) ? Number(message.persistedZoneXp) : null,
+      persistenceVerified: message.persistenceVerified === true,
+      idempotencyKey: String(message.idempotencyKey || ""),
       creditsWritten: message.creditsWritten === true,
       lootWritten: message.lootWritten === true,
       bountyWritten: message.bountyWritten === true,

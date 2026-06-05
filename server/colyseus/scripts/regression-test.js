@@ -2513,6 +2513,7 @@ async function assertStagingBountyHelpers() {
   assert(bountyPatchPlan.xpDelta === 25 && bountyPatchPlan.creditsDelta === 0, "Completed staging bounty patch plan was not XP-only.");
 
   const patchCalls = [];
+  let bountyPersistedSave = bountySave;
   const bountyPatchResult = await applyPlayerSavePatchPlan(bountyPatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
@@ -2523,10 +2524,11 @@ async function assertStagingBountyHelpers() {
     fetchImpl: async (_url, options = {}) => {
       patchCalls.push(options);
       if (options.method === "GET") {
-        return { ok: true, status: 200, json: async () => [{ save_data: bountySave }] };
+        return { ok: true, status: 200, json: async () => [{ save_data: bountyPersistedSave }] };
       }
       if (options.method === "PATCH") {
-        return { ok: true, status: 200, json: async () => [] };
+        bountyPersistedSave = JSON.parse(options.body).save_data;
+        return { ok: true, status: 200, json: async () => [{ save_data: bountyPersistedSave }] };
       }
       throw new Error(`Unexpected bounty player_saves method: ${options.method}`);
     }
@@ -2584,6 +2586,7 @@ async function assertStagingBountyHelpers() {
   assert(botKillPatchPlan.xpDelta === 8 && botKillPatchPlan.creditsDelta === 0, "Staging bot kill patch plan was not XP-only.");
 
   const botKillPatchCalls = [];
+  let botKillPersistedSave = bountySave;
   const botKillPatchResult = await applyPlayerSavePatchPlan(botKillPatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
@@ -2594,15 +2597,17 @@ async function assertStagingBountyHelpers() {
     fetchImpl: async (_url, options = {}) => {
       botKillPatchCalls.push(options);
       if (options.method === "GET") {
-        return { ok: true, status: 200, json: async () => [{ save_data: bountySave }] };
+        return { ok: true, status: 200, json: async () => [{ save_data: botKillPersistedSave }] };
       }
       if (options.method === "PATCH") {
-        return { ok: true, status: 200, json: async () => [] };
+        botKillPersistedSave = JSON.parse(options.body).save_data;
+        return { ok: true, status: 200, json: async () => [{ save_data: botKillPersistedSave }] };
       }
       throw new Error(`Unexpected bot kill player_saves method: ${options.method}`);
     }
   });
   assert(botKillPatchResult.applied === true, "Staging bot kill XP-only patch did not apply in mocked write mode.");
+  assert(botKillPatchResult.persistenceVerified === true, "Staging bot kill XP-only patch was not verified after write.");
   const botKillPatchedBody = JSON.parse(botKillPatchCalls[1].body);
   assert(botKillPatchedBody.save_data.playerProgress.combatXp === 18, "Staging bot kill patch did not add XP.");
   assert(botKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 18, "Staging bot kill patch did not mirror sector-one XP.");
@@ -2645,6 +2650,7 @@ async function assertStagingBountyHelpers() {
   assert(secondBotKillPatchPlan.idempotencyKey !== botKillPatchPlan.idempotencyKey, "Second staging bot kill reused the first kill idempotency key.");
 
   const secondBotKillPatchCalls = [];
+  let secondBotKillPersistedSave = saveAfterFirstBotKill;
   const secondBotKillPatchResult = await applyPlayerSavePatchPlan(secondBotKillPatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
@@ -2655,10 +2661,11 @@ async function assertStagingBountyHelpers() {
     fetchImpl: async (_url, options = {}) => {
       secondBotKillPatchCalls.push(options);
       if (options.method === "GET") {
-        return { ok: true, status: 200, json: async () => [{ save_data: saveAfterFirstBotKill }] };
+        return { ok: true, status: 200, json: async () => [{ save_data: secondBotKillPersistedSave }] };
       }
       if (options.method === "PATCH") {
-        return { ok: true, status: 200, json: async () => [] };
+        secondBotKillPersistedSave = JSON.parse(options.body).save_data;
+        return { ok: true, status: 200, json: async () => [{ save_data: secondBotKillPersistedSave }] };
       }
       throw new Error(`Unexpected second bot kill player_saves method: ${options.method}`);
     }
@@ -2667,6 +2674,96 @@ async function assertStagingBountyHelpers() {
   const secondBotKillPatchedBody = JSON.parse(secondBotKillPatchCalls[1].body);
   assert(secondBotKillPatchedBody.save_data.playerProgress.combatXp === 26, "Second staging bot kill patch did not add another XP award.");
   assert(secondBotKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 26, "Second staging bot kill patch did not mirror second sector-one XP award.");
+
+  let threeKillSave = {
+    ...bountySave,
+    playerProgress: {
+      ...bountySave.playerProgress,
+      combatXp: 16,
+      zoneCombatXp: { "sector-one": 16 }
+    }
+  };
+  const threeKillSeenKeys = new Set();
+  for (let killIndex = 1; killIndex <= 3; killIndex += 1) {
+    const rewardPreviewId = `staging_bot_xp:staging-bot-a:live-kill-${killIndex}`;
+    const rewardPlan = buildRewardWritePlan({
+      preview: {
+        ...botKillPreview,
+        rewardPreviewId,
+        previewXp: 8
+      },
+      claimantIdentity: {
+        sessionId: "session-a",
+        authStatus: "verified",
+        trustedPlayerId: "verified-player-a",
+        displayName: "Pilot A"
+      },
+      contributor: {
+        sessionId: "session-a",
+        totalDamage: 20,
+        hits: 1,
+        percent: 100
+      }
+    });
+    const applicationPlan = buildRewardApplicationPlan(rewardPlan, { sourceEventId: rewardPreviewId });
+    const duplicateDetected = threeKillSeenKeys.has(`${applicationPlan.playerId}:${applicationPlan.sourceEventId}`);
+    const patchPlan = buildPlayerSavePatchPlan(threeKillSave, applicationPlan, {
+      sourceEventId: rewardPreviewId,
+      duplicateDetected
+    });
+    const patchResult = await applyPlayerSavePatchPlan(patchPlan, {
+      env: {
+        ENABLE_STAGING_PROGRESSION_WRITES: "true",
+        STAGING_PROGRESSION_WRITE_SCOPE: "verified",
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+      },
+      fetchImpl: async (_url, options = {}) => {
+        if (options.method === "GET") {
+          return { ok: true, status: 200, json: async () => [{ save_data: threeKillSave }] };
+        }
+        if (options.method === "PATCH") {
+          threeKillSave = JSON.parse(options.body).save_data;
+          return { ok: true, status: 200, json: async () => [{ save_data: threeKillSave }] };
+        }
+        throw new Error(`Unexpected three-kill player_saves method: ${options.method}`);
+      }
+    });
+    assert(patchResult.applied === true, `Bot kill ${killIndex} did not persist XP.`);
+    assert(patchResult.persistenceVerified === true, `Bot kill ${killIndex} was not verified after write.`);
+    threeKillSeenKeys.add(patchPlan.idempotencyKey);
+  }
+  assert(threeKillSave.playerProgress.combatXp === 40, "Three legitimate bot destructions did not persist final XP 40.");
+  assert(threeKillSave.playerProgress.zoneCombatXp["sector-one"] === 40, "Three legitimate bot destructions did not mirror final sector-one XP 40.");
+
+  const duplicateThreeKillRewardPlan = buildRewardWritePlan({
+    preview: {
+      ...botKillPreview,
+      rewardPreviewId: "staging_bot_xp:staging-bot-a:live-kill-3",
+      previewXp: 8
+    },
+    claimantIdentity: {
+      sessionId: "session-a",
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a",
+      displayName: "Pilot A"
+    },
+    contributor: {
+      sessionId: "session-a",
+      totalDamage: 20,
+      hits: 1,
+      percent: 100
+    }
+  });
+  const duplicateThreeKillApplicationPlan = buildRewardApplicationPlan(duplicateThreeKillRewardPlan, {
+    sourceEventId: "staging_bot_xp:staging-bot-a:live-kill-3"
+  });
+  const duplicateThreeKillPatchPlan = buildPlayerSavePatchPlan(threeKillSave, duplicateThreeKillApplicationPlan, {
+    sourceEventId: "staging_bot_xp:staging-bot-a:live-kill-3",
+    duplicateDetected: true
+  });
+  assert(duplicateThreeKillPatchPlan.eligible === false, "Duplicate third bot destruction was not blocked.");
+  assert(duplicateThreeKillPatchPlan.skippedReason === "duplicate_reward_application", "Duplicate third bot destruction had unexpected block reason.");
 
   console.log("staging bounty helper flow and XP-only patch boundaries passed");
 }
@@ -2966,6 +3063,7 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(invalidShapePlayerSavePatchResult?.skippedReason === "xp_path_missing_or_ambiguous", `Unexpected invalid-shape player_saves patch reason: ${invalidShapePlayerSavePatchResult?.skippedReason}`);
 
   const patchedCalls = [];
+  let validPatchPersistedSave = validMockSaveData;
   const validPatchPlayerSaveResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
@@ -2981,18 +3079,19 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
           status: 200,
           async json() {
             return [{
-              save_data: validMockSaveData
+              save_data: validPatchPersistedSave
             }];
           }
         };
       }
 
       if (options.method === "PATCH") {
+        validPatchPersistedSave = JSON.parse(options.body).save_data;
         return {
           ok: true,
           status: 200,
           async json() {
-            return [];
+            return [{ save_data: validPatchPersistedSave }];
           }
         };
       }

@@ -49,16 +49,67 @@
   }
 
   async function saveGameStateToSupabaseForUser(client, user, state) {
+    const saveData = await preserveCloudCombatXpForSave(client, user, state);
     const { error } = await client
       .from("player_saves")
       .upsert({
         user_id: user.id,
-        save_data: state,
+        save_data: saveData,
         updated_at: new Date().toISOString()
       }, { onConflict: "user_id" });
 
     if (error) throw error;
     return true;
+  }
+
+  function getCombatXp(saveData) {
+    return Math.max(0, Math.round(Number(saveData?.playerProgress?.combatXp || 0)));
+  }
+
+  function getZoneCombatXp(saveData, zoneKey = "sector-one") {
+    return Math.max(0, Math.round(Number(saveData?.playerProgress?.zoneCombatXp?.[zoneKey] || 0)));
+  }
+
+  function setCombatXpFloor(saveData, combatXp, zoneKey = "sector-one") {
+    const next = {
+      ...saveData,
+      playerProgress: {
+        ...(saveData?.playerProgress || {})
+      }
+    };
+    const zoneCombatXp = {
+      ...(next.playerProgress.zoneCombatXp || {})
+    };
+    const safeCombatXp = Math.max(getCombatXp(next), Math.round(Number(combatXp || 0)));
+    const safeZoneXp = Math.max(getZoneCombatXp(next, zoneKey), Math.round(Number(combatXp || 0)));
+    next.playerProgress.combatXp = safeCombatXp;
+    zoneCombatXp[zoneKey] = safeZoneXp;
+    next.playerProgress.zoneCombatXp = zoneCombatXp;
+    return next;
+  }
+
+  async function preserveCloudCombatXpForSave(client, user, state) {
+    try {
+      const { data, error } = await client
+        .from("player_saves")
+        .select("save_data")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error || !data?.save_data) return state;
+
+      const cloudXp = Math.max(
+        getCombatXp(data.save_data),
+        getZoneCombatXp(data.save_data)
+      );
+      const localXp = Math.max(
+        getCombatXp(state),
+        getZoneCombatXp(state)
+      );
+      return cloudXp > localXp ? setCombatXpFloor(state, cloudXp) : state;
+    } catch (error) {
+      console.warn("Unable to compare cloud XP before save sync.", error);
+      return state;
+    }
   }
 
   async function loadGameStateFromSupabaseForUser(client, user) {

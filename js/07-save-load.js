@@ -142,20 +142,95 @@ async function loadGameFromSupabase() {
   if (applied) {
     LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
   }
-  return { loaded: applied, exists: true, reason: applied ? "loaded" : "invalid" };
+  return {
+    loaded: applied,
+    exists: true,
+    reason: applied ? "loaded" : "invalid",
+    combatXp: Number(playerProgress?.combatXp || 0),
+    zoneCombatXp: Number(playerProgress?.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0),
+    staleStagingXpRefresh: window.lupenLastStagingXpRefresh?.stale === true
+  };
 }
 
-function applyStagingXpClaimToLoadedState(result = {}) {
+function redrawProgressAfterStagingXp() {
+  if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (typeof updateHudDock === "function") updateHudDock();
+  if (typeof renderPilotProfile === "function" && document.getElementById("pilotProfileScreen")?.classList.contains("active")) {
+    renderPilotProfile();
+  }
+}
+
+function getStagingXpAfterFromResult(result = {}) {
   const xpAfter = Number(
     result.playerSavePatchResult?.xpAfter ??
     result.playerSave?.xpAfter ??
     result.claimStatus?.playerSave?.xpAfter
   );
+  return Number.isFinite(xpAfter) ? Math.max(0, Math.round(xpAfter)) : null;
+}
+
+function rememberTrustedStagingXp(result = {}, source = "stagingXp") {
+  const xpAfter = getStagingXpAfterFromResult(result);
+  if (!Number.isFinite(xpAfter)) return null;
+
+  const currentXp = Math.max(0, Number(playerProgress?.combatXp || 0));
+  window.lupenTrustedStagingXpAfter = {
+    xpAfter,
+    source,
+    xpBefore: Number(result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore ?? currentXp),
+    rememberedAt: Date.now()
+  };
+  return window.lupenTrustedStagingXpAfter;
+}
+
+function applyTrustedStagingXpIfNewer(source = "cloudRefresh") {
+  const trusted = window.lupenTrustedStagingXpAfter;
+  const xpAfter = Number(trusted?.xpAfter);
+  if (!Number.isFinite(xpAfter)) return false;
+  if (Date.now() - Number(trusted.rememberedAt || 0) > 15000) return false;
+
+  const progress = normalizePlayerProgress(playerProgress);
+  const currentXp = Number(progress.combatXp || 0);
+  if (xpAfter <= currentXp) {
+    window.lupenLastStagingXpRefresh = {
+      source,
+      stale: false,
+      trustedXpAfter: xpAfter,
+      refreshedXp: currentXp,
+      checkedAt: Date.now()
+    };
+    return false;
+  }
+
+  progress.combatXp = Math.max(0, Math.round(xpAfter));
+  progress.zoneCombatXp = {
+    ...(progress.zoneCombatXp || {}),
+    [XP_CONFIG.combatZoneKey]: Math.max(
+      Number(progress.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0),
+      progress.combatXp
+    )
+  };
+  playerProgress = normalizePlayerProgress(progress);
+  window.lupenLastStagingXpRefresh = {
+    source,
+    stale: true,
+    trustedXpAfter: xpAfter,
+    refreshedXp: currentXp,
+    appliedXp: playerProgress.combatXp,
+    checkedAt: Date.now()
+  };
+  redrawProgressAfterStagingXp();
+  return true;
+}
+
+function applyStagingXpClaimToLoadedState(result = {}) {
+  const xpAfter = getStagingXpAfterFromResult(result);
   const applied = result.playerSavePatchResult?.applied === true ||
     result.playerSave?.written === true ||
     result.claimStatus?.playerSave?.written === true;
   if (!applied || !Number.isFinite(xpAfter)) return false;
 
+  rememberTrustedStagingXp(result, result.botId ? "botKill" : "bountyClaim");
   const progress = normalizePlayerProgress(playerProgress);
   if (xpAfter < Number(progress.combatXp || 0)) return false;
   progress.combatXp = Math.max(0, Math.round(xpAfter));
@@ -168,13 +243,21 @@ function applyStagingXpClaimToLoadedState(result = {}) {
   };
   playerProgress = normalizePlayerProgress(progress);
   LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
-  if (typeof updateProgressDisplays === "function") updateProgressDisplays();
-  if (typeof updateHudDock === "function") updateHudDock();
-  if (typeof renderPilotProfile === "function" && document.getElementById("pilotProfileScreen")?.classList.contains("active")) {
-    renderPilotProfile();
-  }
+  redrawProgressAfterStagingXp();
   return true;
 }
+
+window.applyStagingXpClaimToLoadedState = applyStagingXpClaimToLoadedState;
+window.getLupenCombatXpSnapshot = function getLupenCombatXpSnapshot() {
+  return {
+    combatXp: Number(playerProgress?.combatXp || 0),
+    zoneCombatXp: Number(playerProgress?.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0),
+    trustedStagingXpAfter: Number.isFinite(Number(window.lupenTrustedStagingXpAfter?.xpAfter))
+      ? Number(window.lupenTrustedStagingXpAfter.xpAfter)
+      : null,
+    lastStagingXpRefresh: window.lupenLastStagingXpRefresh || null
+  };
+};
 
 function getLocalSavePayloadForCloudMigration() {
   return migrateSavedGame(LupenSaveService.readJsonLocalStorage(STORAGE_GAME_KEY));
@@ -364,6 +447,7 @@ function applyLoadedGameState(rawSaved) {
 
   credits = saved.credits ?? credits;
   playerProgress = normalizePlayerProgress(saved.playerProgress || playerProgress);
+  applyTrustedStagingXpIfNewer("loadGameFromSupabase");
   upgradeMaterials = normalizeUpgradeMaterials(saved.upgradeMaterials);
   cargoCostBasis = saved.cargoCostBasis ?? cargoCostBasis;
 
