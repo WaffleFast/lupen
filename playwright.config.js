@@ -7,6 +7,7 @@ const externalBaseUrl = process.env.LUPEN_BASE_URL;
 
 module.exports = defineConfig({
   testDir: "./tests/e2e",
+  testIgnore: process.env.LUPEN_INCLUDE_LIVE_STAGING === "true" ? [] : ["**/*.live.spec.js"],
   timeout: 30000,
   expect: {
     timeout: 10000

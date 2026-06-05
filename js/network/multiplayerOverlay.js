@@ -1969,7 +1969,7 @@
     } else if (botXp?.botId === selectedBot?.id && botXp.mode === "blocked") {
       lines.push(`Bot XP blocked: ${getFriendlyClaimReason(botXp.debugReason || botXp.reason)}.`);
     } else {
-      lines.push(`Bot XP preview: ${Math.round(Number(preview.previewXp || 0))}.`);
+      lines.push(`Preview only: ${Math.round(Number(preview.previewXp || 0))} bot XP not applied yet.`);
     }
     lines.push("Bounty bonus XP claims from Bounty Board.");
     const lootPreview = preview?.lootPreview;
@@ -3110,6 +3110,8 @@
       if (status.lastStagingBotXpResult) {
         const botXp = status.lastStagingBotXpResult;
         setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP +${Math.round(Number(botXp.xpDelta || 0))} / ${botXp.applied ? "applied" : botXp.debugReason || botXp.reason || "not applied"}`);
+      } else if (status.lastRewardPreview?.botId) {
+        setDiagnosticsRow(panel, "bot XP", `preview only / XP +${Math.round(Number(status.lastRewardPreview.previewXp || 0))} / no apply result`);
       }
       if (status.lastRewardClaimResult) {
         const claimStatus = getClaimStatusSummary(status.lastRewardClaimResult);

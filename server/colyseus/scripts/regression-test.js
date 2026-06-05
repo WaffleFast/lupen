@@ -3566,6 +3566,8 @@ try {
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
   roomA.onMessage("staging:reward_preview", (message) => rewardPreviewEvents.push(message));
   roomB.onMessage("staging:reward_preview", () => {});
+  roomA.onMessage("stagingXp:botKillResult", () => {});
+  roomB.onMessage("stagingXp:botKillResult", () => {});
   roomA.onMessage("stagingBounty:statusResult", (message) => bountyStatusEvents.push(message));
 
   console.log(`joined ${ROOM_NAME}: A=${roomA.sessionId} B=${roomB.sessionId}`);
