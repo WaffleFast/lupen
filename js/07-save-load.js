@@ -169,6 +169,7 @@ function applyStagingXpClaimToLoadedState(result = {}) {
   playerProgress = normalizePlayerProgress(progress);
   LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
   if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (typeof updateHudDock === "function") updateHudDock();
   if (typeof renderPilotProfile === "function" && document.getElementById("pilotProfileScreen")?.classList.contains("active")) {
     renderPilotProfile();
   }

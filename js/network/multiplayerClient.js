@@ -670,6 +670,10 @@
       result?.playerSavePatchResult?.applied === true;
     if (!isEnabled() || !playerSaveWritten || typeof global.loadGameFromSupabase !== "function") return;
 
+    if (typeof global.applyStagingXpClaimToLoadedState === "function") {
+      global.applyStagingXpClaimToLoadedState(result);
+    }
+
     Promise.resolve()
       .then(() => global.loadGameFromSupabase())
       .then(() => {

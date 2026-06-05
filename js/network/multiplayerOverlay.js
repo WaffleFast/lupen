@@ -142,10 +142,12 @@
 
       #${stagingCombatPanelId} {
         position: absolute;
-        right: 20px;
-        bottom: 156px;
+        right: 14px;
+        bottom: 128px;
         z-index: 35;
-        width: min(338px, calc(100vw - 32px));
+        width: min(318px, calc(100vw - 32px));
+        max-height: min(430px, calc(100vh - 210px));
+        overflow: auto;
         border: 1px solid rgba(255, 193, 104, 0.46);
         border-radius: 6px;
         background: linear-gradient(180deg, rgba(22, 15, 10, 0.9), rgba(8, 12, 20, 0.88));
@@ -159,9 +161,9 @@
       #${stagingCombatPanelId} .lupen-mp-staging-combat-inner {
         display: grid;
         grid-template-columns: 1fr auto;
-        gap: 8px 12px;
+        gap: 6px 10px;
         align-items: center;
-        padding: 9px 10px;
+        padding: 8px 9px;
       }
 
       #${stagingCombatPanelId} .lupen-mp-staging-combat-kicker {
@@ -253,8 +255,10 @@
       #${stagingCombatPanelId} .lupen-mp-staging-reward {
         grid-column: 1 / -1;
         display: grid;
-        gap: 5px;
-        padding: 7px;
+        gap: 4px;
+        padding: 6px;
+        max-height: 112px;
+        overflow: auto;
         border: 1px solid rgba(127, 223, 255, 0.22);
         border-radius: 5px;
         background: rgba(33, 90, 114, 0.1);
@@ -1954,6 +1958,23 @@
     ];
   }
 
+  function getCompactRewardPreviewPanelLines(status, selectedBot) {
+    const preview = status?.lastRewardPreview;
+    if (!isRewardPreviewForBot(status, selectedBot)) return [];
+
+    const lines = [
+      `XP preview: ${Math.round(Number(preview.previewXp || 0))}. Claim XP on Bounty Board.`
+    ];
+    const lootPreview = preview?.lootPreview;
+    const items = Array.isArray(lootPreview?.items) ? lootPreview.items : [];
+    if (lootPreview?.available && items.length && isLootPreviewEligibleForSelf(status, preview)) {
+      const item = items[0] || {};
+      lines.push(`Shard preview only: ${Math.round(Number(item.quantity || 1))}x ${item.name || "Lupen Shard"}.`);
+    }
+    lines.push("Preview only - no loot or credits applied here.");
+    return lines;
+  }
+
   function isLootPreviewEligibleForSelf(status, preview = status?.lastRewardPreview) {
     const eligibleSessionIds = Array.isArray(preview?.lootPreview?.eligibleSessionIds)
       ? preview.lootPreview.eligibleSessionIds
@@ -2856,10 +2877,12 @@
     bars.appendChild(createStagingCombatBar("Hull", selectedBot.hull, selectedBot.hullMax, "lupen-mp-staging-hull"));
     inner.appendChild(bars);
 
-    const rewardLines = [
-      ...getRewardPreviewPanelLines(status, selectedBot),
-      ...getLootPreviewPanelLines(status, selectedBot)
-    ];
+    const rewardLines = isMpDebugEnabled()
+      ? [
+        ...getRewardPreviewPanelLines(status, selectedBot),
+        ...getLootPreviewPanelLines(status, selectedBot)
+      ]
+      : getCompactRewardPreviewPanelLines(status, selectedBot);
     if (rewardLines.length) {
       const reward = global.document.createElement("div");
       reward.className = "lupen-mp-staging-reward";
@@ -2933,8 +2956,7 @@
     removeStagingBountyPanel();
     requestStagingBountyIfNeeded(status);
     if (!isStagingMode(status) || !status?.enabled || !status?.isConnected) return;
-
-    if (global.document?.getElementById("bountyScreen")?.classList.contains("active") && !isMpDebugEnabled()) return;
+    if (!isMpDebugEnabled()) return;
 
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
