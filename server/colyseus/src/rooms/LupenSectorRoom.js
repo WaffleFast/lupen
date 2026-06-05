@@ -866,13 +866,13 @@ export class LupenSectorRoom extends Room {
     // server-owned visual bots, then applies clamped shield-first test damage
     // without granting rewards. Future authoritative combat can replace this
     // response path with real server-side resolution.
-    this.onMessage("combat:intent", (client, message = {}) => {
-      this.resolveCombatIntent(client, message, "combat:intent");
+    this.onMessage("combat:intent", async (client, message = {}) => {
+      await this.resolveCombatIntent(client, message, "combat:intent");
     });
 
     // Legacy local prototype alias. New clients should send combat:intent.
-    this.onMessage("combat_intent", (client, message = {}) => {
-      this.resolveCombatIntent(client, message, "combat_intent");
+    this.onMessage("combat_intent", async (client, message = {}) => {
+      await this.resolveCombatIntent(client, message, "combat_intent");
     });
 
     // Staging lock-on preparation only. This stores display-only bot selection
@@ -1369,6 +1369,103 @@ export class LupenSectorRoom extends Room {
 
   clearBotContributions(botId) {
     this.botContributions.delete(getStringValue(botId));
+  }
+
+  async applyStagingBotKillXpForPreview(preview = {}) {
+    const contributors = Array.isArray(preview.contributors) ? preview.contributors : [];
+
+    await Promise.all(contributors.map(async (contributor) => {
+      const sessionId = getStringValue(contributor?.sessionId);
+      const targetClient = this.clients.find((candidate) => candidate.sessionId === sessionId);
+      if (!sessionId || !targetClient) return;
+
+      const claimantIdentity = {
+        sessionId,
+        ...this.getPlayerIdentitySnapshot(sessionId)
+      };
+      const rewardWritePlan = {
+        ...buildRewardWritePlan({
+          preview,
+          claimantIdentity,
+          contributor
+        }),
+        intendedReason: "staging_bot_destroyed"
+      };
+      const sourceEventId = preview.rewardPreviewId;
+      const rewardApplicationPlan = buildRewardApplicationPlan(rewardWritePlan, {
+        sourceEventId
+      });
+      const rewardApplicationResult = await applyRewardApplicationPlan(rewardApplicationPlan);
+      const savePreviewContext = rewardApplicationPlan.eligible
+        ? await fetchPlayerSavePreviewContext(rewardApplicationPlan.playerId)
+        : {
+          ok: false,
+          available: false,
+          reason: rewardApplicationPlan.blockedReason || "reward_application_not_eligible",
+          playerId: rewardApplicationPlan.playerId || "",
+          saveSummary: null
+        };
+      const progressionPreview = buildProgressionPreview(savePreviewContext, rewardApplicationPlan);
+      const previewSaveData = progressionPreview.available
+        ? {
+          credits: progressionPreview.currentCredits,
+          playerProgress: {
+            combatXp: progressionPreview.currentXp
+          }
+        }
+        : {};
+      const idempotencyKey = rewardApplicationPlan.playerId && rewardApplicationPlan.sourceEventId
+        ? `${rewardApplicationPlan.playerId}:${rewardApplicationPlan.sourceEventId}`
+        : "";
+      const duplicateDetected = idempotencyKey ? this.rewardApplicationIdempotencyKeys.has(idempotencyKey) : false;
+      const playerSavePatchPlan = buildPlayerSavePatchPlan(previewSaveData, rewardApplicationPlan, {
+        sourceEventId,
+        duplicateDetected
+      });
+      const playerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan);
+      if (playerSavePatchPlan.idempotencyReady &&
+        !playerSavePatchPlan.duplicateDetected &&
+        playerSavePatchResult.applied === true) {
+        this.rewardApplicationIdempotencyKeys.add(playerSavePatchPlan.idempotencyKey);
+      }
+
+      const claimStatus = buildRewardClaimStatus({
+        ok: true,
+        reason: "staging_bot_kill_xp",
+        rewardWritePlan,
+        rewardApplicationPlan,
+        rewardApplicationResult,
+        playerSavePatchPlan,
+        playerSavePatchResult
+      });
+
+      targetClient.send("stagingXp:botKillResult", {
+        ok: true,
+        applied: claimStatus.applied === true,
+        dryRun: claimStatus.applied !== true,
+        mode: claimStatus.mode,
+        reason: claimStatus.reason,
+        debugReason: claimStatus.debugReason,
+        botId: getStringValue(preview.botId),
+        botName: getStringValue(preview.botName, "Staging Bot"),
+        rewardPreviewId: sourceEventId,
+        xpDelta: claimStatus.xpDelta,
+        creditsWritten: false,
+        lootWritten: false,
+        bountyWritten: false,
+        saveWritten: playerSavePatchResult.applied === true,
+        gates: claimStatus.gates,
+        playerSave: claimStatus.playerSave,
+        claimStatus,
+        rewardWritePlan,
+        rewardApplicationPlan,
+        rewardApplicationResult,
+        progressionPreview,
+        playerSavePatchPlan,
+        playerSavePatchResult,
+        receivedAt: Date.now()
+      });
+    }));
   }
 
   getStagingBountyDestructionKey(bot) {
@@ -2538,7 +2635,7 @@ export class LupenSectorRoom extends Room {
     this.reconcilePlayerSelections();
   }
 
-  resolveCombatIntent(client, message = {}, messageType = "combat:intent") {
+  async resolveCombatIntent(client, message = {}, messageType = "combat:intent") {
     const player = this.touchPlayer(client.sessionId);
     const now = Date.now();
     const payloadWarning = validateCombatIntentPayload(message);
@@ -2660,6 +2757,7 @@ export class LupenSectorRoom extends Room {
       this.updateStagingBountyProgressForDisabledBot(targetBot, contributionSummary, client.sessionId);
       const rewardPreview = this.buildRewardPreviewPayload(targetBot, client.sessionId, contributionSummary, Date.now());
       this.rewardPreviews.set(targetBot.id, rewardPreview);
+      await this.applyStagingBotKillXpForPreview(rewardPreview);
 
       this.broadcast("bot:disabled", {
         ok: true,

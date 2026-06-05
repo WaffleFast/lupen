@@ -1962,9 +1962,16 @@
     const preview = status?.lastRewardPreview;
     if (!isRewardPreviewForBot(status, selectedBot)) return [];
 
-    const lines = [
-      `XP preview: ${Math.round(Number(preview.previewXp || 0))}. Claim XP on Bounty Board.`
-    ];
+    const botXp = status?.lastStagingBotXpResult;
+    const lines = [];
+    if (botXp?.botId === selectedBot?.id && botXp.applied) {
+      lines.push(`Bot XP applied: +${Math.round(Number(botXp.xpDelta || 0))}.`);
+    } else if (botXp?.botId === selectedBot?.id && botXp.mode === "blocked") {
+      lines.push(`Bot XP blocked: ${getFriendlyClaimReason(botXp.debugReason || botXp.reason)}.`);
+    } else {
+      lines.push(`Bot XP preview: ${Math.round(Number(preview.previewXp || 0))}.`);
+    }
+    lines.push("Bounty bonus XP claims from Bounty Board.");
     const lootPreview = preview?.lootPreview;
     const items = Array.isArray(lootPreview?.items) ? lootPreview.items : [];
     if (lootPreview?.available && items.length && isLootPreviewEligibleForSelf(status, preview)) {
@@ -3099,6 +3106,10 @@
       }
       if (status.lastStagingBountyClaimResult) {
         setDiagnosticsRow(panel, "bounty claim", `${status.lastStagingBountyClaimResult.mode || "unknown"} / XP +${Math.round(Number(status.lastStagingBountyClaimResult.xpDelta || 0))} / ${status.lastStagingBountyClaimResult.reason || "none"}`);
+      }
+      if (status.lastStagingBotXpResult) {
+        const botXp = status.lastStagingBotXpResult;
+        setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP +${Math.round(Number(botXp.xpDelta || 0))} / ${botXp.applied ? "applied" : botXp.debugReason || botXp.reason || "not applied"}`);
       }
       if (status.lastRewardClaimResult) {
         const claimStatus = getClaimStatusSummary(status.lastRewardClaimResult);

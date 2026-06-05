@@ -2549,6 +2549,72 @@ async function assertStagingBountyHelpers() {
   });
   assert(duplicatePlan.eligible === false && duplicatePlan.skippedReason === "duplicate_reward_application", "Duplicate staging bounty XP claim was not blocked.");
 
+  const botKillPreview = {
+    rewardPreviewId: "staging-bot-a:kill-001",
+    botId: "staging-bot-a",
+    botName: "Erebus Drone",
+    node: "Upper Apex",
+    finalHitBy: "session-a",
+    disabledBySessionId: "session-a",
+    topContributorSessionId: "session-a",
+    previewXp: 8
+  };
+  const botKillRewardPlan = buildRewardWritePlan({
+    preview: botKillPreview,
+    claimantIdentity: {
+      sessionId: "session-a",
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a",
+      displayName: "Pilot A"
+    },
+    contributor: {
+      sessionId: "session-a",
+      totalDamage: 25,
+      hits: 2,
+      percent: 100
+    }
+  });
+  const botKillApplicationPlan = buildRewardApplicationPlan(botKillRewardPlan, {
+    sourceEventId: botKillPreview.rewardPreviewId
+  });
+  const botKillPatchPlan = buildPlayerSavePatchPlan(bountySave, botKillApplicationPlan, {
+    sourceEventId: botKillPreview.rewardPreviewId
+  });
+  assert(botKillPatchPlan.eligible === true, `Staging bot kill XP patch plan was blocked: ${botKillPatchPlan.skippedReason}`);
+  assert(botKillPatchPlan.xpDelta === 8 && botKillPatchPlan.creditsDelta === 0, "Staging bot kill patch plan was not XP-only.");
+
+  const botKillPatchCalls = [];
+  const botKillPatchResult = await applyPlayerSavePatchPlan(botKillPatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_SCOPE: "verified",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      botKillPatchCalls.push(options);
+      if (options.method === "GET") {
+        return { ok: true, status: 200, json: async () => [{ save_data: bountySave }] };
+      }
+      if (options.method === "PATCH") {
+        return { ok: true, status: 200, json: async () => [] };
+      }
+      throw new Error(`Unexpected bot kill player_saves method: ${options.method}`);
+    }
+  });
+  assert(botKillPatchResult.applied === true, "Staging bot kill XP-only patch did not apply in mocked write mode.");
+  const botKillPatchedBody = JSON.parse(botKillPatchCalls[1].body);
+  assert(botKillPatchedBody.save_data.playerProgress.combatXp === 18, "Staging bot kill patch did not add XP.");
+  assert(botKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 18, "Staging bot kill patch did not mirror sector-one XP.");
+  assert(botKillPatchedBody.save_data.credits === 777, "Staging bot kill patch changed credits.");
+  assert(botKillPatchedBody.save_data.inventoryItems[0].id === "loot-stays", "Staging bot kill patch changed inventory.");
+
+  const duplicateBotKillPlan = buildPlayerSavePatchPlan(bountySave, botKillApplicationPlan, {
+    sourceEventId: botKillPreview.rewardPreviewId,
+    duplicateDetected: true
+  });
+  assert(duplicateBotKillPlan.eligible === false && duplicateBotKillPlan.skippedReason === "duplicate_reward_application", "Duplicate staging bot kill XP was not blocked.");
+
   console.log("staging bounty helper flow and XP-only patch boundaries passed");
 }
 

@@ -40,6 +40,7 @@
     lastShotEvent: null,
     lastRewardPreview: null,
     lastRewardClaimResult: null,
+    lastStagingBotXpResult: null,
     lastStagingLootClaimResult: null,
     lastStagingTradeOffers: null,
     lastStagingTradePreview: null,
@@ -273,6 +274,7 @@
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
+      lastStagingBotXpResult: connection.lastStagingBotXpResult ? { ...connection.lastStagingBotXpResult } : null,
       lastStagingLootClaimResult: connection.lastStagingLootClaimResult ? { ...connection.lastStagingLootClaimResult } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers ? { ...connection.lastStagingTradeOffers } : null,
       lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
@@ -668,11 +670,13 @@
     const playerSaveWritten = result?.playerSave?.written === true ||
       result?.claimStatus?.playerSave?.written === true ||
       result?.playerSavePatchResult?.applied === true;
-    if (!isEnabled() || !playerSaveWritten || typeof global.loadGameFromSupabase !== "function") return;
+    if (!isEnabled() || !playerSaveWritten) return;
 
     if (typeof global.applyStagingXpClaimToLoadedState === "function") {
       global.applyStagingXpClaimToLoadedState(result);
     }
+
+    if (typeof global.loadGameFromSupabase !== "function") return;
 
     Promise.resolve()
       .then(() => global.loadGameFromSupabase())
@@ -1266,6 +1270,37 @@
       rewardApplicationResult: normalizeRewardApplicationResult(message.rewardApplicationResult),
       progressionPreview: normalizeProgressionPreview(message.progressionPreview),
       progressionShadowResult: normalizeProgressionShadowResult(message.progressionShadowResult),
+      playerSavePatchPlan: normalizePlayerSavePatchPlan(message.playerSavePatchPlan),
+      playerSavePatchResult: normalizePlayerSavePatchResult(message.playerSavePatchResult),
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
+    };
+  }
+
+  function normalizeStagingXpResult(message) {
+    if (!message || typeof message !== "object") return null;
+
+    return {
+      ok: message.ok === true,
+      applied: message.applied === true,
+      dryRun: message.dryRun !== false,
+      mode: String(message.mode || ""),
+      reason: String(message.reason || ""),
+      debugReason: String(message.debugReason || ""),
+      botId: String(message.botId || ""),
+      botName: String(message.botName || "Staging Bot"),
+      rewardPreviewId: String(message.rewardPreviewId || ""),
+      xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
+      creditsWritten: message.creditsWritten === true,
+      lootWritten: message.lootWritten === true,
+      bountyWritten: message.bountyWritten === true,
+      saveWritten: message.saveWritten === true,
+      gates: normalizeClaimGates(message.gates || message.claimStatus?.gates),
+      playerSave: normalizeClaimPlayerSave(message.playerSave || message.claimStatus?.playerSave),
+      claimStatus: normalizeRewardClaimStatus(message.claimStatus),
+      rewardWritePlan: normalizeRewardWritePlan(message.rewardWritePlan),
+      rewardApplicationPlan: normalizeRewardApplicationPlan(message.rewardApplicationPlan),
+      rewardApplicationResult: normalizeRewardApplicationResult(message.rewardApplicationResult),
+      progressionPreview: normalizeProgressionPreview(message.progressionPreview),
       playerSavePatchPlan: normalizePlayerSavePatchPlan(message.playerSavePatchPlan),
       playerSavePatchResult: normalizePlayerSavePatchResult(message.playerSavePatchResult),
       receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
@@ -1867,6 +1902,13 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("stagingXp:botKillResult", (message) => {
+      connection.lastStagingBotXpResult = normalizeStagingXpResult(message);
+      refreshCloudSaveAfterStagingXpClaim(connection.lastStagingBotXpResult);
+      logDev("server staging bot kill XP result", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("stagingLoot:claimResult", (message) => {
       connection.lastStagingLootClaimResult = normalizeStagingLootClaimResult(message);
       refreshCloudSaveAfterStagingLootClaim(connection.lastStagingLootClaimResult);
@@ -2065,6 +2107,7 @@
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
+      lastStagingBotXpResult: connection.lastStagingBotXpResult ? { ...connection.lastStagingBotXpResult } : null,
       lastStagingLootClaimResult: connection.lastStagingLootClaimResult ? { ...connection.lastStagingLootClaimResult } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers
         ? {
