@@ -2615,6 +2615,59 @@ async function assertStagingBountyHelpers() {
   });
   assert(duplicateBotKillPlan.eligible === false && duplicateBotKillPlan.skippedReason === "duplicate_reward_application", "Duplicate staging bot kill XP was not blocked.");
 
+  const secondBotKillPreview = {
+    ...botKillPreview,
+    rewardPreviewId: "staging_bot_xp:staging-bot-a:kill-002"
+  };
+  const secondBotKillRewardPlan = buildRewardWritePlan({
+    preview: secondBotKillPreview,
+    claimantIdentity: {
+      sessionId: "session-a",
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-a",
+      displayName: "Pilot A"
+    },
+    contributor: {
+      sessionId: "session-a",
+      totalDamage: 22,
+      hits: 1,
+      percent: 100
+    }
+  });
+  const secondBotKillApplicationPlan = buildRewardApplicationPlan(secondBotKillRewardPlan, {
+    sourceEventId: secondBotKillPreview.rewardPreviewId
+  });
+  const saveAfterFirstBotKill = botKillPatchedBody.save_data;
+  const secondBotKillPatchPlan = buildPlayerSavePatchPlan(saveAfterFirstBotKill, secondBotKillApplicationPlan, {
+    sourceEventId: secondBotKillPreview.rewardPreviewId
+  });
+  assert(secondBotKillPatchPlan.eligible === true, `Second staging bot kill XP patch plan was blocked: ${secondBotKillPatchPlan.skippedReason}`);
+  assert(secondBotKillPatchPlan.idempotencyKey !== botKillPatchPlan.idempotencyKey, "Second staging bot kill reused the first kill idempotency key.");
+
+  const secondBotKillPatchCalls = [];
+  const secondBotKillPatchResult = await applyPlayerSavePatchPlan(secondBotKillPatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_SCOPE: "verified",
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      secondBotKillPatchCalls.push(options);
+      if (options.method === "GET") {
+        return { ok: true, status: 200, json: async () => [{ save_data: saveAfterFirstBotKill }] };
+      }
+      if (options.method === "PATCH") {
+        return { ok: true, status: 200, json: async () => [] };
+      }
+      throw new Error(`Unexpected second bot kill player_saves method: ${options.method}`);
+    }
+  });
+  assert(secondBotKillPatchResult.applied === true, "Second staging bot kill XP-only patch did not apply in mocked write mode.");
+  const secondBotKillPatchedBody = JSON.parse(secondBotKillPatchCalls[1].body);
+  assert(secondBotKillPatchedBody.save_data.playerProgress.combatXp === 26, "Second staging bot kill patch did not add another XP award.");
+  assert(secondBotKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 26, "Second staging bot kill patch did not mirror second sector-one XP award.");
+
   console.log("staging bounty helper flow and XP-only patch boundaries passed");
 }
 

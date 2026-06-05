@@ -1289,6 +1289,7 @@
       botId: String(message.botId || ""),
       botName: String(message.botName || "Staging Bot"),
       rewardPreviewId: String(message.rewardPreviewId || ""),
+      destructionInstanceId: String(message.destructionInstanceId || ""),
       xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
       creditsWritten: message.creditsWritten === true,
       lootWritten: message.lootWritten === true,
@@ -1805,6 +1806,8 @@
       connection.lastRewardPreview = {
         ok: message?.ok === true,
         rewardPreviewId: String(message?.rewardPreviewId || ""),
+        destructionInstanceId: String(message?.destructionInstanceId || ""),
+        botXpSourceEventId: String(message?.botXpSourceEventId || ""),
         botId: String(message?.botId || ""),
         botName: String(message?.botName || "Staging Bot"),
         disabledBySessionId: String(message?.disabledBySessionId || ""),

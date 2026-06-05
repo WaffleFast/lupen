@@ -1391,7 +1391,7 @@ export class LupenSectorRoom extends Room {
         }),
         intendedReason: "staging_bot_destroyed"
       };
-      const sourceEventId = preview.rewardPreviewId;
+      const sourceEventId = getStringValue(preview.botXpSourceEventId || preview.destructionInstanceId || preview.rewardPreviewId);
       const rewardApplicationPlan = buildRewardApplicationPlan(rewardWritePlan, {
         sourceEventId
       });
@@ -1449,6 +1449,7 @@ export class LupenSectorRoom extends Room {
         botId: getStringValue(preview.botId),
         botName: getStringValue(preview.botName, "Staging Bot"),
         rewardPreviewId: sourceEventId,
+        destructionInstanceId: getStringValue(preview.destructionInstanceId),
         xpDelta: claimStatus.xpDelta,
         creditsWritten: false,
         lootWritten: false,
@@ -1479,15 +1480,17 @@ export class LupenSectorRoom extends Room {
     return `${botId}:${disabledUntil || lastUpdatedAt}`;
   }
 
-  buildRewardPreviewPayload(bot, disabledBySessionId, contributionSummary, receivedAt = Date.now()) {
+  buildRewardPreviewPayload(bot, disabledBySessionId, contributionSummary, receivedAt = Date.now(), destructionInstanceId = "") {
     const botId = getStringValue(bot?.id);
+    const safeDestructionInstanceId = getStringValue(destructionInstanceId) || `${botId}:${receivedAt}`;
     const finalHitIdentity = this.getPlayerIdentitySnapshot(disabledBySessionId);
     const topContributorIdentity = this.getPlayerIdentitySnapshot(contributionSummary.topContributorSessionId);
     const eligibleSessionIds = (Array.isArray(contributionSummary?.contributors) ? contributionSummary.contributors : [])
       .map((contributor) => getStringValue(contributor?.sessionId))
       .filter(Boolean);
     if (disabledBySessionId) eligibleSessionIds.push(getStringValue(disabledBySessionId));
-    const rewardPreviewId = `${botId}:${receivedAt}`;
+    const rewardPreviewId = `staging_bot_reward:${safeDestructionInstanceId}`;
+    const botXpSourceEventId = `staging_bot_xp:${safeDestructionInstanceId}`;
     const lootPreview = buildStagingLootPreview({
       botId,
       rewardPreviewId,
@@ -1496,6 +1499,8 @@ export class LupenSectorRoom extends Room {
     return {
       ok: true,
       rewardPreviewId,
+      botXpSourceEventId,
+      destructionInstanceId: safeDestructionInstanceId,
       botId,
       botName: bot?.name || bot?.type || "Staging Bot",
       disabledBySessionId,
@@ -2755,7 +2760,8 @@ export class LupenSectorRoom extends Room {
     if (result.disabled) {
       const contributionSummary = this.getContributionSummary(targetBot.id);
       this.updateStagingBountyProgressForDisabledBot(targetBot, contributionSummary, client.sessionId);
-      const rewardPreview = this.buildRewardPreviewPayload(targetBot, client.sessionId, contributionSummary, Date.now());
+      const destructionInstanceId = this.getStagingBountyDestructionKey(targetBot);
+      const rewardPreview = this.buildRewardPreviewPayload(targetBot, client.sessionId, contributionSummary, Date.now(), destructionInstanceId);
       this.rewardPreviews.set(targetBot.id, rewardPreview);
       await this.applyStagingBotKillXpForPreview(rewardPreview);
 

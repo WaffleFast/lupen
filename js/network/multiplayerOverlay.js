@@ -1965,9 +1965,15 @@
     const botXp = status?.lastStagingBotXpResult;
     const lines = [];
     if (botXp?.botId === selectedBot?.id && botXp.applied) {
-      lines.push(`Bot XP applied: +${Math.round(Number(botXp.xpDelta || 0))}.`);
+      const xpBefore = Number(botXp.playerSavePatchResult?.xpBefore ?? botXp.playerSave?.xpBefore);
+      const xpAfter = Number(botXp.playerSavePatchResult?.xpAfter ?? botXp.playerSave?.xpAfter);
+      if (Number.isFinite(xpBefore) && Number.isFinite(xpAfter)) {
+        lines.push(`Bot XP applied: ${Math.round(xpBefore)} -> ${Math.round(xpAfter)}.`);
+      } else {
+        lines.push(`Bot XP applied: +${Math.round(Number(botXp.xpDelta || 0))}.`);
+      }
     } else if (botXp?.botId === selectedBot?.id && botXp.mode === "blocked") {
-      lines.push(`Bot XP blocked: ${getFriendlyClaimReason(botXp.debugReason || botXp.reason)}.`);
+      lines.push(`Bot XP blocked: ${getFriendlyBotXpReason(botXp)}.`);
     } else {
       lines.push(`Preview only: ${Math.round(Number(preview.previewXp || 0))} bot XP not applied yet.`);
     }
@@ -2041,6 +2047,16 @@
       lupen_shards_path_missing_or_invalid: "Lupen Shards save path is unavailable"
     };
     return labels[safeReason] || safeReason || "not eligible";
+  }
+
+  function getFriendlyBotXpReason(result) {
+    const reason = String(result?.debugReason || result?.reason || "").trim();
+    if (reason === "duplicate_reward_application" ||
+      result?.playerSavePatchPlan?.duplicateDetected ||
+      result?.playerSavePatchResult?.duplicateDetected) {
+      return "duplicate destruction event";
+    }
+    return getFriendlyClaimReason(reason);
   }
 
   function getClaimStatusSummary(result = {}) {
@@ -3109,7 +3125,8 @@
       }
       if (status.lastStagingBotXpResult) {
         const botXp = status.lastStagingBotXpResult;
-        setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP +${Math.round(Number(botXp.xpDelta || 0))} / ${botXp.applied ? "applied" : botXp.debugReason || botXp.reason || "not applied"}`);
+        const botXpStatus = botXp.applied ? "applied" : getFriendlyBotXpReason(botXp);
+        setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP +${Math.round(Number(botXp.xpDelta || 0))} / ${botXpStatus}`);
       } else if (status.lastRewardPreview?.botId) {
         setDiagnosticsRow(panel, "bot XP", `preview only / XP +${Math.round(Number(status.lastRewardPreview.previewXp || 0))} / no apply result`);
       }
