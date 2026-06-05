@@ -1314,6 +1314,7 @@
 
   function selectStagingBot(bot) {
     if (!bot?.id) return;
+    if (!isSameCurrentNode(bot)) return;
     const client = getClient();
     const status = client?.getStatus?.();
     if (!status?.enabled || !status?.isConnected) return;
@@ -1438,17 +1439,20 @@
       y: clampMapCoordinate(basePosition.y + offset.y)
     };
     const labelOffset = position.x > 82 ? -2.9 : 2.9;
+    const canSelectOnMap = isSameCurrentNode(bot);
     const group = global.document.createElementNS(SVG_NS, "g");
     group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}${wasRecentlyHit(bot) ? " is-hit" : ""}`);
     group.setAttribute("data-bot-id", bot.id || "");
-    group.setAttribute("pointer-events", "auto");
-    group.style.cursor = "crosshair";
+    group.setAttribute("pointer-events", canSelectOnMap ? "auto" : "none");
+    group.style.cursor = canSelectOnMap ? "crosshair" : "default";
     group.setAttribute("transform", `translate(${position.x} ${position.y})`);
-    group.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      selectStagingBot(bot);
-    });
+    if (canSelectOnMap) {
+      group.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectStagingBot(bot);
+      });
+    }
 
     const title = global.document.createElementNS(SVG_NS, "title");
     title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards / ${bot.id || "unknown"} / x:${bot.x} y:${bot.y}`;
