@@ -4403,6 +4403,43 @@ try {
   assertAllowedBotNodes(roomB);
   console.log("disabled staging bot respawned with matching shared state");
 
+  let respawnedBot = botById(roomA, inspectedBotBeforeCombat.id);
+  const maxSecondKillShots = Math.ceil(botHealthTotal(respawnedBot) / 10) + 4;
+  for (let shot = 0; shot < maxSecondKillShots && !respawnedBot.disabled; shot += 1) {
+    await waitForFireReady(roomA, roomA.sessionId);
+    const currentBot = await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id, "Regression Pilot A");
+    const response = await expectCombatResolved(roomA, () => {
+      roomA.send("combat:intent", {
+        targetBotId: currentBot.id,
+        weaponId: "pulseLaser",
+        weaponName: "Regression Pulse Laser",
+        weaponFamily: "pulse",
+        currentNode: currentBot.currentNode,
+        timestamp: Date.now()
+      });
+    });
+    assert(response?.rewardsGranted === false, "Second staging bot destruction granted rewards.");
+    respawnedBot = botById(roomA, inspectedBotBeforeCombat.id);
+    if (response?.disabled === true) {
+      respawnedBot = {
+        ...respawnedBot,
+        disabled: true
+      };
+      break;
+    }
+  }
+  assert(respawnedBot?.disabled === true, "Respawned staging bot was not disabled by a legitimate second kill.");
+  await waitFor("staging bounty completes after second legitimate destruction", () => {
+    return bountyStatusEvents.some((event) => {
+      return event?.reason === "completed" &&
+        event?.active?.id === STAGING_BOUNTY_ID &&
+        event?.active?.progress === 2 &&
+        event?.active?.requiredKills === 2 &&
+        event?.active?.claimAvailable === true;
+    });
+  });
+  console.log("staging bounty counted a second legitimate respawned bot destruction");
+
   roomA.send("movement:update", {
     displayName: "Regression Pilot A",
     currentShipId: "lupenOrigin",

@@ -1161,7 +1161,11 @@ function renderSectorMap() {
 
 function getActiveObjectiveTargetNode() {
   const objective = typeof getActiveObjective === "function" ? getActiveObjective() : null;
-  if (!objective) return null;
+  if (!objective) {
+    return typeof getMultiplayerStagingBountyTargetNode === "function"
+      ? getMultiplayerStagingBountyTargetNode()
+      : null;
+  }
 
   if (objective.type === "trade" && typeof getTradeObjectiveTargetNode === "function") {
     return getTradeObjectiveTargetNode(objective);
@@ -1178,12 +1182,21 @@ function getActiveObjectiveTargetNode() {
 }
 
 function getActiveObjectiveRouteNodes() {
-  return typeof getObjectiveRoutePath === "function" ? getObjectiveRoutePath() : [];
+  const route = typeof getObjectiveRoutePath === "function" ? getObjectiveRoutePath() : [];
+  if (route.length) return route;
+  return typeof getMultiplayerStagingBountyRoutePath === "function" ? getMultiplayerStagingBountyRoutePath() : [];
 }
 
 function getActiveObjectiveMapLabel() {
   const objective = typeof getActiveObjective === "function" ? getActiveObjective() : null;
-  if (!objective) return "";
+  if (!objective) {
+    const stagingBounty = typeof getActiveMultiplayerStagingBountyObjective === "function"
+      ? getActiveMultiplayerStagingBountyObjective()
+      : null;
+    if (stagingBounty?.claimAvailable || stagingBounty?.completed) return "Claim XP";
+    if (stagingBounty?.accepted) return "Staging bot";
+    return "";
+  }
   if (objective.type === "trade") {
     const target = getActiveObjectiveTargetNode();
     return target ? `Objective: ${target}` : "Trade objective";
@@ -1670,7 +1683,15 @@ function drawSpaceNode(group, node, isCurrent, canJump, isObjectiveTarget = fals
 
 function jumpToNode(destination) {
   const transition = LupenMovementRules.getJumpTransition(sectorNodes, currentNode, destination, jumpCharge, jumpMax);
-  if (!transition.canJump) return;
+  if (!transition.canJump) {
+    const stagingTarget = typeof getMultiplayerStagingBountyTargetNode === "function"
+      ? getMultiplayerStagingBountyTargetNode()
+      : null;
+    if (stagingTarget && destination === stagingTarget && typeof addActivityLog === "function") {
+      addActivityLog(`Staging bounty route plotted to ${destination}. Jump through connected nodes to reach it.`);
+    }
+    return;
+  }
 
   currentNode = destination;
   if (transition.isPlanetDestination) {

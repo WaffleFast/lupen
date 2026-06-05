@@ -2813,6 +2813,9 @@
 
     if (canClaimStagingLoot(status, selectedBot)) {
       const lootResult = isLootClaimResultForBot(status, selectedBot) ? status.lastStagingLootClaimResult : null;
+      const lootGate = lootResult?.gates || {};
+      const lootWriteBlocked = !!lootResult && !lootResult.applied &&
+        (lootGate.writeEnabled === false || lootGate.dryRun !== false || lootGate.playerAllowed === false || lootResult.ok === false);
       const lootButton = global.document.createElement("button");
       lootButton.type = "button";
       lootButton.className = "lupen-mp-staging-fire";
@@ -2820,9 +2823,13 @@
         ? "Shard Claimed"
         : lootResult?.duplicateDetected
           ? "Shard Claimed"
-          : "Claim Shard";
-      lootButton.title = "Staging-only Lupen Shard material claim. No equipment, credits, bounties, or broad inventory writes.";
-      lootButton.disabled = lootResult?.applied === true || lootResult?.duplicateDetected === true;
+          : lootWriteBlocked
+            ? "Preview Only"
+            : "Preview Shard";
+      lootButton.title = lootWriteBlocked
+        ? `Lupen Shard write disabled or blocked in staging: ${getFriendlyClaimReason(lootResult?.reason)}.`
+        : "Preview the staging-only Lupen Shard material claim. No equipment, credits, bounties, or broad inventory writes.";
+      lootButton.disabled = lootResult?.applied === true || lootResult?.duplicateDetected === true || lootWriteBlocked;
       lootButton.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();

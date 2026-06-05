@@ -1371,6 +1371,17 @@ export class LupenSectorRoom extends Room {
     this.botContributions.delete(getStringValue(botId));
   }
 
+  getStagingBountyDestructionKey(bot) {
+    const botId = getStringValue(bot?.id);
+    if (!botId) return "";
+    const disabledUntil = Math.max(0, Math.round(Number(bot?.disabledUntil || 0)));
+    const lastUpdatedAt = Math.max(0, Math.round(Number(bot?.lastUpdatedAt || 0)));
+    // Bot ids are intentionally stable across respawns. The bounty must count
+    // each real server-owned destruction once, so include the disable/update
+    // timestamp while still de-duping duplicate messages for the same kill.
+    return `${botId}:${disabledUntil || lastUpdatedAt}`;
+  }
+
   buildRewardPreviewPayload(bot, disabledBySessionId, contributionSummary, receivedAt = Date.now()) {
     const botId = getStringValue(bot?.id);
     const finalHitIdentity = this.getPlayerIdentitySnapshot(disabledBySessionId);
@@ -1505,7 +1516,7 @@ export class LupenSectorRoom extends Room {
     uniqueContributors.forEach((sessionId) => {
       const currentState = this.getStagingBountyState(sessionId);
       const result = recordStagingBountyBotDestruction(currentState, {
-        botId: bot?.id,
+        botId: this.getStagingBountyDestructionKey(bot),
         contributorSessionIds: uniqueContributors,
         now: Date.now()
       });

@@ -108,6 +108,49 @@ function getSelectedMultiplayerStagingBounty() {
   return bounties.find((bounty) => bounty.id === multiplayerStagingBountySelectedId) || bounties[0] || getMultiplayerStagingBountyFallback();
 }
 
+function getActiveMultiplayerStagingBountyObjective() {
+  const active = getMultiplayerStagingBountyActiveState();
+  if (!isMultiplayerStagingActive() || !active?.accepted || active?.claimed) return null;
+  return mergeMultiplayerStagingBountyState({
+    ...getMultiplayerStagingBountyFallback(),
+    ...active,
+    creditsReward: 0,
+    lootReward: []
+  });
+}
+
+function getServerOwnedStagingBotNodes() {
+  if (!isMultiplayerStagingActive()) return [];
+  const bots = window.LupenMultiplayerClient?.getBots?.() || [];
+  return Array.from(new Set((Array.isArray(bots) ? bots : [])
+    .filter((bot) => bot && bot.disabled !== true && bot.currentNode && sectorNodes[bot.currentNode])
+    .map((bot) => bot.currentNode)));
+}
+
+function getNearestServerOwnedStagingBotNode(startNode = currentNode) {
+  const nodes = getServerOwnedStagingBotNodes();
+  if (!nodes.length) return null;
+  return nodes
+    .map((nodeName) => ({
+      nodeName,
+      route: typeof findSectorRoute === "function" ? findSectorRoute(startNode, nodeName) : []
+    }))
+    .filter((entry) => entry.route.length)
+    .sort((left, right) => left.route.length - right.route.length)[0]?.nodeName || nodes[0] || null;
+}
+
+function getMultiplayerStagingBountyTargetNode() {
+  const bounty = getActiveMultiplayerStagingBountyObjective();
+  if (!bounty) return null;
+  if (bounty.claimAvailable || bounty.completed) return getNearestPlanetNode(currentNode);
+  return getNearestServerOwnedStagingBotNode(currentNode);
+}
+
+function getMultiplayerStagingBountyRoutePath() {
+  const target = getMultiplayerStagingBountyTargetNode();
+  return target && typeof findSectorRoute === "function" ? findSectorRoute(currentNode, target) : [];
+}
+
 function requestMultiplayerStagingBountiesIfNeeded(force = false) {
   if (!isMultiplayerStagingActive()) return;
   const client = window.LupenMultiplayerClient;
@@ -217,6 +260,7 @@ function setupMultiplayerStagingBountyBoardSubscription() {
   multiplayerStagingBountySubscribed = true;
   client.onServerState(() => {
     reconcileMultiplayerStagingBountyResult();
+    if (typeof renderObjectiveHud === "function") renderObjectiveHud();
     if (document.getElementById("bountyScreen")?.classList.contains("active")) {
       renderBountyBoard();
     }
@@ -2932,6 +2976,39 @@ function renderObjectiveHud() {
 
   const objective = getActiveObjective();
   if (!objective) {
+    const stagingBounty = getActiveMultiplayerStagingBountyObjective();
+    if (stagingBounty) {
+      const progress = Math.min(Number(stagingBounty.progress || 0), Number(stagingBounty.requiredKills || 2));
+      const required = Number(stagingBounty.requiredKills || 2);
+      const targetNode = getMultiplayerStagingBountyTargetNode();
+      const actionText = stagingBounty.claimAvailable || stagingBounty.completed
+        ? "Claim XP at Bounty Board"
+        : targetNode
+          ? `Jump toward ${targetNode}`
+          : "Waiting for server-owned bot node";
+      panel.innerHTML = `
+        <div class="objective-hud-card bounty-objective-card orbit-objective-card">
+          <div class="objective-main-row objective-orbit-row">
+            <div class="objective-copy objective-orbit-copy">
+              <div class="objective-title-line">
+                <span class="objective-type-pill bounty-pill">MP Staging</span>
+                <strong>${stagingBounty.title || "Erebus Patrol Sweep"}</strong>
+              </div>
+              <span>Server-owned bounty progress only</span>
+              <em>${actionText}</em>
+            </div>
+            <div class="objective-orbit-meta">
+              <span>${formatNumber(progress)} / ${formatNumber(required)} bots</span>
+              <strong>${formatNumber(stagingBounty.xpReward || 40)} XP</strong>
+            </div>
+            <div class="objective-compact-actions objective-orbit-actions">
+              <button class="objective-map-btn" onclick="openSectorMap()">Jump</button>
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
     panel.innerHTML = `<div class="objective-empty">No active objective.</div>`;
     return;
   }
@@ -3037,13 +3114,18 @@ function isNodeOnActiveTradeRoute(name) {
   const objective = getActiveObjective();
   if (objective?.type === "bounty" && isNodeInBountyArea(name, objective.targetArea)) return true;
   if (objective?.type === "trade" && getTradeObjectiveTargetNode(objective) === name) return true;
-  return getObjectiveRoutePath(objective).includes(name);
+  const stagingPath = !objective ? getMultiplayerStagingBountyRoutePath() : [];
+  return getObjectiveRoutePath(objective).includes(name) || stagingPath.includes(name);
 }
 
 function isLineOnActiveTradeRoute(a, b) {
   const path = getObjectiveRoutePath();
-  for (let i = 0; i < path.length - 1; i += 1) {
-    if ((path[i] === a && path[i + 1] === b) || (path[i] === b && path[i + 1] === a)) return true;
+  const stagingPath = !getActiveObjective() ? getMultiplayerStagingBountyRoutePath() : [];
+  const combinedPaths = [path, stagingPath].filter((entry) => entry.length > 1);
+  for (const candidatePath of combinedPaths) {
+    for (let i = 0; i < candidatePath.length - 1; i += 1) {
+      if ((candidatePath[i] === a && candidatePath[i + 1] === b) || (candidatePath[i] === b && candidatePath[i + 1] === a)) return true;
+    }
   }
   return false;
 }
