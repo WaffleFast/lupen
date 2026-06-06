@@ -27085,6 +27085,76 @@ input::placeholder {
   grid-row: 6;
 }
 
+#storeScreen .store-catalog-card.quality-core,
+#storeScreen .store-quality-core .store-detail-visual {
+  border-color: rgba(205, 164, 255, 0.52);
+  box-shadow:
+    inset 0 0 14px rgba(205, 164, 255, 0.07),
+    0 0 14px rgba(94, 211, 255, 0.08);
+}
+
+#storeScreen .store-catalog-card.quality-core .store-card-art::after,
+#storeScreen .store-quality-core .store-detail-visual::after {
+  inset: 18%;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 54deg,
+      rgba(205, 164, 255, 0.58) 61deg,
+      transparent 68deg,
+      transparent 176deg,
+      rgba(94, 211, 255, 0.42) 184deg,
+      transparent 192deg,
+      transparent 360deg
+    );
+  filter: drop-shadow(0 0 6px rgba(205, 164, 255, 0.32));
+  opacity: 0.5;
+  animation: lupenCoreStoreShimmer 7.8s linear infinite;
+}
+
+#storeScreen .store-catalog-card.quality-core .store-card-art::before,
+#storeScreen .store-quality-core .store-detail-visual::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(205, 164, 255, 0.14), transparent 58%),
+    linear-gradient(115deg, transparent 43%, rgba(94, 211, 255, 0.2) 49%, transparent 56%);
+  opacity: 0.34;
+  transform: translateX(-14%) rotate(0.001deg);
+  animation: lupenCoreStoreGlint 6.2s ease-in-out infinite;
+}
+
+@keyframes lupenCoreStoreShimmer {
+  0% { transform: rotate(0deg) scale(0.98); }
+  50% { transform: rotate(180deg) scale(1.02); }
+  100% { transform: rotate(360deg) scale(0.98); }
+}
+
+@keyframes lupenCoreStoreGlint {
+  0%, 74%, 100% {
+    opacity: 0.18;
+    transform: translateX(-18%) rotate(0.001deg);
+  }
+
+  82% {
+    opacity: 0.42;
+    transform: translateX(18%) rotate(0.001deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #storeScreen .store-catalog-card.quality-core .store-card-art::before,
+  #storeScreen .store-quality-core .store-detail-visual::before,
+  #storeScreen .store-catalog-card.quality-core .store-card-art::after,
+  #storeScreen .store-quality-core .store-detail-visual::after {
+    animation: none !important;
+  }
+}
+
 /* ===== Planet Landing Hub PNG pass ===== */
 .hub-screen {
   width: min(calc(100vw - 24px), calc((100dvh - 24px) * 16 / 9), 1180px);

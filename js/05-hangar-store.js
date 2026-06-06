@@ -20,6 +20,8 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
   "attachment:jumpDrive": "attachment:jumpDrive",
   "attachment:shieldBooster": "attachment:shieldBooster",
   "attachment:evasionMatrix": "attachment:evasionMatrix",
+  "material:lupenShards": "material:lupenShard",
+  "core:lupenCore": "core:lupenCore",
   "ship:lupenHauler": "ship:lupenHauler"
 });
 const STAGING_LF2_HAULER_PRICE = 10500;
@@ -194,7 +196,7 @@ function renderStagingStorePreviewNote(item) {
 
 function isStagingStoreWritableItem(item) {
   const itemId = getStagingStoreItemId(item);
-  return Boolean(itemId) && item?.kind !== "core";
+  return Boolean(itemId);
 }
 
 function getStagingCargoPodEquipLine(result) {
@@ -2351,20 +2353,45 @@ function getDailyStoreSeed() {
 }
 
 function getDailyStoreItem(baseItems) {
-  return {
-    id: "daily:core:lupenCore",
-    kind: "core",
-    key: "lupenCore",
-    name: "Lupen Core",
-    category: "cores",
-    image: "assets/items/lupen-core.png",
-    fixedQuality: LUPEN_CORE_QUALITY,
-    storeTier: "Catalyst Stock",
-    dailyStock: true,
-    stockLimit: 250,
-    basePrice: 0,
-    description: "God-tier catalyst used by the Forge to support quality upgrades."
-  };
+  return null;
+}
+
+function getStoreMaterialItems() {
+  const shardDefinition = upgradeMaterialDefinitions?.lupenShards || {};
+  return [
+    {
+      id: "material:lupenShard",
+      kind: "material",
+      key: "lupenShards",
+      name: "Lupen Shard",
+      category: "materials",
+      image: shardDefinition.icon || "assets/items/lupen-shard.png",
+      fixedQuality: "advanced",
+      storeTier: "Forge Material",
+      basePrice: 50,
+      description: shardDefinition.description || "Charged Forge material used to raise item levels.",
+      stats: [
+        { label: "Use", value: "Forge upgrades" },
+        { label: "Stored", value: "Materials" }
+      ]
+    },
+    {
+      id: "core:lupenCore",
+      kind: "core",
+      key: "lupenCore",
+      name: "Lupen Core",
+      category: "materials",
+      image: "assets/items/lupen-core.png",
+      fixedQuality: LUPEN_CORE_QUALITY,
+      storeTier: "Rare Forge Material",
+      basePrice: 150,
+      description: "Rare Forge catalyst used to support quality upgrades.",
+      stats: [
+        { label: "Tier", value: "Rare catalyst" },
+        { label: "Stored", value: "Vault item" }
+      ]
+    }
+  ];
 }
 
 
@@ -2442,34 +2469,14 @@ function getStoreCatalogItems() {
     });
   });
 
-  if (isMultiplayerStagingStoreActive() && SHIPS.lupenHauler) {
-    const ship = SHIPS.lupenHauler;
-    items.push({
-      id: "ship:lupenHauler",
-      kind: "ship",
-      key: "lupenHauler",
-      name: ship.name,
-      category: "ships",
-      image: ship.image,
-      description: "Cargo-focused staging pilot hull for the online trade loop.",
-      basePrice: STAGING_LF2_HAULER_PRICE,
-      qualityEnabled: false,
-      storeTier: "Staging Hull",
-      stats: [
-        { label: "Cargo", value: ship.cargo },
-        { label: "Shield", value: ship.shield },
-        { label: "Gun Slots", value: ship.gunSlots },
-        { label: "Equip Slots", value: ship.attachmentSlots }
-      ]
-    });
-  }
+  items.push(...getStoreMaterialItems());
 
   const dailyItem = getDailyStoreItem(items);
   if (dailyItem) {
     items.push(dailyItem);
   }
 
-  const order = { ships: 0, attachments: 1, guns: 2 };
+  const order = { attachments: 0, guns: 1, materials: 2 };
   return items.sort((a, b) => {
     if (a.dailyStock !== b.dailyStock) return a.dailyStock ? 1 : -1;
     const delta = (order[a.category] ?? 99) - (order[b.category] ?? 99);
@@ -2481,6 +2488,9 @@ function getStoreCatalogItems() {
 function isStoreOwnedItem(item, quality = selectedStoreQuality) {
   if (!item) return false;
   if (item.kind === "ship") return false;
+  if (item.kind === "material") {
+    return Number(upgradeMaterials?.[item.key] || 0) > 0;
+  }
   if (item.kind === "core") {
     return getStoreItemInventoryCount(item, quality) > 0;
   }
@@ -2504,7 +2514,7 @@ function getStoreSelectedItem() {
 }
 
 function ensureStoreSelection() {
-  if (!["all", "guns", "attachments", "owned"].includes(storeFilter)) {
+  if (!["all", "guns", "attachments", "materials", "owned"].includes(storeFilter)) {
     storeFilter = "all";
   }
   selectedStoreQuality = "standard";
@@ -2650,9 +2660,16 @@ function getStoreDetailStats(item, quality = "standard") {
     return getAttachmentPurchaseStatRows(item, quality);
   }
 
+  if (item.kind === "material") {
+    return item.stats || [
+      { label: "Use", value: "Forge upgrades" },
+      { label: "Stored", value: "Materials" }
+    ];
+  }
+
   if (item.kind === "core") {
-    return [
-      { label: "Tier", value: "God-tier catalyst" },
+    return item.stats || [
+      { label: "Tier", value: "Rare catalyst" },
       { label: "Use", value: "Forge quality upgrades" }
     ];
   }
@@ -2677,6 +2694,7 @@ function getStorePrice(item, quality = "standard") {
 }
 
 function getStoreItemInventoryCount(item, quality = "standard") {
+  if (item?.kind === "material") return Number(upgradeMaterials?.[item.key] || 0);
   return inventoryItems.filter(entry => entry.key === item.key && entry.quality === quality).length;
 }
 
@@ -2756,6 +2774,7 @@ function renderStoreFilters() {
     { key: "all", label: "All" },
     { key: "guns", label: "Guns" },
     { key: "attachments", label: "Attachments" },
+    { key: "materials", label: "Materials" },
     { key: "owned", label: "Owned" }
   ];
 
@@ -2789,14 +2808,16 @@ function renderStoreCatalog() {
     const price = getStorePrice(item, quality);
     const ownedCount = item.kind === "ship"
       ? (ownedShips.includes(item.key) ? 1 : 0)
-      : item.kind === "core"
+      : item.kind === "material"
+        ? Number(upgradeMaterials?.[item.key] || 0)
+        : item.kind === "core"
         ? getStoreItemInventoryCount(item, quality)
         : getStoreOwnedReadyCount(item) + getStoreItemInventoryCount(item, quality);
     let status = "";
 
     if (item.kind === "ship") {
       status = currentShipId === item.key ? "Equipped" : (ownedShips.includes(item.key) ? "Owned" : "");
-    } else if (item.kind === "core") {
+    } else if (item.kind === "material" || item.kind === "core") {
       status = ownedCount > 0 ? `Owned x${formatNumber(ownedCount)}` : "";
     } else {
       status = ownedCount > 0 ? `Owned x${formatNumber(ownedCount)}` : "";
@@ -2805,7 +2826,7 @@ function renderStoreCatalog() {
     const stockLabel = getStoreStockLabel(item);
     const soldOut = getStoreStockRemaining(item) === 0;
     const categoryLabel = getStoreCardCategoryLabel(item, quality);
-    const priceLabel = item.kind === "core" ? "Upgrade Material" : (soldOut ? "Sold Out" : `CR ${formatNumber(price)}`);
+    const priceLabel = soldOut ? "Sold Out" : `CR ${formatNumber(price)}`;
 
     return `
       <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} quality-${quality}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
@@ -2825,14 +2846,16 @@ function getStoreCardCategoryLabel(item, quality = "standard") {
   if (!item) return "";
   if (item.kind === "gun") return "Gun";
   if (item.kind === "attachment") return "Attachment";
-  if (item.kind === "core") return "Legendary Catalyst";
+  if (item.kind === "material") return "Forge Material";
+  if (item.kind === "core") return "Rare Catalyst";
   if (item.kind === "ship") return "Ship";
   return item.category || "";
 }
 
 function getStoreDetailKicker(item, quality = "standard") {
   if (!item) return "";
-  if (item.kind === "core") return "Legendary Catalyst";
+  if (item.kind === "material") return "Forge Material";
+  if (item.kind === "core") return "Rare Catalyst";
   return `${getStoreCardCategoryLabel(item, quality)} / ${titleCaseQuality(quality)}`;
 }
 
@@ -2852,6 +2875,8 @@ function renderStoreDetail() {
   const ownedReady = getStoreOwnedReadyCount(item);
   const totalOwned = item.kind === "ship"
     ? (ownedShips.includes(item.key) ? 1 : 0)
+    : item.kind === "material"
+      ? inventoryCount
     : (ownedReady + inventoryCount);
   const stockRemaining = getStoreStockRemaining(item);
   const hasStock = stockRemaining > 0 || !Number.isFinite(stockRemaining);
@@ -2889,9 +2914,13 @@ function renderStoreDetail() {
     ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Staging Purchase") : "Server Preview") : "Sold Out"}</button>`
     : `<button class="store-detail-buy-action" disabled>Server preview unavailable</button>`;
 
-  if (item.kind === "core") {
+  if (item.kind === "material") {
     buyButton = stagingStoreLocked
-      ? `<button class="store-detail-buy-action store-core-action" disabled>Server preview unavailable</button>`
+      ? stagingPreviewButton
+      : `<button class="store-detail-buy-action store-core-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="openUpgradeForge()">Open Upgrade Bay</button>`;
+  } else if (item.kind === "core") {
+    buyButton = stagingStoreLocked
+      ? stagingPreviewButton
       : `<button class="store-detail-buy-action store-core-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="openUpgradeForge()">Open Upgrade Bay</button>`;
   } else if (item.kind === "ship") {
     if (currentShipId === item.key) {

@@ -1,7 +1,8 @@
 /* Staging-only Store write prototype.
    This service can patch only server-catalog Map 1 Store guns, attachments,
-   and the LF-2 Hauler after strict staging gates pass. It never writes
-   loadouts, loot, bounties, PvP/player damage, broad progression, or schemas. */
+   the LF-2 Hauler, and cheap Forge test materials after strict staging gates
+   pass. It never writes loadouts, loot, bounties, PvP/player damage, broad
+   progression, or schemas. */
 
 import { getStagingStoreItemById, getStagingStoreItemIds } from "../config/stagingStoreConfig.js";
 
@@ -11,6 +12,8 @@ const LUPEN_HAULER_KEY = "lupenHauler";
 const MAX_CREDITS = 999999999;
 const MAX_ATTACHMENT_COUNT = 9999;
 const MAX_GUN_COUNT = 9999;
+const MAX_MATERIAL_COUNT = 999999;
+const LUPEN_CORE_QUALITY = "core";
 const DEFAULT_ALLOWED_STORE_ITEMS = getStagingStoreItemIds().join(",");
 
 function getString(value, fallback = "") {
@@ -104,16 +107,25 @@ function isGunItem(item) {
   return item?.localKind === "gun" && !!item?.localKey;
 }
 
+function isMaterialItem(item) {
+  return item?.localKind === "material" && !!item?.localKey;
+}
+
+function isCoreItem(item) {
+  return item?.localKind === "core" && item?.localKey === "lupenCore";
+}
+
 function isWritableStoreItem(item) {
-  return isAttachmentItem(item) || isGunItem(item) || isLupenHaulerItem(item);
+  return isAttachmentItem(item) || isGunItem(item) || isLupenHaulerItem(item) || isMaterialItem(item) || isCoreItem(item);
 }
 
 function getStoreWriteFlags(applied = false, writeKind = "") {
   return {
     creditsWritten: applied,
-    inventoryWritten: false,
+    inventoryWritten: applied && writeKind === "inventory",
+    materialWritten: applied && writeKind === "material",
     attachmentWritten: applied && writeKind === "attachment",
-    equipmentWritten: applied && writeKind !== "ship",
+    equipmentWritten: applied && (writeKind === "attachment" || writeKind === "weapon"),
     shipWritten: applied && writeKind === "ship",
     weaponWritten: applied && writeKind === "weapon",
     saveWritten: applied,
@@ -156,6 +168,9 @@ function getStoreUserReason(reason) {
     gun_count_missing_or_invalid: "Saved weapon ownership count is missing or invalid.",
     owned_ships_path_missing_or_invalid: "Saved ship ownership path is missing or invalid.",
     ship_already_owned: "Ship is already owned.",
+    upgrade_materials_path_missing_or_invalid: "Saved Forge material path is missing or invalid.",
+    material_count_missing_or_invalid: "Saved Forge material count is missing or invalid.",
+    inventory_items_path_missing_or_invalid: "Saved inventory item path is missing or invalid.",
     supabase_config_missing: "Supabase server config unavailable.",
     player_save_missing: "Player save not found.",
     player_save_read_failed: "Player save read failed.",
@@ -196,6 +211,8 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
   const writesAttachment = isAttachmentItem(selectedItem);
   const writesWeapon = isGunItem(selectedItem);
   const writesShip = isLupenHaulerItem(selectedItem);
+  const writesMaterial = isMaterialItem(selectedItem);
+  const writesCore = isCoreItem(selectedItem);
   if (!selectedItem || !isWritableStoreItem(selectedItem)) {
     return getBlockedResult("store_item_preview_only", {
       itemId: selectedItem?.itemId || "",
@@ -232,7 +249,7 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
   let itemBefore = null;
   let itemAfter = null;
   let appliedFields = ["credits"];
-  const untouchedFields = ["inventoryItems", "shipLoadouts", "loot", "bounties", "PvP", "playerDamage", "progression"];
+  const untouchedFields = ["shipLoadouts", "loot", "bounties", "PvP", "playerDamage", "progression"];
 
   if (writesAttachment) {
     if (!saveData.ownedAttachments || typeof saveData.ownedAttachments !== "object" || Array.isArray(saveData.ownedAttachments)) {
@@ -244,7 +261,7 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     itemAfter = Math.min(MAX_ATTACHMENT_COUNT, itemBefore + safeQuantity);
     patchedSaveData.ownedAttachments[attachmentKey] = itemAfter;
     appliedFields.push(`ownedAttachments.${attachmentKey}`);
-    untouchedFields.push("ownedGuns", "guns");
+    untouchedFields.push("ownedGuns", "guns", "inventoryItems", "upgradeMaterials");
   } else if (writesWeapon) {
     if (!saveData.ownedGuns || typeof saveData.ownedGuns !== "object" || Array.isArray(saveData.ownedGuns)) {
       return getBlockedResult("owned_guns_path_missing_or_invalid");
@@ -255,8 +272,8 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     itemAfter = Math.min(MAX_GUN_COUNT, itemBefore + safeQuantity);
     patchedSaveData.ownedGuns[gunKey] = itemAfter;
     appliedFields.push(`ownedGuns.${gunKey}`);
-    untouchedFields.push("ownedAttachments", "attachments");
-  } else {
+    untouchedFields.push("ownedAttachments", "attachments", "inventoryItems", "upgradeMaterials");
+  } else if (writesShip) {
     if (!Array.isArray(saveData.ownedShips)) {
       return getBlockedResult("owned_ships_path_missing_or_invalid");
     }
@@ -276,10 +293,49 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     patchedSaveData.ownedShips = [...saveData.ownedShips, LUPEN_HAULER_KEY];
     itemAfter = patchedSaveData.ownedShips.length;
     appliedFields.push("ownedShips");
-    untouchedFields.push("ownedAttachments", "ownedGuns", "attachments", "guns");
+    untouchedFields.push("ownedAttachments", "ownedGuns", "attachments", "guns", "inventoryItems", "upgradeMaterials");
+  } else if (writesMaterial) {
+    const materialKey = selectedItem.localKey;
+    const sourceMaterials = saveData.upgradeMaterials && typeof saveData.upgradeMaterials === "object" && !Array.isArray(saveData.upgradeMaterials)
+      ? saveData.upgradeMaterials
+      : {};
+    patchedSaveData.upgradeMaterials = patchedSaveData.upgradeMaterials && typeof patchedSaveData.upgradeMaterials === "object" && !Array.isArray(patchedSaveData.upgradeMaterials)
+      ? patchedSaveData.upgradeMaterials
+      : {};
+    itemBefore = clampInteger(sourceMaterials[materialKey] || 0, 0, MAX_MATERIAL_COUNT);
+    if (itemBefore === null) return getBlockedResult("material_count_missing_or_invalid");
+    itemAfter = Math.min(MAX_MATERIAL_COUNT, itemBefore + safeQuantity);
+    patchedSaveData.upgradeMaterials[materialKey] = itemAfter;
+    appliedFields.push(`upgradeMaterials.${materialKey}`);
+    untouchedFields.push("ownedAttachments", "ownedGuns", "attachments", "guns", "inventoryItems");
+  } else if (writesCore) {
+    if (!Array.isArray(saveData.inventoryItems)) {
+      return getBlockedResult("inventory_items_path_missing_or_invalid");
+    }
+    patchedSaveData.inventoryItems = Array.isArray(patchedSaveData.inventoryItems)
+      ? patchedSaveData.inventoryItems
+      : [];
+    itemBefore = saveData.inventoryItems.filter((entry) => entry?.key === selectedItem.localKey).length;
+    const coreId = `store-${selectedItem.localKey}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    patchedSaveData.inventoryItems.push({
+      id: coreId,
+      key: selectedItem.localKey,
+      quality: LUPEN_CORE_QUALITY
+    });
+    itemAfter = itemBefore + safeQuantity;
+    appliedFields.push("inventoryItems");
+    untouchedFields.push("ownedAttachments", "ownedGuns", "attachments", "guns", "upgradeMaterials");
   }
 
-  const writeKind = writesShip ? "ship" : writesWeapon ? "weapon" : "attachment";
+  const writeKind = writesShip
+    ? "ship"
+    : writesWeapon
+      ? "weapon"
+      : writesAttachment
+        ? "attachment"
+        : writesMaterial
+          ? "material"
+          : "inventory";
 
   return {
     ok: true,
@@ -292,6 +348,7 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     category: selectedItem.category,
     localKind: selectedItem.localKind,
     localKey: selectedItem.localKey,
+    writeKind,
     quantity: safeQuantity,
     unitPrice,
     totalCost: unitPrice,
@@ -484,8 +541,8 @@ export async function applyStagingStorePurchaseWrite({
         itemAllowed: envGate.itemAllowed
       },
       envGate,
-      writes: getStoreWriteFlags(true, isLupenHaulerItem(selectedItem) ? "ship" : isGunItem(selectedItem) ? "weapon" : "attachment"),
-      ...getStoreWriteFlags(true, isLupenHaulerItem(selectedItem) ? "ship" : isGunItem(selectedItem) ? "weapon" : "attachment"),
+      writes: getStoreWriteFlags(true, patchPlan.writeKind),
+      ...getStoreWriteFlags(true, patchPlan.writeKind),
       appliedFields: patchPlan.appliedFields
     };
   } catch (_err) {

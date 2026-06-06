@@ -1,8 +1,9 @@
 /* Static staging Store preview config.
    This catalogue is server-owned data for multiplayer Store validation.
-   It only covers current Map 1 Store ships, guns, and attachments; it never
-   allows unknown item ids, Store sell, loot writes, bounties, PvP/player
-   damage, schema, or broad progression. */
+   It covers current Map 1 Store guns, attachments, the Vessel Exchange LF-2
+   path, and cheap Forge test materials; it never allows unknown item ids,
+   Store sell, loot writes, bounties, PvP/player damage, schema, or broad
+   progression. */
 
 const MAX_STORE_PURCHASE_QUANTITY = 5;
 
@@ -162,6 +163,30 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     stockType: "fixed",
     description: "Cargo-forward pilot hull for staging trade loops.",
     reference: "SHIPS.lupenHauler"
+  }),
+  Object.freeze({
+    itemId: "material:lupenShard",
+    name: "Lupen Shard",
+    category: "material",
+    localKind: "material",
+    localKey: "lupenShards",
+    price: 50,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Charged Forge material for upgrade testing.",
+    reference: "upgradeMaterials.lupenShards"
+  }),
+  Object.freeze({
+    itemId: "core:lupenCore",
+    name: "Lupen Core",
+    category: "material",
+    localKind: "core",
+    localKey: "lupenCore",
+    price: 150,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Rare Forge catalyst for upgrade testing.",
+    reference: "inventoryItems.lupenCore"
   })
 ]);
 
@@ -195,6 +220,7 @@ function getWriteFlags() {
   return {
     creditsWritten: false,
     inventoryWritten: false,
+    materialWritten: false,
     shipWritten: false,
     equipmentWritten: false,
     saveWritten: false,

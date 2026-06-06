@@ -1514,7 +1514,9 @@ async function assertStagingStorePreviewHelpers() {
     "attachment:jumpDrive",
     "attachment:shieldBooster",
     "attachment:evasionMatrix",
-    "ship:lupenHauler"
+    "ship:lupenHauler",
+    "material:lupenShard",
+    "core:lupenCore"
   ];
   assert(items.length >= expectedStoreItemIds.length, "Staging Store item list did not include deterministic Map 1 items.");
   for (const itemId of expectedStoreItemIds) {
@@ -1644,6 +1646,8 @@ async function assertStagingStorePreviewHelpers() {
   const ionBlasterItem = items.find((item) => item.itemId === "gun:ionBlaster");
   const jumpDriveItem = items.find((item) => item.itemId === "attachment:jumpDrive");
   const haulerItem = items.find((item) => item.itemId === "ship:lupenHauler");
+  const lupenShardItem = items.find((item) => item.itemId === "material:lupenShard");
+  const lupenCoreItem = items.find((item) => item.itemId === "core:lupenCore");
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
   assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 780, "Cargo Pod Store patch did not subtract the server price.");
@@ -1690,6 +1694,22 @@ async function assertStagingStorePreviewHelpers() {
   assert(shieldBoosterPatch.patchedSaveData.ownedGuns.pulseLaser === 1, "Shield Booster Store patch changed weapon ownership.");
   assert(shieldBoosterPatch.patchedSaveData.cargo.Iron === 2, "Shield Booster Store patch changed trade cargo.");
   assert(shieldBoosterPatch.patchedSaveData.playerProgress.combatXp === 33, "Shield Booster Store patch changed progression.");
+
+  const shardPatch = buildStagingStorePurchasePatch({ ...validSaveData, upgradeMaterials: { lupenShards: 4 } }, lupenShardItem, 1);
+  assert(shardPatch.ok === true, `Valid Lupen Shard Store patch was blocked: ${shardPatch.blockReason}`);
+  assert(shardPatch.creditsBefore === 1000 && shardPatch.creditsAfter === 950, "Lupen Shard Store patch did not subtract the server price.");
+  assert(shardPatch.itemBefore === 4 && shardPatch.itemAfter === 5, "Lupen Shard Store patch did not increment upgradeMaterials.lupenShards.");
+  assert(shardPatch.patchedSaveData.upgradeMaterials.lupenShards === 5, "Lupen Shard Store patch used the wrong material path.");
+  assert(shardPatch.patchedSaveData.inventoryItems[0].id === "kept-item", "Lupen Shard Store patch changed inventoryItems.");
+  assert(shardPatch.materialWritten === false && shardPatch.saveWritten === false, "Lupen Shard dry-run plan reported writes.");
+
+  const corePatch = buildStagingStorePurchasePatch(validSaveData, lupenCoreItem, 1);
+  assert(corePatch.ok === true, `Valid Lupen Core Store patch was blocked: ${corePatch.blockReason}`);
+  assert(corePatch.creditsBefore === 1000 && corePatch.creditsAfter === 850, "Lupen Core Store patch did not subtract the server price.");
+  assert(corePatch.itemBefore === 0 && corePatch.itemAfter === 1, "Lupen Core Store patch did not count inventoryItems.lupenCore.");
+  assert(corePatch.patchedSaveData.inventoryItems.length === validSaveData.inventoryItems.length + 1, "Lupen Core Store patch did not append a vault item.");
+  assert(corePatch.patchedSaveData.inventoryItems.some((entry) => entry.key === "lupenCore" && entry.quality === "core"), "Lupen Core Store patch used the wrong inventory item shape.");
+  assert(corePatch.inventoryWritten === false && corePatch.saveWritten === false, "Lupen Core dry-run plan reported writes.");
 
   const haulerSaveData = { ...validSaveData, credits: 11000 };
   const haulerPatch = buildStagingStorePurchasePatch(haulerSaveData, haulerItem, 1);
@@ -1859,6 +1879,61 @@ async function assertStagingStorePreviewHelpers() {
   assert(sequentialSave.playerProgress.combatXp === 33, "Applied Store write changed progression.");
   assert(sequentialSave.activeBountyId === "keep-bounty", "Applied Store write changed bounty state.");
   assert(storeFetchCalls.join(",") === "GET,PATCH", `Store write expected read/write pair, got ${storeFetchCalls.join(",")}.`);
+
+  let materialSave = { ...JSON.parse(JSON.stringify(validSaveData)), upgradeMaterials: { lupenShards: 2 } };
+  const appliedMaterialWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "material:lupenShard",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "verified",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: materialSave }] };
+      materialSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedMaterialWrite.applied === true, `Applied Lupen Shard Store write did not apply: ${appliedMaterialWrite.blockReason}`);
+  assert(appliedMaterialWrite.creditsAfter === 950 && materialSave.upgradeMaterials.lupenShards === 3, "Applied Lupen Shard write did not patch credits/material count.");
+  assert(appliedMaterialWrite.materialWritten === true && appliedMaterialWrite.inventoryWritten === false, "Applied Lupen Shard write reported wrong write flags.");
+
+  let coreSave = JSON.parse(JSON.stringify(validSaveData));
+  const appliedCoreWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "core:lupenCore",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "verified",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: coreSave }] };
+      coreSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedCoreWrite.applied === true, `Applied Lupen Core Store write did not apply: ${appliedCoreWrite.blockReason}`);
+  assert(appliedCoreWrite.creditsAfter === 850, "Applied Lupen Core write did not patch credits.");
+  assert(coreSave.inventoryItems.some((entry) => entry.key === "lupenCore" && entry.quality === "core"), "Applied Lupen Core write did not persist a core inventory item.");
+  assert(appliedCoreWrite.inventoryWritten === true && appliedCoreWrite.materialWritten === false, "Applied Lupen Core write reported wrong write flags.");
 
   let weaponSave = JSON.parse(JSON.stringify(validSaveData));
   const weaponFetchCalls = [];
