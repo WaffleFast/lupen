@@ -11,7 +11,8 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 - The tester is logged in with a verified Supabase account.
 - The account is included in the relevant staging allowlists.
 - Colyseus Cloud has the intended staging env vars set.
-- Trade writes, Store writes, loadout writes, XP-only writes, and Lupen Shard writes are enabled only for the specific phase being tested.
+- Trade writes, Store writes, loadout writes, and XP-only writes are enabled only for the specific phase being tested.
+- Lupen Shard writes remain optional/phase-gated; when disabled, shard UI should read as preview-only.
 - Dry-run flags are deliberately set for the intended test mode.
 - No secrets, auth state, traces, or screenshots with private data are committed.
 
@@ -54,9 +55,9 @@ Later systems use separate gates:
 1. Log in to `https://www.lupen.io/?mp=staging`.
 2. Confirm the Multiplayer Staging chip and loop guide appear, and that `?debug=mp` shows diagnostics only when explicitly used.
 3. Open the Trade Terminal.
-4. Buy cargo through the staging trade path.
-5. Sell cargo through the staging trade path.
-6. Refresh and confirm CR/cargo persisted.
+4. Buy cargo through the real Trade Terminal server path.
+5. Travel to the destination and sell cargo through the real Trade Terminal server path.
+6. Refresh/relogin and confirm CR/cargo persisted.
    - The floating Staging Trade Preview is debug-only; normal testers should use the real Trade Terminal.
 7. Open the Store.
 8. Buy LF-2 Hauler (`10,500 CR` staging pilot price).
@@ -73,12 +74,19 @@ Later systems use separate gates:
 19. Confirm shield stat or equipped Shield Booster state persists.
 20. Open the Bounty Board.
 21. Accept Erebus Patrol Sweep (`40 XP` staging bounty reward).
-22. Destroy two staging bots.
-23. Claim XP.
-24. Claim Lupen Shard.
-25. Refresh or relogin.
-26. Confirm CR, cargo, active ship, loadout, equipped items, XP, and Lupen Shard persisted.
-27. Open normal `https://www.lupen.io` and confirm normal single-player remains unchanged with no staging chip, guide, or multiplayer connection.
+22. Launch to Sector and jump through connected nodes toward a server-owned staging bot.
+23. Click a bot in the same node.
+24. Press Engage and confirm auto-fire continues.
+25. Press Disengage once and confirm auto-fire stops.
+26. Re-engage and destroy the bot.
+27. Confirm bot-kill XP applies automatically and the HUD/Pilot XP updates.
+28. Confirm the Activity log records the engagement, destruction, XP, and bounty progress.
+29. Destroy a second staging bot and confirm Erebus Patrol Sweep reaches `2/2`.
+30. Return to the Bounty Board and claim the `40 XP` bounty bonus.
+31. Confirm Lupen Shard remains preview-only unless loot write gates are deliberately enabled for that phase.
+32. Refresh or relogin.
+33. Confirm CR, cargo, active ship, loadout, equipped items, bot XP, bounty XP, and claimed bounty state persisted.
+34. Open normal `https://www.lupen.io` and confirm normal single-player remains unchanged with no staging chip, guide, or multiplayer connection.
 
 ## Deploy Split
 

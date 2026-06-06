@@ -276,7 +276,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("multiplayer staging bounty board uses server-owned bounty copy", async ({ page }) => {
+  test("multiplayer staging bounty board uses player-facing staging bounty copy", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -286,8 +286,8 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#bountyScreen")).toContainText("MP STAGING BOUNTIES");
     await expect(page.locator("#bountyScreen")).toContainText("Erebus Patrol Sweep");
-    await expect(page.locator("#bountyScreen")).toContainText(/Server-owned staging bounty|Waiting for staging multiplayer server/);
-    await expect(page.locator("#bountyScreen")).toContainText(/XP-only reward|No CR or loot/i);
+    await expect(page.locator("#bountyScreen")).toContainText(/Server-tracked staging bounty|Waiting for Multiplayer Staging/);
+    await expect(page.locator("#bountyScreen")).toContainText(/40 XP|No CR or loot items/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

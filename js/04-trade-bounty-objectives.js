@@ -2343,15 +2343,15 @@ function renderMultiplayerStagingBountyDetail() {
         : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accept Pending" : connected ? "Accept Staging Bounty" : "Waiting For Server"}</button>`;
 
   const connectionNote = connected
-    ? "Server-owned staging bounty. Local bounty state and rewards are not used."
-    : "Waiting for staging multiplayer server. No local bounty state will be changed.";
+    ? "Server-tracked staging bounty."
+    : "Waiting for Multiplayer Staging.";
 
   const infoRows = [
-    ["TYPE", "Server-owned staging bounty"],
-    ["TARGET", "Staging Erebus bots"],
-    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} staging Erebus bots`],
-    ["REWARD", `XP-only reward: ${formatNumber(bounty.xpReward || 25)}`],
-    ["EXCLUDED", "No CR or loot in staging"]
+    ["TYPE", "Multiplayer Staging"],
+    ["TARGET", "Erebus bots"],
+    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} Erebus bots`],
+    ["REWARD", `${formatNumber(bounty.xpReward || 25)} XP`],
+    ["LIMITS", "No CR or loot items"]
   ];
 
   panel.innerHTML = `
@@ -2365,8 +2365,8 @@ function renderMultiplayerStagingBountyDetail() {
       </div>
     </div>
 
-    ${bounty.claimAvailable || bounty.completed ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Claim XP sends an XP-only staging request to the server.</span></div>` : ""}
-    ${bounty.claimed ? `<div class="bounty-complete-note claimed"><strong>Already claimed</strong><span>Duplicate staging XP claims are blocked server-side.</span></div>` : ""}
+    ${bounty.claimAvailable || bounty.completed ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Claim the ${formatNumber(bounty.xpReward || 25)} XP bounty bonus.</span></div>` : ""}
+    ${bounty.claimed ? `<div class="bounty-complete-note claimed"><strong>Already claimed</strong><span>Bounty XP has been collected.</span></div>` : ""}
 
     <div class="selected-contract-progress bounty-detail-progress-block selected-bounty-progress">
       <div class="bounty-progress-heading"><span>Progress</span><strong>${formatNumber(progress)} / ${formatNumber(requiredKills)}</strong></div>
