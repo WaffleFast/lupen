@@ -42,6 +42,16 @@ async function openStore(page) {
   await expect(page.locator("#storeScreen")).toContainText("STATION STORE");
 }
 
+async function openHangar(page) {
+  await waitForGameGlobals(page);
+  await page.evaluate(() => {
+    window.showScreen("gameScreen");
+    if (typeof window.openHangar === "function") window.openHangar();
+  });
+  await expect(page.locator("#hangarScreen")).toHaveClass(/active/);
+  await expect(page.locator("#hangarScreen")).toContainText("Loadout");
+}
+
 async function openBountyBoard(page) {
   await waitForGameGlobals(page);
   await page.evaluate(() => {
@@ -480,6 +490,24 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#storeScreen")).toContainText(/LF-2 Hauler selection preview|Apply Cargo Pod|Cargo Pod equip preview|server-backed validation/i);
     await expect(page.locator("#storeScreen")).toContainText(/server-backed validation|server preview only|Real Store purchase is blocked|No CR or inventory changed/i);
     await expect(page.locator("#storeScreen")).not.toContainText("Buy / CR");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("hangar loadout shows selected-item actions without live writes", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
+
+    await openHangar(page);
+    await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
+
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Select equipment");
+    await expect(page.locator("#hangarScreen")).toContainText("Available Equipment");
+    await expect(page.locator("#hangarScreen")).toContainText("Guns");
+    await expect(page.locator("#hangarScreen")).toContainText("Equipment");
+    await expect(page.locator("#hangarScreen")).not.toContainText("Total Slots");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
