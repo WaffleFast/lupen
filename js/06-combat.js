@@ -27,7 +27,14 @@ function retargetEngagementToSelectedTarget() {
   updateAsteroidUI();
   updateTargetPanel();
   updateObjectActionPanel(true);
-  performAttackCycle();
+  clearInterval(engageTimer);
+  if (nextTargetRef.type === "stagingBot") {
+    performStagingBotAttackCycle();
+    engageTimer = setInterval(performStagingBotAttackCycle, 950);
+  } else {
+    performAttackCycle();
+    engageTimer = setInterval(performAttackCycle, getEquippedWeapon().speed);
+  }
   return true;
 }
 
@@ -63,6 +70,18 @@ function selectHostileBot(botId) {
   }
 }
 
+function selectStagingBotTarget(botId) {
+  const bot = getStagingBotTargetById(botId);
+  if (!bot || !bot.alive || (bot.currentNodeId || bot.node) !== currentNode) return;
+
+  selectedTarget = { type: "stagingBot", id: bot.id };
+  showTargetPanel();
+  const retargeted = retargetEngagementToSelectedTarget();
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(retargeted);
+}
+
 function engageTarget() {
   let target = getSelectedTargetEntity();
 
@@ -82,8 +101,13 @@ function engageTarget() {
   engagedTarget = getTargetRefFromEntity(target);
 
   updateAsteroidUI();
-  performAttackCycle();
-  engageTimer = setInterval(performAttackCycle, getEquippedWeapon().speed);
+  if (engagedTarget?.type === "stagingBot") {
+    performStagingBotAttackCycle();
+    engageTimer = setInterval(performStagingBotAttackCycle, 950);
+  } else {
+    performAttackCycle();
+    engageTimer = setInterval(performAttackCycle, getEquippedWeapon().speed);
+  }
   updateTargetPanel();
 }
 
@@ -746,6 +770,26 @@ function respawnAsteroid() {
 
   updateAsteroidUI();
   updateTargetPanel();
+}
+
+function performStagingBotAttackCycle() {
+  const target = getEngagedTargetEntity();
+  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
+    disengageTarget(true);
+    updateObjectActionPanel(true);
+    return;
+  }
+
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  const cooldownRemainingMs = Math.max(0, Number(status?.fireCooldownRemainingMs || 0));
+  if (!status?.enabled || !status?.isConnected || cooldownRemainingMs > 0) return;
+
+  client.sendSelectedStagingBotCombatIntent?.({
+    targetBotId: target.id,
+    currentNode,
+    timestamp: Date.now()
+  });
 }
 
 function respawnHostileBot(botId) {

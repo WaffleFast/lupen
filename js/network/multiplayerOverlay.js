@@ -1324,6 +1324,9 @@
     const status = client?.getStatus?.();
     if (!status?.enabled || !status?.isConnected) return;
     client.selectStagingBot?.(bot.id, { currentNode: getCurrentNodeName() });
+    if (typeof global.selectStagingBotTarget === "function") {
+      global.selectStagingBotTarget(bot.id);
+    }
   }
 
   function getCompactBotModeLabel() {
@@ -2752,7 +2755,7 @@
       return `Server cooldown active: ${formatCooldown(cooldown)} remaining. Damage is server-owned.`;
     }
 
-    return "Target locked. Use Staging Fire to test server damage. No PvP, player damage, credits from combat, loot items, or broad progression are enabled.";
+    return "Target locked. Use Engage to auto-fire server combat. Disengage stops firing. No PvP, player damage, combat credits, or loot item writes are enabled.";
   }
 
   function renderStagingFlowHint(status, selectedBot, players, bots) {
@@ -2862,7 +2865,7 @@
 
   function renderStagingCombatPanel(status, selectedBot) {
     removeStagingCombatPanel();
-    if (!canShowStagingTestFire(status, selectedBot)) return;
+    if (!canShowStagingTestFire(status, selectedBot) || !isMpDebugEnabled()) return;
 
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;

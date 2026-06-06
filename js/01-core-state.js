@@ -1700,12 +1700,38 @@ function getSelectedHostileBot() {
     : null;
 }
 
+function getStagingBotTargetById(id) {
+  if (!id || typeof window === "undefined") return null;
+  const client = window.LupenMultiplayerClient;
+  const bot = client?.getBotById?.(id);
+  if (!bot) return null;
+  const node = bot.currentNode || bot.currentNodeId || bot.node;
+  return {
+    ...bot,
+    currentNodeId: node,
+    node,
+    alive: !bot.disabled,
+    name: bot.name || bot.displayName || "Staging Bot",
+    stagingBot: true
+  };
+}
+
+function getSelectedStagingBotTarget() {
+  return selectedTarget?.type === "stagingBot"
+    ? getStagingBotTargetById(selectedTarget.id)
+    : null;
+}
+
 function getSelectedTargetEntity() {
-  return getSelectedHostileBot() || getSelectedAsteroid();
+  return getSelectedStagingBotTarget() || getSelectedHostileBot() || getSelectedAsteroid();
 }
 
 function getEngagedTargetEntity() {
   if (!engagedTarget) return null;
+
+  if (engagedTarget.type === "stagingBot") {
+    return getStagingBotTargetById(engagedTarget.id);
+  }
 
   if (engagedTarget.type === "hostileBot") {
     return getHostileBotById(engagedTarget.id);
@@ -1719,6 +1745,7 @@ function getEngagedTargetEntity() {
 }
 
 function getTargetTypeFromEntity(target) {
+  if (target?.stagingBot) return "stagingBot";
   return target?.faction === "erebus" || target?.id?.startsWith("erebus-bot") ? "hostileBot" : "asteroid";
 }
 
