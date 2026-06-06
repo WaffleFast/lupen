@@ -99,6 +99,33 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#sectorSvg .reachable-map-node")).not.toHaveCount(0);
     await expect(page.locator("#sectorSvg .svg-route.reachable-route")).not.toHaveCount(0);
     await expect(page.locator("#sectorSvg .svg-mp-ghost-layer")).toHaveCount(0);
+    await expect(page.locator("#sectorSvg .svg-mp-bot-layer")).toHaveCount(0);
+
+    await page.evaluate(() => {
+      window.eval(`
+        sectorScanState = {
+          activeUntil: Date.now() + 5000,
+          cooldownUntilByType: { ally: 0, bot: Date.now() + 10000, enemy: 0 },
+          result: {
+            createdAt: Date.now(),
+            type: "bot",
+            botSignals: [{ type: "bot", node: "Upper Apex", x: 50, y: 14, count: 2, names: ["Erebus Watcher", "Erebus Drone"], classes: ["Bot", "Bot"], threats: ["Medium", "Medium"], aggroStates: ["neutral", "neutral"] }],
+            allySignals: [],
+            enemySignals: []
+          }
+        };
+        renderSectorMap();
+        updateSectorScanPanel();
+      `);
+    });
+    await expect(page.locator("#sectorSvg .svg-scan-marker.scan-bot")).toHaveCount(1);
+    await expect(page.locator("#sectorSvg .svg-scan-marker.scan-bot .scan-count")).toContainText("2");
+    await expect(page.locator("#sectorScanBotsBtn")).toContainText(/Bots 10s|Bots 9s/);
+    await page.evaluate(() => {
+      window.eval("sectorScanState.activeUntil = 0;");
+      if (typeof window.renderSectorMap === "function") window.renderSectorMap();
+    });
+    await expect(page.locator("#sectorSvg .svg-scan-marker.scan-bot")).toHaveCount(0);
 
     await openTradeTerminal(page);
 

@@ -1234,15 +1234,27 @@ function hasSectorScanCooldownsActive() {
 }
 
 function getBotScanSignals() {
-  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) {
-    return [];
-  }
-
   const grouped = new Map();
-  hostileBots
-    .filter(bot => bot.alive && sectorNodes[bot.currentNodeId || bot.node])
+  const localBotVisualGuardActive = typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive();
+  const localBots = localBotVisualGuardActive ? [] : hostileBots;
+  const multiplayerBots = typeof window !== "undefined" && window.LupenMultiplayerClient?.getBots
+    ? window.LupenMultiplayerClient.getBots()
+    : [];
+  const scanBots = [
+    ...localBots.map(bot => ({ ...bot, scanSource: "local" })),
+    ...multiplayerBots.map(bot => ({ ...bot, scanSource: "multiplayer" }))
+  ];
+
+  scanBots
+    .filter(bot => {
+      const nodeId = bot.currentNodeId || bot.currentNode || bot.node;
+      if (!sectorNodes[nodeId]) return false;
+      if (bot.disabled && bot.scanSource === "multiplayer") return false;
+      if (bot.alive === false) return false;
+      return true;
+    })
     .forEach(bot => {
-      const nodeId = bot.currentNodeId || bot.node;
+      const nodeId = bot.currentNodeId || bot.currentNode || bot.node;
       if (!grouped.has(nodeId)) {
         const node = sectorNodes[nodeId];
         grouped.set(nodeId, {

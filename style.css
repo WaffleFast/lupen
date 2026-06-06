@@ -11904,12 +11904,12 @@ input::placeholder {
 }
 
 .scan-bot-btn {
-  border-color: rgba(255, 211, 107, 0.5);
+  border-color: rgba(255, 138, 61, 0.58);
 }
 
 .scan-bot-btn::before {
-  background: linear-gradient(90deg, rgba(255, 211, 107, 0.95), rgba(255, 211, 107, 0.30));
-  box-shadow: 0 0 10px rgba(255, 211, 107, 0.55);
+  background: linear-gradient(90deg, rgba(255, 112, 61, 0.95), rgba(255, 70, 92, 0.30));
+  box-shadow: 0 0 10px rgba(255, 112, 61, 0.55);
 }
 
 .scan-enemy-btn {
@@ -11964,12 +11964,12 @@ input::placeholder {
 
 .svg-scan-marker.scan-bot .scan-pulse,
 .svg-scan-marker.scan-bot .scan-ring {
-  stroke: #ffd36b;
-  filter: drop-shadow(0 0 3px rgba(255, 211, 107, 0.95));
+  stroke: #ff8a3d;
+  filter: drop-shadow(0 0 3px rgba(255, 92, 61, 0.92));
 }
 
 .svg-scan-marker.scan-bot .scan-count {
-  fill: #ffd36b;
+  fill: #ffb069;
 }
 
 .svg-scan-marker.scan-ally .scan-pulse,

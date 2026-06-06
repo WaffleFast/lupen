@@ -1628,6 +1628,7 @@
 
     svg.querySelector(`.${botLayerClass}`)?.remove();
 
+    if (!isMpDebugEnabled()) return;
     if (!bots.length) return;
 
     const layer = global.document.createElementNS(SVG_NS, "g");
