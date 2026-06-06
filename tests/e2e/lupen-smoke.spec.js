@@ -95,6 +95,7 @@ test.describe("Lupen browser smoke", () => {
     });
     await expect(page.locator("#sectorMap")).toHaveClass(/active/);
     await expect(page.locator("#sectorSvg .current-map-node")).toHaveCount(1);
+    await expect(page.locator("#sectorSvg .svg-current-node-ship")).toHaveCount(0);
     await expect(page.locator("#sectorSvg .reachable-map-node")).not.toHaveCount(0);
     await expect(page.locator("#sectorSvg .svg-route.reachable-route")).not.toHaveCount(0);
     await expect(page.locator("#sectorSvg .svg-mp-ghost-layer")).toHaveCount(0);
@@ -192,6 +193,47 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("CR 1,134");
     await expect(page.locator("#marketScreen")).toContainText("CR 1,890");
     await expect(page.locator("#marketScreen")).toContainText("+CR 756");
+
+    await page.evaluate(() => {
+      window.eval(`
+        selectedMarketTargetPlanet = "Virella";
+      `);
+      if (typeof window.setMarketResource === "function") window.setMarketResource("Copper");
+    });
+    await expect(page.locator("#marketScreen .market-builder-selected")).toContainText(/Copper[\s\S]*Asteron Prime > Virella/);
+
+    await page.evaluate(() => {
+      window.eval(`
+        selectedMarketTargetPlanet = "Asteron Prime";
+      `);
+      if (typeof window.setMarketResource === "function") window.setMarketResource("Iron");
+    });
+    await expect(page.locator("#marketScreen .market-builder-selected")).toContainText(/Iron[\s\S]*Asteron Prime > Virella/);
+
+    await page.evaluate(() => {
+      if (typeof window.applyMultiplayerStagingTradeObjective === "function") {
+        window.applyMultiplayerStagingTradeObjective({
+          applied: true,
+          operation: "buy",
+          offerId: "staging-iron-asteron-virella",
+          resourceName: "Iron",
+          buyNode: "Asteron Prime",
+          sellNode: "Virella",
+          quantity: 6,
+          buyPrice: 18,
+          sellPrice: 30,
+          cost: 108,
+          projectedRevenue: 180,
+          cargoDelta: 6
+        });
+      }
+    });
+    await expect(page.locator("#activeObjectiveSummary")).toContainText("Deliver 6 Iron");
+    await expect(page.locator("#activeObjectiveSummary")).toContainText("Asteron Prime -> Virella");
+    await expect(page.locator("#activeObjectiveSummary")).toContainText("+CR 72");
+    await page.evaluate(() => {
+      if (typeof window.clearActiveObjective === "function") window.clearActiveObjective("trade");
+    });
 
     await page.evaluate(() => {
       window.eval(`

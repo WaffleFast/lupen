@@ -12540,8 +12540,8 @@ input::placeholder {
 .market-builder-panel {
   display: grid;
   grid-template-rows: auto auto auto auto auto;
-  gap: 8px;
-  padding: 12px;
+  gap: 7px;
+  padding: 10px;
   overflow: hidden;
 }
 
@@ -12638,8 +12638,8 @@ input::placeholder {
 .market-builder-summary,
 .market-builder-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
   align-content: start;
   overflow: visible;
 }
@@ -12647,7 +12647,7 @@ input::placeholder {
 .market-builder-summary div,
 .market-builder-stats div {
   min-width: 0;
-  padding: 9px 10px;
+  padding: 7px 8px;
   border: 1px solid rgba(90, 190, 255, 0.16);
   border-radius: 8px;
   background: rgba(2, 8, 18, 0.62);
@@ -12658,7 +12658,7 @@ input::placeholder {
   display: block;
   margin-bottom: 1px;
   color: #95b6d8;
-  font-size: 0.54rem;
+  font-size: 0.5rem;
   font-weight: 850;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -12667,7 +12667,7 @@ input::placeholder {
 .market-builder-summary strong,
 .market-builder-stats strong {
   color: #f1f8ff;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   overflow-wrap: anywhere;
 }
 
@@ -12733,6 +12733,10 @@ input::placeholder {
 
 .market-builder-panel.staging-sell-builder .market-builder-summary div {
   padding: 7px 8px;
+}
+
+.market-builder-panel.staging-sell-builder .market-builder-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .market-builder-panel.staging-sell-builder .market-builder-actions {

@@ -1653,7 +1653,6 @@ function drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget
     center.setAttribute("r", 1.05);
     center.setAttribute("class", "svg-current-node-center");
     group.appendChild(center);
-    drawCurrentNodeShipIcon(group, node, 0.88);
   }
 
   const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -1697,7 +1696,6 @@ function drawSpaceNode(group, node, isCurrent, canJump, isObjectiveTarget = fals
     currentRing.setAttribute("r", 2.05);
     currentRing.setAttribute("class", "svg-current-ring");
     group.appendChild(currentRing);
-    drawCurrentNodeShipIcon(group, node, 0.72);
   } else if (canJump) {
     const reachableRing = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     reachableRing.setAttribute("cx", node.x);

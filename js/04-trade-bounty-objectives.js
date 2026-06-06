@@ -450,6 +450,17 @@ function getMultiplayerStagingTargetPlanetsForResource(good, origin = getCurrent
     .filter((node, index, nodes) => node && nodes.indexOf(node) === index);
 }
 
+function getBestMultiplayerStagingTargetPlanet(good, origin = getCurrentMarketPlanet()) {
+  const offers = getMultiplayerStagingBuyOffersAt(origin)
+    .filter((offer) => isMultiplayerStagingOfferForResource(offer, good) && offer.sellNode !== origin)
+    .sort((a, b) => {
+      const profitA = Number(a.sellPrice || 0) - Number(a.buyPrice || 0);
+      const profitB = Number(b.sellPrice || 0) - Number(b.buyPrice || 0);
+      return profitB - profitA;
+    });
+  return offers[0]?.sellNode || "";
+}
+
 function hasMultiplayerStagingBuyRoute(good, origin = getCurrentMarketPlanet()) {
   return getMultiplayerStagingTargetPlanetsForResource(good, origin).length > 0;
 }
@@ -565,6 +576,48 @@ function getMultiplayerStagingTradeSyncLine(result) {
   return `${actionLabel}. Reload or reopen to sync full save display.`;
 }
 
+function applyMultiplayerStagingTradeObjective(result) {
+  if (!isMultiplayerStagingActive() || !result?.applied) return;
+  if (result.operation === "buy") {
+    const quantity = Math.max(0, Number(result.quantity || Math.abs(result.cargoDelta || 0)));
+    const buyPrice = Math.max(1, Number(result.buyPrice || (quantity ? Math.abs(result.cost || result.totalCost || 0) / quantity : 0) || 1));
+    const sellPrice = Math.max(buyPrice, Number(result.sellPrice || (quantity ? Math.abs(result.projectedRevenue || 0) / quantity : 0) || buyPrice));
+    const route = {
+      id: `staging-trade-${result.offerId || Date.now()}`,
+      marketTrade: true,
+      good: result.resourceName || selectedMarketResource,
+      origin: result.buyNode || getCurrentMarketPlanet(),
+      destination: result.sellNode || selectedMarketTargetPlanet,
+      buyPrice,
+      sellPrice,
+      profitPerUnit: sellPrice - buyPrice,
+      maxUnits: quantity,
+      purchasedUnits: quantity,
+      status: "active"
+    };
+    setActiveTradeObjective(route);
+    if (typeof addActivityLog === "function") {
+      addActivityLog(`Trade route active: deliver ${formatNumber(quantity)} ${route.good} to ${route.destination}. Estimated profit CR ${formatNumber(Math.max(0, (sellPrice - buyPrice) * quantity))}.`);
+    }
+    if (typeof renderObjectiveHud === "function") renderObjectiveHud();
+    return;
+  }
+
+  if (result.operation === "sell" && activeTradeRoute?.marketTrade && activeTradeRoute.good === result.resourceName) {
+    const realizedProfit = Number(activeTradeRoute.realizedProfit || 0) + Math.max(0, Number(result.revenue || 0) - (Number(activeTradeRoute.buyPrice || 0) * Math.max(0, Number(result.quantity || 0))));
+    updateActiveTradeProgress({
+      realizedProfit,
+      purchasedUnits: Math.max(0, Number(activeTradeRoute.purchasedUnits || 0) - Math.max(0, Number(result.quantity || 0))),
+      status: "active"
+    });
+    if (currentNode === activeTradeRoute.destination && Number(cargo[result.resourceName] || 0) <= 0) {
+      completeActiveTradeIfReady(result.resourceName);
+    } else if (typeof renderObjectiveHud === "function") {
+      renderObjectiveHud();
+    }
+  }
+}
+
 async function reconcileMultiplayerStagingTradeWrite(result) {
   if (!isMultiplayerStagingActive() || !result?.applied || !["buy", "sell"].includes(result.operation)) return;
   if (multiplayerStagingTradeLastHandledAt >= Number(result.receivedAt || 0)) return;
@@ -580,6 +633,7 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
   const summary = `Staging ${result.operation} applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))}, cargo ${cargoSign}${formatNumber(Math.abs(result.cargoDelta))} ${result.resourceName || "resource"}.`;
   if (typeof addHudToast === "function") addHudToast(summary);
   if (typeof addActivityLog === "function") addActivityLog(`${summary} Refreshing cloud save.`);
+  applyMultiplayerStagingTradeObjective(result);
 
   if (typeof loadGameFromSupabase !== "function") {
     multiplayerStagingTradeSyncStatus = {
@@ -594,6 +648,7 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
   try {
     const loadResult = await loadGameFromSupabase();
     if (loadResult?.loaded) {
+      applyMultiplayerStagingTradeObjective(result);
       multiplayerStagingTradeSyncStatus = {
         status: "synced",
         receivedAt: result.receivedAt,
@@ -919,7 +974,7 @@ function normalizeMarketBuilderState() {
     if (selectedSellOffer) {
       selectedMarketTargetPlanet = currentPlanet;
     } else if (stagingTargets.length && (!stagingTargets.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === currentPlanet)) {
-      selectedMarketTargetPlanet = stagingTargets[0];
+      selectedMarketTargetPlanet = getBestMultiplayerStagingTargetPlanet(selectedMarketResource, currentPlanet) || stagingTargets[0];
     }
   } else if (activeMarketTrade?.destination && MAP_ONE_MARKET_PLANETS.includes(activeMarketTrade.destination)) {
     selectedMarketTargetPlanet = activeMarketTrade.destination;
@@ -1202,7 +1257,9 @@ function setMarketResource(good) {
       selectedMarketTargetPlanet = currentPlanet;
     } else {
       const targets = getMultiplayerStagingTargetPlanetsForResource(good, currentPlanet);
-      if (targets.length) selectedMarketTargetPlanet = targets[0];
+      if (targets.length && (!targets.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === currentPlanet)) {
+        selectedMarketTargetPlanet = getBestMultiplayerStagingTargetPlanet(good, currentPlanet) || targets[0];
+      }
     }
   }
   tutorialEvent("selectedMarketResource");
@@ -3119,7 +3176,7 @@ function renderObjectiveHud() {
             <div class="objective-copy objective-copy-large objective-orbit-copy">
               <div class="objective-title-line">
                 <span class="objective-type-pill">Trade</span>
-                <strong>${objective.good}</strong>
+                <strong>Deliver ${formatNumber(objective.maxUnits || held || 0)} ${objective.good}</strong>
               </div>
               <span>${objective.origin} -> ${objective.destination}</span>
               <em>${routeProgress}</em>
