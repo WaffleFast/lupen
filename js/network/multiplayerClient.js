@@ -1631,6 +1631,7 @@
       cargoCapacity: Number.isFinite(Number(result.cargoCapacity)) ? Number(result.cargoCapacity) : null,
       cargoCostBasisBefore: Number.isFinite(Number(result.cargoCostBasisBefore)) ? Number(result.cargoCostBasisBefore) : null,
       cargoCostBasisAfter: Number.isFinite(Number(result.cargoCostBasisAfter)) ? Number(result.cargoCostBasisAfter) : null,
+      recoveredResourceSale: result.recoveredResourceSale === true,
       validationMode: String(result.validationMode || "unknown"),
       trustedStateAvailable: result.trustedStateAvailable === true,
       snapshotUsed: result.snapshotUsed === true,

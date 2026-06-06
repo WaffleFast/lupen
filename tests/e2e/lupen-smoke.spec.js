@@ -395,6 +395,46 @@ test.describe("Lupen browser smoke", () => {
     await expect(builder).toContainText("Recovered Value");
     await expect(builder).not.toContainText(/Virella > Nyxara/);
 
+    await page.evaluate(() => {
+      if (typeof window.showMultiplayerStagingTradeSellFeedback === "function") {
+        window.showMultiplayerStagingTradeSellFeedback({
+          applied: true,
+          operation: "sell",
+          resourceName: "Iron",
+          quantity: 310,
+          revenue: 9300,
+          creditsDelta: 9300,
+          cargoDelta: -310,
+          sellNode: "Virella",
+          cargoCostBasisBefore: 15,
+          recoveredResourceSale: false
+        });
+      }
+    });
+    await expect(page.locator("#tradeResultBurst")).toContainText("Trade Complete");
+    await expect(page.locator("#tradeResultBurst")).toContainText("+CR 4,650");
+    await expect(page.locator("#tradeResultBurst")).toContainText("Sold 310 Iron at Virella");
+
+    await page.evaluate(() => {
+      if (typeof window.showMultiplayerStagingTradeSellFeedback === "function") {
+        window.showMultiplayerStagingTradeSellFeedback({
+          applied: true,
+          operation: "sell",
+          resourceName: "Copper",
+          quantity: 24,
+          revenue: 1200,
+          creditsDelta: 1200,
+          cargoDelta: -24,
+          sellNode: "Nyxara",
+          cargoCostBasisBefore: null,
+          recoveredResourceSale: true
+        });
+      }
+    });
+    await expect(page.locator("#tradeResultBurst")).toContainText("Recovered Cargo Sold");
+    await expect(page.locator("#tradeResultBurst")).toContainText("+CR 1,200 value");
+    await expect(page.locator("#tradeResultBurst")).toContainText("Sold 24 Copper at Nyxara");
+
     await expectNoUnexpectedBrowserErrors(failures);
   });
 

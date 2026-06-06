@@ -576,6 +576,49 @@ function getMultiplayerStagingTradeSyncLine(result) {
   return `${actionLabel}. Reload or reopen to sync full save display.`;
 }
 
+function getMultiplayerStagingTradeSellProfit(result) {
+  const quantity = Math.max(0, Number(result?.quantity || Math.abs(result?.cargoDelta || 0)));
+  const revenue = Math.max(0, Number(result?.revenue || result?.creditsDelta || 0));
+  const basis = Number(result?.cargoCostBasisBefore);
+  if (!quantity || !Number.isFinite(basis) || basis <= 0) return null;
+  return revenue - (basis * quantity);
+}
+
+function showMultiplayerStagingTradeSellFeedback(result) {
+  if (!result?.applied || result.operation !== "sell") return;
+  const resource = result.resourceName || selectedMarketResource || "resource";
+  const quantity = Math.max(0, Number(result.quantity || Math.abs(result.cargoDelta || 0)));
+  const revenue = Math.max(0, Number(result.revenue || result.creditsDelta || 0));
+  const planet = result.sellNode || getCurrentMarketPlanet();
+  const profit = getMultiplayerStagingTradeSellProfit(result);
+  const recovered = result.recoveredResourceSale === true || profit === null;
+
+  if (typeof showTradeResultBurst === "function") {
+    showTradeResultBurst({
+      good: resource,
+      quantity,
+      revenue,
+      profit: recovered ? revenue : profit,
+      valueMode: recovered,
+      title: recovered ? "Recovered Cargo Sold" : "Trade Complete",
+      detail: recovered
+        ? `Sold ${formatNumber(quantity)} ${resource} at ${planet}`
+        : `Sold ${formatNumber(quantity)} ${resource} at ${planet}`
+    });
+  }
+
+  if (typeof showTradeMiniFloat === "function") {
+    showTradeMiniFloat({ profit: recovered ? revenue : profit });
+  }
+
+  if (typeof addActivityLog === "function") {
+    const line = recovered
+      ? `Sold ${formatNumber(quantity)} recovered ${resource} at ${planet} for +CR ${formatNumber(revenue)}.`
+      : `Sold ${formatNumber(quantity)} ${resource} at ${planet} for ${profit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(profit))} profit.`;
+    addActivityLog(line);
+  }
+}
+
 function applyMultiplayerStagingTradeObjective(result) {
   if (!isMultiplayerStagingActive() || !result?.applied) return;
   if (result.operation === "buy") {
@@ -633,6 +676,7 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
   const summary = `Staging ${result.operation} applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))}, cargo ${cargoSign}${formatNumber(Math.abs(result.cargoDelta))} ${result.resourceName || "resource"}.`;
   if (typeof addHudToast === "function") addHudToast(summary);
   if (typeof addActivityLog === "function") addActivityLog(`${summary} Refreshing cloud save.`);
+  if (result.operation === "sell") showMultiplayerStagingTradeSellFeedback(result);
   applyMultiplayerStagingTradeObjective(result);
 
   if (typeof loadGameFromSupabase !== "function") {

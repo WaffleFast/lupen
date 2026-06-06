@@ -28,10 +28,14 @@ function showLevelUpOverlay(text) {
   setTimeout(() => overlay.classList.remove("active"), 1800);
 }
 
-function showTradeResultBurst({ good, quantity, profit, revenue }) {
-  const amount = Math.round(Number(profit || 0));
-  const isProfit = amount >= 0;
+function showTradeResultBurst({ good, quantity, profit, revenue, title = "", detail = "", valueMode = false }) {
+  const amount = Math.round(Number(valueMode ? revenue : profit || 0));
+  const isProfit = valueMode || amount >= 0;
   const absAmount = Math.abs(amount);
+  const kicker = title || (valueMode ? "Resources Sold" : isProfit ? "Trade Profit" : "Trade Loss");
+  const amountPrefix = valueMode ? "+" : isProfit ? "+" : "-";
+  const amountSuffix = valueMode ? " value" : "";
+  const meta = detail || `${formatNumber(quantity)} ${good} sold / CR ${formatNumber(revenue)} return`;
 
   let burst = document.getElementById("tradeResultBurst");
   if (!burst) {
@@ -44,9 +48,9 @@ function showTradeResultBurst({ good, quantity, profit, revenue }) {
   burst.className = `trade-result-burst ${isProfit ? "profit" : "loss"}`;
   burst.innerHTML = `
     <div class="trade-result-card">
-      <div class="trade-result-kicker">${isProfit ? "Trade Profit" : "Trade Loss"}</div>
-      <div class="trade-result-amount">${isProfit ? "+" : "-"}CR ${formatNumber(absAmount)}</div>
-      <div class="trade-result-meta">${formatNumber(quantity)} ${good} sold / CR ${formatNumber(revenue)} return</div>
+      <div class="trade-result-kicker">${kicker}</div>
+      <div class="trade-result-amount">${amountPrefix}CR ${formatNumber(absAmount)}${amountSuffix}</div>
+      <div class="trade-result-meta">${meta}</div>
     </div>
   `;
 

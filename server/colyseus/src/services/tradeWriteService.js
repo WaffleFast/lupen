@@ -495,6 +495,7 @@ export async function applyStagingTradeBuyWrite({
       cargoCapacity: patchPlan.cargoCapacity,
       cargoCostBasisBefore: patchPlan.cargoCostBasisBefore,
       cargoCostBasisAfter: patchPlan.cargoCostBasisAfter,
+      recoveredResourceSale: patchPlan.recoveredResourceSale === true,
       status: patchResult.status,
       appliedFields: patchPlan.appliedFields,
       writes: getTradeWriteFlags(true),
