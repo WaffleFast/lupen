@@ -180,7 +180,9 @@ function pulseLaserBurstToTarget(target) {
   makeBeam(4, 35);
 }
 
-function incomingLaserBurstFromBot(bot, delay = 0) {
+let lastHostilePlayerHitFeedbackAt = 0;
+
+function incomingLaserBurstFromBot(bot, delay = 0, options = {}) {
   const layer = document.getElementById("laserLayer");
   const spaceScreen = document.getElementById("spaceScreen");
 
@@ -190,43 +192,92 @@ function incomingLaserBurstFromBot(bot, delay = 0) {
 
   const startX = (bot.x / 100) * screenRect.width;
   const startY = (bot.y / 100) * screenRect.height;
+  const count = Math.max(1, Math.min(4, Math.round(Number(options.count || 1))));
 
-  // Aim at the pilot/camera position, not the ship icon.
-  const endX = screenRect.width * (0.48 + Math.random() * 0.04);
-  const endY = screenRect.height * (0.86 + Math.random() * 0.08);
+  for (let index = 0; index < count; index += 1) {
+    // Aim at the pilot/camera position, not the ship icon.
+    const endX = screenRect.width * (0.475 + Math.random() * 0.05);
+    const endY = screenRect.height * (0.84 + Math.random() * 0.07);
+    const beamDelay = delay + index * 48;
+    const startJitterX = (Math.random() - 0.5) * 16;
+    const startJitterY = (Math.random() - 0.5) * 12;
+    const dx = endX - (startX + startJitterX);
+    const dy = endY - (startY + startJitterY);
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    const streakLength = Math.max(58, Math.min(150, length * 0.28));
+    const travelDistance = Math.max(72, length - streakLength * 0.72);
 
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const length = Math.sqrt(dx * dx + dy * dy);
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    const beam = document.createElement("div");
+    beam.className = `laser-burst enemy-incoming-laser${count > 1 ? " enemy-incoming-laser-burst" : ""}`;
+    beam.style.left = `${startX + startJitterX}px`;
+    beam.style.top = `${startY + startJitterY}px`;
+    beam.style.width = `${streakLength}px`;
+    beam.style.setProperty("--incoming-angle", `${angle}deg`);
+    beam.style.setProperty("--incoming-travel", `${travelDistance}px`);
+    beam.style.animationDelay = `${beamDelay}ms`;
+    layer.appendChild(beam);
 
-  const beam = document.createElement("div");
-  beam.className = "laser-burst enemy-incoming-laser";
-  beam.style.left = `${startX}px`;
-  beam.style.top = `${startY}px`;
-  beam.style.width = `${length}px`;
-  beam.style.transform = `rotate(${angle}deg)`;
-  beam.style.animationDelay = `${delay}ms`;
-  layer.appendChild(beam);
-
-  setTimeout(() => beam.remove(), 560 + delay);
+    setTimeout(() => beam.remove(), 620 + beamDelay);
+  }
 }
 
-function showIncomingHitFlash() {
+function showIncomingHitFlash(options = {}) {
   const spaceScreen = document.getElementById("spaceScreen");
   const shipPanel = document.querySelector(".ship-display-panel");
   const statPanel = document.querySelector(".vertical-stats");
+  const isHullHit = options.hullHit === true;
+  const impactClass = isHullHit ? "hull-impact" : "shield-impact";
 
   if (spaceScreen) {
-    spaceScreen.classList.add("incoming-hit-flash");
-    setTimeout(() => spaceScreen.classList.remove("incoming-hit-flash"), 360);
+    spaceScreen.classList.remove("shield-impact", "hull-impact", "incoming-impact-shake");
+    spaceScreen.classList.add("incoming-hit-flash", impactClass, "incoming-impact-shake");
+    setTimeout(() => {
+      spaceScreen.classList.remove("incoming-hit-flash", impactClass, "incoming-impact-shake");
+    }, 320);
   }
 
   [shipPanel, statPanel].forEach(panel => {
     if (!panel) return;
-    panel.classList.add("hud-hit-flash");
-    setTimeout(() => panel.classList.remove("hud-hit-flash"), 360);
+    panel.classList.remove("shield-impact", "hull-impact");
+    panel.classList.add("hud-hit-flash", impactClass);
+    setTimeout(() => panel.classList.remove("hud-hit-flash", impactClass), 320);
   });
+}
+
+function playHostilePlayerHitFeedback(options = {}) {
+  const now = Date.now();
+  if (now - lastHostilePlayerHitFeedbackAt < 180) return false;
+  lastHostilePlayerHitFeedbackAt = now;
+
+  const attackerBot = options.attackerBot || null;
+  const shieldDamage = Math.max(0, Number(options.shieldDamage || 0));
+  const hullDamage = Math.max(0, Number(options.hullDamage || 0));
+  const hitDelay = 150;
+  const streakCount = hullDamage > 0 ? 4 : 3;
+
+  if (attackerBot) {
+    incomingLaserBurstFromBot(attackerBot, 0, { count: streakCount });
+    for (let index = 0; index < Math.min(streakCount, 3); index += 1) {
+      setTimeout(() => {
+        if (typeof playEnemyLaserPulse === "function") playEnemyLaserPulse();
+      }, index * 58);
+    }
+  }
+
+  setTimeout(() => {
+    if (hullDamage > 0 && typeof playHullHitSound === "function") {
+      playHullHitSound();
+    } else if (shieldDamage > 0 && typeof playShieldHitSound === "function") {
+      playShieldHitSound();
+    }
+    showIncomingHitFlash({
+      shieldHit: shieldDamage > 0,
+      hullHit: hullDamage > 0
+    });
+  }, hitDelay);
+
+  return true;
 }
 
 

@@ -1047,18 +1047,25 @@ function applyStagingBotReturnFireDamage(event = {}) {
   shield = Math.max(0, Number(damageResult.shield || 0));
   hull = Math.max(1, Number(damageResult.hull || 1));
 
-  if (damageResult.shieldDamage > 0 && typeof playShieldHitSound === "function") playShieldHitSound();
-  if (damageResult.hullDamage > 0 && typeof playHullHitSound === "function") playHullHitSound();
-  if (typeof showIncomingHitFlash === "function") showIncomingHitFlash();
-
   const attackerName = event.attackerName || "Erebus Bot";
   const attackerBot = typeof getStagingBotTargetById === "function"
     ? getStagingBotTargetById(event.attackerBotId)
     : null;
-  if (attackerBot && typeof incomingLaserBurstFromBot === "function") incomingLaserBurstFromBot(attackerBot, 0);
-  if (typeof playEnemyLaserPulse === "function") playEnemyLaserPulse();
   const shieldDamage = Math.max(0, Number(damageResult.shieldDamage || 0));
   const hullDamage = Math.max(0, Number(damageResult.hullDamage || 0));
+
+  if (typeof playHostilePlayerHitFeedback === "function") {
+    playHostilePlayerHitFeedback({
+      attackerBot,
+      shieldDamage,
+      hullDamage
+    });
+  } else {
+    if (damageResult.shieldDamage > 0 && typeof playShieldHitSound === "function") playShieldHitSound();
+    if (damageResult.hullDamage > 0 && typeof playHullHitSound === "function") playHullHitSound();
+    if (typeof showIncomingHitFlash === "function") showIncomingHitFlash({ hullHit: hullDamage > 0 });
+  }
+
   if (typeof addActivityLog === "function") {
     if (shieldDamage > 0) {
       addActivityLog(`${attackerName} hit your shield for ${formatNumber(Math.round(shieldDamage))}.`);
