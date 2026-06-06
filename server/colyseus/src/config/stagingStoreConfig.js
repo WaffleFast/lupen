@@ -1,11 +1,48 @@
 /* Static staging Store preview config.
-   This catalogue is server-owned dry-run data for multiplayer Store
-   validation only. It never writes credits, inventory, equipment ownership,
-   ship ownership, bounties, loot, PvP/player damage, schema, or progression. */
+   This catalogue is server-owned data for multiplayer Store validation.
+   It only covers current Map 1 Store ships, guns, and attachments; it never
+   allows unknown item ids, Store sell, loot writes, bounties, PvP/player
+   damage, schema, or broad progression. */
 
 const MAX_STORE_PURCHASE_QUANTITY = 5;
 
 export const STAGING_STORE_ITEMS = Object.freeze([
+  Object.freeze({
+    itemId: "gun:heavyLance",
+    name: "Heavy Lance",
+    category: "weapon",
+    localKind: "gun",
+    localKey: "heavyLance",
+    price: 1001,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "High-impact precision beam for slow, heavy shots.",
+    reference: "GUNS.heavyLance"
+  }),
+  Object.freeze({
+    itemId: "gun:ionBlaster",
+    name: "Ion Blaster",
+    category: "weapon",
+    localKind: "gun",
+    localKey: "ionBlaster",
+    price: 746,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Balanced ion weapon with steady damage output.",
+    reference: "GUNS.ionBlaster"
+  }),
+  Object.freeze({
+    itemId: "gun:meltCannon",
+    name: "Melt Cannon",
+    category: "weapon",
+    localKind: "gun",
+    localKey: "meltCannon",
+    price: 821,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Close-range thermal cannon for heavy bursts.",
+    reference: "GUNS.meltCannon"
+  }),
   Object.freeze({
     itemId: "gun:pulseLaser",
     name: "Pulse Laser",
@@ -17,6 +54,42 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     stockType: "fixed",
     description: "Reliable all-round energy weapon.",
     reference: "GUNS.pulseLaser"
+  }),
+  Object.freeze({
+    itemId: "gun:repeater",
+    name: "Repeater",
+    category: "weapon",
+    localKind: "gun",
+    localKey: "repeater",
+    price: 526,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Fast cycling starter-class ballistic weapon.",
+    reference: "GUNS.repeater"
+  }),
+  Object.freeze({
+    itemId: "gun:ripperGun",
+    name: "Ripper Gun",
+    category: "weapon",
+    localKind: "gun",
+    localKey: "ripperGun",
+    price: 777,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "High-rate fragmentation weapon for sustained pressure.",
+    reference: "GUNS.ripperGun"
+  }),
+  Object.freeze({
+    itemId: "gun:voidRail",
+    name: "Void Rail",
+    category: "weapon",
+    localKind: "gun",
+    localKey: "voidRail",
+    price: 1024,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Experimental rail weapon with strong single-hit damage.",
+    reference: "GUNS.voidRail"
   }),
   Object.freeze({
     itemId: "attachment:cargoPod",
@@ -31,6 +104,30 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     reference: "attachments.cargoPod"
   }),
   Object.freeze({
+    itemId: "attachment:hullBooster",
+    name: "Hull Booster",
+    category: "equipment",
+    localKind: "attachment",
+    localKey: "hullBooster",
+    price: 260,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "+40 hull integrity",
+    reference: "attachments.hullBooster"
+  }),
+  Object.freeze({
+    itemId: "attachment:jumpDrive",
+    name: "Jump Drive",
+    category: "equipment",
+    localKind: "attachment",
+    localKey: "jumpDrive",
+    price: 340,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Improves jump system recovery.",
+    reference: "attachments.jumpDrive"
+  }),
+  Object.freeze({
     itemId: "attachment:shieldBooster",
     name: "Shield Booster",
     category: "equipment",
@@ -41,6 +138,18 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     stockType: "fixed",
     description: "+50 shield",
     reference: "attachments.shieldBooster"
+  }),
+  Object.freeze({
+    itemId: "attachment:evasionMatrix",
+    name: "Evasion Matrix",
+    category: "equipment",
+    localKind: "attachment",
+    localKey: "evasionMatrix",
+    price: 390,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "+8 evasion rating",
+    reference: "attachments.evasionMatrix"
   }),
   Object.freeze({
     itemId: "ship:lupenHauler",
@@ -55,6 +164,12 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     reference: "SHIPS.lupenHauler"
   })
 ]);
+
+export const STAGING_STORE_ITEM_IDS = Object.freeze(STAGING_STORE_ITEMS.map((item) => item.itemId));
+
+export function getStagingStoreItemIds() {
+  return [...STAGING_STORE_ITEM_IDS];
+}
 
 function getFiniteNumber(value) {
   if (value === null || value === undefined || value === "") return null;

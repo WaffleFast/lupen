@@ -33,6 +33,7 @@ import {
 import {
   buildStagingStorePurchasePreview,
   getStagingStoreItemById,
+  getStagingStoreItemIds,
   getStagingStoreItems
 } from "../config/stagingStoreConfig.js";
 import {
@@ -62,6 +63,7 @@ import {
   applyStagingLoadoutEquipWrite,
   buildStagingLoadoutEquipPlan,
   buildStagingLoadoutUnequipPlan,
+  STAGING_LOADOUT_ITEM_IDS,
   getLoadoutWriteEnvGate
 } from "../services/loadoutWriteService.js";
 
@@ -106,8 +108,8 @@ const KNOWN_SECTOR_NODES = new Set([
   "Lower Gate Core",
   "Lower Gate East"
 ]);
-const STAGING_STORE_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "attachment:shieldBooster", "gun:pulseLaser", "ship:lupenHauler"]);
-const STAGING_LOADOUT_WRITE_ITEM_IDS = new Set(["attachment:cargoPod", "attachment:shieldBooster", "gun:pulseLaser", "ship:lupenHauler"]);
+const STAGING_STORE_WRITE_ITEM_IDS = new Set(getStagingStoreItemIds());
+const STAGING_LOADOUT_WRITE_ITEM_IDS = new Set(STAGING_LOADOUT_ITEM_IDS);
 
 export const STAGING_BOT_ALLOWED_NODE_IDS = [
   "Upper Apex",

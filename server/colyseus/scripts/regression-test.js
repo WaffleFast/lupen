@@ -76,6 +76,7 @@ import {
   buildStagingShieldBoosterEquipPlan,
   buildStagingPulseLaserEquipPlan,
   buildStagingLupenHaulerSelectPlan,
+  buildStagingLoadoutEquipPlan,
   buildStagingLoadoutUnequipPlan,
   getLoadoutWriteEnvGate
 } from "../src/services/loadoutWriteService.js";
@@ -1500,11 +1501,25 @@ async function assertStagingTradeValidationHelpers() {
 
 async function assertStagingStorePreviewHelpers() {
   const items = getStagingStoreItems();
-  assert(items.length >= 3, "Staging Store item list did not include deterministic test items.");
-  assert(items.some((item) => item.itemId === "gun:pulseLaser"), "Staging Store missing Pulse Laser.");
-  assert(items.some((item) => item.itemId === "attachment:cargoPod"), "Staging Store missing Cargo Pod.");
-  assert(items.some((item) => item.itemId === "attachment:shieldBooster"), "Staging Store missing Shield Booster.");
-  assert(items.some((item) => item.itemId === "ship:lupenHauler"), "Staging Store missing LF-2 Hauler.");
+  const expectedStoreItemIds = [
+    "gun:heavyLance",
+    "gun:ionBlaster",
+    "gun:meltCannon",
+    "gun:pulseLaser",
+    "gun:repeater",
+    "gun:ripperGun",
+    "gun:voidRail",
+    "attachment:cargoPod",
+    "attachment:hullBooster",
+    "attachment:jumpDrive",
+    "attachment:shieldBooster",
+    "attachment:evasionMatrix",
+    "ship:lupenHauler"
+  ];
+  assert(items.length >= expectedStoreItemIds.length, "Staging Store item list did not include deterministic Map 1 items.");
+  for (const itemId of expectedStoreItemIds) {
+    assert(items.some((item) => item.itemId === itemId), `Staging Store missing ${itemId}.`);
+  }
 
   const validTrustedPreview = buildStagingStorePurchasePreview({
     itemId: "attachment:cargoPod",
@@ -1601,7 +1616,15 @@ async function assertStagingStorePreviewHelpers() {
 
   const writeGateDefault = getStoreWriteEnvGate("verified-player-a", "attachment:cargoPod", {});
   assert(writeGateDefault.writeEnabled === false && writeGateDefault.dryRun === true, "Store write gate default was not safe.");
-  assert(writeGateDefault.itemAllowed === true, "Cargo Pod should be the default allowed Store write item.");
+  assert(writeGateDefault.itemAllowed === true, "Catalog Store items should be allowed by the default staging item gate.");
+  const writeGateCatalog = getStoreWriteEnvGate("verified-player-a", "gun:voidRail", {
+    STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
+  });
+  assert(writeGateCatalog.itemAllowed === true, "Store catalog alias did not allow a server-known Store item.");
+  const writeGateCatalogUnknown = getStoreWriteEnvGate("verified-player-a", "gun:notReal", {
+    STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
+  });
+  assert(writeGateCatalogUnknown.itemAllowed === false, "Store catalog alias allowed an unknown item id.");
 
   const validSaveData = {
     credits: 1000,
@@ -1618,6 +1641,8 @@ async function assertStagingStorePreviewHelpers() {
   };
   const cargoPodItem = items.find((item) => item.itemId === "attachment:cargoPod");
   const pulseLaserItem = items.find((item) => item.itemId === "gun:pulseLaser");
+  const ionBlasterItem = items.find((item) => item.itemId === "gun:ionBlaster");
+  const jumpDriveItem = items.find((item) => item.itemId === "attachment:jumpDrive");
   const haulerItem = items.find((item) => item.itemId === "ship:lupenHauler");
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
@@ -1640,6 +1665,20 @@ async function assertStagingStorePreviewHelpers() {
   assert(pulseLaserPatch.patchedSaveData.shipLoadouts.lupenOrigin.guns[0] === "pulseLaser", "Pulse Laser Store patch changed shipLoadouts.");
   assert(pulseLaserPatch.patchedSaveData.inventoryItems[0].id === "kept-item", "Pulse Laser Store patch changed inventoryItems.");
   assert(pulseLaserPatch.patchedSaveData.playerProgress.combatXp === 33, "Pulse Laser Store patch changed progression.");
+
+  const ionBlasterPatch = buildStagingStorePurchasePatch(validSaveData, ionBlasterItem, 1);
+  assert(ionBlasterPatch.ok === true, `Valid Ion Blaster Store patch was blocked: ${ionBlasterPatch.blockReason}`);
+  assert(ionBlasterPatch.creditsBefore === 1000 && ionBlasterPatch.creditsAfter === 254, "Ion Blaster Store patch did not subtract the server price.");
+  assert(ionBlasterPatch.itemBefore === 0 && ionBlasterPatch.itemAfter === 1, "Ion Blaster Store patch did not initialise ownedGuns.ionBlaster.");
+  assert(ionBlasterPatch.patchedSaveData.ownedGuns.pulseLaser === 1, "Ion Blaster Store patch changed Pulse Laser ownership.");
+  assert(ionBlasterPatch.patchedSaveData.inventoryItems[0].id === "kept-item", "Ion Blaster Store patch changed inventoryItems.");
+
+  const jumpDrivePatch = buildStagingStorePurchasePatch(validSaveData, jumpDriveItem, 1);
+  assert(jumpDrivePatch.ok === true, `Valid Jump Drive Store patch was blocked: ${jumpDrivePatch.blockReason}`);
+  assert(jumpDrivePatch.creditsBefore === 1000 && jumpDrivePatch.creditsAfter === 660, "Jump Drive Store patch did not subtract the server price.");
+  assert(jumpDrivePatch.itemBefore === 0 && jumpDrivePatch.itemAfter === 1, "Jump Drive Store patch did not initialise ownedAttachments.jumpDrive.");
+  assert(jumpDrivePatch.patchedSaveData.ownedAttachments.cargoPod === 1, "Jump Drive Store patch changed Cargo Pod ownership.");
+  assert(jumpDrivePatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Jump Drive Store patch changed shipLoadouts.");
 
   const shieldBoosterItem = items.find((item) => item.itemId === "attachment:shieldBooster");
   const shieldBoosterPatch = buildStagingStorePurchasePatch(validSaveData, shieldBoosterItem, 1);
@@ -1957,7 +1996,15 @@ async function assertStagingCargoPodEquipHelpers() {
 
   const defaultGate = getLoadoutWriteEnvGate("verified-player-a", "attachment:cargoPod", {});
   assert(defaultGate.writeEnabled === false && defaultGate.dryRun === true, "Loadout write gate default was not safe.");
-  assert(defaultGate.itemAllowed === true, "Cargo Pod should be default allowed loadout item.");
+  assert(defaultGate.itemAllowed === true, "Catalog loadout items should be allowed by the default staging item gate.");
+  const catalogGate = getLoadoutWriteEnvGate("verified-player-a", "attachment:evasionMatrix", {
+    STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "catalog"
+  });
+  assert(catalogGate.itemAllowed === true, "Loadout catalog alias did not allow a server-known equippable item.");
+  const catalogUnknownGate = getLoadoutWriteEnvGate("verified-player-a", "attachment:notReal", {
+    STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "catalog"
+  });
+  assert(catalogUnknownGate.itemAllowed === false, "Loadout catalog alias allowed an unknown item id.");
 
   const plan = buildStagingCargoPodEquipPlan(validSaveData, { itemId: "attachment:cargoPod" });
   assert(plan.ok === true, `Valid Cargo Pod equip plan was blocked: ${plan.blockReason}`);
@@ -2021,6 +2068,40 @@ async function assertStagingCargoPodEquipHelpers() {
   const noOwnedWeaponPlan = buildStagingPulseLaserEquipPlan({ ...validSaveData, ownedGuns: { pulseLaser: 0 } }, { itemId: "gun:pulseLaser" });
   assert(noOwnedWeaponPlan.ok === false && noOwnedWeaponPlan.blockReason === "pulse_laser_not_owned", "Pulse Laser equip without ownership was not blocked.");
 
+  const ionBlasterPlan = buildStagingLoadoutEquipPlan({
+    ...validSaveData,
+    ownedGuns: { pulseLaser: 1, ionBlaster: 1 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "shieldBooster", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  }, { itemId: "gun:ionBlaster" });
+  assert(ionBlasterPlan.ok === true, `Valid Ion Blaster equip plan was blocked: ${ionBlasterPlan.blockReason}`);
+  assert(ionBlasterPlan.ownedBefore === 1 && ionBlasterPlan.ownedAfter === 0, "Ion Blaster equip plan did not consume owned weapon.");
+  assert(ionBlasterPlan.equippedBefore === 0 && ionBlasterPlan.equippedAfter === 1, "Ion Blaster equip plan did not add equipped weapon.");
+  assert(ionBlasterPlan.patchedSaveData.shipLoadouts.lupenOrigin.guns.some((entry) => entry.key === "ionBlaster"), "Ion Blaster equip plan did not add gun to loadout.");
+  assert(ionBlasterPlan.patchedSaveData.ownedGuns.pulseLaser === 1, "Ion Blaster equip plan changed Pulse Laser ownership.");
+  assert(ionBlasterPlan.patchedSaveData.credits === 780, "Ion Blaster equip plan changed credits.");
+
+  const jumpDrivePlan = buildStagingLoadoutEquipPlan({
+    ...validSaveData,
+    ownedAttachments: { cargoPod: 2, shieldBooster: 1, jumpDrive: 1 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "shieldBooster", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  }, { itemId: "attachment:jumpDrive" });
+  assert(jumpDrivePlan.ok === true, `Valid Jump Drive equip plan was blocked: ${jumpDrivePlan.blockReason}`);
+  assert(jumpDrivePlan.ownedBefore === 1 && jumpDrivePlan.ownedAfter === 0, "Jump Drive equip plan did not consume owned attachment.");
+  assert(jumpDrivePlan.equippedBefore === 0 && jumpDrivePlan.equippedAfter === 1, "Jump Drive equip plan did not add equipped attachment.");
+  assert(jumpDrivePlan.patchedSaveData.shipLoadouts.lupenOrigin.attachments.some((entry) => entry.key === "jumpDrive"), "Jump Drive equip plan did not add attachment to loadout.");
+  assert(jumpDrivePlan.patchedSaveData.ownedAttachments.cargoPod === 2, "Jump Drive equip plan changed Cargo Pod ownership.");
+  assert(jumpDrivePlan.patchedSaveData.credits === 780, "Jump Drive equip plan changed credits.");
+
   const pulseLaserUnequipPlan = buildStagingLoadoutUnequipPlan({
     ...validSaveData,
     ownedGuns: { pulseLaser: 0 },
@@ -2041,6 +2122,22 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(pulseLaserUnequipPlan.patchedSaveData.inventoryItems[0].id === "kept-item", "Pulse Laser unequip plan changed inventoryItems.");
   assert(pulseLaserUnequipPlan.patchedSaveData.cargo.Iron === 2, "Pulse Laser unequip plan changed trade cargo.");
   assert(pulseLaserUnequipPlan.patchedSaveData.playerProgress.combatXp === 33, "Pulse Laser unequip plan changed progression.");
+
+  const jumpDriveUnequipPlan = buildStagingLoadoutUnequipPlan({
+    ...validSaveData,
+    ownedAttachments: { cargoPod: 2, shieldBooster: 1, jumpDrive: 0 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "jumpDrive", quality: "standard", level: 1 }, { key: "shieldBooster", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  }, { itemId: "attachment:jumpDrive" });
+  assert(jumpDriveUnequipPlan.ok === true, `Valid Jump Drive unequip plan was blocked: ${jumpDriveUnequipPlan.blockReason}`);
+  assert(jumpDriveUnequipPlan.ownedBefore === 0 && jumpDriveUnequipPlan.ownedAfter === 1, "Jump Drive unequip plan did not restore available ownership.");
+  assert(jumpDriveUnequipPlan.equippedBefore === 1 && jumpDriveUnequipPlan.equippedAfter === 0, "Jump Drive unequip plan did not remove equipped attachment.");
+  assert(jumpDriveUnequipPlan.patchedSaveData.shipLoadouts.lupenOrigin.attachments.every((entry) => entry.key !== "jumpDrive"), "Jump Drive unequip plan left Jump Drive equipped.");
+  assert(jumpDriveUnequipPlan.patchedSaveData.credits === 780, "Jump Drive unequip plan changed credits.");
 
   const cargoPodUnequipPlan = buildStagingLoadoutUnequipPlan({
     ...validSaveData,

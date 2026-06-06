@@ -2760,6 +2760,25 @@
       });
     },
 
+    previewStagingLoadoutEquip(options = {}) {
+      return sendRoomMessage("previewStagingLoadoutEquip", "stagingLoadout:previewEquip", {
+        itemId: String(options.itemId || "")
+      });
+    },
+
+    equipStagingLoadoutItem(options = {}) {
+      return sendRoomMessage("equipStagingLoadoutItem", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "")
+      });
+    },
+
+    unequipStagingLoadoutItem(options = {}) {
+      return sendRoomMessage("unequipStagingLoadoutItem", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || ""),
+        operation: "unequip"
+      });
+    },
+
     equipStagingCargoPod(options = {}) {
       return sendRoomMessage("equipStagingCargoPod", "stagingLoadout:equipAttachment", {
         itemId: String(options.itemId || "attachment:cargoPod")

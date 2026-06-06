@@ -8,9 +8,18 @@
 }
 
 const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
+  "gun:heavyLance": "gun:heavyLance",
+  "gun:ionBlaster": "gun:ionBlaster",
+  "gun:meltCannon": "gun:meltCannon",
   "gun:pulseLaser": "gun:pulseLaser",
+  "gun:repeater": "gun:repeater",
+  "gun:ripperGun": "gun:ripperGun",
+  "gun:voidRail": "gun:voidRail",
   "attachment:cargoPod": "attachment:cargoPod",
+  "attachment:hullBooster": "attachment:hullBooster",
+  "attachment:jumpDrive": "attachment:jumpDrive",
   "attachment:shieldBooster": "attachment:shieldBooster",
+  "attachment:evasionMatrix": "attachment:evasionMatrix",
   "ship:lupenHauler": "ship:lupenHauler"
 });
 const STAGING_LF2_HAULER_PRICE = 10500;
@@ -21,6 +30,7 @@ let multiplayerStagingCargoPodEquipPending = false;
 let multiplayerStagingShieldBoosterEquipPending = false;
 let multiplayerStagingPulseLaserEquipPending = false;
 let multiplayerStagingShipEquipPending = false;
+let multiplayerStagingLoadoutEquipPendingItemId = "";
 let multiplayerStagingLoadoutUnequipPending = false;
 let selectedVaultActionContext = null;
 let selectedLoadoutItemContext = null;
@@ -141,11 +151,7 @@ function getLastStagingShipEquipResult() {
 
 function getStagingStorePreviewLine(result) {
   if (!result) return "Server preview pending. No CR or inventory changed.";
-  if (result.applied && result.itemId === "ship:lupenHauler") return "LF-2 Hauler purchased.";
-  if (result.applied && result.itemId === "gun:pulseLaser") return "Weapon purchased.";
-  if (result.applied && result.itemId === "attachment:shieldBooster") return "Shield Booster purchased.";
-  if (result.applied && result.itemId === "attachment:cargoPod") return "Cargo Pod purchased.";
-  if (result.applied) return "Staging purchase applied.";
+  if (result.applied) return `${result.name || "Store item"} purchased.`;
   if (result.wouldPass) return "Would pass server Store validation.";
   if (result.blockReason === "insufficient_credits") return "Blocked: not enough credits.";
   if (result.blockReason === "unknown_store_item") return "Server preview unavailable.";
@@ -188,7 +194,7 @@ function renderStagingStorePreviewNote(item) {
 
 function isStagingStoreWritableItem(item) {
   const itemId = getStagingStoreItemId(item);
-  return itemId === "attachment:cargoPod" || itemId === "attachment:shieldBooster" || itemId === "gun:pulseLaser" || itemId === "ship:lupenHauler";
+  return Boolean(itemId) && item?.kind !== "core";
 }
 
 function getStagingCargoPodEquipLine(result) {
@@ -412,34 +418,52 @@ async function requestStagingShieldBoosterEquip(item) {
 }
 
 async function requestStagingPulseLaserEquip(item) {
-  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "gun:pulseLaser") return false;
+  return requestStagingLoadoutEquip(item);
+}
+
+async function requestStagingLoadoutEquip(item) {
+  if (!isMultiplayerStagingStoreActive()) return false;
+  const itemId = getStagingStoreItemId(item);
+  if (!itemId || item?.kind === "core") return false;
+  if (item.kind === "ship") return requestStagingShipEquip(item);
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.();
-  if (!client?.equipStagingPulseLaser || !status?.enabled || !status?.isConnected) {
-    if (typeof addHudToast === "function") addHudToast("MP staging Pulse Laser equip is waiting for the multiplayer server connection.");
+  if (!client?.equipStagingLoadoutItem || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging loadout equip is waiting for the multiplayer server connection.");
     return true;
   }
-  if (multiplayerStagingPulseLaserEquipPending) return true;
-  multiplayerStagingPulseLaserEquipPending = true;
+  if (multiplayerStagingLoadoutEquipPendingItemId) return true;
+  multiplayerStagingLoadoutEquipPendingItemId = itemId;
+  if (itemId === "attachment:cargoPod") multiplayerStagingCargoPodEquipPending = true;
+  if (itemId === "attachment:shieldBooster") multiplayerStagingShieldBoosterEquipPending = true;
+  if (itemId === "gun:pulseLaser") multiplayerStagingPulseLaserEquipPending = true;
   renderStore();
-  client.equipStagingPulseLaser({ itemId: "gun:pulseLaser" });
-  if (typeof addHudToast === "function") addHudToast("Requested MP staging Pulse Laser equip.");
+  client.equipStagingLoadoutItem({ itemId });
+  if (typeof addHudToast === "function") addHudToast(`Equipping ${item.name || "item"}.`);
   setTimeout(async () => {
+    multiplayerStagingLoadoutEquipPendingItemId = "";
+    multiplayerStagingCargoPodEquipPending = false;
+    multiplayerStagingShieldBoosterEquipPending = false;
     multiplayerStagingPulseLaserEquipPending = false;
     const latest = client.getStatus?.().lastStagingLoadoutEquip;
-    if (latest?.itemId === "gun:pulseLaser" && latest.applied) {
-      const message = `Weapon equipped: ${latest.name || "Pulse Laser"}.`;
+    if (latest?.itemId === itemId && latest.applied) {
+      const statChange = latest.cargoCapacityBefore !== null && latest.cargoCapacityBefore !== undefined
+        ? ` Cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`
+        : latest.shieldBefore !== null && latest.shieldBefore !== undefined
+          ? ` Shield ${formatNumber(latest.shieldBefore)} -> ${formatNumber(latest.shieldAfter)}.`
+          : "";
+      const message = `${latest.name || item.name || "Item"} equipped.${statChange}`;
       if (typeof addHudToast === "function") addHudToast(message);
-      if (typeof addActivityLog === "function") addActivityLog(`${message} Server combat damage updated.`);
+      if (typeof addActivityLog === "function") addActivityLog(message);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
           if (loaded?.loaded) {
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("pulse_laser_equipped");
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_equipped");
             if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
           }
         } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast("Weapon equipped. Reload if loadout values look stale.");
+          if (typeof addHudToast === "function") addHudToast("Item equipped. Reload if loadout values look stale.");
         }
       }
     }
@@ -1020,20 +1044,13 @@ async function requestStagingLoadoutUnequip(entry) {
     if (typeof addHudToast === "function") addHudToast("MP staging loadout unequip is waiting for the multiplayer server connection.");
     return true;
   }
-  const method = itemId === "gun:pulseLaser"
-    ? "unequipStagingPulseLaser"
-    : itemId === "attachment:cargoPod"
-      ? "unequipStagingCargoPod"
-      : itemId === "attachment:shieldBooster"
-        ? "unequipStagingShieldBooster"
-        : "";
-  if (!method || typeof client[method] !== "function") {
+  if (typeof client.unequipStagingLoadoutItem !== "function") {
     blockLoadoutMutationInMultiplayerStaging();
     return true;
   }
   if (multiplayerStagingLoadoutUnequipPending) return true;
   multiplayerStagingLoadoutUnequipPending = true;
-  client[method]({ itemId });
+  client.unequipStagingLoadoutItem({ itemId });
   if (typeof addHudToast === "function") addHudToast(`Unequipping ${entry.name}.`);
   setTimeout(async () => {
     multiplayerStagingLoadoutUnequipPending = false;
@@ -2863,6 +2880,11 @@ function renderStoreDetail() {
   const stagingStoreLocked = isMultiplayerStagingStoreActive();
   const stagingStoreItemId = getStagingStoreItemId(item);
   const stagingWritableItem = isStagingStoreWritableItem(item);
+  const stagingEquipPending = multiplayerStagingLoadoutEquipPendingItemId === stagingStoreItemId;
+  const stagingEquippableItem = stagingStoreLocked &&
+    stagingWritableItem &&
+    (item.kind === "gun" || item.kind === "attachment") &&
+    totalOwned > 0;
   const stagingPreviewButton = stagingStoreItemId
     ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Staging Purchase") : "Server Preview") : "Sold Out"}</button>`
     : `<button class="store-detail-buy-action" disabled>Server preview unavailable</button>`;
@@ -2920,9 +2942,7 @@ function renderStoreDetail() {
 
       <div class="store-buy-footer store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
         ${buyButton}
-        ${stagingStoreLocked && stagingStoreItemId === "attachment:cargoPod" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingCargoPodEquip(getStoreSelectedItem())" ${multiplayerStagingCargoPodEquipPending ? "disabled" : ""}>${multiplayerStagingCargoPodEquipPending ? "Applying..." : "Apply Cargo Pod"}</button>` : ""}
-        ${stagingStoreLocked && stagingStoreItemId === "attachment:shieldBooster" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingShieldBoosterEquip(getStoreSelectedItem())" ${multiplayerStagingShieldBoosterEquipPending ? "disabled" : ""}>${multiplayerStagingShieldBoosterEquipPending ? "Applying..." : "Apply Shield Booster"}</button>` : ""}
-        ${stagingStoreLocked && stagingStoreItemId === "gun:pulseLaser" && totalOwned > 0 ? `<button class="store-detail-buy-action" onclick="requestStagingPulseLaserEquip(getStoreSelectedItem())" ${multiplayerStagingPulseLaserEquipPending ? "disabled" : ""}>${multiplayerStagingPulseLaserEquipPending ? "Applying..." : "Apply Pulse Laser"}</button>` : ""}
+        ${stagingEquippableItem ? `<button class="store-detail-buy-action" onclick="requestStagingLoadoutEquip(getStoreSelectedItem())" ${stagingEquipPending ? "disabled" : ""}>${stagingEquipPending ? "Applying..." : `Apply ${escapeHtml(item.name)}`}</button>` : ""}
         ${stagingStoreLocked && stagingStoreItemId === "ship:lupenHauler" && totalOwned > 0 && currentShipId !== item.key ? `<button class="store-detail-buy-action" onclick="requestStagingShipEquip(getStoreSelectedItem())" ${multiplayerStagingShipEquipPending ? "disabled" : ""}>${multiplayerStagingShipEquipPending ? "Applying..." : "Fly LF-2 Hauler"}</button>` : ""}
         ${sellButton}
       </div>
@@ -3126,12 +3146,8 @@ function buyGun(key) {
 
 function equipAttachmentFromInventory(key, quality = "standard", source = "owned") {
   if (isMultiplayerStagingStoreActive()) {
-    if (key === "cargoPod" && quality === "standard" && source === "owned") {
-      requestStagingCargoPodEquip({ kind: "attachment", key: "cargoPod" });
-      return;
-    }
-    if (key === "shieldBooster" && quality === "standard" && source === "owned") {
-      requestStagingShieldBoosterEquip({ kind: "attachment", key: "shieldBooster" });
+    if (quality === "standard" && source === "owned" && getStagingStoreItemId({ kind: "attachment", key })) {
+      requestStagingLoadoutEquip({ kind: "attachment", key, name: attachments[key]?.name || key });
       return;
     }
     blockLoadoutMutationInMultiplayerStaging();
@@ -3210,8 +3226,8 @@ function removeAttachment(index) {
 
 function equipGunFromInventory(key, quality = "standard", source = "owned") {
   if (isMultiplayerStagingStoreActive()) {
-    if (key === "pulseLaser" && quality === "standard" && source === "owned") {
-      requestStagingPulseLaserEquip({ kind: "gun", key: "pulseLaser" });
+    if (quality === "standard" && source === "owned" && getStagingStoreItemId({ kind: "gun", key })) {
+      requestStagingLoadoutEquip({ kind: "gun", key, name: GUNS[key]?.name || key });
       return;
     }
     blockLoadoutMutationInMultiplayerStaging();
