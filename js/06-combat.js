@@ -553,6 +553,17 @@ function clearLocalHostileBotSelectionForStaging() {
   }
 }
 
+function clearStagingBotTargetIfSelected(botId) {
+  if (!botId) return;
+  const selectedMatches = selectedTarget?.type === "stagingBot" && selectedTarget.id === botId;
+  const engagedMatches = engagedTarget?.type === "stagingBot" && engagedTarget.id === botId;
+  if (!selectedMatches && !engagedMatches) return;
+  disengageTarget(false);
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(false);
+}
+
 function updateTargetPanel() {
   const lootSummary = document.getElementById("lootSummary");
   const collectBtn = document.getElementById("collectBtn");

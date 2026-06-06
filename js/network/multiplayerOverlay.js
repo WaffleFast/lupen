@@ -623,6 +623,7 @@
       .lupen-mp-space-bot.is-disabled {
         opacity: 0.48;
         filter: drop-shadow(0 0 8px rgba(170, 170, 170, 0.4));
+        pointer-events: none;
       }
 
       .lupen-mp-space-bot.is-hit {
@@ -1310,6 +1311,41 @@
     return Date.now() - Number(status?.lastShotEvent?.receivedAt || status?.lastShotEvent?.timestamp || 0);
   }
 
+  const localShotFeedbackKeys = new Set();
+
+  function getShotFeedbackKey(event = {}) {
+    return [
+      event.attackerSessionId || "",
+      event.targetBotId || "",
+      event.timestamp || event.receivedAt || "",
+      event.damage || ""
+    ].join(":");
+  }
+
+  function playLocalStagingShotFeedback(status, targetBot) {
+    const event = status?.lastShotEvent;
+    if (!event?.targetBotId || event.targetBotId !== targetBot?.id) return;
+    if (event.attackerSessionId !== status?.sessionId) return;
+    const key = getShotFeedbackKey(event);
+    if (!key || localShotFeedbackKeys.has(key)) return;
+    localShotFeedbackKeys.add(key);
+    if (localShotFeedbackKeys.size > 24) {
+      localShotFeedbackKeys.delete(localShotFeedbackKeys.values().next().value);
+    }
+
+    if (typeof global.pulseLaserBurstToTarget === "function") {
+      global.pulseLaserBurstToTarget(targetBot);
+    }
+    if (typeof global.playPlayerLaserPulse === "function") {
+      global.playPlayerLaserPulse();
+    }
+    if (event.disabled && typeof global.playEnemyShipDestroyedSound === "function") {
+      global.setTimeout(global.playEnemyShipDestroyedSound, 140);
+    } else if (typeof global.playWeaponHitMarkerSound === "function") {
+      global.setTimeout(global.playWeaponHitMarkerSound, 130);
+    }
+  }
+
   function getSpacePercentPosition(entity, fallback = { x: 50, y: 50 }) {
     return {
       x: clampMapCoordinate(entity?.x ?? fallback.x),
@@ -1320,6 +1356,7 @@
   function selectStagingBot(bot) {
     if (!bot?.id) return;
     if (!isSameCurrentNode(bot)) return;
+    if (bot.disabled && !isMpDebugEnabled()) return;
     const client = getClient();
     const status = client?.getStatus?.();
     if (!status?.enabled || !status?.isConnected) return;
@@ -1665,7 +1702,7 @@
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
-    const localBots = bots.filter((bot) => isSameCurrentNode(bot));
+    const localBots = bots.filter((bot) => isSameCurrentNode(bot) && (!bot.disabled || isMpDebugEnabled()));
     if (!localBots.length) return;
 
     ensureStyles();
@@ -1687,6 +1724,7 @@
       marker.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (bot.disabled && !isMpDebugEnabled()) return;
         selectStagingBot(bot);
       });
 
@@ -1755,6 +1793,7 @@
     if (!targetBot || !isSameCurrentNode(targetBot)) return;
 
     ensureStyles();
+    playLocalStagingShotFeedback(status, targetBot);
 
     const attacker = players.find((player) => player.sessionId === status.lastShotEvent.attackerSessionId || player.id === status.lastShotEvent.attackerSessionId);
     const targetPosition = getSpacePercentPosition(targetBot);

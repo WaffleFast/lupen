@@ -1988,6 +1988,9 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server bot disabled", message);
+      if (typeof global.clearStagingBotTargetIfSelected === "function") {
+        global.clearStagingBotTargetIfSelected(connection.lastBotEvent.botId);
+      }
       scheduleStagingCombatProgressRefresh("botDisabled", connection.lastBotEvent);
     });
 
@@ -2154,6 +2157,13 @@
       connection.lastStagingBotXpResult = normalizeStagingXpResult(message);
       if (connection.lastStagingBotXpResult?.applied) {
         const result = connection.lastStagingBotXpResult;
+        if (typeof global.applyStagingXpClaimToLoadedState === "function") {
+          global.applyStagingXpClaimToLoadedState({
+            ...result,
+            xpSource: "botKillEvent",
+            saveWritten: result.saveWritten === true || result.playerSavePatchResult?.applied === true
+          });
+        }
         const xpDelta = Math.max(0, Math.round(Number(result.xpDelta || 0)));
         addStagingActivityLogOnce(
           `bot-xp:${result.destructionInstanceId || result.idempotencyKey || result.botId}:${result.xpAfter}`,
