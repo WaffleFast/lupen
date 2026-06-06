@@ -25,12 +25,56 @@ let multiplayerStagingBountyLastRefreshAt = 0;
 // Mirrors the current Colyseus STAGING_TRADE_WRITE_MAX_QUANTITY gate so the
 // Trade Builder never asks staging to write more than the server will accept.
 const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 1000;
-const MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS = Object.freeze([
-  Object.freeze({ offerId: "staging-iron-asteron-virella", resourceId: "iron", resourceName: "Iron", buyNode: "Asteron Prime", sellNode: "Virella", buyPrice: 18, sellPrice: 30, maxQuantity: 1000 }),
-  Object.freeze({ offerId: "staging-copper-virella-nyxara", resourceId: "copper", resourceName: "Copper", buyNode: "Virella", sellNode: "Nyxara", buyPrice: 32, sellPrice: 50, maxQuantity: 1000 }),
-  Object.freeze({ offerId: "staging-cobalt-nyxara-asteron", resourceId: "cobalt", resourceName: "Cobalt", buyNode: "Nyxara", sellNode: "Asteron Prime", buyPrice: 62, sellPrice: 90, maxQuantity: 1000 }),
-  Object.freeze({ offerId: "staging-crystal-asteron-nyxara", resourceId: "crystal_shards", resourceName: "Crystal Shards", buyNode: "Asteron Prime", sellNode: "Nyxara", buyPrice: 95, sellPrice: 145, maxQuantity: 1000 })
+const MULTIPLAYER_STAGING_TRADE_RESOURCES = Object.freeze([
+  Object.freeze({ resourceId: "iron", resourceName: "Iron" }),
+  Object.freeze({ resourceId: "copper", resourceName: "Copper" }),
+  Object.freeze({ resourceId: "cobalt", resourceName: "Cobalt" }),
+  Object.freeze({ resourceId: "crystal_shards", resourceName: "Crystal Shards" })
 ]);
+const MULTIPLAYER_STAGING_TRADE_PRICE_TABLE = Object.freeze({
+  "Asteron Prime": Object.freeze({ Iron: 18, Copper: 38, Cobalt: 90, "Crystal Shards": 95 }),
+  Virella: Object.freeze({ Iron: 30, Copper: 32, Cobalt: 74, "Crystal Shards": 120 }),
+  Nyxara: Object.freeze({ Iron: 24, Copper: 50, Cobalt: 62, "Crystal Shards": 145 })
+});
+const MULTIPLAYER_STAGING_TRADE_PLANET_SLUGS = Object.freeze({
+  "Asteron Prime": "asteron",
+  Virella: "virella",
+  Nyxara: "nyxara"
+});
+const MULTIPLAYER_STAGING_TRADE_RESOURCE_SLUGS = Object.freeze({
+  crystal_shards: "crystal"
+});
+
+function getMultiplayerStagingTradeOfferId(resourceId = "", buyNode = "", sellNode = "") {
+  return [
+    "staging",
+    MULTIPLAYER_STAGING_TRADE_RESOURCE_SLUGS[resourceId] || String(resourceId || "").replace(/_/g, "-"),
+    MULTIPLAYER_STAGING_TRADE_PLANET_SLUGS[buyNode] || String(buyNode || "").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    MULTIPLAYER_STAGING_TRADE_PLANET_SLUGS[sellNode] || String(sellNode || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")
+  ].filter(Boolean).join("-");
+}
+
+function buildMultiplayerStagingTradeOfferFallbacks() {
+  const planets = Object.keys(MULTIPLAYER_STAGING_TRADE_PRICE_TABLE);
+  return MULTIPLAYER_STAGING_TRADE_RESOURCES.flatMap((resource) => {
+    return planets.flatMap((buyNode) => {
+      return planets
+        .filter((sellNode) => sellNode !== buyNode)
+        .map((sellNode) => Object.freeze({
+          offerId: getMultiplayerStagingTradeOfferId(resource.resourceId, buyNode, sellNode),
+          resourceId: resource.resourceId,
+          resourceName: resource.resourceName,
+          buyNode,
+          sellNode,
+          buyPrice: MULTIPLAYER_STAGING_TRADE_PRICE_TABLE[buyNode][resource.resourceName],
+          sellPrice: MULTIPLAYER_STAGING_TRADE_PRICE_TABLE[sellNode][resource.resourceName],
+          maxQuantity: MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY
+        }));
+    });
+  });
+}
+
+const MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS = Object.freeze(buildMultiplayerStagingTradeOfferFallbacks());
 
 function getMultiplayerStagingBountyFallback() {
   return {

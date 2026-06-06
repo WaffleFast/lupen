@@ -8,7 +8,8 @@ import {
 } from "../src/rooms/LupenSectorRoom.js";
 import {
   buildStagingTradePreview,
-  buildStagingTradeWriteDryRun
+  buildStagingTradeWriteDryRun,
+  getStagingTradeOffers
 } from "../src/config/stagingTradeConfig.js";
 import {
   buildStagingStorePurchasePreview,
@@ -579,6 +580,22 @@ async function assertStagingLootWriteHelpers() {
 }
 
 async function assertStagingTradeValidationHelpers() {
+  const generatedOffers = getStagingTradeOffers();
+  const stagingResources = ["Iron", "Copper", "Cobalt", "Crystal Shards"];
+  const stagingPlanets = ["Asteron Prime", "Virella", "Nyxara"];
+  assert(generatedOffers.length === stagingResources.length * stagingPlanets.length * (stagingPlanets.length - 1), "Generated staging trade offers did not cover every cross-planet resource pair.");
+  for (const resourceName of stagingResources) {
+    for (const buyNode of stagingPlanets) {
+      const buyOffers = generatedOffers.filter((offer) => offer.resourceName === resourceName && offer.buyNode === buyNode);
+      assert(buyOffers.length === stagingPlanets.length - 1, `Missing staging buy offers for ${resourceName} at ${buyNode}.`);
+      assert(!buyOffers.some((offer) => offer.sellNode === buyNode), `Same-planet staging offer was generated for ${resourceName} at ${buyNode}.`);
+    }
+    for (const sellNode of stagingPlanets) {
+      const sellOffers = generatedOffers.filter((offer) => offer.resourceName === resourceName && offer.sellNode === sellNode);
+      assert(sellOffers.length === stagingPlanets.length - 1, `Missing staging sell offers for ${resourceName} at ${sellNode}.`);
+    }
+  }
+
   const extracted = extractTradeValidationStateFromSave({
     credits: 500,
     cargo: {

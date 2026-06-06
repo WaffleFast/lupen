@@ -137,38 +137,33 @@ test.describe("Lupen browser smoke", () => {
         enabledReason: "staging_enabled",
         lastStagingTradeOffers: {
           ok: true,
-          offers: [
-            {
-              offerId: "staging-iron-asteron-virella",
-              resourceId: "iron",
-              resourceName: "Iron",
-              buyNode: "Asteron Prime",
-              sellNode: "Virella",
-              buyPrice: 18,
-              sellPrice: 30,
-              maxQuantity: 1000
-            },
-            {
-              offerId: "staging-crystal-asteron-nyxara",
-              resourceId: "crystal_shards",
-              resourceName: "Crystal Shards",
-              buyNode: "Asteron Prime",
-              sellNode: "Nyxara",
-              buyPrice: 95,
-              sellPrice: 145,
-              maxQuantity: 1000
-            },
-            {
-              offerId: "staging-cobalt-nyxara-asteron",
-              resourceId: "cobalt",
-              resourceName: "Cobalt",
-              buyNode: "Nyxara",
-              sellNode: "Asteron Prime",
-              buyPrice: 62,
-              sellPrice: 90,
-              maxQuantity: 1000
-            }
-          ]
+          offers: (() => {
+            const resources = [
+              { resourceId: "iron", resourceName: "Iron" },
+              { resourceId: "copper", resourceName: "Copper" },
+              { resourceId: "cobalt", resourceName: "Cobalt" },
+              { resourceId: "crystal_shards", resourceName: "Crystal Shards" }
+            ];
+            const prices = {
+              "Asteron Prime": { Iron: 18, Copper: 38, Cobalt: 90, "Crystal Shards": 95 },
+              Virella: { Iron: 30, Copper: 32, Cobalt: 74, "Crystal Shards": 120 },
+              Nyxara: { Iron: 24, Copper: 50, Cobalt: 62, "Crystal Shards": 145 }
+            };
+            const slugs = { "Asteron Prime": "asteron", Virella: "virella", Nyxara: "nyxara" };
+            const resourceSlugs = { crystal_shards: "crystal" };
+            return resources.flatMap((resource) => Object.keys(prices).flatMap((buyNode) => {
+              return Object.keys(prices).filter((sellNode) => sellNode !== buyNode).map((sellNode) => ({
+                offerId: `staging-${resourceSlugs[resource.resourceId] || resource.resourceId.replace(/_/g, "-")}-${slugs[buyNode]}-${slugs[sellNode]}`,
+                resourceId: resource.resourceId,
+                resourceName: resource.resourceName,
+                buyNode,
+                sellNode,
+                buyPrice: prices[buyNode][resource.resourceName],
+                sellPrice: prices[sellNode][resource.resourceName],
+                maxQuantity: 1000
+              }));
+            }));
+          })()
         }
       });
       if (typeof window.renderMarketplace === "function") window.renderMarketplace();
@@ -218,6 +213,31 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("CR 1,260");
     await expect(page.locator("#marketScreen")).toContainText("+CR 392");
 
+    for (const planet of ["Asteron Prime", "Virella", "Nyxara"]) {
+      await page.evaluate((nextPlanet) => {
+        window.eval(`
+          currentNode = ${JSON.stringify(nextPlanet)};
+          lastPlanetNode = ${JSON.stringify(nextPlanet)};
+          selectedMarketResource = "Iron";
+          selectedMarketTargetPlanet = "";
+          selectedMarketQuantity = 1;
+        `);
+        if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+      }, planet);
+      for (const resource of ["Iron", "Copper", "Cobalt", "Crystal Shards"]) {
+        await page.evaluate((nextResource) => {
+          window.eval(`
+            selectedMarketResource = ${JSON.stringify(nextResource)};
+            selectedMarketTargetPlanet = "";
+            selectedMarketQuantity = 1;
+          `);
+          if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+        }, resource);
+        await expect(page.locator("#marketScreen")).toContainText(resource);
+        await expect(page.locator("#marketScreen")).toContainText("Server Buy");
+      }
+    }
+
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
@@ -238,38 +258,33 @@ test.describe("Lupen browser smoke", () => {
         enabledReason: "staging_enabled",
         lastStagingTradeOffers: {
           ok: true,
-          offers: [
-            {
-              offerId: "staging-iron-asteron-virella",
-              resourceId: "iron",
-              resourceName: "Iron",
-              buyNode: "Asteron Prime",
-              sellNode: "Virella",
-              buyPrice: 18,
-              sellPrice: 30,
-              maxQuantity: 1000
-            },
-            {
-              offerId: "staging-copper-virella-nyxara",
-              resourceId: "copper",
-              resourceName: "Copper",
-              buyNode: "Virella",
-              sellNode: "Nyxara",
-              buyPrice: 32,
-              sellPrice: 50,
-              maxQuantity: 1000
-            },
-            {
-              offerId: "staging-crystal-asteron-nyxara",
-              resourceId: "crystal_shards",
-              resourceName: "Crystal Shards",
-              buyNode: "Asteron Prime",
-              sellNode: "Nyxara",
-              buyPrice: 95,
-              sellPrice: 145,
-              maxQuantity: 1000
-            }
-          ]
+          offers: (() => {
+            const resources = [
+              { resourceId: "iron", resourceName: "Iron" },
+              { resourceId: "copper", resourceName: "Copper" },
+              { resourceId: "cobalt", resourceName: "Cobalt" },
+              { resourceId: "crystal_shards", resourceName: "Crystal Shards" }
+            ];
+            const prices = {
+              "Asteron Prime": { Iron: 18, Copper: 38, Cobalt: 90, "Crystal Shards": 95 },
+              Virella: { Iron: 30, Copper: 32, Cobalt: 74, "Crystal Shards": 120 },
+              Nyxara: { Iron: 24, Copper: 50, Cobalt: 62, "Crystal Shards": 145 }
+            };
+            const slugs = { "Asteron Prime": "asteron", Virella: "virella", Nyxara: "nyxara" };
+            const resourceSlugs = { crystal_shards: "crystal" };
+            return resources.flatMap((resource) => Object.keys(prices).flatMap((buyNode) => {
+              return Object.keys(prices).filter((sellNode) => sellNode !== buyNode).map((sellNode) => ({
+                offerId: `staging-${resourceSlugs[resource.resourceId] || resource.resourceId.replace(/_/g, "-")}-${slugs[buyNode]}-${slugs[sellNode]}`,
+                resourceId: resource.resourceId,
+                resourceName: resource.resourceName,
+                buyNode,
+                sellNode,
+                buyPrice: prices[buyNode][resource.resourceName],
+                sellPrice: prices[sellNode][resource.resourceName],
+                maxQuantity: 1000
+              }));
+            }));
+          })()
         }
       });
       window.eval(`
