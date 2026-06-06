@@ -322,7 +322,8 @@ function applyStagingXpClaimToLoadedState(result = {}) {
     result.claimStatus?.playerSave?.written === true;
   if (!applied || !Number.isFinite(xpAfter)) return false;
 
-  rememberTrustedStagingXp(result, result.botId ? "botKill" : "bountyClaim");
+  const xpSource = result.xpSource || result.source || (result.botId ? "botKill" : "bountyClaim");
+  rememberTrustedStagingXp(result, xpSource);
   const progress = normalizePlayerProgress(playerProgress);
   if (xpAfter < Number(progress.combatXp || 0)) return false;
   progress.combatXp = Math.max(0, Math.round(xpAfter));
@@ -335,11 +336,13 @@ function applyStagingXpClaimToLoadedState(result = {}) {
   };
   playerProgress = normalizePlayerProgress(progress);
   window.lupenLastStagingXpRefresh = {
-    source: result.botId ? "botKill" : "bountyClaim",
+    source: xpSource,
     stale: false,
     trustedXpAfter: xpAfter,
     refreshedXp: progress.combatXp,
     appliedXp: playerProgress.combatXp,
+    hudXpAfterPatch: playerProgress.combatXp,
+    redrawTriggered: true,
     reason: "hud_xp_refreshed",
     checkedAt: Date.now()
   };

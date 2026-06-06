@@ -2059,6 +2059,47 @@
     return getFriendlyClaimReason(reason);
   }
 
+  function getAppliedXpRangeFromResult(result = {}) {
+    const playerSave = result.playerSave || result.claimStatus?.playerSave || {};
+    const patchResult = result.playerSavePatchResult || {};
+    const applied = result.applied === true ||
+      result.saveWritten === true ||
+      playerSave.written === true ||
+      patchResult.applied === true;
+    const xpBefore = Number(result.xpBefore ?? playerSave.xpBefore ?? patchResult.xpBefore);
+    const xpAfter = Number(result.xpAfter ?? result.persistedXp ?? playerSave.xpAfter ?? patchResult.xpAfter ?? patchResult.persistedXp);
+    return {
+      applied,
+      xpBefore: Number.isFinite(xpBefore) ? Math.round(xpBefore) : null,
+      xpAfter: Number.isFinite(xpAfter) ? Math.round(xpAfter) : null
+    };
+  }
+
+  function applyStagingXpFromRenderedResult(result = {}, source = "rewardPanel") {
+    const range = getAppliedXpRangeFromResult(result);
+    if (!range.applied || !Number.isFinite(range.xpAfter)) return false;
+
+    const payload = {
+      ...result,
+      xpSource: source,
+      xpBefore: range.xpBefore,
+      xpAfter: range.xpAfter,
+      applied: true,
+      saveWritten: true
+    };
+
+    if (typeof global.applyStagingXpClaimToLoadedState === "function") {
+      return global.applyStagingXpClaimToLoadedState(payload);
+    }
+
+    global.setTimeout(() => {
+      if (typeof global.applyStagingXpClaimToLoadedState === "function") {
+        global.applyStagingXpClaimToLoadedState(payload);
+      }
+    }, 0);
+    return false;
+  }
+
   function getClaimStatusSummary(result = {}) {
     const summary = result.claimStatus || {};
     return {
@@ -2093,6 +2134,13 @@
     if (playerSave.written || result.playerSavePatchResult?.applied) {
       const xpBefore = playerSave.xpBefore ?? result.playerSavePatchResult?.xpBefore;
       const xpAfter = playerSave.xpAfter ?? result.playerSavePatchResult?.xpAfter;
+      applyStagingXpFromRenderedResult({
+        ...result,
+        xpBefore,
+        xpAfter,
+        applied: true,
+        saveWritten: true
+      }, "rewardPanel");
       return `XP-only staging claim applied: ${formatPreviewValue(xpBefore)} -> ${formatPreviewValue(xpAfter)}. No credits awarded; loot preview not applied.`;
     }
 
@@ -2112,6 +2160,13 @@
     const patchResult = result.playerSavePatchResult;
     const patchPlan = result.playerSavePatchPlan || patchResult?.plan;
     if (patchResult?.applied) {
+      applyStagingXpFromRenderedResult({
+        ...result,
+        xpBefore: patchResult.xpBefore,
+        xpAfter: patchResult.xpAfter,
+        applied: true,
+        saveWritten: true
+      }, "claimPreview");
       return `XP-only staging claim applied: ${formatPreviewValue(patchResult.xpBefore)} -> ${formatPreviewValue(patchResult.xpAfter)}. No credits or loot.`;
     }
 
@@ -2342,8 +2397,10 @@
     const local = formatPreviewValue(refresh.localXp);
     const cloud = formatPreviewValue(refresh.refreshXp ?? refresh.cloudXp);
     const applied = formatPreviewValue(refresh.appliedXp);
+    const hud = formatPreviewValue(refresh.hudXpAfterPatch ?? refresh.appliedXp);
+    const redraw = refresh.redrawTriggered ? "redraw yes" : "redraw pending";
     const match = refresh.matched ? "matched" : refresh.stale ? "stale guarded" : "pending";
-    return `${refresh.source || "xp"} / ${match} / local ${local} / cloud ${cloud} / trusted ${trusted} / applied ${applied} / ${refresh.reason || refresh.status || "unknown"}`;
+    return `${refresh.source || "xp"} / ${match} / local ${local} / cloud ${cloud} / trusted ${trusted} / applied ${applied} / hud ${hud} / ${redraw} / ${refresh.reason || refresh.status || "unknown"}`;
   }
 
   function setDiagnosticsRow(panel, label, value) {
@@ -2966,6 +3023,13 @@
     if (result.applied || result.playerSavePatchResult?.applied || result.playerSave?.written) {
       const before = result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore;
       const after = result.playerSavePatchResult?.xpAfter ?? result.playerSave?.xpAfter;
+      applyStagingXpFromRenderedResult({
+        ...result,
+        xpBefore: before,
+        xpAfter: after,
+        applied: true,
+        saveWritten: true
+      }, "bountyClaim");
       return `XP applied ${formatPreviewValue(before)} -> ${formatPreviewValue(after)}. No credits or loot.`;
     }
     if (result.reason === "staging_bounty_already_claimed") return "Already claimed. Duplicate reward blocked.";
