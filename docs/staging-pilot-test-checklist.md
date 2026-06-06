@@ -27,7 +27,7 @@ For real allowlisted Trade Terminal buy/sell writes, Colyseus Cloud needs all of
 - `STAGING_TRADE_WRITE_SCOPE=allowlist`
 - `STAGING_TRADE_WRITE_ALLOWLIST=<verified Supabase auth user UUID>`
 
-`STAGING_TRADE_WRITE_ALLOWLIST` is a comma-separated list of verified Supabase user ids, for example `uuid1,uuid2`. It is not an email allowlist, and there is no wildcard. `STAGING_TRADE_WRITE_SCOPE=verified` allows any verified staging player, so use `allowlist` for live pilot tests. Optional trade gates are `STAGING_TRADE_WRITE_MAX_QUANTITY=10` and `STAGING_TRADE_WRITE_ALLOWED_OFFERS=<offerId1,offerId2>`; leaving allowed offers unset allows the current staging trade offers.
+`STAGING_TRADE_WRITE_ALLOWLIST` is a comma-separated list of verified Supabase user ids, for example `uuid1,uuid2`. It is not an email allowlist, and there is no wildcard. `STAGING_TRADE_WRITE_SCOPE=verified` allows any verified staging player, so use `allowlist` for live pilot tests. Optional trade gates are `STAGING_TRADE_WRITE_MAX_QUANTITY=150` for the temporary manual pilot pass and `STAGING_TRADE_WRITE_ALLOWED_OFFERS=<offerId1,offerId2>`; leaving allowed offers unset allows the current staging trade offers.
 
 `ENABLE_STAGING_REWARD_WRITES` is still used, but only for the dedicated reward ledger path. It does not enable Trade Terminal writes.
 

@@ -24,12 +24,12 @@ let multiplayerStagingBountySubscribed = false;
 let multiplayerStagingBountyLastRefreshAt = 0;
 // Mirrors the current Colyseus STAGING_TRADE_WRITE_MAX_QUANTITY gate so the
 // Trade Builder never asks staging to write more than the server will accept.
-const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 10;
+const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 150;
 const MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS = Object.freeze([
   Object.freeze({ offerId: "staging-iron-asteron-virella", resourceId: "iron", resourceName: "Iron", buyNode: "Asteron Prime", sellNode: "Virella", buyPrice: 18, sellPrice: 30, maxQuantity: 40 }),
   Object.freeze({ offerId: "staging-copper-virella-nyxara", resourceId: "copper", resourceName: "Copper", buyNode: "Virella", sellNode: "Nyxara", buyPrice: 32, sellPrice: 50, maxQuantity: 30 }),
   Object.freeze({ offerId: "staging-cobalt-nyxara-asteron", resourceId: "cobalt", resourceName: "Cobalt", buyNode: "Nyxara", sellNode: "Asteron Prime", buyPrice: 62, sellPrice: 90, maxQuantity: 18 }),
-  Object.freeze({ offerId: "staging-crystal-asteron-nyxara", resourceId: "crystal_shards", resourceName: "Crystal Shards", buyNode: "Asteron Prime", sellNode: "Nyxara", buyPrice: 95, sellPrice: 145, maxQuantity: 10 })
+  Object.freeze({ offerId: "staging-crystal-asteron-nyxara", resourceId: "crystal_shards", resourceName: "Crystal Shards", buyNode: "Asteron Prime", sellNode: "Nyxara", buyPrice: 95, sellPrice: 145, maxQuantity: 150 })
 ]);
 
 function getMultiplayerStagingBountyFallback() {

@@ -146,7 +146,7 @@ test.describe("Lupen browser smoke", () => {
               sellNode: "Nyxara",
               buyPrice: 95,
               sellPrice: 145,
-              maxQuantity: 10
+              maxQuantity: 150
             }
           ]
         }
@@ -208,7 +208,7 @@ test.describe("Lupen browser smoke", () => {
               sellNode: "Nyxara",
               buyPrice: 95,
               sellPrice: 145,
-              maxQuantity: 10
+              maxQuantity: 150
             }
           ]
         }
@@ -248,10 +248,10 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#marketScreen")).toContainText("Server Sell");
     await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Nyxara/);
-    await expect(page.locator("#marketScreen")).toContainText(/Sell 10 of 64 carried/);
+    await expect(page.locator("#marketScreen")).toContainText(/Sell 64 of 64 carried/);
     await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
-    await expect(page.locator("#marketScreen")).toContainText("CR 1,450");
-    await expect(page.locator("#marketScreen")).toContainText("+CR 500");
+    await expect(page.locator("#marketScreen")).toContainText("CR 9,280");
+    await expect(page.locator("#marketScreen")).toContainText("+CR 3,200");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
     await expectNoUnexpectedBrowserErrors(failures);
