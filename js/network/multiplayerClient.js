@@ -675,15 +675,32 @@
     if (!isEnabled() || !playerSaveWritten) return;
 
     const trustedXpAfter = Number(
+      result?.xpAfter ??
       result?.playerSavePatchResult?.xpAfter ??
       result?.playerSave?.xpAfter ??
       result?.claimStatus?.playerSave?.xpAfter
     );
     const source = result?.botId ? "botKill" : "bountyClaim";
 
-    if (typeof global.applyStagingXpClaimToLoadedState === "function") {
-      global.applyStagingXpClaimToLoadedState(result);
-    }
+    const localApplied = typeof global.applyStagingXpClaimToLoadedState === "function"
+      ? global.applyStagingXpClaimToLoadedState(result)
+      : false;
+    const immediateSnapshot = typeof global.getLupenCombatXpSnapshot === "function"
+      ? global.getLupenCombatXpSnapshot()
+      : null;
+    connection.lastStagingXpRefresh = {
+      source,
+      status: localApplied ? "hud_refreshed" : "hud_refresh_pending",
+      trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
+      refreshXp: Number.isFinite(Number(immediateSnapshot?.combatXp)) ? Number(immediateSnapshot.combatXp) : null,
+      matched: Number.isFinite(trustedXpAfter) && Number.isFinite(Number(immediateSnapshot?.combatXp))
+        ? Number(immediateSnapshot.combatXp) >= trustedXpAfter
+        : false,
+      stale: false,
+      reason: localApplied ? "hud_xp_refreshed" : "hud_xp_refresh_not_applied",
+      checkedAt: Date.now()
+    };
+    notifyServerState(room?.state || null);
 
     if (typeof global.loadGameFromSupabase !== "function") {
       connection.lastStagingXpRefresh = {

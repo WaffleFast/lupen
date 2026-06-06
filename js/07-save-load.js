@@ -162,6 +162,7 @@ function redrawProgressAfterStagingXp() {
 
 function getStagingXpAfterFromResult(result = {}) {
   const xpAfter = Number(
+    result.xpAfter ??
     result.playerSavePatchResult?.xpAfter ??
     result.playerSave?.xpAfter ??
     result.claimStatus?.playerSave?.xpAfter
@@ -177,7 +178,7 @@ function rememberTrustedStagingXp(result = {}, source = "stagingXp") {
   window.lupenTrustedStagingXpAfter = {
     xpAfter,
     source,
-    xpBefore: Number(result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore ?? currentXp),
+    xpBefore: Number(result.xpBefore ?? result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore ?? currentXp),
     rememberedAt: Date.now()
   };
   return window.lupenTrustedStagingXpAfter;
@@ -226,6 +227,9 @@ function applyTrustedStagingXpIfNewer(source = "cloudRefresh") {
 function applyStagingXpClaimToLoadedState(result = {}) {
   const xpAfter = getStagingXpAfterFromResult(result);
   const applied = result.playerSavePatchResult?.applied === true ||
+    result.applied === true ||
+    result.botXpApplied === true ||
+    result.saveWritten === true ||
     result.playerSave?.written === true ||
     result.claimStatus?.playerSave?.written === true;
   if (!applied || !Number.isFinite(xpAfter)) return false;
@@ -242,6 +246,15 @@ function applyStagingXpClaimToLoadedState(result = {}) {
     )
   };
   playerProgress = normalizePlayerProgress(progress);
+  window.lupenLastStagingXpRefresh = {
+    source: result.botId ? "botKill" : "bountyClaim",
+    stale: false,
+    trustedXpAfter: xpAfter,
+    refreshedXp: progress.combatXp,
+    appliedXp: playerProgress.combatXp,
+    reason: "hud_xp_refreshed",
+    checkedAt: Date.now()
+  };
   LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
   redrawProgressAfterStagingXp();
   return true;
