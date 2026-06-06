@@ -90,6 +90,15 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
     await expect(page.locator("#debugToolsPanel")).toHaveCount(0);
 
+    await page.evaluate(() => {
+      if (typeof window.openSectorMap === "function") window.openSectorMap();
+    });
+    await expect(page.locator("#sectorMap")).toHaveClass(/active/);
+    await expect(page.locator("#sectorSvg .current-map-node")).toHaveCount(1);
+    await expect(page.locator("#sectorSvg .reachable-map-node")).not.toHaveCount(0);
+    await expect(page.locator("#sectorSvg .svg-route.reachable-route")).not.toHaveCount(0);
+    await expect(page.locator("#sectorSvg .svg-mp-ghost-layer")).toHaveCount(0);
+
     await openTradeTerminal(page);
 
     await expect(page.locator("#marketScreen")).toContainText(/Server Buy|Preview Unavailable/);

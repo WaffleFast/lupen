@@ -1540,7 +1540,7 @@ function drawRoutes(svg) {
         return (nodeName === name && nextNode === target) || (nodeName === target && nextNode === name);
       });
       const routeTone = getRouteTone(node, targetNode);
-      line.setAttribute("class", `svg-route ${isAvailableRoute ? "available" : ""} ${isPlannedTradeRoute ? "planned-trade-route" : ""} ${isObjectiveStep ? "objective-route-step" : ""} ${routeTone}`);
+      line.setAttribute("class", `svg-route ${isAvailableRoute ? "available reachable-route" : "inactive-route"} ${isPlannedTradeRoute ? "planned-trade-route" : ""} ${isObjectiveStep ? "objective-route-step" : ""} ${routeTone}`);
       svg.appendChild(line);
     });
   });
@@ -1556,9 +1556,9 @@ function drawNodes(svg) {
     const isObjectivePath = objectiveRoute.includes(name);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
-    group.style.cursor = canJump || isCurrent ? "pointer" : "not-allowed";
+    group.style.cursor = canJump || isCurrent ? "pointer" : "default";
     group.onclick = () => jumpToNode(name);
-    group.setAttribute("class", `${isCurrent ? "svg-player-node" : ""} ${isObjectiveTarget ? "svg-objective-target-node" : ""} ${isObjectivePath ? "svg-objective-path-node" : ""}`);
+    group.setAttribute("class", `${isCurrent ? "svg-player-node current-map-node" : ""} ${canJump && !isCurrent ? "reachable-map-node" : ""} ${!canJump && !isCurrent ? "unreachable-map-node" : ""} ${isObjectiveTarget ? "svg-objective-target-node" : ""} ${isObjectivePath ? "svg-objective-path-node" : ""}`);
 
     if (node.type === "planet") {
       drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget);
@@ -1608,6 +1608,14 @@ function drawObjectiveTargetMarker(group, node, options = {}) {
   group.appendChild(marker);
 }
 
+function drawCurrentNodeShipIcon(group, node, scale = 1) {
+  const ship = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  const size = 1.15 * scale;
+  ship.setAttribute("d", `M ${node.x} ${node.y - (1.55 * scale)} L ${node.x + size} ${node.y + (1.25 * scale)} L ${node.x} ${node.y + (0.72 * scale)} L ${node.x - size} ${node.y + (1.25 * scale)} Z`);
+  ship.setAttribute("class", "svg-current-node-ship");
+  group.appendChild(ship);
+}
+
 function drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget = false) {
   const isPlanned = isNodeOnActiveTradeRoute(name);
   const isClaimRewardTarget = isActiveObjectiveClaimRewardTarget(name);
@@ -1618,8 +1626,9 @@ function drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget
   const glow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   glow.setAttribute("cx", node.x);
   glow.setAttribute("cy", node.y);
-  glow.setAttribute("r", 3.8);
+  glow.setAttribute("r", isCurrent ? 4.65 : canJump ? 4.15 : 3.8);
   glow.setAttribute("fill", "rgba(80, 180, 255, 0.12)");
+  glow.setAttribute("class", isCurrent ? "svg-current-node-glow" : canJump ? "svg-reachable-node-glow" : "svg-node-glow");
   group.appendChild(glow);
 
   const planet = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -1627,15 +1636,25 @@ function drawPlanetNode(group, name, node, isCurrent, canJump, isObjectiveTarget
   planet.setAttribute("cy", node.y);
   planet.setAttribute("r", 2.6);
   planet.setAttribute("fill", node.planetClass === "virella" ? "url(#planetVirella)" : node.planetClass === "nyxara" ? "url(#planetNyxara)" : "url(#planetAsteron)");
-  if (!canJump && !isCurrent) planet.setAttribute("opacity", "0.45");
+  if (!canJump && !isCurrent) planet.setAttribute("opacity", "0.34");
   group.appendChild(planet);
 
   const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   ring.setAttribute("cx", node.x);
   ring.setAttribute("cy", node.y);
-  ring.setAttribute("r", isCurrent ? 3.5 : 3.0);
-  ring.setAttribute("class", isCurrent ? "svg-current-ring" : isObjectiveTarget ? "svg-objective-target-ring" : isPlanned ? "svg-planned-trade-ring" : "svg-planet-ring");
+  ring.setAttribute("r", isCurrent ? 4.15 : canJump ? 3.35 : 3.0);
+  ring.setAttribute("class", isCurrent ? "svg-current-ring" : canJump ? "svg-reachable-ring" : isObjectiveTarget ? "svg-objective-target-ring" : isPlanned ? "svg-planned-trade-ring" : "svg-planet-ring");
   group.appendChild(ring);
+
+  if (isCurrent) {
+    const center = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    center.setAttribute("cx", node.x);
+    center.setAttribute("cy", node.y);
+    center.setAttribute("r", 1.05);
+    center.setAttribute("class", "svg-current-node-center");
+    group.appendChild(center);
+    drawCurrentNodeShipIcon(group, node, 0.88);
+  }
 
   const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
   label.setAttribute("x", node.x);
@@ -1660,17 +1679,32 @@ function drawSpaceNode(group, node, isCurrent, canJump, isObjectiveTarget = fals
   const star = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   star.setAttribute("cx", node.x);
   star.setAttribute("cy", node.y);
-  star.setAttribute("r", node.route === "safe" ? 0.72 : 0.82);
-  star.setAttribute("class", `svg-space-node ${node.route || "safe"} ${node.danger === "hostile" ? "hostile" : "safe"} ${isPlanned ? "planned-trade-node" : ""} ${isObjectiveTarget ? "objective-target-node" : ""} ${!canJump && !isCurrent ? "locked" : ""}`);
+  star.setAttribute("r", isCurrent ? 1.28 : canJump ? 1.02 : node.route === "safe" ? 0.72 : 0.82);
+  star.setAttribute("class", `svg-space-node ${node.route || "safe"} ${node.danger === "hostile" ? "hostile" : "safe"} ${isCurrent ? "current-space-node" : ""} ${canJump && !isCurrent ? "reachable-space-node" : ""} ${isPlanned ? "planned-trade-node" : ""} ${isObjectiveTarget ? "objective-target-node" : ""} ${!canJump && !isCurrent ? "locked" : ""}`);
   group.appendChild(star);
 
   if (isCurrent) {
+    const currentGlow = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    currentGlow.setAttribute("cx", node.x);
+    currentGlow.setAttribute("cy", node.y);
+    currentGlow.setAttribute("r", 2.25);
+    currentGlow.setAttribute("class", "svg-current-node-glow");
+    group.insertBefore(currentGlow, star);
+
     const currentRing = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     currentRing.setAttribute("cx", node.x);
     currentRing.setAttribute("cy", node.y);
-    currentRing.setAttribute("r", 1.4);
+    currentRing.setAttribute("r", 2.05);
     currentRing.setAttribute("class", "svg-current-ring");
     group.appendChild(currentRing);
+    drawCurrentNodeShipIcon(group, node, 0.72);
+  } else if (canJump) {
+    const reachableRing = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    reachableRing.setAttribute("cx", node.x);
+    reachableRing.setAttribute("cy", node.y);
+    reachableRing.setAttribute("r", 1.82);
+    reachableRing.setAttribute("class", "svg-reachable-ring");
+    group.appendChild(reachableRing);
   }
 
   const hit = document.createElementNS("http://www.w3.org/2000/svg", "circle");

@@ -1200,8 +1200,20 @@
 
   function getDevGhostLabel(player) {
     const shipLabel = getShipLabel(player);
+    if (isStagingMode() && !isMpDebugEnabled()) return shipLabel === "Unknown ship" ? "" : shipLabel;
     const modeLabel = isStagingMode() ? "STAGING PILOT" : "DEV GHOST";
     return shipLabel === "Unknown ship" ? modeLabel : `${shipLabel} / ${modeLabel}`;
+  }
+
+  function isFreshRemotePilot(player, status = getClient()?.getStatus?.()) {
+    if (!player || player.isSelf) return false;
+    const playerSessionId = String(player.sessionId || player.id || "");
+    if (!playerSessionId || playerSessionId === String(status?.sessionId || "")) return false;
+    if (!String(player.currentNode || "").trim()) return false;
+    if (!isStagingMode(status)) return true;
+    const lastSeenAt = Number(player.lastSeenAt || player.joinedAt || 0);
+    if (!lastSeenAt) return false;
+    return Date.now() - lastSeenAt < 30000;
   }
 
   function getBotLabel(bot) {
@@ -1471,7 +1483,7 @@
     note.setAttribute("stroke-width", "0.32");
     note.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
     note.textContent = getDevGhostLabel(player);
-    group.appendChild(note);
+    if (note.textContent) group.appendChild(note);
 
     layer.appendChild(group);
   }
@@ -1597,12 +1609,13 @@
 
     svg.querySelector(`.${layerClass}`)?.remove();
 
-    if (!players.length) return;
+    const visiblePlayers = players.filter((player) => isFreshRemotePilot(player));
+    if (!visiblePlayers.length) return;
 
     const layer = global.document.createElementNS(SVG_NS, "g");
     layer.setAttribute("class", layerClass);
     layer.setAttribute("pointer-events", "none");
-    players.forEach((player) => drawSectorGhost(layer, player));
+    visiblePlayers.forEach((player) => drawSectorGhost(layer, player));
     svg.appendChild(layer);
   }
 
@@ -1642,7 +1655,7 @@
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
-    const localPlayers = players.filter((player) => isSameCurrentNode(player));
+    const localPlayers = players.filter((player) => isFreshRemotePilot(player) && isSameCurrentNode(player));
     if (!localPlayers.length) return;
 
     ensureStyles();
@@ -1687,7 +1700,7 @@
       const note = global.document.createElement("div");
       note.className = "lupen-mp-space-ghost-note";
       note.textContent = getDevGhostLabel(player);
-      marker.appendChild(note);
+      if (note.textContent) marker.appendChild(note);
 
       layer.appendChild(marker);
     });
