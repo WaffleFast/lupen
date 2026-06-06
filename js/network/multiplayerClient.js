@@ -2236,10 +2236,16 @@
     activeRoom.onMessage("stagingBounty:statusResult", (message) => {
       connection.lastStagingBountyStatus = normalizeStagingBountyStatus(message);
       const active = connection.lastStagingBountyStatus?.active;
+      if (active?.accepted) {
+        addStagingActivityLogOnce(
+          `bounty-accepted:${active.id}`,
+          `Bounty accepted: ${active.title}. Destroy ${active.requiredKills} Erebus bots.`
+        );
+      }
       if (active?.accepted && active.progress > 0) {
         addStagingActivityLogOnce(
           `bounty-progress:${active.id}:${active.progress}`,
-          `${active.title} progress: ${active.progress}/${active.requiredKills}.`
+          `Bounty progress: ${active.progress}/${active.requiredKills} Erebus bots destroyed.`
         );
       }
       if (active?.claimAvailable || active?.completed) {
@@ -2263,6 +2269,13 @@
         };
       }
       refreshCloudSaveAfterStagingXpClaim(connection.lastStagingBountyClaimResult);
+      if (connection.lastStagingBountyClaimResult?.applied) {
+        const claim = connection.lastStagingBountyClaimResult;
+        addStagingActivityLogOnce(
+          `bounty-claimed:${claim.bounty?.id || claim.id}:${claim.xpAfter || claim.receivedAt}`,
+          `Bounty XP claimed: +${Math.round(Number(claim.xpDelta || 0))} XP.`
+        );
+      }
       logDev("server staging bounty claim result", message);
       notifyServerState(activeRoom.state || null);
     });

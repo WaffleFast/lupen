@@ -673,9 +673,11 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
   };
 
   const cargoSign = result.cargoDelta < 0 ? "-" : "+";
-  const summary = `Staging ${result.operation} applied: CR ${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))}, cargo ${cargoSign}${formatNumber(Math.abs(result.cargoDelta))} ${result.resourceName || "resource"}.`;
+  const summary = result.operation === "buy"
+    ? `Bought ${formatNumber(Math.abs(result.cargoDelta || result.quantity || 0))} ${result.resourceName || "cargo"} for CR ${formatNumber(Math.abs(result.creditsDelta || result.cost || 0))}.`
+    : `Sold ${formatNumber(Math.abs(result.cargoDelta || result.quantity || 0))} ${result.resourceName || "cargo"} for CR ${formatNumber(Math.abs(result.creditsDelta || result.revenue || 0))}.`;
   if (typeof addHudToast === "function") addHudToast(summary);
-  if (typeof addActivityLog === "function") addActivityLog(`${summary} Refreshing cloud save.`);
+  if (result.operation === "buy" && typeof addActivityLog === "function") addActivityLog(summary);
   if (result.operation === "sell") showMultiplayerStagingTradeSellFeedback(result);
   applyMultiplayerStagingTradeObjective(result);
 
@@ -3164,28 +3166,40 @@ function renderObjectiveHud() {
       const progress = Math.min(Number(stagingBounty.progress || 0), Number(stagingBounty.requiredKills || 2));
       const required = Number(stagingBounty.requiredKills || 2);
       const targetNode = getMultiplayerStagingBountyTargetNode();
+      const routePath = targetNode && typeof findSectorRoute === "function" ? findSectorRoute(currentNode, targetNode) : [];
+      const nextHop = routePath.length > 1 ? routePath[1] : targetNode;
       const actionText = stagingBounty.claimAvailable || stagingBounty.completed
         ? "Claim XP at Bounty Board"
         : targetNode
-          ? `Jump toward ${targetNode}`
-          : "Waiting for server-owned bot node";
+          ? currentNode === targetNode
+            ? "Engage Erebus bot"
+            : `Jump to ${nextHop || targetNode}`
+          : "Scan or follow bounty route";
+      const routeText = stagingBounty.claimAvailable || stagingBounty.completed
+        ? "Return to Bounty Board"
+        : targetNode
+          ? `Target: ${targetNode}`
+          : "Target: Erebus patrol";
       panel.innerHTML = `
-        <div class="objective-hud-card bounty-objective-card orbit-objective-card">
-          <div class="objective-main-row objective-orbit-row">
-            <div class="objective-copy objective-orbit-copy">
+        <div class="objective-list compact-objective-list">
+          <div class="objective-hud-card bounty-objective-card compact-objective-card orbit-objective-card">
+            <div class="objective-main-row compact-objective-main objective-orbit-row">
+              <div class="objective-bounty-icon image objective-icon-large"><img src="${typeof getBountyIconSrc === "function" ? getBountyIconSrc("assets/bounties/erebus-patrol.png") : "assets/icons/bounty-board.png"}" alt=""></div>
+              <div class="objective-copy objective-copy-large objective-orbit-copy">
               <div class="objective-title-line">
-                <span class="objective-type-pill bounty-pill">MP Staging</span>
-                <strong>${stagingBounty.title || "Erebus Patrol Sweep"}</strong>
+                <span class="objective-type-pill bounty-pill">Bounty</span>
+                <strong>Destroy ${formatNumber(required)} Erebus bots</strong>
               </div>
-              <span>Server-owned bounty progress only</span>
+              <span>${routeText}</span>
               <em>${actionText}</em>
             </div>
             <div class="objective-orbit-meta">
-              <span>${formatNumber(progress)} / ${formatNumber(required)} bots</span>
+              <span>${formatNumber(progress)} / ${formatNumber(required)} destroyed</span>
               <strong>${formatNumber(stagingBounty.xpReward || 40)} XP</strong>
             </div>
             <div class="objective-compact-actions objective-orbit-actions">
               <button class="objective-map-btn" onclick="openSectorMap()">Jump</button>
+            </div>
             </div>
           </div>
         </div>

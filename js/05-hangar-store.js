@@ -311,7 +311,9 @@ async function requestStagingShipEquip(item) {
     multiplayerStagingShipEquipPending = false;
     const latest = client.getStatus?.().lastStagingLoadoutEquip;
     if (latest?.itemId === "ship:lupenHauler" && latest.applied) {
-      if (typeof addHudToast === "function") addHudToast(`LF-2 Hauler ready: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`);
+      const message = `LF-2 Hauler selected: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
+      if (typeof addHudToast === "function") addHudToast(message);
+      if (typeof addActivityLog === "function") addActivityLog(message);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
@@ -347,7 +349,9 @@ async function requestStagingCargoPodEquip(item) {
     multiplayerStagingCargoPodEquipPending = false;
     const latest = client.getStatus?.().lastStagingLoadoutEquip;
     if (latest?.itemId === "attachment:cargoPod" && latest.applied) {
-      if (typeof addHudToast === "function") addHudToast(`Cargo Pod equipped: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`);
+      const message = `Cargo Pod equipped: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
+      if (typeof addHudToast === "function") addHudToast(message);
+      if (typeof addActivityLog === "function") addActivityLog(message);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
@@ -383,7 +387,9 @@ async function requestStagingShieldBoosterEquip(item) {
     multiplayerStagingShieldBoosterEquipPending = false;
     const latest = client.getStatus?.().lastStagingLoadoutEquip;
     if (latest?.itemId === "attachment:shieldBooster" && latest.applied) {
-      if (typeof addHudToast === "function") addHudToast(`Shield Booster equipped: shield ${formatNumber(latest.shieldBefore)} -> ${formatNumber(latest.shieldAfter)}.`);
+      const message = `Shield Booster equipped: shield ${formatNumber(latest.shieldBefore)} -> ${formatNumber(latest.shieldAfter)}.`;
+      if (typeof addHudToast === "function") addHudToast(message);
+      if (typeof addActivityLog === "function") addActivityLog(message);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
@@ -419,7 +425,9 @@ async function requestStagingPulseLaserEquip(item) {
     multiplayerStagingPulseLaserEquipPending = false;
     const latest = client.getStatus?.().lastStagingLoadoutEquip;
     if (latest?.itemId === "gun:pulseLaser" && latest.applied) {
-      if (typeof addHudToast === "function") addHudToast(`Weapon equipped: ${latest.name || "Pulse Laser"}.`);
+      const message = `Weapon equipped: ${latest.name || "Pulse Laser"}.`;
+      if (typeof addHudToast === "function") addHudToast(message);
+      if (typeof addActivityLog === "function") addActivityLog(`${message} Server combat damage updated.`);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
@@ -460,7 +468,12 @@ async function requestStagingStorePurchase(item) {
     multiplayerStagingStorePurchasePending = false;
     const latest = client.getStatus?.().lastStagingStorePurchase;
     if (latest?.itemId === itemId && latest.applied) {
-      if (typeof addHudToast === "function") addHudToast(`Staging purchase applied: ${latest.name || "Store item"}.`);
+      const spent = Number.isFinite(Number(latest.creditsBefore)) && Number.isFinite(Number(latest.creditsAfter))
+        ? ` CR ${formatNumber(Math.max(0, Number(latest.creditsBefore) - Number(latest.creditsAfter)))} spent.`
+        : "";
+      const message = `${latest.name || "Store item"} purchased.${spent}`;
+      if (typeof addHudToast === "function") addHudToast(message);
+      if (typeof addActivityLog === "function") addActivityLog(message);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
