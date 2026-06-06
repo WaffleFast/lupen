@@ -74,6 +74,8 @@
   let room = null;
   let clientScriptPromise = null;
   let authStateListenerRegistered = false;
+  let stagingCombatRefreshTimer = null;
+  let stagingCombatRefreshRetryTimer = null;
   const playersById = new Map();
   const botsById = new Map();
 
@@ -756,6 +758,91 @@
         logDev("staging XP save refresh failed", error?.message || error);
         notifyServerState(room?.state || null);
       });
+  }
+
+  function getTrustedXpAfter(result = {}) {
+    const value = Number(
+      result?.xpAfter ??
+      result?.persistedXp ??
+      result?.playerSavePatchResult?.xpAfter ??
+      result?.playerSavePatchResult?.persistedXp ??
+      result?.playerSave?.xpAfter ??
+      result?.claimStatus?.playerSave?.xpAfter ??
+      connection.lastStagingBotXpResult?.xpAfter ??
+      connection.lastRewardClaimResult?.xpAfter ??
+      connection.lastStagingBountyClaimResult?.xpAfter
+    );
+    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : null;
+  }
+
+  function scheduleStagingCombatProgressRefresh(reason = "combatRefresh", result = {}, delayMs = 500, retry = true) {
+    if (!isEnabled()) return;
+    const trustedXpAfter = getTrustedXpAfter(result);
+
+    if (stagingCombatRefreshTimer) {
+      global.clearTimeout(stagingCombatRefreshTimer);
+      stagingCombatRefreshTimer = null;
+    }
+    if (stagingCombatRefreshRetryTimer) {
+      global.clearTimeout(stagingCombatRefreshRetryTimer);
+      stagingCombatRefreshRetryTimer = null;
+    }
+
+    stagingCombatRefreshTimer = global.setTimeout(() => {
+      stagingCombatRefreshTimer = null;
+      if (typeof global.refreshProgressAfterStagingCombat !== "function") {
+        connection.lastStagingXpRefresh = {
+          source: reason,
+          status: "refresh_unavailable",
+          trustedXpAfter,
+          refreshXp: null,
+          matched: false,
+          stale: false,
+          reason: "refreshProgressAfterStagingCombat_unavailable",
+          checkedAt: Date.now()
+        };
+        notifyServerState(room?.state || null);
+        return;
+      }
+
+      Promise.resolve(global.refreshProgressAfterStagingCombat({
+        reason,
+        trustedXpAfter
+      })).then((refreshResult = {}) => {
+        connection.lastStagingXpRefresh = {
+          source: reason,
+          status: refreshResult.reason || "combat_refresh",
+          trustedXpAfter: Number.isFinite(Number(refreshResult.trustedXpAfter)) ? Number(refreshResult.trustedXpAfter) : trustedXpAfter,
+          refreshXp: Number.isFinite(Number(refreshResult.cloudXp)) ? Number(refreshResult.cloudXp) : null,
+          localXp: Number.isFinite(Number(refreshResult.localXp)) ? Number(refreshResult.localXp) : null,
+          appliedXp: Number.isFinite(Number(refreshResult.appliedXp)) ? Number(refreshResult.appliedXp) : null,
+          matched: refreshResult.matched === true,
+          stale: refreshResult.stale === true,
+          reason: refreshResult.reason || "combat_refresh_complete",
+          checkedAt: Date.now()
+        };
+        notifyServerState(room?.state || null);
+
+        if (retry && !refreshResult.matched) {
+          stagingCombatRefreshRetryTimer = global.setTimeout(() => {
+            stagingCombatRefreshRetryTimer = null;
+            scheduleStagingCombatProgressRefresh(`${reason}:retry`, { xpAfter: trustedXpAfter }, 0, false);
+          }, 1500);
+        }
+      }).catch((error) => {
+        connection.lastStagingXpRefresh = {
+          source: reason,
+          status: "failed",
+          trustedXpAfter,
+          refreshXp: null,
+          matched: false,
+          stale: false,
+          reason: error?.message || "combat_refresh_failed",
+          checkedAt: Date.now()
+        };
+        notifyServerState(room?.state || null);
+      });
+    }, Math.max(0, Number(delayMs || 0)));
   }
 
   function refreshCloudSaveAfterStagingLootClaim(result) {
@@ -1873,6 +1960,9 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server combat intent resolved", message);
+      if (connection.lastCombatResponse.disabled) {
+        scheduleStagingCombatProgressRefresh("combatResolvedDisabled", connection.lastCombatResponse);
+      }
     });
 
     activeRoom.onMessage("bot:disabled", (message) => {
@@ -1887,6 +1977,7 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server bot disabled", message);
+      scheduleStagingCombatProgressRefresh("botDisabled", connection.lastBotEvent);
     });
 
     activeRoom.onMessage("bot:respawned", (message) => {
@@ -1967,6 +2058,7 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server staging reward preview", message);
+      scheduleStagingCombatProgressRefresh("rewardPreview", connection.lastRewardPreview);
       notifyServerState(activeRoom.state || null);
     });
 
@@ -2042,6 +2134,7 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       refreshCloudSaveAfterStagingXpClaim(connection.lastRewardClaimResult);
+      scheduleStagingCombatProgressRefresh("rewardClaim", connection.lastRewardClaimResult);
       logDev("server staging reward claim preview result", message);
       notifyServerState(activeRoom.state || null);
     });
@@ -2049,6 +2142,7 @@
     activeRoom.onMessage("stagingXp:botKillResult", (message) => {
       connection.lastStagingBotXpResult = normalizeStagingXpResult(message);
       refreshCloudSaveAfterStagingXpClaim(connection.lastStagingBotXpResult);
+      scheduleStagingCombatProgressRefresh("botKillXp", connection.lastStagingBotXpResult);
       logDev("server staging bot kill XP result", message);
       notifyServerState(activeRoom.state || null);
     });

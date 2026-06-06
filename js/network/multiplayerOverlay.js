@@ -2339,9 +2339,11 @@
     const refresh = status?.lastStagingXpRefresh;
     if (!refresh) return "";
     const trusted = formatPreviewValue(refresh.trustedXpAfter);
-    const loaded = formatPreviewValue(refresh.refreshXp);
+    const local = formatPreviewValue(refresh.localXp);
+    const cloud = formatPreviewValue(refresh.refreshXp ?? refresh.cloudXp);
+    const applied = formatPreviewValue(refresh.appliedXp);
     const match = refresh.matched ? "matched" : refresh.stale ? "stale guarded" : "pending";
-    return `${refresh.source || "xp"} / ${match} / trusted ${trusted} / refresh ${loaded} / ${refresh.reason || refresh.status || "unknown"}`;
+    return `${refresh.source || "xp"} / ${match} / local ${local} / cloud ${cloud} / trusted ${trusted} / applied ${applied} / ${refresh.reason || refresh.status || "unknown"}`;
   }
 
   function setDiagnosticsRow(panel, label, value) {

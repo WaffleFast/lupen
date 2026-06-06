@@ -226,6 +226,92 @@ function applyTrustedStagingXpIfNewer(source = "cloudRefresh") {
   return true;
 }
 
+function getCurrentCombatXpSnapshot() {
+  return {
+    combatXp: Math.max(0, Math.round(Number(playerProgress?.combatXp || 0))),
+    zoneCombatXp: Math.max(0, Math.round(Number(playerProgress?.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0)))
+  };
+}
+
+function applyCombatXpFloorForStaging(xpValue, source = "combatRefresh") {
+  const xpAfter = Math.max(0, Math.round(Number(xpValue || 0)));
+  if (!Number.isFinite(xpAfter)) return false;
+
+  const progress = normalizePlayerProgress(playerProgress);
+  const currentXp = Math.max(
+    Number(progress.combatXp || 0),
+    Number(progress.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0)
+  );
+  if (xpAfter <= currentXp) return false;
+
+  progress.combatXp = xpAfter;
+  progress.zoneCombatXp = {
+    ...(progress.zoneCombatXp || {}),
+    [XP_CONFIG.combatZoneKey]: xpAfter
+  };
+  playerProgress = normalizePlayerProgress(progress);
+  window.lupenLastStagingXpRefresh = {
+    ...(window.lupenLastStagingXpRefresh || {}),
+    source,
+    appliedXp: playerProgress.combatXp,
+    reason: "combat_refresh_applied",
+    checkedAt: Date.now()
+  };
+  LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
+  redrawProgressAfterStagingXp();
+  return true;
+}
+
+async function refreshProgressAfterStagingCombat(options = {}) {
+  const reason = typeof options === "string" ? options : (options.reason || "combatRefresh");
+  const trustedXpAfter = Number(options.trustedXpAfter ?? window.lupenTrustedStagingXpAfter?.xpAfter);
+  const before = getCurrentCombatXpSnapshot();
+  const localBefore = Math.max(before.combatXp, before.zoneCombatXp);
+  let loadResult = null;
+  let loadError = "";
+
+  try {
+    if (typeof loadGameFromSupabase === "function") {
+      loadResult = await loadGameFromSupabase();
+    }
+  } catch (error) {
+    loadError = error?.message || "cloud_refresh_failed";
+  }
+
+  const afterLoad = getCurrentCombatXpSnapshot();
+  const cloudXp = Math.max(
+    Number(loadResult?.combatXp || 0),
+    Number(loadResult?.zoneCombatXp || 0),
+    afterLoad.combatXp,
+    afterLoad.zoneCombatXp
+  );
+  const bestXp = Math.max(
+    localBefore,
+    Number.isFinite(trustedXpAfter) ? trustedXpAfter : 0,
+    cloudXp
+  );
+  const applied = applyCombatXpFloorForStaging(bestXp, reason);
+  const afterApply = getCurrentCombatXpSnapshot();
+  const appliedXp = Math.max(afterApply.combatXp, afterApply.zoneCombatXp);
+  const matched = Number.isFinite(trustedXpAfter) ? appliedXp >= trustedXpAfter : cloudXp > localBefore || applied;
+
+  window.lupenLastStagingXpRefresh = {
+    source: reason,
+    localXp: localBefore,
+    cloudXp,
+    trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
+    appliedXp,
+    matched,
+    stale: cloudXp < bestXp,
+    reason: loadError || (applied ? "combat_refresh_applied" : matched ? "combat_refresh_matched" : "combat_refresh_no_change"),
+    checkedAt: Date.now()
+  };
+  redrawProgressAfterStagingXp();
+  return window.lupenLastStagingXpRefresh;
+}
+
+window.refreshProgressAfterStagingCombat = refreshProgressAfterStagingCombat;
+
 function applyStagingXpClaimToLoadedState(result = {}) {
   const xpAfter = getStagingXpAfterFromResult(result);
   const applied = result.playerSavePatchResult?.applied === true ||
