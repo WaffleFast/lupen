@@ -1149,6 +1149,32 @@
     };
   }
 
+  function getXpMetadataFromResult(result = {}) {
+    const playerSavePatchResult = result.playerSavePatchResult || null;
+    const playerSave = result.playerSave || result.claimStatus?.playerSave || null;
+    const claimStatus = result.claimStatus || null;
+    return {
+      xpBefore: Number.isFinite(Number(result.xpBefore ?? playerSavePatchResult?.xpBefore ?? playerSave?.xpBefore))
+        ? Number(result.xpBefore ?? playerSavePatchResult?.xpBefore ?? playerSave?.xpBefore)
+        : null,
+      xpAfter: Number.isFinite(Number(result.xpAfter ?? playerSavePatchResult?.xpAfter ?? playerSave?.xpAfter))
+        ? Number(result.xpAfter ?? playerSavePatchResult?.xpAfter ?? playerSave?.xpAfter)
+        : null,
+      persistedXp: Number.isFinite(Number(result.persistedXp ?? playerSavePatchResult?.persistedXp))
+        ? Number(result.persistedXp ?? playerSavePatchResult?.persistedXp)
+        : null,
+      persistedZoneXp: Number.isFinite(Number(result.persistedZoneXp ?? playerSavePatchResult?.persistedZoneXp))
+        ? Number(result.persistedZoneXp ?? playerSavePatchResult?.persistedZoneXp)
+        : null,
+      persistenceVerified: result.persistenceVerified === true || playerSavePatchResult?.persistenceVerified === true,
+      saveWritten: result.saveWritten === true ||
+        playerSavePatchResult?.applied === true ||
+        playerSave?.written === true ||
+        claimStatus?.playerSave?.written === true,
+      applied: result.applied === true || playerSavePatchResult?.applied === true || playerSave?.written === true
+    };
+  }
+
   function normalizeRewardClaimStatus(status) {
     if (!status || typeof status !== "object") return null;
 
@@ -1317,25 +1343,39 @@
 
   function normalizeStagingBountyClaimResult(message) {
     if (!message || typeof message !== "object") return null;
+    const normalized = {
+      playerSave: normalizeClaimPlayerSave(message.playerSave || message.claimStatus?.playerSave),
+      claimStatus: normalizeRewardClaimStatus(message.claimStatus),
+      playerSavePatchResult: normalizePlayerSavePatchResult(message.playerSavePatchResult)
+    };
+    const xp = getXpMetadataFromResult({
+      ...message,
+      ...normalized
+    });
 
     return {
       ok: message.ok === true,
-      applied: message.applied === true,
+      applied: xp.applied,
       dryRun: message.dryRun !== false,
       mode: String(message.mode || ""),
       reason: String(message.reason || ""),
       debugReason: String(message.debugReason || ""),
       bounty: normalizeStagingBounty(message.bounty),
       xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
+      xpBefore: xp.xpBefore,
+      xpAfter: xp.xpAfter,
+      persistedXp: xp.persistedXp,
+      persistedZoneXp: xp.persistedZoneXp,
+      persistenceVerified: xp.persistenceVerified,
       creditsWritten: message.creditsWritten === true,
       lootWritten: message.lootWritten === true,
       bountyWritten: message.bountyWritten === true,
-      saveWritten: message.saveWritten === true,
+      saveWritten: xp.saveWritten,
       gates: normalizeClaimGates(message.gates || message.claimStatus?.gates),
       ledger: normalizeClaimLedger(message.ledger || message.claimStatus?.ledger),
       progressionShadow: normalizeClaimProgressionShadow(message.progressionShadow || message.claimStatus?.progressionShadow),
-      playerSave: normalizeClaimPlayerSave(message.playerSave || message.claimStatus?.playerSave),
-      claimStatus: normalizeRewardClaimStatus(message.claimStatus),
+      playerSave: normalized.playerSave,
+      claimStatus: normalized.claimStatus,
       rewardWritePlan: normalizeRewardWritePlan(message.rewardWritePlan),
       rewardLedgerResult: normalizeRewardLedgerResult(message.rewardLedgerResult),
       rewardApplicationPlan: normalizeRewardApplicationPlan(message.rewardApplicationPlan),
@@ -1343,17 +1383,26 @@
       progressionPreview: normalizeProgressionPreview(message.progressionPreview),
       progressionShadowResult: normalizeProgressionShadowResult(message.progressionShadowResult),
       playerSavePatchPlan: normalizePlayerSavePatchPlan(message.playerSavePatchPlan),
-      playerSavePatchResult: normalizePlayerSavePatchResult(message.playerSavePatchResult),
+      playerSavePatchResult: normalized.playerSavePatchResult,
       receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
     };
   }
 
   function normalizeStagingXpResult(message) {
     if (!message || typeof message !== "object") return null;
+    const normalized = {
+      playerSave: normalizeClaimPlayerSave(message.playerSave || message.claimStatus?.playerSave),
+      claimStatus: normalizeRewardClaimStatus(message.claimStatus),
+      playerSavePatchResult: normalizePlayerSavePatchResult(message.playerSavePatchResult)
+    };
+    const xp = getXpMetadataFromResult({
+      ...message,
+      ...normalized
+    });
 
     return {
       ok: message.ok === true,
-      applied: message.applied === true,
+      applied: xp.applied,
       dryRun: message.dryRun !== false,
       mode: String(message.mode || ""),
       reason: String(message.reason || ""),
@@ -1363,25 +1412,25 @@
       rewardPreviewId: String(message.rewardPreviewId || ""),
       destructionInstanceId: String(message.destructionInstanceId || ""),
       xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
-      xpBefore: Number.isFinite(Number(message.xpBefore)) ? Number(message.xpBefore) : null,
-      xpAfter: Number.isFinite(Number(message.xpAfter)) ? Number(message.xpAfter) : null,
-      persistedXp: Number.isFinite(Number(message.persistedXp)) ? Number(message.persistedXp) : null,
-      persistedZoneXp: Number.isFinite(Number(message.persistedZoneXp)) ? Number(message.persistedZoneXp) : null,
-      persistenceVerified: message.persistenceVerified === true,
+      xpBefore: xp.xpBefore,
+      xpAfter: xp.xpAfter,
+      persistedXp: xp.persistedXp,
+      persistedZoneXp: xp.persistedZoneXp,
+      persistenceVerified: xp.persistenceVerified,
       idempotencyKey: String(message.idempotencyKey || ""),
       creditsWritten: message.creditsWritten === true,
       lootWritten: message.lootWritten === true,
       bountyWritten: message.bountyWritten === true,
-      saveWritten: message.saveWritten === true,
+      saveWritten: xp.saveWritten,
       gates: normalizeClaimGates(message.gates || message.claimStatus?.gates),
-      playerSave: normalizeClaimPlayerSave(message.playerSave || message.claimStatus?.playerSave),
-      claimStatus: normalizeRewardClaimStatus(message.claimStatus),
+      playerSave: normalized.playerSave,
+      claimStatus: normalized.claimStatus,
       rewardWritePlan: normalizeRewardWritePlan(message.rewardWritePlan),
       rewardApplicationPlan: normalizeRewardApplicationPlan(message.rewardApplicationPlan),
       rewardApplicationResult: normalizeRewardApplicationResult(message.rewardApplicationResult),
       progressionPreview: normalizeProgressionPreview(message.progressionPreview),
       playerSavePatchPlan: normalizePlayerSavePatchPlan(message.playerSavePatchPlan),
-      playerSavePatchResult: normalizePlayerSavePatchResult(message.playerSavePatchResult),
+      playerSavePatchResult: normalized.playerSavePatchResult,
       receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
     };
   }
@@ -1925,6 +1974,15 @@
       const contributors = Array.isArray(message?.contributors)
         ? message.contributors.map(normalizeRewardContributor).filter(Boolean)
         : [];
+      const normalized = {
+        playerSave: normalizeClaimPlayerSave(message?.playerSave || message?.claimStatus?.playerSave),
+        claimStatus: normalizeRewardClaimStatus(message?.claimStatus),
+        playerSavePatchResult: normalizePlayerSavePatchResult(message?.playerSavePatchResult)
+      };
+      const xp = getXpMetadataFromResult({
+        ...message,
+        ...normalized
+      });
       connection.lastRewardClaimResult = {
         ok: message?.ok === true,
         rewardPreviewId: String(message?.rewardPreviewId || ""),
@@ -1953,19 +2011,24 @@
         cargoWritten: message?.cargoWritten === true,
         creditsWritten: message?.creditsWritten === true,
         bountyWritten: message?.bountyWritten === true,
-        saveWritten: message?.saveWritten === true,
-        applied: message?.applied === true,
+        saveWritten: xp.saveWritten,
+        applied: xp.applied,
         mode: String(message?.mode || message?.claimStatus?.mode || ""),
         xpDelta: Number.isFinite(Number(message?.xpDelta ?? message?.claimStatus?.xpDelta))
           ? Number(message?.xpDelta ?? message?.claimStatus?.xpDelta)
           : 0,
+        xpBefore: xp.xpBefore,
+        xpAfter: xp.xpAfter,
+        persistedXp: xp.persistedXp,
+        persistedZoneXp: xp.persistedZoneXp,
+        persistenceVerified: xp.persistenceVerified,
         dryRun: message?.dryRun === true,
         debugReason: String(message?.debugReason || message?.claimStatus?.debugReason || ""),
         gates: normalizeClaimGates(message?.gates || message?.claimStatus?.gates),
         ledger: normalizeClaimLedger(message?.ledger || message?.claimStatus?.ledger),
         progressionShadow: normalizeClaimProgressionShadow(message?.progressionShadow || message?.claimStatus?.progressionShadow),
-        playerSave: normalizeClaimPlayerSave(message?.playerSave || message?.claimStatus?.playerSave),
-        claimStatus: normalizeRewardClaimStatus(message?.claimStatus),
+        playerSave: normalized.playerSave,
+        claimStatus: normalized.claimStatus,
         rewardWritePlan: normalizeRewardWritePlan(message?.rewardWritePlan),
         rewardLedgerResult: normalizeRewardLedgerResult(message?.rewardLedgerResult),
         rewardApplicationPlan: normalizeRewardApplicationPlan(message?.rewardApplicationPlan),
@@ -1973,7 +2036,7 @@
         progressionPreview: normalizeProgressionPreview(message?.progressionPreview),
         progressionShadowResult: normalizeProgressionShadowResult(message?.progressionShadowResult),
         playerSavePatchPlan: normalizePlayerSavePatchPlan(message?.playerSavePatchPlan),
-        playerSavePatchResult: normalizePlayerSavePatchResult(message?.playerSavePatchResult),
+        playerSavePatchResult: normalized.playerSavePatchResult,
         claimSimulated: message?.claimSimulated === true,
         reason: String(message?.reason || "staging_preview_only"),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()

@@ -163,7 +163,9 @@ function redrawProgressAfterStagingXp() {
 function getStagingXpAfterFromResult(result = {}) {
   const xpAfter = Number(
     result.xpAfter ??
+    result.persistedXp ??
     result.playerSavePatchResult?.xpAfter ??
+    result.playerSavePatchResult?.persistedXp ??
     result.playerSave?.xpAfter ??
     result.claimStatus?.playerSave?.xpAfter
   );
