@@ -2766,6 +2766,13 @@
       });
     },
 
+    unequipStagingCargoPod(options = {}) {
+      return sendRoomMessage("unequipStagingCargoPod", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "attachment:cargoPod"),
+        operation: "unequip"
+      });
+    },
+
     previewStagingShieldBoosterEquip(options = {}) {
       return sendRoomMessage("previewStagingShieldBoosterEquip", "stagingLoadout:previewEquip", {
         itemId: String(options.itemId || "attachment:shieldBooster")
@@ -2778,6 +2785,13 @@
       });
     },
 
+    unequipStagingShieldBooster(options = {}) {
+      return sendRoomMessage("unequipStagingShieldBooster", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "attachment:shieldBooster"),
+        operation: "unequip"
+      });
+    },
+
     previewStagingPulseLaserEquip(options = {}) {
       return sendRoomMessage("previewStagingPulseLaserEquip", "stagingLoadout:previewEquip", {
         itemId: String(options.itemId || "gun:pulseLaser")
@@ -2787,6 +2801,13 @@
     equipStagingPulseLaser(options = {}) {
       return sendRoomMessage("equipStagingPulseLaser", "stagingLoadout:equipAttachment", {
         itemId: String(options.itemId || "gun:pulseLaser")
+      });
+    },
+
+    unequipStagingPulseLaser(options = {}) {
+      return sendRoomMessage("unequipStagingPulseLaser", "stagingLoadout:equipAttachment", {
+        itemId: String(options.itemId || "gun:pulseLaser"),
+        operation: "unequip"
       });
     },
 

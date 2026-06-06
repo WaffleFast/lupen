@@ -19117,6 +19117,37 @@ input::placeholder {
   background: rgba(120, 26, 42, 0.72);
 }
 
+.vault-management-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.vault-management-actions button {
+  min-height: 34px;
+  border: 1px solid rgba(127, 223, 255, 0.34);
+  border-radius: 8px;
+  background: rgba(4, 18, 34, 0.72);
+  color: #dff6ff;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.vault-management-actions button.primary,
+.vault-management-actions button:not(:disabled):hover {
+  border-color: rgba(90, 232, 255, 0.82);
+  background: linear-gradient(135deg, rgba(26, 108, 160, 0.72), rgba(8, 44, 78, 0.82));
+  color: #fff;
+}
+
+.vault-management-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 /* Keep the objectives panel future-ready for multiple objectives */
 .objectives-panel .activity-objective-block {
   min-height: 0;

@@ -76,6 +76,7 @@ import {
   buildStagingShieldBoosterEquipPlan,
   buildStagingPulseLaserEquipPlan,
   buildStagingLupenHaulerSelectPlan,
+  buildStagingLoadoutUnequipPlan,
   getLoadoutWriteEnvGate
 } from "../src/services/loadoutWriteService.js";
 
@@ -2020,6 +2021,53 @@ async function assertStagingCargoPodEquipHelpers() {
   const noOwnedWeaponPlan = buildStagingPulseLaserEquipPlan({ ...validSaveData, ownedGuns: { pulseLaser: 0 } }, { itemId: "gun:pulseLaser" });
   assert(noOwnedWeaponPlan.ok === false && noOwnedWeaponPlan.blockReason === "pulse_laser_not_owned", "Pulse Laser equip without ownership was not blocked.");
 
+  const pulseLaserUnequipPlan = buildStagingLoadoutUnequipPlan({
+    ...validSaveData,
+    ownedGuns: { pulseLaser: 0 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "shieldBooster", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  }, { itemId: "gun:pulseLaser" });
+  assert(pulseLaserUnequipPlan.ok === true, `Valid Pulse Laser unequip plan was blocked: ${pulseLaserUnequipPlan.blockReason}`);
+  assert(pulseLaserUnequipPlan.operation === "unequip", "Pulse Laser unequip plan did not report unequip operation.");
+  assert(pulseLaserUnequipPlan.ownedBefore === 0 && pulseLaserUnequipPlan.ownedAfter === 1, "Pulse Laser unequip plan did not restore available ownership.");
+  assert(pulseLaserUnequipPlan.equippedBefore === 1 && pulseLaserUnequipPlan.equippedAfter === 0, "Pulse Laser unequip plan did not remove equipped weapon.");
+  assert(pulseLaserUnequipPlan.patchedSaveData.shipLoadouts.lupenOrigin.guns.length === 0, "Pulse Laser unequip plan left weapon equipped.");
+  assert(pulseLaserUnequipPlan.patchedSaveData.ownedGuns.pulseLaser === 1, "Pulse Laser unequip plan did not increment owned weapon.");
+  assert(pulseLaserUnequipPlan.patchedSaveData.credits === 780, "Pulse Laser unequip plan changed credits.");
+  assert(pulseLaserUnequipPlan.patchedSaveData.inventoryItems[0].id === "kept-item", "Pulse Laser unequip plan changed inventoryItems.");
+  assert(pulseLaserUnequipPlan.patchedSaveData.cargo.Iron === 2, "Pulse Laser unequip plan changed trade cargo.");
+  assert(pulseLaserUnequipPlan.patchedSaveData.playerProgress.combatXp === 33, "Pulse Laser unequip plan changed progression.");
+
+  const cargoPodUnequipPlan = buildStagingLoadoutUnequipPlan({
+    ...validSaveData,
+    ownedAttachments: { cargoPod: 0, shieldBooster: 1 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "cargoPod", quality: "standard", level: 1 }, { key: "shieldBooster", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  }, { itemId: "attachment:cargoPod" });
+  assert(cargoPodUnequipPlan.ok === true, `Valid Cargo Pod unequip plan was blocked: ${cargoPodUnequipPlan.blockReason}`);
+  assert(cargoPodUnequipPlan.ownedBefore === 0 && cargoPodUnequipPlan.ownedAfter === 1, "Cargo Pod unequip plan did not restore available ownership.");
+  assert(cargoPodUnequipPlan.equippedBefore === 1 && cargoPodUnequipPlan.equippedAfter === 0, "Cargo Pod unequip plan did not remove equipped attachment.");
+  assert(cargoPodUnequipPlan.cargoCapacityBefore === 175 && cargoPodUnequipPlan.cargoCapacityAfter === 150, "Cargo Pod unequip plan did not remove +25 cargo capacity.");
+  assert(cargoPodUnequipPlan.patchedSaveData.shipLoadouts.lupenOrigin.attachments.every((entry) => entry.key !== "cargoPod"), "Cargo Pod unequip plan left Cargo Pod equipped.");
+  assert(cargoPodUnequipPlan.patchedSaveData.ownedAttachments.cargoPod === 1, "Cargo Pod unequip plan did not increment owned Cargo Pod.");
+  assert(cargoPodUnequipPlan.patchedSaveData.ownedGuns.pulseLaser === 1, "Cargo Pod unequip plan changed weapon ownership.");
+  assert(cargoPodUnequipPlan.patchedSaveData.playerProgress.combatXp === 33, "Cargo Pod unequip plan changed progression.");
+
+  const notEquippedWeaponPlan = buildStagingLoadoutUnequipPlan({
+    ...validSaveData,
+    ownedGuns: { pulseLaser: 1 },
+    shipLoadouts: { lupenOrigin: { attachments: [{ key: "shieldBooster" }], guns: [] } }
+  }, { itemId: "gun:pulseLaser" });
+  assert(notEquippedWeaponPlan.ok === false && notEquippedWeaponPlan.blockReason === "pulse_laser_not_equipped", "Pulse Laser unequip without equipped weapon was not blocked.");
+
   const fullGunSlotsPlan = buildStagingPulseLaserEquipPlan({
     ...validSaveData,
     ownedGuns: { pulseLaser: 1 },
@@ -2194,6 +2242,52 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(weaponLoadoutSave.cargo.Iron === 2, "Applied Pulse Laser equip changed trade cargo.");
   assert(weaponLoadoutSave.playerProgress.combatXp === 33, "Applied Pulse Laser equip changed progression.");
   assert(weaponLoadoutFetchCalls.join(",") === "GET,PATCH", `Pulse Laser equip expected read/write pair, got ${weaponLoadoutFetchCalls.join(",")}.`);
+
+  let weaponUnequipSave = JSON.parse(JSON.stringify({
+    ...validSaveData,
+    ownedGuns: { pulseLaser: 0 },
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [{ key: "shieldBooster", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  }));
+  const weaponUnequipFetchCalls = [];
+  const appliedWeaponUnequip = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "gun:pulseLaser",
+    operation: "unequip",
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_LOADOUT_WRITE_ENABLED: "true",
+      STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+      STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
+      STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "gun:pulseLaser"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      weaponUnequipFetchCalls.push(options.method || "GET");
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: weaponUnequipSave }] };
+      weaponUnequipSave = JSON.parse(options.body || "{}").save_data;
+      return { ok: true, status: 204, json: async () => [] };
+    }
+  });
+  assert(appliedWeaponUnequip.applied === true && appliedWeaponUnequip.operation === "unequip", `Gated Pulse Laser unequip did not apply: ${appliedWeaponUnequip.blockReason}`);
+  assert(appliedWeaponUnequip.ownedBefore === 0 && appliedWeaponUnequip.ownedAfter === 1, "Applied Pulse Laser unequip returned incorrect ownership.");
+  assert(appliedWeaponUnequip.equippedBefore === 1 && appliedWeaponUnequip.equippedAfter === 0, "Applied Pulse Laser unequip returned incorrect equipped count.");
+  assert(appliedWeaponUnequip.loadoutWritten === true && appliedWeaponUnequip.weaponWritten === true && appliedWeaponUnequip.saveWritten === true, "Applied Pulse Laser unequip did not report allowed writes.");
+  assert(appliedWeaponUnequip.attachmentWritten === false && appliedWeaponUnequip.creditsWritten === false && appliedWeaponUnequip.inventoryWritten === false, "Applied Pulse Laser unequip reported forbidden writes.");
+  assert(weaponUnequipSave.credits === 780, "Applied Pulse Laser unequip changed credits.");
+  assert(weaponUnequipSave.ownedGuns.pulseLaser === 1, "Applied Pulse Laser unequip did not increment owned weapon.");
+  assert(weaponUnequipSave.shipLoadouts.lupenOrigin.guns.length === 0, "Applied Pulse Laser unequip did not clear gun loadout entry.");
+  assert(weaponUnequipSave.ownedAttachments.cargoPod === 2, "Applied Pulse Laser unequip changed attachment ownership.");
+  assert(weaponUnequipSave.inventoryItems[0].id === "kept-item", "Applied Pulse Laser unequip changed inventoryItems.");
+  assert(weaponUnequipSave.cargo.Iron === 2, "Applied Pulse Laser unequip changed trade cargo.");
+  assert(weaponUnequipSave.playerProgress.combatXp === 33, "Applied Pulse Laser unequip changed progression.");
+  assert(weaponUnequipFetchCalls.join(",") === "GET,PATCH", `Pulse Laser unequip expected read/write pair, got ${weaponUnequipFetchCalls.join(",")}.`);
 
   let shieldLoadoutSave = JSON.parse(JSON.stringify(validSaveData));
   const shieldLoadoutFetchCalls = [];

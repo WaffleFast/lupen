@@ -1,8 +1,9 @@
 /* Staging-only loadout equip prototype.
    This service mirrors the current local standard equip behavior for
    attachment:cargoPod, attachment:shieldBooster, gun:pulseLaser, and
-   ship:lupenHauler only. Equipment writes decrement the matching owned count
-   and append a standard level-1 entry. Ship selection writes only current ship
+   ship:lupenHauler only. Equipment equip writes decrement the matching owned
+   count and append a standard level-1 entry; unequip writes reverse that for
+   supported equipment. Ship selection writes only current ship
    selection fields. It preserves every unrelated save field and never writes credits,
    inventoryItems, ships, loot, bounties, PvP/player damage, broad progression,
    schema, or RLS. */
@@ -132,6 +133,9 @@ function getUserReason(reason) {
     shield_booster_not_owned: "No owned Shield Booster is available to equip.",
     owned_guns_path_missing_or_invalid: "Saved weapon ownership path is missing or invalid.",
     pulse_laser_not_owned: "No owned Pulse Laser is available to equip.",
+    cargo_pod_not_equipped: "No equipped Cargo Pod is available to unequip.",
+    shield_booster_not_equipped: "No equipped Shield Booster is available to unequip.",
+    pulse_laser_not_equipped: "No equipped Pulse Laser is available to unequip.",
     owned_ships_path_missing_or_invalid: "Saved ship ownership path is missing or invalid.",
     ship_not_owned: "Ship is not owned yet.",
     ship_already_equipped: "Ship is already active.",
@@ -157,6 +161,46 @@ function blocked(reason, extra = {}) {
     ...getLoadoutWriteFlags(false),
     ...extra
   };
+}
+
+function getLoadoutItemMeta(itemId) {
+  if (isCargoPodItem(itemId)) {
+    return {
+      itemId: CARGO_POD_ITEM_ID,
+      key: CARGO_POD_KEY,
+      name: "Cargo Pod",
+      category: "equipment",
+      listName: "attachments",
+      ownedPath: "ownedAttachments",
+      unequippedReason: "cargo_pod_not_equipped",
+      writeKind: "attachment"
+    };
+  }
+  if (isShieldBoosterItem(itemId)) {
+    return {
+      itemId: SHIELD_BOOSTER_ITEM_ID,
+      key: SHIELD_BOOSTER_KEY,
+      name: "Shield Booster",
+      category: "equipment",
+      listName: "attachments",
+      ownedPath: "ownedAttachments",
+      unequippedReason: "shield_booster_not_equipped",
+      writeKind: "attachment"
+    };
+  }
+  if (isPulseLaserItem(itemId)) {
+    return {
+      itemId: PULSE_LASER_ITEM_ID,
+      key: PULSE_LASER_KEY,
+      name: "Pulse Laser",
+      category: "weapon",
+      listName: "guns",
+      ownedPath: "ownedGuns",
+      unequippedReason: "pulse_laser_not_equipped",
+      writeKind: "weapon"
+    };
+  }
+  return null;
 }
 
 function isCargoPodItem(itemId) {
@@ -509,6 +553,91 @@ export function buildStagingLoadoutEquipPlan(saveData = {}, { itemId = CARGO_POD
   return blocked("unknown_loadout_item", { itemId });
 }
 
+export function buildStagingLoadoutUnequipPlan(saveData = {}, { itemId = CARGO_POD_ITEM_ID } = {}) {
+  const meta = getLoadoutItemMeta(itemId);
+  if (!meta) return blocked("unknown_loadout_item", { itemId, operation: "unequip" });
+  if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) return blocked("save_data_missing_or_invalid", { itemId: meta.itemId, operation: "unequip" });
+
+  const currentShipId = getString(saveData.currentShipId);
+  const ship = STAGING_SHIP_CONFIG[currentShipId];
+  if (!currentShipId) return blocked("current_ship_missing_or_invalid", { itemId: meta.itemId, operation: "unequip" });
+  if (!ship) return blocked("unsupported_ship_for_loadout_preview", { itemId: meta.itemId, currentShipId, operation: "unequip" });
+
+  const ownedStore = saveData[meta.ownedPath];
+  if (!ownedStore || typeof ownedStore !== "object" || Array.isArray(ownedStore)) {
+    return blocked(meta.ownedPath === "ownedGuns" ? "owned_guns_path_missing_or_invalid" : "owned_attachments_path_missing_or_invalid", {
+      itemId: meta.itemId,
+      currentShipId,
+      operation: "unequip"
+    });
+  }
+
+  if (!saveData.shipLoadouts || typeof saveData.shipLoadouts !== "object" || Array.isArray(saveData.shipLoadouts)) {
+    return blocked("ship_loadouts_path_missing_or_invalid", { itemId: meta.itemId, currentShipId, operation: "unequip" });
+  }
+
+  const loadout = saveData.shipLoadouts[currentShipId];
+  if (!loadout || typeof loadout !== "object" || Array.isArray(loadout) || !Array.isArray(loadout.attachments) || !Array.isArray(loadout.guns)) {
+    return blocked("current_ship_loadout_missing_or_invalid", { itemId: meta.itemId, currentShipId, operation: "unequip" });
+  }
+
+  const normalizedEntries = loadout[meta.listName].map(normalizeLoadoutEntry).filter(Boolean);
+  const removeIndex = normalizedEntries.findIndex((entry) => entry.key === meta.key && entry.quality === "standard" && Number(entry.level || 1) <= 1);
+  const equippedBefore = normalizedEntries.filter((entry) => entry.key === meta.key).length;
+  const ownedBefore = clampInteger(ownedStore[meta.key], 0, meta.ownedPath === "ownedGuns" ? MAX_GUN_COUNT : MAX_ATTACHMENT_COUNT) || 0;
+  if (removeIndex < 0) {
+    return blocked(meta.unequippedReason, {
+      itemId: meta.itemId,
+      currentShipId,
+      operation: "unequip",
+      ownedBefore,
+      ownedAfter: ownedBefore,
+      equippedBefore,
+      equippedAfter: equippedBefore
+    });
+  }
+
+  const patchedSaveData = cloneJson(saveData);
+  const nextEntries = normalizedEntries.filter((_entry, index) => index !== removeIndex);
+  patchedSaveData[meta.ownedPath][meta.key] = ownedBefore + 1;
+  patchedSaveData.shipLoadouts[currentShipId][meta.listName] = nextEntries;
+
+  const result = {
+    ok: true,
+    mode: "loadout_write_plan",
+    operation: "unequip",
+    applied: false,
+    dryRun: true,
+    itemId: meta.itemId,
+    name: meta.name,
+    category: meta.category,
+    currentShipId,
+    ownedBefore,
+    ownedAfter: ownedBefore + 1,
+    equippedBefore,
+    equippedAfter: Math.max(0, equippedBefore - 1),
+    patchedSaveData,
+    appliedFields: [`${meta.ownedPath}.${meta.key}`, `shipLoadouts.${currentShipId}.${meta.listName}`],
+    untouchedFields: ["credits", "inventoryItems", "ownedShips", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"]
+  };
+
+  if (meta.key === CARGO_POD_KEY) {
+    result.cargoCapacityBefore = getCargoCapacity(saveData, currentShipId, normalizedEntries);
+    result.cargoCapacityAfterPreview = getCargoCapacity(patchedSaveData, currentShipId, nextEntries);
+    result.cargoCapacityAfter = result.cargoCapacityAfterPreview;
+  }
+  if (meta.key === SHIELD_BOOSTER_KEY) {
+    result.shieldBefore = getShieldCapacity(saveData, currentShipId, normalizedEntries);
+    result.shieldAfterPreview = getShieldCapacity(patchedSaveData, currentShipId, nextEntries);
+    result.shieldAfter = result.shieldAfterPreview;
+  }
+  if (meta.key === PULSE_LASER_KEY) {
+    result.gunSlots = ship.gunSlots;
+  }
+
+  return result;
+}
+
 async function fetchPlayerSaveRow(baseUrl, playerId, config, fetchImpl) {
   const response = await fetchImpl(getPlayerSaveReadUrl(baseUrl, playerId), {
     method: "GET",
@@ -545,13 +674,16 @@ async function patchPlayerSaveData(baseUrl, playerId, saveData, config, fetchImp
 export async function applyStagingLoadoutEquipWrite({
   playerId = "",
   itemId = CARGO_POD_ITEM_ID,
+  operation = "equip",
   trustedState = null,
   env = process.env,
   fetchImpl = globalThis.fetch
 } = {}) {
   const safePlayerId = getString(playerId);
+  const safeOperation = getString(operation, "equip") === "unequip" ? "unequip" : "equip";
   if (!safePlayerId) return blocked("verified_identity_required", { itemId });
   if (!isCargoPodItem(itemId) && !isShieldBoosterItem(itemId) && !isPulseLaserItem(itemId) && !isLupenHaulerShipItem(itemId)) return blocked("unknown_loadout_item", { itemId });
+  if (safeOperation === "unequip" && isLupenHaulerShipItem(itemId)) return blocked("unknown_loadout_item", { itemId, operation: safeOperation });
   if (!trustedState?.available || !trustedState?.validationState) return blocked("trusted_save_required", { itemId });
   if (typeof fetchImpl !== "function") return blocked("fetch_unavailable", { itemId });
 
@@ -573,7 +705,9 @@ export async function applyStagingLoadoutEquipWrite({
     const readResult = await fetchPlayerSaveRow(baseUrl, safePlayerId, config, fetchImpl);
     if (!readResult.ok) return blocked(readResult.reason, { envGate, status: readResult.status, itemId });
     const saveData = getSaveDataFromRow(readResult.row);
-    const plan = buildStagingLoadoutEquipPlan(saveData, { itemId });
+    const plan = safeOperation === "unequip"
+      ? buildStagingLoadoutUnequipPlan(saveData, { itemId })
+      : buildStagingLoadoutEquipPlan(saveData, { itemId });
     if (!plan.ok) return { ...plan, envGate, itemId };
     const patchResult = await patchPlayerSaveData(baseUrl, safePlayerId, plan.patchedSaveData, config, fetchImpl);
     if (!patchResult.ok) return blocked(patchResult.reason, { envGate, status: patchResult.status, itemId });
@@ -581,17 +715,21 @@ export async function applyStagingLoadoutEquipWrite({
     return {
       ok: true,
       mode: "loadout_write",
-      operation: "equip",
+      operation: safeOperation,
       applied: true,
       dryRun: false,
-      reason: isLupenHaulerShipItem(itemId)
+      reason: safeOperation === "unequip"
+        ? `${plan.name} unequipped`
+        : isLupenHaulerShipItem(itemId)
         ? "LF-2 Hauler selected"
         : isPulseLaserItem(itemId)
         ? "Pulse Laser equipped"
         : isShieldBoosterItem(itemId)
           ? "Shield Booster equipped"
           : "Cargo Pod equipped",
-      debugReason: isLupenHaulerShipItem(itemId)
+      debugReason: safeOperation === "unequip"
+        ? `staging_${plan.name.toLowerCase().replace(/\s+/g, "_")}_unequip_applied`
+        : isLupenHaulerShipItem(itemId)
         ? "phase_ship_staging_lf2_hauler_select_applied"
         : isPulseLaserItem(itemId)
         ? "phase_weapon_staging_pulse_laser_equip_applied"
@@ -652,6 +790,7 @@ export const LoadoutWriteService = Object.freeze({
   buildStagingPulseLaserEquipPlan,
   buildStagingLupenHaulerSelectPlan,
   buildStagingLoadoutEquipPlan,
+  buildStagingLoadoutUnequipPlan,
   applyStagingCargoPodEquipWrite,
   applyStagingLoadoutEquipWrite
 });

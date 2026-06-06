@@ -61,6 +61,7 @@ import {
 import {
   applyStagingLoadoutEquipWrite,
   buildStagingLoadoutEquipPlan,
+  buildStagingLoadoutUnequipPlan,
   getLoadoutWriteEnvGate
 } from "../services/loadoutWriteService.js";
 
@@ -2571,6 +2572,7 @@ export class LupenSectorRoom extends Room {
       playerId: player?.playerId || ""
     };
     const itemId = getStringValue(message?.itemId || "attachment:cargoPod");
+    const operation = getStringValue(message?.operation || "equip") === "unequip" ? "unequip" : "equip";
     const trustedState = await fetchPlayerTradeValidationState({
       authStatus: identity.authStatus,
       trustedPlayerId: identity.trustedPlayerId,
@@ -2589,7 +2591,7 @@ export class LupenSectorRoom extends Room {
     const base = {
       ok: false,
       mode: "blocked",
-      operation: "equip",
+      operation,
       applied: false,
       dryRun: true,
       itemId,
@@ -2621,6 +2623,7 @@ export class LupenSectorRoom extends Room {
 
     if (wantsWrite &&
       STAGING_LOADOUT_WRITE_ITEM_IDS.has(itemId) &&
+      !(operation === "unequip" && itemId === "ship:lupenHauler") &&
       gates.writeEnabled === true &&
       gates.dryRun === false &&
       gates.verified === true &&
@@ -2631,6 +2634,7 @@ export class LupenSectorRoom extends Room {
       const writeResult = await applyStagingLoadoutEquipWrite({
         playerId: identity.trustedPlayerId || identity.playerId,
         itemId,
+        operation,
         trustedState
       });
       client.send(messageType, {
@@ -2644,6 +2648,8 @@ export class LupenSectorRoom extends Room {
 
     let reason = !STAGING_LOADOUT_WRITE_ITEM_IDS.has(itemId)
       ? "unknown_loadout_item"
+      : operation === "unequip" && itemId === "ship:lupenHauler"
+        ? "unknown_loadout_item"
       : wantsWrite && player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun
         ? "staging_mode_required_for_loadout_write"
         : !gates.writeEnabled
@@ -2662,7 +2668,9 @@ export class LupenSectorRoom extends Room {
 
     let plan = null;
     if (trustedState?.available && trustedState?.rawSaveData) {
-      plan = buildStagingLoadoutEquipPlan(trustedState.rawSaveData, { itemId });
+      plan = operation === "unequip"
+        ? buildStagingLoadoutUnequipPlan(trustedState.rawSaveData, { itemId })
+        : buildStagingLoadoutEquipPlan(trustedState.rawSaveData, { itemId });
       reason = plan.ok ? reason : plan.blockReason || reason;
     }
 
@@ -2676,7 +2684,7 @@ export class LupenSectorRoom extends Room {
       blockReason: plan?.blockReason || reason,
       reason,
       userReason: plan?.userReason || (reason === "staging_loadout_dry_run_enabled"
-        ? `Would equip ${base.name || "staging item"}. Dry run only - loadout not changed.`
+        ? `Would ${operation} ${base.name || "staging item"}. Dry run only - loadout not changed.`
         : `Blocked: ${reason}.`),
       gates,
       writes: base.writes,

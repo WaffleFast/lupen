@@ -21,6 +21,8 @@ let multiplayerStagingCargoPodEquipPending = false;
 let multiplayerStagingShieldBoosterEquipPending = false;
 let multiplayerStagingPulseLaserEquipPending = false;
 let multiplayerStagingShipEquipPending = false;
+let multiplayerStagingLoadoutUnequipPending = false;
+let selectedVaultActionContext = null;
 
 function isMultiplayerStagingStoreActive() {
   try {
@@ -641,6 +643,26 @@ function setHangarVaultFilter(nextFilter) {
 
 function selectVaultItem(groupKey) {
   selectedVaultGroupKey = groupKey;
+  selectedVaultActionContext = null;
+  renderHangarVault();
+}
+
+function selectEquippedLoadoutVaultItem(categoryKey, index) {
+  const loadout = getShipLoadout(selectedHangarShipId);
+  const listName = categoryKey === "guns" ? "guns" : "attachments";
+  const entry = loadout?.[listName]?.[Number(index)];
+  const key = getEquipmentKey(entry);
+  const quality = getEquipmentQuality(entry);
+  if (!key) return;
+  hangarVaultFilter = categoryKey;
+  selectedVaultGroupKey = `${key}__${quality}`;
+  selectedVaultActionContext = {
+    source: "equipped",
+    categoryKey,
+    index: Number(index),
+    key,
+    quality
+  };
   renderHangarVault();
 }
 
@@ -785,6 +807,7 @@ function getVaultEntryStats(entry) {
 
   if (entry.categoryKey !== "cores") {
     stats.push({ label: "Equipped", value: formatNumber(entry.equippedCount) });
+    stats.push({ label: "Available", value: formatNumber(entry.storedCount) });
   }
 
   if (item.kind === "gun") {
@@ -799,7 +822,7 @@ function getVaultEntryStats(entry) {
     stats.push({ label: "Use", value: "Upgrade equipment" });
   }
 
-  return stats.slice(0, item.kind === "gun" ? 5 : 3);
+  return stats.slice(0, item.kind === "gun" ? 6 : 4);
 }
 
 
@@ -887,6 +910,21 @@ function renderVaultDetail() {
 
   const stats = getVaultEntryStats(entry);
   const canUpgrade = ["guns", "attachments"].includes(entry.categoryKey);
+  const selectedFromEquippedSlot = selectedVaultActionContext?.source === "equipped" &&
+    selectedVaultActionContext.key === entry.key &&
+    selectedVaultActionContext.quality === entry.quality;
+  const equipAvailable = canEquipVaultEntry(entry);
+  const unequipAvailable = findEquippedVaultEntryIndex(entry) >= 0;
+  const managementActions = ["guns", "attachments"].includes(entry.categoryKey) ? `
+    <div class="vault-management-actions">
+      <button type="button" onclick="equipSelectedVaultItem()" ${equipAvailable ? "" : "disabled"}>
+        Equip
+      </button>
+      <button type="button" class="${selectedFromEquippedSlot ? "primary" : ""}" onclick="unequipSelectedVaultItem()" ${unequipAvailable ? "" : "disabled"}>
+        Unequip
+      </button>
+    </div>
+  ` : "";
   const upgradePanel = canUpgrade ? `
     <div class="vault-upgrade-panel">
       <div>
@@ -922,9 +960,110 @@ function renderVaultDetail() {
           </div>
         `).join("")}
       </div>
+      ${managementActions}
       ${upgradePanel}
     </div>
   `;
+}
+
+function getVaultItemId(entry) {
+  if (!entry) return "";
+  if (entry.categoryKey === "guns") return `gun:${entry.key}`;
+  if (entry.categoryKey === "attachments") return `attachment:${entry.key}`;
+  return "";
+}
+
+function canEquipVaultEntry(entry) {
+  if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return false;
+  if (Number(entry.storedCount || 0) <= 0) return false;
+  const loadout = getShipLoadout(selectedHangarShipId);
+  if (entry.categoryKey === "guns") return (loadout.guns || []).length < getGunSlotLimit(selectedHangarShipId);
+  return (loadout.attachments || []).length < getAttachmentSlotLimit(selectedHangarShipId);
+}
+
+function findEquippedVaultEntryIndex(entry) {
+  if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return -1;
+  const loadout = getShipLoadout(selectedHangarShipId);
+  const list = entry.categoryKey === "guns" ? loadout.guns : loadout.attachments;
+  return (list || []).findIndex(item => getEquipmentKey(item) === entry.key && getEquipmentQuality(item) === entry.quality);
+}
+
+function equipSelectedVaultItem() {
+  const entry = getSelectedVaultEntry();
+  if (!entry || !canEquipVaultEntry(entry)) return;
+  if (entry.categoryKey === "guns") {
+    equipGunFromInventory(entry.key, entry.quality, "owned");
+  } else if (entry.categoryKey === "attachments") {
+    equipAttachmentFromInventory(entry.key, entry.quality, "owned");
+  }
+  selectedVaultActionContext = null;
+}
+
+async function requestStagingLoadoutUnequip(entry) {
+  const itemId = getVaultItemId(entry);
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!itemId || !status?.enabled || !status?.isConnected) {
+    if (typeof addHudToast === "function") addHudToast("MP staging loadout unequip is waiting for the multiplayer server connection.");
+    return true;
+  }
+  const method = itemId === "gun:pulseLaser"
+    ? "unequipStagingPulseLaser"
+    : itemId === "attachment:cargoPod"
+      ? "unequipStagingCargoPod"
+      : itemId === "attachment:shieldBooster"
+        ? "unequipStagingShieldBooster"
+        : "";
+  if (!method || typeof client[method] !== "function") {
+    blockLoadoutMutationInMultiplayerStaging();
+    return true;
+  }
+  if (multiplayerStagingLoadoutUnequipPending) return true;
+  multiplayerStagingLoadoutUnequipPending = true;
+  client[method]({ itemId });
+  if (typeof addHudToast === "function") addHudToast(`Unequipping ${entry.name}.`);
+  setTimeout(async () => {
+    multiplayerStagingLoadoutUnequipPending = false;
+    const latest = client.getStatus?.().lastStagingLoadoutEquip;
+    if (latest?.itemId === itemId && latest.applied && latest.operation === "unequip") {
+      const message = `${latest.name || entry.name} unequipped. Available ${formatNumber(latest.ownedAfter ?? 1)}.`;
+      if (typeof addHudToast === "function") addHudToast(message);
+      if (typeof addActivityLog === "function") addActivityLog(message);
+      if (typeof loadGameFromSupabase === "function") {
+        try {
+          const loaded = await loadGameFromSupabase();
+          if (loaded?.loaded) {
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_unequipped");
+            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
+          }
+        } catch (_err) {
+          if (typeof addHudToast === "function") addHudToast(`${latest.name || entry.name} unequipped. Reload if loadout values look stale.`);
+        }
+      }
+    }
+    selectedVaultActionContext = null;
+    renderHangar();
+  }, 900);
+  return true;
+}
+
+function unequipSelectedVaultItem() {
+  const entry = getSelectedVaultEntry();
+  if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return;
+  if (isMultiplayerStagingStoreActive()) {
+    requestStagingLoadoutUnequip(entry);
+    return;
+  }
+  const index = selectedVaultActionContext?.source === "equipped" && selectedVaultActionContext.key === entry.key
+    ? selectedVaultActionContext.index
+    : findEquippedVaultEntryIndex(entry);
+  if (index < 0) return;
+  if (entry.categoryKey === "guns") {
+    removeGun(index);
+  } else {
+    removeAttachment(index);
+  }
+  selectedVaultActionContext = null;
 }
 
 function renderHangarVault() {
@@ -1387,7 +1526,7 @@ function renderInstalledAttachments() {
     slot.className = `equipment-slot scalable-loadout-slot ${item ? "filled" : "empty"} quality-${quality}`;
     slot.dataset.slotIndex = String(i + 1).padStart(2, "0");
     slot.disabled = !item;
-    slot.onclick = () => removeAttachment(i);
+    slot.onclick = () => selectEquippedLoadoutVaultItem("attachments", i);
 
     if (item) {
       slot.removeAttribute("title");
@@ -1427,7 +1566,7 @@ function renderInstalledGuns() {
     slot.className = `equipment-slot scalable-loadout-slot ${item ? "filled" : "empty"} quality-${quality}`;
     slot.dataset.slotIndex = String(i + 1).padStart(2, "0");
     slot.disabled = !item;
-    slot.onclick = () => removeGun(i);
+    slot.onclick = () => selectEquippedLoadoutVaultItem("guns", i);
 
     if (item) {
       slot.removeAttribute("title");
