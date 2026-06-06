@@ -2729,33 +2729,33 @@
   }
 
   function getStagingFlowHint(status, selectedBot, players, bots) {
-    const loop = "1 Trade for CR -> 2 Buy/fly LF-2 Hauler (10.5k CR) -> 3 Buy/equip Cargo Pod -> 4 Buy/equip Pulse Laser -> 5 Buy/equip Shield Booster -> 6 Accept Erebus Patrol (40 XP) -> 7 Destroy staging bots for automatic XP -> 8 Claim bounty XP from Bounty Board; shard remains preview-only.";
+    const loop = "Trade for CR -> Store upgrades -> Launch -> Engage bots -> Claim bounty XP.";
 
     if (!status?.isConnected) {
       return `Connecting to Multiplayer Staging. ${loop}`;
     }
 
     if (!bots.length) {
-      return `Server-backed trade, Store, ship, loadout, combat, XP, and Lupen Shard test loop. Waiting for server-owned staging bots. ${loop}`;
+      return `Waiting for server-owned targets. ${loop}`;
     }
 
     if (!selectedBot?.id) {
       const pilotText = players.length ? `${players.length} remote pilot${players.length === 1 ? "" : "s"} connected. ` : "";
-      return `${pilotText}Server-backed trade, gated Store purchases, LF-2 Hauler cargo hull, Cargo Pod capacity, Pulse Laser damage, Shield Booster shield stats, Erebus Patrol progress, XP, and Lupen Shard claims are staged here. ${loop}`;
+      return `${pilotText}${loop} No PvP or player damage in this staging build.`;
     }
 
     if (selectedBot.disabled) {
       return status?.lastRewardPreview?.botId === selectedBot.id
-        ? "Target destroyed. Bot XP auto-applies from the server; bounty XP is claimed from the Bounty Board. Lupen Shard remains preview-only here."
-        : "Target destroyed. Waiting for the server to respawn it. Use the loop guide for the next staging pass.";
+        ? "Target destroyed. XP applied. Claim bounty XP from the Bounty Board when ready."
+        : "Target destroyed. Waiting for the server to respawn it.";
     }
 
     const cooldown = Math.max(0, Number(status.fireCooldownRemainingMs || 0));
     if (cooldown > 0) {
-      return `Server cooldown active: ${formatCooldown(cooldown)} remaining. Damage is server-owned.`;
+      return `Weapons cooling: ${formatCooldown(cooldown)}.`;
     }
 
-    return "Target locked. Use Engage to auto-fire server combat. Disengage stops firing. No PvP, player damage, combat credits, or loot item writes are enabled.";
+    return "Target locked. Engage starts auto-fire; Disengage stops it.";
   }
 
   function renderStagingFlowHint(status, selectedBot, players, bots) {
@@ -2789,7 +2789,7 @@
 
     const note = global.document.createElement("span");
     note.className = "lupen-mp-flow-note";
-    note.textContent = "Server-backed trade/store/ship/loadout/combat. No PvP, player damage, combat credits, or loot items yet.";
+    note.textContent = "Trade, Store, loadout, combat XP, and bounty XP are live for staging. No PvP or player damage.";
     hint.appendChild(note);
 
     global.document.body.appendChild(hint);

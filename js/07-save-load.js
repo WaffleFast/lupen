@@ -704,6 +704,9 @@ function loadGame() {
 
 function isDebugToolsEnabled() {
   const params = new URLSearchParams(window.location.search);
+  if (params.get("mp") === "staging") {
+    return params.get("debug") === "tools" || params.get("debugTools") === "true";
+  }
   return params.has("debug") || localStorage.getItem("lupenDebugTools") === "true";
 }
 
