@@ -293,7 +293,7 @@ function getCsvSet(value = "") {
 }
 
 export function getStagingTradeWriteConfig(env = process.env) {
-  const maxQuantity = normalizeTradeNumber(env.STAGING_TRADE_WRITE_MAX_QUANTITY, 999999) || 1000;
+  const maxQuantity = normalizeTradeNumber(env.STAGING_TRADE_WRITE_MAX_QUANTITY, 1000) || 1000;
   const allowlist = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWLIST);
   const allowedOffers = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWED_OFFERS);
   const requestedScope = String(env.STAGING_TRADE_WRITE_SCOPE || "disabled").trim().toLowerCase();

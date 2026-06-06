@@ -331,6 +331,16 @@ function findMultiplayerStagingTradeOffer({ good = "", origin = "", destination 
   }) || null;
 }
 
+function getMultiplayerStagingRoutePricing({ good = "", origin = "", destination = "" } = {}) {
+  const offer = findMultiplayerStagingTradeOffer({ good, origin, destination });
+  if (!offer) return null;
+  return {
+    offer,
+    buyPrice: Number(offer.buyPrice || 0),
+    sellPrice: Number(offer.sellPrice || 0)
+  };
+}
+
 function getMultiplayerStagingBuyOffersAt(origin = getCurrentMarketPlanet()) {
   const normalizedOrigin = normalizeTradeRouteValue(origin);
   return getMultiplayerStagingTradeOffers().filter((offer) => normalizeTradeRouteValue(offer.buyNode) === normalizedOrigin);
@@ -349,6 +359,16 @@ function getMultiplayerStagingOfferQuantityLimit(_offer) {
   return MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY;
 }
 
+function getMultiplayerStagingMaxBuyQuantity({ good = selectedMarketResource, origin = getCurrentMarketPlanet(), destination = selectedMarketTargetPlanet } = {}) {
+  const routePricing = getMultiplayerStagingRoutePricing({ good, origin, destination });
+  const price = isMultiplayerStagingActive()
+    ? Number(routePricing?.buyPrice || 0)
+    : Number(getMapOneMarketPrice(good, origin) || 0);
+  const maxAffordable = price > 0 ? Math.floor(credits / price) : 0;
+  const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
+  return Math.max(0, Math.min(maxAffordable, freeCargo));
+}
+
 function getMultiplayerStagingTradeQuantityLimit({
   operation = "buy",
   good = selectedMarketResource,
@@ -364,7 +384,7 @@ function getMultiplayerStagingTradeQuantityLimit({
   if (sellMode) {
     return Math.max(0, Math.min(Number(cargo[good] || 0), serverLimit));
   }
-  return Math.max(0, Math.min(getMarketMaxBuyQuantity(good, origin), serverLimit));
+  return Math.max(0, Math.min(getMultiplayerStagingMaxBuyQuantity({ good, origin, destination }), serverLimit));
 }
 
 function getMultiplayerStagingTargetPlanetsForResource(good, origin = getCurrentMarketPlanet()) {
@@ -964,15 +984,20 @@ function renderMapOneMarketTerminal(goodsBox) {
   const targetPlanetOptions = stagingTradeLocked && stagingTargetPlanets.length
     ? stagingTargetPlanets
     : MAP_ONE_MARKET_PLANETS.filter(planet => planet !== currentPlanet || planet === targetPlanet);
-  const quantity = selectedMarketQuantity;
-  const buyPrice = getMapOneMarketPrice(resource, currentPlanet);
-  const estimatedSellPrice = getMapOneMarketPrice(resource, targetPlanet);
-  const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
-  const atTargetWithCargo = held > 0 && currentPlanet === targetPlanet;
-  const maxBuy = getMarketMaxBuyQuantity(resource, currentPlanet);
   const buyStagingOffer = stagingTradeLocked
     ? findMultiplayerStagingTradeOffer({ good: resource, origin: currentPlanet, destination: targetPlanet })
     : null;
+  const stagingRoutePricing = stagingTradeLocked
+    ? getMultiplayerStagingRoutePricing({ good: resource, origin: currentPlanet, destination: targetPlanet })
+    : null;
+  const quantity = selectedMarketQuantity;
+  const buyPrice = stagingTradeLocked ? Number(stagingRoutePricing?.buyPrice || 0) : getMapOneMarketPrice(resource, currentPlanet);
+  const estimatedSellPrice = stagingTradeLocked ? Number(stagingRoutePricing?.sellPrice || 0) : getMapOneMarketPrice(resource, targetPlanet);
+  const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
+  const atTargetWithCargo = held > 0 && currentPlanet === targetPlanet;
+  const maxBuy = stagingTradeLocked && buyStagingOffer
+    ? getMultiplayerStagingMaxBuyQuantity({ good: resource, origin: currentPlanet, destination: targetPlanet })
+    : getMarketMaxBuyQuantity(resource, currentPlanet);
   const buyQuantityLimit = stagingTradeLocked
     ? getMultiplayerStagingTradeQuantityLimit({ operation: "buy", good: resource, origin: currentPlanet, destination: targetPlanet })
     : Math.max(1, maxBuy);
@@ -1082,6 +1107,7 @@ function renderMapOneMarketTerminal(goodsBox) {
             ? `<div><span>Sell Revenue</span><strong>CR ${formatNumber(sellRevenue)}</strong></div>
               <div class="profit-summary-card"><span>Sell Profit</span><strong class="${sellProfit >= 0 ? "profit-good" : "profit-bad"}">${sellProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(sellProfit))}</strong></div>`
             : `<div><span>Total Cost</span><strong>CR ${formatNumber(totalCost)}</strong></div>
+              <div><span>Estimated Revenue</span><strong>CR ${formatNumber(estimatedRevenue)}</strong></div>
               <div class="profit-summary-card"><span>Estimated Profit</span><strong class="${estimatedProfit >= 0 ? "profit-good" : "profit-bad"}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>`}
         </div>
 

@@ -147,6 +147,16 @@ test.describe("Lupen browser smoke", () => {
               buyPrice: 95,
               sellPrice: 145,
               maxQuantity: 1000
+            },
+            {
+              offerId: "staging-cobalt-nyxara-asteron",
+              resourceId: "cobalt",
+              resourceName: "Cobalt",
+              buyNode: "Nyxara",
+              sellNode: "Asteron Prime",
+              buyPrice: 62,
+              sellPrice: 90,
+              maxQuantity: 1000
             }
           ]
         }
@@ -158,6 +168,45 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("Server Buy");
     await expect(page.locator("#marketScreen")).not.toContainText("Preview Unavailable");
     await expect(page.locator("#marketScreen")).toContainText(/Crystal Shards[\s\S]*Asteron Prime > Nyxara|Iron[\s\S]*Asteron Prime > Virella/i);
+
+    await page.evaluate(() => {
+      window.eval(`
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        credits = 10000;
+        cargo.Iron = 0;
+        selectedMarketResource = "Iron";
+        selectedMarketTargetPlanet = "Virella";
+        selectedMarketQuantity = 63;
+      `);
+      if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+    });
+
+    await expect(page.locator("#marketScreen")).toContainText(/Iron[\s\S]*Asteron Prime > Virella/);
+    await expect(page.locator("#marketScreen")).toContainText("63 units");
+    await expect(page.locator("#marketScreen")).toContainText("CR 1,134");
+    await expect(page.locator("#marketScreen")).toContainText("CR 1,890");
+    await expect(page.locator("#marketScreen")).toContainText("+CR 756");
+
+    await page.evaluate(() => {
+      window.eval(`
+        currentNode = "Nyxara";
+        lastPlanetNode = "Nyxara";
+        credits = 10000;
+        cargo.Iron = 0;
+        cargo.Cobalt = 0;
+        selectedMarketResource = "Cobalt";
+        selectedMarketTargetPlanet = "Asteron Prime";
+        selectedMarketQuantity = 14;
+      `);
+      if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+    });
+
+    await expect(page.locator("#marketScreen")).toContainText(/Cobalt[\s\S]*Nyxara > Asteron Prime/);
+    await expect(page.locator("#marketScreen")).toContainText("14 units");
+    await expect(page.locator("#marketScreen")).toContainText("CR 868");
+    await expect(page.locator("#marketScreen")).toContainText("CR 1,260");
+    await expect(page.locator("#marketScreen")).toContainText("+CR 392");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
