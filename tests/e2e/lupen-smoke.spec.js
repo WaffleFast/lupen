@@ -313,6 +313,31 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("+CR 3,200");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
+    await page.evaluate(() => {
+      window.eval(`
+        currentNode = "Nyxara";
+        lastPlanetNode = "Nyxara";
+        cargo.Iron = 0;
+        cargo["Crystal Shards"] = 0;
+        cargo.Copper = 24;
+        delete cargoCostBasis.Copper;
+        selectedMarketResource = "Copper";
+        selectedMarketTargetPlanet = "Nyxara";
+        selectedMarketQuantity = 24;
+      `);
+      if (typeof window.renderMarketplace === "function") window.renderMarketplace();
+    });
+
+    const builder = page.locator("#marketScreen .market-builder-panel");
+    await expect(builder).toContainText("Server Sell");
+    await expect(builder).toContainText("Recovered resource");
+    await expect(builder).toContainText("Mined cargo");
+    await expect(builder).toContainText(/Sell 24 of 24 carried/);
+    await expect(builder).toContainText("Sell Revenue");
+    await expect(builder).toContainText("CR 1,200");
+    await expect(builder).toContainText("Recovered Value");
+    await expect(builder).not.toContainText(/Virella > Nyxara/);
+
     await expectNoUnexpectedBrowserErrors(failures);
   });
 

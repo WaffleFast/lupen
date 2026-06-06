@@ -1299,6 +1299,30 @@ async function assertStagingTradeValidationHelpers() {
   assert(crystalSellPatchPlan.patchedSaveData.inventoryItems[0].id === "kept", "Crystal Shards sell patch changed inventory.");
   assert(crystalSellPatchPlan.patchedSaveData.activeBountyId === "bounty-safe", "Crystal Shards sell patch changed bounty.");
 
+  const minedCopperSellPatchPlan = buildStagingTradeSellSavePatch({
+    credits: 1000,
+    cargo: { Copper: 24 },
+    cargoCostBasis: {},
+    inventoryItems: [{ id: "kept" }],
+    playerProgress: { combatXp: 22 }
+  }, {
+    offerId: "staging-copper-virella-nyxara",
+    resourceId: "copper",
+    resourceName: "Copper",
+    sellPrice: 50
+  }, 24, {
+    cargoCapacity: 150
+  });
+  assert(minedCopperSellPatchPlan.ok === true, `Mined Copper sell patch plan failed: ${minedCopperSellPatchPlan.reason}`);
+  assert(minedCopperSellPatchPlan.recoveredResourceSale === true, "Mined Copper sell patch did not mark recovered resource sale.");
+  assert(minedCopperSellPatchPlan.creditsBefore === 1000 && minedCopperSellPatchPlan.creditsAfter === 2200, "Mined Copper sell patch did not add market revenue.");
+  assert(minedCopperSellPatchPlan.cargoBefore === 24 && minedCopperSellPatchPlan.cargoAfter === 0, "Mined Copper sell patch did not subtract trusted cargo.");
+  assert(minedCopperSellPatchPlan.cargoCostBasisBefore === null && minedCopperSellPatchPlan.cargoCostBasisAfter === null, "Mined Copper sell patch invented a cost basis.");
+  assert(minedCopperSellPatchPlan.patchedSaveData.cargo.Copper === 0, "Mined Copper sell patch did not zero cargo.");
+  assert(minedCopperSellPatchPlan.patchedSaveData.cargoCostBasis.Copper === undefined, "Mined Copper sell patch created a cost-basis entry.");
+  assert(minedCopperSellPatchPlan.patchedSaveData.inventoryItems[0].id === "kept", "Mined Copper sell patch changed inventory.");
+  assert(minedCopperSellPatchPlan.patchedSaveData.playerProgress.combatXp === 22, "Mined Copper sell patch changed progression.");
+
   fetchCalls = [];
   const appliedSellWrite = await applyStagingTradeSellWrite({
     playerId: "verified-player-a",

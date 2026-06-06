@@ -355,6 +355,18 @@ function findMultiplayerStagingSellOffer({ good = "", destination = getCurrentMa
   return getMultiplayerStagingSellOffersAt(destination).find((offer) => isMultiplayerStagingOfferForResource(offer, good)) || null;
 }
 
+function findCargoCostBasisKeyForResource(good = "") {
+  const normalizedGood = normalizeMultiplayerStagingResourceKey(good);
+  if (!normalizedGood || !cargoCostBasis || typeof cargoCostBasis !== "object") return "";
+  return Object.keys(cargoCostBasis).find((key) => normalizeMultiplayerStagingResourceKey(key) === normalizedGood) || "";
+}
+
+function getCargoCostBasisForResource(good = "") {
+  const basisKey = findCargoCostBasisKeyForResource(good);
+  const basis = basisKey ? Number(cargoCostBasis[basisKey]) : NaN;
+  return Number.isFinite(basis) && basis > 0 ? basis : null;
+}
+
 function getMultiplayerStagingOfferQuantityLimit(_offer) {
   return MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY;
 }
@@ -976,7 +988,9 @@ function renderMapOneMarketTerminal(goodsBox) {
   const sellStagingOffer = stagingTradeLocked && held > 0
     ? findMultiplayerStagingSellOffer({ good: resource, destination: currentPlanet })
     : null;
-  const sellStagingOrigin = sellStagingOffer?.buyNode || currentPlanet;
+  const cargoUnitBasis = getCargoCostBasisForResource(resource);
+  const stagingRecoveredCargoSale = Boolean(stagingTradeLocked && sellStagingOffer && cargoUnitBasis === null);
+  const sellStagingOrigin = stagingRecoveredCargoSale ? "" : sellStagingOffer?.buyNode || currentPlanet;
   const stagingSellMode = Boolean(stagingTradeLocked && sellStagingOffer);
   const stagingTargetPlanets = stagingTradeLocked && getMultiplayerStagingTradeOffers().length
     ? (stagingSellMode ? [currentPlanet] : getMultiplayerStagingTargetPlanetsForResource(resource, currentPlanet))
@@ -1020,12 +1034,14 @@ function renderMapOneMarketTerminal(goodsBox) {
     ? renderMultiplayerStagingTradePreviewResult((stagingSellMode ? sellStagingOffer?.offerId : buyStagingOffer?.offerId) || "", { operation: stagingSellMode ? "sell" : "buy" })
     : "";
   const sellUnitPrice = stagingTradeLocked && sellStagingOffer ? sellStagingOffer.sellPrice : getEffectiveSellPrice(resource, currentPlanet);
-  const sellUnitBasis = cargoCostBasis[resource] || (stagingTradeLocked && sellStagingOffer ? sellStagingOffer.buyPrice : getEffectiveBuyPrice(resource, currentPlanet)) || sellUnitPrice;
+  const sellUnitBasis = cargoUnitBasis || (stagingTradeLocked && sellStagingOffer && !stagingRecoveredCargoSale ? sellStagingOffer.buyPrice : getEffectiveBuyPrice(resource, currentPlanet)) || sellUnitPrice;
   const sellRevenue = Math.max(0, effectiveQuantity) * Math.max(0, sellUnitPrice || 0);
-  const sellProfit = Math.max(0, effectiveQuantity) * ((sellUnitPrice || 0) - (sellUnitBasis || 0));
+  const sellProfit = stagingRecoveredCargoSale
+    ? sellRevenue
+    : Math.max(0, effectiveQuantity) * ((sellUnitPrice || 0) - (sellUnitBasis || 0));
   const buyActionQuantityLimit = stagingTradeLocked ? buyQuantityLimit : maxBuy;
   const builderRouteText = stagingSellMode
-    ? `${sellStagingOrigin} > ${currentPlanet}`
+    ? (stagingRecoveredCargoSale ? "Recovered resource" : `${sellStagingOrigin} > ${currentPlanet}`)
     : `${currentPlanet} > ${targetPlanet}`;
 
   goodsBox.innerHTML = `
@@ -1105,7 +1121,7 @@ function renderMapOneMarketTerminal(goodsBox) {
         <div class="market-builder-summary">
           ${stagingSellMode
             ? `<div><span>Sell Revenue</span><strong>CR ${formatNumber(sellRevenue)}</strong></div>
-              <div class="profit-summary-card"><span>Sell Profit</span><strong class="${sellProfit >= 0 ? "profit-good" : "profit-bad"}">${sellProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(sellProfit))}</strong></div>`
+              <div class="profit-summary-card"><span>${stagingRecoveredCargoSale ? "Recovered Value" : "Sell Profit"}</span><strong class="${sellProfit >= 0 ? "profit-good" : "profit-bad"}">${stagingRecoveredCargoSale ? "CR " : sellProfit >= 0 ? "+" : "-"}${stagingRecoveredCargoSale ? formatNumber(sellProfit) : `CR ${formatNumber(Math.abs(sellProfit))}`}</strong></div>`
             : `<div><span>Total Cost</span><strong>CR ${formatNumber(totalCost)}</strong></div>
               <div><span>Estimated Revenue</span><strong>CR ${formatNumber(estimatedRevenue)}</strong></div>
               <div class="profit-summary-card"><span>Estimated Profit</span><strong class="${estimatedProfit >= 0 ? "profit-good" : "profit-bad"}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>`}
@@ -1113,7 +1129,7 @@ function renderMapOneMarketTerminal(goodsBox) {
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
           <div class="trade-preview-note staging-sell-summary">
-            <strong>${stagingTradeLocked ? "Server sell cargo" : "Cargo ready to sell"}</strong>
+            <strong>${stagingRecoveredCargoSale ? "Mined cargo" : stagingTradeLocked ? "Server sell cargo" : "Cargo ready to sell"}</strong>
             <span>${stagingSellMode ? `Selling ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} ${resource} at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `Carrying ${formatNumber(held)} ${resource} / current route sell support unavailable here`}</span>
           </div>
           ${stagingTradeLocked

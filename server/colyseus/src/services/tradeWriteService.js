@@ -301,13 +301,7 @@ export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quanti
   const cargoUsedBefore = getCargoUsed(cargo);
   const basisKey = findCargoResourceKey(cargoCostBasis, offer) || resourceKey;
   const basisBefore = clampInteger(cargoCostBasis[basisKey], 0, MAX_CREDITS);
-  if (basisBefore === null) {
-    return getBlockedResult("cargo_cost_basis_resource_missing_or_invalid", {
-      operation: "sell",
-      resourceKey,
-      expectedResourceKeys: getOfferResourceKeys(offer)
-    });
-  }
+  const hasCostBasis = basisBefore !== null;
 
   const revenue = sellPrice * safeQuantity;
   const resourceAfter = Math.max(0, resourceBefore - safeQuantity);
@@ -316,7 +310,7 @@ export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quanti
   patchedSaveData.cargo[resourceKey] = resourceAfter;
   if (resourceAfter <= 0) {
     delete patchedSaveData.cargoCostBasis[basisKey];
-  } else {
+  } else if (hasCostBasis) {
     // cargoCostBasis is an average unit basis in the local save. A partial
     // sale leaves the remaining cargo's unit basis unchanged.
     patchedSaveData.cargoCostBasis[basisKey] = basisBefore;
@@ -343,8 +337,9 @@ export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quanti
     cargoUsedBefore,
     cargoUsedAfter: Math.max(0, cargoUsedBefore - safeQuantity),
     cargoCapacity,
-    cargoCostBasisBefore: basisBefore,
-    cargoCostBasisAfter: resourceAfter <= 0 ? null : basisBefore,
+    cargoCostBasisBefore: hasCostBasis ? basisBefore : null,
+    cargoCostBasisAfter: hasCostBasis && resourceAfter > 0 ? basisBefore : null,
+    recoveredResourceSale: !hasCostBasis,
     patchedSaveData,
     appliedFields: ["credits", "cargo", "cargoCostBasis"],
     untouchedFields: ["inventory", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeTotals"]
