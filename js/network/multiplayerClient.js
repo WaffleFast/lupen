@@ -78,6 +78,7 @@
   let stagingCombatRefreshRetryTimer = null;
   const playersById = new Map();
   const botsById = new Map();
+  const stagingActivityLogKeys = new Set();
 
   function hasDevFlag() {
     return getMultiplayerMode() === "1";
@@ -114,6 +115,16 @@
           : [],
       allowProductionHost: legacyConfig.allowProductionHost === true || global.LUPEN_MULTIPLAYER_ALLOW_PRODUCTION_HOST === true
     };
+  }
+
+  function addStagingActivityLogOnce(key, message) {
+    if (!key || !message || stagingActivityLogKeys.has(key)) return;
+    stagingActivityLogKeys.add(key);
+    if (stagingActivityLogKeys.size > 80) {
+      const [oldest] = stagingActivityLogKeys;
+      stagingActivityLogKeys.delete(oldest);
+    }
+    global.addActivityLog?.(message);
   }
 
   function getSearchParam(name) {
@@ -2141,6 +2152,14 @@
 
     activeRoom.onMessage("stagingXp:botKillResult", (message) => {
       connection.lastStagingBotXpResult = normalizeStagingXpResult(message);
+      if (connection.lastStagingBotXpResult?.applied) {
+        const result = connection.lastStagingBotXpResult;
+        const xpDelta = Math.max(0, Math.round(Number(result.xpDelta || 0)));
+        addStagingActivityLogOnce(
+          `bot-xp:${result.destructionInstanceId || result.idempotencyKey || result.botId}:${result.xpAfter}`,
+          `Destroyed ${result.botName || "Staging Bot"}.${xpDelta > 0 ? ` +${xpDelta} XP.` : ""}`
+        );
+      }
       refreshCloudSaveAfterStagingXpClaim(connection.lastStagingBotXpResult);
       scheduleStagingCombatProgressRefresh("botKillXp", connection.lastStagingBotXpResult);
       logDev("server staging bot kill XP result", message);
@@ -2170,6 +2189,19 @@
 
     activeRoom.onMessage("stagingBounty:statusResult", (message) => {
       connection.lastStagingBountyStatus = normalizeStagingBountyStatus(message);
+      const active = connection.lastStagingBountyStatus?.active;
+      if (active?.accepted && active.progress > 0) {
+        addStagingActivityLogOnce(
+          `bounty-progress:${active.id}:${active.progress}`,
+          `${active.title} progress: ${active.progress}/${active.requiredKills}.`
+        );
+      }
+      if (active?.claimAvailable || active?.completed) {
+        addStagingActivityLogOnce(
+          `bounty-complete:${active.id}:${active.completionSequence || active.progress}`,
+          `Bounty complete: ${active.title}.`
+        );
+      }
       logDev("server staging bounty status", message);
       notifyServerState(activeRoom.state || null);
     });

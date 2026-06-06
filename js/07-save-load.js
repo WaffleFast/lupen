@@ -267,12 +267,17 @@ async function refreshProgressAfterStagingCombat(options = {}) {
   const trustedXpAfter = Number(options.trustedXpAfter ?? window.lupenTrustedStagingXpAfter?.xpAfter);
   const before = getCurrentCombatXpSnapshot();
   const localBefore = Math.max(before.combatXp, before.zoneCombatXp);
+  const liveJumpCharge = Number.isFinite(Number(jumpCharge)) ? Number(jumpCharge) : null;
   let loadResult = null;
   let loadError = "";
 
   try {
     if (typeof loadGameFromSupabase === "function") {
       loadResult = await loadGameFromSupabase();
+      if (Number.isFinite(liveJumpCharge) && Number(jumpCharge) < liveJumpCharge) {
+        jumpCharge = liveJumpCharge;
+        if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+      }
     }
   } catch (error) {
     loadError = error?.message || "cloud_refresh_failed";

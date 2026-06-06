@@ -102,6 +102,7 @@ function engageTarget() {
 
   updateAsteroidUI();
   if (engagedTarget?.type === "stagingBot") {
+    if (typeof addActivityLog === "function") addActivityLog(`Engaged ${target.name || "Staging Bot"}.`);
     performStagingBotAttackCycle();
     engageTimer = setInterval(performStagingBotAttackCycle, 950);
   } else {
