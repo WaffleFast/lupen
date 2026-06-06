@@ -85,7 +85,7 @@ test.describe("Lupen browser smoke", () => {
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText("Multiplayer Staging Loop", { timeout: 15000 });
-    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*LF-2 Hauler[\s\S]*Cargo Pod[\s\S]*Pulse Laser[\s\S]*Shield Booster[\s\S]*Erebus Patrol[\s\S]*Claim XP[\s\S]*Lupen Shard/i);
+    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*LF-2 Hauler[\s\S]*Cargo Pod[\s\S]*Pulse Laser[\s\S]*Shield Booster[\s\S]*Erebus Patrol[\s\S]*automatic XP[\s\S]*Bounty Board[\s\S]*shard remains preview-only/i);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/No PvP[\s\S]*player damage[\s\S]*loot items/i);
     await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
 

@@ -30,6 +30,7 @@
   let stagingTradeOffersRequested = false;
   let stagingBountyRequested = false;
   let stagingFlowHintDismissed = false;
+  let lastRewardPanelXpRefreshKey = "";
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const shipImageById = {
@@ -1965,8 +1966,8 @@
     const botXp = status?.lastStagingBotXpResult;
     const lines = [];
     if (botXp?.botId === selectedBot?.id && botXp.applied) {
-      const xpBefore = Number(botXp.playerSavePatchResult?.xpBefore ?? botXp.playerSave?.xpBefore);
-      const xpAfter = Number(botXp.playerSavePatchResult?.xpAfter ?? botXp.playerSave?.xpAfter);
+      const xpBefore = Number(botXp.xpBefore ?? botXp.playerSavePatchResult?.xpBefore ?? botXp.playerSave?.xpBefore);
+      const xpAfter = Number(botXp.xpAfter ?? botXp.persistedXp ?? botXp.playerSavePatchResult?.xpAfter ?? botXp.playerSave?.xpAfter);
       if (Number.isFinite(xpBefore) && Number.isFinite(xpAfter)) {
         lines.push(`Bot XP applied: ${Math.round(xpBefore)} -> ${Math.round(xpAfter)}.`);
       } else {
@@ -1975,7 +1976,7 @@
     } else if (botXp?.botId === selectedBot?.id && botXp.mode === "blocked") {
       lines.push(`Bot XP blocked: ${getFriendlyBotXpReason(botXp)}.`);
     } else {
-      lines.push(`Preview only: ${Math.round(Number(preview.previewXp || 0))} bot XP not applied yet.`);
+      lines.push(`Bot XP auto-applies on destruction: +${Math.round(Number(preview.previewXp || 0))}. Refreshing server XP.`);
     }
     lines.push("Bounty bonus XP claims from Bounty Board.");
     const lootPreview = preview?.lootPreview;
@@ -2098,6 +2099,26 @@
       }
     }, 0);
     return false;
+  }
+
+  function requestRewardPanelXpRefresh(status = {}, selectedBot = null) {
+    const preview = status.lastRewardPreview;
+    if (!preview?.botId || (selectedBot?.id && preview.botId !== selectedBot.id)) return;
+    if (typeof global.refreshProgressAfterStagingCombat !== "function") return;
+
+    const key = `${preview.rewardPreviewId || preview.botId}:${status.lastStagingBotXpResult?.xpAfter || ""}:${status.lastRewardClaimResult?.xpAfter || ""}`;
+    if (!key || key === lastRewardPanelXpRefreshKey) return;
+    lastRewardPanelXpRefreshKey = key;
+
+    global.setTimeout(() => {
+      global.refreshProgressAfterStagingCombat?.({
+        reason: "rewardPanel",
+        trustedXpAfter: status.lastStagingBotXpResult?.xpAfter ||
+          status.lastRewardClaimResult?.xpAfter ||
+          status.lastStagingBountyClaimResult?.xpAfter ||
+          null
+      });
+    }, 250);
   }
 
   function getClaimStatusSummary(result = {}) {
@@ -2705,7 +2726,7 @@
   }
 
   function getStagingFlowHint(status, selectedBot, players, bots) {
-    const loop = "1 Trade for CR -> 2 Buy/fly LF-2 Hauler (10.5k CR) -> 3 Buy/equip Cargo Pod -> 4 Buy/equip Pulse Laser -> 5 Buy/equip Shield Booster -> 6 Accept Erebus Patrol (40 XP) -> 7 Destroy staging bots -> 8 Claim XP + Lupen Shard.";
+    const loop = "1 Trade for CR -> 2 Buy/fly LF-2 Hauler (10.5k CR) -> 3 Buy/equip Cargo Pod -> 4 Buy/equip Pulse Laser -> 5 Buy/equip Shield Booster -> 6 Accept Erebus Patrol (40 XP) -> 7 Destroy staging bots for automatic XP -> 8 Claim bounty XP from Bounty Board; shard remains preview-only.";
 
     if (!status?.isConnected) {
       return `Connecting to Multiplayer Staging. ${loop}`;
@@ -2722,7 +2743,7 @@
 
     if (selectedBot.disabled) {
       return status?.lastRewardPreview?.botId === selectedBot.id
-        ? "Target destroyed. Claim XP and Lupen Shard from the staging combat panel. Rewards stay behind staging gates."
+        ? "Target destroyed. Bot XP auto-applies from the server; bounty XP is claimed from the Bounty Board. Lupen Shard remains preview-only here."
         : "Target destroyed. Waiting for the server to respawn it. Use the loop guide for the next staging pass.";
     }
 
@@ -2910,22 +2931,7 @@
     });
     inner.appendChild(button);
 
-    if (canClaimRewardPreview(status, selectedBot)) {
-      const claimState = getClaimButtonState(status, selectedBot);
-      const claimButton = global.document.createElement("button");
-      claimButton.type = "button";
-      claimButton.className = "lupen-mp-staging-fire";
-      claimButton.textContent = claimState.label;
-      claimButton.title = claimState.title;
-      claimButton.disabled = claimState.disabled;
-      claimButton.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (claimState.disabled) return;
-        sendStagingRewardPreviewClaim(status);
-      });
-      inner.appendChild(claimButton);
-    }
+    requestRewardPanelXpRefresh(status, selectedBot);
 
     if (canClaimStagingLoot(status, selectedBot)) {
       const lootResult = isLootClaimResultForBot(status, selectedBot) ? status.lastStagingLootClaimResult : null;
