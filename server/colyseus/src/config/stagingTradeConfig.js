@@ -13,7 +13,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     sellNode: "Virella",
     buyPrice: 18,
     sellPrice: 30,
-    maxQuantity: 40,
+    maxQuantity: 1000,
     refreshSeconds: 300
   }),
   Object.freeze({
@@ -24,7 +24,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     sellNode: "Nyxara",
     buyPrice: 32,
     sellPrice: 50,
-    maxQuantity: 30,
+    maxQuantity: 1000,
     refreshSeconds: 300
   }),
   Object.freeze({
@@ -35,7 +35,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     sellNode: "Asteron Prime",
     buyPrice: 62,
     sellPrice: 90,
-    maxQuantity: 18,
+    maxQuantity: 1000,
     refreshSeconds: 300
   }),
   Object.freeze({
@@ -46,7 +46,7 @@ export const STAGING_TRADE_OFFERS = Object.freeze([
     sellNode: "Nyxara",
     buyPrice: 95,
     sellPrice: 145,
-    maxQuantity: 10,
+    maxQuantity: 1000,
     refreshSeconds: 300
   })
 ]);
@@ -242,7 +242,7 @@ function getTradeValidation({ offer, quantity, playerSnapshot, trustedState }) {
     ? Math.floor(validation.creditsAvailable / offer.buyPrice)
     : 0;
   const maxCargoQuantity = validation.cargoFree;
-  const maxValidQuantity = Math.max(0, Math.min(maxAffordableQuantity, maxCargoQuantity, offer.maxQuantity));
+  const maxValidQuantity = Math.max(0, Math.min(maxAffordableQuantity, maxCargoQuantity));
   const insufficientCredits = quantity > maxAffordableQuantity;
   const insufficientCargo = quantity > maxCargoQuantity;
   const blockReason = insufficientCredits
@@ -293,7 +293,7 @@ function getCsvSet(value = "") {
 }
 
 export function getStagingTradeWriteConfig(env = process.env) {
-  const maxQuantity = normalizeTradeNumber(env.STAGING_TRADE_WRITE_MAX_QUANTITY, 999999) || 10;
+  const maxQuantity = normalizeTradeNumber(env.STAGING_TRADE_WRITE_MAX_QUANTITY, 999999) || 1000;
   const allowlist = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWLIST);
   const allowedOffers = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWED_OFFERS);
   const requestedScope = String(env.STAGING_TRADE_WRITE_SCOPE || "disabled").trim().toLowerCase();
@@ -437,13 +437,13 @@ export function buildStagingTradeWriteDryRun({
     });
   }
 
-  if (requestedQuantity > offer.maxQuantity || requestedQuantity > config.maxQuantity) {
+  if (requestedQuantity > config.maxQuantity) {
     return buildBlockedTradeWriteResult({
       operation: safeOperation,
       offerId,
       quantity: requestedQuantity,
       reason: "quantity_exceeds_staging_trade_write_limit",
-      debugReason: `max_quantity_${Math.min(offer.maxQuantity, config.maxQuantity)}`,
+      debugReason: `max_quantity_${config.maxQuantity}`,
       offer,
       gates
     });
@@ -595,25 +595,6 @@ export function buildStagingTradePreview({
       offerId: offer.offerId,
       reason: "invalid_trade_quantity",
       debugReason: "quantity_must_be_positive_integer",
-      wouldPass: false,
-      ...getRejectedValidation({ playerSnapshot, trustedState }),
-      blockReason: "invalid_quantity",
-      userReason: "Invalid trade quantity.",
-      creditsWritten: false,
-      cargoWritten: false,
-      saveWritten: false
-    };
-  }
-
-  if (requestedQuantity > offer.maxQuantity) {
-    return {
-      ok: false,
-      mode: "dry_run",
-      applied: false,
-      offerId: offer.offerId,
-      reason: "quantity_exceeds_staging_offer_limit",
-      debugReason: "quantity_exceeds_max_quantity",
-      maxQuantity: offer.maxQuantity,
       wouldPass: false,
       ...getRejectedValidation({ playerSnapshot, trustedState }),
       blockReason: "invalid_quantity",

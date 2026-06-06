@@ -3805,7 +3805,7 @@ try {
   assert(validTradePreview?.blockReason === null, `Unexpected valid trade block reason: ${validTradePreview?.blockReason}`);
   assert(validTradePreview?.maxAffordableQuantity === Math.floor(10000 / firstTradeOffer.buyPrice), "Staging trade max affordable quantity was incorrect.");
   assert(validTradePreview?.maxCargoQuantity === 140, "Staging trade max cargo quantity was incorrect.");
-  assert(validTradePreview?.maxValidQuantity === Math.min(Math.floor(10000 / firstTradeOffer.buyPrice), 140, firstTradeOffer.maxQuantity), "Staging trade max valid quantity was incorrect.");
+  assert(validTradePreview?.maxValidQuantity === Math.min(Math.floor(10000 / firstTradeOffer.buyPrice), 140), "Staging trade max valid quantity was incorrect.");
   assert(validTradePreview?.creditsWritten === false && validTradePreview?.cargoWritten === false && validTradePreview?.saveWritten === false, "Staging trade preview reported writes.");
 
   const storeItems = await expectStagingStoreItems(roomA, () => {
@@ -3997,16 +3997,20 @@ try {
   assert(invalidQuantityPreview?.wouldPass === false, "Invalid staging trade quantity reported wouldPass.");
   assert(invalidQuantityPreview?.blockReason === "invalid_quantity", `Unexpected invalid quantity block reason: ${invalidQuantityPreview?.blockReason}`);
 
-  const excessiveQuantityPreview = await expectStagingTradePreview(roomA, () => {
+  const productionLikeQuantityPreview = await expectStagingTradePreview(roomA, () => {
     roomA.send("stagingTrade:preview", {
       offerId: firstTradeOffer.offerId,
-      quantity: Number(firstTradeOffer.maxQuantity || 0) + 1
+      quantity: 40,
+      playerSnapshot: {
+        credits: 10000,
+        cargoUsed: 0,
+        cargoCapacity: 150
+      }
     });
   });
-  assert(excessiveQuantityPreview?.ok === false, "Excessive staging trade quantity was not rejected.");
-  assert(excessiveQuantityPreview?.reason === "quantity_exceeds_staging_offer_limit", `Unexpected excessive quantity reason: ${excessiveQuantityPreview?.reason}`);
-  assert(excessiveQuantityPreview?.wouldPass === false, "Excessive staging trade quantity reported wouldPass.");
-  assert(excessiveQuantityPreview?.blockReason === "invalid_quantity", `Unexpected excessive quantity block reason: ${excessiveQuantityPreview?.blockReason}`);
+  assert(productionLikeQuantityPreview?.ok === true, `40-unit staging trade preview unexpectedly failed: ${productionLikeQuantityPreview?.reason}`);
+  assert(productionLikeQuantityPreview?.wouldPass === true, `40-unit staging trade preview did not pass: ${productionLikeQuantityPreview?.blockReason}`);
+  assert(productionLikeQuantityPreview?.totalCost === firstTradeOffer.buyPrice * 40, "40-unit staging trade preview total cost was incorrect.");
 
   const buyDryRun = await expectStagingTradeWriteResult(roomA, "buy", () => {
     roomA.send("stagingTrade:buy", {
@@ -4078,7 +4082,7 @@ try {
   const excessiveSellQuantity = await expectStagingTradeWriteResult(roomA, "sell", () => {
     roomA.send("stagingTrade:sell", {
       offerId: firstTradeOffer.offerId,
-      quantity: 999
+      quantity: 1001
     });
   });
   assert(excessiveSellQuantity?.ok === false && excessiveSellQuantity?.reason === "quantity_exceeds_staging_trade_write_limit", "Excessive sell quantity did not block safely.");

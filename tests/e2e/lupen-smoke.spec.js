@@ -136,7 +136,7 @@ test.describe("Lupen browser smoke", () => {
               sellNode: "Virella",
               buyPrice: 18,
               sellPrice: 30,
-              maxQuantity: 40
+              maxQuantity: 1000
             },
             {
               offerId: "staging-crystal-asteron-nyxara",
@@ -146,7 +146,7 @@ test.describe("Lupen browser smoke", () => {
               sellNode: "Nyxara",
               buyPrice: 95,
               sellPrice: 145,
-              maxQuantity: 150
+              maxQuantity: 1000
             }
           ]
         }
@@ -188,7 +188,7 @@ test.describe("Lupen browser smoke", () => {
               sellNode: "Virella",
               buyPrice: 18,
               sellPrice: 30,
-              maxQuantity: 40
+              maxQuantity: 1000
             },
             {
               offerId: "staging-copper-virella-nyxara",
@@ -198,7 +198,7 @@ test.describe("Lupen browser smoke", () => {
               sellNode: "Nyxara",
               buyPrice: 32,
               sellPrice: 50,
-              maxQuantity: 30
+              maxQuantity: 1000
             },
             {
               offerId: "staging-crystal-asteron-nyxara",
@@ -208,7 +208,7 @@ test.describe("Lupen browser smoke", () => {
               sellNode: "Nyxara",
               buyPrice: 95,
               sellPrice: 145,
-              maxQuantity: 150
+              maxQuantity: 1000
             }
           ]
         }
