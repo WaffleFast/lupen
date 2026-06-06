@@ -3242,6 +3242,10 @@
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
+      if (status.lastStagingReturnFire) {
+        const returnFire = status.lastStagingReturnFire;
+        setDiagnosticsRow(panel, "return fire", `${returnFire.attackerName || "bot"} / ${Math.round(Number(returnFire.damage || 0))} dmg / ${returnFire.sessionOnly ? "session" : "persistent"}`);
+      }
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
       setDiagnosticsRow(panel, "loot preview", getLootPreviewLabel(status));
       if (status.lastStagingLootClaimResult) {

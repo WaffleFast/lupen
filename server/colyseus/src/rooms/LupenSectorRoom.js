@@ -180,6 +180,8 @@ const STAGING_DAMAGE_MAX = 50;
 const STAGING_FIRE_COOLDOWN_MS = 900;
 const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
+const STAGING_BOT_RETURN_FIRE_DAMAGE = 4;
+const STAGING_BOT_RETURN_FIRE_INTERVAL_MS = 2600;
 const STAGING_WEAPON_STATS = Object.freeze({
   pulseLaser: Object.freeze({
     key: "pulseLaser",
@@ -839,6 +841,9 @@ export class LupenSectorRoom extends Room {
     // touch local bounty arrays, Supabase bounty tables, route completion,
     // loot, credits, or normal single-player objective state.
     this.stagingBountyStates = new Map();
+    // Session-only return-fire cooldowns for Map 1 staging bots. These never
+    // persist player damage, saves, cargo loss, PvP, credits, loot, or death.
+    this.stagingBotReturnFireCooldowns = new Map();
 
     this.spawnDummyBots();
     this.botInterval = this.clock.setInterval(() => {
@@ -1076,6 +1081,7 @@ export class LupenSectorRoom extends Room {
   onLeave(client) {
     this.state.players.delete(client.sessionId);
     this.stagingBountyStates.delete(client.sessionId);
+    this.clearStagingReturnFireForSession(client.sessionId);
   }
 
   onDispose() {
@@ -1245,6 +1251,7 @@ export class LupenSectorRoom extends Room {
   clearStagingBotSelection(client, messageType = "target:clear") {
     const player = this.touchPlayer(client.sessionId);
     if (player) player.selectedTargetBotId = "";
+    this.clearStagingReturnFireForSession(client.sessionId);
     client.send("target:selected", {
       ok: true,
       reason: "selection_cleared",
@@ -1260,6 +1267,7 @@ export class LupenSectorRoom extends Room {
     if (!player?.selectedTargetBotId) return;
     const bot = this.state.bots.get(player.selectedTargetBotId);
     if (!bot || bot.currentNode !== player.currentNode) {
+      this.clearStagingReturnFireForSession(player.sessionId);
       player.selectedTargetBotId = "";
     }
   }
@@ -1369,6 +1377,67 @@ export class LupenSectorRoom extends Room {
 
   clearBotContributions(botId) {
     this.botContributions.delete(getStringValue(botId));
+  }
+
+  getStagingReturnFireKey(sessionId, botId) {
+    return `${getStringValue(sessionId)}:${getStringValue(botId)}`;
+  }
+
+  clearStagingReturnFireForSession(sessionId) {
+    const safeSessionId = getStringValue(sessionId);
+    if (!safeSessionId || !this.stagingBotReturnFireCooldowns) return;
+
+    Array.from(this.stagingBotReturnFireCooldowns.keys()).forEach((key) => {
+      if (key.startsWith(`${safeSessionId}:`)) {
+        this.stagingBotReturnFireCooldowns.delete(key);
+      }
+    });
+  }
+
+  clearStagingReturnFireForBot(botId) {
+    const safeBotId = getStringValue(botId);
+    if (!safeBotId || !this.stagingBotReturnFireCooldowns) return;
+
+    Array.from(this.stagingBotReturnFireCooldowns.keys()).forEach((key) => {
+      if (key.endsWith(`:${safeBotId}`)) {
+        this.stagingBotReturnFireCooldowns.delete(key);
+      }
+    });
+  }
+
+  maybeSendStagingBotReturnFire(client, player, bot, now = Date.now()) {
+    if (!client || !player || !bot) return null;
+    if (bot.disabled || bot.currentNode !== player.currentNode) return null;
+    if (player.selectedTargetBotId !== bot.id) return null;
+
+    const cooldownKey = this.getStagingReturnFireKey(client.sessionId, bot.id);
+    const nextAllowedAt = Number(this.stagingBotReturnFireCooldowns.get(cooldownKey) || 0);
+    if (nextAllowedAt > now) return null;
+
+    const nextReturnFireAt = now + STAGING_BOT_RETURN_FIRE_INTERVAL_MS;
+    this.stagingBotReturnFireCooldowns.set(cooldownKey, nextReturnFireAt);
+
+    const payload = {
+      ok: true,
+      reason: "staging_bot_return_fire",
+      sessionId: client.sessionId,
+      attackerBotId: bot.id,
+      attackerName: bot.name || bot.type || "Erebus Bot",
+      currentNode: player.currentNode,
+      damage: STAGING_BOT_RETURN_FIRE_DAMAGE,
+      damageType: "shield_first",
+      sessionOnly: true,
+      persisted: false,
+      saveWritten: false,
+      playerDeathEnabled: false,
+      cargoLossEnabled: false,
+      cooldownMs: STAGING_BOT_RETURN_FIRE_INTERVAL_MS,
+      nextReturnFireAt,
+      receivedAt: now
+    };
+
+    client.send("staging:return_fire", payload);
+    return payload;
   }
 
   async applyStagingBotKillXpForPreview(preview = {}) {
@@ -2766,7 +2835,12 @@ export class LupenSectorRoom extends Room {
       receivedAt: resolvedAt
     });
 
+    if (!result.disabled) {
+      this.maybeSendStagingBotReturnFire(client, player, targetBot, resolvedAt);
+    }
+
     if (result.disabled) {
+      this.clearStagingReturnFireForBot(targetBot.id);
       const contributionSummary = this.getContributionSummary(targetBot.id);
       this.updateStagingBountyProgressForDisabledBot(targetBot, contributionSummary, client.sessionId);
       const destructionInstanceId = this.getStagingBountyDestructionKey(targetBot);

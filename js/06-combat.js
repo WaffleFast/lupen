@@ -113,12 +113,22 @@ function engageTarget() {
 }
 
 function disengageTarget(keepTarget = false) {
+  const disengagedRef = engagedTarget ? { ...engagedTarget } : null;
+  const disengagedEntity = disengagedRef?.type === "stagingBot" ? getEngagedTargetEntity() : null;
+
   if (engageTimer) {
     clearInterval(engageTimer);
     engageTimer = null;
   }
 
   engagedTarget = null;
+
+  if (disengagedRef?.type === "stagingBot") {
+    if (typeof addActivityLog === "function") {
+      addActivityLog(`Disengaged ${disengagedEntity?.name || "Staging Bot"}.`);
+    }
+    window.LupenMultiplayerClient?.clearStagingTarget?.();
+  }
 
   if (!keepTarget) {
     selectedTarget = null;

@@ -3749,6 +3749,7 @@ try {
   const botRespawnedEvents = [];
   const roomAShotEvents = [];
   const roomBShotEvents = [];
+  const roomAReturnFireEvents = [];
   const rewardPreviewEvents = [];
   const bountyStatusEvents = [];
   roomA.onMessage("bot:disabled", (message) => botDisabledEvents.push(message));
@@ -3757,6 +3758,8 @@ try {
   roomB.onMessage("bot:respawned", () => {});
   roomA.onMessage("staging:shot", (message) => roomAShotEvents.push(message));
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
+  roomA.onMessage("staging:return_fire", (message) => roomAReturnFireEvents.push(message));
+  roomB.onMessage("staging:return_fire", () => {});
   roomA.onMessage("staging:reward_preview", (message) => rewardPreviewEvents.push(message));
   roomB.onMessage("staging:reward_preview", () => {});
   roomA.onMessage("stagingXp:botKillResult", () => {});
@@ -4226,6 +4229,18 @@ try {
   assert(combatResponse?.pulseLaserDetected === true, "Pulse Laser was not detected by server weapon resolver.");
   assert(combatResponse?.weaponName === "Pulse Laser", "Combat response did not use server-known weapon name.");
   assert(combatResponse?.rewardsGranted === false, "Staging combat intent granted rewards.");
+
+  await waitFor("client A to receive light staging return fire", () => {
+    const returnFire = roomAReturnFireEvents.find((event) => event?.attackerBotId === inspectedBotBeforeCombat.id);
+    return returnFire &&
+      returnFire.damage === 4 &&
+      returnFire.sessionOnly === true &&
+      returnFire.persisted === false &&
+      returnFire.saveWritten === false &&
+      returnFire.playerDeathEnabled === false &&
+      returnFire.cargoLossEnabled === false;
+  });
+  console.log("staging bot return fire stayed light and session-only");
 
   await waitFor("both clients to receive staging shot event", () => {
     const shotA = roomAShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 10);

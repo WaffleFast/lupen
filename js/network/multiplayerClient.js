@@ -38,6 +38,7 @@
     lastTargetResponse: null,
     lastBotEvent: null,
     lastShotEvent: null,
+    lastStagingReturnFire: null,
     lastRewardPreview: null,
     lastRewardClaimResult: null,
     lastStagingBotXpResult: null,
@@ -286,6 +287,7 @@
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
       lastStagingBotXpResult: connection.lastStagingBotXpResult ? { ...connection.lastStagingBotXpResult } : null,
@@ -1533,6 +1535,29 @@
     };
   }
 
+  function normalizeStagingReturnFire(message) {
+    if (!message || typeof message !== "object") return null;
+
+    return {
+      ok: message.ok === true,
+      reason: String(message.reason || "staging_bot_return_fire"),
+      sessionId: String(message.sessionId || ""),
+      attackerBotId: String(message.attackerBotId || ""),
+      attackerName: String(message.attackerName || "Erebus Bot"),
+      currentNode: String(message.currentNode || ""),
+      damage: Number.isFinite(Number(message.damage)) ? Math.max(0, Number(message.damage)) : 0,
+      damageType: String(message.damageType || "shield_first"),
+      sessionOnly: message.sessionOnly !== false,
+      persisted: message.persisted === true,
+      saveWritten: message.saveWritten === true,
+      playerDeathEnabled: message.playerDeathEnabled === true,
+      cargoLossEnabled: message.cargoLossEnabled === true,
+      cooldownMs: Number.isFinite(Number(message.cooldownMs)) ? Number(message.cooldownMs) : 0,
+      nextReturnFireAt: Number.isFinite(Number(message.nextReturnFireAt)) ? Number(message.nextReturnFireAt) : 0,
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
+    };
+  }
+
   function normalizeStagingTradeOffer(offer) {
     if (!offer || typeof offer !== "object") return null;
 
@@ -2032,6 +2057,16 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("staging:return_fire", (message) => {
+      connection.lastStagingReturnFire = normalizeStagingReturnFire(message);
+      logDev("server staging return fire", message);
+      if (connection.lastStagingReturnFire?.ok &&
+        typeof global.applyStagingBotReturnFireDamage === "function") {
+        global.applyStagingBotReturnFireDamage(connection.lastStagingReturnFire);
+      }
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("staging:reward_preview", (message) => {
       const contributors = Array.isArray(message?.contributors)
         ? message.contributors.map(normalizeRewardContributor).filter(Boolean)
@@ -2386,6 +2421,7 @@
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
       lastStagingBotXpResult: connection.lastStagingBotXpResult ? { ...connection.lastStagingBotXpResult } : null,

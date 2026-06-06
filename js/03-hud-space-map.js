@@ -1031,6 +1031,57 @@ function applyDamageToPlayer(totalDamage) {
   }
 }
 
+function applyStagingBotReturnFireDamage(event = {}) {
+  const damage = Number(event.damage || 0);
+  if (!Number.isFinite(damage) || damage <= 0 || hull <= 0) return null;
+
+  stopShieldRegen();
+
+  const shieldBefore = Math.max(0, Number(shield || 0));
+  const hullBefore = Math.max(0, Number(hull || 0));
+  const damageResult = LupenCombatRules.resolveIncomingPlayerDamage(
+    { hull, shield, armor },
+    getMitigatedIncomingDamage(damage)
+  );
+
+  shield = Math.max(0, Number(damageResult.shield || 0));
+  hull = Math.max(1, Number(damageResult.hull || 1));
+
+  if (damageResult.shieldDamage > 0 && typeof playShieldHitSound === "function") playShieldHitSound();
+  if (damageResult.hullDamage > 0 && typeof playHullHitSound === "function") playHullHitSound();
+  if (typeof showIncomingHitFlash === "function") showIncomingHitFlash();
+
+  const attackerName = event.attackerName || "Erebus Bot";
+  const attackerBot = typeof getStagingBotTargetById === "function"
+    ? getStagingBotTargetById(event.attackerBotId)
+    : null;
+  if (attackerBot && typeof incomingLaserBurstFromBot === "function") incomingLaserBurstFromBot(attackerBot, 0);
+  if (typeof playEnemyLaserPulse === "function") playEnemyLaserPulse();
+  const shieldDamage = Math.max(0, Number(damageResult.shieldDamage || 0));
+  const hullDamage = Math.max(0, Number(damageResult.hullDamage || 0));
+  if (typeof addActivityLog === "function") {
+    if (shieldDamage > 0) {
+      addActivityLog(`${attackerName} hit your shield for ${formatNumber(Math.round(shieldDamage))}.`);
+    } else if (hullDamage > 0) {
+      addActivityLog(`${attackerName} hit your hull for ${formatNumber(Math.round(hullDamage))}.`);
+    }
+  }
+
+  updateSpaceHUD();
+  updateTargetPanel();
+
+  return {
+    shieldBefore,
+    shieldAfter: shield,
+    hullBefore,
+    hullAfter: hull,
+    shieldDamage,
+    hullDamage,
+    sessionOnly: true,
+    saveWritten: false
+  };
+}
+
 function calculateDisabledCargoLoss() {
   const lostCargo = {};
 
