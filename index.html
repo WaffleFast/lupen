@@ -475,15 +475,28 @@
       </div>
 
       <div id="hangarVaultSection" class="hangar-section">
-        <div class="hangar-section-title compact-title">
-          <h3>Vault</h3>
-          <p>Browse owned guns, attachments and Lupen Cores kept in station storage.</p>
-        </div>
-
-        <div class="vault-layout">
+        <div class="vault-layout station-vault-layout">
           <div class="vault-main-panel">
-            <div class="modern-store-panel-header vault-filter-header">
+            <div class="vault-storage-header">
+              <div>
+                <span>Vault Storage</span>
+                <p>Spare weapons, attachments, and upgrade cores stored at this station.</p>
+              </div>
+              <strong id="vaultCapacityText">0 / 50</strong>
+            </div>
+            <div class="vault-filter-header">
               <div id="vaultFilterBar" class="vault-filter-row"></div>
+            </div>
+            <div class="vault-utility-row">
+              <label class="vault-search-field">
+                <span aria-hidden="true"></span>
+                <input id="vaultSearchInput" type="search" placeholder="Search vault..." oninput="setHangarVaultSearch(this.value)" />
+              </label>
+              <select id="vaultSortSelect" class="vault-sort-select" onchange="setHangarVaultSort(this.value)">
+                <option value="quality">Sort: Quality</option>
+                <option value="name">Sort: Name</option>
+                <option value="level">Sort: Level</option>
+              </select>
             </div>
             <div id="vaultCatalogGrid" class="vault-catalog-grid"></div>
           </div>

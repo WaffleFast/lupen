@@ -40,6 +40,8 @@ let selectedLoadoutItemContext = null;
 let selectedLoadoutVaultFilter = "all";
 let selectedLoadoutVaultSearch = "";
 let selectedLoadoutVaultSort = "quality";
+let selectedVaultSearch = "";
+let selectedVaultSort = "quality";
 let selectedShipyardFilter = "all";
 const LOADOUT_GRID_SLOT_COUNT = 20;
 const LOADOUT_VAULT_CAPACITY = 50;
@@ -579,13 +581,15 @@ function getEquippedVaultCounts() {
     (loadout.attachments || []).forEach(entry => {
       const key = getEquipmentKey(entry);
       const quality = getEquipmentQuality(entry);
-      const mapKey = `${key}__${quality}`;
+      const level = getEquipmentLevel(entry);
+      const mapKey = `${key}__${quality}__${level}`;
       equipped.set(mapKey, (equipped.get(mapKey) || 0) + 1);
     });
     (loadout.guns || []).forEach(entry => {
       const key = getEquipmentKey(entry);
       const quality = getEquipmentQuality(entry);
-      const mapKey = `${key}__${quality}`;
+      const level = getEquipmentLevel(entry);
+      const mapKey = `${key}__${quality}__${level}`;
       equipped.set(mapKey, (equipped.get(mapKey) || 0) + 1);
     });
   });
@@ -594,74 +598,118 @@ function getEquippedVaultCounts() {
 
 function buildVaultEntries() {
   ensureInventoryObjects();
-  const grouped = new Map();
+  const entries = [];
+  const storedCounts = new Map();
+  const resourceGroups = new Map();
   const equippedCounts = getEquippedVaultCounts();
 
-  function ensureEntry(key, quality = "standard") {
+  function getSignature(key, quality = "standard", level = 1) {
+    return `${key}__${quality}__${Math.max(1, Number(level || 1))}`;
+  }
+
+  function makeEntry({ key, quality = "standard", level = 1, source = "owned", index = 0, storedCount = 1, count = 1, resource = false }) {
     const definition = itemDefinitions[key];
     if (!definition) return null;
-    const groupKey = `${key}__${quality}`;
-    if (!grouped.has(groupKey)) {
-      grouped.set(groupKey, {
-        groupKey,
+    const safeLevel = Math.max(1, Number(level || 1));
+    const signature = getSignature(key, quality, safeLevel);
+    return {
+      groupKey: resource ? `${signature}__resource` : `${signature}__${source}__${index}`,
+      signature,
+      key,
+      quality,
+      level: safeLevel,
+      name: definition.name,
+      category: definition.category,
+      categoryKey: getItemCategoryKey(key),
+      icon: definition.icon || "assets/items/lupen-core.png",
+      count,
+      storedCount,
+      equippedCount: equippedCounts.get(signature) || 0,
+      resource,
+      stackable: resource,
+      source
+    };
+  }
+
+  function addStoredGear(key, quality = "standard", level = 1, source = "owned", index = 0) {
+    const signature = getSignature(key, quality, level);
+    storedCounts.set(signature, (storedCounts.get(signature) || 0) + 1);
+    const entry = makeEntry({ key, quality, level, source, index, storedCount: 1, count: 1 });
+    if (entry) entries.push(entry);
+  }
+
+  function addResource(key, quality, quantity = 1) {
+    const signature = getSignature(key, quality, 1);
+    if (!resourceGroups.has(signature)) {
+      resourceGroups.set(signature, makeEntry({
         key,
         quality,
-        name: definition.name,
-        category: definition.category,
-        categoryKey: getItemCategoryKey(key),
-        icon: definition.icon || "assets/items/lupen-core.png",
-        count: 0,
+        level: 1,
+        source: "resource",
         storedCount: 0,
-        equippedCount: 0
-      });
+        count: 0,
+        resource: true
+      }));
     }
-    return grouped.get(groupKey);
+    const entry = resourceGroups.get(signature);
+    if (!entry) return;
+    entry.count += Math.max(1, Number(quantity || 1));
   }
 
   Object.entries(ownedAttachments || {}).forEach(([key, count]) => {
-    if (!count) return;
-    const entry = ensureEntry(key, "standard");
-    if (!entry) return;
-    entry.count += count;
-    entry.storedCount += count;
+    const total = Math.max(0, Number(count || 0));
+    for (let index = 0; index < total; index += 1) addStoredGear(key, "standard", 1, "owned", index);
   });
 
   Object.entries(ownedGuns || {}).forEach(([key, count]) => {
-    if (!count) return;
-    const entry = ensureEntry(key, "standard");
-    if (!entry) return;
-    entry.count += count;
-    entry.storedCount += count;
+    const total = Math.max(0, Number(count || 0));
+    for (let index = 0; index < total; index += 1) addStoredGear(key, "standard", 1, "owned", index);
   });
 
   (inventoryItems || []).forEach(item => {
     if (!item || !itemDefinitions[item.key]) return;
-    const entry = ensureEntry(item.key, item.key === "lupenCore" ? LUPEN_CORE_QUALITY : (item.quality || "standard"));
-    if (!entry) return;
-    entry.count += 1;
-    entry.storedCount += 1;
+    if (item.key === "lupenCore") {
+      addResource(item.key, LUPEN_CORE_QUALITY, 1);
+      return;
+    }
+    addStoredGear(item.key, item.quality || "standard", item.level || 1, "inventory", item.id || entries.length);
   });
 
-  equippedCounts.forEach((count, groupKey) => {
-    const [key, quality = "standard"] = groupKey.split("__");
-    const entry = ensureEntry(key, quality);
-    if (!entry) return;
-    entry.count += count;
-    entry.equippedCount += count;
+  entries.forEach(entry => {
+    entry.storedCount = storedCounts.get(entry.signature) || entry.storedCount || 0;
+    entry.count = entry.storedCount + (equippedCounts.get(entry.signature) || 0);
   });
 
-  return Array.from(grouped.values()).sort((a, b) => {
-    const qualityDelta = ITEM_QUALITY_ORDER.indexOf(b.quality) - ITEM_QUALITY_ORDER.indexOf(a.quality);
-    if (qualityDelta !== 0) return qualityDelta;
-    if (a.categoryKey !== b.categoryKey) return a.categoryKey.localeCompare(b.categoryKey);
-    return a.name.localeCompare(b.name);
-  });
+  return [...entries, ...Array.from(resourceGroups.values())].sort(sortVaultEntries);
+}
+
+function getVaultCapacityUsage() {
+  return buildVaultEntries().filter(entry => ["guns", "attachments"].includes(entry.categoryKey) && !entry.resource).length;
+}
+
+function sortVaultEntries(a, b) {
+  if (selectedVaultSort === "name") return a.name.localeCompare(b.name) || a.quality.localeCompare(b.quality);
+  if (selectedVaultSort === "level") return Number(b.level || 1) - Number(a.level || 1) || a.name.localeCompare(b.name);
+  const qualityDelta = ITEM_QUALITY_ORDER.indexOf(b.quality) - ITEM_QUALITY_ORDER.indexOf(a.quality);
+  if (qualityDelta !== 0) return qualityDelta;
+  if (a.categoryKey !== b.categoryKey) return a.categoryKey.localeCompare(b.categoryKey);
+  return a.name.localeCompare(b.name) || Number(b.level || 1) - Number(a.level || 1);
 }
 
 function getVaultFilteredEntries() {
   const entries = buildVaultEntries();
-  if (hangarVaultFilter === "all") return entries;
-  return entries.filter(entry => entry.categoryKey === hangarVaultFilter);
+  const query = selectedVaultSearch.trim().toLowerCase();
+  return entries.filter(entry => {
+    if (hangarVaultFilter !== "all" && entry.categoryKey !== hangarVaultFilter) return false;
+    if (!query) return true;
+    return [
+      entry.name,
+      entry.category,
+      entry.categoryKey,
+      titleCaseQuality(entry.quality),
+      `lv ${entry.level || 1}`
+    ].some(value => String(value || "").toLowerCase().includes(query));
+  });
 }
 
 function ensureVaultSelection() {
@@ -671,12 +719,29 @@ function ensureVaultSelection() {
     return;
   }
   if (!entries.some(entry => entry.groupKey === selectedVaultGroupKey)) {
+    const legacyMatch = entries.find(entry => selectedVaultGroupKey && entry.groupKey.startsWith(`${selectedVaultGroupKey}__`));
+    if (legacyMatch) {
+      selectedVaultGroupKey = legacyMatch.groupKey;
+      return;
+    }
     selectedVaultGroupKey = entries[0].groupKey;
   }
 }
 
 function setHangarVaultFilter(nextFilter) {
   hangarVaultFilter = nextFilter;
+  ensureVaultSelection();
+  renderHangarVault();
+}
+
+function setHangarVaultSearch(query) {
+  selectedVaultSearch = String(query || "");
+  ensureVaultSelection();
+  renderHangarVault();
+}
+
+function setHangarVaultSort(nextSort) {
+  selectedVaultSort = ["quality", "name", "level"].includes(nextSort) ? nextSort : "quality";
   ensureVaultSelection();
   renderHangarVault();
 }
@@ -723,7 +788,9 @@ function selectEquippedLoadoutVaultItem(categoryKey, index) {
 
 function getSelectedVaultEntry() {
   const entries = buildVaultEntries();
-  return entries.find(entry => entry.groupKey === selectedVaultGroupKey) || null;
+  return entries.find(entry => entry.groupKey === selectedVaultGroupKey) ||
+    entries.find(entry => selectedVaultGroupKey && entry.groupKey.startsWith(`${selectedVaultGroupKey}__`)) ||
+    null;
 }
 
 function getNextItemQuality(quality = "standard") {
@@ -847,8 +914,20 @@ function renderVaultFilters() {
   ];
 
   bar.innerHTML = filters.map(filter => `
-    <button class="store-filter-btn ${hangarVaultFilter === filter.key ? "active" : ""}" onclick="setHangarVaultFilter('${filter.key}')">${filter.label}</button>
+    <button id="vaultFilter${filter.label.replace(/\s+/g, "")}" class="vault-filter-btn ${hangarVaultFilter === filter.key ? "active" : ""}" onclick="setHangarVaultFilter('${filter.key}')">${filter.label}</button>
   `).join("");
+
+  const search = document.getElementById("vaultSearchInput");
+  if (search && search.value !== selectedVaultSearch) search.value = selectedVaultSearch;
+  const sort = document.getElementById("vaultSortSelect");
+  if (sort && sort.value !== selectedVaultSort) sort.value = selectedVaultSort;
+  const count = document.getElementById("vaultCapacityText");
+  if (count) count.textContent = `${formatNumber(getVaultCapacityUsage())} / ${formatNumber(LOADOUT_VAULT_CAPACITY)}`;
+}
+
+function getVaultQualityLabel(entry) {
+  if (entry?.categoryKey === "cores" || entry?.quality === LUPEN_CORE_QUALITY) return "Legendary";
+  return titleCaseQuality(entry?.quality || "standard");
 }
 
 function getVaultEntryStats(entry) {
@@ -910,7 +989,7 @@ function getVaultTooltipHtml(entry) {
         <img src="${escapeHtml(entry.icon)}" alt="">
         <div>
           <div class="hangar-tooltip-name">${escapeHtml(entry.name)}</div>
-          <div class="hangar-tooltip-meta">${escapeHtml(qualityLabel)} / x${formatNumber(entry.count || 0)} owned</div>
+          <div class="hangar-tooltip-meta">${escapeHtml(getVaultQualityLabel(entry))} / x${formatNumber(entry.count || 0)} owned</div>
         </div>
       </div>
       <div class="hangar-tooltip-stats">${statHtml}</div>
@@ -925,7 +1004,12 @@ function renderVaultCatalog() {
 
   const entries = getVaultFilteredEntries();
   if (!entries.length) {
-    grid.innerHTML = `<div class="vault-empty-state">No owned items in this category.</div>`;
+    grid.innerHTML = `
+      <div class="vault-empty-state new-vault-empty">
+        <strong>No vault items found</strong>
+        <span>Try another filter or search.</span>
+      </div>
+    `;
     return;
   }
 
@@ -933,20 +1017,23 @@ function renderVaultCatalog() {
 
   entries.forEach(entry => {
     const button = document.createElement("button");
-    button.className = `store-catalog-card vault-catalog-card vault-icon-card ${selectedVaultGroupKey === entry.groupKey ? "selected" : ""} quality-${entry.quality}`;
+    button.className = `vault-storage-card ${selectedVaultGroupKey === entry.groupKey ? "selected" : ""} quality-${entry.quality}`;
     button.onclick = () => selectVaultItem(entry.groupKey);
     button.removeAttribute("title");
     showHangarTooltip(button, getVaultTooltipHtml(entry));
     bindHangarEquipmentTooltip(button);
 
     button.innerHTML = `
-      ${entry.equippedCount > 0 ? `<span class="vault-card-equipped">EQ ${entry.equippedCount}</span>` : ""}
-      <span class="vault-card-count">x${formatNumber(entry.count)}</span>
-      <div class="store-card-art quality-${entry.quality}">
+      ${entry.stackable ? `<span class="vault-card-count">x${formatNumber(entry.count)}</span>` : ""}
+      <div class="vault-storage-art quality-${entry.quality}">
         <img src="${entry.icon}" alt="${entry.name}">
       </div>
-      <div class="store-card-name">${entry.name}</div>
-      <div class="vault-card-meta">${titleCaseQuality(entry.quality)}</div>
+      <div class="vault-storage-copy">
+        <strong>${entry.name}</strong>
+        <span>${entry.category}</span>
+        <em class="quality-${entry.quality}">${getVaultQualityLabel(entry)}</em>
+      </div>
+      <span class="vault-level-badge">LV ${formatNumber(entry.level || 1)}</span>
     `;
 
     grid.appendChild(button);
@@ -965,58 +1052,49 @@ function renderVaultDetail() {
 
   const stats = getVaultEntryStats(entry);
   const canUpgrade = ["guns", "attachments"].includes(entry.categoryKey);
-  const selectedFromEquippedSlot = selectedVaultActionContext?.source === "equipped" &&
-    selectedVaultActionContext.key === entry.key &&
-    selectedVaultActionContext.quality === entry.quality;
   const equipAvailable = canEquipVaultEntry(entry);
-  const unequipAvailable = findEquippedVaultEntryIndex(entry) >= 0;
-  const managementActions = ["guns", "attachments"].includes(entry.categoryKey) ? `
-    <div class="vault-management-actions">
-      <button type="button" onclick="equipSelectedVaultItem()" ${equipAvailable ? "" : "disabled"}>
-        Equip
-      </button>
-      <button type="button" class="${selectedFromEquippedSlot ? "primary" : ""}" onclick="unequipSelectedVaultItem()" ${unequipAvailable ? "" : "disabled"}>
-        Unequip
-      </button>
-    </div>
-  ` : "";
-  const upgradePanel = canUpgrade ? `
-    <div class="vault-upgrade-panel">
-      <div>
-        <span>Station Forge</span>
-        <strong>Level and quality upgrades are handled in the Forge</strong>
-      </div>
-      <button type="button" onclick="openUpgradeForgeFromVault('${escapeJsString(entry.groupKey)}')">
-        Open Forge
-      </button>
-    </div>
-  ` : entry.categoryKey === "cores" ? `
-    <div class="vault-upgrade-panel passive">
-      <div>
-        <span>Lupen Cores</span>
-        <strong>Used to upgrade guns and equipment</strong>
-      </div>
-    </div>
-  ` : "";
+  const effectStat = stats.find(stat => !["Owned", "Equipped", "Available"].includes(stat.label)) || stats[0] || { label: "Stored", value: formatNumber(entry.count || 0) };
+  const infoStats = [
+    effectStat,
+    { label: "Owned", value: formatNumber(entry.count || 0) },
+    { label: "Equipped", value: formatNumber(entry.equippedCount || 0) },
+    { label: "Available", value: formatNumber(entry.storedCount || (entry.stackable ? entry.count : 0)) }
+  ];
 
   panel.innerHTML = `
-    <div class="store-detail-shell store-quality-${entry.quality} compact-store-detail simplified-store-detail vault-detail-shell">
-      <div class="store-detail-visual quality-${entry.quality}">
+    <div class="vault-item-detail-shell quality-${entry.quality}">
+      <div class="vault-item-preview">
+        <div class="vault-item-preview-glow"></div>
+        <div class="exchange-hero-ring"></div>
         <img src="${entry.icon}" alt="${entry.name}">
       </div>
-      <div class="store-detail-kicker">${entry.category.toUpperCase()} / ${titleCaseQuality(entry.quality)}</div>
-      <div class="store-detail-title">${entry.name}</div>
-      <div class="store-detail-desc">${getVaultEntryDescription(entry)}</div>
-      <div class="store-detail-stat-grid compact-detail-stats vault-detail-stats">
-        ${stats.map(stat => `
-          <div class="store-detail-stat-card compact-detail-stat-card">
+
+      <div class="vault-item-identity">
+        <div>
+          <h4>${entry.name}</h4>
+          <p>${entry.category} / <strong class="quality-${entry.quality}">${getVaultQualityLabel(entry)}</strong></p>
+        </div>
+        <span>LV ${formatNumber(entry.level || 1)}</span>
+      </div>
+
+      <div class="vault-item-description">${getVaultEntryDescription(entry)}</div>
+
+      <div class="vault-item-stat-grid">
+        ${infoStats.map(stat => `
+          <div class="vault-item-stat-card ${stat.label.toLowerCase().replace(/\s+/g, "-")}-stat">
             <span>${stat.label}</span>
             <strong>${stat.value}</strong>
           </div>
         `).join("")}
       </div>
-      ${managementActions}
-      ${upgradePanel}
+
+      <div class="vault-item-note">Items of different quality or level are stored separately.</div>
+
+      <div class="vault-item-actions">
+        <button type="button" class="vault-action-primary" onclick="equipSelectedVaultItem()" ${equipAvailable ? "" : "disabled"}>Equip</button>
+        <button type="button" class="vault-action-secondary" onclick="openUpgradeForgeFromVault('${escapeJsString(entry.groupKey)}')" ${canUpgrade ? "" : "disabled"}>Open Forge</button>
+        <button type="button" class="vault-action-danger" disabled>Sell</button>
+      </div>
     </div>
   `;
 }
@@ -1265,7 +1343,7 @@ function renderHangarVault() {
   const title = document.getElementById("hangarShipTitle");
   const subtitle = document.getElementById("hangarShipSubtitle");
   if (title) title.textContent = "Station Vault";
-  if (subtitle) subtitle.textContent = "Owned systems and upgrade materials";
+  if (subtitle) subtitle.textContent = "Owned ship gear and upgrade cores";
 
   ensureVaultSelection();
   renderVaultFilters();
