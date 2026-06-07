@@ -2131,7 +2131,7 @@ function getLoadoutVaultEntryStatLine(entry) {
   if (entry.categoryKey === "guns") {
     const gun = GUNS[entry.key];
     if (!gun) return "";
-    return `Damage ${formatNumber(getWeaponPurchaseDamage(gun, entry.quality))} - ${getVaultFireRateLabel(gun)}`;
+    return `Damage ${formatNumber(getWeaponPurchaseDamage(gun, entry.quality))} · ${getVaultFireRateLabel(gun)}`;
   }
   if (entry.categoryKey === "attachments") {
     const stat = getAttachmentPurchaseStatRows(entry, entry.quality)[0];
