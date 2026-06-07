@@ -37,6 +37,7 @@ let multiplayerStagingLoadoutEquipPendingItemId = "";
 let multiplayerStagingLoadoutUnequipPending = false;
 let selectedVaultActionContext = null;
 let selectedLoadoutItemContext = null;
+let selectedLoadoutSlotCategory = "guns";
 let selectedLoadoutVaultFilter = "all";
 let selectedLoadoutVaultSearch = "";
 let selectedLoadoutVaultSort = "quality";
@@ -771,6 +772,7 @@ function selectVaultItem(groupKey) {
 }
 
 function selectEquippedLoadoutVaultItem(categoryKey, index) {
+  selectedLoadoutSlotCategory = categoryKey === "attachments" ? "attachments" : "guns";
   const loadout = getShipLoadout(selectedHangarShipId);
   const listName = categoryKey === "guns" ? "guns" : "attachments";
   const entry = loadout?.[listName]?.[Number(index)];
@@ -1754,6 +1756,8 @@ function updateLoadoutSlotSummaries() {
   const attachmentCount = loadout.attachments.filter(Boolean).length;
   const gunText = `${gunCount} / ${gunLimit} EQUIPPED`;
   const attachmentText = `${attachmentCount} / ${attachmentLimit} EQUIPPED`;
+  const gunToggleText = `Weapons ${gunCount}/${gunLimit}`;
+  const attachmentToggleText = `Attachments ${attachmentCount}/${attachmentLimit}`;
   const gunMirrorText = `${gunCount}/${gunLimit}`;
   const attachmentMirrorText = `${attachmentCount}/${attachmentLimit}`;
 
@@ -1767,6 +1771,19 @@ function updateLoadoutSlotSummaries() {
   Object.entries(summaries).forEach(([id, text]) => {
     const node = document.getElementById(id);
     if (node) node.textContent = text;
+  });
+
+  const toggleButtons = {
+    loadoutCategoryWeapons: { categoryKey: "guns", text: gunToggleText },
+    loadoutCategoryAttachments: { categoryKey: "attachments", text: attachmentToggleText }
+  };
+
+  Object.entries(toggleButtons).forEach(([id, config]) => {
+    const node = document.getElementById(id);
+    if (!node) return;
+    node.textContent = config.text;
+    node.classList.toggle("active", selectedLoadoutSlotCategory === config.categoryKey);
+    node.setAttribute("aria-selected", selectedLoadoutSlotCategory === config.categoryKey ? "true" : "false");
   });
 
   const pipSummaries = {
@@ -1808,16 +1825,38 @@ function ensureSelectedLoadoutSlot() {
     ? (current.categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId))
     : 0;
   const index = Number(current?.index);
-  if (validCategory && Number.isInteger(index) && index >= 0 && index < limit) return;
+  if (validCategory && Number.isInteger(index) && index >= 0 && index < limit) {
+    selectedLoadoutSlotCategory = current.categoryKey;
+    return;
+  }
 
-  const gunLimit = getGunSlotLimit(selectedHangarShipId);
+  const categoryKey = selectedLoadoutSlotCategory === "attachments" ? "attachments" : "guns";
+  const slotLimit = categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
   selectedLoadoutItemContext = {
     source: "slot",
-    categoryKey: "guns",
-    index: Math.min(1, Math.max(0, gunLimit - 1)),
+    categoryKey,
+    index: Math.min(categoryKey === "guns" ? 1 : 0, Math.max(0, slotLimit - 1)),
     key: "",
     quality: "standard"
   };
+}
+
+function setLoadoutSlotCategory(categoryKey) {
+  selectedLoadoutSlotCategory = categoryKey === "attachments" ? "attachments" : "guns";
+  const limit = selectedLoadoutSlotCategory === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
+  const currentIndex = selectedLoadoutItemContext?.categoryKey === selectedLoadoutSlotCategory
+    ? Number(selectedLoadoutItemContext.index || 0)
+    : 0;
+  selectedLoadoutItemContext = {
+    source: "slot",
+    categoryKey: selectedLoadoutSlotCategory,
+    index: Math.min(Math.max(0, currentIndex), Math.max(0, limit - 1)),
+    key: "",
+    quality: "standard"
+  };
+  renderInstalledGuns();
+  renderInstalledAttachments();
+  renderGunInventory();
 }
 
 function renderLoadoutSlotGrid(box, categoryKey) {
@@ -1828,6 +1867,7 @@ function renderLoadoutSlotGrid(box, categoryKey) {
   const limit = categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
   const definitionMap = categoryKey === "guns" ? GUNS : attachments;
   setSlotRailDensity(box, LOADOUT_GRID_SLOT_COUNT);
+  box.closest(".loadout-slot-bank")?.classList.toggle("active", selectedLoadoutSlotCategory === categoryKey);
 
   box.innerHTML = "";
 
@@ -2069,7 +2109,6 @@ function getAllLoadoutVaultEntries() {
 }
 
 function getFilteredLoadoutVaultEntries() {
-  const query = selectedLoadoutVaultSearch.trim().toLowerCase();
   const selectedCategory = selectedLoadoutItemContext?.categoryKey;
   const filter = selectedLoadoutVaultFilter === "all" && (selectedCategory === "guns" || selectedCategory === "attachments")
     ? selectedCategory
@@ -2077,7 +2116,6 @@ function getFilteredLoadoutVaultEntries() {
 
   return getAllLoadoutVaultEntries()
     .filter(entry => filter === "all" || entry.categoryKey === filter)
-    .filter(entry => !query || entry.name.toLowerCase().includes(query) || titleCaseQuality(entry.quality).toLowerCase().includes(query))
     .sort((a, b) => {
       if (selectedLoadoutVaultSort === "name") return a.name.localeCompare(b.name);
       if (selectedLoadoutVaultSort === "quantity") return Number(b.count || 0) - Number(a.count || 0) || a.name.localeCompare(b.name);
@@ -2086,6 +2124,20 @@ function getFilteredLoadoutVaultEntries() {
       if (b.level !== a.level) return b.level - a.level;
       return a.name.localeCompare(b.name);
     });
+}
+
+function getLoadoutVaultEntryStatLine(entry) {
+  if (!entry) return "";
+  if (entry.categoryKey === "guns") {
+    const gun = GUNS[entry.key];
+    if (!gun) return "";
+    return `Damage ${formatNumber(getWeaponPurchaseDamage(gun, entry.quality))} - ${getVaultFireRateLabel(gun)}`;
+  }
+  if (entry.categoryKey === "attachments") {
+    const stat = getAttachmentPurchaseStatRows(entry, entry.quality)[0];
+    return stat ? `${stat.label} ${stat.value}` : "Utility module";
+  }
+  return "";
 }
 
 function updateLoadoutVaultChrome() {
@@ -2225,7 +2277,12 @@ function renderGunInventory() {
   const box = document.getElementById("gunInventory");
   if (!box) return;
 
-  const entries = getFilteredLoadoutVaultEntries();
+  const entries = getFilteredLoadoutVaultEntries()
+    .flatMap(entry => Array.from({ length: Math.max(1, Number(entry.count || 1)) }, (_unused, index) => ({
+      ...entry,
+      count: 1,
+      displayKey: `${entry.groupKey}__${index}`
+    })));
   const selectedCategory = selectedLoadoutItemContext?.categoryKey;
   box.innerHTML = "";
   updateLoadoutVaultChrome();
@@ -2261,9 +2318,9 @@ function renderGunInventory() {
       <img src="${entry.icon}" alt="${entry.name}">
       <span class="loadout-vault-row-copy">
         <strong>${escapeHtml(entry.name)}</strong>
-        <small>${escapeHtml(titleCaseQuality(entry.quality))} / Lv ${formatNumber(entry.level || 1)}${entry.categoryKey === "attachments" ? " / Attachment" : ""}</small>
+        <small>${escapeHtml(getLoadoutVaultEntryStatLine(entry))}</small>
       </span>
-      <b>x${formatNumber(entry.count)}</b>
+      <b>LV ${formatRomanLevel(entry.level || 1)}</b>
     `;
 
     box.appendChild(btn);

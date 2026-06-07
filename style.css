@@ -35908,35 +35908,64 @@ input::placeholder {
 }
 
 #hangarOverviewSection .orbit-loadout-arena.scalable-loadout-arena {
-  grid-template-rows: 168px minmax(0, 1fr) !important;
-  gap: 10px !important;
+  grid-template-rows: 212px minmax(0, 1fr) !important;
+  gap: 12px !important;
 }
 
 #hangarOverviewSection .loadout-hero-stage {
-  min-height: 168px !important;
-  height: 168px !important;
+  min-height: 212px !important;
+  height: 212px !important;
 }
 
 #hangarOverviewSection .loadout-hero-stage img {
   width: min(56%, 360px) !important;
   max-width: 360px !important;
-  max-height: 164px !important;
+  max-height: 208px !important;
   transform: translateY(2px) !important;
 }
 
 #hangarOverviewSection .loadout-grid-stack {
   display: grid !important;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
-  gap: 11px !important;
+  grid-template-rows: 38px minmax(0, 1fr) !important;
+  gap: 10px !important;
   min-height: 0 !important;
+}
+
+#hangarOverviewSection .loadout-category-toggle {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+#hangarOverviewSection .loadout-category-toggle button {
+  display: grid !important;
+  place-items: center !important;
+  min-height: 38px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(81, 183, 238, 0.34) !important;
+  background: rgba(2, 13, 26, 0.84) !important;
+  color: rgba(230, 246, 255, 0.88) !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+#hangarOverviewSection .loadout-category-toggle button.active {
+  border-color: rgba(67, 209, 255, 0.9) !important;
+  background: linear-gradient(180deg, rgba(31, 121, 222, 0.95), rgba(10, 75, 158, 0.95)) !important;
+  box-shadow: 0 0 18px rgba(31, 181, 255, 0.22), inset 0 0 16px rgba(122, 224, 255, 0.12) !important;
+  color: #ffffff !important;
 }
 
 #hangarOverviewSection .loadout-slot-bank {
   display: grid !important;
   grid-template-rows: 24px minmax(0, 1fr) !important;
   min-height: 0 !important;
-  padding: 9px 12px 10px !important;
+  padding: 10px 12px 12px !important;
   border-radius: 10px !important;
+}
+
+#hangarOverviewSection .loadout-slot-bank:not(.active) {
+  display: none !important;
 }
 
 #hangarOverviewSection .loadout-bank-title {
@@ -35968,9 +35997,9 @@ input::placeholder {
 
 #hangarScreen #hangarOverviewSection .loadout-slot-bank .equipment-slot.scalable-loadout-slot.loadout-grid-slot {
   height: 100% !important;
-  min-height: 40px !important;
-  max-height: 54px !important;
-  border-radius: 7px !important;
+  min-height: 66px !important;
+  max-height: 90px !important;
+  border-radius: 8px !important;
 }
 
 #hangarOverviewSection .equipment-slot.loadout-grid-slot::before {
@@ -35981,8 +36010,8 @@ input::placeholder {
 }
 
 #hangarOverviewSection .equipment-slot.loadout-grid-slot img {
-  width: 34px !important;
-  height: 32px !important;
+  width: 48px !important;
+  height: 44px !important;
   object-fit: contain !important;
 }
 
@@ -36030,6 +36059,53 @@ input::placeholder {
 #hangarOverviewSection .loadout-quick-stats,
 #hangarOverviewSection .loadout-stage-footer {
   display: none !important;
+}
+
+#hangarOverviewSection .loadout-vault-search-row,
+#hangarOverviewSection .loadout-item-detail-panel {
+  display: none !important;
+}
+
+#hangarOverviewSection .equipment-drawer {
+  grid-template-rows: auto minmax(0, 1fr) !important;
+}
+
+#hangarOverviewSection .loadout-compatible-heading {
+  color: #dff8ff !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+}
+
+#hangarOverviewSection .loadout-vault-row {
+  min-height: 72px !important;
+  grid-template-columns: 58px minmax(0, 1fr) 52px !important;
+  gap: 11px !important;
+}
+
+#hangarOverviewSection .loadout-vault-row img {
+  width: 50px !important;
+  height: 50px !important;
+}
+
+#hangarOverviewSection .loadout-vault-row-copy strong {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+#hangarOverviewSection .loadout-vault-row-copy small {
+  color: rgba(150, 210, 246, 0.9) !important;
+}
+
+#hangarOverviewSection .loadout-vault-row b {
+  display: inline-grid !important;
+  place-items: center !important;
+  min-width: 46px !important;
+  height: 25px !important;
+  padding: 0 7px !important;
+  border-radius: 7px !important;
 }
 
 #hangarOverviewSection .equipment-count-chip {

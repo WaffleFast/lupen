@@ -339,6 +339,10 @@
               </div>
 
               <div class="loadout-slot-matrix loadout-grid-stack" aria-label="Equipped loadout slots">
+                <div class="loadout-category-toggle" role="tablist" aria-label="Loadout category">
+                  <button id="loadoutCategoryWeapons" type="button" onclick="setLoadoutSlotCategory('guns')">Weapons 0/20</button>
+                  <button id="loadoutCategoryAttachments" type="button" onclick="setLoadoutSlotCategory('attachments')">Attachments 0/20</button>
+                </div>
                 <section class="loadout-slot-bank weapon-slot-bank">
                   <div class="loadout-bank-title compact-bank-title">
                     <span>Weapons</span>
@@ -407,6 +411,7 @@
 
             <div class="equipment-drawer">
               <div id="loadoutItemDetailPanel" class="loadout-item-detail-panel"></div>
+              <div class="loadout-compatible-heading">Compatible Items</div>
               <div id="gunInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid loadout-vault-list"></div>
               <div id="attachmentInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid hidden-loadout-inventory"></div>
             </div>
