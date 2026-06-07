@@ -698,17 +698,9 @@ function sortVaultEntries(a, b) {
 
 function getVaultFilteredEntries() {
   const entries = buildVaultEntries();
-  const query = selectedVaultSearch.trim().toLowerCase();
   return entries.filter(entry => {
     if (hangarVaultFilter !== "all" && entry.categoryKey !== hangarVaultFilter) return false;
-    if (!query) return true;
-    return [
-      entry.name,
-      entry.category,
-      entry.categoryKey,
-      titleCaseQuality(entry.quality),
-      `lv ${entry.level || 1}`
-    ].some(value => String(value || "").toLowerCase().includes(query));
+    return true;
   });
 }
 
@@ -930,6 +922,12 @@ function getVaultQualityLabel(entry) {
   return titleCaseQuality(entry?.quality || "standard");
 }
 
+function formatRomanLevel(level = 1) {
+  const value = Math.max(1, Math.min(10, Math.floor(Number(level || 1))));
+  const numerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+  return numerals[value] || String(value);
+}
+
 function getVaultEntryStats(entry) {
   if (!entry) return [];
   const item = {
@@ -1007,7 +1005,7 @@ function renderVaultCatalog() {
     grid.innerHTML = `
       <div class="vault-empty-state new-vault-empty">
         <strong>No vault items found</strong>
-        <span>Try another filter or search.</span>
+        <span>Try another vault filter.</span>
       </div>
     `;
     return;
@@ -1030,10 +1028,8 @@ function renderVaultCatalog() {
       </div>
       <div class="vault-storage-copy">
         <strong>${entry.name}</strong>
-        <span>${entry.category}</span>
-        <em class="quality-${entry.quality}">${getVaultQualityLabel(entry)}</em>
       </div>
-      <span class="vault-level-badge">LV ${formatNumber(entry.level || 1)}</span>
+      <span class="vault-level-badge">LV ${formatRomanLevel(entry.level || 1)}</span>
     `;
 
     grid.appendChild(button);
@@ -1074,7 +1070,7 @@ function renderVaultDetail() {
           <h4>${entry.name}</h4>
           <p>${entry.category} / <strong class="quality-${entry.quality}">${getVaultQualityLabel(entry)}</strong></p>
         </div>
-        <span>LV ${formatNumber(entry.level || 1)}</span>
+        <span>LV ${formatRomanLevel(entry.level || 1)}</span>
       </div>
 
       <div class="vault-item-description">${getVaultEntryDescription(entry)}</div>
