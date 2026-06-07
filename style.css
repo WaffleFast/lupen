@@ -38685,7 +38685,7 @@ input::placeholder {
   min-height: 39px !important;
   height: 39px !important;
   margin: 0 !important;
-  transform: translateY(12px) !important;
+  transform: translateY(2px) !important;
 }
 
 #hangarScreen.hangar-screen.active:has(#hangarVaultSection.active) .hangar-tabs button {
@@ -38701,7 +38701,7 @@ input::placeholder {
   height: 476px !important;
   min-height: 0 !important;
   overflow: visible !important;
-  transform: translateY(22px) !important;
+  transform: translateY(2px) !important;
 }
 
 #hangarVaultSection .station-vault-layout {
@@ -38955,7 +38955,7 @@ input::placeholder {
 
 #hangarVaultSection .vault-storage-copy {
   min-width: 0 !important;
-  padding-right: 50px !important;
+  padding-right: 60px !important;
 }
 
 #hangarVaultSection .vault-storage-copy strong {
@@ -38963,9 +38963,9 @@ input::placeholder {
   -webkit-box-orient: vertical !important;
   -webkit-line-clamp: 2 !important;
   color: #ffffff !important;
-  font-size: 12.5px !important;
+  font-size: 12px !important;
   font-weight: 850 !important;
-  line-height: 1.12 !important;
+  line-height: 1.18 !important;
   white-space: normal !important;
   overflow: hidden !important;
   text-overflow: clip !important;
@@ -39208,7 +39208,7 @@ input::placeholder {
 
 #hangarVaultSection .vault-item-actions {
   display: grid !important;
-  grid-template-columns: 1fr 1fr 0.9fr !important;
+  grid-template-columns: 1fr 0.9fr 1fr !important;
   gap: 10px !important;
   min-height: 0 !important;
 }

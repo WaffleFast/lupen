@@ -941,14 +941,14 @@ function getVaultEntryStats(entry) {
       return [
         { label: "Damage", value: formatNumber(getWeaponPurchaseDamage(gun, entry.quality)) },
         { label: "Fire Rate", value: getGunFireRateText(gun) },
-        { label: "Stored", value: formatNumber(entry.storedCount || 0) }
+        { label: "Owned", value: formatNumber(entry.storedCount || 0) }
       ];
     }
   } else if (item.kind === "attachment") {
     const effectStats = getAttachmentPurchaseStatRows(item, entry.quality);
     return [
       ...(effectStats.length ? [effectStats[0]] : []),
-      { label: "Stored", value: formatNumber(entry.storedCount || 0) }
+      { label: "Owned", value: formatNumber(entry.storedCount || 0) }
     ];
   } else if (item.kind === "core") {
     return [
@@ -957,7 +957,7 @@ function getVaultEntryStats(entry) {
     ];
   }
 
-  return [{ label: "Stored", value: formatNumber(entry.storedCount || entry.count || 0) }];
+  return [{ label: "Owned", value: formatNumber(entry.storedCount || entry.count || 0) }];
 }
 
 
@@ -1084,8 +1084,8 @@ function renderVaultDetail() {
 
       <div class="vault-item-actions">
         <button type="button" class="vault-action-primary" onclick="equipSelectedVaultItem()" ${equipAvailable ? "" : "disabled"}>Equip</button>
-        <button type="button" class="vault-action-secondary" onclick="openUpgradeForgeFromVault('${escapeJsString(entry.groupKey)}')" ${canUpgrade ? "" : "disabled"}>Open Forge</button>
         <button type="button" class="vault-action-danger" disabled>Sell</button>
+        <button type="button" class="vault-action-secondary" onclick="openUpgradeForgeFromVault('${escapeJsString(entry.groupKey)}')" ${canUpgrade ? "" : "disabled"}>Open Forge</button>
       </div>
     </div>
   `;
