@@ -506,10 +506,11 @@ test.describe("Lupen browser smoke", () => {
     await openHangar(page);
     await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
 
-    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Select equipment");
-    await expect(page.locator("#hangarScreen")).toContainText("Available Equipment");
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Weapon 02");
+    await expect(page.locator("#hangarScreen")).toContainText("Vault Equipment");
+    await expect(page.locator("#hangarScreen")).toContainText("Selected Slot: Weapon 02");
     await expect(page.locator("#hangarScreen")).toContainText("Guns");
-    await expect(page.locator("#hangarScreen")).toContainText("Equipment");
+    await expect(page.locator("#hangarScreen")).toContainText("Attachments");
     await expect(page.locator("#hangarScreen")).not.toContainText("Total Slots");
 
     await expectNoUnexpectedBrowserErrors(failures);

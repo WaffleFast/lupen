@@ -804,6 +804,16 @@ function getScaledAttachmentEffect(key, quality = "standard", level = 1) {
   return effect;
 }
 
+function getDefaultShipGuns(ship) {
+  const defaultGuns = Array.isArray(ship?.defaultGuns)
+    ? ship.defaultGuns
+    : (ship?.defaultGun ? [ship.defaultGun] : []);
+
+  return defaultGuns
+    .filter(key => GUNS[key])
+    .map(key => makeLeveledLoadoutEntry(key, "standard", 1));
+}
+
 function normalizeShipLoadout(loadout, shipId) {
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   const ship = SHIPS[shipId] || SHIPS[starterShipId] || SHIPS.lupenOrigin;
@@ -811,7 +821,7 @@ function normalizeShipLoadout(loadout, shipId) {
   if (Array.isArray(loadout)) {
     return {
       attachments: loadout.filter(isAttachmentEntry).map(entry => makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry))),
-      guns: ship.defaultGun ? [makeLeveledLoadoutEntry(ship.defaultGun, "standard", 1)] : []
+      guns: getDefaultShipGuns(ship)
     };
   }
 
@@ -825,7 +835,7 @@ function normalizeShipLoadout(loadout, shipId) {
   };
 
   if (loadout === undefined || loadout === null) {
-    normalized.guns = ship.defaultGun ? [makeLeveledLoadoutEntry(ship.defaultGun, "standard", 1)] : [];
+    normalized.guns = getDefaultShipGuns(ship);
   }
 
   return normalized;

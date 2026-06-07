@@ -365,7 +365,8 @@ const SHIPS = {
     evasion: 0.18,
     gunSlots: 2,
     attachmentSlots: 2,
-    defaultGun: "pulseLaser"
+    defaultGun: "pulseLaser",
+    defaultGuns: ["pulseLaser", "pulseLaser"]
   },
   bison: {
     id: "bison",
