@@ -1752,14 +1752,16 @@ function updateLoadoutSlotSummaries() {
   const attachmentLimit = getAttachmentSlotLimit(selectedHangarShipId);
   const gunCount = loadout.guns.filter(Boolean).length;
   const attachmentCount = loadout.attachments.filter(Boolean).length;
-  const gunText = `${gunCount}/${LOADOUT_GRID_SLOT_COUNT}`;
-  const attachmentText = `${attachmentCount}/${LOADOUT_GRID_SLOT_COUNT}`;
+  const gunText = `${gunCount} / ${gunLimit} EQUIPPED`;
+  const attachmentText = `${attachmentCount} / ${attachmentLimit} EQUIPPED`;
+  const gunMirrorText = `${gunCount}/${gunLimit}`;
+  const attachmentMirrorText = `${attachmentCount}/${attachmentLimit}`;
 
   const summaries = {
     gunSlotSummary: gunText,
-    gunSlotSummaryMirror: gunText,
+    gunSlotSummaryMirror: gunMirrorText,
     attachmentSlotSummary: attachmentText,
-    attachmentSlotSummaryMirror: attachmentText
+    attachmentSlotSummaryMirror: attachmentMirrorText
   };
 
   Object.entries(summaries).forEach(([id, text]) => {
@@ -1856,7 +1858,9 @@ function renderLoadoutSlotGrid(box, categoryKey) {
 
     slot.innerHTML = item
       ? `<img src="${item.image}" alt="${item.name}">`
-      : `<span class="slot-lock-mark" aria-hidden="true">${supported ? "" : "LOCK"}</span>`;
+      : supported
+        ? `<span class="slot-empty-label" aria-hidden="true"><b>Empty</b> <small>Available</small></span>`
+        : `<span class="slot-lock-mark" aria-hidden="true">LOCK</span>`;
 
     box.appendChild(slot);
   }
