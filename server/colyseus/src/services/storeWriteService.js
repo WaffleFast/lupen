@@ -1,14 +1,12 @@
 /* Staging-only Store write prototype.
    This service can patch only server-catalog Map 1 Store guns, attachments,
-   the LF-2 Hauler, and cheap Forge test materials after strict staging gates
+   Falcon/Bison/Monolith, and cheap Forge test materials after strict staging gates
    pass. It never writes loadouts, loot, bounties, PvP/player damage, broad
    progression, or schemas. */
 
 import { getStagingStoreItemById, getStagingStoreItemIds } from "../config/stagingStoreConfig.js";
 
 const PLAYER_SAVES_TABLE = "player_saves";
-const LUPEN_HAULER_ITEM_ID = "ship:lupenHauler";
-const LUPEN_HAULER_KEY = "lupenHauler";
 const MAX_CREDITS = 999999999;
 const MAX_ATTACHMENT_COUNT = 9999;
 const MAX_GUN_COUNT = 9999;
@@ -95,8 +93,8 @@ function getSaveDataFromRow(row = {}) {
     : null;
 }
 
-function isLupenHaulerItem(item) {
-  return item?.itemId === LUPEN_HAULER_ITEM_ID && item?.localKey === LUPEN_HAULER_KEY;
+function isShipItem(item) {
+  return item?.localKind === "ship" && !!item?.localKey && String(item.itemId || "").startsWith("ship:");
 }
 
 function isAttachmentItem(item) {
@@ -116,7 +114,7 @@ function isCoreItem(item) {
 }
 
 function isWritableStoreItem(item) {
-  return isAttachmentItem(item) || isGunItem(item) || isLupenHaulerItem(item) || isMaterialItem(item) || isCoreItem(item);
+  return isAttachmentItem(item) || isGunItem(item) || isShipItem(item) || isMaterialItem(item) || isCoreItem(item);
 }
 
 function getStoreWriteFlags(applied = false, writeKind = "") {
@@ -210,7 +208,7 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
   const safeQuantity = normalizeStoreWriteQuantity(quantity);
   const writesAttachment = isAttachmentItem(selectedItem);
   const writesWeapon = isGunItem(selectedItem);
-  const writesShip = isLupenHaulerItem(selectedItem);
+  const writesShip = isShipItem(selectedItem);
   const writesMaterial = isMaterialItem(selectedItem);
   const writesCore = isCoreItem(selectedItem);
   if (!selectedItem || !isWritableStoreItem(selectedItem)) {
@@ -227,7 +225,7 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     });
   }
 
-  const unitPrice = clampInteger(selectedItem.price, 1, MAX_CREDITS);
+  const unitPrice = clampInteger(selectedItem.price, 0, MAX_CREDITS);
   const creditsBefore = clampInteger(saveData.credits, 0, MAX_CREDITS);
   if (unitPrice === null) return getBlockedResult("store_item_invalid");
   if (creditsBefore === null) return getBlockedResult("credits_path_missing_or_invalid");
@@ -277,7 +275,8 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
     if (!Array.isArray(saveData.ownedShips)) {
       return getBlockedResult("owned_ships_path_missing_or_invalid");
     }
-    if (saveData.ownedShips.includes(LUPEN_HAULER_KEY)) {
+    const shipKey = selectedItem.localKey;
+    if (saveData.ownedShips.includes(shipKey)) {
       return getBlockedResult("ship_already_owned", {
         itemId: selectedItem.itemId,
         name: selectedItem.name,
@@ -290,9 +289,15 @@ export function buildStagingStorePurchasePatch(saveData = {}, item = null, quant
       });
     }
     itemBefore = saveData.ownedShips.length;
-    patchedSaveData.ownedShips = [...saveData.ownedShips, LUPEN_HAULER_KEY];
+    patchedSaveData.ownedShips = [...saveData.ownedShips, shipKey];
+    patchedSaveData.shipLoadouts = patchedSaveData.shipLoadouts && typeof patchedSaveData.shipLoadouts === "object" && !Array.isArray(patchedSaveData.shipLoadouts)
+      ? patchedSaveData.shipLoadouts
+      : {};
+    if (!patchedSaveData.shipLoadouts[shipKey]) patchedSaveData.shipLoadouts[shipKey] = { attachments: [], guns: [] };
     itemAfter = patchedSaveData.ownedShips.length;
-    appliedFields.push("ownedShips");
+    appliedFields.push("ownedShips", `shipLoadouts.${shipKey}`);
+    const shipLoadoutsUntouchedIndex = untouchedFields.indexOf("shipLoadouts");
+    if (shipLoadoutsUntouchedIndex >= 0) untouchedFields.splice(shipLoadoutsUntouchedIndex, 1);
     untouchedFields.push("ownedAttachments", "ownedGuns", "attachments", "guns", "inventoryItems", "upgradeMaterials");
   } else if (writesMaterial) {
     const materialKey = selectedItem.localKey;

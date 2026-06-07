@@ -1,7 +1,7 @@
 /* Static staging Store preview config.
    This catalogue is server-owned data for multiplayer Store validation.
-   It covers current Map 1 Store guns, attachments, the Vessel Exchange LF-2
-   path, and cheap Forge test materials; it never allows unknown item ids,
+   It covers current Map 1 Store guns, attachments, the Vessel Exchange
+   Falcon/Bison/Monolith path, and cheap Forge test materials; it never allows unknown item ids,
    Store sell, loot writes, bounties, PvP/player damage, schema, or broad
    progression. */
 
@@ -153,16 +153,40 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     reference: "attachments.evasionMatrix"
   }),
   Object.freeze({
-    itemId: "ship:lupenHauler",
-    name: "LF-2 Hauler",
+    itemId: "ship:falcon",
+    name: "F-1 Falcon",
     category: "ship",
     localKind: "ship",
-    localKey: "lupenHauler",
-    price: 10500,
+    localKey: "falcon",
+    price: 0,
     levelRequirement: 0,
     stockType: "fixed",
-    description: "Cargo-forward pilot hull for staging trade loops.",
-    reference: "SHIPS.lupenHauler"
+    description: "Fast starter combat ship with low cargo and agile handling.",
+    reference: "SHIPS.falcon"
+  }),
+  Object.freeze({
+    itemId: "ship:bison",
+    name: "B-1 Bison",
+    category: "ship",
+    localKind: "ship",
+    localKey: "bison",
+    price: 12000,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Durable early cargo ship with strong hold capacity and modest combat ability.",
+    reference: "SHIPS.bison"
+  }),
+  Object.freeze({
+    itemId: "ship:monolith",
+    name: "Monolith",
+    category: "ship",
+    localKind: "ship",
+    localKey: "monolith",
+    price: 250000,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "Rare endgame ancient-tech warship with extreme loadout capacity.",
+    reference: "SHIPS.monolith"
   }),
   Object.freeze({
     itemId: "material:lupenShard",

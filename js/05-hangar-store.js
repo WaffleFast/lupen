@@ -22,9 +22,10 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
   "attachment:evasionMatrix": "attachment:evasionMatrix",
   "material:lupenShards": "material:lupenShard",
   "core:lupenCore": "core:lupenCore",
-  "ship:lupenHauler": "ship:lupenHauler"
+  "ship:falcon": "ship:falcon",
+  "ship:bison": "ship:bison",
+  "ship:monolith": "ship:monolith"
 });
-const STAGING_LF2_HAULER_PRICE = 10500;
 
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
@@ -143,12 +144,13 @@ function getLastStagingPulseLaserEquipResult() {
   return preview?.itemId === "gun:pulseLaser" ? preview : null;
 }
 
-function getLastStagingShipEquipResult() {
+function getLastStagingShipEquipResult(itemId = "") {
   const status = getMultiplayerStagingStoreStatus();
+  const safeItemId = String(itemId || "").trim();
   const equip = status.lastStagingLoadoutEquip;
-  if (equip?.itemId === "ship:lupenHauler") return equip;
+  if (safeItemId && equip?.itemId === safeItemId) return equip;
   const preview = status.lastStagingLoadoutPreview;
-  return preview?.itemId === "ship:lupenHauler" ? preview : null;
+  return safeItemId && preview?.itemId === safeItemId ? preview : null;
 }
 
 function getStagingStorePreviewLine(result) {
@@ -279,19 +281,21 @@ function renderStagingPulseLaserEquipNote(item) {
     </div>`;
 }
 
-function getStagingShipEquipLine(result) {
-  if (!result) return "LF-2 Hauler selection preview pending.";
-  if (result.applied) return "LF-2 Hauler selected.";
-  if (result.mode === "dry_run" && result.ok) return "Would fly LF-2 Hauler.";
-  if (result.blockReason === "ship_not_owned") return "Blocked: LF-2 Hauler is not owned.";
-  if (result.blockReason === "ship_already_equipped") return "LF-2 Hauler already active.";
+function getStagingShipEquipLine(result, shipName = "Ship") {
+  if (!result) return `${shipName} selection preview pending.`;
+  if (result.applied) return `${shipName} selected.`;
+  if (result.mode === "dry_run" && result.ok) return `Would fly ${shipName}.`;
+  if (result.blockReason === "ship_not_owned") return `Blocked: ${shipName} is not owned.`;
+  if (result.blockReason === "ship_already_equipped") return `${shipName} already active.`;
   if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - active ship not changed.";
   return `Blocked: ${result.blockReason || result.reason || "ship selection unavailable"}.`;
 }
 
 function renderStagingShipEquipNote(item) {
-  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "ship:lupenHauler") return "";
-  const result = getLastStagingShipEquipResult();
+  const itemId = getStagingStoreItemId(item);
+  if (!isMultiplayerStagingStoreActive() || !itemId || item?.kind !== "ship") return "";
+  const result = getLastStagingShipEquipResult(itemId);
+  const shipName = item?.name || result?.name || "Ship";
   const shipLine = result?.selectedShipBefore && result?.selectedShipAfter
     ? ` / Ship ${result.selectedShipBefore} -> ${result.selectedShipAfter}`
     : "";
@@ -300,40 +304,43 @@ function renderStagingShipEquipNote(item) {
     : "";
   return `
     <div class="store-detail-owned-line">
-      <strong>${escapeHtml(getStagingShipEquipLine(result))}</strong>${escapeHtml(shipLine)}${escapeHtml(capacityLine)} /
+      <strong>${escapeHtml(getStagingShipEquipLine(result, shipName))}</strong>${escapeHtml(shipLine)}${escapeHtml(capacityLine)} /
       ${escapeHtml(result?.applied ? "Server save refreshed after applied ship selection." : "Dry run only - no loadout, cargo, weapons, equipment, loot, or bounties changed.")}
     </div>`;
 }
 
 async function requestStagingShipEquip(item) {
-  if (!isMultiplayerStagingStoreActive() || getStagingStoreItemId(item) !== "ship:lupenHauler") return false;
+  const itemId = getStagingStoreItemId(item);
+  if (!isMultiplayerStagingStoreActive() || !itemId || item?.kind !== "ship") return false;
+  const shipName = item?.name || "Ship";
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.();
   if (!client?.equipStagingShip || !status?.enabled || !status?.isConnected) {
-    if (typeof addHudToast === "function") addHudToast("MP staging LF-2 Hauler selection is waiting for the multiplayer server connection.");
+    if (typeof addHudToast === "function") addHudToast(`MP staging ${shipName} selection is waiting for the multiplayer server connection.`);
     return true;
   }
   if (multiplayerStagingShipEquipPending) return true;
   multiplayerStagingShipEquipPending = true;
   renderStore();
-  client.equipStagingShip({ itemId: "ship:lupenHauler" });
-  if (typeof addHudToast === "function") addHudToast("Requested MP staging LF-2 Hauler selection.");
+  client.equipStagingShip({ itemId });
+  if (typeof addHudToast === "function") addHudToast(`Requested MP staging ${shipName} selection.`);
   setTimeout(async () => {
     multiplayerStagingShipEquipPending = false;
     const latest = client.getStatus?.().lastStagingLoadoutEquip;
-    if (latest?.itemId === "ship:lupenHauler" && latest.applied) {
-      const message = `LF-2 Hauler selected: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
+    if (latest?.itemId === itemId && latest.applied) {
+      const selectedName = latest.name || shipName;
+      const message = `${selectedName} selected: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
           if (loaded?.loaded) {
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("lf2_hauler_selected");
+            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("ship_selected");
             if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
           }
         } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast("LF-2 Hauler selected. Reload if ship values look stale.");
+          if (typeof addHudToast === "function") addHudToast(`${selectedName} selected. Reload if ship values look stale.`);
         }
       }
     }
@@ -1258,7 +1265,7 @@ function renderHangarVault() {
 
 function renderHangar() {
   if (!ownedShips.includes(selectedHangarShipId)) {
-    selectedHangarShipId = currentShipId || "lupenOrigin";
+    selectedHangarShipId = currentShipId || (typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon");
   }
 
   ensureInventoryObjects();
@@ -1323,7 +1330,7 @@ function renderHangarOverview() {
 
   if (overviewName) overviewName.textContent = ship.name;
   if (overviewImage) {
-    overviewImage.src = ship.image;
+    overviewImage.src = typeof getShipAsset === "function" ? getShipAsset(ship.id, "master") : ship.image;
     overviewImage.alt = ship.name;
   }
   if (overviewNameplate) overviewNameplate.textContent = ship.name;
@@ -1459,7 +1466,7 @@ function renderOwnedShips() {
     card.innerHTML = `
       <div class="fleet-card-badge">${isEquipped ? "In Use" : "Owned"}</div>
       <div class="fleet-card-image-wrap">
-        <img src="${ship.image}" alt="${ship.name}">
+        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
       <div class="fleet-card-role">${ship.roleSubtitle || getShipRole(shipId)}</div>
@@ -1498,7 +1505,7 @@ function renderFleetDetail() {
   panel.innerHTML = `
     <div class="fleet-detail-hero">
       <div class="fleet-detail-ship-glow"></div>
-      <img src="${ship.image}" alt="${ship.name}">
+      <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "master") : ship.image}" alt="${ship.name}">
     </div>
 
     <div class="fleet-detail-title">
@@ -1596,7 +1603,7 @@ function renderHangarEditor() {
   if (title) title.textContent = `Edit ${ship.name}`;
 
   document.getElementById("hangarShipTitle").textContent = ship.name;
-  document.getElementById("hangarShipImage").src = ship.image;
+  document.getElementById("hangarShipImage").src = typeof getShipAsset === "function" ? getShipAsset(ship.id, "master") : ship.image;
   document.getElementById("hangarShipImage").alt = ship.name;
 
   document.getElementById("shipStats").innerHTML = `
@@ -2089,7 +2096,7 @@ function getExchangeShips() {
 
 function getShipyardSelectedShip() {
   if (!SHIPS[selectedShipyardShipId] || SHIPS[selectedShipyardShipId].hiddenFromExchange) {
-    selectedShipyardShipId = getExchangeShips().find(ship => !ownedShips.includes(ship.id))?.id || currentShipId || "lupenOrigin";
+    selectedShipyardShipId = getExchangeShips().find(ship => !ownedShips.includes(ship.id))?.id || currentShipId || (typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon");
   }
   return SHIPS[selectedShipyardShipId] || getCurrentShip();
 }
@@ -2149,7 +2156,7 @@ function renderExchangeStatRail(shipId) {
 
 function renderExchangeSlotPips(count) {
   const safeCount = Math.max(0, Math.round(Number(count || 0)));
-  const visibleCount = Math.min(safeCount, 8);
+  const visibleCount = Math.min(safeCount, 10);
   if (!visibleCount) return `<span class="exchange-slot-pip empty"></span>`;
   return Array.from({ length: visibleCount }).map(() => `<span class="exchange-slot-pip filled"></span>`).join("");
 }
@@ -2203,7 +2210,7 @@ function renderShipyardDetail() {
   panel.innerHTML = `
     <div class="fleet-detail-hero">
       <div class="fleet-detail-ship-glow"></div>
-      <img src="${ship.image}" alt="${ship.name}">
+      <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
     </div>
 
     <div class="fleet-detail-title">
@@ -2250,7 +2257,7 @@ function renderShipShop() {
   if (creditText) creditText.textContent = formatNumber(credits);
 
   if (!SHIPS[selectedShipyardShipId] || SHIPS[selectedShipyardShipId].hiddenFromExchange) {
-    selectedShipyardShipId = getExchangeShips().find(ship => !ownedShips.includes(ship.id))?.id || currentShipId;
+    selectedShipyardShipId = getExchangeShips().find(ship => !ownedShips.includes(ship.id))?.id || currentShipId || (typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon");
   }
 
   box.innerHTML = "";
@@ -2262,15 +2269,16 @@ function renderShipShop() {
     const stats = getShipStats(ship.id);
 
     const card = document.createElement("button");
-    const isTutorialRequiredShip = tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && ship.id === "lupenOrigin";
+    const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+    const isTutorialRequiredShip = tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && ship.id === starterShipId;
     card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card ${selected ? "selected" : ""} ${equipped ? "active" : ""} ${owned ? "owned" : ""} ${isTutorialRequiredShip ? "tutorial-required-ship" : ""}`;
     card.dataset.shipId = ship.id;
-    if (ship.id === "lupenOrigin") card.dataset.tutorialTarget = "firstShipCard";
+    if (ship.id === starterShipId) card.dataset.tutorialTarget = "firstShipCard";
     card.onclick = () => selectShipyardShip(ship.id);
     card.innerHTML = `
       <div class="fleet-card-badge">${equipped ? "In Use" : owned ? "Owned" : `CR ${formatNumber(ship.price)}`}</div>
       <div class="fleet-card-image-wrap">
-        <img src="${ship.image}" alt="${ship.name}">
+        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
       <div class="fleet-card-role">${ship.roleSubtitle || getShipyardClassLabel(ship)}</div>
@@ -2832,7 +2840,7 @@ function renderStoreCatalog() {
       <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} quality-${quality}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
         ${status ? `<span class="store-card-status">${status}</span>` : ""}
         <div class="store-card-art quality-${quality}">
-          <img src="${item.image}" alt="${item.name}">
+          <img src="${item.kind === "ship" && typeof getShipAsset === "function" ? getShipAsset(item.key, "large") : item.image}" alt="${item.name}">
         </div>
         <div class="store-card-name">${item.name}</div>
         <div class="store-card-sub">${categoryLabel}</div>
@@ -2972,7 +2980,7 @@ function renderStoreDetail() {
       <div class="store-buy-footer store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
         ${buyButton}
         ${stagingEquippableItem ? `<button class="store-detail-buy-action" onclick="requestStagingLoadoutEquip(getStoreSelectedItem())" ${stagingEquipPending ? "disabled" : ""}>${stagingEquipPending ? "Applying..." : `Apply ${escapeHtml(item.name)}`}</button>` : ""}
-        ${stagingStoreLocked && stagingStoreItemId === "ship:lupenHauler" && totalOwned > 0 && currentShipId !== item.key ? `<button class="store-detail-buy-action" onclick="requestStagingShipEquip(getStoreSelectedItem())" ${multiplayerStagingShipEquipPending ? "disabled" : ""}>${multiplayerStagingShipEquipPending ? "Applying..." : "Fly LF-2 Hauler"}</button>` : ""}
+        ${stagingStoreLocked && item.kind === "ship" && stagingStoreItemId && totalOwned > 0 && currentShipId !== item.key ? `<button class="store-detail-buy-action" onclick="requestStagingShipEquip(getStoreSelectedItem())" ${multiplayerStagingShipEquipPending ? "disabled" : ""}>${multiplayerStagingShipEquipPending ? "Applying..." : `Fly ${escapeHtml(item.name)}`}</button>` : ""}
         ${sellButton}
       </div>
     </div>`;
@@ -3336,7 +3344,7 @@ function removeGun(index) {
 function buyShip(shipId) {
   if (isMultiplayerStagingStoreActive()) {
     const ship = SHIPS[shipId];
-    if (shipId === "lupenHauler" && ship && !ownedShips.includes(shipId)) {
+    if (ship && !ship.hiddenFromExchange && !ownedShips.includes(shipId) && getStagingStoreItemId({ kind: "ship", key: shipId })) {
       requestStagingStorePurchase({ kind: "ship", key: shipId });
       return;
     }
@@ -3374,7 +3382,7 @@ function buyShip(shipId) {
 function equipShip(shipId) {
   if (isMultiplayerStagingStoreActive()) {
     const ship = SHIPS[shipId];
-    if (shipId === "lupenHauler" && ship && ownedShips.includes(shipId) && currentShipId !== shipId) {
+    if (ship && !ship.hiddenFromExchange && ownedShips.includes(shipId) && currentShipId !== shipId && getStagingStoreItemId({ kind: "ship", key: shipId })) {
       requestStagingShipEquip({ kind: "ship", key: shipId });
       return;
     }
