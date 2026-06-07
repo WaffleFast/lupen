@@ -402,8 +402,8 @@ const SHIPS = {
     cargo: 320,
     jumpRecharge: 6,
     evasion: 0.04,
-    gunSlots: 10,
-    attachmentSlots: 10
+    gunSlots: 20,
+    attachmentSlots: 20
   },
   lupenOrigin: {
     id: "lupenOrigin",

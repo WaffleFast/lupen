@@ -48,7 +48,7 @@ const DEFAULT_ALLOWED_LOADOUT_ITEMS = STAGING_LOADOUT_ITEM_IDS.join(",");
 const STAGING_SHIP_CONFIG = Object.freeze({
   falcon: Object.freeze({ name: "F-1 Falcon", cargo: 60, shield: 220, attachmentSlots: 2, gunSlots: 2 }),
   bison: Object.freeze({ name: "B-1 Bison", cargo: 260, shield: 135, attachmentSlots: 3, gunSlots: 2 }),
-  monolith: Object.freeze({ name: "Monolith", cargo: 320, shield: 1800, attachmentSlots: 10, gunSlots: 10 }),
+  monolith: Object.freeze({ name: "Monolith", cargo: 320, shield: 1800, attachmentSlots: 20, gunSlots: 20 }),
   lupenOrigin: Object.freeze({ cargo: 150, shield: 100, attachmentSlots: 3, gunSlots: 2 }),
   lupenHauler: Object.freeze({ cargo: 260, shield: 90, attachmentSlots: 4, gunSlots: 1 }),
   lupenStriker: Object.freeze({ cargo: 100, shield: 130, attachmentSlots: 3, gunSlots: 3 }),
@@ -354,6 +354,7 @@ function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM
       equippedBefore,
       equippedAfter: equippedBefore,
       gunSlots: meta.listName === "guns" ? ship.gunSlots : undefined,
+      attachmentSlots: meta.listName === "attachments" ? ship.attachmentSlots : undefined,
       cargoCapacityBefore: meta.key === CARGO_POD_KEY ? getCargoCapacity(saveData, currentShipId, normalizedEntries) : undefined,
       cargoCapacityAfterPreview: meta.key === CARGO_POD_KEY ? getCargoCapacity(saveData, currentShipId, normalizedEntries) : undefined,
       shieldBefore: meta.key === SHIELD_BOOSTER_KEY ? getShieldCapacity(saveData, currentShipId, normalizedEntries) : undefined,
@@ -383,6 +384,7 @@ function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM
     equippedBefore,
     equippedAfter: equippedBefore + 1,
     gunSlots: meta.listName === "guns" ? ship.gunSlots : undefined,
+    attachmentSlots: meta.listName === "attachments" ? ship.attachmentSlots : undefined,
     patchedSaveData,
     appliedFields: [`${meta.ownedPath}.${meta.key}`, `shipLoadouts.${currentShipId}.${meta.listName}`],
     untouchedFields: ["credits", "inventoryItems", "ownedShips", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"]
