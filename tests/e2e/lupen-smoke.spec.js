@@ -226,10 +226,10 @@ test.describe("Lupen browser smoke", () => {
     });
 
     await expect(page.locator("#marketScreen")).toContainText(/Iron[\s\S]*Asteron Prime > Virella/);
-    await expect(page.locator("#marketScreen")).toContainText("60 units");
-    await expect(page.locator("#marketScreen")).toContainText("CR 1,080");
-    await expect(page.locator("#marketScreen")).toContainText("CR 1,800");
-    await expect(page.locator("#marketScreen")).toContainText("+CR 720");
+    await expect(page.locator("#marketScreen")).toContainText("63 units");
+    await expect(page.locator("#marketScreen")).toContainText("CR 1,134");
+    await expect(page.locator("#marketScreen")).toContainText("CR 1,890");
+    await expect(page.locator("#marketScreen")).toContainText("+CR 756");
 
     await page.evaluate(() => {
       window.eval(`

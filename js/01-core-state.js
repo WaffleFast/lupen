@@ -360,7 +360,7 @@ const SHIPS = {
     hull: 700,
     shield: 220,
     armor: 10,
-    cargo: 60,
+    cargo: 150,
     jumpRecharge: 15,
     evasion: 0.18,
     gunSlots: 2,

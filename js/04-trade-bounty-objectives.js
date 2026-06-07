@@ -994,9 +994,6 @@ function getOrderedMapOneMarketPlanets(currentPlanet = getCurrentMarketPlanet())
 function normalizeMarketBuilderState() {
   const currentPlanet = getCurrentMarketPlanet();
   if (isMultiplayerStagingActive()) requestMultiplayerStagingTradeOffersIfNeeded();
-  if (activeTradeRoute?.marketTrade && MAP_ONE_TRADE_RESOURCES.includes(activeTradeRoute.good)) {
-    selectedMarketResource = activeTradeRoute.good;
-  }
   const activeMarketTrade = activeTradeRoute?.marketTrade && activeTradeRoute.good === selectedMarketResource
     ? activeTradeRoute
     : null;
@@ -1007,9 +1004,6 @@ function normalizeMarketBuilderState() {
 
   if (isMultiplayerStagingActive() && getMultiplayerStagingTradeOffers().length) {
     const sellableCargo = getMultiplayerStagingSellableCargoAt(currentPlanet);
-    if (sellableCargo.length && !sellableCargo.includes(selectedMarketResource)) {
-      selectedMarketResource = sellableCargo[0];
-    }
     if (!canSelectMultiplayerStagingMarketResource(selectedMarketResource, currentPlanet)) {
       selectedMarketResource = sellableCargo[0] || getMultiplayerStagingBuyOffersAt(currentPlanet)[0]?.resourceName || selectedMarketResource;
     }
