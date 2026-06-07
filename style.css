@@ -37421,6 +37421,61 @@ input::placeholder {
   white-space: nowrap !important;
 }
 
+#hangarOverviewSection .equipment-slot.loadout-grid-slot > .quality-fx {
+  position: absolute !important;
+  inset: 4px !important;
+  z-index: 2 !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-grid !important;
+  pointer-events: none !important;
+}
+
+#hangarOverviewSection .equipment-slot.loadout-grid-slot > .quality-fx > span {
+  display: block !important;
+}
+
+#hangarOverviewSection .equipment-slot.loadout-grid-slot > .quality-fx .quality-fx__item {
+  width: min(64px, 82%) !important;
+  height: min(52px, 76%) !important;
+  max-width: min(64px, 82%) !important;
+  max-height: min(52px, 76%) !important;
+}
+
+#hangarOverviewSection .equipment-slot.loadout-grid-slot::before {
+  z-index: 6 !important;
+}
+
+#hangarOverviewSection .equipment-slot.loadout-grid-slot.filled::after {
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+
+#hangarOverviewSection .equipment-slot.loadout-grid-slot.selected {
+  z-index: 3 !important;
+}
+
+#hangarOverviewSection .loadout-vault-row > .quality-fx {
+  width: 50px !important;
+  height: 50px !important;
+  min-width: 50px !important;
+  align-self: center !important;
+  justify-self: center !important;
+  display: inline-grid !important;
+  pointer-events: none !important;
+}
+
+#hangarOverviewSection .loadout-vault-row > .quality-fx > span {
+  display: block !important;
+}
+
+#hangarOverviewSection .loadout-vault-row > .quality-fx .quality-fx__item {
+  width: 48px !important;
+  height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+}
+
 @media (max-height: 760px) {
   #hangarOverviewSection .orbit-loadout-arena.scalable-loadout-arena {
     grid-template-rows: 132px minmax(0, 1fr) !important;
@@ -40674,6 +40729,14 @@ input::placeholder {
   pointer-events: none;
 }
 
+.quality-fx,
+.quality-fx::before,
+.quality-fx::after,
+.quality-fx *,
+.quality-fx-host::after {
+  pointer-events: none !important;
+}
+
 .quality-fx--standard {
   --q: #45c8ff;
   --q2: #1d6dff;
@@ -41006,6 +41069,14 @@ input::placeholder {
 .upgrade-forge-screen .forge-selected-art .quality-fx {
   width: 100% !important;
   height: 100% !important;
+  pointer-events: none !important;
+}
+
+.upgrade-forge-screen .forge-picker-card > .quality-fx {
+  width: 64px !important;
+  height: 64px !important;
+  min-width: 64px !important;
+  pointer-events: none !important;
 }
 
 #storeScreen .store-card-art .quality-fx {
