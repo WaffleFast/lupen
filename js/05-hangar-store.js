@@ -40,6 +40,7 @@ let selectedLoadoutItemContext = null;
 let selectedLoadoutVaultFilter = "all";
 let selectedLoadoutVaultSearch = "";
 let selectedLoadoutVaultSort = "quality";
+let selectedShipyardFilter = "all";
 const LOADOUT_GRID_SLOT_COUNT = 20;
 const LOADOUT_VAULT_CAPACITY = 50;
 
@@ -2274,6 +2275,35 @@ function getShipyardClassMark(ship = {}) {
   return label.split(/\s+/).map(part => part[0]).join("").slice(0, 2) || "HX";
 }
 
+function setShipyardFilter(filter = "all") {
+  selectedShipyardFilter = ["owned", "unowned"].includes(filter) ? filter : "all";
+  const visibleShips = getFilteredExchangeShips();
+  if (visibleShips.length && !visibleShips.some(ship => ship.id === selectedShipyardShipId)) {
+    selectedShipyardShipId = visibleShips[0].id;
+  }
+  renderShipShop();
+}
+
+function getFilteredExchangeShips() {
+  return getExchangeShips().filter(ship => {
+    const owned = ownedShips.includes(ship.id);
+    if (selectedShipyardFilter === "owned") return owned;
+    if (selectedShipyardFilter === "unowned") return !owned;
+    return true;
+  });
+}
+
+function updateShipyardFilterButtons() {
+  [
+    ["shipyardFilterAll", "all"],
+    ["shipyardFilterOwned", "owned"],
+    ["shipyardFilterUnowned", "unowned"]
+  ].forEach(([id, filter]) => {
+    const button = document.getElementById(id);
+    if (button) button.classList.toggle("active", selectedShipyardFilter === filter);
+  });
+}
+
 function renderExchangeStatRail(shipId) {
   const stats = getShipStats(shipId);
   const statRows = [
@@ -2304,19 +2334,29 @@ function renderExchangeHardpointRail(shipId) {
   const guns = getGunSlotLimit(shipId);
   const equip = getAttachmentSlotLimit(shipId);
   return `
-    <div class="exchange-hardpoint-title">
-      <span>Hardpoints</span>
-      <strong>${guns} gun / ${equip} equip</strong>
+    <div class="exchange-capacity-card weapon-capacity">
+      <div class="exchange-capacity-strip">
+        <span>Guns</span>
+        <strong>${guns}</strong>
+        <div class="exchange-slot-pips">${renderExchangeSlotPips(guns)}</div>
+      </div>
+      <div class="exchange-capacity-copy">
+        <span>Weapons</span>
+        <strong>${guns} Slots</strong>
+        <small>${guns} gun slots</small>
+      </div>
     </div>
-    <div class="exchange-hardpoint-bank">
-      <span>Guns</span>
-      <strong>${guns}</strong>
-      <div class="exchange-slot-pips">${renderExchangeSlotPips(guns)}</div>
-    </div>
-    <div class="exchange-hardpoint-bank">
-      <span>Equip</span>
-      <strong>${equip}</strong>
-      <div class="exchange-slot-pips">${renderExchangeSlotPips(equip)}</div>
+    <div class="exchange-capacity-card equip-capacity">
+      <div class="exchange-capacity-strip">
+        <span>Equip</span>
+        <strong>${equip}</strong>
+        <div class="exchange-slot-pips">${renderExchangeSlotPips(equip)}</div>
+      </div>
+      <div class="exchange-capacity-copy">
+        <span>Attachments</span>
+        <strong>${equip} Slots</strong>
+        <small>${equip} equip slots</small>
+      </div>
     </div>
   `;
 }
@@ -2347,8 +2387,9 @@ function renderShipyardDetail() {
   }
 
   panel.innerHTML = `
-    <div class="fleet-detail-hero">
+    <div class="fleet-detail-hero exchange-detail-hero">
       <div class="fleet-detail-ship-glow"></div>
+      <div class="exchange-hero-ring"></div>
       <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
     </div>
 
@@ -2369,12 +2410,11 @@ function renderShipyardDetail() {
       ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
     </div>
 
-    <div class="shipyard-capacity-panel fleet-capacity-panel">
+    <div class="shipyard-capacity-panel fleet-capacity-panel exchange-loadout-capacity">
       <div class="shipyard-capacity-heading">
-        <span>Hardpoints</span>
-        <strong>${formatSlotCapacityShort(ship.id)}</strong>
+        <span>Loadout Capacity</span>
       </div>
-      ${renderShipSlotSummary(ship.id, "capacity")}
+      <div class="exchange-hardpoint-rail">${renderExchangeHardpointRail(ship.id)}</div>
     </div>
 
     <div class="fleet-detail-actions compact fleet-swap-actions shipyard-purchase-actions">
@@ -2394,6 +2434,7 @@ function renderShipShop() {
 
   const creditText = document.getElementById("shipyardCreditText");
   if (creditText) creditText.textContent = formatNumber(credits);
+  updateShipyardFilterButtons();
 
   if (!SHIPS[selectedShipyardShipId] || SHIPS[selectedShipyardShipId].hiddenFromExchange) {
     selectedShipyardShipId = getExchangeShips().find(ship => !ownedShips.includes(ship.id))?.id || currentShipId || (typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon");
@@ -2401,11 +2442,26 @@ function renderShipShop() {
 
   box.innerHTML = "";
 
-  getExchangeShips().forEach(ship => {
+  const visibleShips = getFilteredExchangeShips();
+  if (!visibleShips.length) {
+    box.innerHTML = `
+      <div class="vessel-empty-state">
+        <strong>No vessels found</strong>
+        <span>Try another ownership filter.</span>
+      </div>
+    `;
+    renderShipyardDetail();
+    return;
+  }
+
+  if (!visibleShips.some(ship => ship.id === selectedShipyardShipId)) {
+    selectedShipyardShipId = visibleShips[0].id;
+  }
+
+  visibleShips.forEach(ship => {
     const owned = ownedShips.includes(ship.id);
     const equipped = currentShipId === ship.id;
     const selected = selectedShipyardShipId === ship.id;
-    const stats = getShipStats(ship.id);
 
     const card = document.createElement("button");
     const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
@@ -2415,18 +2471,13 @@ function renderShipShop() {
     if (ship.id === starterShipId) card.dataset.tutorialTarget = "firstShipCard";
     card.onclick = () => selectShipyardShip(ship.id);
     card.innerHTML = `
-      <div class="fleet-card-badge">${equipped ? "In Use" : owned ? "Owned" : `CR ${formatNumber(ship.price)}`}</div>
+      <div class="fleet-card-badge">${equipped ? "In Use" : owned ? "Owned" : ship.price ? `CR ${formatNumber(ship.price)}` : "Unowned"}</div>
       <div class="fleet-card-image-wrap">
         <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
       <div class="fleet-card-role">${ship.roleSubtitle || getShipyardClassLabel(ship)}</div>
-      <div class="fleet-card-mini-stats">
-        <span>Hull ${formatNumber(stats.hull)}</span>
-        <span>Shield ${formatNumber(stats.shield)}</span>
-        <span>Cargo ${formatNumber(stats.cargo)}</span>
-      </div>
-      <div class="fleet-card-slots compact-fleet-slots">${renderShipSlotSummary(ship.id, "capacity")}</div>
+      <p class="vessel-card-description">${escapeHtml(ship.description || "Available hull for station exchange review.")}</p>
     `;
     box.appendChild(card);
   });
