@@ -2131,7 +2131,12 @@ function renderGunInventory() {
   updateLoadoutVaultChrome();
 
   if (!entries.length) {
-    box.innerHTML = `<div class="cargo-empty compact-empty">No compatible vault equipment</div>`;
+    box.innerHTML = `
+      <div class="loadout-vault-empty">
+        <strong>No compatible vault equipment</strong>
+        <span>Compatible spare gear will appear here.</span>
+      </div>
+    `;
     return;
   }
 
