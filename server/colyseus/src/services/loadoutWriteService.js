@@ -7,6 +7,8 @@
    inventoryItems, ships, loot, bounties, PvP/player damage, broad progression,
    schema, or RLS. */
 
+import { STAGING_SHIP_CONFIG } from "../config/stagingShipConfig.js";
+
 const PLAYER_SAVES_TABLE = "player_saves";
 const CARGO_POD_ITEM_ID = "attachment:cargoPod";
 const CARGO_POD_KEY = "cargoPod";
@@ -44,21 +46,6 @@ export const STAGING_LOADOUT_ITEM_IDS = Object.freeze([
   ...STAGING_SHIP_ITEMS.map((item) => item.itemId)
 ]);
 const DEFAULT_ALLOWED_LOADOUT_ITEMS = STAGING_LOADOUT_ITEM_IDS.join(",");
-
-const STAGING_SHIP_CONFIG = Object.freeze({
-  falcon: Object.freeze({ name: "F-1 Falcon", cargo: 60, shield: 220, attachmentSlots: 2, gunSlots: 2 }),
-  bison: Object.freeze({ name: "B-1 Bison", cargo: 260, shield: 135, attachmentSlots: 3, gunSlots: 2 }),
-  monolith: Object.freeze({ name: "Monolith", cargo: 320, shield: 1800, attachmentSlots: 20, gunSlots: 20 }),
-  lupenOrigin: Object.freeze({ cargo: 150, shield: 100, attachmentSlots: 3, gunSlots: 2 }),
-  lupenHauler: Object.freeze({ cargo: 260, shield: 90, attachmentSlots: 4, gunSlots: 1 }),
-  lupenStriker: Object.freeze({ cargo: 100, shield: 130, attachmentSlots: 3, gunSlots: 3 }),
-  hermesCourier: Object.freeze({ cargo: 190, shield: 110, attachmentSlots: 3, gunSlots: 2 }),
-  athenaSentinel: Object.freeze({ cargo: 140, shield: 240, attachmentSlots: 4, gunSlots: 2 }),
-  aresVindicator: Object.freeze({ cargo: 90, shield: 150, attachmentSlots: 3, gunSlots: 4 }),
-  hephaestusTrader: Object.freeze({ cargo: 360, shield: 120, attachmentSlots: 6, gunSlots: 2 }),
-  poseidonAggressor: Object.freeze({ cargo: 120, shield: 190, attachmentSlots: 4, gunSlots: 5 }),
-  zeusExplorer: Object.freeze({ cargo: 220, shield: 185, attachmentSlots: 6, gunSlots: 3 })
-});
 
 function getString(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;

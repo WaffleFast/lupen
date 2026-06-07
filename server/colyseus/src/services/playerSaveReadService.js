@@ -3,6 +3,8 @@
    never writes player_saves, and returns sanitized trade validation fields
    instead of raw save snapshots. */
 
+import { STAGING_SHIP_CARGO } from "../config/stagingShipConfig.js";
+
 const PLAYER_SAVES_TABLE = "player_saves";
 const CARGO_KEYS = Object.freeze([
   "Iron",
@@ -24,21 +26,6 @@ function normalizeCargoResourceKey(value) {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ");
 }
-
-const STAGING_SHIP_CARGO = Object.freeze({
-  falcon: 60,
-  bison: 260,
-  monolith: 320,
-  lupenOrigin: 150,
-  lupenHauler: 260,
-  lupenStriker: 100,
-  hermesCourier: 190,
-  athenaSentinel: 140,
-  aresVindicator: 90,
-  hephaestusTrader: 360,
-  poseidonAggressor: 120,
-  zeusExplorer: 220
-});
 
 const CARGO_POD_CARGO_BONUS = 25;
 

@@ -653,6 +653,33 @@ async function assertStagingTradeValidationHelpers() {
   assert(derivedStarterCapacity.validationState.cargoCapacity === 150, "Starter cargo capacity was not derived from currentShipId.");
   assert(derivedStarterCapacity.stateSources.cargoCapacity === "trusted_save_derived", "Derived starter cargo capacity source was not marked.");
 
+  const derivedFalconCapacity = extractTradeValidationStateFromSave({
+    credits: 10000,
+    cargo: {
+      Iron: 0,
+      Copper: 0,
+      Cobalt: 0,
+      "Crystal Shards": 0
+    },
+    cargoCostBasis: {
+      Iron: 0,
+      Copper: 0,
+      Cobalt: 0,
+      "Crystal Shards": 0
+    },
+    currentShipId: "falcon",
+    ownedShips: ["falcon"],
+    shipLoadouts: {
+      falcon: {
+        attachments: [],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  });
+  assert(derivedFalconCapacity.available === true, "Falcon trade save state with derived capacity was not available.");
+  assert(derivedFalconCapacity.validationState.cargoCapacity === 150, "Falcon cargo capacity was not derived as 150.");
+  assert(derivedFalconCapacity.stateSources.cargoCapacity === "trusted_save_derived", "Falcon cargo capacity source was not marked derived.");
+
   const derivedCargoPodCapacity = extractTradeValidationStateFromSave({
     credits: 10000,
     cargo: {
@@ -670,6 +697,26 @@ async function assertStagingTradeValidationHelpers() {
   });
   assert(derivedCargoPodCapacity.available === true, "Cargo Pod trade save state with derived capacity was not available.");
   assert(derivedCargoPodCapacity.validationState.cargoCapacity === 175, "Cargo Pod capacity was not derived from saved loadout.");
+
+  const derivedFalconCargoPodCapacity = extractTradeValidationStateFromSave({
+    credits: 10000,
+    cargo: {
+      "Crystal Shards": 0
+    },
+    cargoCostBasis: {
+      "Crystal Shards": 0
+    },
+    currentShipId: "falcon",
+    ownedShips: ["falcon"],
+    shipLoadouts: {
+      falcon: {
+        attachments: [{ key: "cargoPod", quality: "standard", level: 1 }],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  });
+  assert(derivedFalconCargoPodCapacity.available === true, "Falcon Cargo Pod trade save state was not available.");
+  assert(derivedFalconCargoPodCapacity.validationState.cargoCapacity === 175, "Falcon Cargo Pod bonus did not add +25 cargo capacity.");
 
   const malformed = extractTradeValidationStateFromSave({
     cargo: {
@@ -1072,6 +1119,45 @@ async function assertStagingTradeValidationHelpers() {
   assert(patchPlan.patchedSaveData.activeBountyId === "bounty-1", "Trade buy patch changed bounty state.");
   assert(patchPlan.patchedSaveData.playerProgress.combatXp === 77, "Trade buy patch changed progression.");
   assert(patchPlan.patchedSaveData.nested.untouched === true, "Trade buy patch changed unrelated fields.");
+
+  const falconCrystalBuyPlan = buildStagingTradeBuySavePatch({
+    credits: 10000,
+    cargo: {
+      "Crystal Shards": 0
+    },
+    cargoCostBasis: {
+      "Crystal Shards": 0
+    }
+  }, {
+    offerId: "asteron-prime-crystal-shards-virella",
+    resourceId: "crystal-shards",
+    resourceName: "Crystal Shards",
+    buyPrice: 30
+  }, 105, {
+    cargoCapacity: 150
+  });
+  assert(falconCrystalBuyPlan.ok === true, `Falcon 105 Crystal Shards buy was blocked: ${falconCrystalBuyPlan.reason}`);
+  assert(falconCrystalBuyPlan.cargoUsedBefore === 0 && falconCrystalBuyPlan.cargoUsedAfter === 105, "Falcon 105 Crystal Shards buy did not use 105/150 cargo.");
+  assert(falconCrystalBuyPlan.cargoCapacity === 150, "Falcon 105 Crystal Shards buy did not trust 150 cargo capacity.");
+
+  const falconOverCapacityBuyPlan = buildStagingTradeBuySavePatch({
+    credits: 10000,
+    cargo: {
+      "Crystal Shards": 0
+    },
+    cargoCostBasis: {
+      "Crystal Shards": 0
+    }
+  }, {
+    offerId: "asteron-prime-crystal-shards-virella",
+    resourceId: "crystal-shards",
+    resourceName: "Crystal Shards",
+    buyPrice: 30
+  }, 151, {
+    cargoCapacity: 150
+  });
+  assert(falconOverCapacityBuyPlan.ok === false, "Falcon over-capacity Crystal Shards buy was not blocked.");
+  assert(falconOverCapacityBuyPlan.reason === "insufficient_cargo", `Unexpected Falcon over-capacity reason: ${falconOverCapacityBuyPlan.reason}`);
 
   const invalidPatch = buildStagingTradeBuySavePatch({
     credits: 1000,
