@@ -342,7 +342,7 @@ function renderEquippedLoadoutView() {
         <div class="loadout-slot-bank gun-slot-bank" aria-label="Gun slots">${gunSlotHtml}</div>
         <div class="equipped-ship-core">
           <div class="equipped-ship-ring"></div>
-          <img src="${ship.image}" alt="${ship.name}">
+          <img src="${typeof getShipAsset === "function" ? getShipAsset(currentShipId, "medium") : ship.image}" alt="${ship.name}">
           <strong>${ship.name}</strong>
           <span>${gunSlots} gun / ${attachmentSlots} attachment slots</span>
         </div>
@@ -368,7 +368,7 @@ function renderLoadoutSlotDetail() {
   if (!selectedLoadoutDetail) {
     detail.innerHTML = `
       <div class="inventory-detail-title compact-loadout-title">
-        <img src="${ship.image}" alt="${ship.name}">
+        <img src="${typeof getShipAsset === "function" ? getShipAsset(currentShipId, "small") : ship.image}" alt="${ship.name}">
         <div><strong>Current Loadout</strong><span>Click an equipped item to inspect stats</span></div>
       </div>
       <div class="inventory-detail-stats">
@@ -721,15 +721,16 @@ function getMultiplayerPresencePayload() {
     ? loadout.guns.map((entry) => typeof entry === "string" ? entry : entry?.key).filter(Boolean)
     : [];
   const shipName = ship.name || "";
+  const shipImage = typeof getShipAsset === "function" ? getShipAsset(currentShipId, "medium") : (ship.image || "");
   return {
     currentNode,
     x: Number.isFinite(Number(node.x)) ? Number(node.x) : 50,
     y: Number.isFinite(Number(node.y)) ? Number(node.y) : 50,
     displayName: getPilotName(),
     currentShipId: currentShipId || "",
-    shipImage: ship.image || "",
-    shipImageSrc: ship.image || "",
-    shipImagePath: ship.image || "",
+    shipImage,
+    shipImageSrc: shipImage,
+    shipImagePath: shipImage,
     shipClass: ship.roleSubtitle || "",
     shipName,
     ship: shipName,
@@ -935,7 +936,7 @@ function updateSpaceHUD() {
 
   const shipImage = document.getElementById("hudShipImage");
   if (shipImage) {
-    shipImage.src = ship.image;
+    shipImage.src = typeof getShipAsset === "function" ? getShipAsset(currentShipId, "small") : ship.image;
     shipImage.alt = ship.name;
   }
 

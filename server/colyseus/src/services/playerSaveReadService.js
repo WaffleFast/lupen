@@ -26,6 +26,9 @@ function normalizeCargoResourceKey(value) {
 }
 
 const STAGING_SHIP_CARGO = Object.freeze({
+  falcon: 60,
+  bison: 260,
+  monolith: 320,
   lupenOrigin: 150,
   lupenHauler: 260,
   lupenStriker: 100,

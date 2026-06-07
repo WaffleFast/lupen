@@ -2597,8 +2597,8 @@ export class LupenSectorRoom extends Room {
       applied: false,
       dryRun: true,
       itemId,
-      name: itemId === "ship:lupenHauler" ? "LF-2 Hauler" : itemId === "gun:pulseLaser" ? "Pulse Laser" : itemId === "attachment:shieldBooster" ? "Shield Booster" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
-      category: itemId === "ship:lupenHauler" ? "ship" : itemId === "gun:pulseLaser" ? "weapon" : "equipment",
+      name: itemId === "ship:falcon" ? "F-1 Falcon" : itemId === "ship:bison" ? "B-1 Bison" : itemId === "ship:monolith" ? "Monolith" : itemId === "gun:pulseLaser" ? "Pulse Laser" : itemId === "attachment:shieldBooster" ? "Shield Booster" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
+      category: itemId.startsWith("ship:") ? "ship" : itemId === "gun:pulseLaser" ? "weapon" : "equipment",
       validationMode: trustedState?.available ? "trusted_save" : "unknown",
       trustedStateAvailable: trustedState?.available === true,
       gates,
@@ -2625,7 +2625,7 @@ export class LupenSectorRoom extends Room {
 
     if (wantsWrite &&
       STAGING_LOADOUT_WRITE_ITEM_IDS.has(itemId) &&
-      !(operation === "unequip" && itemId === "ship:lupenHauler") &&
+      !(operation === "unequip" && itemId.startsWith("ship:")) &&
       gates.writeEnabled === true &&
       gates.dryRun === false &&
       gates.verified === true &&
@@ -2650,7 +2650,7 @@ export class LupenSectorRoom extends Room {
 
     let reason = !STAGING_LOADOUT_WRITE_ITEM_IDS.has(itemId)
       ? "unknown_loadout_item"
-      : operation === "unequip" && itemId === "ship:lupenHauler"
+      : operation === "unequip" && itemId.startsWith("ship:")
         ? "unknown_loadout_item"
       : wantsWrite && player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun
         ? "staging_mode_required_for_loadout_write"

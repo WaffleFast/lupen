@@ -34,6 +34,9 @@
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const shipImageById = {
+    falcon: "assets/ships/falcon/falcon-medium.webp",
+    bison: "assets/ships/bison/bison-medium.webp",
+    monolith: "assets/ships/monolith/monolith-medium.webp",
     lupenOrigin: "assets/ships/lupen-origin.png",
     lupenHauler: "assets/ships/lupen-hauler.png",
     lupenStriker: "assets/ships/lupen-striker.png",
@@ -47,6 +50,11 @@
     cobraMoth: "assets/ships/cobra-moth.png"
   };
   const shipImageByName = {
+    "falcon": shipImageById.falcon,
+    "f-1 falcon": shipImageById.falcon,
+    "bison": shipImageById.bison,
+    "b-1 bison": shipImageById.bison,
+    "monolith": shipImageById.monolith,
     "lf 1 origin": shipImageById.lupenOrigin,
     "lf-1 origin": shipImageById.lupenOrigin,
     "hauler": shipImageById.lupenHauler,
@@ -3330,12 +3338,12 @@
       if (loadoutEquip) {
         const isWeaponEquip = String(loadoutEquip.itemId || "").startsWith("gun:");
         const isShieldEquip = String(loadoutEquip.itemId || "") === "attachment:shieldBooster";
-        const isShipEquip = String(loadoutEquip.itemId || "") === "ship:lupenHauler";
+        const isShipEquip = String(loadoutEquip.itemId || "").startsWith("ship:");
         const equipLabel = isShipEquip ? "ship select" : isWeaponEquip ? "weapon equip" : isShieldEquip ? "shield equip" : "cargo pod equip";
         const appliedLine = isWeaponEquip
           ? `applied / guns ${formatTradeNumber(loadoutEquip.equippedBefore)} -> ${formatTradeNumber(loadoutEquip.equippedAfter)}`
           : isShipEquip
-            ? `applied / ${loadoutEquip.selectedShipBefore || loadoutEquip.currentShipId || "ship"} -> ${loadoutEquip.selectedShipAfter || loadoutEquip.targetShipId || "lupenHauler"}`
+            ? `applied / ${loadoutEquip.selectedShipBefore || loadoutEquip.currentShipId || "ship"} -> ${loadoutEquip.selectedShipAfter || loadoutEquip.targetShipId || "ship"}`
           : isShieldEquip
             ? `applied / shield ${formatTradeNumber(loadoutEquip.shieldBefore)} -> ${formatTradeNumber(loadoutEquip.shieldAfter)}`
           : `applied / cargo ${formatTradeNumber(loadoutEquip.cargoCapacityBefore)} -> ${formatTradeNumber(loadoutEquip.cargoCapacityAfter)}`;

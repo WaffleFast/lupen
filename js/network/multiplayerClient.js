@@ -2832,13 +2832,13 @@
 
     previewStagingShipEquip(options = {}) {
       return sendRoomMessage("previewStagingShipEquip", "stagingLoadout:previewEquip", {
-        itemId: String(options.itemId || "ship:lupenHauler")
+        itemId: String(options.itemId || "ship:falcon")
       });
     },
 
     equipStagingShip(options = {}) {
       return sendRoomMessage("equipStagingShip", "stagingLoadout:equipAttachment", {
-        itemId: String(options.itemId || "ship:lupenHauler")
+        itemId: String(options.itemId || "ship:falcon")
       });
     },
 

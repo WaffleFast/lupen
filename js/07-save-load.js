@@ -375,9 +375,11 @@ function getLocalSavePayloadForCloudMigration() {
 function hasMeaningfulLocalSave(saved = getLocalSavePayloadForCloudMigration()) {
   if (!saved) return false;
 
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const starterShipIds = new Set([starterShipId, "lupenOrigin"]);
   const ownedShipIds = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : [];
-  const hasNonStarterShip = ownedShipIds.some(shipId => shipId !== "lupenOrigin");
-  const hasOnlyDefaultStarterShip = ownedShipIds.length === 1 && ownedShipIds[0] === "lupenOrigin";
+  const hasNonStarterShip = ownedShipIds.some(shipId => !starterShipIds.has(shipId));
+  const hasOnlyDefaultStarterShip = ownedShipIds.length === 1 && starterShipIds.has(ownedShipIds[0]);
   const progressTotals = saved.playerProgress?.totals || {};
   const hasProgressTotals = Object.values(progressTotals).some(value => Number(value || 0) > 0);
   const hasCombatXp = Number(saved.playerProgress?.combatXp || 0) > 0;
@@ -560,11 +562,14 @@ function applyLoadedGameState(rawSaved) {
   upgradeMaterials = normalizeUpgradeMaterials(saved.upgradeMaterials);
   cargoCostBasis = saved.cargoCostBasis ?? cargoCostBasis;
 
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   ownedShips = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : ownedShips;
-  currentShipId = SHIPS[saved.currentShipId] && ownedShips.includes(saved.currentShipId) ? saved.currentShipId : (ownedShips[0] || "");
-  selectedHangarShipId = SHIPS[saved.selectedHangarShipId] ? saved.selectedHangarShipId : (currentShipId || "lupenOrigin");
-  selectedFleetShipId = SHIPS[saved.selectedFleetShipId] ? saved.selectedFleetShipId : (currentShipId || "lupenOrigin");
+  if (!ownedShips.length && SHIPS[starterShipId]) ownedShips = [starterShipId];
+  currentShipId = SHIPS[saved.currentShipId] && ownedShips.includes(saved.currentShipId) ? saved.currentShipId : (ownedShips[0] || starterShipId);
+  selectedHangarShipId = SHIPS[saved.selectedHangarShipId] ? saved.selectedHangarShipId : (currentShipId || starterShipId);
+  selectedFleetShipId = SHIPS[saved.selectedFleetShipId] ? saved.selectedFleetShipId : (currentShipId || starterShipId);
   shipLoadouts = saved.shipLoadouts && typeof saved.shipLoadouts === "object" ? saved.shipLoadouts : shipLoadouts;
+  if (currentShipId && !shipLoadouts[currentShipId]) shipLoadouts[currentShipId] = normalizeShipLoadout(undefined, currentShipId);
   activeTradeRoute = saved.activeTradeRoute && sectorNodes[saved.activeTradeRoute.origin] && sectorNodes[saved.activeTradeRoute.destination] ? {
     ...saved.activeTradeRoute,
     maxUnits: Number(saved.activeTradeRoute.maxUnits || getShipStats().cargo || 0),
@@ -757,12 +762,13 @@ function debugSkipTutorial() {
 }
 
 function debugGrantStarter() {
-  if (!ownedShips.includes("lupenOrigin")) ownedShips.push("lupenOrigin");
-  currentShipId = "lupenOrigin";
-  selectedHangarShipId = "lupenOrigin";
-  selectedFleetShipId = "lupenOrigin";
-  selectedShipyardShipId = "lupenOrigin";
-  shipLoadouts.lupenOrigin = normalizeShipLoadout(shipLoadouts.lupenOrigin, "lupenOrigin");
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  if (!ownedShips.includes(starterShipId)) ownedShips.push(starterShipId);
+  currentShipId = starterShipId;
+  selectedHangarShipId = starterShipId;
+  selectedFleetShipId = starterShipId;
+  selectedShipyardShipId = starterShipId;
+  shipLoadouts[starterShipId] = normalizeShipLoadout(shipLoadouts[starterShipId], starterShipId);
   if (typeof grantStarterShipKit === "function") grantStarterShipKit();
   if (typeof applyShipStats === "function") applyShipStats(true);
   jumpCharge = jumpMax;

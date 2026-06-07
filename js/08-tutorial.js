@@ -537,7 +537,8 @@ function getDynamicTutorialTarget(step) {
   }
 
   if (step.target === "tutorial:firstShipBuy") {
-    return document.querySelector(".buy-ship-action:not(:disabled)") || document.querySelector(".vessel-exchange-card[data-ship-id='lupenOrigin']");
+    const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+    return document.querySelector(".buy-ship-action:not(:disabled)") || document.querySelector(`.vessel-exchange-card[data-ship-id='${starterShipId}']`);
   }
 
   if (step.target === "tutorial:firstGun") {
@@ -962,8 +963,9 @@ function renderStarterTutorial() {
 
   const step = getCurrentTutorialStep();
 
-  if (step?.id === "buy-first-ship" && !hasActiveShip() && selectedShipyardShipId !== "lupenOrigin") {
-    selectedShipyardShipId = "lupenOrigin";
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  if (step?.id === "buy-first-ship" && !hasActiveShip() && selectedShipyardShipId !== starterShipId) {
+    selectedShipyardShipId = starterShipId;
     if (document.getElementById("hangarShipyardSection")?.classList.contains("active")) {
       renderShipShop();
     }

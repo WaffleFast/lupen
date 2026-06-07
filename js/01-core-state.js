@@ -311,7 +311,100 @@ function migrateSavedGame(saved) {
   return migrated;
 }
 
+const STARTER_SHIP_ID = "falcon";
+const SHIP_ASSET_MANIFEST = Object.freeze({
+  falcon: Object.freeze({
+    master: "assets/ships/falcon/falcon-master.webp",
+    large: "assets/ships/falcon/falcon-large.webp",
+    medium: "assets/ships/falcon/falcon-medium.webp",
+    small: "assets/ships/falcon/falcon-small.webp"
+  }),
+  bison: Object.freeze({
+    master: "assets/ships/bison/bison-master.webp",
+    large: "assets/ships/bison/bison-large.webp",
+    medium: "assets/ships/bison/bison-medium.webp",
+    small: "assets/ships/bison/bison-small.webp"
+  }),
+  monolith: Object.freeze({
+    master: "assets/ships/monolith/monolith-master.webp",
+    large: "assets/ships/monolith/monolith-large.webp",
+    medium: "assets/ships/monolith/monolith-medium.webp",
+    small: "assets/ships/monolith/monolith-small.webp"
+  })
+});
+const SHIP_ASSET_SIZE_FALLBACKS = Object.freeze({
+  master: Object.freeze(["master", "large", "medium", "small"]),
+  large: Object.freeze(["large", "master", "medium", "small"]),
+  medium: Object.freeze(["medium", "large", "small", "master"]),
+  small: Object.freeze(["small", "medium", "large", "master"])
+});
+
+function getShipAsset(shipId, size = "medium") {
+  const manifest = SHIP_ASSET_MANIFEST[shipId] || SHIP_ASSET_MANIFEST[STARTER_SHIP_ID] || {};
+  const order = SHIP_ASSET_SIZE_FALLBACKS[size] || SHIP_ASSET_SIZE_FALLBACKS.medium;
+  const path = order.map(key => manifest[key]).find(Boolean);
+  return path || "assets/ships/falcon/falcon-medium.webp";
+}
+
 const SHIPS = {
+  falcon: {
+    id: "falcon",
+    name: "F-1 Falcon",
+    manufacturer: "Lupen Foundry",
+    role: "Starter Fighter / Interceptor",
+    roleSubtitle: "Starter Fighter / Interceptor",
+    description: "Fast starter combat ship with low cargo and agile handling.",
+    image: getShipAsset("falcon", "medium"),
+    assets: SHIP_ASSET_MANIFEST.falcon,
+    price: 0,
+    hull: 700,
+    shield: 220,
+    armor: 10,
+    cargo: 60,
+    jumpRecharge: 15,
+    evasion: 0.18,
+    gunSlots: 2,
+    attachmentSlots: 2,
+    defaultGun: "pulseLaser"
+  },
+  bison: {
+    id: "bison",
+    name: "B-1 Bison",
+    manufacturer: "Lupen Foundry",
+    role: "Cargo / Trader",
+    roleSubtitle: "Cargo / Trader",
+    description: "Durable early cargo ship with strong hold capacity and modest combat ability.",
+    image: getShipAsset("bison", "medium"),
+    assets: SHIP_ASSET_MANIFEST.bison,
+    price: 12000,
+    hull: 1300,
+    shield: 135,
+    armor: 18,
+    cargo: 260,
+    jumpRecharge: 8,
+    evasion: 0.05,
+    gunSlots: 2,
+    attachmentSlots: 3
+  },
+  monolith: {
+    id: "monolith",
+    name: "Monolith",
+    manufacturer: "Unknown Ancient-Tech",
+    role: "Ancient-Tech Endgame Ship",
+    roleSubtitle: "Ancient-Tech Endgame Ship",
+    description: "Rare endgame ancient-tech warship with extreme loadout capacity.",
+    image: getShipAsset("monolith", "medium"),
+    assets: SHIP_ASSET_MANIFEST.monolith,
+    price: 250000,
+    hull: 4200,
+    shield: 1800,
+    armor: 70,
+    cargo: 320,
+    jumpRecharge: 6,
+    evasion: 0.04,
+    gunSlots: 10,
+    attachmentSlots: 10
+  },
   lupenOrigin: {
     id: "lupenOrigin",
     name: "LF-1 Origin",
@@ -327,7 +420,9 @@ const SHIPS = {
     jumpRecharge: 11,
     evasion: 0.10,
     gunSlots: 2,
-    attachmentSlots: 3
+    attachmentSlots: 3,
+    hiddenFromExchange: true,
+    legacy: true
   },
   lupenHauler: {
     id: "lupenHauler",
@@ -344,7 +439,9 @@ const SHIPS = {
     jumpRecharge: 8,
     evasion: 0.05,
     gunSlots: 1,
-    attachmentSlots: 4
+    attachmentSlots: 4,
+    hiddenFromExchange: true,
+    legacy: true
   },
   lupenStriker: {
     id: "lupenStriker",
@@ -361,7 +458,9 @@ const SHIPS = {
     jumpRecharge: 15,
     evasion: 0.28,
     gunSlots: 3,
-    attachmentSlots: 3
+    attachmentSlots: 3,
+    hiddenFromExchange: true,
+    legacy: true
   },
   hermesCourier: {
     id: "hermesCourier",
@@ -378,7 +477,9 @@ const SHIPS = {
     jumpRecharge: 18,
     evasion: 34,
     gunSlots: 2,
-    attachmentSlots: 3
+    attachmentSlots: 3,
+    hiddenFromExchange: true,
+    legacy: true
   },
   athenaSentinel: {
     id: "athenaSentinel",
@@ -395,7 +496,9 @@ const SHIPS = {
     jumpRecharge: 10,
     evasion: 14,
     gunSlots: 2,
-    attachmentSlots: 4
+    attachmentSlots: 4,
+    hiddenFromExchange: true,
+    legacy: true
   },
   aresVindicator: {
     id: "aresVindicator",
@@ -412,7 +515,9 @@ const SHIPS = {
     jumpRecharge: 12,
     evasion: 20,
     gunSlots: 4,
-    attachmentSlots: 3
+    attachmentSlots: 3,
+    hiddenFromExchange: true,
+    legacy: true
   },
   hephaestusTrader: {
     id: "hephaestusTrader",
@@ -429,7 +534,9 @@ const SHIPS = {
     jumpRecharge: 8,
     evasion: 8,
     gunSlots: 2,
-    attachmentSlots: 6
+    attachmentSlots: 6,
+    hiddenFromExchange: true,
+    legacy: true
   },
   poseidonAggressor: {
     id: "poseidonAggressor",
@@ -446,7 +553,9 @@ const SHIPS = {
     jumpRecharge: 12,
     evasion: 18,
     gunSlots: 5,
-    attachmentSlots: 4
+    attachmentSlots: 4,
+    hiddenFromExchange: true,
+    legacy: true
   },
   zeusExplorer: {
     id: "zeusExplorer",
@@ -463,7 +572,9 @@ const SHIPS = {
     jumpRecharge: 20,
     evasion: 24,
     gunSlots: 3,
-    attachmentSlots: 6
+    attachmentSlots: 6,
+    hiddenFromExchange: true,
+    legacy: true
   }
 };
 
@@ -518,11 +629,11 @@ let currentNode = "Asteron Prime";
 let lastPlanetNode = "Asteron Prime";
 let homePlanet = "Asteron Prime";
 let credits = 10000;
-let currentShipId = "lupenOrigin";
-let ownedShips = ["lupenOrigin"];
-let selectedHangarShipId = "lupenOrigin";
-let selectedFleetShipId = "lupenOrigin";
-let selectedShipyardShipId = "lupenOrigin";
+let currentShipId = STARTER_SHIP_ID;
+let ownedShips = [STARTER_SHIP_ID];
+let selectedHangarShipId = STARTER_SHIP_ID;
+let selectedFleetShipId = STARTER_SHIP_ID;
+let selectedShipyardShipId = STARTER_SHIP_ID;
 let stationVaultWasClearedThisSession = false;
 let installedAttachments = [];
 let ownedAttachments = {
@@ -536,7 +647,7 @@ let ownedGuns = {
   pulseLaser: 0,
   heavyPulseLaser: 0
 };
-let shipLoadouts = { lupenOrigin: { attachments: [], guns: ["pulseLaser"] } };
+let shipLoadouts = { [STARTER_SHIP_ID]: { attachments: [], guns: ["pulseLaser"] } };
 
 const cargo = {
   "Iron": 0,

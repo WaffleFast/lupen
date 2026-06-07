@@ -326,12 +326,13 @@ function resetToNoShipStarterState() {
   mineralKeys.forEach(mineral => { cargo[mineral] = 0; });
   cargoCostBasis = {};
 
-  currentShipId = "";
-  selectedHangarShipId = "lupenOrigin";
-  selectedFleetShipId = "lupenOrigin";
-  selectedShipyardShipId = "lupenOrigin";
-  ownedShips = [];
-  shipLoadouts = {};
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  currentShipId = starterShipId;
+  selectedHangarShipId = starterShipId;
+  selectedFleetShipId = starterShipId;
+  selectedShipyardShipId = starterShipId;
+  ownedShips = [starterShipId];
+  shipLoadouts = { [starterShipId]: { attachments: [], guns: ["pulseLaser"] } };
 
   Object.keys(ownedAttachments || {}).forEach(key => { ownedAttachments[key] = 0; });
   Object.keys(ownedGuns || {}).forEach(key => { ownedGuns[key] = 0; });
@@ -725,7 +726,7 @@ function getCurrentShip() {
     manufacturer: "Unassigned",
     roleSubtitle: "Purchase your first hull",
     description: "No active vessel.",
-    image: "assets/ships/lupen-origin.png",
+    image: typeof getShipAsset === "function" ? getShipAsset(STARTER_SHIP_ID, "medium") : "assets/ships/falcon/falcon-medium.webp",
     price: 0,
     hull: 0,
     shield: 0,
@@ -804,7 +805,8 @@ function getScaledAttachmentEffect(key, quality = "standard", level = 1) {
 }
 
 function normalizeShipLoadout(loadout, shipId) {
-  const ship = SHIPS[shipId] || SHIPS.lupenOrigin;
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const ship = SHIPS[shipId] || SHIPS[starterShipId] || SHIPS.lupenOrigin;
 
   if (Array.isArray(loadout)) {
     return {
@@ -1016,7 +1018,7 @@ function showHangarSection(sectionName) {
 
   if (sectionName === "shipyard") {
     if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && !hasActiveShip()) {
-      selectedShipyardShipId = "lupenOrigin";
+      selectedShipyardShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
     }
     tutorialEvent("openedVesselExchange");
     renderShipShop();
@@ -1155,8 +1157,9 @@ function openStore() {
 
 function openHangar() {
   tutorialEvent("openedHangar");
-  selectedHangarShipId = currentShipId || "lupenOrigin";
-  selectedShipyardShipId = currentShipId || selectedShipyardShipId || "lupenOrigin";
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  selectedHangarShipId = currentShipId || starterShipId;
+  selectedShipyardShipId = currentShipId || selectedShipyardShipId || starterShipId;
   renderHangar();
   showScreen("hangarScreen");
   showHangarSection(hasActiveShip() ? "overview" : "shipyard");
