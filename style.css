@@ -37072,15 +37072,21 @@ input::placeholder {
 #hangarShipyardSection #shipyardDetailPanel .exchange-detail-loadout .exchange-slot-pips {
   display: grid !important;
   grid-auto-flow: row !important;
-  grid-template-columns: repeat(10, 6px) !important;
-  grid-template-rows: repeat(2, 8px) !important;
-  grid-auto-rows: 8px !important;
-  place-content: center !important;
-  justify-content: center !important;
-  align-content: center !important;
-  gap: 5px !important;
+  grid-template-columns: repeat(10, 10px) !important;
+  grid-template-rows: repeat(2, 5px) !important;
+  grid-auto-rows: 5px !important;
+  place-content: start !important;
+  justify-content: start !important;
+  align-content: start !important;
+  gap: 5px 4px !important;
   min-width: 0 !important;
-  padding: 8px 10px !important;
+  padding: 8px 11px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-loadout .exchange-slot-pip {
+  width: 10px !important;
+  height: 4px !important;
+  border-radius: 999px !important;
 }
 
 /* ===== Vessel Exchange final slot summary + footer alignment ===== */
@@ -38465,19 +38471,20 @@ input::placeholder {
 #hangarOwnedSection .exchange-detail-loadout .exchange-slot-pips {
   display: grid !important;
   grid-auto-flow: row !important;
-  grid-template-columns: repeat(10, 6px) !important;
-  grid-template-rows: repeat(2, 8px) !important;
-  grid-auto-rows: 8px !important;
-  place-content: center !important;
-  justify-content: center !important;
-  align-content: center !important;
-  gap: 5px !important;
-  padding: 8px 10px !important;
+  grid-template-columns: repeat(10, 10px) !important;
+  grid-template-rows: repeat(2, 5px) !important;
+  grid-auto-rows: 5px !important;
+  place-content: start !important;
+  justify-content: start !important;
+  align-content: start !important;
+  gap: 5px 4px !important;
+  padding: 8px 11px !important;
 }
 
 #hangarOwnedSection .exchange-detail-loadout .exchange-slot-pip {
-  width: 6px !important;
-  height: 8px !important;
+  width: 10px !important;
+  height: 4px !important;
+  border-radius: 999px !important;
 }
 
 #hangarOwnedSection .exchange-detail-loadout .exchange-slot-pip.filled {
@@ -38518,6 +38525,31 @@ input::placeholder {
   border-color: rgba(76, 210, 255, 0.48) !important;
   background: linear-gradient(180deg, rgba(7, 67, 126, 0.9), rgba(3, 31, 70, 0.94)) !important;
   color: #ffffff !important;
+}
+
+/* ===== Shared Hangar detail slot marker alignment ===== */
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-loadout .exchange-slot-pips,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-loadout .exchange-slot-pips {
+  display: grid !important;
+  grid-auto-flow: row !important;
+  grid-template-columns: repeat(10, 10px) !important;
+  grid-template-rows: repeat(2, 5px) !important;
+  grid-auto-rows: 5px !important;
+  place-content: start !important;
+  justify-content: start !important;
+  align-content: start !important;
+  justify-items: start !important;
+  align-items: center !important;
+  gap: 5px 4px !important;
+  min-width: 0 !important;
+  padding: 8px 11px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-loadout .exchange-slot-pip,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-loadout .exchange-slot-pip {
+  width: 10px !important;
+  height: 4px !important;
+  border-radius: 999px !important;
 }
 
 #hangarOwnedSection .exchange-detail-footer .exchange-footer-secondary {
