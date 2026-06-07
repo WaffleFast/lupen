@@ -805,7 +805,7 @@ function selectEquippedLoadoutVaultItem(categoryKey, index) {
 }
 
 function getSelectedVaultEntry() {
-  const entries = buildVaultEntries();
+  const entries = getVaultFilteredEntries();
   return entries.find(entry => entry.groupKey === selectedVaultGroupKey) ||
     entries.find(entry => selectedVaultGroupKey && entry.groupKey.startsWith(`${selectedVaultGroupKey}__`)) ||
     null;
@@ -1053,7 +1053,8 @@ function renderVaultCatalog() {
 
   entries.forEach(entry => {
     const button = document.createElement("button");
-    button.className = `vault-storage-card ${selectedVaultGroupKey === entry.groupKey ? "selected" : ""} quality-${entry.quality}`;
+    const selected = selectedVaultGroupKey === entry.groupKey || Boolean(selectedVaultGroupKey && entry.groupKey.startsWith(`${selectedVaultGroupKey}__`));
+    button.className = `vault-storage-card ${selected ? "selected" : ""} ${entry.stackable ? "resource-entry" : "gear-entry"} quality-${entry.quality}`;
     button.onclick = () => selectVaultItem(entry.groupKey);
     button.removeAttribute("title");
     showHangarTooltip(button, getVaultTooltipHtml(entry));

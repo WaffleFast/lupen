@@ -38936,6 +38936,18 @@ input::placeholder {
 #hangarVaultSection .vault-storage-card.quality-core { border-color: rgba(255, 186, 50, 0.54) !important; }
 #hangarVaultSection .vault-storage-card.quality-godlike { border-color: rgba(255, 92, 98, 0.62) !important; }
 
+#hangarVaultSection .vault-storage-card.resource-entry {
+  border-color: rgba(255, 190, 72, 0.5) !important;
+  background:
+    radial-gradient(circle at 18% 30%, rgba(255, 190, 72, 0.11), transparent 44%),
+    linear-gradient(180deg, rgba(28, 24, 12, 0.8), rgba(3, 13, 25, 0.96)) !important;
+}
+
+#hangarVaultSection .vault-storage-card.resource-entry.selected {
+  border-color: rgba(255, 204, 78, 0.92) !important;
+  box-shadow: inset 0 0 22px rgba(255, 190, 72, 0.12), 0 0 14px rgba(255, 186, 50, 0.18) !important;
+}
+
 #hangarVaultSection .vault-storage-art {
   display: grid !important;
   place-items: center !important;
