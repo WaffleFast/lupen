@@ -1657,6 +1657,18 @@
       cargoCostBasisBefore: Number.isFinite(Number(result.cargoCostBasisBefore)) ? Number(result.cargoCostBasisBefore) : null,
       cargoCostBasisAfter: Number.isFinite(Number(result.cargoCostBasisAfter)) ? Number(result.cargoCostBasisAfter) : null,
       recoveredResourceSale: result.recoveredResourceSale === true,
+      writeHandlerUsed: String(result.writeHandlerUsed || ""),
+      dryRunEnv: result.dryRunEnv === true,
+      sellValidationReason: String(result.sellValidationReason || ""),
+      trustedCargo: result.trustedCargo && typeof result.trustedCargo === "object"
+        ? {
+          found: result.trustedCargo.found === true,
+          key: String(result.trustedCargo.key || ""),
+          amount: Number.isFinite(Number(result.trustedCargo.amount)) ? Number(result.trustedCargo.amount) : null
+        }
+        : null,
+      costBasisFound: result.costBasisFound === true,
+      currentNode: String(result.currentNode || ""),
       validationMode: String(result.validationMode || "unknown"),
       trustedStateAvailable: result.trustedStateAvailable === true,
       snapshotUsed: result.snapshotUsed === true,
@@ -1914,7 +1926,8 @@
       return {
         credits: Math.max(0, Math.floor(creditsValue)),
         cargoUsed: Math.max(0, Math.floor(cargoUsedValue)),
-        cargoCapacity: Math.max(0, Math.floor(cargoCapacityValue))
+        cargoCapacity: Math.max(0, Math.floor(cargoCapacityValue)),
+        currentNode: typeof currentNode !== "undefined" ? String(currentNode || "") : ""
       };
     } catch (err) {
       logDev("staging trade player snapshot unavailable", err);
@@ -2719,18 +2732,22 @@
     },
 
     stagingTradeBuy(options = {}) {
+      const snapshot = options.playerSnapshot || getStagingTradePlayerSnapshot();
       return sendRoomMessage("stagingTradeBuy", "stagingTrade:buy", {
         offerId: String(options.offerId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity,
-        playerSnapshot: options.playerSnapshot || getStagingTradePlayerSnapshot()
+        currentNode: String(options.currentNode || snapshot?.currentNode || localPresence.currentNode || ""),
+        playerSnapshot: snapshot
       });
     },
 
     stagingTradeSell(options = {}) {
+      const snapshot = options.playerSnapshot || getStagingTradePlayerSnapshot();
       return sendRoomMessage("stagingTradeSell", "stagingTrade:sell", {
         offerId: String(options.offerId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity,
-        playerSnapshot: options.playerSnapshot || getStagingTradePlayerSnapshot()
+        currentNode: String(options.currentNode || snapshot?.currentNode || localPresence.currentNode || ""),
+        playerSnapshot: snapshot
       });
     },
 

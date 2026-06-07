@@ -3312,6 +3312,15 @@
       if (tradeWrite) {
         setDiagnosticsRow(panel, "trade write", `${tradeWrite.operation || "trade"} / ${tradeWrite.mode || "dry_run"} / applied ${tradeWrite.applied ? "yes" : "no"} / writes ${tradeWrite.saveWritten ? "yes" : "no"}`);
         setDiagnosticsRow(panel, "trade gates", `verified ${tradeWrite.gates?.verified ? "yes" : "no"} / enabled ${tradeWrite.gates?.writeEnabled ? "yes" : "no"} / dry ${tradeWrite.gates?.dryRun ? "yes" : "no"}`);
+        if (tradeWrite.operation === "sell") {
+          const trustedCargo = tradeWrite.trustedCargo
+            ? `${tradeWrite.trustedCargo.key || "cargo"} ${formatTradeNumber(tradeWrite.trustedCargo.amount)}`
+            : "unknown";
+          setDiagnosticsRow(panel, "sell handler", `${tradeWrite.writeHandlerUsed || "preflight"} / dryEnv ${tradeWrite.dryRunEnv ? "yes" : "no"}`);
+          setDiagnosticsRow(panel, "sell validation", `${tradeWrite.sellValidationReason || tradeWrite.blockReason || tradeWrite.reason || "ok"} / basis ${tradeWrite.costBasisFound ? "yes" : "no"}`);
+          setDiagnosticsRow(panel, "sell cargo", trustedCargo);
+          setDiagnosticsRow(panel, "sell node", `${tradeWrite.currentNode || "unknown"} -> ${tradeWrite.sellNode || "unknown"}`);
+        }
         if (tradeWrite.applied) {
           setDiagnosticsRow(panel, "trade delta", `CR ${formatTradeNumber(tradeWrite.creditsBefore)} -> ${formatTradeNumber(tradeWrite.creditsAfter)} / ${tradeWrite.resourceName || "cargo"} ${formatTradeNumber(tradeWrite.cargoBefore)} -> ${formatTradeNumber(tradeWrite.cargoAfter)}`);
           setDiagnosticsRow(panel, "trade hold", `${formatTradeNumber(tradeWrite.cargoUsedBefore)} -> ${formatTradeNumber(tradeWrite.cargoUsedAfter)} / ${formatTradeNumber(tradeWrite.cargoCapacity)}`);

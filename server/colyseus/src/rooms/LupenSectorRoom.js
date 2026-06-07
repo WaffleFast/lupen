@@ -356,7 +356,12 @@ function logStagingTradeWriteBlocked({
     dryRun: gates.dryRun !== false,
     scope: gates.scope || "",
     allowlisted: gates.allowlisted === true,
-    trustedSaveAvailable: gates.trustedSaveAvailable === true
+    trustedSaveAvailable: gates.trustedSaveAvailable === true,
+    currentNode: player?.currentNode || "",
+    sellNode: result.sellNode || "",
+    sellValidationReason: result.sellValidationReason || "",
+    trustedCargo: result.trustedCargo || null,
+    costBasisFound: result.costBasisFound === true
   });
 }
 
@@ -2295,6 +2300,11 @@ export class LupenSectorRoom extends Room {
     });
 
     const offer = getStagingTradeOfferById(message?.offerId);
+    const requestedNode = getStringValue(message?.currentNode)
+      || getStringValue(message?.playerSnapshot?.currentNode);
+    if (requestedNode && KNOWN_SECTOR_NODES.has(requestedNode) && player?.multiplayerMode === "staging") {
+      player.currentNode = requestedNode;
+    }
     const playerNode = String(player?.currentNode || "");
     const sellDestinationValid = operation !== "sell" || (offer?.sellNode && playerNode === offer.sellNode);
 
@@ -2392,6 +2402,13 @@ export class LupenSectorRoom extends Room {
         validationMode: result.validationMode,
         trustedStateAvailable: result.trustedStateAvailable,
         snapshotUsed: result.snapshotUsed,
+        writeHandlerUsed: "applyStagingTradeSellWrite",
+        dryRunEnv: result.gates?.dryRun !== false,
+        sellValidationReason: writeResult?.reason || writeResult?.debugReason || result.sellValidationReason || "sell_write_attempted",
+        trustedCargo: result.trustedCargo || null,
+        costBasisFound: result.costBasisFound === true,
+        currentNode: playerNode,
+        sellNode: offer?.sellNode || "",
         sessionId: client.sessionId,
         receivedAt: Date.now()
       });
@@ -2429,6 +2446,15 @@ export class LupenSectorRoom extends Room {
           : writeBlockReason,
       blockReason: writeBlockReason,
       writeBlockReason,
+      writeHandlerUsed: "preflight",
+      dryRunEnv: result.gates?.dryRun !== false,
+      sellValidationReason: operation === "sell"
+        ? (sellDestinationBlocked ? "sell_destination_mismatch" : result.sellValidationReason || writeBlockReason)
+        : undefined,
+      trustedCargo: result.trustedCargo || null,
+      costBasisFound: result.costBasisFound === true,
+      currentNode: playerNode,
+      sellNode: offer?.sellNode || "",
       userReason: writeBlockUserReason,
       sessionId: client.sessionId,
       receivedAt: Date.now()

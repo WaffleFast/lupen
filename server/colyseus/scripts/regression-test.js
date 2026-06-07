@@ -1492,6 +1492,73 @@ async function assertStagingTradeValidationHelpers() {
   assert(appliedSellWrite.creditsDelta === 50 && appliedSellWrite.cargoDelta === -2, "Trade sell write returned incorrect deltas.");
   assert(appliedSellWrite.inventoryWritten === false && appliedSellWrite.lootWritten === false && appliedSellWrite.bountyWritten === false, "Applied trade sell write reported forbidden writes.");
 
+  fetchCalls = [];
+  const crystalSellWrite = await applyStagingTradeSellWrite({
+    playerId: "verified-player-a",
+    offer: {
+      offerId: "staging-crystal-asteron-nyxara",
+      resourceId: "crystal_shards",
+      resourceName: "Crystal Shards",
+      buyNode: "Asteron Prime",
+      sellNode: "Nyxara",
+      buyPrice: 95,
+      sellPrice: 145
+    },
+    quantity: 105,
+    trustedState: {
+      available: true,
+      validationState: {
+        cargoCapacity: 150
+      }
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "allowlist",
+      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+    },
+    fetchImpl: async (url, options = {}) => {
+      fetchCalls.push({ url, options });
+      if (options.method === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return [{
+              save_data: {
+                credits: 1000,
+                cargo: { "Crystal Shards": 105, Iron: 1 },
+                cargoCostBasis: { "Crystal Shards": 95 },
+                inventoryItems: [{ id: "safe" }],
+                activeBountyId: "unchanged",
+                playerProgress: { combatXp: 10 }
+              }
+            }];
+          }
+        };
+      }
+      assert(options.method === "PATCH", "Crystal Shards sell write used unexpected method.");
+      const body = JSON.parse(options.body);
+      assert(body.save_data.credits === 16225, "Crystal Shards sell PATCH did not add CR 15,225 revenue.");
+      assert(body.save_data.cargo["Crystal Shards"] === 0, "Crystal Shards sell PATCH did not clear sold cargo.");
+      assert(body.save_data.cargo.Iron === 1, "Crystal Shards sell PATCH changed unrelated cargo.");
+      assert(body.save_data.cargoCostBasis["Crystal Shards"] === undefined, "Crystal Shards sell PATCH did not clear sold cost basis.");
+      assert(body.save_data.inventoryItems[0].id === "safe", "Crystal Shards sell PATCH changed inventory.");
+      assert(body.save_data.activeBountyId === "unchanged", "Crystal Shards sell PATCH changed bounty.");
+      assert(body.save_data.playerProgress.combatXp === 10, "Crystal Shards sell PATCH changed progression.");
+      return { ok: true, status: 204 };
+    }
+  });
+  assert(fetchCalls.length === 2, `Crystal Shards sell write expected read+patch, got ${fetchCalls.length} calls.`);
+  assert(crystalSellWrite.applied === true, `Crystal Shards route sell did not apply: ${crystalSellWrite.reason}`);
+  assert(crystalSellWrite.saveWritten === true && crystalSellWrite.creditsWritten === true && crystalSellWrite.cargoWritten === true, "Crystal Shards route sell did not report writes.");
+  assert(crystalSellWrite.revenue === 15225, `Crystal Shards route sell revenue was ${crystalSellWrite.revenue}, expected 15225.`);
+  assert(crystalSellWrite.creditsDelta === 15225, "Crystal Shards route sell credits delta was incorrect.");
+  assert(crystalSellWrite.cargoBefore === 105 && crystalSellWrite.cargoAfter === 0, "Crystal Shards route sell did not subtract 105 cargo.");
+  assert(crystalSellWrite.cargoCostBasisBefore === 95 && crystalSellWrite.cargoCostBasisAfter === null, "Crystal Shards route sell did not clear cost basis.");
+
   let sequentialSave = {
     credits: 1000,
     cargo: { Iron: 0, Copper: 2 },

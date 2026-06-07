@@ -119,6 +119,27 @@ function readResourceAmount(resourceMap = {}, offer = {}) {
   return compatibleKey ? normalizeTradeNumber(resourceMap[compatibleKey], 999999) : null;
 }
 
+function readResourceDebug(resourceMap = {}, offer = {}, max = 999999) {
+  if (!resourceMap || typeof resourceMap !== "object" || Array.isArray(resourceMap)) {
+    return { found: false, key: "", amount: null };
+  }
+
+  const directKey = getOfferResourceKeys(offer).find((key) => Object.prototype.hasOwnProperty.call(resourceMap, key));
+  if (directKey) {
+    return {
+      found: true,
+      key: directKey,
+      amount: normalizeTradeNumber(resourceMap[directKey], max)
+    };
+  }
+
+  const normalizedOfferKeys = new Set(getOfferResourceKeys(offer).map(normalizeTradeResourceKey));
+  const compatibleKey = Object.keys(resourceMap).find((key) => normalizedOfferKeys.has(normalizeTradeResourceKey(key)));
+  return compatibleKey
+    ? { found: true, key: compatibleKey, amount: normalizeTradeNumber(resourceMap[compatibleKey], max) }
+    : { found: false, key: "", amount: null };
+}
+
 function getUnknownValidation(reason = "unknown_player_state", readStatus = "") {
   return {
     validationMode: "unknown",
@@ -497,10 +518,24 @@ export function buildStagingTradeWriteDryRun({
   }
 
   const cargoByResource = trustedState?.validationState?.cargoByResource;
-  const resourceHeld = readResourceAmount(cargoByResource, offer);
+  const trustedCargo = readResourceDebug(cargoByResource, offer);
+  const resourceHeld = trustedCargo.amount;
+  const costBasisDebug = readResourceDebug(trustedState?.validationState?.cargoCostBasisByResource, offer, 999999999);
+  const sellDebug = safeOperation === "sell"
+    ? {
+      writeHandlerUsed: "preflight",
+      dryRunEnv: config.envDryRun,
+      sellValidationReason: "preflight",
+      trustedCargo,
+      costBasisFound: costBasisDebug.found && costBasisDebug.amount !== null,
+      cargoCostBasisKey: costBasisDebug.key,
+      cargoCostBasisBefore: costBasisDebug.amount
+    }
+    : {};
 
   if (safeOperation === "sell" && resourceHeld === null) {
-    return buildBlockedTradeWriteResult({
+    return {
+      ...buildBlockedTradeWriteResult({
       operation: safeOperation,
       offerId,
       quantity: requestedQuantity,
@@ -509,11 +544,15 @@ export function buildStagingTradeWriteDryRun({
       offer,
       validation,
       gates
-    });
+      }),
+      ...sellDebug,
+      sellValidationReason: "resource_level_cargo_validation_unavailable"
+    };
   }
 
   if (safeOperation === "sell" && resourceHeld < requestedQuantity) {
-    return buildBlockedTradeWriteResult({
+    return {
+      ...buildBlockedTradeWriteResult({
       operation: safeOperation,
       offerId,
       quantity: requestedQuantity,
@@ -522,7 +561,10 @@ export function buildStagingTradeWriteDryRun({
       offer,
       validation,
       gates
-    });
+      }),
+      ...sellDebug,
+      sellValidationReason: "not_enough_saved_resource_cargo"
+    };
   }
 
   const cost = safeOperation === "buy" ? offer.buyPrice * requestedQuantity : 0;
@@ -567,6 +609,8 @@ export function buildStagingTradeWriteDryRun({
     userReason: safeOperation === "buy"
       ? "Would buy if staging trade writes were enabled."
       : "Would sell if staging trade writes were enabled.",
+    ...sellDebug,
+    sellValidationReason: safeOperation === "sell" ? "trusted_resource_cargo_available" : undefined,
     gates,
     writes: getWriteFlags(),
     creditsWritten: false,
