@@ -1471,24 +1471,18 @@ function renderOwnedShips() {
 
     const isEquipped = currentShipId === shipId;
     const isSelected = selectedFleetShipId === shipId;
-    const stats = getShipStats(shipId);
 
     const card = document.createElement("button");
-    card.className = `fleet-ship-card fleet-selector-card ${isSelected ? "selected" : ""} ${isEquipped ? "active" : ""}`;
+    card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card owned ${isSelected ? "selected" : ""} ${isEquipped ? "active" : ""}`;
+    card.dataset.shipId = shipId;
     card.onclick = () => selectFleetShip(shipId);
     card.innerHTML = `
-      <div class="fleet-card-badge">${isEquipped ? "In Use" : "Owned"}</div>
+      <div class="fleet-card-badge">${isEquipped ? "Active" : "Owned"}</div>
       <div class="fleet-card-image-wrap">
         <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
-      <div class="fleet-card-role">${ship.roleSubtitle || getShipRole(shipId)}</div>
-      <div class="fleet-card-mini-stats">
-        <span>Hull ${formatNumber(stats.hull)}</span>
-        <span>Shield ${formatNumber(stats.shield)}</span>
-        <span>Cargo ${formatNumber(stats.cargo)}</span>
-      </div>
-      <div class="fleet-card-slots compact-fleet-slots">${renderShipSlotSummary(shipId, "usage")}</div>
+      <div class="fleet-card-role">${getVesselExchangeClassLabel(ship)}</div>
     `;
 
     box.appendChild(card);
@@ -1509,46 +1503,47 @@ function renderFleetDetail() {
   }
 
   const stats = getShipStats(shipId);
-  const loadout = getShipLoadout(shipId);
-  const weapon = getEquippedWeapon(shipId);
   const isEquipped = currentShipId === shipId;
   const status = document.getElementById("fleetDetailStatus");
-  if (status) status.textContent = isEquipped ? "In Use" : "Owned";
+  if (status) status.textContent = isEquipped ? "Active" : "Owned";
+
+  const primaryAction = isEquipped
+    ? `<button class="exchange-footer-secondary" disabled>Active</button>`
+    : `<button class="exchange-footer-secondary" disabled>Owned</button>`;
+  const secondaryAction = isEquipped
+    ? `<button class="exchange-footer-primary" onclick="showHangarSection('overview');">Open Loadout</button>`
+    : `<button class="exchange-footer-primary" onclick="equipShip('${shipId}'); showHangarSection('owned');">Set Active</button>`;
 
   panel.innerHTML = `
-    <div class="fleet-detail-hero">
-      <div class="fleet-detail-ship-glow"></div>
-      <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "master") : ship.image}" alt="${ship.name}">
-    </div>
+    <div class="exchange-detail-stack">
+      <div class="exchange-detail-preview">
+        <div class="exchange-detail-glow"></div>
+        <div class="exchange-hero-ring"></div>
+        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
+      </div>
 
-    <div class="fleet-detail-title">
-      <div>
+      <div class="exchange-detail-identity">
         <h4>${ship.name}</h4>
-        <p>${ship.roleSubtitle || getShipRole(shipId)}</p>
+        <p>${getVesselExchangeClassLabel(ship)}</p>
       </div>
-      <span class="fleet-status-chip ${isEquipped ? "active" : ""}">${isEquipped ? "In Use" : "Owned"}</span>
-    </div>
 
-    <div class="fleet-detail-stats">
-      ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
-      ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
-      ${renderFleetStatChip("Armor", formatNumber(stats.armor), "hull-stat")}
-      ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
-      ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
-      ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
-    </div>
-
-    <div class="shipyard-capacity-panel fleet-capacity-panel">
-      <div class="shipyard-capacity-heading">
-        <span>Hardpoints</span>
-        <strong>${formatSlotUsageText(shipId)}</strong>
+      <div class="exchange-detail-stat-grid">
+        ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
+        ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
+        ${renderFleetStatChip("Armor", formatNumber(stats.armor), "armor-stat")}
+        ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
+        ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
+        ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
       </div>
-      ${renderShipSlotSummary(shipId, "usage")}
-    </div>
 
-    <div class="fleet-detail-actions compact fleet-swap-actions">
-      <button class="fleet-primary-swap" onclick="equipShip('${shipId}'); showHangarSection('owned');" ${isEquipped ? "disabled" : ""}>${isEquipped ? "In Use" : "Fly This Ship"}</button>
-      <button onclick="equipShip('${shipId}'); showHangarSection('overview');">Open Loadout</button>
+      <div class="exchange-detail-loadout">
+        ${renderExchangeHardpointRail(shipId)}
+      </div>
+
+      <div class="exchange-detail-footer">
+        ${primaryAction}
+        ${secondaryAction}
+      </div>
     </div>
   `;
 }
