@@ -571,6 +571,9 @@ function getVaultEntryDescription(entry) {
     };
     return attachmentDescriptions[entry.key] || itemDefinitions[entry.key]?.name || "";
   }
+  if (entry.key === "lupenShards") {
+    return upgradeMaterialDefinitions?.lupenShards?.description || "Charged Forge material used to raise item levels.";
+  }
   return "Rare enhancement core used for future upgrades, quality progression and high-value trading.";
 }
 
@@ -638,18 +641,30 @@ function buildVaultEntries() {
     if (entry) entries.push(entry);
   }
 
-  function addResource(key, quality, quantity = 1) {
+  function addResource(key, quality, quantity = 1, override = {}) {
     const signature = getSignature(key, quality, 1);
     if (!resourceGroups.has(signature)) {
-      resourceGroups.set(signature, makeEntry({
+      const definition = itemDefinitions[key] || override;
+      if (!definition?.name) return;
+      const entry = {
+        groupKey: `${signature}__resource`,
+        signature,
         key,
         quality,
         level: 1,
-        source: "resource",
-        storedCount: 0,
+        name: definition.name,
+        category: definition.category || "Core",
+        categoryKey: override.categoryKey || getItemCategoryKey(key),
+        icon: definition.icon || "assets/items/lupen-core.png",
         count: 0,
-        resource: true
-      }));
+        storedCount: 0,
+        equippedCount: 0,
+        resource: true,
+        stackable: true,
+        source: "resource",
+        ...override
+      };
+      resourceGroups.set(signature, entry);
     }
     const entry = resourceGroups.get(signature);
     if (!entry) return;
@@ -674,6 +689,17 @@ function buildVaultEntries() {
     }
     addStoredGear(item.key, item.quality || "standard", item.level || 1, "inventory", item.id || entries.length);
   });
+
+  const shardCount = Math.max(0, Number(upgradeMaterials?.lupenShards || 0));
+  if (shardCount > 0) {
+    const shardDefinition = upgradeMaterialDefinitions?.lupenShards || {};
+    addResource("lupenShards", LUPEN_CORE_QUALITY, shardCount, {
+      name: "Lupen Shard",
+      category: "Core",
+      categoryKey: "cores",
+      icon: shardDefinition.icon || "assets/items/lupen-shard.png"
+    });
+  }
 
   entries.forEach(entry => {
     entry.storedCount = storedCounts.get(entry.signature) || entry.storedCount || 0;
@@ -928,6 +954,14 @@ function formatRomanLevel(level = 1) {
   return numerals[value] || String(value);
 }
 
+function getVaultFireRateLabel(gun) {
+  const rate = getGunFireRateValue(gun);
+  if (rate <= 0) return "Unknown";
+  if (rate < 0.7) return "Slow";
+  if (rate < 1.15) return "Steady";
+  return "Rapid";
+}
+
 function getVaultEntryStats(entry) {
   if (!entry) return [];
   const item = {
@@ -940,7 +974,7 @@ function getVaultEntryStats(entry) {
     if (gun) {
       return [
         { label: "Damage", value: formatNumber(getWeaponPurchaseDamage(gun, entry.quality)) },
-        { label: "Fire Rate", value: getGunFireRateText(gun) },
+        { label: "Fire Rate", value: getVaultFireRateLabel(gun) },
         { label: "Owned", value: formatNumber(entry.storedCount || 0) }
       ];
     }
@@ -951,9 +985,10 @@ function getVaultEntryStats(entry) {
       { label: "Owned", value: formatNumber(entry.storedCount || 0) }
     ];
   } else if (item.kind === "core") {
+    const useText = entry.key === "lupenShards" ? "Level upgrade" : "Quality upgrade";
     return [
       { label: "Quantity", value: formatNumber(entry.count || 0) },
-      { label: "Use", value: "Quality upgrade" }
+      { label: "Use", value: useText }
     ];
   }
 
@@ -1032,7 +1067,7 @@ function renderVaultCatalog() {
       <div class="vault-storage-copy">
         <strong>${entry.name}</strong>
       </div>
-      <span class="vault-level-badge">LV ${formatRomanLevel(entry.level || 1)}</span>
+      ${entry.stackable ? "" : `<span class="vault-level-badge">LV ${formatRomanLevel(entry.level || 1)}</span>`}
     `;
 
     grid.appendChild(button);
@@ -1050,8 +1085,6 @@ function renderVaultDetail() {
   }
 
   const infoStats = getVaultEntryStats(entry);
-  const canUpgrade = ["guns", "attachments"].includes(entry.categoryKey);
-  const equipAvailable = canEquipVaultEntry(entry);
 
   panel.innerHTML = `
     <div class="vault-item-detail-shell quality-${entry.quality}">
@@ -1066,7 +1099,7 @@ function renderVaultDetail() {
           <h4>${entry.name}</h4>
           <p>${entry.category} / <strong class="quality-${entry.quality}">${getVaultQualityLabel(entry)}</strong></p>
         </div>
-        <span>LV ${formatRomanLevel(entry.level || 1)}</span>
+        ${entry.stackable ? "" : `<span>LV ${formatRomanLevel(entry.level || 1)}</span>`}
       </div>
 
       <div class="vault-item-description">${getVaultEntryDescription(entry)}</div>
@@ -1082,11 +1115,7 @@ function renderVaultDetail() {
 
       <div class="vault-item-note">Items of different quality or level are stored separately.</div>
 
-      <div class="vault-item-actions">
-        <button type="button" class="vault-action-primary" onclick="equipSelectedVaultItem()" ${equipAvailable ? "" : "disabled"}>Equip</button>
-        <button type="button" class="vault-action-danger" disabled>Sell</button>
-        <button type="button" class="vault-action-secondary" onclick="openUpgradeForgeFromVault('${escapeJsString(entry.groupKey)}')" ${canUpgrade ? "" : "disabled"}>Open Forge</button>
-      </div>
+      <div class="vault-item-note vault-passive-note">Manage equipment from Loadout, Store, or Forge.</div>
     </div>
   `;
 }
