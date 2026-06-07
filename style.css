@@ -37006,6 +37006,293 @@ input::placeholder {
   font-size: 15px !important;
 }
 
+/* ===== Vessel Exchange Ship Detail rebuild ===== */
+#hangarShipyardSection #shipyardDetailPanel.shipyard-detail-body {
+  display: block !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+#hangarShipyardSection .exchange-detail-stack {
+  display: grid;
+  grid-template-rows: 152px 40px 86px 78px 42px;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#hangarShipyardSection .exchange-detail-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 152px;
+  min-height: 152px;
+  border-radius: 9px;
+  border: 1px solid rgba(80, 180, 238, 0.28);
+  background:
+    radial-gradient(ellipse at 50% 76%, rgba(0, 198, 255, 0.24), transparent 52%),
+    linear-gradient(180deg, rgba(3, 21, 39, 0.18), rgba(0, 8, 18, 0.76)),
+    url("assets/backgrounds/hangar-bay-background.png") center 58% / cover no-repeat;
+  overflow: hidden;
+}
+
+#hangarShipyardSection .exchange-detail-glow {
+  position: absolute;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(72, 207, 255, 0.16);
+  box-shadow:
+    0 0 54px rgba(52, 177, 255, 0.13),
+    inset 0 0 36px rgba(52, 177, 255, 0.08);
+}
+
+#hangarShipyardSection .exchange-detail-preview .exchange-hero-ring {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 9% !important;
+  width: 50% !important;
+  height: 24% !important;
+  transform: translateX(-50%) perspective(520px) rotateX(68deg) !important;
+  border: 2px solid rgba(43, 215, 255, 0.72) !important;
+  border-radius: 50% !important;
+  opacity: 0.9 !important;
+  box-shadow: 0 0 24px rgba(0, 204, 255, 0.48), inset 0 0 20px rgba(0, 204, 255, 0.18) !important;
+}
+
+#hangarShipyardSection .exchange-detail-preview img {
+  position: relative;
+  z-index: 3;
+  width: min(58%, 330px);
+  max-height: 146px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 24px rgba(70, 180, 255, 0.22));
+}
+
+#hangarShipyardSection .exchange-detail-identity {
+  display: grid;
+  align-content: center;
+  min-height: 0;
+}
+
+#hangarShipyardSection .exchange-detail-identity h4 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 23px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+#hangarShipyardSection .exchange-detail-identity p {
+  margin: 5px 0 0;
+  color: #2cecff;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  min-height: 0;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip {
+  position: relative;
+  display: grid;
+  align-content: center;
+  min-height: 0 !important;
+  padding: 6px 10px 9px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(80, 150, 210, 0.58) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(80, 150, 210, 0.14), transparent 55%), rgba(2, 13, 27, 0.82) !important;
+  overflow: hidden;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip span {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  letter-spacing: 0.08em !important;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip strong {
+  margin-top: 5px;
+  font-size: 15px !important;
+  line-height: 1 !important;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip.hull-stat {
+  border-color: rgba(86, 178, 230, 0.64) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(54, 181, 255, 0.16), transparent 55%), rgba(2, 15, 30, 0.84) !important;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip.hull-stat::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 6px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(42, 223, 255, 0.95), rgba(42, 223, 255, 0.52));
+  box-shadow: 0 0 10px rgba(42, 223, 255, 0.28);
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip.shield-stat {
+  border-color: rgba(51, 230, 255, 0.72) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(42, 231, 255, 0.16), transparent 55%), rgba(2, 16, 30, 0.82) !important;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip.armor-stat {
+  border-color: rgba(80, 150, 210, 0.58) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(80, 150, 210, 0.14), transparent 55%), rgba(2, 13, 27, 0.82) !important;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip.cargo-stat {
+  border-color: rgba(255, 224, 40, 0.78) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 224, 40, 0.18), transparent 55%), rgba(30, 26, 2, 0.62) !important;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip.jump-stat {
+  border-color: rgba(38, 184, 255, 0.66) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(38, 184, 255, 0.14), transparent 55%), rgba(2, 13, 27, 0.82) !important;
+}
+
+#hangarShipyardSection .exchange-detail-stat-grid .fleet-stat-chip.evasion-stat {
+  border-color: rgba(46, 230, 198, 0.72) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(46, 230, 198, 0.16), transparent 55%), rgba(2, 24, 26, 0.78) !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  height: 78px;
+  min-height: 78px;
+  min-width: 0;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-capacity-card {
+  display: grid !important;
+  grid-template-rows: 28px minmax(0, 1fr) !important;
+  min-height: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(86, 185, 238, 0.34) !important;
+  background: linear-gradient(180deg, rgba(4, 21, 38, 0.9), rgba(1, 10, 20, 0.92)) !important;
+  overflow: hidden;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-capacity-strip {
+  display: grid !important;
+  grid-template-columns: auto auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 0 10px !important;
+  border-bottom: 1px solid rgba(86, 185, 238, 0.22) !important;
+  background: rgba(5, 27, 47, 0.76) !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-capacity-strip span {
+  color: #9fc4df !important;
+  font: 10px var(--font-title) !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-capacity-strip strong {
+  color: #ffffff !important;
+  font: 15px var(--font-title) !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-slot-pips {
+  display: flex !important;
+  justify-content: end !important;
+  gap: 4px !important;
+  min-width: 0;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-slot-pip {
+  width: 6px !important;
+  height: 8px !important;
+  border-radius: 999px !important;
+  background: rgba(79, 190, 255, 0.24) !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-slot-pip.filled {
+  background: #4bdcff !important;
+  box-shadow: 0 0 8px rgba(75, 220, 255, 0.65) !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .equip-capacity .exchange-slot-pip.filled {
+  background: #37e38d !important;
+  box-shadow: 0 0 8px rgba(55, 227, 141, 0.58) !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-capacity-copy {
+  display: grid !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 4px !important;
+  padding: 8px !important;
+  text-align: center !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-capacity-copy span {
+  color: #a9d8f2 !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout .exchange-capacity-copy small {
+  color: #8bdfff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+#hangarShipyardSection .exchange-detail-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  height: 42px;
+  min-height: 42px;
+  min-width: 0;
+}
+
+#hangarShipyardSection .exchange-detail-footer button {
+  min-width: 0;
+  min-height: 42px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+#hangarShipyardSection .exchange-detail-footer .exchange-footer-primary {
+  border-color: rgba(76, 210, 255, 0.48);
+  background: linear-gradient(180deg, rgba(7, 67, 126, 0.9), rgba(3, 31, 70, 0.94));
+  color: #ffffff;
+}
+
+#hangarShipyardSection .exchange-detail-footer .buy-ship-action {
+  background: linear-gradient(135deg, #18b761, #0d8e4b) !important;
+}
+
+#hangarShipyardSection .exchange-detail-footer .exchange-footer-secondary {
+  border-color: rgba(86, 185, 238, 0.34);
+  background: linear-gradient(180deg, rgba(4, 21, 38, 0.88), rgba(1, 10, 20, 0.92));
+  color: #9fdcff;
+}
+
 #hangarShipyardSection .shipyard-catalog-panel.fleet-gallery-panel {
   display: flex !important;
   flex-direction: column !important;

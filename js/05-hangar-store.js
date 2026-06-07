@@ -2342,8 +2342,7 @@ function renderExchangeHardpointRail(shipId) {
       </div>
       <div class="exchange-capacity-copy">
         <span>Weapons</span>
-        <strong>${guns} Slots</strong>
-        <small>${guns} gun slots</small>
+        <small>${guns} slots</small>
       </div>
     </div>
     <div class="exchange-capacity-card equip-capacity">
@@ -2354,8 +2353,7 @@ function renderExchangeHardpointRail(shipId) {
       </div>
       <div class="exchange-capacity-copy">
         <span>Attachments</span>
-        <strong>${equip} Slots</strong>
-        <small>${equip} equip slots</small>
+        <small>${equip} slots</small>
       </div>
     </div>
   `;
@@ -2371,55 +2369,51 @@ function renderShipyardDetail() {
   const canAfford = credits >= ship.price;
   const stats = getShipStats(ship.id);
   const status = document.getElementById("shipyardDetailStatus");
-  if (status) status.textContent = equipped ? "In Use" : owned ? "Owned" : "Available";
+  if (status) status.textContent = equipped ? "Active" : owned ? "Owned" : "Available";
 
   let primaryAction = "";
   let secondaryAction = "";
   if (equipped) {
-    primaryAction = `<button class="fleet-primary-swap" disabled>In Use</button>`;
-    secondaryAction = `<button onclick="showHangarSection('overview');">Open Loadout</button>`;
+    primaryAction = `<button class="exchange-footer-secondary" disabled>Active</button>`;
+    secondaryAction = `<button class="exchange-footer-primary" onclick="showHangarSection('overview');">Open Loadout</button>`;
   } else if (owned) {
-    primaryAction = `<button class="fleet-primary-swap" onclick="equipShip('${ship.id}'); showHangarSection('shipyard');">Fly This Ship</button>`;
-    secondaryAction = `<button onclick="equipShip('${ship.id}'); showHangarSection('overview');">Open Loadout</button>`;
+    primaryAction = `<button class="exchange-footer-secondary" disabled>Owned</button>`;
+    secondaryAction = `<button class="exchange-footer-primary" onclick="equipShip('${ship.id}'); showHangarSection('shipyard');">Set Active</button>`;
   } else {
-    primaryAction = `<button class="fleet-primary-swap buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>Buy Hull</button>`;
-    secondaryAction = `<button class="shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
+    primaryAction = `<button class="exchange-footer-primary buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>Buy Hull</button>`;
+    secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   }
 
   panel.innerHTML = `
-    <div class="fleet-detail-hero exchange-detail-hero">
-      <div class="fleet-detail-ship-glow"></div>
-      <div class="exchange-hero-ring"></div>
-      <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
-    </div>
+    <div class="exchange-detail-stack">
+      <div class="exchange-detail-preview">
+        <div class="exchange-detail-glow"></div>
+        <div class="exchange-hero-ring"></div>
+        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
+      </div>
 
-    <div class="fleet-detail-title">
-      <div>
+      <div class="exchange-detail-identity">
         <h4>${ship.name}</h4>
         <p>${ship.roleSubtitle || getShipyardClassLabel(ship)}</p>
       </div>
-      <span class="fleet-status-chip ${equipped ? "active" : owned ? "" : "available"}">${equipped ? "In Use" : owned ? "Owned" : "Available"}</span>
-    </div>
 
-    <div class="fleet-detail-stats">
-      ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
-      ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
-      ${renderFleetStatChip("Armor", formatNumber(stats.armor), "hull-stat")}
-      ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
-      ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
-      ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
-    </div>
-
-    <div class="shipyard-capacity-panel fleet-capacity-panel exchange-loadout-capacity">
-      <div class="shipyard-capacity-heading">
-        <span>Loadout Capacity</span>
+      <div class="exchange-detail-stat-grid">
+        ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
+        ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
+        ${renderFleetStatChip("Armor", formatNumber(stats.armor), "armor-stat")}
+        ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
+        ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
+        ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
       </div>
-      <div class="exchange-hardpoint-rail">${renderExchangeHardpointRail(ship.id)}</div>
-    </div>
 
-    <div class="fleet-detail-actions compact fleet-swap-actions shipyard-purchase-actions">
-      ${primaryAction}
-      ${secondaryAction}
+      <div class="exchange-detail-loadout">
+        ${renderExchangeHardpointRail(ship.id)}
+      </div>
+
+      <div class="exchange-detail-footer">
+        ${primaryAction}
+        ${secondaryAction}
+      </div>
     </div>
   `;
 }
@@ -2471,13 +2465,12 @@ function renderShipShop() {
     if (ship.id === starterShipId) card.dataset.tutorialTarget = "firstShipCard";
     card.onclick = () => selectShipyardShip(ship.id);
     card.innerHTML = `
-      <div class="fleet-card-badge">${equipped ? "In Use" : owned ? "Owned" : ship.price ? `CR ${formatNumber(ship.price)}` : "Unowned"}</div>
+      <div class="fleet-card-badge">${equipped ? "Active" : owned ? "Owned" : ship.price ? `CR ${formatNumber(ship.price)}` : "Available"}</div>
       <div class="fleet-card-image-wrap">
         <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
       <div class="fleet-card-role">${ship.roleSubtitle || getShipyardClassLabel(ship)}</div>
-      <p class="vessel-card-description">${escapeHtml(ship.description || "Available hull for station exchange review.")}</p>
     `;
     box.appendChild(card);
   });
