@@ -38582,3 +38582,58 @@ input::placeholder {
   background: linear-gradient(180deg, rgba(4, 21, 38, 0.88), rgba(1, 10, 20, 0.92)) !important;
   color: #9fdcff !important;
 }
+
+/* ===== Shared Fleet / Vessel Exchange detail spacing lock ===== */
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-stack,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-stack {
+  grid-template-rows: 148px 38px 82px 78px 40px !important;
+  gap: 9px !important;
+  padding-bottom: 6px !important;
+  box-sizing: border-box !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-stat-grid,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-stat-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-stat-grid .fleet-stat-chip,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-stat-grid .fleet-stat-chip {
+  display: grid !important;
+  align-content: center !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 5px 10px 7px !important;
+  box-sizing: border-box !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-stat-grid .fleet-stat-chip span,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-stat-grid .fleet-stat-chip span {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  letter-spacing: 0.08em !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-stat-grid .fleet-stat-chip strong,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-stat-grid .fleet-stat-chip strong {
+  margin-top: 5px !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-loadout,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-loadout {
+  height: 78px !important;
+  min-height: 78px !important;
+  margin: 0 !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-loadout .exchange-capacity-card,
+#hangarOwnedSection #fleetDetailPanel .exchange-detail-loadout .exchange-capacity-card {
+  grid-template-rows: 30px minmax(0, 1fr) !important;
+}
