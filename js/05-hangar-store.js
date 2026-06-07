@@ -935,26 +935,29 @@ function getVaultEntryStats(entry) {
     kind: entry.categoryKey === "guns" ? "gun" : entry.categoryKey === "attachments" ? "attachment" : "core"
   };
 
-  const stats = [{ label: "Owned", value: formatNumber(entry.count) }];
-
-  if (entry.categoryKey !== "cores") {
-    stats.push({ label: "Equipped", value: formatNumber(entry.equippedCount) });
-    stats.push({ label: "Available", value: formatNumber(entry.storedCount) });
-  }
-
   if (item.kind === "gun") {
     const gun = GUNS[item.key];
     if (gun) {
-      stats.push(...getWeaponPurchaseStatRows(gun, entry.quality));
+      return [
+        { label: "Damage", value: formatNumber(getWeaponPurchaseDamage(gun, entry.quality)) },
+        { label: "Fire Rate", value: getGunFireRateText(gun) },
+        { label: "Stored", value: formatNumber(entry.storedCount || 0) }
+      ];
     }
   } else if (item.kind === "attachment") {
-    stats.push(...getAttachmentPurchaseStatRows(item, entry.quality));
+    const effectStats = getAttachmentPurchaseStatRows(item, entry.quality);
+    return [
+      ...(effectStats.length ? [effectStats[0]] : []),
+      { label: "Stored", value: formatNumber(entry.storedCount || 0) }
+    ];
   } else if (item.kind === "core") {
-    stats.push({ label: "Tier", value: "God-tier" });
-    stats.push({ label: "Use", value: "Upgrade equipment" });
+    return [
+      { label: "Quantity", value: formatNumber(entry.count || 0) },
+      { label: "Use", value: "Quality upgrade" }
+    ];
   }
 
-  return stats.slice(0, item.kind === "gun" ? 6 : 4);
+  return [{ label: "Stored", value: formatNumber(entry.storedCount || entry.count || 0) }];
 }
 
 
@@ -1046,16 +1049,9 @@ function renderVaultDetail() {
     return;
   }
 
-  const stats = getVaultEntryStats(entry);
+  const infoStats = getVaultEntryStats(entry);
   const canUpgrade = ["guns", "attachments"].includes(entry.categoryKey);
   const equipAvailable = canEquipVaultEntry(entry);
-  const effectStat = stats.find(stat => !["Owned", "Equipped", "Available"].includes(stat.label)) || stats[0] || { label: "Stored", value: formatNumber(entry.count || 0) };
-  const infoStats = [
-    effectStat,
-    { label: "Owned", value: formatNumber(entry.count || 0) },
-    { label: "Equipped", value: formatNumber(entry.equippedCount || 0) },
-    { label: "Available", value: formatNumber(entry.storedCount || (entry.stackable ? entry.count : 0)) }
-  ];
 
   panel.innerHTML = `
     <div class="vault-item-detail-shell quality-${entry.quality}">
