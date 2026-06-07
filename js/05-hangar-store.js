@@ -2325,7 +2325,7 @@ function renderExchangeStatRail(shipId) {
 
 function renderExchangeSlotPips(count) {
   const safeCount = Math.max(0, Math.round(Number(count || 0)));
-  const visibleCount = Math.min(safeCount, 10);
+  const visibleCount = Math.min(safeCount, 20);
   if (!visibleCount) return `<span class="exchange-slot-pip empty"></span>`;
   return Array.from({ length: visibleCount }).map(() => `<span class="exchange-slot-pip filled"></span>`).join("");
 }
@@ -2335,25 +2335,21 @@ function renderExchangeHardpointRail(shipId) {
   const equip = getAttachmentSlotLimit(shipId);
   return `
     <div class="exchange-capacity-card weapon-capacity">
-      <div class="exchange-capacity-strip">
-        <span>Guns</span>
+      <div class="exchange-slot-summary-head">
+        <span>Weapon Slots</span>
         <strong>${guns}</strong>
-        <div class="exchange-slot-pips">${renderExchangeSlotPips(guns)}</div>
       </div>
-      <div class="exchange-capacity-copy">
-        <span>Weapons</span>
-        <small>${guns} slots</small>
+      <div class="exchange-slot-pips">
+        ${renderExchangeSlotPips(guns)}
       </div>
     </div>
     <div class="exchange-capacity-card equip-capacity">
-      <div class="exchange-capacity-strip">
-        <span>Equip</span>
+      <div class="exchange-slot-summary-head">
+        <span>Equipment Slots</span>
         <strong>${equip}</strong>
-        <div class="exchange-slot-pips">${renderExchangeSlotPips(equip)}</div>
       </div>
-      <div class="exchange-capacity-copy">
-        <span>Attachments</span>
-        <small>${equip} slots</small>
+      <div class="exchange-slot-pips">
+        ${renderExchangeSlotPips(equip)}
       </div>
     </div>
   `;
