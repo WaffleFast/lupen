@@ -40644,3 +40644,487 @@ input::placeholder {
   opacity: 0.56 !important;
   cursor: not-allowed !important;
 }
+
+/* ===== Shared item quality FX: dense thin lightning source of truth ===== */
+.quality-fx,
+.quality-fx * {
+  box-sizing: border-box;
+}
+
+.quality-fx {
+  --q: #45c8ff;
+  --q2: #1d6dff;
+  --q3: #ffffff;
+  --fx-aura: 0.1;
+  --fx-storm: 0;
+  --fx-sweep: 0;
+  --fx-spark: 0;
+  --fx-bolt: 0;
+  --fx-speed: 3s;
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  color: var(--q);
+  pointer-events: none;
+}
+
+.quality-fx--standard {
+  --q: #45c8ff;
+  --q2: #1d6dff;
+  --q3: #ffffff;
+  --fx-aura: 0.12;
+  --fx-storm: 0;
+  --fx-sweep: 0;
+  --fx-spark: 0;
+  --fx-bolt: 0;
+  --fx-speed: 3s;
+}
+
+.quality-fx--refined {
+  --q: #2fff94;
+  --q2: #12bc70;
+  --q3: #dffff1;
+  --fx-aura: 0.24;
+  --fx-storm: 0.12;
+  --fx-sweep: 0.16;
+  --fx-spark: 0.06;
+  --fx-bolt: 0;
+  --fx-speed: 2.5s;
+}
+
+.quality-fx--advanced {
+  --q: #38d9ff;
+  --q2: #5373ff;
+  --q3: #e7ffff;
+  --fx-aura: 0.46;
+  --fx-storm: 0.3;
+  --fx-sweep: 0.32;
+  --fx-spark: 0.14;
+  --fx-bolt: 0.22;
+  --fx-speed: 1.9s;
+}
+
+.quality-fx--elite {
+  --q: #be61ff;
+  --q2: #ff4dd7;
+  --q3: #fff0ff;
+  --fx-aura: 0.68;
+  --fx-storm: 0.62;
+  --fx-sweep: 0.48;
+  --fx-spark: 0.22;
+  --fx-bolt: 0.82;
+  --fx-speed: 1.35s;
+}
+
+.quality-fx--legendary {
+  --q: #ffd04b;
+  --q2: #ff7b1f;
+  --q3: #fff9dc;
+  --fx-aura: 0.88;
+  --fx-storm: 0.88;
+  --fx-sweep: 0.66;
+  --fx-spark: 0.3;
+  --fx-bolt: 1;
+  --fx-speed: 1.05s;
+}
+
+.quality-fx--godlike {
+  --q: #6dfff8;
+  --q2: #ff2ccf;
+  --q3: #ffffff;
+  --fx-aura: 1;
+  --fx-storm: 1;
+  --fx-sweep: 0.86;
+  --fx-spark: 0.42;
+  --fx-bolt: 1;
+  --fx-speed: 0.82s;
+}
+
+.quality-fx::before,
+.quality-fx::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.quality-fx::before {
+  opacity: var(--fx-sweep);
+  background:
+    linear-gradient(115deg,
+      transparent 0%,
+      color-mix(in srgb, var(--q) 10%, transparent) 18%,
+      color-mix(in srgb, var(--q2) 24%, transparent) 34%,
+      color-mix(in srgb, #ffffff 16%, transparent) 42%,
+      color-mix(in srgb, var(--q) 28%, transparent) 50%,
+      transparent 66%);
+  transform: translateX(-132%) skewX(-18deg);
+  animation: qualityFxSweep 3.3s linear infinite;
+}
+
+.quality-fx::after {
+  opacity: var(--fx-spark);
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--q) 88%, transparent) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle, color-mix(in srgb, var(--q2) 68%, transparent) 0 0.8px, transparent 1.4px);
+  background-size: 18px 18px, 30px 30px;
+  background-position: 0 0, 10px 8px;
+  animation: qualityFxDrift 4.8s linear infinite;
+}
+
+.quality-fx__item {
+  position: relative !important;
+  z-index: 7 !important;
+  display: block !important;
+  width: auto !important;
+  max-width: 88% !important;
+  max-height: 82% !important;
+  object-fit: contain !important;
+  filter:
+    brightness(1.06)
+    drop-shadow(0 0 7px color-mix(in srgb, var(--q) 34%, transparent))
+    drop-shadow(0 0 15px color-mix(in srgb, var(--q2) 18%, transparent))
+    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.52)) !important;
+}
+
+.quality-fx--slot .quality-fx__item {
+  max-width: 78% !important;
+  max-height: 70% !important;
+}
+
+.quality-fx--row .quality-fx__item,
+.quality-fx--small .quality-fx__item {
+  max-width: 86% !important;
+  max-height: 78% !important;
+}
+
+.quality-fx--card .quality-fx__item {
+  max-width: 92% !important;
+  max-height: 82% !important;
+}
+
+.quality-fx--feature .quality-fx__item {
+  max-width: min(86%, 210px) !important;
+  max-height: 86% !important;
+}
+
+.quality-fx__flare,
+.quality-fx__storm,
+.quality-fx__ring,
+.quality-fx__bolt {
+  position: absolute;
+  pointer-events: none;
+}
+
+.quality-fx__flare {
+  z-index: 1;
+  width: 78%;
+  height: 72%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--q) 28%, transparent), transparent 58%);
+  filter: blur(16px);
+  opacity: calc(var(--fx-aura) * 0.9);
+  animation: qualityFxBreathe calc(var(--fx-speed) * 0.72) ease-in-out infinite;
+}
+
+.quality-fx__storm {
+  z-index: 2;
+  width: 86%;
+  height: 74%;
+  border-radius: 50%;
+  opacity: var(--fx-storm);
+  filter: blur(9px);
+  background:
+    conic-gradient(from 0deg,
+      transparent 0deg 12deg,
+      color-mix(in srgb, var(--q) 38%, transparent) 12deg 32deg,
+      transparent 32deg 52deg,
+      color-mix(in srgb, var(--q2) 28%, transparent) 52deg 76deg,
+      transparent 76deg 108deg,
+      color-mix(in srgb, var(--q) 40%, transparent) 108deg 138deg,
+      transparent 138deg 178deg,
+      color-mix(in srgb, #ffffff 22%, transparent) 178deg 196deg,
+      transparent 196deg 232deg,
+      color-mix(in srgb, var(--q2) 28%, transparent) 232deg 258deg,
+      transparent 258deg 302deg,
+      color-mix(in srgb, var(--q) 34%, transparent) 302deg 334deg,
+      transparent 334deg 360deg);
+  animation: qualityFxStorm 6.7s linear infinite;
+}
+
+.quality-fx__storm--2 {
+  width: 96%;
+  height: 86%;
+  filter: blur(15px);
+  opacity: calc(var(--fx-storm) * 0.78);
+  animation-duration: 5.2s;
+  animation-direction: reverse;
+}
+
+.quality-fx__storm--3 {
+  width: 68%;
+  height: 56%;
+  filter: blur(7px);
+  opacity: calc(var(--fx-storm) * 0.58);
+  animation-duration: 8s;
+}
+
+.quality-fx__ring {
+  z-index: 3;
+  left: 50%;
+  top: 54%;
+  width: 84%;
+  height: 42%;
+  border: 1px solid color-mix(in srgb, var(--q) 64%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--q) 42%, transparent),
+    0 0 44px color-mix(in srgb, var(--q2) 20%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--q) 18%, transparent);
+  opacity: calc(var(--fx-aura) * 1.08);
+  transform: translate(-50%, -50%) rotate(-8deg);
+  animation: qualityFxOrbit1 var(--fx-speed) ease-in-out infinite;
+}
+
+.quality-fx__ring--2 {
+  width: 94%;
+  height: 54%;
+  border-color: color-mix(in srgb, var(--q2) 52%, transparent);
+  opacity: calc(var(--fx-aura) * 0.82);
+  animation: qualityFxOrbit2 calc(var(--fx-speed) * 1.08) ease-in-out infinite;
+}
+
+.quality-fx__ring--3 {
+  width: 66%;
+  height: 30%;
+  border-color: color-mix(in srgb, #ffffff 38%, transparent);
+  opacity: calc(var(--fx-aura) * 0.52);
+  animation: qualityFxOrbit3 calc(var(--fx-speed) * 0.68) ease-in-out infinite;
+}
+
+.quality-fx__bolt {
+  z-index: 5;
+  width: 54%;
+  max-width: 132px;
+  height: 5px;
+  opacity: 0;
+  background:
+    linear-gradient(90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--q3) 95%, transparent) 18%,
+      color-mix(in srgb, var(--q) 100%, transparent) 46%,
+      color-mix(in srgb, var(--q2) 78%, transparent) 76%,
+      transparent 100%);
+  clip-path: polygon(0 50%, 9% 46%, 17% 54%, 25% 40%, 33% 49%, 41% 35%, 49% 44%, 57% 28%, 65% 38%, 73% 24%, 81% 33%, 89% 22%, 97% 30%, 100% 18%, 94% 56%, 86% 50%, 78% 66%, 70% 56%, 62% 72%, 54% 62%, 46% 76%, 36% 66%, 26% 82%, 16% 68%);
+  filter:
+    drop-shadow(0 0 2px color-mix(in srgb, var(--q3) 70%, transparent))
+    drop-shadow(0 0 4px color-mix(in srgb, var(--q) 85%, transparent));
+  animation: qualityFxBolt 0.74s linear infinite;
+}
+
+.quality-fx__bolt--1 { top: 22%; left: 8%; transform: rotate(-18deg) scale(0.86); animation-delay: -0.12s; }
+.quality-fx__bolt--2 { top: 45%; right: 6%; transform: rotate(17deg) scale(0.78); animation-delay: -0.48s; }
+.quality-fx__bolt--3 { top: 62%; left: 30%; transform: rotate(7deg) scale(0.66); animation-delay: -0.26s; }
+.quality-fx__bolt--4 { top: 34%; right: 28%; transform: rotate(-6deg) scale(0.58); animation-delay: -0.62s; }
+.quality-fx__bolt--5 { top: 28%; left: 27%; transform: rotate(6deg) scale(0.52); animation-delay: -0.72s; }
+.quality-fx__bolt--6 { top: 72%; right: 20%; transform: rotate(-12deg) scale(0.64); animation-delay: -0.38s; }
+.quality-fx__bolt--7 { top: 18%; right: 15%; transform: rotate(11deg) scale(0.48); animation-delay: -0.08s; }
+.quality-fx__bolt--8 { top: 56%; left: 6%; transform: rotate(-10deg) scale(0.52); animation-delay: -0.58s; }
+.quality-fx__bolt--9 { top: 42%; left: 42%; transform: rotate(22deg) scale(0.46); animation-delay: -0.19s; }
+.quality-fx__bolt--10 { top: 76%; left: 20%; transform: rotate(-4deg) scale(0.46); animation-delay: -0.44s; }
+
+.quality-fx--advanced .quality-fx__bolt--1,
+.quality-fx--advanced .quality-fx__bolt--2 {
+  opacity: var(--fx-bolt);
+}
+
+.quality-fx--elite .quality-fx__bolt--1,
+.quality-fx--elite .quality-fx__bolt--2,
+.quality-fx--elite .quality-fx__bolt--3,
+.quality-fx--elite .quality-fx__bolt--4 {
+  opacity: var(--fx-bolt);
+}
+
+.quality-fx--legendary .quality-fx__bolt--1,
+.quality-fx--legendary .quality-fx__bolt--2,
+.quality-fx--legendary .quality-fx__bolt--3,
+.quality-fx--legendary .quality-fx__bolt--4,
+.quality-fx--legendary .quality-fx__bolt--5,
+.quality-fx--legendary .quality-fx__bolt--6,
+.quality-fx--legendary .quality-fx__bolt--7,
+.quality-fx--godlike .quality-fx__bolt {
+  opacity: var(--fx-bolt);
+}
+
+.quality-fx--small .quality-fx__storm--2,
+.quality-fx--small .quality-fx__storm--3,
+.quality-fx--row .quality-fx__storm--2,
+.quality-fx--row .quality-fx__storm--3,
+.quality-fx--slot .quality-fx__storm--2,
+.quality-fx--slot .quality-fx__storm--3 {
+  display: none;
+}
+
+.quality-fx--small .quality-fx__bolt:nth-of-type(n + 11),
+.quality-fx--row .quality-fx__bolt:nth-of-type(n + 11),
+.quality-fx--slot .quality-fx__bolt:nth-of-type(n + 10) {
+  display: none;
+}
+
+#hangarScreen .equipment-slot .quality-fx,
+#hangarOverviewSection .equipment-slot.loadout-grid-slot .quality-fx {
+  position: absolute;
+  inset: 0;
+}
+
+#hangarOverviewSection .loadout-vault-row > .quality-fx {
+  width: 50px !important;
+  height: 50px !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+
+#hangarOverviewSection .loadout-detail-head > .quality-fx {
+  width: 54px !important;
+  height: 54px !important;
+}
+
+#hangarVaultSection .vault-storage-art .quality-fx {
+  width: 56px !important;
+  height: 54px !important;
+}
+
+#hangarVaultSection .vault-item-preview .quality-fx,
+#storeScreen .store-detail-visual .quality-fx,
+.upgrade-forge-screen .forge-selected-art .quality-fx {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#storeScreen .store-card-art .quality-fx {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#storeScreen .store-card-art::before,
+#storeScreen .store-card-art::after,
+#storeScreen .store-detail-visual::before,
+#storeScreen .store-detail-visual::after,
+#hangarVaultSection .vault-item-preview-glow,
+#hangarVaultSection .vault-item-preview .exchange-hero-ring,
+.upgrade-forge-screen .forge-selected-card--stack .forge-selected-art::after {
+  display: none !important;
+  content: none !important;
+}
+
+#storeScreen .store-card-art,
+#storeScreen .store-detail-visual,
+#hangarVaultSection .vault-storage-art,
+#hangarVaultSection .vault-item-preview,
+#hangarOverviewSection .loadout-detail-head,
+.upgrade-forge-screen .forge-selected-art {
+  isolation: isolate !important;
+}
+
+.quality-fx-host {
+  --q: #45c8ff;
+  --q2: #1d6dff;
+}
+
+.quality-fx-host.quality-fx--refined { --q: #2fff94; --q2: #12bc70; }
+.quality-fx-host.quality-fx--advanced { --q: #38d9ff; --q2: #5373ff; }
+.quality-fx-host.quality-fx--elite { --q: #be61ff; --q2: #ff4dd7; }
+.quality-fx-host.quality-fx--legendary { --q: #ffd04b; --q2: #ff7b1f; }
+.quality-fx-host.quality-fx--godlike { --q: #6dfff8; --q2: #ff2ccf; }
+
+.upgrade-forge-screen .forge-chamber-visual.quality-fx-host::after {
+  content: "";
+  position: absolute;
+  inset: 8% 20%;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 50%;
+  opacity: 0.32;
+  background:
+    conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--q) 34%, transparent), transparent, color-mix(in srgb, var(--q2) 28%, transparent), transparent);
+  filter: blur(14px);
+  animation: qualityFxStorm 5.8s linear infinite;
+}
+
+.upgrade-forge-screen .forge-chamber-visual.quality-fx--elite::after,
+.upgrade-forge-screen .forge-chamber-visual.quality-fx--legendary::after,
+.upgrade-forge-screen .forge-chamber-visual.quality-fx--godlike::after {
+  opacity: 0.56;
+}
+
+@keyframes qualityFxSweep {
+  0% { transform: translateX(-135%) skewX(-18deg); }
+  48%, 100% { transform: translateX(135%) skewX(-18deg); }
+}
+
+@keyframes qualityFxDrift {
+  from { background-position: 0 0, 10px 8px; }
+  to { background-position: 54px -54px, -12px 66px; }
+}
+
+@keyframes qualityFxBreathe {
+  0%, 100% { transform: scale(0.88); opacity: calc(var(--fx-aura) * 0.72); }
+  50% { transform: scale(1.14); opacity: var(--fx-aura); }
+}
+
+@keyframes qualityFxStorm {
+  from { transform: rotate(0deg) scale(0.92); }
+  50% { transform: rotate(180deg) scale(1.07); }
+  to { transform: rotate(360deg) scale(0.92); }
+}
+
+@keyframes qualityFxOrbit1 {
+  0%, 100% { transform: translate(-50%, -50%) rotate(-8deg) scale(0.96); }
+  50% { transform: translate(-50%, -50%) rotate(-2deg) scale(1.08); }
+}
+
+@keyframes qualityFxOrbit2 {
+  0%, 100% { transform: translate(-50%, -50%) rotate(9deg) scale(0.96); }
+  50% { transform: translate(-50%, -50%) rotate(16deg) scale(1.09); }
+}
+
+@keyframes qualityFxOrbit3 {
+  0%, 100% { transform: translate(-50%, -50%) rotate(23deg) scale(0.94); }
+  50% { transform: translate(-50%, -50%) rotate(35deg) scale(1.12); }
+}
+
+@keyframes qualityFxBolt {
+  0%, 54%, 100% { opacity: 0; }
+  56% { opacity: calc(var(--fx-bolt) * 0.14); }
+  57% { opacity: var(--fx-bolt); }
+  59% { opacity: calc(var(--fx-bolt) * 0.1); }
+  60% { opacity: calc(var(--fx-bolt) * 0.86); }
+  62% { opacity: calc(var(--fx-bolt) * 0.06); }
+  64% { opacity: calc(var(--fx-bolt) * 0.72); }
+  66% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quality-fx,
+  .quality-fx *,
+  .quality-fx::before,
+  .quality-fx::after,
+  .quality-fx-host::after {
+    animation: none !important;
+  }
+
+  .quality-fx__bolt {
+    opacity: 0 !important;
+  }
+
+  .quality-fx__storm {
+    opacity: calc(var(--fx-storm) * 0.32) !important;
+  }
+}

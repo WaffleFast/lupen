@@ -1065,7 +1065,7 @@ function renderVaultCatalog() {
     button.innerHTML = `
       ${entry.stackable ? `<span class="vault-card-count">x${formatNumber(entry.count)}</span>` : ""}
       <div class="vault-storage-art quality-${entry.quality}">
-        <img src="${entry.icon}" alt="${entry.name}">
+        ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "small" })}
       </div>
       <div class="vault-storage-copy">
         <strong>${entry.name}</strong>
@@ -1094,7 +1094,7 @@ function renderVaultDetail() {
       <div class="vault-item-preview">
         <div class="vault-item-preview-glow"></div>
         <div class="exchange-hero-ring"></div>
-        <img src="${entry.icon}" alt="${entry.name}">
+        ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "feature" })}
       </div>
 
       <div class="vault-item-identity">
@@ -1311,7 +1311,7 @@ function renderLoadoutItemDetail() {
   panel.innerHTML = `
     <div class="loadout-detail-card quality-${escapeHtml(detail.quality)}">
       <div class="loadout-detail-head">
-        <img src="${escapeHtml(detail.icon)}" alt="${escapeHtml(detail.name)}">
+        ${renderQualityFx(detail.quality, { src: detail.icon, alt: detail.name, size: "small" })}
         <div>
           <span>${escapeHtml(detail.typeLabel)} / ${escapeHtml(titleCaseQuality(detail.quality))}</span>
           <strong>${escapeHtml(detail.name)} / Lv ${formatNumber(detail.level)}</strong>
@@ -1897,7 +1897,7 @@ function renderLoadoutSlotGrid(box, categoryKey) {
     }
 
     slot.innerHTML = item
-      ? `<img src="${item.image}" alt="${item.name}">`
+      ? renderQualityFx(quality, { src: item.image, alt: item.name, size: "slot" })
       : supported
         ? `<span class="slot-empty-label" aria-hidden="true"><b>Empty</b> <small>Available</small></span>`
         : `<span class="slot-lock-mark" aria-hidden="true">LOCK</span>`;
@@ -2047,6 +2047,36 @@ function getEquipmentTooltipHtml(entry, categoryKey) {
 
 function showHangarTooltip(button, html) {
   button.dataset.tooltip = html || "";
+}
+
+function normalizeQualityFxTier(quality = "standard") {
+  const normalized = String(quality || "standard").toLowerCase();
+  if (["standard", "refined", "advanced", "elite", "legendary", "godlike"].includes(normalized)) return normalized;
+  if (normalized === "unique") return "refined";
+  if (normalized === "core") return "godlike";
+  return "standard";
+}
+
+function renderQualityFx(quality = "standard", options = {}) {
+  const tier = normalizeQualityFxTier(quality);
+  const src = escapeHtml(options.src || "");
+  const alt = escapeHtml(options.alt || "");
+  const size = escapeHtml(options.size || "card");
+  const extraClass = options.extraClass ? ` ${escapeHtml(options.extraClass)}` : "";
+  const bolts = Array.from({ length: 10 }, (_unused, index) => `<span class="quality-fx__bolt quality-fx__bolt--${index + 1}" aria-hidden="true"></span>`).join("");
+  return `
+    <span class="quality-fx quality-fx--${tier} quality-fx--${size}${extraClass}" data-quality-tier="${tier}">
+      <span class="quality-fx__flare" aria-hidden="true"></span>
+      <span class="quality-fx__storm quality-fx__storm--1" aria-hidden="true"></span>
+      <span class="quality-fx__storm quality-fx__storm--2" aria-hidden="true"></span>
+      <span class="quality-fx__storm quality-fx__storm--3" aria-hidden="true"></span>
+      <span class="quality-fx__ring quality-fx__ring--1" aria-hidden="true"></span>
+      <span class="quality-fx__ring quality-fx__ring--2" aria-hidden="true"></span>
+      <span class="quality-fx__ring quality-fx__ring--3" aria-hidden="true"></span>
+      ${bolts}
+      <img class="quality-fx__item" src="${src}" alt="${alt}">
+    </span>
+  `;
 }
 
 
@@ -2315,7 +2345,7 @@ function renderGunInventory() {
     bindHangarEquipmentTooltip(btn);
 
     btn.innerHTML = `
-      <img src="${entry.icon}" alt="${entry.name}">
+      ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "row" })}
       <span class="loadout-vault-row-copy">
         <strong>${escapeHtml(entry.name)}</strong>
         <small>${escapeHtml(getLoadoutVaultEntryStatLine(entry))}</small>
@@ -3184,7 +3214,7 @@ function renderStoreCatalog() {
       <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} quality-${quality}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
         ${status ? `<span class="store-card-status">${status}</span>` : ""}
         <div class="store-card-art quality-${quality}">
-          <img src="${item.kind === "ship" && typeof getShipAsset === "function" ? getShipAsset(item.key, "large") : item.image}" alt="${item.name}">
+          ${renderQualityFx(quality, { src: item.kind === "ship" && typeof getShipAsset === "function" ? getShipAsset(item.key, "large") : item.image, alt: item.name, size: "card" })}
         </div>
         <div class="store-card-name">${item.name}</div>
         <div class="store-card-sub">${categoryLabel}</div>
@@ -3306,7 +3336,7 @@ function renderStoreDetail() {
     <div class="store-detail-shell store-quality-${quality} compact-store-detail simplified-store-detail">
       <div class="store-detail-content">
         <div class="store-detail-visual quality-${quality}">
-          <img src="${item.image}" alt="${item.name}">
+          ${renderQualityFx(quality, { src: item.image, alt: item.name, size: "feature" })}
         </div>
 
         <div class="store-detail-kicker">${getStoreDetailKicker(item, quality)}</div>
