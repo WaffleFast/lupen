@@ -2270,6 +2270,15 @@ function getShipyardClassLabel(ship = {}) {
     .toUpperCase();
 }
 
+function getVesselExchangeClassLabel(ship = {}) {
+  const raw = String(ship.roleSubtitle || ship.role || "Available Hull").trim();
+  const labels = {
+    "Starter Fighter / Interceptor": "Starter Fighter",
+    "Ancient-Tech Endgame Ship": "Ancient-Tech"
+  };
+  return labels[raw] || raw.replace(/\s+hull$/i, "");
+}
+
 function getShipyardClassMark(ship = {}) {
   const label = getShipyardClassLabel(ship);
   return label.split(/\s+/).map(part => part[0]).join("").slice(0, 2) || "HX";
@@ -2390,7 +2399,7 @@ function renderShipyardDetail() {
 
       <div class="exchange-detail-identity">
         <h4>${ship.name}</h4>
-        <p>${ship.roleSubtitle || getShipyardClassLabel(ship)}</p>
+        <p>${getVesselExchangeClassLabel(ship)}</p>
       </div>
 
       <div class="exchange-detail-stat-grid">
@@ -2466,7 +2475,7 @@ function renderShipShop() {
         <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
-      <div class="fleet-card-role">${ship.roleSubtitle || getShipyardClassLabel(ship)}</div>
+      <div class="fleet-card-role">${getVesselExchangeClassLabel(ship)}</div>
     `;
     box.appendChild(card);
   });

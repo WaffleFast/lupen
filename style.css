@@ -37963,3 +37963,48 @@ input::placeholder {
   line-height: 1 !important;
   text-align: center !important;
 }
+
+/* ===== Vessel Exchange final micro-polish ===== */
+#hangarShipyardSection .shipyard-catalog-panel.fleet-gallery-panel {
+  overflow: hidden !important;
+}
+
+#hangarShipyardSection .shipyard-catalog-panel.fleet-gallery-panel #shipShop.shipyard-grid.vessel-card-grid {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card.fleet-selector-card.exchange-vessel-card .fleet-card-role {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  letter-spacing: 0.04em !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-detail-loadout .exchange-slot-pips {
+  display: grid !important;
+  grid-auto-flow: row !important;
+  grid-template-columns: repeat(10, 6px) !important;
+  grid-template-rows: repeat(2, 8px) !important;
+  grid-auto-rows: 8px !important;
+  place-content: center !important;
+  justify-content: center !important;
+  align-content: center !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  padding: 8px 10px !important;
+}
+
+#hangarShipyardSection .exchange-detail-footer button {
+  display: inline-grid !important;
+  place-items: center !important;
+  align-items: center !important;
+  justify-items: center !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}
