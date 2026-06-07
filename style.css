@@ -35116,6 +35116,26 @@ input::placeholder {
   opacity: 1 !important;
 }
 
+/* Keep the Hangar navigation row identical across Loadout, Fleet, Vessel Exchange and Vault. */
+#hangarScreen.hangar-screen.active:has(#hangarShipyardSection.active) {
+  grid-template-rows: 86px auto minmax(0, 1fr) !important;
+}
+
+#hangarScreen.hangar-screen.active:has(#hangarShipyardSection.active) .hangar-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin-bottom: 10px !important;
+}
+
+#hangarScreen.hangar-screen.active:has(#hangarShipyardSection.active) .hangar-tabs button {
+  min-width: 0 !important;
+  min-height: 38px !important;
+  padding: 10px 8px !important;
+  font-size: 12px !important;
+  letter-spacing: 0.8px !important;
+}
+
 /* Compact Vault detail so the forge action fits without a hidden bottom button. */
 #hangarVaultSection .vault-detail-panel-body,
 #hangarVaultSection #vaultDetailPanel {
