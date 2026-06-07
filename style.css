@@ -36772,3 +36772,271 @@ input::placeholder {
   min-height: 44px !important;
   font-size: 16px !important;
 }
+
+/* ===== Vessel Exchange polish pass ===== */
+#hangarShipyardSection .shipyard-catalog-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 13px 14px 12px !important;
+}
+
+#hangarShipyardSection .vessel-browser-header {
+  flex: 0 0 24px !important;
+  min-height: 24px !important;
+  align-items: center !important;
+}
+
+#hangarShipyardSection .vessel-browser-header span {
+  font-size: 17px !important;
+  line-height: 1 !important;
+}
+
+#hangarShipyardSection .vessel-zone-select {
+  display: none !important;
+}
+
+#hangarShipyardSection .vessel-filter-row {
+  flex: 0 0 30px !important;
+  gap: 7px !important;
+  min-height: 30px !important;
+}
+
+#hangarShipyardSection .vessel-filter-row button {
+  min-width: 74px !important;
+  min-height: 30px !important;
+  padding: 0 13px !important;
+  font-size: 12px !important;
+}
+
+#hangarShipyardSection #shipShop.shipyard-grid.vessel-card-grid {
+  flex: 1 1 auto !important;
+  grid-auto-rows: 220px !important;
+  gap: 11px !important;
+  padding: 2px 8px 8px 0 !important;
+}
+
+#hangarShipyardSection .exchange-vessel-card {
+  grid-template-rows: 94px auto auto minmax(0, 1fr) !important;
+  min-height: 220px !important;
+  height: 220px !important;
+  padding: 12px 14px 13px !important;
+  row-gap: 0 !important;
+}
+
+#hangarShipyardSection .exchange-vessel-card:hover,
+#hangarShipyardSection .exchange-vessel-card.selected {
+  box-shadow:
+    inset 0 0 24px rgba(35, 172, 255, 0.13),
+    0 0 14px rgba(0, 197, 255, 0.18) !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card .fleet-card-badge {
+  min-width: 66px !important;
+  min-height: 21px !important;
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card .fleet-card-image-wrap {
+  height: 94px !important;
+  min-height: 94px !important;
+  padding: 10px 4px 2px !important;
+  overflow: visible !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card .fleet-card-image-wrap img {
+  max-width: 158px !important;
+  max-height: 96px !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card .fleet-card-name {
+  margin-top: 2px !important;
+  font-size: 20px !important;
+  line-height: 1.05 !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card .fleet-card-role {
+  margin-top: 4px !important;
+  padding-bottom: 7px !important;
+  font-size: 11px !important;
+  line-height: 1.05 !important;
+}
+
+#hangarShipyardSection .vessel-card-description {
+  margin-top: 8px !important;
+  font-size: 12.5px !important;
+  line-height: 1.38 !important;
+  -webkit-line-clamp: 3 !important;
+}
+
+#hangarShipyardSection .shipyard-detail-panel {
+  grid-template-rows: 25px minmax(0, 1fr) !important;
+  padding: 12px !important;
+}
+
+#hangarShipyardSection .shipyard-detail-panel .modern-store-panel-header {
+  min-height: 25px !important;
+}
+
+#hangarShipyardSection .shipyard-detail-panel .modern-store-panel-header span {
+  font-size: 17px !important;
+}
+
+#hangarShipyardSection .shipyard-detail-panel .modern-store-panel-header small {
+  font-size: 11px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel.fleet-detail-body {
+  grid-template-rows: 152px 34px 82px 88px 42px !important;
+  gap: 7px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-hero.exchange-detail-hero {
+  height: 152px !important;
+  min-height: 152px !important;
+  border-color: rgba(80, 180, 238, 0.28) !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-hero img {
+  max-height: 146px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-hero-ring {
+  bottom: 9% !important;
+  width: 50% !important;
+  height: 24% !important;
+  opacity: 0.9 !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-title h4 {
+  font-size: 22px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-title p {
+  margin-top: 3px !important;
+  font-size: 11px !important;
+  letter-spacing: 0.06em !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-status-chip {
+  min-width: 72px !important;
+  padding: 4px 8px !important;
+  font-size: 9px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-stats {
+  gap: 7px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-stats .fleet-stat-chip {
+  min-height: 39px !important;
+  padding: 6px 10px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-stats .fleet-stat-chip span {
+  font-size: 10px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-stats .fleet-stat-chip strong {
+  font-size: 15px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-loadout-capacity {
+  min-height: 88px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .shipyard-capacity-heading {
+  margin-bottom: 6px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .shipyard-capacity-heading span {
+  font-size: 13px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-hardpoint-rail {
+  min-height: 60px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-capacity-strip {
+  gap: 7px !important;
+  padding: 0 10px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-capacity-strip span {
+  font-size: 10px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-capacity-strip strong {
+  font-size: 15px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-slot-pips {
+  gap: 4px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-slot-pip {
+  width: 6px !important;
+  height: 8px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-capacity-copy {
+  gap: 3px !important;
+  padding: 7px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-capacity-copy span {
+  font-size: 10px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-capacity-copy strong {
+  font-size: 16px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .exchange-capacity-copy small {
+  font-size: 11px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-actions.compact {
+  gap: 10px !important;
+}
+
+#hangarShipyardSection #shipyardDetailPanel .fleet-detail-actions.compact button {
+  min-height: 42px !important;
+  font-size: 15px !important;
+}
+
+#hangarShipyardSection .shipyard-catalog-panel.fleet-gallery-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-rows: none !important;
+  gap: 8px !important;
+  padding: 13px 14px 12px !important;
+}
+
+#hangarShipyardSection .shipyard-catalog-panel.fleet-gallery-panel .vessel-browser-header {
+  flex: 0 0 24px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+}
+
+#hangarShipyardSection .shipyard-catalog-panel.fleet-gallery-panel .vessel-filter-row {
+  flex: 0 0 30px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  margin: 0 !important;
+}
+
+#hangarShipyardSection .shipyard-catalog-panel.fleet-gallery-panel #shipShop.shipyard-grid.vessel-card-grid {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  grid-auto-rows: 220px !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card.fleet-selector-card.exchange-vessel-card {
+  grid-template-rows: 94px auto auto minmax(0, 1fr) !important;
+  min-height: 220px !important;
+  height: 220px !important;
+  padding: 12px 14px 13px !important;
+}
