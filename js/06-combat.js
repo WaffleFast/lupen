@@ -75,6 +75,7 @@ function selectStagingBotTarget(botId) {
   if (!bot || !bot.alive || (bot.currentNodeId || bot.node) !== currentNode) return;
 
   selectedTarget = { type: "stagingBot", id: bot.id };
+  window.LupenMultiplayerClient?.selectStagingBot?.(bot.id, { currentNode });
   showTargetPanel();
   const retargeted = retargetEngagementToSelectedTarget();
   updateAsteroidUI();

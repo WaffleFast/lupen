@@ -4784,6 +4784,33 @@ try {
   assert(inspectedBotAfterCooldownReject?.hull === inspectedBotAfterCombat.hull, "Cooldown rejection changed bot hull.");
   console.log("immediate second combat intent rejected by staging cooldown");
 
+  roomA.send("target:clear", {});
+  await waitFor("client A target selection to clear", () => !playerFrom(roomA, roomA.sessionId)?.selectedTargetBotId);
+  await waitForFireReady(roomA, roomA.sessionId);
+  const implicitRepeaterCombatResponse = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "repeater",
+      weaponName: "Regression Repeater",
+      weaponFamily: "rapid",
+      damage: 9999,
+      cooldownMs: 450,
+      currentNode: inspectedBotBeforeCombat.currentNode,
+      timestamp: Date.now()
+    });
+  });
+
+  assert(implicitRepeaterCombatResponse?.ok === true, "Implicit-lock Repeater combat intent did not resolve.");
+  assert(implicitRepeaterCombatResponse?.weaponKey === "repeater", "Implicit-lock combat did not resolve Repeater weapon key.");
+  assert(implicitRepeaterCombatResponse?.weaponName === "Repeater", "Implicit-lock combat did not use server-known Repeater name.");
+  assert(implicitRepeaterCombatResponse?.damage === 5, `Unexpected Repeater staging damage: ${implicitRepeaterCombatResponse?.damage}`);
+  assert(implicitRepeaterCombatResponse?.damageSource === "server_known_weapon", `Repeater did not use server-known weapon stats: ${implicitRepeaterCombatResponse?.damageSource}`);
+  assert(implicitRepeaterCombatResponse?.fallbackDamageUsed === false, "Repeater incorrectly used fallback damage.");
+  await waitFor("implicit combat lock to mirror into room state", () => {
+    return playerFrom(roomA, roomA.sessionId)?.selectedTargetBotId === inspectedBotBeforeCombat.id;
+  });
+  console.log("implicit combat lock resolved Repeater damage after target clear");
+
   const botForClientB = await moveAndSelectBot(roomB, inspectedBotBeforeCombat.id, "Regression Pilot B");
   const clientBContributionResponse = await expectCombatResolved(roomB, () => {
     roomB.send("combat:intent", {

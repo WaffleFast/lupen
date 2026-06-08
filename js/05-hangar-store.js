@@ -104,6 +104,25 @@ function setupMultiplayerStagingStoreSubscription() {
   multiplayerStagingStoreSubscribed = Boolean(subscription?.unsubscribe);
 }
 
+function waitForMultiplayerStagingResult(getResult, predicate, timeoutMs = 2200) {
+  const startedAt = Date.now();
+  return new Promise(resolve => {
+    const check = () => {
+      const result = typeof getResult === "function" ? getResult() : null;
+      if (result && (!predicate || predicate(result))) {
+        resolve(result);
+        return;
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve(result || null);
+        return;
+      }
+      setTimeout(check, 80);
+    };
+    check();
+  });
+}
+
 function getStagingStoreLocalLookupKey(item) {
   if (!item) return "";
   return `${item.kind}:${item.key}`;
@@ -333,9 +352,12 @@ async function requestStagingShipEquip(item) {
   renderStore();
   client.equipStagingShip({ itemId });
   if (typeof addHudToast === "function") addHudToast(`Requested MP staging ${shipName} selection.`);
-  setTimeout(async () => {
+  (async () => {
+    const latest = await waitForMultiplayerStagingResult(
+      () => client.getStatus?.().lastStagingLoadoutEquip,
+      result => result?.itemId === itemId
+    );
     multiplayerStagingShipEquipPending = false;
-    const latest = client.getStatus?.().lastStagingLoadoutEquip;
     if (latest?.itemId === itemId && latest.applied) {
       const selectedName = latest.name || shipName;
       const message = `${selectedName} selected: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
@@ -355,7 +377,7 @@ async function requestStagingShipEquip(item) {
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
-  }, 900);
+  })();
   return true;
 }
 
@@ -458,12 +480,15 @@ async function requestStagingLoadoutEquip(item) {
   renderStore();
   client.equipStagingLoadoutItem({ itemId });
   if (typeof addHudToast === "function") addHudToast(`Equipping ${item.name || "item"}.`);
-  setTimeout(async () => {
+  (async () => {
+    const latest = await waitForMultiplayerStagingResult(
+      () => client.getStatus?.().lastStagingLoadoutEquip,
+      result => result?.itemId === itemId && result?.operation !== "unequip"
+    );
     multiplayerStagingLoadoutEquipPendingItemId = "";
     multiplayerStagingCargoPodEquipPending = false;
     multiplayerStagingShieldBoosterEquipPending = false;
     multiplayerStagingPulseLaserEquipPending = false;
-    const latest = client.getStatus?.().lastStagingLoadoutEquip;
     if (latest?.itemId === itemId && latest.applied) {
       const statChange = latest.cargoCapacityBefore !== null && latest.cargoCapacityBefore !== undefined
         ? ` Cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`
@@ -484,10 +509,14 @@ async function requestStagingLoadoutEquip(item) {
           if (typeof addHudToast === "function") addHudToast("Item equipped. Reload if loadout values look stale.");
         }
       }
+    } else if (latest?.itemId === itemId) {
+      const reason = latest.userReason || latest.blockReason || latest.reason || "loadout unavailable";
+      if (typeof addHudToast === "function") addHudToast(`Equip blocked: ${reason}`);
+      if (typeof addActivityLog === "function") addActivityLog(`MP staging equip blocked: ${reason}`);
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
-  }, 900);
+  })();
   return true;
 }
 
@@ -509,9 +538,12 @@ async function requestStagingStorePurchase(item) {
   renderStore();
   client.purchaseStagingStoreItem({ itemId, quantity: 1 });
   if (typeof addHudToast === "function") addHudToast("Requested MP staging Store purchase.");
-  setTimeout(async () => {
+  (async () => {
+    const latest = await waitForMultiplayerStagingResult(
+      () => client.getStatus?.().lastStagingStorePurchase,
+      result => result?.itemId === itemId
+    );
     multiplayerStagingStorePurchasePending = false;
-    const latest = client.getStatus?.().lastStagingStorePurchase;
     if (latest?.itemId === itemId && latest.applied) {
       const spent = Number.isFinite(Number(latest.creditsBefore)) && Number.isFinite(Number(latest.creditsAfter))
         ? ` CR ${formatNumber(Math.max(0, Number(latest.creditsBefore) - Number(latest.creditsAfter)))} spent.`
@@ -530,10 +562,14 @@ async function requestStagingStorePurchase(item) {
           if (typeof addHudToast === "function") addHudToast("Staging purchase applied. Reload if Store values look stale.");
         }
       }
+    } else if (latest?.itemId === itemId) {
+      const reason = latest.userReason || latest.blockReason || latest.reason || "Store validation unavailable";
+      if (typeof addHudToast === "function") addHudToast(`Purchase blocked: ${reason}`);
+      if (typeof addActivityLog === "function") addActivityLog(`MP staging purchase blocked: ${reason}`);
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
-  }, 900);
+  })();
   return true;
 }
 
@@ -1172,9 +1208,12 @@ async function requestStagingLoadoutUnequip(entry) {
   multiplayerStagingLoadoutUnequipPending = true;
   client.unequipStagingLoadoutItem({ itemId });
   if (typeof addHudToast === "function") addHudToast(`Unequipping ${entry.name}.`);
-  setTimeout(async () => {
+  (async () => {
+    const latest = await waitForMultiplayerStagingResult(
+      () => client.getStatus?.().lastStagingLoadoutEquip,
+      result => result?.itemId === itemId && result?.operation === "unequip"
+    );
     multiplayerStagingLoadoutUnequipPending = false;
-    const latest = client.getStatus?.().lastStagingLoadoutEquip;
     if (latest?.itemId === itemId && latest.applied && latest.operation === "unequip") {
       const message = `${latest.name || entry.name} unequipped. Available ${formatNumber(latest.ownedAfter ?? 1)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
@@ -1190,11 +1229,15 @@ async function requestStagingLoadoutUnequip(entry) {
           if (typeof addHudToast === "function") addHudToast(`${latest.name || entry.name} unequipped. Reload if loadout values look stale.`);
         }
       }
+    } else if (latest?.itemId === itemId) {
+      const reason = latest.userReason || latest.blockReason || latest.reason || "loadout unavailable";
+      if (typeof addHudToast === "function") addHudToast(`Unequip blocked: ${reason}`);
+      if (typeof addActivityLog === "function") addActivityLog(`MP staging unequip blocked: ${reason}`);
     }
     selectedVaultActionContext = null;
     selectedLoadoutItemContext = null;
     renderHangar();
-  }, 900);
+  })();
   return true;
 }
 

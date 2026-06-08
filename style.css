@@ -31415,6 +31415,100 @@ input::placeholder {
   color: #ffe0a9 !important;
   background: linear-gradient(180deg, rgba(78, 54, 26, 0.92), rgba(42, 27, 14, 0.94)) !important;
 }
+
+@media (max-width: 700px) {
+  .upgrade-forge-screen.active {
+    width: calc(100vw - 24px) !important;
+    height: min(760px, calc(100vh - 48px)) !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: 12px !important;
+    padding: 22px 24px 24px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .upgrade-forge-screen .forge-topbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px !important;
+    width: 100% !important;
+  }
+
+  .upgrade-forge-screen .forge-topbar h2 {
+    font-size: 42px !important;
+  }
+
+  .upgrade-forge-screen .forge-topbar > div:first-child > span {
+    font-size: 17px !important;
+    line-height: 1.25 !important;
+  }
+
+  .upgrade-forge-screen .forge-top-stats {
+    width: 100% !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .upgrade-forge-screen .forge-top-chip {
+    min-width: 0 !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    min-height: 50px !important;
+    padding: 7px 9px !important;
+  }
+
+  .upgrade-forge-screen .forge-top-chip span {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 12px !important;
+  }
+
+  .upgrade-forge-screen .forge-top-chip strong {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 15px !important;
+  }
+
+  .upgrade-forge-screen .forge-top-stats .screen-back-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-column: 1 / -1 !important;
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+
+  .upgrade-forge-screen .upgrade-forge-layout {
+    width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-rows: auto !important;
+    gap: 12px !important;
+    overflow: visible !important;
+  }
+
+  .upgrade-forge-screen .forge-panel {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .upgrade-forge-screen .forge-chamber-panel {
+    grid-template-rows: auto 180px auto auto !important;
+  }
+
+  .upgrade-forge-screen .forge-chamber-visual,
+  .upgrade-forge-screen .forge-chamber-visual.missing-materials {
+    height: 180px !important;
+    min-height: 180px !important;
+    max-height: 180px !important;
+  }
+
+  .upgrade-forge-screen .forge-mode-switch {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .upgrade-forge-screen .forge-mode-card,
+  .upgrade-forge-screen .forge-mode-switch button {
+    min-height: 138px !important;
+  }
+}
 /* ===== Pilot Profile command deck background ===== */
 #pilotProfileScreen.pilot-profile-screen {
   background-color: #020814 !important;
@@ -41197,5 +41291,52 @@ input::placeholder {
 
   .quality-fx__storm {
     opacity: calc(var(--fx-storm) * 0.32) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  #hangarScreen #hangarOverviewSection.hangar-section.active {
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #hangarScreen #hangarOverviewSection .integrated-hangar-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px !important;
+    overflow: visible !important;
+  }
+
+  #hangarScreen #hangarOverviewSection .integrated-stats-panel,
+  #hangarScreen #hangarOverviewSection .hangar-loadout-stage,
+  #hangarScreen #hangarOverviewSection .equipment-drawer-panel {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-column: 1 / -1 !important;
+  }
+
+  #hangarScreen #hangarOverviewSection .integrated-stats-panel .overview-stat-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #hangarScreen #hangarOverviewSection .orbit-loadout-arena.scalable-loadout-arena {
+    grid-template-rows: minmax(150px, auto) auto !important;
+  }
+
+  #hangarScreen #hangarOverviewSection .loadout-hero-stage {
+    height: auto !important;
+    min-height: 150px !important;
+  }
+
+  #hangarScreen #hangarOverviewSection .loadout-slot-bank .orbit-slot-rail.scalable-loadout-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 }

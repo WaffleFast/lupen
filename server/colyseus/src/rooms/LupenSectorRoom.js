@@ -186,6 +186,30 @@ const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_BOT_RETURN_FIRE_DAMAGE = 4;
 const STAGING_BOT_RETURN_FIRE_INTERVAL_MS = 2600;
 const STAGING_WEAPON_STATS = Object.freeze({
+  heavyLance: Object.freeze({
+    key: "heavyLance",
+    name: "Heavy Lance",
+    family: "heavy",
+    type: "heavy",
+    damage: 16,
+    cooldownMs: 2222
+  }),
+  ionBlaster: Object.freeze({
+    key: "ionBlaster",
+    name: "Ion Blaster",
+    family: "ion",
+    type: "ion",
+    damage: 10,
+    cooldownMs: 909
+  }),
+  meltCannon: Object.freeze({
+    key: "meltCannon",
+    name: "Melt Cannon",
+    family: "melt",
+    type: "melt",
+    damage: 12,
+    cooldownMs: 1333
+  }),
   pulseLaser: Object.freeze({
     key: "pulseLaser",
     name: "Pulse Laser",
@@ -193,6 +217,30 @@ const STAGING_WEAPON_STATS = Object.freeze({
     type: "pulse",
     damage: 10,
     cooldownMs: 1000
+  }),
+  repeater: Object.freeze({
+    key: "repeater",
+    name: "Repeater",
+    family: "rapid",
+    type: "rapid",
+    damage: 5,
+    cooldownMs: 450
+  }),
+  ripperGun: Object.freeze({
+    key: "ripperGun",
+    name: "Ripper Gun",
+    family: "ripper",
+    type: "ripper",
+    damage: 11,
+    cooldownMs: 1250
+  }),
+  voidRail: Object.freeze({
+    key: "voidRail",
+    name: "Void Rail",
+    family: "sniper",
+    type: "sniper",
+    damage: 15,
+    cooldownMs: 2500
   })
 });
 const STAGING_BOT_DISABLED_RESET_MS = 6500;
@@ -2618,6 +2666,20 @@ export class LupenSectorRoom extends Room {
       playerId: identity.playerId
     });
     const envGate = getLoadoutWriteEnvGate(identity.trustedPlayerId || identity.playerId, itemId);
+    const stagingWeaponKey = itemId.startsWith("gun:") ? itemId.slice(4) : "";
+    const stagingWeapon = stagingWeaponKey ? STAGING_WEAPON_STATS[stagingWeaponKey] : null;
+    const baseName = itemId === "ship:falcon"
+      ? "F-1 Falcon"
+      : itemId === "ship:bison"
+        ? "B-1 Bison"
+        : itemId === "ship:monolith"
+          ? "Monolith"
+          : stagingWeapon?.name || (itemId === "attachment:shieldBooster" ? "Shield Booster" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "");
+    const baseCategory = itemId.startsWith("ship:")
+      ? "ship"
+      : itemId.startsWith("gun:")
+        ? "weapon"
+        : "equipment";
     const gates = {
       verified: identity.authStatus === "verified" && !!(identity.trustedPlayerId || identity.playerId),
       writeEnabled: envGate.writeEnabled,
@@ -2634,8 +2696,8 @@ export class LupenSectorRoom extends Room {
       applied: false,
       dryRun: true,
       itemId,
-      name: itemId === "ship:falcon" ? "F-1 Falcon" : itemId === "ship:bison" ? "B-1 Bison" : itemId === "ship:monolith" ? "Monolith" : itemId === "gun:pulseLaser" ? "Pulse Laser" : itemId === "attachment:shieldBooster" ? "Shield Booster" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "",
-      category: itemId.startsWith("ship:") ? "ship" : itemId === "gun:pulseLaser" ? "weapon" : "equipment",
+      name: baseName,
+      category: baseCategory,
       validationMode: trustedState?.available ? "trusted_save" : "unknown",
       trustedStateAvailable: trustedState?.available === true,
       gates,
@@ -2782,11 +2844,7 @@ export class LupenSectorRoom extends Room {
       validationReason = `unknown staging bot: ${targetBotId}`;
     }
 
-    if (!validationReason && !player.selectedTargetBotId) {
-      validationReason = "no staging bot selected";
-    }
-
-    if (!validationReason && player.selectedTargetBotId !== targetBotId) {
+    if (!validationReason && player.selectedTargetBotId && player.selectedTargetBotId !== targetBotId) {
       validationReason = "combat target does not match selected staging bot";
     }
 
@@ -2812,6 +2870,19 @@ export class LupenSectorRoom extends Room {
     if (validationReason) {
       this.sendCombatRejected(client, "combat_intent_rejected", message, messageType, validationReason);
       return;
+    }
+
+    if (!player.selectedTargetBotId) {
+      player.selectedTargetBotId = targetBotId;
+      client.send("target:selected", {
+        ok: true,
+        reason: "implicit_combat_lock",
+        messageType,
+        sessionId: client.sessionId,
+        targetBotId,
+        currentNode: player.currentNode,
+        receivedAt: Date.now()
+      });
     }
 
     const resolvedWeapon = resolveStagingWeapon(message, player);
@@ -2955,7 +3026,7 @@ export class LupenSectorRoom extends Room {
     const weaponKeys = Array.isArray(message.equippedWeaponKeys)
       ? message.equippedWeaponKeys.map((entry) => getSafeWeaponKey(entry)).filter(Boolean)
       : String(message.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean);
-    if (weaponKeys.length) player.equippedWeaponKeys = weaponKeys.slice(0, 6).join(",");
+    if (weaponKeys.length) player.equippedWeaponKeys = weaponKeys.slice(0, 20).join(",");
 
     const currentNode = getStringValue(message.currentNode);
     if (currentNode) player.currentNode = currentNode;
