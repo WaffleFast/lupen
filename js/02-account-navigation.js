@@ -974,6 +974,8 @@ function getEquippedWeapon(shipId = currentShipId) {
     .join(" + ");
 
   return {
+    key: equippedGuns[0]?.key || "",
+    weaponKeys: equippedGuns.map(item => item.key).filter(Boolean),
     name,
     damage,
     damageLayers,

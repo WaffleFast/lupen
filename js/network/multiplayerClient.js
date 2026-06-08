@@ -530,11 +530,16 @@
       }
 
       const weapon = global.getEquippedWeapon() || {};
+      const weaponKeys = Array.isArray(weapon.weaponKeys)
+        ? weapon.weaponKeys.map((key) => String(key || "")).filter(Boolean)
+        : [];
+      const normalizedWeaponKeys = equippedWeaponKeys.length ? equippedWeaponKeys : weaponKeys;
+      const normalizedWeaponKey = String(equippedWeaponKey || normalizedWeaponKeys[0] || weapon.key || weapon.id || "");
       return {
-        weaponId: String(equippedWeaponKey || weapon.id || weapon.key || weapon.familyId || weapon.fireStyle || "equippedWeapon"),
-        weaponKey: equippedWeaponKey || String(weapon.key || weapon.id || ""),
-        equippedWeaponKey,
-        equippedWeaponKeys,
+        weaponId: String(normalizedWeaponKey || weapon.familyId || weapon.fireStyle || "equippedWeapon"),
+        weaponKey: normalizedWeaponKey,
+        equippedWeaponKey: normalizedWeaponKey,
+        equippedWeaponKeys: normalizedWeaponKeys,
         weaponName: String(weapon.name || "Equipped Weapon").slice(0, 80),
         weaponFamily: String(weapon.familyId || weapon.family || weapon.fireStyle || weapon.type || ""),
         weaponType: String(weapon.type || weapon.fireStyle || ""),

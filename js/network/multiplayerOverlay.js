@@ -601,6 +601,13 @@
         filter: drop-shadow(0 0 8px rgba(255, 128, 62, 0.42));
       }
 
+      .lupen-mp-space-bot-hitbox {
+        position: absolute;
+        inset: -14px -18px 12px;
+        z-index: 0;
+        pointer-events: auto;
+      }
+
       .lupen-mp-space-bot::after {
         content: "";
         position: absolute;
@@ -644,10 +651,12 @@
 
       .lupen-mp-space-bot-ship {
         position: relative;
+        z-index: 1;
         width: 76px;
         height: 76px;
         display: grid;
         place-items: center;
+        pointer-events: none;
       }
 
       .lupen-mp-space-bot-ship::after {
@@ -680,9 +689,12 @@
         clip-path: polygon(50% 0%, 88% 48%, 68% 48%, 72% 88%, 50% 72%, 28% 88%, 32% 48%, 12% 48%);
         background: linear-gradient(180deg, rgba(255, 184, 92, 0.76), rgba(255, 74, 58, 0.4));
         border: 1px solid rgba(255, 224, 180, 0.58);
+        pointer-events: none;
       }
 
       .lupen-mp-space-bot-label {
+        position: relative;
+        z-index: 1;
         padding: 2px 5px;
         border: 1px solid rgba(255, 163, 92, 0.46);
         border-radius: 4px;
@@ -691,14 +703,18 @@
         font: 800 9px/1.15 Arial, sans-serif;
         text-transform: uppercase;
         white-space: nowrap;
+        pointer-events: none;
       }
 
       .lupen-mp-space-bot-note {
+        position: relative;
+        z-index: 1;
         color: rgba(255, 213, 172, 0.8);
         font: 700 8px/1 Arial, sans-serif;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         text-shadow: 0 1px 3px rgba(10, 2, 0, 0.9);
+        pointer-events: none;
       }
 
       .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-note::after {
@@ -718,10 +734,13 @@
       }
 
       .lupen-mp-space-bot-bars {
+        position: relative;
+        z-index: 1;
         width: 74px;
         display: grid;
         gap: 2px;
         margin-top: -5px;
+        pointer-events: none;
       }
 
       .lupen-mp-space-bot-bar {
@@ -1523,6 +1542,15 @@
     title.textContent = `${getBotLabel(bot)} / ${getBotModeLabel()} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards / ${bot.id || "unknown"} / x:${bot.x} y:${bot.y}`;
     group.appendChild(title);
 
+    const hitArea = global.document.createElementNS(SVG_NS, "circle");
+    hitArea.setAttribute("cx", "0");
+    hitArea.setAttribute("cy", "0");
+    hitArea.setAttribute("r", "4.4");
+    hitArea.setAttribute("fill", "rgba(255, 255, 255, 0.001)");
+    hitArea.setAttribute("stroke", "none");
+    hitArea.setAttribute("pointer-events", canSelectOnMap ? "all" : "none");
+    group.appendChild(hitArea);
+
     const halo = global.document.createElementNS(SVG_NS, "circle");
     halo.setAttribute("cx", "0");
     halo.setAttribute("cy", "0");
@@ -1530,6 +1558,7 @@
     halo.setAttribute("fill", "rgba(255, 114, 60, 0.08)");
     halo.setAttribute("stroke", "rgba(255, 160, 87, 0.42)");
     halo.setAttribute("stroke-width", "0.12");
+    halo.setAttribute("pointer-events", "none");
     group.appendChild(halo);
 
     if (selectedTargetBotId === bot.id) {
@@ -1541,6 +1570,7 @@
       lockRing.setAttribute("stroke", "rgba(255, 244, 199, 0.92)");
       lockRing.setAttribute("stroke-width", "0.18");
       lockRing.setAttribute("stroke-dasharray", "0.9 0.7");
+      lockRing.setAttribute("pointer-events", "none");
       group.appendChild(lockRing);
     }
 
@@ -1556,6 +1586,7 @@
       damageText.setAttribute("stroke", "rgba(25, 5, 0, 0.96)");
       damageText.setAttribute("stroke-width", "0.28");
       damageText.setAttribute("text-anchor", "middle");
+      damageText.setAttribute("pointer-events", "none");
       damageText.textContent = `-${damageAmount}`;
       group.appendChild(damageText);
     }
@@ -1572,6 +1603,7 @@
       ship.setAttribute("opacity", bot.disabled ? "0.44" : "0.86");
       ship.setAttribute("preserveAspectRatio", "xMidYMid meet");
       ship.setAttribute("filter", "drop-shadow(0 0 2px rgba(255, 113, 55, 0.68))");
+      ship.setAttribute("pointer-events", "none");
       group.appendChild(ship);
     } else {
       const ship = global.document.createElementNS(SVG_NS, "polygon");
@@ -1580,6 +1612,7 @@
       ship.setAttribute("stroke", "rgba(255, 225, 185, 0.82)");
       ship.setAttribute("stroke-width", "0.18");
       ship.setAttribute("filter", "drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72))");
+      ship.setAttribute("pointer-events", "none");
       group.appendChild(ship);
 
       const core = global.document.createElementNS(SVG_NS, "circle");
@@ -1589,6 +1622,7 @@
       core.setAttribute("fill", "rgba(48, 9, 4, 0.8)");
       core.setAttribute("stroke", "rgba(255, 230, 194, 0.82)");
       core.setAttribute("stroke-width", "0.1");
+      core.setAttribute("pointer-events", "none");
       group.appendChild(core);
     }
 
@@ -1602,6 +1636,7 @@
     note.setAttribute("stroke", "rgba(10, 2, 0, 0.96)");
     note.setAttribute("stroke-width", "0.24");
     note.setAttribute("text-anchor", labelOffset < 0 ? "end" : "start");
+    note.setAttribute("pointer-events", "none");
     note.textContent = getCompactBotModeLabel();
     group.appendChild(note);
 
@@ -1749,6 +1784,11 @@
         if (bot.disabled && !isMpDebugEnabled()) return;
         selectStagingBot(bot);
       });
+
+      const hitbox = global.document.createElement("span");
+      hitbox.className = "lupen-mp-space-bot-hitbox";
+      hitbox.setAttribute("aria-hidden", "true");
+      marker.appendChild(hitbox);
 
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-bot-ship";

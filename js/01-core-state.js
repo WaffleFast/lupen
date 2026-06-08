@@ -1815,7 +1815,9 @@ function getSelectedHostileBot() {
 function getStagingBotTargetById(id) {
   if (!id || typeof window === "undefined") return null;
   const client = window.LupenMultiplayerClient;
-  const bot = client?.getBotById?.(id);
+  const bot = client?.getBotById?.(id)
+    || client?.getBotsInCurrentNode?.(currentNode)?.find(item => String(item?.id || "") === String(id))
+    || client?.getBots?.()?.find(item => String(item?.id || "") === String(id));
   if (!bot) return null;
   const node = bot.currentNode || bot.currentNodeId || bot.node;
   return {
@@ -1890,6 +1892,15 @@ function getVisibleHostileBotsForLocalTargetUi() {
   return isStagingLocalCombatBotVisualGuardActive() ? [] : getVisibleHostileBots();
 }
 
+function getVisibleStagingBotTargets() {
+  if (typeof window === "undefined") return [];
+  const client = window.LupenMultiplayerClient;
+  const bots = client?.getBotsInCurrentNode?.(currentNode) || client?.getBots?.() || [];
+  return bots
+    .map(bot => getStagingBotTargetById(bot?.id))
+    .filter(bot => bot && bot.alive && (bot.currentNodeId || bot.node) === currentNode);
+}
+
 function isBotFacingPlayer(bot) {
   return Boolean(bot && Number(bot.attackingUntil || 0) > Date.now());
 }
@@ -1934,7 +1945,7 @@ function triggerWarningBanner(text = "WARNING") {
 }
 
 function getVisibleTargets() {
-  return [...getVisibleHostileBotsForLocalTargetUi(), ...getVisibleAsteroids()];
+  return [...getVisibleStagingBotTargets(), ...getVisibleHostileBotsForLocalTargetUi(), ...getVisibleAsteroids()];
 }
 
 function showScreen(screenId) {

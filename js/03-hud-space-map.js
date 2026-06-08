@@ -718,7 +718,10 @@ function getMultiplayerPresencePayload() {
   const ship = SHIPS[currentShipId] || {};
   const loadout = typeof getShipLoadout === "function" ? getShipLoadout(currentShipId) : { guns: [] };
   const equippedWeaponKeys = Array.isArray(loadout?.guns)
-    ? loadout.guns.map((entry) => typeof entry === "string" ? entry : entry?.key).filter(Boolean)
+    ? loadout.guns.map((entry) => {
+      if (typeof getEquipmentKey === "function") return getEquipmentKey(entry);
+      return typeof entry === "string" ? entry : entry?.key;
+    }).map((key) => String(key || "").trim()).filter(Boolean)
     : [];
   const shipName = ship.name || "";
   const shipImage = typeof getShipAsset === "function" ? getShipAsset(currentShipId, "medium") : (ship.image || "");

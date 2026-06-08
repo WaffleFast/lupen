@@ -773,33 +773,44 @@ function resolveStagingWeapon(message = {}, player = null) {
   const presenceListKey = getFirstWeaponKeyFromList(player?.equippedWeaponKeys);
   const weaponKey = payloadKey || payloadListKey || presenceKey || presenceListKey;
   const known = STAGING_WEAPON_STATS[weaponKey] || null;
+  const requestedDamage = getRequestedDamageFromPayload(message);
+  const payloadCount = getNumberValue(message.count, 0);
+  const hasMultiWeaponLoadout = payloadCount > 1 || String(message.weaponName || "").includes(" + ");
 
   if (known) {
+    const knownDamage = clampNumber(Math.round(known.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
+    const aggregateDamage = hasMultiWeaponLoadout && requestedDamage > knownDamage
+      ? clampNumber(Math.round(requestedDamage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX)
+      : knownDamage;
     return {
       weaponKey: known.key,
       weaponName: known.name,
       weaponFamily: known.family,
       weaponType: known.type,
-      damage: clampNumber(Math.round(known.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX),
+      damage: aggregateDamage,
       cooldownMs: clampNumber(Math.round(known.cooldownMs), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS),
-      damageSource: "server_known_weapon",
+      damageSource: aggregateDamage === knownDamage ? "server_known_weapon" : "client_loadout_aggregate",
       fallbackDamageUsed: false,
       pulseLaserDetected: known.key === "pulseLaser",
-      requestedDamage: getRequestedDamageFromPayload(message)
+      requestedDamage
     };
   }
+
+  const clampedRequestedDamage = hasMultiWeaponLoadout && requestedDamage > 0
+    ? clampNumber(Math.round(requestedDamage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX)
+    : STAGING_TEST_DAMAGE;
 
   return {
     weaponKey,
     weaponName: getStringValue(message.weaponName, "Staging Fallback") || "Staging Fallback",
     weaponFamily: getStringValue(message.weaponFamily || message.weaponType || "staging-fallback"),
     weaponType: getStringValue(message.weaponType || message.weaponFamily || "staging-fallback"),
-    damage: STAGING_TEST_DAMAGE,
+    damage: clampedRequestedDamage,
     cooldownMs: STAGING_FIRE_COOLDOWN_MS,
-    damageSource: weaponKey ? "fallback_unknown_weapon" : "fallback_no_weapon",
-    fallbackDamageUsed: true,
+    damageSource: hasMultiWeaponLoadout && requestedDamage > 0 ? "client_loadout_aggregate" : (weaponKey ? "fallback_unknown_weapon" : "fallback_no_weapon"),
+    fallbackDamageUsed: !(hasMultiWeaponLoadout && requestedDamage > 0),
     pulseLaserDetected: false,
-    requestedDamage: getRequestedDamageFromPayload(message)
+    requestedDamage
   };
 }
 

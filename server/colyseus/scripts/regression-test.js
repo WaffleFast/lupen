@@ -4816,6 +4816,38 @@ try {
   console.log("client B contributed staging damage to shared bot");
 
   await waitForFireReady(roomA, roomA.sessionId);
+  const multiWeaponCombatResponse = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "voidRail",
+      weaponName: "Pulse Laser x2 + Advanced Ion Blaster + Heavy Lance",
+      weaponFamily: "multi",
+      damage: 37,
+      count: 7,
+      equippedWeaponKeys: ["pulseLaser", "pulseLaser", "ionBlaster", "heavyLance", "meltCannon", "repeater", "voidRail"],
+      cooldownMs: 900,
+      currentNode: inspectedBotBeforeCombat.currentNode,
+      timestamp: Date.now()
+    });
+  });
+
+  assert(multiWeaponCombatResponse?.stagingDamage === 37, `Multi-weapon aggregate damage was not accepted: ${multiWeaponCombatResponse?.stagingDamage}`);
+  assert(multiWeaponCombatResponse?.damageSource === "client_loadout_aggregate", `Multi-weapon aggregate had unexpected source: ${multiWeaponCombatResponse?.damageSource}`);
+  assert(multiWeaponCombatResponse?.fallbackDamageUsed === false, "Multi-weapon aggregate incorrectly used fallback damage.");
+  await waitFor("both clients to receive multi-weapon aggregate damage", () => {
+    const botA = botById(roomA, inspectedBotBeforeCombat.id);
+    const botB = botById(roomB, inspectedBotBeforeCombat.id);
+    return botA && botB &&
+      botA.shield === multiWeaponCombatResponse.shield &&
+      botA.hull === multiWeaponCombatResponse.hull &&
+      botB.shield === multiWeaponCombatResponse.shield &&
+      botB.hull === multiWeaponCombatResponse.hull;
+  });
+  const inspectedBotAfterMultiWeaponCombat = botById(roomA, inspectedBotBeforeCombat.id);
+  assert(botHealthTotal(inspectedBotAfterMultiWeaponCombat) === botHealthTotal(inspectedBotAfterClientBCombat) - Number(multiWeaponCombatResponse.damage || 0), "Multi-weapon aggregate did not apply resolved staging damage.");
+  console.log("multi-weapon staging loadout aggregate damage applied within server clamp");
+
+  await waitForFireReady(roomA, roomA.sessionId);
   const oversizedCombatResponse = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetBotId: inspectedBotBeforeCombat.id,
@@ -4843,8 +4875,8 @@ try {
       botB.hull === oversizedCombatResponse.hull;
   });
   const inspectedBotAfterOversizedCombat = botById(roomA, inspectedBotBeforeCombat.id);
-  assert(botHealthTotal(inspectedBotAfterOversizedCombat) === botHealthTotal(inspectedBotAfterClientBCombat) - 5, "Oversized unknown weapon did not apply fallback staging damage.");
-  console.log("oversized unknown weapon damage ignored in favor of server fallback");
+  assert(botHealthTotal(inspectedBotAfterOversizedCombat) === botHealthTotal(inspectedBotAfterMultiWeaponCombat) - 5, "Oversized unknown weapon did not apply fallback staging damage.");
+  console.log("oversized single unknown weapon damage ignored in favor of server fallback");
 
   await waitForFireReady(roomA, roomA.sessionId);
   const invalidWeaponCombatResponse = await expectCombatResolved(roomA, () => {
