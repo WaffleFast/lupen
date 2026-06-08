@@ -715,6 +715,102 @@ function isDebugToolsEnabled() {
   return params.has("debug") || localStorage.getItem("lupenDebugTools") === "true";
 }
 
+function isStagingTestGrantEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  const host = String(window.location.hostname || "").toLowerCase();
+  const localHost = ["localhost", "127.0.0.1", "::1"].includes(host);
+  const stagingUrl = params.get("mp") === "staging";
+  const mpDebug = params.get("debug") === "mp";
+  const stagingClient = window.LupenMultiplayerClient?.getStatus?.()?.enabledReason === "staging_enabled";
+  return Boolean(stagingUrl || stagingClient || (localHost && mpDebug) || isDebugToolsEnabled());
+}
+
+function ensureLupenCoreCount(targetCount) {
+  const target = Math.max(0, Math.floor(Number(targetCount || 0)));
+  const current = Array.isArray(inventoryItems)
+    ? inventoryItems.filter(item => item?.key === "lupenCore").length
+    : 0;
+  const missing = Math.max(0, target - current);
+  for (let index = 0; index < missing; index += 1) {
+    inventoryItems.push({
+      id: `debug-core-${Date.now()}-${index}-${Math.random().toString(16).slice(2, 8)}`,
+      key: "lupenCore",
+      quality: typeof LUPEN_CORE_QUALITY !== "undefined" ? LUPEN_CORE_QUALITY : "core",
+      level: 1,
+      source: "staging_debug_grant"
+    });
+  }
+  return current + missing;
+}
+
+function addLupenCores(quantity) {
+  const total = Math.max(0, Math.floor(Number(quantity || 0)));
+  for (let index = 0; index < total; index += 1) {
+    inventoryItems.push({
+      id: `debug-core-${Date.now()}-${index}-${Math.random().toString(16).slice(2, 8)}`,
+      key: "lupenCore",
+      quality: typeof LUPEN_CORE_QUALITY !== "undefined" ? LUPEN_CORE_QUALITY : "core",
+      level: 1,
+      source: "staging_debug_grant"
+    });
+  }
+  return Array.isArray(inventoryItems)
+    ? inventoryItems.filter(item => item?.key === "lupenCore").length
+    : 0;
+}
+
+function refreshAfterStagingTestGrant(message) {
+  if (typeof addActivityLog === "function") addActivityLog(message);
+  if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (typeof updateHudDock === "function") updateHudDock();
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  if (typeof renderHangar === "function" && document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
+  if (typeof renderStore === "function" && document.getElementById("storeScreen")?.classList.contains("active")) renderStore();
+  if (typeof renderUpgradeForge === "function" && document.getElementById("upgradeForgeScreen")?.classList.contains("active")) renderUpgradeForge();
+  if (typeof window.LupenMultiplayerOverlay?.scheduleRender === "function") window.LupenMultiplayerOverlay.scheduleRender();
+  saveGame();
+}
+
+function grantStagingTestFunds(options = {}) {
+  if (!isStagingTestGrantEnabled()) {
+    console.warn("Staging test funds grant blocked: debug/staging guard is not active.");
+    return {
+      ok: false,
+      reason: "debug_guard_inactive"
+    };
+  }
+
+  if (!Array.isArray(inventoryItems)) inventoryItems = [];
+  upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+
+  const small = options?.small === true || options?.mode === "small";
+  if (small) {
+    credits = Math.max(0, Math.floor(Number(credits || 0))) + 100000;
+    addLupenCores(10);
+    upgradeMaterials.lupenShards = Math.max(0, Math.floor(Number(upgradeMaterials.lupenShards || 0))) + 100;
+  } else {
+    credits = Math.max(Math.max(0, Math.floor(Number(credits || 0))), 1000000);
+    ensureLupenCoreCount(100);
+    upgradeMaterials.lupenShards = Math.max(Math.max(0, Math.floor(Number(upgradeMaterials.lupenShards || 0))), 1000);
+  }
+
+  const coreCount = Array.isArray(inventoryItems)
+    ? inventoryItems.filter(item => item?.key === "lupenCore").length
+    : 0;
+  const result = {
+    ok: true,
+    mode: small ? "small" : "full",
+    credits,
+    lupenCores: coreCount,
+    lupenShards: Math.max(0, Math.floor(Number(upgradeMaterials.lupenShards || 0)))
+  };
+  refreshAfterStagingTestGrant(small ? "Granted small staging test funds." : "Granted staging test funds.");
+  console.info("Granted staging test funds", result);
+  return result;
+}
+
+window.lupenDebugGrantTestFunds = grantStagingTestFunds;
+
 function refreshDebugToolsUI(message = "") {
   const status = document.getElementById("debugToolsStatus");
   if (status) status.textContent = message;
@@ -741,12 +837,18 @@ function ensureDebugToolsPanel() {
       <button type="button" onclick="debugGrantDemoWeapons()">Demo Weapons</button>
       <button type="button" onclick="debugGrantLupenCore()">Lupen Core</button>
       <button type="button" onclick="debugGrantCredits()">+50K CR</button>
+      <button type="button" onclick="debugGrantTestFunds()">Grant Test Funds</button>
       <button type="button" onclick="debugOpenBounty()">Bounty Board</button>
       <button type="button" onclick="debugResetSave()">Reset Save</button>
     </div>
     <span id="debugToolsStatus"></span>
   `;
   document.body.appendChild(panel);
+}
+
+function debugGrantTestFunds() {
+  const result = grantStagingTestFunds();
+  refreshDebugToolsUI(result.ok ? "Granted staging test funds." : "Grant blocked.");
 }
 
 function debugSkipTutorial() {

@@ -2897,24 +2897,54 @@
   }
 
   function addDiagnosticsActions(panel, status, selectedBot) {
-    if (!canShowStagingTestFire(status, selectedBot)) return;
+    if (!canShowStagingTestFire(status, selectedBot) && typeof global.lupenDebugGrantTestFunds !== "function") return;
 
     const actions = global.document.createElement("div");
     actions.className = "lupen-mp-diagnostics-actions";
 
-    const button = global.document.createElement("button");
-    button.type = "button";
-    button.className = "lupen-mp-test-fire-button";
-    const cooldownRemainingMs = Math.max(0, Number(status.fireCooldownRemainingMs || 0));
-    button.textContent = cooldownRemainingMs > 0 ? `Test Fire ${formatCooldown(cooldownRemainingMs)}` : "Test Fire";
-    button.title = "Send staging-only server test damage. No real combat or rewards.";
-    button.disabled = !canSendStagingTestFire(status, selectedBot);
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      sendStagingTestFire(selectedBot);
-    });
-    actions.appendChild(button);
+    if (typeof global.lupenDebugGrantTestFunds === "function") {
+      const grantButton = global.document.createElement("button");
+      grantButton.type = "button";
+      grantButton.className = "lupen-mp-test-fire-button";
+      grantButton.textContent = "Grant Test Funds";
+      grantButton.title = "Staging/debug only: set CR 1,000,000, LC 100, and LS 1,000 for the current save.";
+      grantButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        global.lupenDebugGrantTestFunds();
+        scheduleRender();
+      });
+      actions.appendChild(grantButton);
+
+      const smallGrantButton = global.document.createElement("button");
+      smallGrantButton.type = "button";
+      smallGrantButton.className = "lupen-mp-test-fire-button";
+      smallGrantButton.textContent = "+Small Funds";
+      smallGrantButton.title = "Staging/debug only: add CR 100,000, LC 10, and LS 100 to the current save.";
+      smallGrantButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        global.lupenDebugGrantTestFunds({ small: true });
+        scheduleRender();
+      });
+      actions.appendChild(smallGrantButton);
+    }
+
+    if (canShowStagingTestFire(status, selectedBot)) {
+      const button = global.document.createElement("button");
+      button.type = "button";
+      button.className = "lupen-mp-test-fire-button";
+      const cooldownRemainingMs = Math.max(0, Number(status.fireCooldownRemainingMs || 0));
+      button.textContent = cooldownRemainingMs > 0 ? `Test Fire ${formatCooldown(cooldownRemainingMs)}` : "Test Fire";
+      button.title = "Send staging-only server test damage. No real combat or rewards.";
+      button.disabled = !canSendStagingTestFire(status, selectedBot);
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        sendStagingTestFire(selectedBot);
+      });
+      actions.appendChild(button);
+    }
     panel.appendChild(actions);
   }
 

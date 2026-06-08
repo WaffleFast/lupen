@@ -1140,8 +1140,15 @@ function getStoredEquipmentItemCount() {
   return attachmentCount + gunCount;
 }
 
+function isStackableInventoryResource(item) {
+  return item?.key === "lupenCore";
+}
+
 function getCarriedInventoryItemCount() {
-  return (Array.isArray(inventoryItems) ? inventoryItems.length : 0) + getStoredEquipmentItemCount();
+  const carriedGearCount = Array.isArray(inventoryItems)
+    ? inventoryItems.filter(item => !isStackableInventoryResource(item)).length
+    : 0;
+  return carriedGearCount + getStoredEquipmentItemCount();
 }
 
 function getAvailableInventoryItemSlots() {
@@ -1226,8 +1233,11 @@ function removeInventoryItems(key, quality, quantity) {
 }
 
 function trimPrototypeInventoryItems() {
-  if (Array.isArray(inventoryItems) && inventoryItems.length > MAX_CARRIED_INVENTORY_ITEMS) {
-    inventoryItems = inventoryItems.slice(0, MAX_CARRIED_INVENTORY_ITEMS);
+  if (!Array.isArray(inventoryItems)) return;
+  const resources = inventoryItems.filter(isStackableInventoryResource);
+  const carriedGear = inventoryItems.filter(item => !isStackableInventoryResource(item));
+  if (carriedGear.length > MAX_CARRIED_INVENTORY_ITEMS) {
+    inventoryItems = [...carriedGear.slice(0, MAX_CARRIED_INVENTORY_ITEMS), ...resources];
   }
 }
 
