@@ -4846,12 +4846,12 @@ try {
   const multiWeaponCombatResponse = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetBotId: inspectedBotBeforeCombat.id,
-      weaponId: "voidRail",
-      weaponName: "Pulse Laser x2 + Advanced Ion Blaster + Heavy Lance",
+      weaponId: "equippedWeapon",
+      weaponName: "Pulse Laser x2 + Advanced Ion Blaster + Heavy Lance + Attachments",
       weaponFamily: "multi",
       damage: 37,
-      count: 7,
-      equippedWeaponKeys: ["pulseLaser", "pulseLaser", "ionBlaster", "heavyLance", "meltCannon", "repeater", "voidRail"],
+      count: 8,
+      equippedWeaponKeys: ["pulseLaser", "pulseLaser", "ionBlaster", "heavyLance", "shieldBooster", "cargoRig", "meltCannon", "repeater", "voidRail"],
       cooldownMs: 900,
       currentNode: inspectedBotBeforeCombat.currentNode,
       timestamp: Date.now()
@@ -4861,6 +4861,11 @@ try {
   assert(multiWeaponCombatResponse?.stagingDamage === 37, `Multi-weapon aggregate damage was not accepted: ${multiWeaponCombatResponse?.stagingDamage}`);
   assert(multiWeaponCombatResponse?.damageSource === "client_loadout_aggregate", `Multi-weapon aggregate had unexpected source: ${multiWeaponCombatResponse?.damageSource}`);
   assert(multiWeaponCombatResponse?.fallbackDamageUsed === false, "Multi-weapon aggregate incorrectly used fallback damage.");
+  assert(multiWeaponCombatResponse?.weaponKey === "pulseLaser", `Multi-weapon aggregate did not prefer equipped gun keys over generic weaponId: ${multiWeaponCombatResponse?.weaponKey}`);
+  assert(Number(multiWeaponCombatResponse?.activeShipWeaponCount || 0) === 8, `Unexpected active weapon debug count: ${multiWeaponCombatResponse?.activeShipWeaponCount}`);
+  assert(Number(multiWeaponCombatResponse?.validCombatWeaponCount || 0) === 6, `Unexpected valid weapon debug count: ${multiWeaponCombatResponse?.validCombatWeaponCount}`);
+  assert(Number(multiWeaponCombatResponse?.rejectedWeaponCount || 0) === 3, `Unexpected rejected weapon debug count: ${multiWeaponCombatResponse?.rejectedWeaponCount}`);
+  assert(String(multiWeaponCombatResponse?.firstRejectedWeaponReason || "").startsWith("unknown_weapon:"), `Missing first rejected weapon reason: ${multiWeaponCombatResponse?.firstRejectedWeaponReason}`);
   await waitFor("both clients to receive multi-weapon aggregate damage", () => {
     const botA = botById(roomA, inspectedBotBeforeCombat.id);
     const botB = botById(roomB, inspectedBotBeforeCombat.id);

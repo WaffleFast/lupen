@@ -281,6 +281,14 @@ type("string")(LupenSectorPlayer.prototype, "equippedWeaponKeys");
 type("string")(LupenSectorPlayer.prototype, "multiplayerMode");
 type("string")(LupenSectorPlayer.prototype, "currentNode");
 type("string")(LupenSectorPlayer.prototype, "selectedTargetBotId");
+type("string")(LupenSectorPlayer.prototype, "lastCombatIntentReason");
+type("string")(LupenSectorPlayer.prototype, "lastLockOnClearReason");
+type("string")(LupenSectorPlayer.prototype, "lastWeaponSourceReason");
+type("string")(LupenSectorPlayer.prototype, "lastCombatNodeValidationReason");
+type("number")(LupenSectorPlayer.prototype, "activeShipWeaponCount");
+type("number")(LupenSectorPlayer.prototype, "validCombatWeaponCount");
+type("number")(LupenSectorPlayer.prototype, "rejectedWeaponCount");
+type("string")(LupenSectorPlayer.prototype, "firstRejectedWeaponReason");
 type("number")(LupenSectorPlayer.prototype, "x");
 type("number")(LupenSectorPlayer.prototype, "y");
 type("number")(LupenSectorPlayer.prototype, "joinedAt");
@@ -794,19 +802,56 @@ function getSafeWeaponKey(value = "") {
   return /^[A-Za-z0-9_-]{1,48}$/.test(key) ? key : "";
 }
 
-function getFirstWeaponKeyFromList(value) {
+function getWeaponKeysFromValue(value) {
   if (Array.isArray(value)) {
-    for (const entry of value) {
-      const key = getSafeWeaponKey(entry);
-      if (key) return key;
-    }
-    return "";
+    return value.map((entry) => getSafeWeaponKey(entry)).filter(Boolean);
   }
 
   return String(value || "")
     .split(",")
     .map((entry) => getSafeWeaponKey(entry))
-    .find(Boolean) || "";
+    .filter(Boolean);
+}
+
+function getFirstWeaponKeyFromList(value) {
+  return getWeaponKeysFromValue(value)[0] || "";
+}
+
+function getWeaponSourceDebug(message = {}, player = null, selectedKey = "") {
+  const payloadKeys = [
+    getSafeWeaponKey(message.weaponKey),
+    getSafeWeaponKey(message.equippedWeaponKey),
+    ...getWeaponKeysFromValue(message.equippedWeaponKeys)
+  ].filter(Boolean);
+  const presenceKeys = [
+    getSafeWeaponKey(player?.equippedWeaponKey),
+    ...getWeaponKeysFromValue(player?.equippedWeaponKeys)
+  ].filter(Boolean);
+  const allKeys = [...payloadKeys, ...presenceKeys];
+  const uniqueKeys = Array.from(new Set(allKeys));
+  const validKeys = uniqueKeys.filter((key) => !!STAGING_WEAPON_STATS[key]);
+  const rejectedKeys = uniqueKeys.filter((key) => !STAGING_WEAPON_STATS[key]);
+  const fallbackWeaponId = getSafeWeaponKey(message.weaponId);
+  const fallbackRejected = fallbackWeaponId && fallbackWeaponId !== selectedKey && !STAGING_WEAPON_STATS[fallbackWeaponId];
+  const firstRejectedWeaponReason = rejectedKeys[0]
+    ? `unknown_weapon:${rejectedKeys[0]}`
+    : fallbackRejected
+      ? `weaponId_not_catalog_weapon:${fallbackWeaponId}`
+      : uniqueKeys.length
+        ? ""
+        : "no_equipped_weapon_keys";
+
+  return {
+    activeShipWeaponCount: uniqueKeys.length,
+    validCombatWeaponCount: validKeys.length,
+    rejectedWeaponCount: rejectedKeys.length + (fallbackRejected ? 1 : 0),
+    firstRejectedWeaponReason,
+    weaponSourceReason: validKeys.length
+      ? "catalog_weapon_resolved"
+      : selectedKey
+        ? "fallback_unknown_weapon"
+        : "fallback_no_weapon"
+  };
 }
 
 function getRequestedDamageFromPayload(message = {}) {
@@ -815,15 +860,17 @@ function getRequestedDamageFromPayload(message = {}) {
 }
 
 function resolveStagingWeapon(message = {}, player = null) {
-  const payloadKey = getSafeWeaponKey(message.weaponKey || message.weaponId || message.equippedWeaponKey);
+  const payloadKey = getSafeWeaponKey(message.weaponKey || message.equippedWeaponKey);
   const payloadListKey = getFirstWeaponKeyFromList(message.equippedWeaponKeys);
   const presenceKey = getSafeWeaponKey(player?.equippedWeaponKey);
   const presenceListKey = getFirstWeaponKeyFromList(player?.equippedWeaponKeys);
-  const weaponKey = payloadKey || payloadListKey || presenceKey || presenceListKey;
+  const weaponIdKey = getSafeWeaponKey(message.weaponId);
+  const weaponKey = payloadKey || payloadListKey || presenceKey || presenceListKey || weaponIdKey;
   const known = STAGING_WEAPON_STATS[weaponKey] || null;
   const requestedDamage = getRequestedDamageFromPayload(message);
   const payloadCount = getNumberValue(message.count, 0);
   const hasMultiWeaponLoadout = payloadCount > 1 || String(message.weaponName || "").includes(" + ");
+  const debug = getWeaponSourceDebug(message, player, weaponKey);
 
   if (known) {
     const knownDamage = clampNumber(Math.round(known.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
@@ -840,7 +887,9 @@ function resolveStagingWeapon(message = {}, player = null) {
       damageSource: aggregateDamage === knownDamage ? "server_known_weapon" : "client_loadout_aggregate",
       fallbackDamageUsed: false,
       pulseLaserDetected: known.key === "pulseLaser",
-      requestedDamage
+      requestedDamage,
+      ...debug,
+      weaponSourceReason: aggregateDamage === knownDamage ? "server_known_weapon" : "client_loadout_aggregate"
     };
   }
 
@@ -858,7 +907,9 @@ function resolveStagingWeapon(message = {}, player = null) {
     damageSource: hasMultiWeaponLoadout && requestedDamage > 0 ? "client_loadout_aggregate" : (weaponKey ? "fallback_unknown_weapon" : "fallback_no_weapon"),
     fallbackDamageUsed: !(hasMultiWeaponLoadout && requestedDamage > 0),
     pulseLaserDetected: false,
-    requestedDamage
+    requestedDamage,
+    ...debug,
+    weaponSourceReason: hasMultiWeaponLoadout && requestedDamage > 0 ? "client_loadout_aggregate" : debug.weaponSourceReason
   };
 }
 
@@ -1131,11 +1182,19 @@ export class LupenSectorRoom extends Room {
       shipClass: getSafeShipClass(options),
       equippedWeaponKey: getSafeWeaponKey(options.equippedWeaponKey || options.weaponKey),
       equippedWeaponKeys: Array.isArray(options.equippedWeaponKeys)
-        ? options.equippedWeaponKeys.map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 6).join(",")
-        : String(options.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 6).join(","),
+        ? options.equippedWeaponKeys.map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 20).join(",")
+        : String(options.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 20).join(","),
       multiplayerMode: getSafeIdentityValue(options.multiplayerMode, "dev"),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
       selectedTargetBotId: "",
+      lastCombatIntentReason: "",
+      lastLockOnClearReason: "",
+      lastWeaponSourceReason: "",
+      lastCombatNodeValidationReason: "",
+      activeShipWeaponCount: 0,
+      validCombatWeaponCount: 0,
+      rejectedWeaponCount: 0,
+      firstRejectedWeaponReason: "",
       x: getNumberValue(options.x, 50),
       y: getNumberValue(options.y, 50),
       joinedAt: now,
@@ -1239,9 +1298,16 @@ export class LupenSectorRoom extends Room {
   }
 
   sendTargetRejected(client, reason, messageType, targetBotId = "") {
+    const player = this.state.players.get(client.sessionId);
+    if (player) {
+      player.lastLockOnClearReason = reason || "target_rejected";
+      player.lastCombatNodeValidationReason = reason || "";
+    }
     client.send("target:rejected", {
       ok: false,
       reason,
+      lockOnClearReason: reason || "target_rejected",
+      combatNodeValidationReason: reason || "",
       messageType,
       sessionId: client.sessionId,
       targetBotId,
@@ -1258,6 +1324,14 @@ export class LupenSectorRoom extends Room {
       ok: false,
       reason,
       validation,
+      combatIntentReason: validation || reason,
+      combatNodeValidationReason: validation && validation.includes("node") ? validation : "",
+      lockOnClearReason: player?.lastLockOnClearReason || "",
+      weaponSourceReason: player?.lastWeaponSourceReason || "not_resolved_intent_rejected",
+      activeShipWeaponCount: Number(player?.activeShipWeaponCount || 0),
+      validCombatWeaponCount: Number(player?.validCombatWeaponCount || 0),
+      rejectedWeaponCount: Number(player?.rejectedWeaponCount || 0),
+      firstRejectedWeaponReason: player?.firstRejectedWeaponReason || "",
       messageType,
       sessionId: client.sessionId,
       targetBotId,
@@ -1304,9 +1378,14 @@ export class LupenSectorRoom extends Room {
     }
 
     player.selectedTargetBotId = targetBotId;
+    player.lastCombatIntentReason = "target_selected_waiting_for_engage";
+    player.lastLockOnClearReason = "";
+    player.lastCombatNodeValidationReason = "selection_node_valid";
     client.send("target:selected", {
       ok: true,
       reason: "lock_on_only_combat_disabled",
+      lockOnClearReason: "",
+      combatNodeValidationReason: "selection_node_valid",
       messageType,
       sessionId: client.sessionId,
       targetBotId,
@@ -1317,11 +1396,16 @@ export class LupenSectorRoom extends Room {
 
   clearStagingBotSelection(client, messageType = "target:clear") {
     const player = this.touchPlayer(client.sessionId);
-    if (player) player.selectedTargetBotId = "";
+    if (player) {
+      player.selectedTargetBotId = "";
+      player.lastLockOnClearReason = messageType === "target:clear" ? "client_target_clear_or_disengage" : "selection_cleared";
+      player.lastCombatIntentReason = "selection_cleared";
+    }
     this.clearStagingReturnFireForSession(client.sessionId);
     client.send("target:selected", {
       ok: true,
       reason: "selection_cleared",
+      lockOnClearReason: player?.lastLockOnClearReason || "selection_cleared",
       messageType,
       sessionId: client.sessionId,
       targetBotId: "",
@@ -1333,7 +1417,15 @@ export class LupenSectorRoom extends Room {
   reconcilePlayerSelection(player) {
     if (!player?.selectedTargetBotId) return;
     const bot = this.state.bots.get(player.selectedTargetBotId);
-    if (!bot || bot.currentNode !== player.currentNode) {
+    if (!bot) {
+      player.lastLockOnClearReason = "selected_bot_missing";
+      this.clearStagingReturnFireForSession(player.sessionId);
+      player.selectedTargetBotId = "";
+      return;
+    }
+    if (bot.currentNode !== player.currentNode) {
+      player.lastLockOnClearReason = "selected_bot_node_mismatch";
+      player.lastCombatNodeValidationReason = `bot:${bot.currentNode || "unknown"} player:${player.currentNode || "unknown"}`;
       this.clearStagingReturnFireForSession(player.sessionId);
       player.selectedTargetBotId = "";
     }
@@ -2849,6 +2941,7 @@ export class LupenSectorRoom extends Room {
     }
 
     if (!validationReason && Number(player.nextFireAt || 0) > now) {
+      player.lastCombatIntentReason = "fire cooldown active";
       this.sendCombatRejected(client, "staging_fire_cooldown", message, messageType, "fire cooldown active", {
         cooldownRemainingMs: Math.max(0, Math.ceil(Number(player.nextFireAt || 0) - now))
       });
@@ -2868,15 +2961,22 @@ export class LupenSectorRoom extends Room {
     }
 
     if (validationReason) {
+      if (player) {
+        player.lastCombatIntentReason = validationReason;
+        player.lastCombatNodeValidationReason = validationReason.includes("node") ? validationReason : "";
+      }
       this.sendCombatRejected(client, "combat_intent_rejected", message, messageType, validationReason);
       return;
     }
 
     if (!player.selectedTargetBotId) {
       player.selectedTargetBotId = targetBotId;
+      player.lastLockOnClearReason = "";
       client.send("target:selected", {
         ok: true,
         reason: "implicit_combat_lock",
+        lockOnClearReason: "",
+        combatNodeValidationReason: "combat_node_valid",
         messageType,
         sessionId: client.sessionId,
         targetBotId,
@@ -2891,6 +2991,13 @@ export class LupenSectorRoom extends Room {
     const result = this.applyStagingTestDamage(targetBot, stagingDamage);
     player.lastFireAt = now;
     player.nextFireAt = now + stagingCooldownMs;
+    player.lastCombatIntentReason = "staging_damage_applied";
+    player.lastWeaponSourceReason = resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "";
+    player.activeShipWeaponCount = Number(resolvedWeapon.activeShipWeaponCount || 0);
+    player.validCombatWeaponCount = Number(resolvedWeapon.validCombatWeaponCount || 0);
+    player.rejectedWeaponCount = Number(resolvedWeapon.rejectedWeaponCount || 0);
+    player.firstRejectedWeaponReason = resolvedWeapon.firstRejectedWeaponReason || "";
+    player.lastCombatNodeValidationReason = "combat_node_valid";
 
     const weaponName = resolvedWeapon.weaponName;
     const weaponFamily = resolvedWeapon.weaponFamily;
@@ -2918,6 +3025,13 @@ export class LupenSectorRoom extends Room {
       damageSource: resolvedWeapon.damageSource,
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
       pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
+      weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
+      combatIntentReason: "staging_damage_applied",
+      combatNodeValidationReason: "combat_node_valid",
+      activeShipWeaponCount: resolvedWeapon.activeShipWeaponCount || 0,
+      validCombatWeaponCount: resolvedWeapon.validCombatWeaponCount || 0,
+      rejectedWeaponCount: resolvedWeapon.rejectedWeaponCount || 0,
+      firstRejectedWeaponReason: resolvedWeapon.firstRejectedWeaponReason || "",
       shieldDamage: result.shieldDamage,
       hullDamage: result.hullDamage,
       shield: result.shield,
@@ -2945,6 +3059,7 @@ export class LupenSectorRoom extends Room {
       damageSource: resolvedWeapon.damageSource,
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
       pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
+      weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
       shield: result.shield,
       hull: result.hull,
       disabled: result.disabled,

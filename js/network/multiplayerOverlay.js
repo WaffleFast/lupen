@@ -3313,10 +3313,25 @@
       setDiagnosticsRow(panel, "bot image", compactPath(getStagingBotImage(inspectedBot)));
       setDiagnosticsRow(panel, "bot img status", `${getBotImageLoadLabel(inspectedBot)} / fallback ${isBotFallbackActive(inspectedBot) ? "yes" : "no"}`);
       const weaponKey = status.lastCombatResponse?.weaponKey || status.localEquippedWeaponKey || weaponIntent.weaponKey || weaponIntent.equippedWeaponKey || "";
-      const damageSource = status.lastCombatResponse?.damageSource || "pending";
+      const damageSource = status.lastCombatResponse?.damageSource || status.weaponSourceReason || "pending";
       const serverDamage = status.lastCombatResponse?.serverDamageUsed ?? status.lastCombatResponse?.stagingDamage ?? weaponIntent.damage ?? 0;
+      const localWeaponCount = Array.isArray(weaponIntent.equippedWeaponKeys) ? weaponIntent.equippedWeaponKeys.length : 0;
+      const activeShipWeaponCount = Math.max(0, Math.round(Number(status.activeShipWeaponCount || localWeaponCount || 0)));
+      const validCombatWeaponCount = Math.max(0, Math.round(Number(status.validCombatWeaponCount || 0)));
+      const rejectedWeaponCount = Math.max(0, Math.round(Number(status.rejectedWeaponCount || 0)));
+      const combatIntentReason = status.combatIntentReason || status.lastCombatResponse?.validation || status.lastCombatResponse?.reason || "pending";
+      const lockOnReason = selectedBot?.id
+        ? "locked"
+        : status.lockOnClearReason
+          ? `cleared / ${status.lockOnClearReason}`
+          : "pending";
       setDiagnosticsRow(panel, "weapon", `${status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "unknown"}${weaponKey ? ` / ${weaponKey}` : ""} / server dmg ${Math.round(Number(serverDamage || 0))}`);
       setDiagnosticsRow(panel, "weapon source", `${damageSource} / fallback ${status.lastCombatResponse?.fallbackDamageUsed ? "yes" : "no"} / pulse ${status.lastCombatResponse?.pulseLaserDetected ? "yes" : "no"}`);
+      setDiagnosticsRow(panel, "combat intent", `${status.lastCombatResponse?.ok ? "resolved" : "pending/rejected"} / ${String(combatIntentReason).slice(0, 48)}`);
+      setDiagnosticsRow(panel, "lock-on", String(lockOnReason).slice(0, 56));
+      if (status.combatNodeValidationReason) setDiagnosticsRow(panel, "combat node", String(status.combatNodeValidationReason).slice(0, 56));
+      setDiagnosticsRow(panel, "weapon count", `${activeShipWeaponCount} active / ${validCombatWeaponCount} valid / ${rejectedWeaponCount} rejected`);
+      if (status.firstRejectedWeaponReason) setDiagnosticsRow(panel, "weapon reject", String(status.firstRejectedWeaponReason).slice(0, 56));
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
