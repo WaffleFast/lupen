@@ -516,7 +516,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("hangar loadout unequips selected weapon and attachment slots", async ({ page }) => {
+  test("hangar loadout explicitly equips and unequips selected weapon and attachment slots", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -537,9 +537,16 @@ test.describe("Lupen browser smoke", () => {
       `);
     });
     await expect(page.locator("#hangarScreen")).toHaveClass(/active/);
+    await expect(page.locator(".loadout-vault-filters button")).toHaveCount(2);
 
+    await page.locator("#loadoutVaultFilterGuns").click();
+    await expect(page.locator("#loadoutCategoryWeapons")).toHaveClass(/active/);
     await page.locator("#installedGuns .loadout-grid-slot.empty").first().click();
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']").first().click();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser");
+    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip", exact: true })).toBeEnabled();
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip", exact: true }).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
 
     await page.reload();
@@ -559,16 +566,21 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
     await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']")).toHaveCount(1);
 
-    await page.locator("#loadoutCategoryAttachments").click();
+    await page.locator("#loadoutVaultFilterAttachments").click();
+    await expect(page.locator("#loadoutCategoryAttachments")).toHaveClass(/active/);
     await page.locator("#installedAttachments .loadout-grid-slot.empty").first().click();
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']").first().click();
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
+    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip", exact: true })).toBeEnabled();
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip", exact: true }).click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
 
     await page.reload();
     await openHangar(page);
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
 
-    await page.locator("#loadoutCategoryAttachments").click();
+    await page.locator("#loadoutVaultFilterAttachments").click();
     await page.locator("#installedAttachments .loadout-grid-slot.filled").first().click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled").first()).toHaveClass(/selected/);
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
@@ -580,7 +592,7 @@ test.describe("Lupen browser smoke", () => {
     await page.reload();
     await openHangar(page);
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
-    await page.locator("#loadoutCategoryAttachments").click();
+    await page.locator("#loadoutVaultFilterAttachments").click();
     await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']")).toHaveCount(1);
 
     await page.evaluate(() => {
@@ -595,7 +607,7 @@ test.describe("Lupen browser smoke", () => {
       `);
     });
     await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(20);
-    await page.locator("#loadoutCategoryAttachments").click();
+    await page.locator("#loadoutVaultFilterAttachments").click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(20);
 
     await expectNoUnexpectedBrowserErrors(failures);

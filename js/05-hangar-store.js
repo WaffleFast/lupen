@@ -38,7 +38,7 @@ let multiplayerStagingLoadoutUnequipPending = false;
 let selectedVaultActionContext = null;
 let selectedLoadoutItemContext = null;
 let selectedLoadoutSlotCategory = "guns";
-let selectedLoadoutVaultFilter = "all";
+let selectedLoadoutVaultFilter = "guns";
 let selectedLoadoutVaultSearch = "";
 let selectedLoadoutVaultSort = "quality";
 let selectedVaultSearch = "";
@@ -809,6 +809,7 @@ function selectVaultItem(groupKey) {
 
 function selectEquippedLoadoutVaultItem(categoryKey, index) {
   selectedLoadoutSlotCategory = categoryKey === "attachments" ? "attachments" : "guns";
+  selectedLoadoutVaultFilter = selectedLoadoutSlotCategory;
   const loadout = getShipLoadout(selectedHangarShipId);
   const listName = categoryKey === "guns" ? "guns" : "attachments";
   const entry = loadout?.[listName]?.[Number(index)];
@@ -1314,7 +1315,25 @@ function unequipSelectedVaultItem() {
 
 function selectAvailableLoadoutItem(categoryKey, entry) {
   if (!entry || !["guns", "attachments"].includes(categoryKey)) return;
-  equipLoadoutVaultEntry(entry);
+  const currentIndex = selectedLoadoutItemContext?.categoryKey === categoryKey
+    ? Number(selectedLoadoutItemContext.index || 0)
+    : 0;
+  selectedLoadoutSlotCategory = categoryKey;
+  selectedLoadoutVaultFilter = categoryKey;
+  selectedVaultActionContext = null;
+  selectedLoadoutItemContext = {
+    source: "available",
+    inventorySource: entry.source || "owned",
+    categoryKey,
+    index: Number.isInteger(currentIndex) && currentIndex >= 0 ? currentIndex : 0,
+    key: entry.key,
+    quality: entry.quality || "standard",
+    level: Math.max(1, Number(entry.level || 1))
+  };
+  renderInstalledGuns();
+  renderInstalledAttachments();
+  renderGunInventory();
+  renderLoadoutItemDetail();
 }
 
 function getCurrentShipEquippedCount(key, quality, categoryKey) {
@@ -1394,7 +1413,13 @@ function renderLoadoutItemDetail() {
     key: detail.key,
     quality: detail.quality
   }) >= 0;
-  const equipPrimary = detail.source !== "equipped";
+  const actionButton = detail.source === "equipped"
+    ? `<button type="button" class="primary" onclick="unequipSelectedLoadoutItem()" ${unequipAvailable ? "" : "disabled"}>
+          Unequip
+        </button>`
+    : `<button type="button" class="primary" onclick="equipSelectedLoadoutItem()" ${equipAvailable ? "" : "disabled"}>
+          Equip
+        </button>`;
   const statRows = [
     { label: "Owned", value: formatNumber(detail.ownedCount) },
     { label: "Equipped", value: formatNumber(detail.equippedCount) },
@@ -1420,12 +1445,7 @@ function renderLoadoutItemDetail() {
         `).join("")}
       </div>
       <div class="loadout-detail-actions">
-        <button type="button" class="${equipPrimary ? "primary" : ""}" onclick="equipSelectedLoadoutItem()" ${equipAvailable ? "" : "disabled"}>
-          Equip
-        </button>
-        <button type="button" class="${!equipPrimary ? "primary" : ""}" onclick="unequipSelectedLoadoutItem()" ${unequipAvailable ? "" : "disabled"}>
-          Unequip
-        </button>
+        ${actionButton}
       </div>
     </div>
   `;
@@ -1439,6 +1459,8 @@ function equipSelectedLoadoutItem() {
     quality: detail.quality,
     level: detail.level,
     categoryKey: detail.categoryKey,
+    name: detail.name,
+    icon: detail.icon,
     source: selectedLoadoutItemContext?.inventorySource || "owned"
   });
 }
@@ -1944,6 +1966,7 @@ function ensureSelectedLoadoutSlot() {
 
 function setLoadoutSlotCategory(categoryKey) {
   selectedLoadoutSlotCategory = categoryKey === "attachments" ? "attachments" : "guns";
+  selectedLoadoutVaultFilter = selectedLoadoutSlotCategory;
   const limit = selectedLoadoutSlotCategory === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
   const currentIndex = selectedLoadoutItemContext?.categoryKey === selectedLoadoutSlotCategory
     ? Number(selectedLoadoutItemContext.index || 0)
@@ -1955,9 +1978,11 @@ function setLoadoutSlotCategory(categoryKey) {
     key: "",
     quality: "standard"
   };
+  selectedVaultActionContext = null;
   renderInstalledGuns();
   renderInstalledAttachments();
   renderGunInventory();
+  renderLoadoutItemDetail();
 }
 
 function renderLoadoutSlotGrid(box, categoryKey) {
@@ -2241,12 +2266,14 @@ function getAllLoadoutVaultEntries() {
 
 function getFilteredLoadoutVaultEntries() {
   const selectedCategory = selectedLoadoutItemContext?.categoryKey;
-  const filter = selectedLoadoutVaultFilter === "all" && (selectedCategory === "guns" || selectedCategory === "attachments")
-    ? selectedCategory
-    : selectedLoadoutVaultFilter;
+  const filter = ["guns", "attachments"].includes(selectedLoadoutVaultFilter)
+    ? selectedLoadoutVaultFilter
+    : ["guns", "attachments"].includes(selectedCategory)
+      ? selectedCategory
+      : selectedLoadoutSlotCategory === "attachments" ? "attachments" : "guns";
 
   return getAllLoadoutVaultEntries()
-    .filter(entry => filter === "all" || entry.categoryKey === filter)
+    .filter(entry => entry.categoryKey === filter)
     .sort((a, b) => {
       if (selectedLoadoutVaultSort === "name") return a.name.localeCompare(b.name);
       if (selectedLoadoutVaultSort === "quantity") return Number(b.count || 0) - Number(a.count || 0) || a.name.localeCompare(b.name);
@@ -2287,7 +2314,6 @@ function updateLoadoutVaultChrome() {
   if (sort && sort.value !== selectedLoadoutVaultSort) sort.value = selectedLoadoutVaultSort;
 
   const filterIds = {
-    all: "loadoutVaultFilterAll",
     guns: "loadoutVaultFilterGuns",
     attachments: "loadoutVaultFilterAttachments"
   };
@@ -2298,8 +2324,7 @@ function updateLoadoutVaultChrome() {
 }
 
 function setLoadoutVaultFilter(nextFilter) {
-  selectedLoadoutVaultFilter = ["all", "guns", "attachments"].includes(nextFilter) ? nextFilter : "all";
-  renderGunInventory();
+  setLoadoutSlotCategory(nextFilter === "attachments" ? "attachments" : "guns");
 }
 
 function setLoadoutVaultSearch(query) {
