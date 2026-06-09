@@ -943,10 +943,34 @@ function getEquippedWeapon(shipId = currentShipId) {
       range: 0,
       projectileColor: "#7fd6ff",
       fireStyle: "pulse",
-      count: 0
+      count: 0,
+      weapons: []
     };
   }
 
+  const weaponDetails = equippedGuns.map(item => {
+    const multiplier = getItemStatMultiplier(item.quality) * getItemLevelMultiplier(item.level);
+    const base = getWeaponLayerDamage(item.gun);
+    const damageLayers = {
+      shield: Math.round(base.shield * multiplier),
+      armor: Math.round(base.armor * multiplier),
+      hull: Math.round(base.hull * multiplier)
+    };
+    return {
+      key: item.key,
+      familyId: item.gun.familyId || item.key,
+      name: item.gun.name || item.key,
+      quality: item.quality,
+      level: item.level,
+      projectileColor: item.gun.projectileColor || "#7fd6ff",
+      fireStyle: item.gun.fireStyle || "pulse",
+      speed: Number(item.gun.speed || 1000),
+      fireRate: Number(item.gun.fireRate || (item.gun.speed ? 1000 / item.gun.speed : 1)),
+      accuracy: Number(item.gun.accuracy || 90),
+      damageLayers,
+      damage: Math.round((damageLayers.shield + damageLayers.armor + damageLayers.hull) / 3)
+    };
+  });
   const damageLayers = equippedGuns.reduce((sum, item) => {
     const multiplier = getItemStatMultiplier(item.quality) * getItemLevelMultiplier(item.level);
     const base = getWeaponLayerDamage(item.gun);
@@ -985,7 +1009,8 @@ function getEquippedWeapon(shipId = currentShipId) {
     range,
     projectileColor: primaryGun.projectileColor || "#7fd6ff",
     fireStyle: primaryGun.fireStyle || "pulse",
-    count: equippedGuns.length
+    count: equippedGuns.length,
+    weapons: weaponDetails
   };
 }
 

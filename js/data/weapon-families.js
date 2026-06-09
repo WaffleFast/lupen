@@ -2,54 +2,54 @@ const WEAPON_FAMILIES = {
   heavyLance: {
     id: "heavyLance",
     name: "Heavy Lance",
-    shortDescription: "Slow-firing heavy weapon with strong impact.",
-    role: "High damage, slow firing",
+    shortDescription: "Chunky heavy lance with a decisive amber impact.",
+    role: "High damage, heavy hit",
     image: "assets/weapons/heavy-lance.png",
-    projectileColor: "#ff8a47",
+    projectileColor: "#ffbd58",
     fireStyle: "heavy",
     fireRate: 0.45,
     range: 850,
     accuracy: 88,
-    damage: { shield: 14, armor: 16, hull: 18 }
+    damage: { shield: 15, armor: 20, hull: 23 }
   },
   ionBlaster: {
     id: "ionBlaster",
     name: "Ion Blaster",
-    shortDescription: "Specialised shield-breaking energy weapon.",
-    role: "Shield-focused weapon",
+    shortDescription: "Fast crackling energy weapon that pressures shields.",
+    role: "Shield pressure / energy weapon",
     image: "assets/weapons/ion-blaster.png",
-    projectileColor: "#40c4ff",
+    projectileColor: "#bdf4ff",
     fireStyle: "ion",
     fireRate: 1.1,
     range: 780,
     accuracy: 93,
-    damage: { shield: 18, armor: 7, hull: 6 }
+    damage: { shield: 13, armor: 8, hull: 7 }
   },
   meltCannon: {
     id: "meltCannon",
     name: "Melt Cannon",
-    shortDescription: "Armor-melting weapon for hardened targets.",
-    role: "Armor-focused weapon",
+    shortDescription: "Hot cannon pulse tuned to melt armor and hull plating.",
+    role: "Hull / armor pressure",
     image: "assets/weapons/melt-cannon.png",
-    projectileColor: "#77dd77",
+    projectileColor: "#ff6248",
     fireStyle: "melt",
-    fireRate: 0.75,
+    fireRate: 0.56,
     range: 760,
     accuracy: 90,
-    damage: { shield: 7, armor: 18, hull: 10 }
+    damage: { shield: 9, armor: 20, hull: 17 }
   },
   pulseLaser: {
     id: "pulseLaser",
     name: "Pulse Laser",
-    shortDescription: "Reliable all-round energy weapon.",
-    role: "Balanced starter weapon",
+    shortDescription: "Reliable blue pulse laser with steady combat output.",
+    role: "Balanced reliable weapon",
     image: "assets/weapons/pulse-laser.png",
-    projectileColor: "#7fd6ff",
+    projectileColor: "#4bb7ff",
     fireStyle: "pulse",
-    fireRate: 1.0,
+    fireRate: 0.77,
     range: 800,
     accuracy: 92,
-    damage: { shield: 10, armor: 10, hull: 10 }
+    damage: { shield: 11, armor: 10, hull: 10 }
   },
   repeater: {
     id: "repeater",
@@ -57,38 +57,38 @@ const WEAPON_FAMILIES = {
     shortDescription: "Rapid-fire weapon for constant pressure.",
     role: "Low damage, fast firing",
     image: "assets/weapons/repeater.png",
-    projectileColor: "#ffe066",
+    projectileColor: "#63e7ff",
     fireStyle: "rapid",
-    fireRate: 2.8,
+    fireRate: 1.0,
     range: 700,
     accuracy: 95,
-    damage: { shield: 5, armor: 4, hull: 5 }
+    damage: { shield: 7, armor: 6, hull: 7 }
   },
   ripperGun: {
     id: "ripperGun",
     name: "Ripper Gun",
-    shortDescription: "Finisher weapon for exposed hull damage.",
-    role: "Hull-focused weapon",
+    shortDescription: "Unstable teal arc weapon with erratic utility-style pressure.",
+    role: "Unstable utility / status-style weapon",
     image: "assets/weapons/ripper-gun.png",
-    projectileColor: "#ff5a5a",
-    fireStyle: "ripper",
-    fireRate: 0.8,
+    projectileColor: "#38f2a6",
+    fireStyle: "disruptor",
+    fireRate: 0.67,
     range: 740,
     accuracy: 91,
-    damage: { shield: 6, armor: 8, hull: 19 }
+    damage: { shield: 12, armor: 12, hull: 13 }
   },
   voidRail: {
     id: "voidRail",
     name: "Void Rail",
-    shortDescription: "Long-range precision weapon with high hull impact.",
+    shortDescription: "Long-range violet rail shot with high precision impact.",
     role: "Sniper / precision weapon",
     image: "assets/weapons/void-rail.png",
-    projectileColor: "#caa6ff",
+    projectileColor: "#b778ff",
     fireStyle: "sniper",
-    fireRate: 0.35,
+    fireRate: 0.33,
     range: 1100,
     accuracy: 98,
-    damage: { shield: 9, armor: 15, hull: 20 }
+    damage: { shield: 18, armor: 25, hull: 32 }
   }
 };
 

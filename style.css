@@ -891,6 +891,96 @@ input::placeholder {
   animation-delay: 30ms;
 }
 
+.laser-burst.player-shot {
+  animation-timing-function: cubic-bezier(0.18, 0.88, 0.26, 1);
+}
+
+.player-shot-rapid {
+  opacity: 0.94;
+}
+
+.player-shot-ion {
+  filter: saturate(1.35) drop-shadow(0 0 5px rgba(210, 250, 255, 0.54));
+}
+
+.player-shot-melt,
+.player-shot-heavy {
+  filter: saturate(1.16) drop-shadow(0 0 7px rgba(255, 210, 130, 0.46));
+}
+
+.player-shot-sniper {
+  filter: drop-shadow(0 0 9px rgba(190, 116, 255, 0.62));
+}
+
+.player-shot-disruptor,
+.player-shot-ripper {
+  filter: saturate(1.24) drop-shadow(0 0 7px rgba(56, 242, 166, 0.5));
+}
+
+.weapon-impact {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  margin-top: -17px;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.94) 0 9%, var(--weapon-impact-color, #7fd6ff) 10% 32%, transparent 68%);
+  box-shadow:
+    0 0 8px var(--weapon-impact-color, #7fd6ff),
+    0 0 18px var(--weapon-impact-color, #7fd6ff);
+  opacity: 0;
+  transform: scale(0.34);
+  animation: weaponImpactFlash 240ms ease-out forwards;
+}
+
+.weapon-impact::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid var(--weapon-impact-color, #7fd6ff);
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: weaponImpactRing 260ms ease-out forwards;
+}
+
+.weapon-impact-sniper {
+  width: 42px;
+  height: 42px;
+  margin-left: -21px;
+  margin-top: -21px;
+}
+
+@keyframes weaponImpactFlash {
+  0% {
+    opacity: 0;
+    transform: scale(0.24);
+  }
+
+  30% {
+    opacity: 0.95;
+    transform: scale(0.82);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.34);
+  }
+}
+
+@keyframes weaponImpactRing {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.48);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
 @keyframes laserBurst {
   0% {
     opacity: 0;
@@ -903,6 +993,27 @@ input::placeholder {
   100% {
     opacity: 0;
     clip-path: inset(0 0 0 100%);
+  }
+}
+
+.asteroid-target.weapon-hit-react img {
+  animation: weaponTargetHitReact 220ms ease-out;
+}
+
+@keyframes weaponTargetHitReact {
+  0% {
+    filter: brightness(1) drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  36% {
+    filter: brightness(1.7) drop-shadow(0 0 12px rgba(255, 255, 255, 0.72));
+    transform: translate3d(1px, -1px, 0) scale(1.025);
+  }
+
+  100% {
+    filter: brightness(1) drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 

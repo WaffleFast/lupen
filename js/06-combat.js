@@ -139,7 +139,89 @@ function disengageTarget(keepTarget = false) {
   updateTargetPanel();
 }
 
-function pulseLaserBurstToTarget(target) {
+let weaponVisualCycleOffset = 0;
+
+function isCombatDebugEnabled() {
+  try {
+    return new URLSearchParams(window.location.search).get("debug") === "mp";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function debugCombatShot(message, detail = {}) {
+  if (!isCombatDebugEnabled()) return;
+  console.debug(`[combat] ${message}`, detail);
+}
+
+function getVisibleShotWeapons(weapon) {
+  const allWeapons = Array.isArray(weapon?.weapons) && weapon.weapons.length
+    ? weapon.weapons
+    : [weapon].filter(Boolean);
+  const visibleLimit = 6;
+
+  if (allWeapons.length <= visibleLimit) return allWeapons;
+
+  const visibleWeapons = [];
+  for (let index = 0; index < visibleLimit; index += 1) {
+    visibleWeapons.push(allWeapons[(weaponVisualCycleOffset + index) % allWeapons.length]);
+  }
+  weaponVisualCycleOffset = (weaponVisualCycleOffset + visibleLimit) % allWeapons.length;
+  return visibleWeapons;
+}
+
+function getShotVisualProfile(shotWeapon = {}) {
+  const style = String(shotWeapon.fireStyle || "pulse").toLowerCase();
+  const color = shotWeapon.projectileColor || "#7fd6ff";
+  const profile = {
+    color,
+    height: 3,
+    durationMs: 150,
+    streakScale: 1,
+    offsetSpread: 3
+  };
+
+  if (style === "rapid") {
+    Object.assign(profile, { height: 2, durationMs: 115, streakScale: 0.74, offsetSpread: 5 });
+  } else if (style === "ion") {
+    Object.assign(profile, { height: 3, durationMs: 135, streakScale: 0.86, offsetSpread: 4 });
+  } else if (style === "melt") {
+    Object.assign(profile, { height: 5, durationMs: 175, streakScale: 0.9, offsetSpread: 3 });
+  } else if (style === "heavy") {
+    Object.assign(profile, { height: 6, durationMs: 180, streakScale: 0.96, offsetSpread: 2 });
+  } else if (style === "sniper") {
+    Object.assign(profile, { height: 2, durationMs: 165, streakScale: 1.04, offsetSpread: 1 });
+  } else if (style === "disruptor" || style === "ripper") {
+    Object.assign(profile, { height: 4, durationMs: 155, streakScale: 0.82, offsetSpread: 6 });
+  }
+
+  return profile;
+}
+
+function showWeaponImpactAtTarget(target, shotWeapon, delay = 0) {
+  const layer = document.getElementById("explosionLayer");
+  const spaceScreen = document.getElementById("spaceScreen");
+  if (!layer || !spaceScreen || !target) return false;
+
+  const screenRect = spaceScreen.getBoundingClientRect();
+  const profile = getShotVisualProfile(shotWeapon);
+  const x = (target.x / 100) * screenRect.width;
+  const y = (target.y / 100) * screenRect.height;
+
+  setTimeout(() => {
+    const impact = document.createElement("div");
+    impact.className = `weapon-impact weapon-impact-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
+    impact.style.left = `${x}px`;
+    impact.style.top = `${y}px`;
+    impact.style.setProperty("--weapon-impact-color", profile.color);
+    layer.appendChild(impact);
+    setTimeout(() => impact.remove(), 360);
+  }, delay);
+
+  return true;
+}
+
+function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   const layer = document.getElementById("laserLayer");
   const spaceScreen = document.getElementById("spaceScreen");
 
@@ -157,28 +239,46 @@ function pulseLaserBurstToTarget(target) {
   const dy = endY - startY;
   const length = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-  const weapon = typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null;
-  const projectileColor = weapon?.projectileColor || "#7fd6ff";
-  const beamHeight = weapon?.fireStyle === "heavy" ? 5 : weapon?.fireStyle === "sniper" ? 2 : weapon?.fireStyle === "rapid" ? 2 : 3;
+  const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
+  const visualWeapons = getVisibleShotWeapons(resolvedWeapon);
+  const visualCapApplied = Number(resolvedWeapon?.count || visualWeapons.length) > visualWeapons.length;
 
-  const makeBeam = (offsetY = 0, delay = 0) => {
+  const makeBeam = (shotWeapon, offsetY = 0, delay = 0) => {
+    const profile = getShotVisualProfile(shotWeapon);
+    const shotLength = Math.max(54, length * profile.streakScale);
     const beam = document.createElement("div");
-    beam.className = "laser-burst";
+    beam.className = `laser-burst player-shot player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
     beam.style.left = `${startX}px`;
     beam.style.top = `${startY + offsetY}px`;
-    beam.style.width = `${length}px`;
-    beam.style.height = `${beamHeight}px`;
-    beam.style.background = `linear-gradient(90deg, transparent, ${projectileColor}, #ffffff, ${projectileColor}, transparent)`;
-    beam.style.boxShadow = `0 0 12px ${projectileColor}`;
+    beam.style.width = `${shotLength}px`;
+    beam.style.height = `${profile.height}px`;
+    beam.style.background = `linear-gradient(90deg, transparent, ${profile.color}, #ffffff, ${profile.color}, transparent)`;
+    beam.style.boxShadow = `0 0 10px ${profile.color}, 0 0 18px ${profile.color}`;
     beam.style.transform = `rotate(${angle}deg)`;
+    beam.style.animationDuration = `${profile.durationMs}ms`;
     beam.style.animationDelay = `${delay}ms`;
     layer.appendChild(beam);
 
-    setTimeout(() => beam.remove(), 450);
+    setTimeout(() => beam.remove(), delay + profile.durationMs + 80);
+    if (options.showImpact !== false) {
+      showWeaponImpactAtTarget(target, shotWeapon, delay + Math.max(70, profile.durationMs - 30));
+    }
   };
 
-  makeBeam(-4, 0);
-  makeBeam(4, 35);
+  visualWeapons.forEach((shotWeapon, index) => {
+    const profile = getShotVisualProfile(shotWeapon);
+    const side = index % 2 === 0 ? -1 : 1;
+    const offsetY = side * (profile.offsetSpread + Math.floor(index / 2) * 2);
+    makeBeam(shotWeapon, offsetY, Math.min(index * 75, 375));
+  });
+
+  debugCombatShot("shot visuals", {
+    activeWeaponCount: Number(resolvedWeapon?.count || visualWeapons.length),
+    visibleWeaponCount: visualWeapons.length,
+    visualCapApplied,
+    weaponNames: visualWeapons.map(item => item?.name || item?.key || "weapon").join(", "),
+    cooldownMs: Number(resolvedWeapon?.speed || 0)
+  });
 }
 
 let lastHostilePlayerHitFeedbackAt = 0;
@@ -373,13 +473,29 @@ function performAttackCycle() {
     return;
   }
 
-  pulseLaserBurstToTarget(target);
-  playPlayerLaserPulse();
   const weapon = getEquippedWeapon();
   const result = applyWeaponDamageToTarget(target, weapon);
+  pulseLaserBurstToTarget(target, weapon, { showImpact: result.hit === true });
+  const soundPulseCount = Math.max(1, Math.min(6, Number(weapon?.count || 1)));
+  Array.from({ length: soundPulseCount }).forEach((_shotWeapon, index) => {
+    setTimeout(() => {
+      if (typeof playPlayerLaserPulse === "function") playPlayerLaserPulse();
+    }, Math.min(index * 75, 375));
+  });
+  if (result.hit) {
+    target.hitFlashUntil = Date.now() + 260;
+  }
   if (result.hit && engagedTarget?.type === "hostileBot" && target.faction === "erebus") {
     triggerErebusAggro(target.id);
   }
+  debugCombatShot("shot resolved", {
+    activeWeaponCount: Number(weapon?.count || 0),
+    firingWeaponName: weapon?.name || "Unarmed",
+    cooldownMs: Number(weapon?.speed || 0),
+    hit: result.hit === true,
+    damageApplied: Math.round(Number(result.amount || 0)),
+    visualShotEmitted: true
+  });
 
   if (target.hp <= 0) {
     showExplosionAtTarget(target);
@@ -532,6 +648,9 @@ function renderTargetButton(target, options = {}) {
     btn.classList.add(...getBotDirectionClass(target).split(" "));
     btn.classList.add(`threat-${String(target.threat || "medium").toLowerCase()}`);
     if (target.aggroState === "hostile") btn.classList.add("is-hostile");
+  }
+  if (Number(target.hitFlashUntil || 0) > Date.now()) {
+    btn.classList.add("weapon-hit-react");
   }
 
   btn.style.left = `${target.x}%`;
