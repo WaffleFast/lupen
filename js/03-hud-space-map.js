@@ -1049,7 +1049,7 @@ function applyStagingBotReturnFireDamage(event = {}) {
   );
 
   shield = Math.max(0, Number(damageResult.shield || 0));
-  hull = Math.max(1, Number(damageResult.hull || 1));
+  hull = Math.max(0, Number(damageResult.hull || 0));
 
   const attackerName = event.attackerName || "Erebus Bot";
   const attackerBot = typeof getStagingBotTargetById === "function"
@@ -1071,26 +1071,50 @@ function applyStagingBotReturnFireDamage(event = {}) {
   }
 
   if (typeof addActivityLog === "function") {
-    if (shieldDamage > 0) {
-      addActivityLog(`${attackerName} hit your shield for ${formatNumber(Math.round(shieldDamage))}.`);
-    } else if (hullDamage > 0) {
-      addActivityLog(`${attackerName} hit your hull for ${formatNumber(Math.round(hullDamage))}.`);
+    const shieldText = shieldDamage > 0 ? `${formatNumber(Math.round(shieldDamage))} shield` : "";
+    const hullText = hullDamage > 0 ? `${formatNumber(Math.round(hullDamage))} hull` : "";
+    const damageText = [shieldText, hullText].filter(Boolean).join(" / ");
+    if (damageText) {
+      addActivityLog(`${attackerName} hit you for ${damageText}.`);
+    }
+    if (shieldBefore > 0 && shield <= 0 && hullDamage > 0) {
+      addActivityLog(`Shield depleted; hull took ${formatNumber(Math.round(hullDamage))} damage.`);
+    }
+    if (hull > 0 && hull <= Math.max(1, Math.round(hullMax * 0.25))) {
+      addActivityLog("Hull critical.");
     }
   }
 
-  updateSpaceHUD();
-  updateTargetPanel();
-
-  return {
+  const playerDestroyed = damageResult.destroyed === true || hull <= 0;
+  const result = {
     shieldBefore,
     shieldAfter: shield,
     hullBefore,
     hullAfter: hull,
     shieldDamage,
     hullDamage,
+    playerDestroyed,
+    botAttackStatus: playerDestroyed ? "stopped" : "cooldown",
+    botAttackReason: playerDestroyed ? "player_destroyed" : "return_fire_applied",
     sessionOnly: true,
     saveWritten: false
   };
+
+  if (playerDestroyed) {
+    if (typeof addActivityLog === "function") addActivityLog("Ship disabled.");
+    if (typeof handleShipDisabled === "function") handleShipDisabled();
+    return result;
+  }
+
+  updateSpaceHUD();
+  updateTargetPanel();
+  saveGame();
+
+  if (shield < shieldMax) {
+    scheduleShieldRegen();
+  }
+
+  return result;
 }
 
 function calculateDisabledCargoLoss() {

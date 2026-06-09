@@ -2842,7 +2842,7 @@
 
     if (!selectedBot?.id) {
       const pilotText = players.length ? `${players.length} remote pilot${players.length === 1 ? "" : "s"} connected. ` : "";
-      return `${pilotText}${loop} No PvP or player damage in this staging build.`;
+      return `${pilotText}${loop} No PvP; engaged bots return fire locally.`;
     }
 
     if (selectedBot.disabled) {
@@ -2890,7 +2890,7 @@
 
     const note = global.document.createElement("span");
     note.className = "lupen-mp-flow-note";
-    note.textContent = "Trade, Store, loadout, combat XP, and bounty XP are live for staging. No PvP or player damage.";
+    note.textContent = "Trade, Store, loadout, combat XP, and bounty XP are live for staging. No PvP; engaged bots return fire locally.";
     hint.appendChild(note);
 
     global.document.body.appendChild(hint);
@@ -3345,9 +3345,25 @@
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
-      if (status.lastStagingReturnFire) {
-        const returnFire = status.lastStagingReturnFire;
-        setDiagnosticsRow(panel, "return fire", `${returnFire.attackerName || "bot"} / ${Math.round(Number(returnFire.damage || 0))} dmg / ${returnFire.sessionOnly ? "session" : "persistent"}`);
+      const returnFire = status.lastStagingReturnFire;
+      const botAttackCooldown = returnFire?.nextReturnFireAt
+        ? Math.max(0, Math.ceil(Number(returnFire.nextReturnFireAt || 0) - Date.now()))
+        : 0;
+      const botAttackStatus = selectedBot?.disabled
+        ? "stopped"
+        : returnFire?.botAttackStatus
+          ? returnFire.botAttackStatus
+          : selectedBot?.id
+            ? botAttackCooldown > 0 ? "cooldown" : "ready"
+            : "stopped";
+      setDiagnosticsRow(panel, "bot attack", `${botAttackStatus} / ${formatCooldown(botAttackCooldown)} / dmg ${Math.round(Number(returnFire?.botDamage ?? returnFire?.damage ?? 0))}`);
+      if (returnFire) {
+        const shieldBefore = returnFire.playerShieldBefore ?? "?";
+        const shieldAfter = returnFire.playerShieldAfter ?? "?";
+        const hullBefore = returnFire.playerHullBefore ?? "?";
+        const hullAfter = returnFire.playerHullAfter ?? "?";
+        setDiagnosticsRow(panel, "bot damage", `${returnFire.attackerName || "bot"} / S ${shieldBefore}->${shieldAfter} / H ${hullBefore}->${hullAfter} / destroyed ${returnFire.playerDestroyed ? "yes" : "no"}`);
+        if (returnFire.botAttackReason) setDiagnosticsRow(panel, "bot attack reason", String(returnFire.botAttackReason).slice(0, 56));
       }
       setDiagnosticsRow(panel, "reward preview", getRewardPreviewLabel(status));
       setDiagnosticsRow(panel, "loot preview", getLootPreviewLabel(status));

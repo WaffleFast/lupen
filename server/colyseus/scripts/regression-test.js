@@ -4753,10 +4753,12 @@ try {
       returnFire.sessionOnly === true &&
       returnFire.persisted === false &&
       returnFire.saveWritten === false &&
-      returnFire.playerDeathEnabled === false &&
-      returnFire.cargoLossEnabled === false;
+      returnFire.playerDeathEnabled === true &&
+      returnFire.cargoLossEnabled === true &&
+      returnFire.botAttackStatus === "cooldown" &&
+      returnFire.botAttackReason === "return_fire_sent";
   });
-  console.log("staging bot return fire stayed light and session-only");
+  console.log("staging bot return fire stayed light, session-only, and player-damage enabled");
 
   await waitFor("both clients to receive staging shot event", () => {
     const shotA = roomAShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 10);

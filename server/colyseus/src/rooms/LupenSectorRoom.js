@@ -965,9 +965,10 @@ function getNodeDebugPayload({ message = {}, player = null, targetBot = null } =
 // This room mirrors local player display/location data and server-owned dummy
 // bot positions for dev ghosts only. It does not persist state, grant rewards,
 // run real combat, or control the real single-player game. Staging combat
-// intents may apply tiny server-owned test damage to visual bots only. The
-// staging bounty wrapper is room/session scoped; it never writes normal bounty
-// state, loot, credits, PvP, player damage, or broad progression.
+// intents may apply tiny server-owned test damage to visual bots and send
+// session-only return-fire to engaged clients. The staging bounty wrapper is
+// room/session scoped; it never writes normal bounty state, loot, credits,
+// PvP, or broad progression.
 export class LupenSectorRoom extends Room {
   onCreate() {
     this.setState(new LupenSectorState());
@@ -991,8 +992,8 @@ export class LupenSectorRoom extends Room {
     // touch local bounty arrays, Supabase bounty tables, route completion,
     // loot, credits, or normal single-player objective state.
     this.stagingBountyStates = new Map();
-    // Session-only return-fire cooldowns for Map 1 staging bots. These never
-    // persist player damage, saves, cargo loss, PvP, credits, loot, or death.
+    // Session-only return-fire cooldowns for Map 1 staging bots. The room never
+    // persists player damage, saves, cargo loss, PvP, credits, loot, or death.
     this.stagingBotReturnFireCooldowns = new Map();
 
     this.spawnDummyBots();
@@ -1627,12 +1628,15 @@ export class LupenSectorRoom extends Room {
       attackerName: bot.name || bot.type || "Erebus Bot",
       currentNode: player.currentNode,
       damage: STAGING_BOT_RETURN_FIRE_DAMAGE,
+      botDamage: STAGING_BOT_RETURN_FIRE_DAMAGE,
       damageType: "shield_first",
       sessionOnly: true,
       persisted: false,
       saveWritten: false,
-      playerDeathEnabled: false,
-      cargoLossEnabled: false,
+      playerDeathEnabled: true,
+      cargoLossEnabled: true,
+      botAttackStatus: "cooldown",
+      botAttackReason: "return_fire_sent",
       cooldownMs: STAGING_BOT_RETURN_FIRE_INTERVAL_MS,
       nextReturnFireAt,
       receivedAt: now
@@ -3096,7 +3100,7 @@ export class LupenSectorRoom extends Room {
 
     // Visual-only staging combat event. Clients may render a synced flash/beam
     // from this payload, but it is not a real projectile simulation and never
-    // grants rewards, progression, saves, PvP, or player damage.
+    // grants rewards, progression, saves, or PvP/player damage.
     this.broadcast("staging:shot", {
       ok: true,
       attackerSessionId: client.sessionId,

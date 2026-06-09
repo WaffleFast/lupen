@@ -1565,6 +1565,16 @@
       saveWritten: message.saveWritten === true,
       playerDeathEnabled: message.playerDeathEnabled === true,
       cargoLossEnabled: message.cargoLossEnabled === true,
+      botAttackStatus: String(message.botAttackStatus || "cooldown"),
+      botAttackReason: String(message.botAttackReason || "return_fire_sent"),
+      botDamage: Number.isFinite(Number(message.botDamage ?? message.damage)) ? Math.max(0, Number(message.botDamage ?? message.damage)) : 0,
+      playerShieldBefore: Number.isFinite(Number(message.playerShieldBefore)) ? Number(message.playerShieldBefore) : null,
+      playerShieldAfter: Number.isFinite(Number(message.playerShieldAfter)) ? Number(message.playerShieldAfter) : null,
+      playerHullBefore: Number.isFinite(Number(message.playerHullBefore)) ? Number(message.playerHullBefore) : null,
+      playerHullAfter: Number.isFinite(Number(message.playerHullAfter)) ? Number(message.playerHullAfter) : null,
+      shieldDamage: Number.isFinite(Number(message.shieldDamage)) ? Math.max(0, Number(message.shieldDamage)) : 0,
+      hullDamage: Number.isFinite(Number(message.hullDamage)) ? Math.max(0, Number(message.hullDamage)) : 0,
+      playerDestroyed: message.playerDestroyed === true,
       cooldownMs: Number.isFinite(Number(message.cooldownMs)) ? Number(message.cooldownMs) : 0,
       nextReturnFireAt: Number.isFinite(Number(message.nextReturnFireAt)) ? Number(message.nextReturnFireAt) : 0,
       receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
@@ -2122,7 +2132,21 @@
       logDev("server staging return fire", message);
       if (connection.lastStagingReturnFire?.ok &&
         typeof global.applyStagingBotReturnFireDamage === "function") {
-        global.applyStagingBotReturnFireDamage(connection.lastStagingReturnFire);
+        const damageResult = global.applyStagingBotReturnFireDamage(connection.lastStagingReturnFire);
+        if (damageResult && typeof damageResult === "object") {
+          connection.lastStagingReturnFire = {
+            ...connection.lastStagingReturnFire,
+            playerShieldBefore: Number.isFinite(Number(damageResult.shieldBefore)) ? Number(damageResult.shieldBefore) : null,
+            playerShieldAfter: Number.isFinite(Number(damageResult.shieldAfter)) ? Number(damageResult.shieldAfter) : null,
+            playerHullBefore: Number.isFinite(Number(damageResult.hullBefore)) ? Number(damageResult.hullBefore) : null,
+            playerHullAfter: Number.isFinite(Number(damageResult.hullAfter)) ? Number(damageResult.hullAfter) : null,
+            shieldDamage: Number.isFinite(Number(damageResult.shieldDamage)) ? Number(damageResult.shieldDamage) : 0,
+            hullDamage: Number.isFinite(Number(damageResult.hullDamage)) ? Number(damageResult.hullDamage) : 0,
+            playerDestroyed: damageResult.playerDestroyed === true,
+            botAttackStatus: String(damageResult.botAttackStatus || connection.lastStagingReturnFire.botAttackStatus || "cooldown"),
+            botAttackReason: String(damageResult.botAttackReason || connection.lastStagingReturnFire.botAttackReason || "return_fire_applied")
+          };
+        }
       }
       notifyServerState(activeRoom.state || null);
     });
