@@ -29,6 +29,7 @@ function getLeaveSaveNode() {
 }
 
 function buildSaveState(options = {}) {
+  if (typeof saveActiveShipCondition === "function") saveActiveShipCondition(currentShipId);
   const leaveSave = Boolean(options.leaveSave);
   const savedCurrentNode = leaveSave ? getLeaveSaveNode() : currentNode;
   const savedLastPlanetNode = sectorNodes[savedCurrentNode]?.type === "planet" ? savedCurrentNode : lastPlanetNode;
@@ -52,6 +53,7 @@ function buildSaveState(options = {}) {
     ownedAttachments,
     ownedGuns,
     shipLoadouts,
+    shipConditions,
     selectedHangarShipId,
     selectedFleetShipId,
     currentShipId,
@@ -570,6 +572,7 @@ function applyLoadedGameState(rawSaved) {
   selectedFleetShipId = SHIPS[saved.selectedFleetShipId] ? saved.selectedFleetShipId : (currentShipId || starterShipId);
   shipLoadouts = saved.shipLoadouts && typeof saved.shipLoadouts === "object" ? saved.shipLoadouts : shipLoadouts;
   if (currentShipId && !shipLoadouts[currentShipId]) shipLoadouts[currentShipId] = normalizeShipLoadout(undefined, currentShipId);
+  shipConditions = saved.shipConditions && typeof saved.shipConditions === "object" ? saved.shipConditions : {};
   activeTradeRoute = saved.activeTradeRoute && sectorNodes[saved.activeTradeRoute.origin] && sectorNodes[saved.activeTradeRoute.destination] ? {
     ...saved.activeTradeRoute,
     maxUnits: Number(saved.activeTradeRoute.maxUnits || getShipStats().cargo || 0),
@@ -633,6 +636,14 @@ function applyLoadedGameState(rawSaved) {
   shield = Number.isFinite(Number(saved.shield)) ? Number(saved.shield) : shield;
   shieldEnabled = true;
   jumpCharge = Number.isFinite(Number(saved.jumpCharge)) ? Number(saved.jumpCharge) : jumpCharge;
+  if (typeof normalizeShipCondition === "function") {
+    ownedShips.forEach(shipId => {
+      shipConditions[shipId] = normalizeShipCondition(shipId, shipConditions[shipId]);
+    });
+    if (currentShipId && !saved.shipConditions?.[currentShipId]) {
+      shipConditions[currentShipId] = normalizeShipCondition(currentShipId, { hull, shield });
+    }
+  }
 
   const loadedStats = getShipStats(currentShipId);
   if (!Number.isFinite(hull) || hull <= 0 || !Number.isFinite(hullMax) || hullMax <= 0) hull = loadedStats.hull;

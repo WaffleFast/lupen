@@ -333,6 +333,7 @@ function resetToNoShipStarterState() {
   selectedShipyardShipId = starterShipId;
   ownedShips = [starterShipId];
   shipLoadouts = { [starterShipId]: { attachments: [], guns: ["pulseLaser"] } };
+  shipConditions = {};
 
   Object.keys(ownedAttachments || {}).forEach(key => { ownedAttachments[key] = 0; });
   Object.keys(ownedGuns || {}).forEach(key => { ownedGuns[key] = 0; });
@@ -894,6 +895,32 @@ function getShipStats(shipId = currentShipId) {
   return stats;
 }
 
+function normalizeShipCondition(shipId = currentShipId, condition = null) {
+  const stats = getShipStats(shipId);
+  const maxHull = Math.max(0, Number(stats.hull || 0));
+  const maxShield = Math.max(0, Number(stats.shield || 0));
+  const savedHull = Number(condition?.hull);
+  const savedShield = Number(condition?.shield);
+
+  return {
+    hull: Math.max(0, Math.min(maxHull, Number.isFinite(savedHull) ? savedHull : maxHull)),
+    shield: Math.max(0, Math.min(maxShield, Number.isFinite(savedShield) ? savedShield : maxShield))
+  };
+}
+
+function ensureShipCondition(shipId = currentShipId) {
+  if (!shipId || !SHIPS[shipId]) return { hull: 0, shield: 0 };
+  shipConditions = shipConditions && typeof shipConditions === "object" ? shipConditions : {};
+  shipConditions[shipId] = normalizeShipCondition(shipId, shipConditions[shipId]);
+  return shipConditions[shipId];
+}
+
+function saveActiveShipCondition(shipId = currentShipId) {
+  if (!shipId || !SHIPS[shipId]) return;
+  shipConditions = shipConditions && typeof shipConditions === "object" ? shipConditions : {};
+  shipConditions[shipId] = normalizeShipCondition(shipId, { hull, shield });
+}
+
 function formatEvasion(value) {
   return `${Math.max(0, Math.round(value || 0))}%`;
 }
@@ -1081,9 +1108,11 @@ function applyShipStats(refill = false) {
     hull = hullMax;
     shield = shieldMax;
   } else {
-    hull = Math.min(hull, hullMax);
-    shield = Math.min(shield, shieldMax);
+    const condition = ensureShipCondition(currentShipId);
+    hull = condition.hull;
+    shield = condition.shield;
   }
+  saveActiveShipCondition(currentShipId);
 
   if (!hasActiveShip() || shieldMax <= 0 || shield >= shieldMax) {
     stopShieldRegen();

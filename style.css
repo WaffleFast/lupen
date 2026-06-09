@@ -893,6 +893,7 @@ input::placeholder {
 
 .laser-burst.player-shot {
   animation-timing-function: cubic-bezier(0.18, 0.88, 0.26, 1);
+  mix-blend-mode: screen;
 }
 
 .player-shot-rapid {
@@ -919,17 +920,18 @@ input::placeholder {
 
 .weapon-impact {
   position: absolute;
-  width: 34px;
-  height: 34px;
-  margin-left: -17px;
-  margin-top: -17px;
+  width: 42px;
+  height: 42px;
+  margin-left: -21px;
+  margin-top: -21px;
   border-radius: 50%;
   pointer-events: none;
   background:
     radial-gradient(circle, rgba(255, 255, 255, 0.94) 0 9%, var(--weapon-impact-color, #7fd6ff) 10% 32%, transparent 68%);
   box-shadow:
-    0 0 8px var(--weapon-impact-color, #7fd6ff),
-    0 0 18px var(--weapon-impact-color, #7fd6ff);
+    0 0 10px var(--weapon-impact-color, #7fd6ff),
+    0 0 24px var(--weapon-impact-color, #7fd6ff),
+    0 0 38px color-mix(in srgb, var(--weapon-impact-color, #7fd6ff) 42%, transparent);
   opacity: 0;
   transform: scale(0.34);
   animation: weaponImpactFlash 240ms ease-out forwards;
@@ -946,10 +948,10 @@ input::placeholder {
 }
 
 .weapon-impact-sniper {
-  width: 42px;
-  height: 42px;
-  margin-left: -21px;
-  margin-top: -21px;
+  width: 52px;
+  height: 52px;
+  margin-left: -26px;
+  margin-top: -26px;
 }
 
 @keyframes weaponImpactFlash {
@@ -41481,6 +41483,33 @@ input::placeholder {
 #storeScreen .store-detail-visual.store-art-lupenShards .quality-fx__item {
   width: 66% !important;
   height: 66% !important;
+}
+
+#storeScreen .simplified-store-detail .store-detail-visual {
+  min-height: 152px !important;
+  max-height: 152px !important;
+}
+
+#storeScreen .store-detail-visual .quality-fx__item {
+  width: 96% !important;
+  height: 96% !important;
+  max-width: 210px !important;
+  max-height: 138px !important;
+}
+
+#storeScreen .store-detail-visual.store-art-material .quality-fx__item,
+#storeScreen .store-detail-visual.store-art-core .quality-fx__item {
+  width: 88% !important;
+  height: 88% !important;
+  max-width: 156px !important;
+  max-height: 124px !important;
+}
+
+#storeScreen .store-detail-visual.store-art-lupenShards .quality-fx__item {
+  width: 82% !important;
+  height: 82% !important;
+  max-width: 142px !important;
+  max-height: 116px !important;
 }
 
 #storeScreen .store-art-lupenCore,

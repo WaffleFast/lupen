@@ -178,21 +178,22 @@ function getShotVisualProfile(shotWeapon = {}) {
     height: 3,
     durationMs: 150,
     streakScale: 1,
-    offsetSpread: 3
+    offsetSpread: 3,
+    glowScale: 1
   };
 
   if (style === "rapid") {
-    Object.assign(profile, { height: 2, durationMs: 115, streakScale: 0.74, offsetSpread: 5 });
+    Object.assign(profile, { height: 2, durationMs: 115, streakScale: 0.78, offsetSpread: 5, glowScale: 0.94 });
   } else if (style === "ion") {
-    Object.assign(profile, { height: 3, durationMs: 135, streakScale: 0.86, offsetSpread: 4 });
+    Object.assign(profile, { height: 3, durationMs: 135, streakScale: 0.9, offsetSpread: 4, glowScale: 1.18 });
   } else if (style === "melt") {
-    Object.assign(profile, { height: 5, durationMs: 175, streakScale: 0.9, offsetSpread: 3 });
+    Object.assign(profile, { height: 5, durationMs: 175, streakScale: 0.94, offsetSpread: 3, glowScale: 1.22 });
   } else if (style === "heavy") {
-    Object.assign(profile, { height: 6, durationMs: 180, streakScale: 0.96, offsetSpread: 2 });
+    Object.assign(profile, { height: 6, durationMs: 180, streakScale: 1, offsetSpread: 2, glowScale: 1.28 });
   } else if (style === "sniper") {
-    Object.assign(profile, { height: 2, durationMs: 165, streakScale: 1.04, offsetSpread: 1 });
+    Object.assign(profile, { height: 2, durationMs: 165, streakScale: 1.08, offsetSpread: 1, glowScale: 1.32 });
   } else if (style === "disruptor" || style === "ripper") {
-    Object.assign(profile, { height: 4, durationMs: 155, streakScale: 0.82, offsetSpread: 6 });
+    Object.assign(profile, { height: 4, durationMs: 155, streakScale: 0.88, offsetSpread: 6, glowScale: 1.18 });
   }
 
   return profile;
@@ -229,31 +230,41 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
 
   const screenRect = spaceScreen.getBoundingClientRect();
 
-  const startX = 285;
-  const startY = screenRect.height - 105;
+  const baseStartX = 285;
+  const baseStartY = screenRect.height - 105;
 
   const endX = (target.x / 100) * screenRect.width;
   const endY = (target.y / 100) * screenRect.height;
-
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const length = Math.sqrt(dx * dx + dy * dy);
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
   const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
   const visualWeapons = getVisibleShotWeapons(resolvedWeapon);
+  const barrageWeapons = visualWeapons.length === 1 ? [visualWeapons[0], visualWeapons[0]] : visualWeapons;
   const visualCapApplied = Number(resolvedWeapon?.count || visualWeapons.length) > visualWeapons.length;
 
-  const makeBeam = (shotWeapon, offsetY = 0, delay = 0) => {
+  const makeBeam = (shotWeapon, laneIndex = 0, delay = 0) => {
     const profile = getShotVisualProfile(shotWeapon);
+    const side = laneIndex % 2 === 0 ? -1 : 1;
+    const laneDepth = Math.floor(laneIndex / 2);
+    const startOffsetX = side * Math.min(34, 8 + laneDepth * 7);
+    const startOffsetY = side * (profile.offsetSpread + laneDepth * 3);
+    const targetOffsetX = side * Math.min(10, 2 + laneDepth * 2);
+    const targetOffsetY = -Math.min(8, laneDepth * 2);
+    const startX = baseStartX + startOffsetX;
+    const startY = baseStartY + startOffsetY;
+    const beamEndX = endX + targetOffsetX;
+    const beamEndY = endY + targetOffsetY;
+    const dx = beamEndX - startX;
+    const dy = beamEndY - startY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     const shotLength = Math.max(54, length * profile.streakScale);
     const beam = document.createElement("div");
     beam.className = `laser-burst player-shot player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
     beam.style.left = `${startX}px`;
-    beam.style.top = `${startY + offsetY}px`;
+    beam.style.top = `${startY}px`;
     beam.style.width = `${shotLength}px`;
     beam.style.height = `${profile.height}px`;
-    beam.style.background = `linear-gradient(90deg, transparent, ${profile.color}, #ffffff, ${profile.color}, transparent)`;
-    beam.style.boxShadow = `0 0 10px ${profile.color}, 0 0 18px ${profile.color}`;
+    beam.style.background = `linear-gradient(90deg, transparent 0%, ${profile.color} 16%, #ffffff 44%, ${profile.color} 68%, transparent 100%)`;
+    beam.style.boxShadow = `0 0 ${Math.round(12 * profile.glowScale)}px ${profile.color}, 0 0 ${Math.round(24 * profile.glowScale)}px ${profile.color}`;
     beam.style.transform = `rotate(${angle}deg)`;
     beam.style.animationDuration = `${profile.durationMs}ms`;
     beam.style.animationDelay = `${delay}ms`;
@@ -265,16 +276,13 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
     }
   };
 
-  visualWeapons.forEach((shotWeapon, index) => {
-    const profile = getShotVisualProfile(shotWeapon);
-    const side = index % 2 === 0 ? -1 : 1;
-    const offsetY = side * (profile.offsetSpread + Math.floor(index / 2) * 2);
-    makeBeam(shotWeapon, offsetY, Math.min(index * 75, 375));
+  barrageWeapons.forEach((shotWeapon, index) => {
+    makeBeam(shotWeapon, index, Math.min(index * 68, 380));
   });
 
   debugCombatShot("shot visuals", {
     activeWeaponCount: Number(resolvedWeapon?.count || visualWeapons.length),
-    visibleWeaponCount: visualWeapons.length,
+    visibleWeaponCount: barrageWeapons.length,
     visualCapApplied,
     weaponNames: visualWeapons.map(item => item?.name || item?.key || "weapon").join(", "),
     cooldownMs: Number(resolvedWeapon?.speed || 0)

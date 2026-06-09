@@ -1818,6 +1818,7 @@ function repairCurrentShip() {
 
   credits -= repairCost;
   hull = hullMax;
+  saveActiveShipCondition(currentShipId);
 
   addHudToast(`Hull repaired in Hangar for CR ${formatNumber(repairCost)}.`);
   updateSpaceHUD();
@@ -3628,6 +3629,7 @@ function sellShipToStore(shipId) {
   if (!ship || shipId === currentShipId || !ownedShips.includes(shipId)) return;
   ownedShips = ownedShips.filter(id => id !== shipId);
   delete shipLoadouts[shipId];
+  delete shipConditions[shipId];
   credits += Math.max(1, Math.floor(ship.price * 0.7));
   renderStore();
   saveGame();
@@ -3870,6 +3872,7 @@ function buyShip(shipId) {
   selectedFleetShipId = shipId;
   selectedShipyardShipId = shipId;
   shipLoadouts[shipId] = { attachments: [], guns: [] };
+  shipConditions[shipId] = normalizeShipCondition(shipId);
 
   if (hadNoShip) {
     currentShipId = shipId;
@@ -3895,10 +3898,12 @@ function equipShip(shipId) {
   if (blockLoadoutMutationInMultiplayerStaging()) return;
   if (!ownedShips.includes(shipId)) return;
 
+  saveActiveShipCondition(currentShipId);
   currentShipId = shipId;
   selectedHangarShipId = shipId;
   selectedFleetShipId = shipId;
-  applyShipStats(true);
+  ensureShipCondition(shipId);
+  applyShipStats(false);
   renderHangar();
   addHudToast(`${SHIPS[shipId]?.name || "Ship"} is ready to fly.`);
   saveGame();

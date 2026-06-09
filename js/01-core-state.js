@@ -637,6 +637,7 @@ let selectedFleetShipId = STARTER_SHIP_ID;
 let selectedShipyardShipId = STARTER_SHIP_ID;
 let stationVaultWasClearedThisSession = false;
 let installedAttachments = [];
+let shipConditions = {};
 let ownedAttachments = {
   cargoPod: 0,
   hullBooster: 0,

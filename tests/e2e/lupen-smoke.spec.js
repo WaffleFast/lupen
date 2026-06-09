@@ -497,6 +497,54 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("station store detail art stays centered and prominent", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await openStore(page);
+
+    const measurements = await page.evaluate(async () => {
+      const items = [
+        ["cargoPod", "attachment:cargoPod"],
+        ["ionBlaster", "gun:ionBlaster"],
+        ["heavyLance", "gun:heavyLance"],
+        ["lupenCore", "core:lupenCore"],
+        ["lupenShards", "material:lupenShard"]
+      ];
+      const rows = [];
+      for (const [key, id] of items) {
+        window.selectStoreItem(id);
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const frame = document.querySelector(".store-detail-visual");
+        const item = frame?.querySelector(".quality-fx__item, img");
+        const button = document.querySelector(".store-detail-buy-action");
+        const frameRect = frame?.getBoundingClientRect();
+        const itemRect = item?.getBoundingClientRect();
+        rows.push({
+          key,
+          frameHeight: frameRect?.height || 0,
+          itemHeight: itemRect?.height || 0,
+          offsetX: itemRect && frameRect ? Math.abs((itemRect.left + itemRect.width / 2) - (frameRect.left + frameRect.width / 2)) : 999,
+          offsetY: itemRect && frameRect ? Math.abs((itemRect.top + itemRect.height / 2) - (frameRect.top + frameRect.height / 2)) : 999,
+          actionText: button?.textContent?.trim() || "",
+          actionDisabled: button?.disabled === true
+        });
+      }
+      return rows;
+    });
+
+    for (const row of measurements) {
+      expect(row.frameHeight, row.key).toBeGreaterThanOrEqual(145);
+      expect(row.itemHeight, row.key).toBeGreaterThanOrEqual(row.key === "lupenShards" ? 95 : 110);
+      expect(row.offsetX, row.key).toBeLessThanOrEqual(1);
+      expect(row.offsetY, row.key).toBeLessThanOrEqual(1);
+      expect(row.actionText, row.key).not.toBe("");
+      expect(row.actionDisabled, row.key).toBe(false);
+    }
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("hangar loadout shows selected-item actions without live writes", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -512,6 +560,55 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#hangarScreen")).toContainText("Guns");
     await expect(page.locator("#hangarScreen")).toContainText("Attachments");
     await expect(page.locator("#hangarScreen")).not.toContainText("Total Slots");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("ship switching restores each hull condition instead of inheriting previous hull", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => {
+      window.eval(`
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        selectedShipyardShipId = "falcon";
+        ownedShips = ["falcon", "bison", "monolith"];
+        shipLoadouts = {
+          falcon: normalizeShipLoadout({ attachments: [], guns: ["pulseLaser"] }, "falcon"),
+          bison: normalizeShipLoadout({ attachments: [], guns: [] }, "bison"),
+          monolith: normalizeShipLoadout({ attachments: [], guns: [] }, "monolith")
+        };
+        shipConditions = {
+          falcon: { hull: 620, shield: 111 },
+          bison: { hull: 930, shield: 77 }
+        };
+        hull = 620;
+        shield = 111;
+        applyShipStats(false);
+        equipShip("monolith");
+      `);
+      const monolith = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
+      window.eval(`equipShip("bison");`);
+      const bisonBeforeRepair = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
+      window.eval(`repairCurrentShip();`);
+      const bisonAfterRepair = { ship: currentShipId, hull, hullMax, shield, shieldMax, savedHull: shipConditions.bison.hull };
+      window.eval(`equipShip("falcon");`);
+      const falcon = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
+      return { monolith, bisonBeforeRepair, bisonAfterRepair, falcon };
+    });
+
+    expect(state.monolith).toMatchObject({ ship: "monolith", hull: 4200, hullMax: 4200, shield: 1800, shieldMax: 1800 });
+    expect(state.bisonBeforeRepair).toMatchObject({ ship: "bison", hull: 930, hullMax: 1300, shield: 77, shieldMax: 135 });
+    expect(state.bisonAfterRepair).toMatchObject({ ship: "bison", hull: 1300, hullMax: 1300, savedHull: 1300 });
+    expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 700, shield: 111, shieldMax: 220 });
+    expect(state.monolith.armor).toBe(70);
+    expect(state.bisonBeforeRepair.cargo).toBe(260);
+    expect(state.falcon.jumpRecharge).toBe(15);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
