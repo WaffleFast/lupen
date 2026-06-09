@@ -439,8 +439,8 @@ function getShipImageValue(message = {}) {
 function getSafeShipImagePath(value = "") {
   const path = getStringValue(value).replace(/\\/g, "/").slice(0, 160);
   if (!path) return "";
-  if (!/^assets\/(?:ships|player-ships|hub\/ships)\/[a-z0-9-]+\.png$/i.test(path)) return "";
   if (path.includes("..") || path.includes("//")) return "";
+  if (!/^assets\/(?:ships|player-ships|hub\/ships)\/[a-z0-9-/.]+\.(?:png|webp|jpg|jpeg)$/i.test(path)) return "";
   return path;
 }
 
@@ -773,11 +773,6 @@ function validatePresencePayload(message = {}) {
     if (!Number.isFinite(y) || y < -1000 || y > 1000) return "y is outside presence bounds";
   }
 
-  const shipImageValue = getShipImageValue(message);
-  if (shipImageValue && typeof shipImageValue === "string" && shipImageValue.trim() && !getSafeShipImagePath(shipImageValue)) {
-    return "shipImage path is unsafe";
-  }
-
   return "";
 }
 
@@ -927,6 +922,43 @@ function validateTargetSelectionPayload(message = {}) {
   }
 
   return "";
+}
+
+function getNodeCompareResult({ player = null, targetBot = null, clientNode = "", selectedBotId = "" } = {}) {
+  const playerServerNode = getStringValue(player?.currentNode);
+  const botServerNode = getStringValue(targetBot?.currentNode);
+  const combatIntentNode = getStringValue(clientNode);
+  if (!playerServerNode) return "player_server_node_missing";
+  if (!botServerNode) return selectedBotId ? "selected_bot_missing" : "bot_server_node_missing";
+  if (combatIntentNode && combatIntentNode !== playerServerNode && combatIntentNode === botServerNode) {
+    return "player_presence_stale_client_matches_bot";
+  }
+  if (combatIntentNode && combatIntentNode !== playerServerNode) return "client_node_mismatch";
+  if (botServerNode !== playerServerNode) return "bot_node_mismatch";
+  return "same_node";
+}
+
+function getNodeDebugPayload({ message = {}, player = null, targetBot = null } = {}) {
+  const combatIntentNode = getStringValue(message.currentNode);
+  const selectedBotId = getStringValue(message.targetBotId || player?.selectedTargetBotId);
+  const botServerNode = getStringValue(targetBot?.currentNode);
+  const playerServerNode = getStringValue(player?.currentNode);
+  return {
+    playerClientNode: combatIntentNode,
+    playerServerNode,
+    playerPresenceNode: playerServerNode,
+    selectedBotId,
+    selectedBotNode: botServerNode,
+    botServerNode,
+    botVisualNode: botServerNode,
+    combatIntentNode,
+    nodeCompareResult: getNodeCompareResult({
+      player,
+      targetBot,
+      clientNode: combatIntentNode,
+      selectedBotId
+    })
+  };
 }
 
 // Presence-only stepping stone for future server-authoritative multiplayer.
@@ -1297,8 +1329,9 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  sendTargetRejected(client, reason, messageType, targetBotId = "") {
+  sendTargetRejected(client, reason, messageType, targetBotId = "", message = {}) {
     const player = this.state.players.get(client.sessionId);
+    const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
     if (player) {
       player.lastLockOnClearReason = reason || "target_rejected";
       player.lastCombatNodeValidationReason = reason || "";
@@ -1308,6 +1341,7 @@ export class LupenSectorRoom extends Room {
       reason,
       lockOnClearReason: reason || "target_rejected",
       combatNodeValidationReason: reason || "",
+      ...getNodeDebugPayload({ message: { ...message, targetBotId }, player, targetBot }),
       messageType,
       sessionId: client.sessionId,
       targetBotId,
@@ -1319,6 +1353,7 @@ export class LupenSectorRoom extends Room {
     const player = this.state.players.get(client.sessionId);
     const targetBotId = getStringValue(message.targetBotId);
     const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
+    const nodeDebug = getNodeDebugPayload({ message, player, targetBot });
 
     client.send("combat:rejected", {
       ok: false,
@@ -1332,6 +1367,7 @@ export class LupenSectorRoom extends Room {
       validCombatWeaponCount: Number(player?.validCombatWeaponCount || 0),
       rejectedWeaponCount: Number(player?.rejectedWeaponCount || 0),
       firstRejectedWeaponReason: player?.firstRejectedWeaponReason || "",
+      ...nodeDebug,
       messageType,
       sessionId: client.sessionId,
       targetBotId,
@@ -1353,27 +1389,32 @@ export class LupenSectorRoom extends Room {
     const requestedNode = getStringValue(message.currentNode, player?.currentNode || "");
 
     if (payloadWarning) {
-      this.sendTargetRejected(client, payloadWarning, messageType, targetBotId);
+      this.sendTargetRejected(client, payloadWarning, messageType, targetBotId, message);
       return;
     }
 
     if (!player) {
-      this.sendTargetRejected(client, "session player not found", messageType, targetBotId);
+      this.sendTargetRejected(client, "session player not found", messageType, targetBotId, message);
       return;
     }
 
     if (!targetBot) {
-      this.sendTargetRejected(client, `unknown staging bot: ${targetBotId}`, messageType, targetBotId);
+      this.sendTargetRejected(client, `unknown staging bot: ${targetBotId}`, messageType, targetBotId, message);
       return;
     }
 
+    if (requestedNode && requestedNode !== player.currentNode && requestedNode === targetBot.currentNode) {
+      player.currentNode = requestedNode;
+      player.lastCombatNodeValidationReason = "player_presence_resynced_to_selected_bot_node";
+    }
+
     if (requestedNode && requestedNode !== player.currentNode) {
-      this.sendTargetRejected(client, "selection node does not match player node", messageType, targetBotId);
+      this.sendTargetRejected(client, "selection node does not match player node", messageType, targetBotId, message);
       return;
     }
 
     if (targetBot.currentNode !== player.currentNode) {
-      this.sendTargetRejected(client, "player and staging bot are not in the same node", messageType, targetBotId);
+      this.sendTargetRejected(client, "player and staging bot are not in the same node", messageType, targetBotId, message);
       return;
     }
 
@@ -1381,11 +1422,13 @@ export class LupenSectorRoom extends Room {
     player.lastCombatIntentReason = "target_selected_waiting_for_engage";
     player.lastLockOnClearReason = "";
     player.lastCombatNodeValidationReason = "selection_node_valid";
+    const nodeDebug = getNodeDebugPayload({ message, player, targetBot });
     client.send("target:selected", {
       ok: true,
       reason: "lock_on_only_combat_disabled",
       lockOnClearReason: "",
       combatNodeValidationReason: "selection_node_valid",
+      ...nodeDebug,
       messageType,
       sessionId: client.sessionId,
       targetBotId,
@@ -2940,6 +2983,11 @@ export class LupenSectorRoom extends Room {
       validationReason = "combat target does not match selected staging bot";
     }
 
+    if (!validationReason && clientCurrentNode && targetBot && clientCurrentNode !== player.currentNode && clientCurrentNode === targetBot.currentNode) {
+      player.currentNode = clientCurrentNode;
+      player.lastCombatNodeValidationReason = "player_presence_resynced_to_combat_bot_node";
+    }
+
     if (!validationReason && Number(player.nextFireAt || 0) > now) {
       player.lastCombatIntentReason = "fire cooldown active";
       this.sendCombatRejected(client, "staging_fire_cooldown", message, messageType, "fire cooldown active", {
@@ -2972,11 +3020,13 @@ export class LupenSectorRoom extends Room {
     if (!player.selectedTargetBotId) {
       player.selectedTargetBotId = targetBotId;
       player.lastLockOnClearReason = "";
+      const nodeDebug = getNodeDebugPayload({ message, player, targetBot });
       client.send("target:selected", {
         ok: true,
         reason: "implicit_combat_lock",
         lockOnClearReason: "",
         combatNodeValidationReason: "combat_node_valid",
+        ...nodeDebug,
         messageType,
         sessionId: client.sessionId,
         targetBotId,
@@ -3028,6 +3078,7 @@ export class LupenSectorRoom extends Room {
       weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
       combatIntentReason: "staging_damage_applied",
       combatNodeValidationReason: "combat_node_valid",
+      ...getNodeDebugPayload({ message, player, targetBot }),
       activeShipWeaponCount: resolvedWeapon.activeShipWeaponCount || 0,
       validCombatWeaponCount: resolvedWeapon.validCombatWeaponCount || 0,
       rejectedWeaponCount: resolvedWeapon.rejectedWeaponCount || 0,
@@ -3128,7 +3179,13 @@ export class LupenSectorRoom extends Room {
     }
 
     if (typeof message.shipImage === "string" || typeof message.shipImageSrc === "string" || typeof message.shipImagePath === "string") {
-      player.shipImage = getSafeShipImagePath(getShipImageValue(message));
+      const requestedShipImage = getShipImageValue(message);
+      const safeShipImage = getSafeShipImagePath(requestedShipImage);
+      if (requestedShipImage && !safeShipImage) {
+        this.sendWarning(client, "shipImage path is unsafe", messageType);
+      } else {
+        player.shipImage = safeShipImage;
+      }
     }
 
     if (typeof message.shipClass === "string" || typeof message.shipType === "string" || typeof message.shipRole === "string") {

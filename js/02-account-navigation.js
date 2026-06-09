@@ -1095,6 +1095,7 @@ function launchShip() {
   updateAsteroidUI();
   updateTargetPanel();
   openHudPanel("sector");
+  if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("launch");
 
   if (jumpCharge < jumpMax) {
     startJumpRecharge();

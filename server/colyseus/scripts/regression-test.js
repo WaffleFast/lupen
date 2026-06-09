@@ -4650,15 +4650,18 @@ try {
 
   const unsafeShipImageWarning = await expectPresenceWarning(roomA, () => {
     roomA.send("presence:update", {
-      currentNode: "Asteron Prime",
+      currentNode: "Virella",
       x: 50,
       y: 50,
       shipImage: "https://example.com/not-allowed.png"
     });
   });
   assert(unsafeShipImageWarning?.reason === "shipImage path is unsafe", `Unexpected unsafe ship image warning: ${unsafeShipImageWarning?.reason}`);
+  await waitFor("unsafe ship image warning did not block player node sync", () => {
+    return playerFrom(roomB, roomA.sessionId)?.currentNode === "Virella";
+  });
   assert(playerFrom(roomB, roomA.sessionId)?.shipImage === "assets/ships/lupen-origin.png", "Unsafe ship image changed stored ship metadata.");
-  console.log("unsafe ship image metadata rejected safely");
+  console.log("unsafe ship image metadata rejected safely without blocking node sync");
 
   await waitFor("dummy bots to appear", () => botCount(roomA) > 0 && botCount(roomB) > 0);
   assertAllowedBotNodes(roomA);
@@ -4688,6 +4691,32 @@ try {
 
   const inspectedBotBeforeCombat = botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
+
+  const stalePlayerNode = inspectedBotBeforeCombat.currentNode === "Asteron Prime" ? "Virella" : "Asteron Prime";
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    currentNode: stalePlayerNode,
+    x: 50,
+    y: 50
+  });
+  await waitFor("client A server node to become stale before bot selection", () => {
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === stalePlayerNode;
+  });
+  const staleSelectionResponse = await expectTargetSelected(roomA, () => {
+    roomA.send("target:select", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      currentNode: inspectedBotBeforeCombat.currentNode
+    });
+  });
+  assert(staleSelectionResponse?.ok === true, "Stale player node was not resynced for visible same-node bot selection.");
+  assert(staleSelectionResponse?.nodeCompareResult === "same_node", `Unexpected node compare result after resync: ${staleSelectionResponse?.nodeCompareResult}`);
+  await waitFor("stale player node resynced to selected bot node", () => {
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === inspectedBotBeforeCombat.currentNode &&
+      playerFrom(roomA, roomA.sessionId)?.selectedTargetBotId === inspectedBotBeforeCombat.id;
+  });
+  console.log("stale player node resynced from selected server-owned bot node");
 
   await moveAndSelectBot(roomA, inspectedBotBeforeCombat.id, "Regression Pilot A");
   console.log("staging bot lock-on selected for display only");

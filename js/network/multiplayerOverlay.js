@@ -3325,10 +3325,20 @@
         : status.lockOnClearReason
           ? `cleared / ${status.lockOnClearReason}`
           : "pending";
+      const playerClientNode = status.playerClientNode || getCurrentNodeName() || "unknown";
+      const playerServerNode = status.playerServerNode || "unknown";
+      const selectedBotNode = status.selectedBotNode || selectedBot?.currentNode || "none";
+      const botServerNode = status.botServerNode || selectedBot?.currentNode || inspectedBot?.currentNode || "unknown";
+      const botVisualNode = status.botVisualNode || selectedBot?.currentNode || inspectedBot?.currentNode || "unknown";
+      const combatIntentNode = status.combatIntentNode || status.lastCombatResponse?.combatIntentNode || "pending";
       setDiagnosticsRow(panel, "weapon", `${status.lastCombatResponse?.weaponName || weaponIntent.weaponName || "unknown"}${weaponKey ? ` / ${weaponKey}` : ""} / server dmg ${Math.round(Number(serverDamage || 0))}`);
       setDiagnosticsRow(panel, "weapon source", `${damageSource} / fallback ${status.lastCombatResponse?.fallbackDamageUsed ? "yes" : "no"} / pulse ${status.lastCombatResponse?.pulseLaserDetected ? "yes" : "no"}`);
       setDiagnosticsRow(panel, "combat intent", `${status.lastCombatResponse?.ok ? "resolved" : "pending/rejected"} / ${String(combatIntentReason).slice(0, 48)}`);
       setDiagnosticsRow(panel, "lock-on", String(lockOnReason).slice(0, 56));
+      setDiagnosticsRow(panel, "node compare", String(status.nodeCompareResult || "pending").slice(0, 56));
+      setDiagnosticsRow(panel, "player nodes", `client ${playerClientNode} / server ${playerServerNode}`);
+      setDiagnosticsRow(panel, "bot nodes", `sel ${selectedBotNode} / server ${botServerNode} / visual ${botVisualNode}`);
+      setDiagnosticsRow(panel, "intent node", String(combatIntentNode).slice(0, 56));
       if (status.combatNodeValidationReason) setDiagnosticsRow(panel, "combat node", String(status.combatNodeValidationReason).slice(0, 56));
       setDiagnosticsRow(panel, "weapon count", `${activeShipWeaponCount} active / ${validCombatWeaponCount} valid / ${rejectedWeaponCount} rejected`);
       if (status.firstRejectedWeaponReason) setDiagnosticsRow(panel, "weapon reject", String(status.firstRejectedWeaponReason).slice(0, 56));
