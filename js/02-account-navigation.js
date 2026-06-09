@@ -997,6 +997,8 @@ function setSelectedHangarShip(shipId) {
 }
 
 function showHangarSection(sectionName) {
+  if (typeof hideHangarTooltip === "function") hideHangarTooltip();
+
   document.querySelectorAll(".hangar-section").forEach(section => {
     section.classList.remove("active");
   });

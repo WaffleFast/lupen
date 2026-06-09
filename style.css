@@ -37528,47 +37528,96 @@ input::placeholder {
 
 #hangarScreen #hangarOverviewSection .loadout-detail-card,
 #hangarScreen #hangarOverviewSection .loadout-detail-empty {
-  min-height: 50px !important;
-  padding: 7px 9px !important;
+  min-height: 46px !important;
+  padding: 6px 8px !important;
 }
 
-#hangarScreen #hangarOverviewSection .loadout-detail-head {
-  grid-template-columns: 38px minmax(0, 1fr) !important;
+#hangarScreen #hangarOverviewSection .loadout-detail-card {
+  grid-template-columns: minmax(0, 1fr) 92px !important;
+  align-items: center !important;
   gap: 8px !important;
 }
 
+#hangarScreen #hangarOverviewSection .loadout-detail-head {
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+}
+
 #hangarScreen #hangarOverviewSection .loadout-detail-head img {
-  width: 36px !important;
-  height: 36px !important;
+  width: 32px !important;
+  height: 32px !important;
 }
 
 #hangarScreen #hangarOverviewSection .loadout-detail-head span {
   font-size: 9px !important;
+  letter-spacing: 0.08em !important;
 }
 
 #hangarScreen #hangarOverviewSection .loadout-detail-head strong {
-  font-size: 13px !important;
+  font-size: 12px !important;
   line-height: 1.1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 #hangarScreen #hangarOverviewSection .loadout-detail-actions {
   grid-template-columns: 1fr !important;
-  margin-top: 4px !important;
-  gap: 6px !important;
+  margin-top: 0 !important;
+  gap: 0 !important;
 }
 
 #hangarScreen #hangarOverviewSection .loadout-detail-actions button {
-  min-height: 32px !important;
+  min-height: 30px !important;
   padding: 0 8px !important;
   border-radius: 7px !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
+}
+
+#hangarScreen #hangarOverviewSection .loadout-vault-list {
+  gap: 7px !important;
 }
 
 #hangarScreen #hangarOverviewSection .loadout-vault-row {
-  min-height: 62px !important;
-  grid-template-columns: 54px minmax(0, 1fr) 44px !important;
-  gap: 8px !important;
-  padding: 6px 7px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  grid-template-columns: 46px minmax(0, 1fr) 42px !important;
+  gap: 7px !important;
+  padding: 5px 7px !important;
+}
+
+#hangarScreen #hangarOverviewSection .loadout-vault-row img {
+  width: 42px !important;
+  height: 42px !important;
+}
+
+#hangarScreen #hangarOverviewSection .loadout-vault-row-copy {
+  gap: 2px !important;
+}
+
+#hangarScreen #hangarOverviewSection .loadout-vault-row-copy strong {
+  font-size: 13px !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#hangarScreen #hangarOverviewSection .loadout-vault-row-copy small {
+  font-size: 11px !important;
+  line-height: 1.12 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#hangarScreen #hangarOverviewSection .loadout-vault-row b {
+  min-width: 38px !important;
+  height: 24px !important;
+  padding: 0 6px !important;
+  font-size: 10px !important;
 }
 
 #hangarOverviewSection .equipment-slot.loadout-grid-slot > .quality-fx {

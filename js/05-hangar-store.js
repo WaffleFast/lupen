@@ -2217,6 +2217,11 @@ function ensureHangarTooltip() {
   return tooltip;
 }
 
+function hideHangarTooltip() {
+  const tooltip = document.getElementById("hangarTooltip");
+  if (tooltip) tooltip.classList.remove("visible");
+}
+
 function bindHangarEquipmentTooltip(btn) {
   const tooltip = ensureHangarTooltip();
 

@@ -528,7 +528,13 @@ test.describe("Lupen browser smoke", () => {
         selectedHangarShipId = STARTER_SHIP_ID;
         ownedShips = [STARTER_SHIP_ID];
         ownedGuns.pulseLaser = 1;
+        ownedGuns.repeater = 1;
+        ownedGuns.meltCannon = 1;
+        ownedGuns.ionBlaster = 1;
         ownedAttachments.cargoPod = 1;
+        ownedAttachments.shieldBooster = 1;
+        ownedAttachments.hullBooster = 1;
+        ownedAttachments.jumpDrive = 1;
         shipLoadouts[STARTER_SHIP_ID] = { attachments: [], guns: [] };
         showScreen("gameScreen");
         openHangar();
@@ -542,6 +548,16 @@ test.describe("Lupen browser smoke", () => {
     await page.locator("#loadoutVaultFilterGuns").click();
     await expect(page.locator("#loadoutCategoryWeapons")).toHaveClass(/active/);
     await page.locator("#installedGuns .loadout-grid-slot.empty").first().click();
+    await expect(page.locator("#gunInventory .hangar-equipment-card")).toHaveCount(4);
+    await expect.poll(async () => page.locator("#gunInventory .hangar-equipment-card").evaluateAll((rows, selector) => {
+      const list = document.querySelector(selector);
+      if (!list) return 0;
+      const listRect = list.getBoundingClientRect();
+      return rows.filter(row => {
+        const rect = row.getBoundingClientRect();
+        return rect.top >= listRect.top && rect.bottom <= listRect.bottom;
+      }).length;
+    }, "#gunInventory")).toBeGreaterThanOrEqual(3);
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']").first().click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser");
@@ -569,6 +585,16 @@ test.describe("Lupen browser smoke", () => {
     await page.locator("#loadoutVaultFilterAttachments").click();
     await expect(page.locator("#loadoutCategoryAttachments")).toHaveClass(/active/);
     await page.locator("#installedAttachments .loadout-grid-slot.empty").first().click();
+    await expect(page.locator("#gunInventory .hangar-equipment-card")).toHaveCount(4);
+    await expect.poll(async () => page.locator("#gunInventory .hangar-equipment-card").evaluateAll((rows, selector) => {
+      const list = document.querySelector(selector);
+      if (!list) return 0;
+      const listRect = list.getBoundingClientRect();
+      return rows.filter(row => {
+        const rect = row.getBoundingClientRect();
+        return rect.top >= listRect.top && rect.bottom <= listRect.bottom;
+      }).length;
+    }, "#gunInventory")).toBeGreaterThanOrEqual(3);
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']").first().click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
