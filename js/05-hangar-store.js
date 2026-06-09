@@ -3342,9 +3342,9 @@ function renderStoreCatalog() {
     const priceLabel = soldOut ? "Sold Out" : `CR ${formatNumber(price)}`;
 
     return `
-      <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} quality-${quality}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
+      <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} quality-${quality} store-kind-${item.kind}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
         ${status ? `<span class="store-card-status">${status}</span>` : ""}
-        <div class="store-card-art quality-${quality}">
+        <div class="store-card-art quality-${quality} store-art-${item.kind} store-art-${item.key}">
           ${renderQualityFx(quality, { src: item.kind === "ship" && typeof getShipAsset === "function" ? getShipAsset(item.key, "large") : item.image, alt: item.name, size: "card" })}
         </div>
         <div class="store-card-name">${item.name}</div>
@@ -3464,9 +3464,9 @@ function renderStoreDetail() {
     : (totalOwned > 0 ? `Owned / x${formatNumber(totalOwned)}` : "Not owned");
 
   panel.innerHTML = `
-    <div class="store-detail-shell store-quality-${quality} compact-store-detail simplified-store-detail">
+    <div class="store-detail-shell store-quality-${quality} compact-store-detail simplified-store-detail store-kind-${item.kind}" data-item-key="${item.key}" data-item-kind="${item.kind}">
       <div class="store-detail-content">
-        <div class="store-detail-visual quality-${quality}">
+        <div class="store-detail-visual quality-${quality} store-art-${item.kind} store-art-${item.key}">
           ${renderQualityFx(quality, { src: item.image, alt: item.name, size: "feature" })}
         </div>
 

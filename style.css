@@ -41414,6 +41414,89 @@ input::placeholder {
   isolation: isolate !important;
 }
 
+/* ===== Station Store image centering polish ===== */
+#storeScreen .store-card-art,
+#storeScreen .store-detail-visual {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: visible !important;
+  border-radius: 8px !important;
+}
+
+#storeScreen .store-card-art .quality-fx,
+#storeScreen .store-detail-visual .quality-fx {
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  transform: none !important;
+}
+
+#storeScreen .store-card-art .quality-fx__item,
+#storeScreen .store-detail-visual .quality-fx__item {
+  display: block !important;
+  object-fit: contain !important;
+  object-position: 50% 50% !important;
+  margin: auto !important;
+  transform: translate3d(0, 0, 0) !important;
+  transform-origin: 50% 50% !important;
+}
+
+#storeScreen .store-card-art .quality-fx__item {
+  width: 86% !important;
+  height: 86% !important;
+  max-width: 60px !important;
+  max-height: 40px !important;
+}
+
+#storeScreen .store-detail-visual .quality-fx__item {
+  width: 82% !important;
+  height: 82% !important;
+  max-width: 112px !important;
+  max-height: 88px !important;
+}
+
+#storeScreen .store-art-material .quality-fx__item,
+#storeScreen .store-art-core .quality-fx__item {
+  width: 76% !important;
+  height: 76% !important;
+}
+
+#storeScreen .store-detail-visual.store-art-material .quality-fx__item,
+#storeScreen .store-detail-visual.store-art-core .quality-fx__item {
+  width: 70% !important;
+  height: 70% !important;
+  max-width: 96px !important;
+  max-height: 78px !important;
+}
+
+#storeScreen .store-art-lupenShards .quality-fx__item {
+  width: 72% !important;
+  height: 72% !important;
+}
+
+#storeScreen .store-detail-visual.store-art-lupenShards .quality-fx__item {
+  width: 66% !important;
+  height: 66% !important;
+}
+
+#storeScreen .store-art-lupenCore,
+#storeScreen .store-art-lupenShards {
+  background:
+    radial-gradient(circle at 50% 47%, rgba(255, 255, 255, 0.09), transparent 36%),
+    linear-gradient(180deg, rgba(98, 207, 255, 0.07), rgba(160, 118, 255, 0.05)) !important;
+}
+
+#storeScreen .store-art-lupenCore .quality-fx__ring,
+#storeScreen .store-art-lupenShards .quality-fx__ring,
+#storeScreen .store-art-lupenCore .quality-fx__storm,
+#storeScreen .store-art-lupenShards .quality-fx__storm {
+  opacity: 0.26 !important;
+}
+
 .quality-fx-host {
   --q: #45c8ff;
   --q2: #1d6dff;
