@@ -16056,6 +16056,10 @@ input::placeholder {
   gap: 10px;
 }
 
+#hangarScreen #hangarOverviewSection .equipment-drawer {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 #hangarScreen .scalable-equipment-grid,
 #hangarScreen .compact-equipment-grid {
   grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
@@ -36550,7 +36554,7 @@ input::placeholder {
 #hangarOverviewSection .equipment-drawer {
   min-height: 0;
   display: grid !important;
-  grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
   gap: 8px;
   overflow: hidden;
 }
@@ -37047,13 +37051,16 @@ input::placeholder {
   display: none !important;
 }
 
-#hangarOverviewSection .loadout-vault-search-row,
-#hangarOverviewSection .loadout-item-detail-panel {
+#hangarOverviewSection .loadout-vault-search-row {
   display: none !important;
 }
 
+#hangarOverviewSection .loadout-item-detail-panel {
+  display: block !important;
+}
+
 #hangarOverviewSection .equipment-drawer {
-  grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
 }
 
 #hangarOverviewSection .loadout-compatible-heading {
@@ -37152,7 +37159,7 @@ input::placeholder {
 }
 
 #hangarOverviewSection .equipment-drawer {
-  grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
   gap: 10px !important;
 }
 

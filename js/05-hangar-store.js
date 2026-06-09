@@ -1181,6 +1181,50 @@ function findEquippedVaultEntryIndex(entry) {
   return (list || []).findIndex(item => getEquipmentKey(item) === entry.key && getEquipmentQuality(item) === entry.quality);
 }
 
+function getSelectedEquippedLoadoutContext() {
+  const context = selectedVaultActionContext?.source === "equipped"
+    ? selectedVaultActionContext
+    : selectedLoadoutItemContext?.source === "equipped"
+      ? selectedLoadoutItemContext
+      : null;
+  if (!context || !["guns", "attachments"].includes(context.categoryKey) || !context.key) return null;
+  return context;
+}
+
+function getSelectedEquippedLoadoutEntry() {
+  const context = getSelectedEquippedLoadoutContext();
+  if (!context) return null;
+  const definition = context.categoryKey === "guns" ? GUNS[context.key] : attachments[context.key];
+  if (!definition) return null;
+  const quality = context.quality || "standard";
+  return {
+    source: "equipped",
+    categoryKey: context.categoryKey,
+    key: context.key,
+    quality,
+    level: Math.max(1, Number(context.level || 1)),
+    name: definition.name || context.key,
+    icon: definition.image || "",
+    storedCount: 0,
+    count: 0,
+    groupKey: `${context.key}__${quality}`
+  };
+}
+
+function getSelectedEquippedLoadoutIndex(entry) {
+  const context = getSelectedEquippedLoadoutContext();
+  if (!context || !entry || context.categoryKey !== entry.categoryKey || context.key !== entry.key) return -1;
+  const quality = context.quality || "standard";
+  if (quality !== entry.quality) return -1;
+  const index = Number(context.index);
+  if (!Number.isInteger(index) || index < 0) return -1;
+  const loadout = getShipLoadout(selectedHangarShipId);
+  const list = entry.categoryKey === "guns" ? loadout.guns : loadout.attachments;
+  const equipped = list?.[index];
+  if (getEquipmentKey(equipped) !== entry.key || getEquipmentQuality(equipped) !== entry.quality) return -1;
+  return index;
+}
+
 function equipSelectedVaultItem() {
   const entry = getSelectedVaultEntry();
   if (!entry || !canEquipVaultEntry(entry)) return;
@@ -1242,23 +1286,30 @@ async function requestStagingLoadoutUnequip(entry) {
 }
 
 function unequipSelectedVaultItem() {
-  const entry = getSelectedVaultEntry();
+  const entry = getSelectedVaultEntry() || getSelectedEquippedLoadoutEntry();
   if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return;
   if (isMultiplayerStagingStoreActive()) {
     requestStagingLoadoutUnequip(entry);
     return;
   }
-  const index = selectedVaultActionContext?.source === "equipped" && selectedVaultActionContext.key === entry.key
-    ? selectedVaultActionContext.index
-    : findEquippedVaultEntryIndex(entry);
+  const selectedIndex = getSelectedEquippedLoadoutIndex(entry);
+  const index = selectedIndex >= 0 ? selectedIndex : findEquippedVaultEntryIndex(entry);
   if (index < 0) return;
+  selectedVaultActionContext = null;
+  selectedLoadoutSlotCategory = entry.categoryKey;
+  selectedLoadoutItemContext = {
+    source: "slot",
+    categoryKey: entry.categoryKey,
+    index,
+    key: "",
+    quality: "standard",
+    level: 1
+  };
   if (entry.categoryKey === "guns") {
     removeGun(index);
   } else {
     removeAttachment(index);
   }
-  selectedVaultActionContext = null;
-  selectedLoadoutItemContext = null;
 }
 
 function selectAvailableLoadoutItem(categoryKey, entry) {
@@ -1395,13 +1446,20 @@ function equipSelectedLoadoutItem() {
 function unequipSelectedLoadoutItem() {
   const detail = getLoadoutDetailDefinition(selectedLoadoutItemContext);
   if (!detail || detail.equippedCount <= 0) return;
+  const selectedIndex = selectedLoadoutItemContext?.source === "equipped" &&
+    selectedLoadoutItemContext.categoryKey === detail.categoryKey &&
+    selectedLoadoutItemContext.key === detail.key &&
+    (selectedLoadoutItemContext.quality || "standard") === detail.quality
+    ? Number(selectedLoadoutItemContext.index)
+    : -1;
   selectedVaultGroupKey = `${detail.key}__${detail.quality}`;
   selectedVaultActionContext = {
     source: "equipped",
     categoryKey: detail.categoryKey,
-    index: findEquippedVaultEntryIndex(detail),
+    index: Number.isInteger(selectedIndex) && selectedIndex >= 0 ? selectedIndex : findEquippedVaultEntryIndex(detail),
     key: detail.key,
-    quality: detail.quality
+    quality: detail.quality,
+    level: detail.level
   };
   unequipSelectedVaultItem();
 }

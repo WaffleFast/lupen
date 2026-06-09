@@ -516,6 +516,91 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("hangar loadout unequips selected weapon and attachment slots", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.eval(`
+        localStorage.clear();
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        ownedGuns.pulseLaser = 1;
+        ownedAttachments.cargoPod = 1;
+        shipLoadouts[STARTER_SHIP_ID] = { attachments: [], guns: [] };
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("overview");
+        saveGame();
+      `);
+    });
+    await expect(page.locator("#hangarScreen")).toHaveClass(/active/);
+
+    await page.locator("#installedGuns .loadout-grid-slot.empty").first().click();
+    await page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']").first().click();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+
+    await page.reload();
+    await openHangar(page);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+
+    await page.locator("#installedGuns .loadout-grid-slot.filled").first().click();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled").first()).toHaveClass(/selected/);
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser");
+    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" })).toBeEnabled();
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" }).click();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
+    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']")).toHaveCount(1);
+
+    await page.reload();
+    await openHangar(page);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
+    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']")).toHaveCount(1);
+
+    await page.locator("#loadoutCategoryAttachments").click();
+    await page.locator("#installedAttachments .loadout-grid-slot.empty").first().click();
+    await page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']").first().click();
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
+
+    await page.reload();
+    await openHangar(page);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
+
+    await page.locator("#loadoutCategoryAttachments").click();
+    await page.locator("#installedAttachments .loadout-grid-slot.filled").first().click();
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled").first()).toHaveClass(/selected/);
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
+    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" })).toBeEnabled();
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" }).click();
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
+    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']")).toHaveCount(1);
+
+    await page.reload();
+    await openHangar(page);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
+    await page.locator("#loadoutCategoryAttachments").click();
+    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']")).toHaveCount(1);
+
+    await page.evaluate(() => {
+      window.eval(`
+        currentShipId = "monolith";
+        selectedHangarShipId = "monolith";
+        ownedShips = [STARTER_SHIP_ID, "monolith"];
+        shipLoadouts.monolith = { attachments: [], guns: [] };
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("overview");
+      `);
+    });
+    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(20);
+    await page.locator("#loadoutCategoryAttachments").click();
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(20);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging bounty board uses player-facing staging bounty copy", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
