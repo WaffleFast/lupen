@@ -39433,6 +39433,58 @@ input::placeholder {
   -webkit-line-clamp: 3 !important;
 }
 
+.progression-locked {
+  filter: grayscale(0.82) brightness(0.62) !important;
+  opacity: 0.78 !important;
+}
+
+.progression-locked.selected,
+.progression-locked:hover {
+  filter: grayscale(0.65) brightness(0.78) !important;
+  opacity: 0.9 !important;
+}
+
+.progression-locked img,
+.progression-locked .quality-fx__item {
+  filter: grayscale(0.88) brightness(0.72) !important;
+}
+
+.progression-locked .store-card-status,
+.progression-locked .fleet-card-badge {
+  border-color: rgba(180, 195, 210, 0.45) !important;
+  background: rgba(20, 27, 36, 0.86) !important;
+  color: rgba(228, 236, 246, 0.92) !important;
+}
+
+.progression-requirement-list {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.progression-requirement-list span {
+  display: block;
+  padding: 7px 9px;
+  border: 1px solid rgba(80, 150, 210, 0.32);
+  border-radius: 6px;
+  background: rgba(4, 15, 29, 0.72);
+  color: rgba(224, 238, 252, 0.9);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.progression-requirement-list.locked span {
+  border-color: rgba(190, 200, 210, 0.24);
+  color: rgba(200, 210, 220, 0.86);
+}
+
+.locked-action {
+  border-color: rgba(190, 200, 210, 0.35) !important;
+  background: rgba(24, 31, 40, 0.86) !important;
+  color: rgba(232, 238, 246, 0.92) !important;
+}
+
 #hangarShipyardSection #shipyardDetailPanel .fleet-detail-stats .fleet-stat-chip {
   position: relative !important;
   overflow: hidden !important;

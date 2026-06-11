@@ -395,7 +395,7 @@ const SHIPS = {
     description: "A broad early hauler with steady plating, useful cargo volume and a single defensive weapon bank.",
     image: getShipAsset("bison", "medium"),
     assets: SHIP_ASSET_MANIFEST.bison,
-    price: 12000,
+    price: 10500,
     hull: 1300,
     shield: 135,
     armor: 18,
@@ -582,7 +582,7 @@ const SHIPS = {
     description: "A fast black-crystal scout built for quick jumps, high evasion and a flexible three-gun skirmish loadout.",
     image: getShipAsset("zeusExplorer", "medium"),
     assets: SHIP_ASSET_MANIFEST.zeusExplorer,
-    price: 22000,
+    price: 8500,
     hull: 900,
     shield: 150,
     armor: 10,
@@ -593,6 +593,15 @@ const SHIPS = {
     attachmentSlots: 3
   }
 };
+
+const SHIP_UNLOCK_REQUIREMENTS = Object.freeze({
+  falcon: Object.freeze({ combatLevel: 1 }),
+  zeusExplorer: Object.freeze({ combatLevel: 2, erebusBotsDestroyed: 25 }),
+  bison: Object.freeze({ totalTradingProfit: 7500 }),
+  monolith: Object.freeze({ combatLevel: 3, erebusBotsDestroyed: 75, bountiesClaimed: 5 }),
+  hephaestusTrader: Object.freeze({ combatLevel: 3, totalTradingProfit: 35000 }),
+  poseidonAggressor: Object.freeze({ combatLevel: 4, erebusBotsDestroyed: 125, totalTradingProfit: 25000 })
+});
 
 const attachments = {
   cargoPod: {
@@ -640,6 +649,28 @@ const GUNS = Object.fromEntries(
 GUNS.heavyPulseLaser = { ...createWeaponCatalogDefinition("heavyLance"), key: "heavyPulseLaser", familyId: "heavyLance", hiddenFromStore: true };
 GUNS.pulseRelay = { ...createWeaponCatalogDefinition("pulseLaser"), key: "pulseRelay", familyId: "pulseLaser", name: "Pulse Relay", hiddenFromStore: true };
 GUNS.targetingArray = { ...createWeaponCatalogDefinition("voidRail"), key: "targetingArray", familyId: "voidRail", name: "Targeting Array", hiddenFromStore: true };
+
+const EQUIPMENT_UNLOCK_REQUIREMENTS = Object.freeze({
+  guns: Object.freeze({
+    pulseLaser: Object.freeze({ combatLevel: 1 }),
+    repeater: Object.freeze({ combatLevel: 2 }),
+    ionBlaster: Object.freeze({ combatLevel: 2 }),
+    ripperGun: Object.freeze({ combatLevel: 2 }),
+    meltCannon: Object.freeze({ combatLevel: 3 }),
+    heavyLance: Object.freeze({ combatLevel: 3 }),
+    voidRail: Object.freeze({ combatLevel: 4 }),
+    heavyPulseLaser: Object.freeze({ combatLevel: 3 }),
+    pulseRelay: Object.freeze({ combatLevel: 1 }),
+    targetingArray: Object.freeze({ combatLevel: 4 })
+  }),
+  attachments: Object.freeze({
+    cargoPod: Object.freeze({ combatLevel: 1 }),
+    jumpDrive: Object.freeze({ combatLevel: 1 }),
+    hullBooster: Object.freeze({ combatLevel: 2 }),
+    shieldBooster: Object.freeze({ combatLevel: 2 }),
+    evasionMatrix: Object.freeze({ combatLevel: 3 })
+  })
+});
 
 let currentNode = "Asteron Prime";
 let lastPlanetNode = "Asteron Prime";
@@ -2010,8 +2041,10 @@ function createDefaultPlayerProgress() {
     zoneCombatXp: { [XP_CONFIG.combatZoneKey]: 0 },
     totals: {
       botsDestroyed: 0,
+      erebusBotsDestroyed: 0,
       tradesCompleted: 0,
       tradeProfit: 0,
+      totalTradingProfit: 0,
       cargoSold: 0,
       bountiesClaimed: 0
     }
@@ -2036,12 +2069,22 @@ function normalizePlayerProgress(progress) {
     zoneCombatXp[XP_CONFIG.combatZoneKey] = combatXp;
   }
 
+  const rawTotals = safe.totals && typeof safe.totals === "object" ? safe.totals : {};
+  const botsDestroyed = Math.max(0, Number(rawTotals.botsDestroyed || rawTotals.erebusBotsDestroyed || 0));
+  const erebusBotsDestroyed = Math.max(0, Number(rawTotals.erebusBotsDestroyed || rawTotals.botsDestroyed || 0));
+  const tradeProfit = Math.max(0, Number(rawTotals.tradeProfit || rawTotals.totalTradingProfit || 0));
+  const totalTradingProfit = Math.max(0, Number(rawTotals.totalTradingProfit || rawTotals.tradeProfit || 0));
+
   return {
     combatXp,
     zoneCombatXp,
     totals: {
       ...defaults.totals,
-      ...(safe.totals && typeof safe.totals === "object" ? safe.totals : {})
+      ...rawTotals,
+      botsDestroyed,
+      erebusBotsDestroyed,
+      tradeProfit,
+      totalTradingProfit
     }
   };
 }
@@ -2062,6 +2105,99 @@ function getCombatLevelInfo() {
     levelBase,
     percent: Math.min(100, Math.round((current / next) * 100)),
     capped: false
+  };
+}
+
+function getPlayerProgressTotals() {
+  playerProgress = normalizePlayerProgress(playerProgress);
+  return playerProgress.totals || {};
+}
+
+function getUnlockProgressValue(key) {
+  const totals = getPlayerProgressTotals();
+  if (key === "combatLevel") return getCombatLevelInfo().level;
+  if (key === "erebusBotsDestroyed") return Math.max(0, Number(totals.erebusBotsDestroyed || totals.botsDestroyed || 0));
+  if (key === "totalTradingProfit") return Math.max(0, Number(totals.totalTradingProfit || totals.tradeProfit || 0));
+  if (key === "bountiesClaimed") return Math.max(0, Number(totals.bountiesClaimed || 0));
+  return Math.max(0, Number(totals[key] || 0));
+}
+
+function getUnlockRequirementProgress(requirements = {}) {
+  return Object.entries(requirements || {})
+    .filter(([, target]) => Number(target || 0) > 0)
+    .map(([key, target]) => {
+      const current = getUnlockProgressValue(key);
+      const required = Math.max(0, Number(target || 0));
+      return {
+        key,
+        current,
+        required,
+        met: current >= required
+      };
+    });
+}
+
+function formatUnlockRequirementLine(progress) {
+  if (!progress) return "";
+  if (progress.key === "combatLevel") return `Requires Combat Level ${formatNumber(progress.required)}`;
+  if (progress.key === "erebusBotsDestroyed") return `Destroy Erebus bots: ${formatNumber(Math.min(progress.current, progress.required))} / ${formatNumber(progress.required)}`;
+  if (progress.key === "totalTradingProfit") return `Trading profit: CR ${formatNumber(Math.min(progress.current, progress.required))} / CR ${formatNumber(progress.required)}`;
+  if (progress.key === "bountiesClaimed") return `Claim bounties: ${formatNumber(Math.min(progress.current, progress.required))} / ${formatNumber(progress.required)}`;
+  return `${progress.key}: ${formatNumber(Math.min(progress.current, progress.required))} / ${formatNumber(progress.required)}`;
+}
+
+function getFirstLockedRequirementMessage(requirements = {}, fallback = "Complete the unlock requirements first.") {
+  const missing = getUnlockRequirementProgress(requirements).find(item => !item.met);
+  if (!missing) return fallback;
+  if (missing.key === "combatLevel") return `Reach Combat Level ${formatNumber(missing.required)} to unlock this.`;
+  if (missing.key === "erebusBotsDestroyed") return `Destroy ${formatNumber(missing.required)} Erebus bots to unlock this.`;
+  if (missing.key === "totalTradingProfit") return `Earn CR ${formatNumber(missing.required)} trading profit to unlock this.`;
+  if (missing.key === "bountiesClaimed") return `Claim ${formatNumber(missing.required)} bounties to unlock this.`;
+  return fallback;
+}
+
+function getShipUnlockRequirements(shipId) {
+  return SHIP_UNLOCK_REQUIREMENTS[shipId] || {};
+}
+
+function getShipUnlockStatus(shipId) {
+  const requirements = getShipUnlockRequirements(shipId);
+  const progress = getUnlockRequirementProgress(requirements);
+  const unlocked = progress.every(item => item.met);
+  const owned = ownedShips.includes(shipId);
+  const active = currentShipId === shipId;
+  return {
+    shipId,
+    requirements,
+    progress,
+    unlocked,
+    locked: !unlocked,
+    owned,
+    active,
+    state: active ? "active" : owned ? "owned" : unlocked ? "available" : "locked",
+    requirementLines: progress.map(formatUnlockRequirementLine),
+    message: getFirstLockedRequirementMessage(requirements, "Complete this ship unlock challenge first.")
+  };
+}
+
+function getEquipmentUnlockRequirements(categoryKey, itemKey) {
+  const normalizedCategory = categoryKey === "attachments" || categoryKey === "attachment" ? "attachments" : "guns";
+  return EQUIPMENT_UNLOCK_REQUIREMENTS[normalizedCategory]?.[itemKey] || { combatLevel: 1 };
+}
+
+function getEquipmentUnlockStatus(categoryKey, itemKey) {
+  const requirements = getEquipmentUnlockRequirements(categoryKey, itemKey);
+  const progress = getUnlockRequirementProgress(requirements);
+  const unlocked = progress.every(item => item.met);
+  return {
+    categoryKey: categoryKey === "attachments" || categoryKey === "attachment" ? "attachments" : "guns",
+    itemKey,
+    requirements,
+    progress,
+    unlocked,
+    locked: !unlocked,
+    requirementLines: progress.map(formatUnlockRequirementLine),
+    message: getFirstLockedRequirementMessage(requirements, "Complete the item unlock requirement first.")
   };
 }
 
@@ -2099,6 +2235,9 @@ function addCombatXp(amount, source = "") {
 function awardCombatXpFromBot(bot) {
   const award = Number(bot?.xpReward || getCombatXpPerBot());
   playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
+  if (!bot || bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_")) {
+    playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
+  }
 
   if (award <= 0) {
     updateProgressDisplays();
@@ -2118,6 +2257,7 @@ function awardTradingXpFromProfit(profit) {
 
   playerProgress.totals.tradesCompleted = Math.max(0, Number(playerProgress.totals.tradesCompleted || 0)) + 1;
   playerProgress.totals.tradeProfit = Math.max(0, Number(playerProgress.totals.tradeProfit || 0)) + safeProfit;
+  playerProgress.totals.totalTradingProfit = Math.max(0, Number(playerProgress.totals.totalTradingProfit || 0)) + safeProfit;
   addActivityLog(`Trade completed: CR ${formatNumber(safeProfit)} profit.`);
   updateProgressDisplays();
   return 0;

@@ -30,6 +30,7 @@ function getLeaveSaveNode() {
 
 function buildSaveState(options = {}) {
   if (typeof saveActiveShipCondition === "function") saveActiveShipCondition(currentShipId);
+  if (typeof normalizePlayerProgress === "function") playerProgress = normalizePlayerProgress(playerProgress);
   const leaveSave = Boolean(options.leaveSave);
   const savedCurrentNode = leaveSave ? getLeaveSaveNode() : currentNode;
   const savedLastPlanetNode = sectorNodes[savedCurrentNode]?.type === "planet" ? savedCurrentNode : lastPlanetNode;

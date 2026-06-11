@@ -257,6 +257,109 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("early progression locks ships and equipment while preserving starter access", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const progression = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        credits = 50000;
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        selectedShipyardShipId = "zeusExplorer";
+        ownedShips = ["falcon"];
+        ownedGuns = Object.fromEntries(Object.keys(GUNS).map(key => [key, 0]));
+        ownedAttachments = Object.fromEntries(Object.keys(attachments).map(key => [key, 0]));
+        shipLoadouts = { falcon: normalizeShipLoadout({ attachments: [], guns: [] }, "falcon") };
+        playerProgress = normalizePlayerProgress({ combatXp: 0, totals: { botsDestroyed: 0, erebusBotsDestroyed: 0, tradeProfit: 0, totalTradingProfit: 0 } });
+        tutorialState = { active: false, completed: false, stepIndex: 0 };
+        buyGun("repeater");
+        const repeaterOwnedAfterBlockedBuy = ownedGuns.repeater || 0;
+        buyGun("pulseLaser");
+        buyAttachment("cargoPod");
+        buyAttachment("jumpDrive");
+        buyAttachment("shieldBooster");
+        ownedGuns.ionBlaster = 1;
+        selectedLoadoutSlotCategory = "guns";
+        selectedLoadoutItemContext = { source: "slot", categoryKey: "guns", index: 0, key: "", quality: "standard" };
+        equipGunFromInventory("ionBlaster");
+        playerProgress.totals.erebusBotsDestroyed = 12;
+        playerProgress.totals.botsDestroyed = 12;
+        playerProgress.totals.totalTradingProfit = 3456;
+        playerProgress.totals.tradeProfit = 3456;
+        saveGame();
+        return {
+          starterShip: getShipUnlockStatus("falcon"),
+          nightshade: getShipUnlockStatus("zeusExplorer"),
+          hauler: getShipUnlockStatus("bison"),
+          pulse: getEquipmentUnlockStatus("guns", "pulseLaser"),
+          repeater: getEquipmentUnlockStatus("guns", "repeater"),
+          cargoPod: getEquipmentUnlockStatus("attachments", "cargoPod"),
+          jumpDrive: getEquipmentUnlockStatus("attachments", "jumpDrive"),
+          shieldBooster: getEquipmentUnlockStatus("attachments", "shieldBooster"),
+          repeaterOwnedAfterBlockedBuy,
+          pulseOwned: ownedGuns.pulseLaser || 0,
+          cargoOwned: ownedAttachments.cargoPod || 0,
+          jumpOwned: ownedAttachments.jumpDrive || 0,
+          shieldOwned: ownedAttachments.shieldBooster || 0,
+          ionOwned: ownedGuns.ionBlaster || 0,
+          equippedGuns: shipLoadouts.falcon.guns.length,
+          savedProgress: JSON.parse(localStorage.getItem("lupenGameState")).playerProgress.totals
+        };
+      })()
+    `));
+
+    expect(progression.starterShip.locked).toBe(false);
+    expect(progression.nightshade.locked).toBe(true);
+    expect(progression.nightshade.requirementLines.join(" ")).toContain("Destroy Erebus bots: 12 / 25");
+    expect(progression.hauler.locked).toBe(true);
+    expect(progression.hauler.requirementLines.join(" ")).toContain("Trading profit: CR 3,456 / CR 7,500");
+    expect(progression.pulse.locked).toBe(false);
+    expect(progression.cargoPod.locked).toBe(false);
+    expect(progression.jumpDrive.locked).toBe(false);
+    expect(progression.repeater.locked).toBe(true);
+    expect(progression.shieldBooster.locked).toBe(true);
+    expect(progression.repeaterOwnedAfterBlockedBuy).toBe(0);
+    expect(progression.pulseOwned).toBe(1);
+    expect(progression.cargoOwned).toBe(1);
+    expect(progression.jumpOwned).toBe(1);
+    expect(progression.shieldOwned).toBe(0);
+    expect(progression.ionOwned).toBe(1);
+    expect(progression.equippedGuns).toBe(0);
+    expect(progression.savedProgress).toMatchObject({
+      erebusBotsDestroyed: 12,
+      botsDestroyed: 12,
+      totalTradingProfit: 3456,
+      tradeProfit: 3456
+    });
+
+    await page.evaluate(() => {
+      window.showScreen("gameScreen");
+      window.openHangar();
+      window.showHangarSection("shipyard");
+      window.selectShipyardShip("zeusExplorer");
+    });
+
+    await expect(page.locator(".vessel-exchange-card[data-ship-id='zeusExplorer']")).toHaveClass(/progression-locked/);
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Destroy Erebus bots: 12 / 25");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Requires Combat Level 2");
+
+    await page.reload();
+    await waitForGameGlobals(page);
+    const restored = await page.evaluate(() => ({
+      nightshadeLines: getShipUnlockStatus("zeusExplorer").requirementLines,
+      haulerLines: getShipUnlockStatus("bison").requirementLines
+    }));
+    expect(restored.nightshadeLines.join(" ")).toContain("Destroy Erebus bots: 12 / 25");
+    expect(restored.haulerLines.join(" ")).toContain("Trading profit: CR 3,456 / CR 7,500");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging mode exposes staging UI without using real trade buttons", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -821,6 +924,7 @@ test.describe("Lupen browser smoke", () => {
         selectedFleetShipId = "falcon";
         selectedShipyardShipId = "falcon";
         ownedShips = ["falcon"];
+        playerProgress = normalizePlayerProgress({ combatXp: 2500 });
         ownedGuns.pulseLaser = 0;
         inventoryItems = [];
         shipLoadouts = {
@@ -1085,6 +1189,7 @@ test.describe("Lupen browser smoke", () => {
         selectedFleetShipId = "falcon";
         selectedShipyardShipId = "falcon";
         ownedShips = ["falcon"];
+        playerProgress = normalizePlayerProgress({ combatXp: 2500 });
         ownedGuns.pulseLaser = 0;
         ownedGuns.ionBlaster = 0;
         inventoryItems = [{

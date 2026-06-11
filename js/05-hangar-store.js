@@ -1175,6 +1175,8 @@ function getVaultItemId(entry) {
 function canEquipVaultEntry(entry) {
   if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return false;
   if (Number(entry.storedCount || 0) <= 0) return false;
+  const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
+  if (!unlock.unlocked) return false;
   const loadout = getShipLoadout(selectedHangarShipId);
   if (entry.categoryKey === "guns") return (loadout.guns || []).length < getGunSlotLimit(selectedHangarShipId);
   return (loadout.attachments || []).length < getAttachmentSlotLimit(selectedHangarShipId);
@@ -1233,7 +1235,12 @@ function getSelectedEquippedLoadoutIndex(entry) {
 
 function equipSelectedVaultItem() {
   const entry = getSelectedVaultEntry();
-  if (!entry || !canEquipVaultEntry(entry)) return;
+  if (!entry) return;
+  if (!canEquipVaultEntry(entry)) {
+    const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
+    showLoadoutEquipValidationMessage(unlock.locked ? "locked_item" : "item_unavailable", { ...entry, unlock });
+    return;
+  }
   equipLoadoutVaultEntry(entry);
   selectedVaultActionContext = null;
 }
@@ -1364,6 +1371,7 @@ function getLoadoutDetailDefinition(context) {
   const level = Math.max(1, Number(context.level || 1));
   const equippedCount = getCurrentShipEquippedCount(context.key, quality, context.categoryKey);
   const availableCount = getAvailableLoadoutEntryCount(context.key, quality, context.categoryKey, level);
+  const unlock = getEquipmentUnlockStatus(context.categoryKey, context.key);
   return {
     key: context.key,
     baseId: context.baseId || context.key,
@@ -1380,6 +1388,7 @@ function getLoadoutDetailDefinition(context) {
     equippedCount,
     availableCount,
     ownedCount: equippedCount + availableCount,
+    unlock,
     stats: isGun
       ? getWeaponPurchaseStatRows(definition, quality)
       : getAttachmentPurchaseStatRows({ key: context.key }, quality)
@@ -1426,6 +1435,7 @@ function getLoadoutEquipValidationMessage(reason, detail = {}) {
   if (reason === "missing_selected_item") return "Select a compatible item before equipping.";
   if (reason === "item_unavailable" || reason === "inventory_item_missing") return "That item is no longer available in the vault.";
   if (reason === "invalid_category") return "That item cannot be equipped in this slot.";
+  if (reason === "locked_item") return detail.unlock?.message || "Reach the required Combat Level to equip this.";
   if (reason === "weapon_slot_unsupported") return "This ship has no empty weapon slots for that item.";
   if (reason === "attachment_slot_unsupported") return "This ship has no empty attachment slots for that item.";
   return isWeapon ? "That weapon cannot be equipped on this ship." : "That attachment cannot be equipped on this ship.";
@@ -1468,6 +1478,7 @@ function renderLoadoutItemDetail() {
 
   const equipAvailable = canEquipVaultEntry({
     categoryKey: detail.categoryKey,
+    key: detail.key,
     storedCount: detail.availableCount
   });
   const unequipAvailable = findEquippedVaultEntryIndex({
@@ -1506,6 +1517,7 @@ function renderLoadoutItemDetail() {
           </div>
         `).join("")}
       </div>
+      ${detail.unlock?.locked ? `<div class="loadout-detail-status">${escapeHtml(detail.unlock.message)}</div>` : ""}
       ${selectedLoadoutStatusMessage ? `<div class="loadout-detail-status">${escapeHtml(selectedLoadoutStatusMessage)}</div>` : ""}
       <div class="loadout-detail-actions">
         ${actionButton}
@@ -1522,6 +1534,10 @@ function equipSelectedLoadoutItem() {
   }
   if (detail.availableCount <= 0) {
     showLoadoutEquipValidationMessage("item_unavailable", detail);
+    return;
+  }
+  if (detail.unlock?.locked) {
+    showLoadoutEquipValidationMessage("locked_item", detail);
     return;
   }
   equipLoadoutVaultEntry({
@@ -2471,6 +2487,11 @@ function equipLoadoutVaultEntry(entry) {
     showLoadoutEquipValidationMessage("invalid_category", entry || {});
     return;
   }
+  const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
+  if (!unlock.unlocked) {
+    showLoadoutEquipValidationMessage("locked_item", { ...entry, unlock });
+    return;
+  }
   ensureSelectedLoadoutSlot();
   const selected = selectedLoadoutItemContext || {};
   const categoryKey = entry.categoryKey;
@@ -2555,13 +2576,14 @@ function renderGunInventory() {
 
   entries.forEach(entry => {
     const compatible = selectedCategory === entry.categoryKey || !["guns", "attachments"].includes(selectedCategory);
+    const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
     const btn = document.createElement("button");
     const selected = selectedLoadoutItemContext?.source === "available" &&
       selectedLoadoutItemContext.categoryKey === entry.categoryKey &&
       selectedLoadoutItemContext.key === entry.key &&
       selectedLoadoutItemContext.quality === entry.quality &&
       Number(selectedLoadoutItemContext.level || 1) === Number(entry.level || 1);
-    btn.className = `inventory-icon-card hangar-equipment-card loadout-vault-row quality-${entry.quality} ${selected ? "selected" : ""}`;
+    btn.className = `inventory-icon-card hangar-equipment-card loadout-vault-row quality-${entry.quality} ${selected ? "selected" : ""} ${unlock.locked ? "progression-locked" : ""}`;
     btn.dataset.itemKey = entry.key;
     btn.dataset.itemType = entry.categoryKey === "guns" ? "gun" : "attachment";
     btn.disabled = entry.count <= 0 || !compatible;
@@ -2574,9 +2596,9 @@ function renderGunInventory() {
       ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "row" })}
       <span class="loadout-vault-row-copy">
         <strong>${escapeHtml(entry.name)}</strong>
-        <small>${escapeHtml(getLoadoutVaultEntryStatLine(entry))}</small>
+        <small>${escapeHtml(unlock.locked ? unlock.requirementLines.join(" / ") : getLoadoutVaultEntryStatLine(entry))}</small>
       </span>
-      <b>LV ${formatRomanLevel(entry.level || 1)}</b>
+      <b>${unlock.locked ? "LOCK" : `LV ${formatRomanLevel(entry.level || 1)}`}</b>
     `;
 
     box.appendChild(btn);
@@ -2592,9 +2614,10 @@ function renderAttachmentShop() {
   Object.entries(attachments).forEach(([key, item]) => {
     const canAfford = credits >= item.price;
     const owned = ownedAttachments[key] || 0;
+    const unlock = getEquipmentUnlockStatus("attachments", key);
 
     const card = document.createElement("div");
-    card.className = "equipment-card";
+    card.className = `equipment-card ${unlock.locked ? "progression-locked" : ""}`;
     card.innerHTML = `
       <img src="${item.image}" alt="${item.name}">
       <div class="equipment-card-meta">
@@ -2604,7 +2627,7 @@ function renderAttachmentShop() {
         <p>Price: CR ${formatNumber(item.price)}</p>
       </div>
       <div class="equipment-card-actions">
-        <button class="store-buy-attachment-action" data-item-key="${key}" data-item-type="attachment" onclick="buyAttachment('${key}')" ${!canAfford ? "disabled" : ""}>Buy</button>
+        <button class="store-buy-attachment-action" data-item-key="${key}" data-item-type="attachment" onclick="buyAttachment('${key}')" ${!canAfford || unlock.locked ? "disabled" : ""}>${unlock.locked ? "Locked" : "Buy"}</button>
       </div>
     `;
     box.appendChild(card);
@@ -2622,9 +2645,10 @@ function renderGunShop() {
     const canAfford = credits >= item.price;
     const owned = ownedGuns[key] || 0;
     const statRows = getWeaponPurchaseStatRows(item, "standard");
+    const unlock = getEquipmentUnlockStatus("guns", key);
 
     const card = document.createElement("div");
-    card.className = "equipment-card";
+    card.className = `equipment-card ${unlock.locked ? "progression-locked" : ""}`;
     card.innerHTML = `
       <img src="${item.image}" alt="${item.name}">
       <div class="equipment-card-meta">
@@ -2635,7 +2659,7 @@ function renderGunShop() {
         <p>Price: CR ${formatNumber(item.price)}</p>
       </div>
       <div class="equipment-card-actions">
-        <button class="store-buy-gun-action" data-item-key="${key}" data-item-type="gun" onclick="buyGun('${key}')" ${!canAfford ? "disabled" : ""}>Buy</button>
+        <button class="store-buy-gun-action" data-item-key="${key}" data-item-type="gun" onclick="buyGun('${key}')" ${!canAfford || unlock.locked ? "disabled" : ""}>${unlock.locked ? "Locked" : "Buy"}</button>
       </div>
     `;
     box.appendChild(card);
@@ -2785,8 +2809,9 @@ function renderShipyardDetail() {
   const equipped = currentShipId === ship.id;
   const canAfford = credits >= ship.price;
   const stats = getShipStats(ship.id);
+  const unlock = getShipUnlockStatus(ship.id);
   const status = document.getElementById("shipyardDetailStatus");
-  if (status) status.textContent = equipped ? "Active" : owned ? "Owned" : "Available";
+  if (status) status.textContent = unlock.state === "locked" ? "Locked" : equipped ? "Active" : owned ? "Owned" : "Available";
 
   let primaryAction = "";
   let secondaryAction = "";
@@ -2796,10 +2821,19 @@ function renderShipyardDetail() {
   } else if (owned) {
     primaryAction = `<button class="exchange-footer-secondary" disabled>Owned</button>`;
     secondaryAction = `<button class="exchange-footer-primary" onclick="equipShip('${ship.id}'); showHangarSection('shipyard');">Set Active</button>`;
+  } else if (unlock.locked) {
+    primaryAction = `<button class="exchange-footer-primary buy-ship-action locked-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')">Locked</button>`;
+    secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   } else {
     primaryAction = `<button class="exchange-footer-primary buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>Buy Hull</button>`;
     secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   }
+
+  const requirementHtml = unlock.requirementLines.length ? `
+    <div class="progression-requirement-list ${unlock.locked ? "locked" : "met"}">
+      ${unlock.requirementLines.map(line => `<span>${escapeHtml(line)}</span>`).join("")}
+    </div>
+  ` : "";
 
   panel.innerHTML = `
     <div class="exchange-detail-stack">
@@ -2813,6 +2847,7 @@ function renderShipyardDetail() {
         <h4>${ship.name}</h4>
         <p>${getVesselExchangeClassLabel(ship)}</p>
       </div>
+      ${requirementHtml}
 
       <div class="exchange-detail-stat-grid">
         ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
@@ -2873,21 +2908,23 @@ function renderShipShop() {
     const owned = ownedShips.includes(ship.id);
     const equipped = currentShipId === ship.id;
     const selected = selectedShipyardShipId === ship.id;
+    const unlock = getShipUnlockStatus(ship.id);
 
     const card = document.createElement("button");
     const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
     const isTutorialRequiredShip = tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && ship.id === starterShipId;
-    card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card ${selected ? "selected" : ""} ${equipped ? "active" : ""} ${owned ? "owned" : ""} ${isTutorialRequiredShip ? "tutorial-required-ship" : ""}`;
+    card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card ${selected ? "selected" : ""} ${equipped ? "active" : ""} ${owned ? "owned" : ""} ${unlock.locked ? "progression-locked" : ""} ${unlock.state === "available" ? "challenge-complete" : ""} ${isTutorialRequiredShip ? "tutorial-required-ship" : ""}`;
     card.dataset.shipId = ship.id;
     if (ship.id === starterShipId) card.dataset.tutorialTarget = "firstShipCard";
     card.onclick = () => selectShipyardShip(ship.id);
     card.innerHTML = `
-      <div class="fleet-card-badge">${equipped ? "Active" : owned ? "Owned" : ship.price ? `CR ${formatNumber(ship.price)}` : "Available"}</div>
+      <div class="fleet-card-badge">${equipped ? "Active" : owned ? "Owned" : unlock.locked ? "LOCKED" : ship.price ? `CR ${formatNumber(ship.price)}` : "Available"}</div>
       <div class="fleet-card-image-wrap">
         <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
       <div class="fleet-card-name">${ship.name}</div>
       <div class="fleet-card-role">${getVesselExchangeClassLabel(ship)}</div>
+      ${unlock.requirementLines.length ? `<div class="vessel-card-description">${escapeHtml(unlock.locked ? unlock.requirementLines[0] : "Challenge complete / available to buy")}</div>` : ""}
     `;
     box.appendChild(card);
   });
@@ -3366,8 +3403,8 @@ function renderStore() {
 
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
     setTimeout(() => {
-      const target = document.querySelector(".store-detail-buy-action[data-item-key='evasionMatrix']:not(:disabled)") ||
-        document.querySelector(".store-catalog-card[data-item-key='evasionMatrix']:not(.sold-out)");
+      const target = document.querySelector(".store-detail-buy-action[data-item-key='pulseLaser']:not(:disabled)") ||
+        document.querySelector(".store-catalog-card[data-item-key='pulseLaser']:not(.sold-out)");
       target?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
       if (typeof renderStarterTutorial === "function") renderStarterTutorial();
     }, 40);
@@ -3434,17 +3471,21 @@ function renderStoreCatalog() {
     const stockLabel = getStoreStockLabel(item);
     const soldOut = getStoreStockRemaining(item) === 0;
     const categoryLabel = getStoreCardCategoryLabel(item, quality);
+    const unlock = item.kind === "gun" || item.kind === "attachment"
+      ? getEquipmentUnlockStatus(item.kind === "gun" ? "guns" : "attachments", item.key)
+      : null;
     const priceLabel = soldOut ? "Sold Out" : `CR ${formatNumber(price)}`;
+    const locked = Boolean(unlock?.locked);
 
     return `
-      <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} quality-${quality} store-kind-${item.kind}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
-        ${status ? `<span class="store-card-status">${status}</span>` : ""}
+      <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} ${locked ? "progression-locked" : ""} quality-${quality} store-kind-${item.kind}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
+        ${locked ? `<span class="store-card-status">LOCKED</span>` : status ? `<span class="store-card-status">${status}</span>` : ""}
         <div class="store-card-art quality-${quality} store-art-${item.kind} store-art-${item.key}">
           ${renderQualityFx(quality, { src: item.kind === "ship" && typeof getShipAsset === "function" ? getShipAsset(item.key, "large") : item.image, alt: item.name, size: "card" })}
         </div>
         <div class="store-card-name">${item.name}</div>
         <div class="store-card-sub">${categoryLabel}</div>
-        <div class="store-card-stock">${stockLabel}</div>
+        <div class="store-card-stock">${locked ? escapeHtml(unlock.requirementLines[0] || unlock.message) : stockLabel}</div>
         <div class="store-card-price">${priceLabel}</div>
       </button>`;
   }).join("");
@@ -3488,7 +3529,11 @@ function renderStoreDetail() {
     : (ownedReady + inventoryCount);
   const stockRemaining = getStoreStockRemaining(item);
   const hasStock = stockRemaining > 0 || !Number.isFinite(stockRemaining);
-  const canBuy = item.kind === "ship" ? (!ownedShips.includes(item.key) && credits >= buyPrice && hasStock) : credits >= buyPrice && hasStock;
+  const unlock = item.kind === "gun" || item.kind === "attachment"
+    ? getEquipmentUnlockStatus(item.kind === "gun" ? "guns" : "attachments", item.key)
+    : null;
+  const progressionLocked = Boolean(unlock?.locked);
+  const canBuy = item.kind === "ship" ? (!ownedShips.includes(item.key) && credits >= buyPrice && hasStock) : credits >= buyPrice && hasStock && !progressionLocked;
   const sellPrice = item.kind === "ship"
     ? 0
     : (item.kind === "attachment" || item.kind === "gun") && quality === "standard" && ownedReady > 0
@@ -3543,7 +3588,9 @@ function renderStoreDetail() {
   } else {
     buyButton = stagingStoreLocked
       ? stagingPreviewButton
-      : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
+      : progressionLocked
+        ? `<button class="store-detail-buy-action locked-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()">Locked</button>`
+        : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
     if (sellPrice > 0) {
       const sellHandler = (item.kind === "attachment" || item.kind === "gun") && quality === "standard" && ownedReady > 0
         ? 'storeSellSelectedOwned()'
@@ -3568,7 +3615,7 @@ function renderStoreDetail() {
         <div class="store-detail-kicker">${getStoreDetailKicker(item, quality)}</div>
         <div class="store-detail-title">${item.name}</div>
         <div class="store-detail-desc">${item.description}</div>
-        <div class="store-detail-owned-line">${ownershipLine} / ${getStoreStockLabel(item)}</div>
+        <div class="store-detail-owned-line">${ownershipLine} / ${progressionLocked ? escapeHtml(unlock.requirementLines.join(" / ") || unlock.message) : getStoreStockLabel(item)}</div>
         ${renderStagingStorePreviewNote(item)}
         ${renderStagingCargoPodEquipNote(item)}
         ${renderStagingShieldBoosterEquipNote(item)}
@@ -3598,6 +3645,15 @@ function storeBuySelected() {
     return;
   }
   const quality = getStoreItemDisplayQuality(item);
+  const unlock = item.kind === "gun" || item.kind === "attachment"
+    ? getEquipmentUnlockStatus(item.kind === "gun" ? "guns" : "attachments", item.key)
+    : null;
+  if (unlock?.locked) {
+    const message = unlock.message || "Reach the required Combat Level to unlock this.";
+    if (typeof addHudToast === "function") addHudToast(message);
+    else alert(message);
+    return;
+  }
   const price = getStorePrice(item, quality);
   if (getStoreStockRemaining(item) <= 0) {
     alert("This daily store item has sold out.");
@@ -3733,6 +3789,12 @@ function buyAttachment(key) {
   if (blockStoreMutationInMultiplayerStaging()) return;
   const item = attachments[key];
   if (!item) return;
+  const unlock = getEquipmentUnlockStatus("attachments", key);
+  if (unlock.locked) {
+    if (typeof addHudToast === "function") addHudToast(unlock.message);
+    else alert(unlock.message);
+    return;
+  }
 
   if (!canAddInventoryItems(1)) {
     alert(INVENTORY_FULL_MESSAGE);
@@ -3760,6 +3822,12 @@ function buyGun(key) {
   if (blockStoreMutationInMultiplayerStaging()) return;
   const item = GUNS[key];
   if (!item) return;
+  const unlock = getEquipmentUnlockStatus("guns", key);
+  if (unlock.locked) {
+    if (typeof addHudToast === "function") addHudToast(unlock.message);
+    else alert(unlock.message);
+    return;
+  }
 
   if (!canAddInventoryItems(1)) {
     alert(INVENTORY_FULL_MESSAGE);
@@ -3795,6 +3863,12 @@ function equipAttachmentFromInventory(key, quality = "standard", source = "owned
   const loadout = getShipLoadout(selectedHangarShipId);
 
   if (!item) return;
+  const unlock = getEquipmentUnlockStatus("attachments", key);
+  if (unlock.locked) {
+    if (typeof addHudToast === "function") addHudToast(unlock.message);
+    else alert(unlock.message);
+    return;
+  }
 
   if (loadout.attachments.length >= getAttachmentSlotLimit(selectedHangarShipId)) {
     alert("No empty attachment slots.");
@@ -3875,6 +3949,12 @@ function equipGunFromInventory(key, quality = "standard", source = "owned") {
   const loadout = getShipLoadout(selectedHangarShipId);
 
   if (!item) return;
+  const unlock = getEquipmentUnlockStatus("guns", key);
+  if (unlock.locked) {
+    if (typeof addHudToast === "function") addHudToast(unlock.message);
+    else alert(unlock.message);
+    return;
+  }
 
   if (loadout.guns.length >= getGunSlotLimit(selectedHangarShipId)) {
     alert("No empty gun slots.");
@@ -3953,6 +4033,13 @@ function buyShip(shipId) {
   if (blockStoreMutationInMultiplayerStaging()) return;
   const ship = SHIPS[shipId];
   if (!ship || ownedShips.includes(shipId)) return;
+  const unlock = getShipUnlockStatus(shipId);
+  if (unlock.locked) {
+    if (typeof addHudToast === "function") addHudToast(unlock.message);
+    else alert(unlock.message);
+    renderShipShop();
+    return;
+  }
 
   if (credits < ship.price) {
     alert("Not enough credits.");
