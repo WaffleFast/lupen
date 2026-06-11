@@ -27,6 +27,9 @@ import {
   buildStagingLootPreview
 } from "../src/config/stagingLootConfig.js";
 import {
+  STAGING_SHIP_CONFIG
+} from "../src/config/stagingShipConfig.js";
+import {
   buildRewardLedgerEntry,
   checkRewardLedgerConnectivity,
   writeRewardLedgerEntry
@@ -1670,6 +1673,9 @@ async function assertStagingStorePreviewHelpers() {
     "ship:falcon",
     "ship:bison",
     "ship:monolith",
+    "ship:zeusExplorer",
+    "ship:hephaestusTrader",
+    "ship:poseidonAggressor",
     "material:lupenShard",
     "core:lupenCore"
   ];
@@ -2300,6 +2306,74 @@ async function assertStagingCargoPodEquipHelpers() {
   const noOwnedWeaponPlan = buildStagingPulseLaserEquipPlan({ ...validSaveData, ownedGuns: { pulseLaser: 0 } }, { itemId: "gun:pulseLaser" });
   assert(noOwnedWeaponPlan.ok === false && noOwnedWeaponPlan.blockReason === "pulse_laser_not_owned", "Pulse Laser equip without ownership was not blocked.");
 
+  const firstMapShipIds = ["falcon", "bison", "monolith", "zeusExplorer", "hephaestusTrader", "poseidonAggressor"];
+  for (const shipId of firstMapShipIds) {
+    const ship = STAGING_SHIP_CONFIG[shipId];
+    assert(ship, `Missing staging config for ${shipId}.`);
+    const almostFullGuns = Array.from({ length: Math.max(0, ship.gunSlots - 1) }, () => ({ key: "pulseLaser", quality: "standard", level: 1 }));
+    const finalGunPlan = buildStagingLoadoutEquipPlan({
+      ...validSaveData,
+      currentShipId: shipId,
+      ownedShips: [shipId],
+      ownedGuns: { pulseLaser: 1 },
+      shipLoadouts: {
+        [shipId]: {
+          attachments: [],
+          guns: almostFullGuns
+        }
+      }
+    }, { itemId: "gun:pulseLaser" });
+    assert(finalGunPlan.ok === true, `${ship.name || shipId} final gun slot equip was blocked: ${finalGunPlan.blockReason}`);
+    assert(finalGunPlan.gunSlots === ship.gunSlots, `${ship.name || shipId} gun slot count drifted.`);
+    assert(finalGunPlan.patchedSaveData.shipLoadouts[shipId].guns.length === ship.gunSlots, `${ship.name || shipId} did not fill all gun slots.`);
+
+    const fullGunPlan = buildStagingLoadoutEquipPlan({
+      ...validSaveData,
+      currentShipId: shipId,
+      ownedShips: [shipId],
+      ownedGuns: { pulseLaser: 1 },
+      shipLoadouts: {
+        [shipId]: {
+          attachments: [],
+          guns: finalGunPlan.patchedSaveData.shipLoadouts[shipId].guns
+        }
+      }
+    }, { itemId: "gun:pulseLaser" });
+    assert(fullGunPlan.ok === false && fullGunPlan.blockReason === "gun_slots_full", `${ship.name || shipId} extra gun slot was not blocked.`);
+
+    const almostFullAttachments = Array.from({ length: Math.max(0, ship.attachmentSlots - 1) }, () => ({ key: "cargoPod", quality: "standard", level: 1 }));
+    const finalAttachmentPlan = buildStagingLoadoutEquipPlan({
+      ...validSaveData,
+      currentShipId: shipId,
+      ownedShips: [shipId],
+      ownedAttachments: { cargoPod: 1 },
+      shipLoadouts: {
+        [shipId]: {
+          attachments: almostFullAttachments,
+          guns: []
+        }
+      }
+    }, { itemId: "attachment:cargoPod" });
+    assert(finalAttachmentPlan.ok === true, `${ship.name || shipId} final attachment slot equip was blocked: ${finalAttachmentPlan.blockReason}`);
+    assert(finalAttachmentPlan.attachmentSlots === ship.attachmentSlots, `${ship.name || shipId} attachment slot count drifted.`);
+    assert(finalAttachmentPlan.patchedSaveData.shipLoadouts[shipId].attachments.length === ship.attachmentSlots, `${ship.name || shipId} did not fill all attachment slots.`);
+    assert(finalAttachmentPlan.cargoCapacityAfter === ship.cargo + ship.attachmentSlots * 25, `${ship.name || shipId} cargo pod capacity math drifted.`);
+
+    const fullAttachmentPlan = buildStagingLoadoutEquipPlan({
+      ...validSaveData,
+      currentShipId: shipId,
+      ownedShips: [shipId],
+      ownedAttachments: { cargoPod: 1 },
+      shipLoadouts: {
+        [shipId]: {
+          attachments: finalAttachmentPlan.patchedSaveData.shipLoadouts[shipId].attachments,
+          guns: []
+        }
+      }
+    }, { itemId: "attachment:cargoPod" });
+    assert(fullAttachmentPlan.ok === false && fullAttachmentPlan.blockReason === "attachment_slots_full", `${ship.name || shipId} extra attachment slot was not blocked.`);
+  }
+
   const ionBlasterPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
     ownedGuns: { pulseLaser: 1, ionBlaster: 1 },
@@ -2317,7 +2391,7 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(ionBlasterPlan.patchedSaveData.ownedGuns.pulseLaser === 1, "Ion Blaster equip plan changed Pulse Laser ownership.");
   assert(ionBlasterPlan.patchedSaveData.credits === 780, "Ion Blaster equip plan changed credits.");
 
-  const monolithAlmostFullGuns = Array.from({ length: 19 }, () => ({ key: "pulseLaser", quality: "standard", level: 1 }));
+  const monolithAlmostFullGuns = Array.from({ length: 5 }, () => ({ key: "pulseLaser", quality: "standard", level: 1 }));
   const monolithGunStressPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
     currentShipId: "monolith",
@@ -2330,9 +2404,9 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "gun:ionBlaster" });
-  assert(monolithGunStressPlan.ok === true, `Monolith 20th gun slot equip was blocked: ${monolithGunStressPlan.blockReason}`);
-  assert(monolithGunStressPlan.gunSlots === 20, "Monolith gun stress plan reported unexpected gun slot count.");
-  assert(monolithGunStressPlan.patchedSaveData.shipLoadouts.monolith.guns.length === 20, "Monolith gun stress plan did not fill the 20th gun slot.");
+  assert(monolithGunStressPlan.ok === true, `Majin Vindicator sixth gun slot equip was blocked: ${monolithGunStressPlan.blockReason}`);
+  assert(monolithGunStressPlan.gunSlots === 6, "Majin Vindicator gun stress plan reported unexpected gun slot count.");
+  assert(monolithGunStressPlan.patchedSaveData.shipLoadouts.monolith.guns.length === 6, "Majin Vindicator gun stress plan did not fill the sixth gun slot.");
 
   const monolithFullGunSlotsPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
@@ -2346,7 +2420,7 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "gun:ionBlaster" });
-  assert(monolithFullGunSlotsPlan.ok === false && monolithFullGunSlotsPlan.blockReason === "gun_slots_full", "Monolith 21st gun slot was not blocked.");
+  assert(monolithFullGunSlotsPlan.ok === false && monolithFullGunSlotsPlan.blockReason === "gun_slots_full", "Majin Vindicator seventh gun slot was not blocked.");
 
   const jumpDrivePlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
@@ -2365,7 +2439,7 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(jumpDrivePlan.patchedSaveData.ownedAttachments.cargoPod === 2, "Jump Drive equip plan changed Cargo Pod ownership.");
   assert(jumpDrivePlan.patchedSaveData.credits === 780, "Jump Drive equip plan changed credits.");
 
-  const monolithAlmostFullAttachments = Array.from({ length: 19 }, () => ({ key: "cargoPod", quality: "standard", level: 1 }));
+  const monolithAlmostFullAttachments = Array.from({ length: 3 }, () => ({ key: "cargoPod", quality: "standard", level: 1 }));
   const monolithAttachmentStressPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
     currentShipId: "monolith",
@@ -2378,9 +2452,9 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "attachment:jumpDrive" });
-  assert(monolithAttachmentStressPlan.ok === true, `Monolith 20th attachment slot equip was blocked: ${monolithAttachmentStressPlan.blockReason}`);
-  assert(monolithAttachmentStressPlan.attachmentSlots === 20, "Monolith attachment stress plan reported unexpected attachment slot count.");
-  assert(monolithAttachmentStressPlan.patchedSaveData.shipLoadouts.monolith.attachments.length === 20, "Monolith attachment stress plan did not fill the 20th attachment slot.");
+  assert(monolithAttachmentStressPlan.ok === true, `Majin Vindicator fourth attachment slot equip was blocked: ${monolithAttachmentStressPlan.blockReason}`);
+  assert(monolithAttachmentStressPlan.attachmentSlots === 4, "Majin Vindicator attachment stress plan reported unexpected attachment slot count.");
+  assert(monolithAttachmentStressPlan.patchedSaveData.shipLoadouts.monolith.attachments.length === 4, "Majin Vindicator attachment stress plan did not fill the fourth attachment slot.");
 
   const monolithFullAttachmentSlotsPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
@@ -2394,7 +2468,7 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "attachment:jumpDrive" });
-  assert(monolithFullAttachmentSlotsPlan.ok === false && monolithFullAttachmentSlotsPlan.blockReason === "attachment_slots_full", "Monolith 21st attachment slot was not blocked.");
+  assert(monolithFullAttachmentSlotsPlan.ok === false && monolithFullAttachmentSlotsPlan.blockReason === "attachment_slots_full", "Majin Vindicator fifth attachment slot was not blocked.");
 
   const pulseLaserUnequipPlan = buildStagingLoadoutUnequipPlan({
     ...validSaveData,

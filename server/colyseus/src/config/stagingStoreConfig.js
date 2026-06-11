@@ -1,7 +1,7 @@
 /* Static staging Store preview config.
    This catalogue is server-owned data for multiplayer Store validation.
    It covers current Map 1 Store guns, attachments, the Vessel Exchange
-   Falcon/Bison/Monolith path, and cheap Forge test materials; it never allows unknown item ids,
+   first-map ship path, and cheap Forge test materials; it never allows unknown item ids,
    Store sell, loot writes, bounties, PvP/player damage, schema, or broad
    progression. */
 
@@ -154,39 +154,75 @@ export const STAGING_STORE_ITEMS = Object.freeze([
   }),
   Object.freeze({
     itemId: "ship:falcon",
-    name: "F-1 Falcon",
+    name: "Azure Striker",
     category: "ship",
     localKind: "ship",
     localKey: "falcon",
     price: 0,
     levelRequirement: 0,
     stockType: "fixed",
-    description: "Fast starter combat ship with low cargo and agile handling.",
+    description: "A nimble first-map striker with twin forward mounts, clean jump recovery and enough cargo room for early trade runs.",
     reference: "SHIPS.falcon"
   }),
   Object.freeze({
     itemId: "ship:bison",
-    name: "B-1 Bison",
+    name: "Buu Hauler",
     category: "ship",
     localKind: "ship",
     localKey: "bison",
     price: 12000,
     levelRequirement: 0,
     stockType: "fixed",
-    description: "Durable early cargo ship with strong hold capacity and modest combat ability.",
+    description: "A broad early hauler with steady plating, useful cargo volume and a single defensive weapon bank.",
     reference: "SHIPS.bison"
   }),
   Object.freeze({
     itemId: "ship:monolith",
-    name: "Monolith",
+    name: "Majin Vindicator",
     category: "ship",
     localKind: "ship",
     localKey: "monolith",
-    price: 250000,
+    price: 48000,
     levelRequirement: 0,
     stockType: "fixed",
-    description: "Rare endgame ancient-tech warship with extreme loadout capacity.",
+    description: "A costly first-map heavy fighter with strong armor, six compact hardpoints and limited utility space.",
     reference: "SHIPS.monolith"
+  }),
+  Object.freeze({
+    itemId: "ship:zeusExplorer",
+    name: "Nightshade Hawk",
+    category: "ship",
+    localKind: "ship",
+    localKey: "zeusExplorer",
+    price: 22000,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "A fast black-crystal scout built for quick jumps, high evasion and a flexible three-gun skirmish loadout.",
+    reference: "SHIPS.zeusExplorer"
+  }),
+  Object.freeze({
+    itemId: "ship:hephaestusTrader",
+    name: "Champa Carrier",
+    category: "ship",
+    localKind: "ship",
+    localKey: "hephaestusTrader",
+    price: 34000,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "A utility-rich carrier with big service tanks, six attachment slots and enough guns to discourage light raiders.",
+    reference: "SHIPS.hephaestusTrader"
+  }),
+  Object.freeze({
+    itemId: "ship:poseidonAggressor",
+    name: "Silver Instinct",
+    category: "ship",
+    localKind: "ship",
+    localKey: "poseidonAggressor",
+    price: 42000,
+    levelRequirement: 0,
+    stockType: "fixed",
+    description: "A premium assault hull with five weapon mounts, sharp evasion and a lighter hold than the trade-focused ships.",
+    reference: "SHIPS.poseidonAggressor"
   }),
   Object.freeze({
     itemId: "material:lupenShard",

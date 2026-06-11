@@ -727,7 +727,7 @@ function getCurrentShip() {
     manufacturer: "Unassigned",
     roleSubtitle: "Purchase your first hull",
     description: "No active vessel.",
-    image: typeof getShipAsset === "function" ? getShipAsset(STARTER_SHIP_ID, "medium") : "assets/ships/falcon/falcon-medium.webp",
+    image: typeof getShipAsset === "function" ? getShipAsset(STARTER_SHIP_ID, "medium") : "assets/ships/azure-striker/azure-striker-medium.webp",
     price: 0,
     hull: 0,
     shield: 0,

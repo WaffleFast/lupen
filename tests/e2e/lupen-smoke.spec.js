@@ -484,7 +484,7 @@ test.describe("Lupen browser smoke", () => {
     await openStore(page);
 
     await expect(page.locator("#storeScreen")).toContainText(/Staging Purchase|Server Preview|Server preview unavailable/);
-    await expect(page.locator("#storeScreen")).not.toContainText(/LF-2 Hauler|Hauler/i);
+    await expect(page.locator("#storeScreen")).not.toContainText(/LF-2 Hauler/i);
     await expect(page.locator("#storeScreen")).toContainText(/Pulse Laser/i);
     await expect(page.locator("#storeScreen")).toContainText(/Shield Booster/i);
     await expect(page.locator("#storeScreen")).toContainText(/Lupen Shard/i);
@@ -602,13 +602,13 @@ test.describe("Lupen browser smoke", () => {
       return { monolith, bisonBeforeRepair, bisonAfterRepair, falcon };
     });
 
-    expect(state.monolith).toMatchObject({ ship: "monolith", hull: 4200, hullMax: 4200, shield: 1800, shieldMax: 1800 });
+    expect(state.monolith).toMatchObject({ ship: "monolith", hull: 1800, hullMax: 1800, shield: 360, shieldMax: 360 });
     expect(state.bisonBeforeRepair).toMatchObject({ ship: "bison", hull: 930, hullMax: 1300, shield: 77, shieldMax: 135 });
     expect(state.bisonAfterRepair).toMatchObject({ ship: "bison", hull: 1300, hullMax: 1300, savedHull: 1300 });
-    expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 700, shield: 111, shieldMax: 220 });
-    expect(state.monolith.armor).toBe(70);
+    expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 720, shield: 111, shieldMax: 180 });
+    expect(state.monolith.armor).toBe(28);
     expect(state.bisonBeforeRepair.cargo).toBe(260);
-    expect(state.falcon.jumpRecharge).toBe(15);
+    expect(state.falcon.jumpRecharge).toBe(16);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -729,9 +729,123 @@ test.describe("Lupen browser smoke", () => {
         showHangarSection("overview");
       `);
     });
-    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(20);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(6);
     await page.locator("#loadoutVaultFilterAttachments").click();
-    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(20);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(4);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("all new ships accept guns, equipment, combat stats, and cargo math", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const matrix = await page.evaluate(() => window.eval(`
+      (() => {
+        const shipIds = ["falcon", "bison", "monolith", "zeusExplorer", "hephaestusTrader", "poseidonAggressor"];
+        const alerts = [];
+        const previousAlert = window.alert;
+        window.alert = (message) => alerts.push(String(message || ""));
+        localStorage.clear();
+        ownedShips = shipIds.slice();
+        shipConditions = {};
+        mineralKeys.forEach(key => { cargo[key] = 0; });
+        Object.keys(cargoCostBasis).forEach(key => { delete cargoCostBasis[key]; });
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        credits = 1000000;
+
+        const rows = shipIds.map(shipId => {
+          const ship = SHIPS[shipId];
+          currentShipId = shipId;
+          selectedHangarShipId = shipId;
+          selectedFleetShipId = shipId;
+          selectedShipyardShipId = shipId;
+          selectedShipyardStoreShipId = shipId;
+          shipLoadouts[shipId] = { attachments: [], guns: [] };
+          ownedGuns.pulseLaser = Math.max(ownedGuns.pulseLaser || 0, ship.gunSlots + 2);
+          ownedAttachments.cargoPod = Math.max(ownedAttachments.cargoPod || 0, ship.attachmentSlots + 2);
+
+          applyShipStats(true);
+          const baseStats = getShipStats(shipId);
+          const baseCondition = ensureShipCondition(shipId);
+
+          for (let i = 0; i < ship.gunSlots; i += 1) {
+            equipGunFromInventory("pulseLaser");
+          }
+          const gunCount = countEquippedGuns(shipId);
+          const weapon = getEquippedWeapon(shipId);
+          equipGunFromInventory("pulseLaser");
+          const gunCountAfterOverflow = countEquippedGuns(shipId);
+
+          for (let i = 0; i < ship.attachmentSlots; i += 1) {
+            equipAttachmentFromInventory("cargoPod");
+          }
+          const attachmentCount = countEquippedAttachments(shipId);
+          const cargoStats = getShipStats(shipId);
+          equipAttachmentFromInventory("cargoPod");
+          const attachmentCountAfterOverflow = countEquippedAttachments(shipId);
+
+          mineralKeys.forEach(key => { cargo[key] = 0; });
+          cargo.Iron = Math.max(0, cargoStats.cargo - 1);
+          const usedCargo = cargoUsed();
+          const freeCargo = cargoStats.cargo - usedCargo;
+
+          return {
+            id: shipId,
+            name: ship.name,
+            image: ship.image,
+            gunSlots: ship.gunSlots,
+            attachmentSlots: ship.attachmentSlots,
+            gunCount,
+            gunCountAfterOverflow,
+            attachmentCount,
+            attachmentCountAfterOverflow,
+            baseCargo: baseStats.cargo,
+            cargoWithPods: cargoStats.cargo,
+            cargoDelta: cargoStats.cargo - baseStats.cargo,
+            usedCargo,
+            freeCargo,
+            hull,
+            hullMax,
+            shield,
+            shieldMax,
+            conditionHull: baseCondition.hull,
+            conditionShield: baseCondition.shield,
+            weaponCount: weapon.count,
+            weaponDamage: weapon.damage,
+            weaponShieldDamage: weapon.damageLayers.shield,
+            weaponName: weapon.name
+          };
+        });
+
+        window.alert = previousAlert;
+        return { rows, alerts };
+      })()
+    `));
+
+    expect(matrix.rows).toHaveLength(6);
+    expect(matrix.alerts.filter(message => /No empty gun slots|No empty attachment slots/.test(message))).toHaveLength(12);
+    for (const row of matrix.rows) {
+      expect(row.image, row.name).toMatch(/assets\/ships\/.+\.webp$/);
+      expect(row.gunCount, row.name).toBe(row.gunSlots);
+      expect(row.gunCountAfterOverflow, row.name).toBe(row.gunSlots);
+      expect(row.attachmentCount, row.name).toBe(row.attachmentSlots);
+      expect(row.attachmentCountAfterOverflow, row.name).toBe(row.attachmentSlots);
+      expect(row.cargoDelta, row.name).toBe(row.attachmentSlots * 25);
+      expect(row.usedCargo, row.name).toBe(row.cargoWithPods - 1);
+      expect(row.freeCargo, row.name).toBe(1);
+      expect(row.hull, row.name).toBe(row.hullMax);
+      expect(row.shield, row.name).toBe(row.shieldMax);
+      expect(row.conditionHull, row.name).toBeGreaterThan(0);
+      expect(row.conditionShield, row.name).toBeGreaterThan(0);
+      expect(row.weaponCount, row.name).toBe(row.gunSlots);
+      expect(row.weaponDamage, row.name).toBeGreaterThan(0);
+      expect(row.weaponShieldDamage, row.name).toBeGreaterThan(0);
+      expect(row.weaponName, row.name).toContain("Pulse Laser");
+    }
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

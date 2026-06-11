@@ -34,27 +34,30 @@
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const shipImageById = {
-    falcon: "assets/ships/falcon/falcon-medium.webp",
-    bison: "assets/ships/bison/bison-medium.webp",
-    monolith: "assets/ships/monolith/monolith-medium.webp",
+    falcon: "assets/ships/azure-striker/azure-striker-medium.webp",
+    bison: "assets/ships/buu-hauler/buu-hauler-medium.webp",
+    monolith: "assets/ships/majin-vindicator/majin-vindicator-medium.webp",
     lupenOrigin: "assets/ships/lupen-origin.png",
     lupenHauler: "assets/ships/lupen-hauler.png",
     lupenStriker: "assets/ships/lupen-striker.png",
     hermesCourier: "assets/ships/hermes-courier.png",
     athenaSentinel: "assets/ships/athena-sentinel.png",
     aresVindicator: "assets/ships/ares-vindicator.png",
-    hephaestusTrader: "assets/ships/hephaestus-trader.png",
-    poseidonAggressor: "assets/ships/poseidon-aggressor.png",
-    zeusExplorer: "assets/ships/zeus-explorer.png",
+    hephaestusTrader: "assets/ships/champa-carrier/champa-carrier-medium.webp",
+    poseidonAggressor: "assets/ships/silver-instinct/silver-instinct-medium.webp",
+    zeusExplorer: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
     cobraSeeker: "assets/ships/cobra-seeker.png",
     cobraMoth: "assets/ships/cobra-moth.png"
   };
   const shipImageByName = {
     "falcon": shipImageById.falcon,
     "f-1 falcon": shipImageById.falcon,
+    "azure striker": shipImageById.falcon,
     "bison": shipImageById.bison,
     "b-1 bison": shipImageById.bison,
+    "buu hauler": shipImageById.bison,
     "monolith": shipImageById.monolith,
+    "majin vindicator": shipImageById.monolith,
     "lf 1 origin": shipImageById.lupenOrigin,
     "lf-1 origin": shipImageById.lupenOrigin,
     "hauler": shipImageById.lupenHauler,
@@ -63,8 +66,11 @@
     "athena sentinel": shipImageById.athenaSentinel,
     "ares vindicator": shipImageById.aresVindicator,
     "hephaestus trader": shipImageById.hephaestusTrader,
+    "champa carrier": shipImageById.hephaestusTrader,
     "poseidon aggressor": shipImageById.poseidonAggressor,
+    "silver instinct": shipImageById.poseidonAggressor,
     "zeus explorer": shipImageById.zeusExplorer,
+    "nightshade hawk": shipImageById.zeusExplorer,
     "cobra seeker": shipImageById.cobraSeeker,
     "cobra moth": shipImageById.cobraMoth
   };

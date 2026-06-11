@@ -37,6 +37,9 @@ import {
   getStagingStoreItems
 } from "../config/stagingStoreConfig.js";
 import {
+  STAGING_SHIP_CONFIG
+} from "../config/stagingShipConfig.js";
+import {
   STAGING_BOUNTY,
   STAGING_BOUNTY_ID,
   buildStagingBountySourceEventId,
@@ -2807,13 +2810,9 @@ export class LupenSectorRoom extends Room {
     const envGate = getLoadoutWriteEnvGate(identity.trustedPlayerId || identity.playerId, itemId);
     const stagingWeaponKey = itemId.startsWith("gun:") ? itemId.slice(4) : "";
     const stagingWeapon = stagingWeaponKey ? STAGING_WEAPON_STATS[stagingWeaponKey] : null;
-    const baseName = itemId === "ship:falcon"
-      ? "F-1 Falcon"
-      : itemId === "ship:bison"
-        ? "B-1 Bison"
-        : itemId === "ship:monolith"
-          ? "Monolith"
-          : stagingWeapon?.name || (itemId === "attachment:shieldBooster" ? "Shield Booster" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "");
+    const stagingShipKey = itemId.startsWith("ship:") ? itemId.slice(5) : "";
+    const stagingShip = stagingShipKey ? STAGING_SHIP_CONFIG[stagingShipKey] : null;
+    const baseName = stagingShip?.name || stagingWeapon?.name || (itemId === "attachment:shieldBooster" ? "Shield Booster" : itemId === "attachment:cargoPod" ? "Cargo Pod" : "");
     const baseCategory = itemId.startsWith("ship:")
       ? "ship"
       : itemId.startsWith("gun:")

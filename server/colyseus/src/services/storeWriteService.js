@@ -1,6 +1,6 @@
 /* Staging-only Store write prototype.
    This service can patch only server-catalog Map 1 Store guns, attachments,
-   Falcon/Bison/Monolith, and cheap Forge test materials after strict staging gates
+   first-map ships, and cheap Forge test materials after strict staging gates
    pass. It never writes loadouts, loot, bounties, PvP/player damage, broad
    progression, or schemas. */
 

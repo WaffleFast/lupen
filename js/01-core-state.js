@@ -314,22 +314,40 @@ function migrateSavedGame(saved) {
 const STARTER_SHIP_ID = "falcon";
 const SHIP_ASSET_MANIFEST = Object.freeze({
   falcon: Object.freeze({
-    master: "assets/ships/falcon/falcon-master.webp",
-    large: "assets/ships/falcon/falcon-large.webp",
-    medium: "assets/ships/falcon/falcon-medium.webp",
-    small: "assets/ships/falcon/falcon-small.webp"
+    master: "assets/ships/azure-striker/azure-striker-master.webp",
+    large: "assets/ships/azure-striker/azure-striker-large.webp",
+    medium: "assets/ships/azure-striker/azure-striker-medium.webp",
+    small: "assets/ships/azure-striker/azure-striker-small.webp"
   }),
   bison: Object.freeze({
-    master: "assets/ships/bison/bison-master.webp",
-    large: "assets/ships/bison/bison-large.webp",
-    medium: "assets/ships/bison/bison-medium.webp",
-    small: "assets/ships/bison/bison-small.webp"
+    master: "assets/ships/buu-hauler/buu-hauler-master.webp",
+    large: "assets/ships/buu-hauler/buu-hauler-large.webp",
+    medium: "assets/ships/buu-hauler/buu-hauler-medium.webp",
+    small: "assets/ships/buu-hauler/buu-hauler-small.webp"
   }),
   monolith: Object.freeze({
-    master: "assets/ships/monolith/monolith-master.webp",
-    large: "assets/ships/monolith/monolith-large.webp",
-    medium: "assets/ships/monolith/monolith-medium.webp",
-    small: "assets/ships/monolith/monolith-small.webp"
+    master: "assets/ships/majin-vindicator/majin-vindicator-master.webp",
+    large: "assets/ships/majin-vindicator/majin-vindicator-large.webp",
+    medium: "assets/ships/majin-vindicator/majin-vindicator-medium.webp",
+    small: "assets/ships/majin-vindicator/majin-vindicator-small.webp"
+  }),
+  zeusExplorer: Object.freeze({
+    master: "assets/ships/nightshade-hawk/nightshade-hawk-master.webp",
+    large: "assets/ships/nightshade-hawk/nightshade-hawk-large.webp",
+    medium: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
+    small: "assets/ships/nightshade-hawk/nightshade-hawk-small.webp"
+  }),
+  hephaestusTrader: Object.freeze({
+    master: "assets/ships/champa-carrier/champa-carrier-master.webp",
+    large: "assets/ships/champa-carrier/champa-carrier-large.webp",
+    medium: "assets/ships/champa-carrier/champa-carrier-medium.webp",
+    small: "assets/ships/champa-carrier/champa-carrier-small.webp"
+  }),
+  poseidonAggressor: Object.freeze({
+    master: "assets/ships/silver-instinct/silver-instinct-master.webp",
+    large: "assets/ships/silver-instinct/silver-instinct-large.webp",
+    medium: "assets/ships/silver-instinct/silver-instinct-medium.webp",
+    small: "assets/ships/silver-instinct/silver-instinct-small.webp"
   })
 });
 const SHIP_ASSET_SIZE_FALLBACKS = Object.freeze({
@@ -343,26 +361,26 @@ function getShipAsset(shipId, size = "medium") {
   const manifest = SHIP_ASSET_MANIFEST[shipId] || SHIP_ASSET_MANIFEST[STARTER_SHIP_ID] || {};
   const order = SHIP_ASSET_SIZE_FALLBACKS[size] || SHIP_ASSET_SIZE_FALLBACKS.medium;
   const path = order.map(key => manifest[key]).find(Boolean);
-  return path || "assets/ships/falcon/falcon-medium.webp";
+  return path || "assets/ships/azure-striker/azure-striker-medium.webp";
 }
 
 const SHIPS = {
   falcon: {
     id: "falcon",
-    name: "F-1 Falcon",
+    name: "Azure Striker",
     manufacturer: "Lupen Foundry",
     role: "Starter Fighter / Interceptor",
     roleSubtitle: "Starter Fighter / Interceptor",
-    description: "Fast starter combat ship with low cargo and agile handling.",
+    description: "A nimble first-map striker with twin forward mounts, clean jump recovery and enough cargo room for early trade runs.",
     image: getShipAsset("falcon", "medium"),
     assets: SHIP_ASSET_MANIFEST.falcon,
     price: 0,
-    hull: 700,
-    shield: 220,
+    hull: 720,
+    shield: 180,
     armor: 10,
     cargo: 150,
-    jumpRecharge: 15,
-    evasion: 0.18,
+    jumpRecharge: 16,
+    evasion: 18,
     gunSlots: 2,
     attachmentSlots: 2,
     defaultGun: "pulseLaser",
@@ -370,11 +388,11 @@ const SHIPS = {
   },
   bison: {
     id: "bison",
-    name: "B-1 Bison",
+    name: "Buu Hauler",
     manufacturer: "Lupen Foundry",
     role: "Cargo / Trader",
     roleSubtitle: "Cargo / Trader",
-    description: "Durable early cargo ship with strong hold capacity and modest combat ability.",
+    description: "A broad early hauler with steady plating, useful cargo volume and a single defensive weapon bank.",
     image: getShipAsset("bison", "medium"),
     assets: SHIP_ASSET_MANIFEST.bison,
     price: 12000,
@@ -383,28 +401,28 @@ const SHIPS = {
     armor: 18,
     cargo: 260,
     jumpRecharge: 8,
-    evasion: 0.05,
-    gunSlots: 2,
-    attachmentSlots: 3
+    evasion: 5,
+    gunSlots: 1,
+    attachmentSlots: 4
   },
   monolith: {
     id: "monolith",
-    name: "Monolith",
-    manufacturer: "Unknown Ancient-Tech",
-    role: "Ancient-Tech Endgame Ship",
-    roleSubtitle: "Ancient-Tech Endgame Ship",
-    description: "Rare endgame ancient-tech warship with extreme loadout capacity.",
+    name: "Majin Vindicator",
+    manufacturer: "Asteron Skunkworks",
+    role: "Heavy Combat Hull",
+    roleSubtitle: "Heavy Combat Hull",
+    description: "A costly first-map heavy fighter with strong armor, six compact hardpoints and limited utility space.",
     image: getShipAsset("monolith", "medium"),
     assets: SHIP_ASSET_MANIFEST.monolith,
-    price: 250000,
-    hull: 4200,
-    shield: 1800,
-    armor: 70,
-    cargo: 320,
-    jumpRecharge: 6,
-    evasion: 0.04,
-    gunSlots: 20,
-    attachmentSlots: 20
+    price: 48000,
+    hull: 1800,
+    shield: 360,
+    armor: 28,
+    cargo: 150,
+    jumpRecharge: 10,
+    evasion: 10,
+    gunSlots: 6,
+    attachmentSlots: 4
   },
   lupenOrigin: {
     id: "lupenOrigin",
@@ -522,60 +540,57 @@ const SHIPS = {
   },
   hephaestusTrader: {
     id: "hephaestusTrader",
-    name: "Hephaestus Trader",
+    name: "Champa Carrier",
     manufacturer: "Asteron Freightworks",
     roleSubtitle: "Heavy Trade Hull",
-    description: "A high-capacity trader with reinforced service bays, oversized cargo handling and enough utility mounts for long commercial routes.",
-    image: "assets/ships/hephaestus-trader.png",
-    price: 42000,
-    hull: 1700,
+    description: "A utility-rich carrier with big service tanks, six attachment slots and enough guns to discourage light raiders.",
+    image: getShipAsset("hephaestusTrader", "medium"),
+    assets: SHIP_ASSET_MANIFEST.hephaestusTrader,
+    price: 34000,
+    hull: 1650,
     shield: 180,
-    armor: 24,
+    armor: 22,
     cargo: 360,
     jumpRecharge: 8,
-    evasion: 8,
+    evasion: 6,
     gunSlots: 2,
-    attachmentSlots: 6,
-    hiddenFromExchange: true,
-    legacy: true
+    attachmentSlots: 6
   },
   poseidonAggressor: {
     id: "poseidonAggressor",
-    name: "Poseidon Aggressor",
+    name: "Silver Instinct",
     manufacturer: "Asteron Skunkworks",
     roleSubtitle: "Assault / Control Hull",
-    description: "An aggressive blue-water combat platform with heavy hardpoint coverage, resilient defensive systems and room for tactical equipment.",
-    image: "assets/ships/poseidon-aggressor.png",
-    price: 52000,
-    hull: 1500,
-    shield: 210,
-    armor: 26,
+    description: "A premium assault hull with five weapon mounts, sharp evasion and a lighter hold than the trade-focused ships.",
+    image: getShipAsset("poseidonAggressor", "medium"),
+    assets: SHIP_ASSET_MANIFEST.poseidonAggressor,
+    price: 42000,
+    hull: 1300,
+    shield: 260,
+    armor: 20,
     cargo: 120,
-    jumpRecharge: 12,
-    evasion: 18,
+    jumpRecharge: 14,
+    evasion: 22,
     gunSlots: 5,
-    attachmentSlots: 4,
-    hiddenFromExchange: true,
-    legacy: true
+    attachmentSlots: 4
   },
   zeusExplorer: {
     id: "zeusExplorer",
-    name: "Zeus Explorer",
+    name: "Nightshade Hawk",
     manufacturer: "Asteron Skunkworks",
-    roleSubtitle: "Deep Range Explorer",
-    description: "A long-range explorer built for volatile lanes, pairing fast repositioning with strong utility capacity and dependable shielding.",
-    image: "assets/ships/zeus-explorer.png",
-    price: 48000,
-    hull: 1150,
-    shield: 185,
-    armor: 16,
-    cargo: 220,
+    roleSubtitle: "Fast Scout / Skirmisher",
+    description: "A fast black-crystal scout built for quick jumps, high evasion and a flexible three-gun skirmish loadout.",
+    image: getShipAsset("zeusExplorer", "medium"),
+    assets: SHIP_ASSET_MANIFEST.zeusExplorer,
+    price: 22000,
+    hull: 900,
+    shield: 150,
+    armor: 10,
+    cargo: 150,
     jumpRecharge: 20,
-    evasion: 24,
+    evasion: 28,
     gunSlots: 3,
-    attachmentSlots: 6,
-    hiddenFromExchange: true,
-    legacy: true
+    attachmentSlots: 3
   }
 };
 
