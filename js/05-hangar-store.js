@@ -647,13 +647,14 @@ function buildVaultEntries() {
     return `${key}__${quality}__${Math.max(1, Number(level || 1))}`;
   }
 
-  function makeEntry({ key, quality = "standard", level = 1, source = "owned", index = 0, storedCount = 1, count = 1, resource = false }) {
+  function makeEntry({ key, quality = "standard", level = 1, source = "owned", index = 0, storedCount = 1, count = 1, resource = false, inventoryId = "" }) {
     const definition = itemDefinitions[key];
     if (!definition) return null;
     const safeLevel = Math.max(1, Number(level || 1));
     const signature = getSignature(key, quality, safeLevel);
+    const safeInventoryId = String(inventoryId || "");
     return {
-      groupKey: resource ? `${signature}__resource` : `${signature}__${source}__${index}`,
+      groupKey: resource ? `${signature}__resource` : `${signature}__${source}__${safeInventoryId || index}`,
       signature,
       key,
       quality,
@@ -667,14 +668,16 @@ function buildVaultEntries() {
       equippedCount: equippedCounts.get(signature) || 0,
       resource,
       stackable: resource,
-      source
+      source,
+      inventoryId: safeInventoryId,
+      baseId: key
     };
   }
 
-  function addStoredGear(key, quality = "standard", level = 1, source = "owned", index = 0) {
+  function addStoredGear(key, quality = "standard", level = 1, source = "owned", index = 0, inventoryId = "") {
     const signature = getSignature(key, quality, level);
     storedCounts.set(signature, (storedCounts.get(signature) || 0) + 1);
-    const entry = makeEntry({ key, quality, level, source, index, storedCount: 1, count: 1 });
+    const entry = makeEntry({ key, quality, level, source, index, storedCount: 1, count: 1, inventoryId });
     if (entry) entries.push(entry);
   }
 
@@ -724,7 +727,7 @@ function buildVaultEntries() {
       addResource(item.key, LUPEN_CORE_QUALITY, 1);
       return;
     }
-    addStoredGear(item.key, item.quality || "standard", item.level || 1, "inventory", item.id || entries.length);
+    addStoredGear(item.key, item.quality || "standard", item.level || 1, "inventory", item.id || entries.length, item.id || "");
   });
 
   const shardCount = Math.max(0, Number(upgradeMaterials?.lupenShards || 0));
@@ -1229,11 +1232,7 @@ function getSelectedEquippedLoadoutIndex(entry) {
 function equipSelectedVaultItem() {
   const entry = getSelectedVaultEntry();
   if (!entry || !canEquipVaultEntry(entry)) return;
-  if (entry.categoryKey === "guns") {
-    equipGunFromInventory(entry.key, entry.quality, "owned");
-  } else if (entry.categoryKey === "attachments") {
-    equipAttachmentFromInventory(entry.key, entry.quality, "owned");
-  }
+  equipLoadoutVaultEntry(entry);
   selectedVaultActionContext = null;
 }
 
@@ -1327,6 +1326,9 @@ function selectAvailableLoadoutItem(categoryKey, entry) {
     categoryKey,
     index: Number.isInteger(currentIndex) && currentIndex >= 0 ? currentIndex : 0,
     key: entry.key,
+    baseId: entry.baseId || entry.key,
+    inventoryId: entry.inventoryId || "",
+    groupKey: entry.groupKey || "",
     quality: entry.quality || "standard",
     level: Math.max(1, Number(entry.level || 1))
   };
@@ -1361,6 +1363,9 @@ function getLoadoutDetailDefinition(context) {
   const availableCount = getAvailableLoadoutEntryCount(context.key, quality, context.categoryKey, level);
   return {
     key: context.key,
+    baseId: context.baseId || context.key,
+    inventoryId: context.inventoryId || "",
+    groupKey: context.groupKey || "",
     quality,
     categoryKey: context.categoryKey,
     source: context.source || "available",
@@ -1376,6 +1381,40 @@ function getLoadoutDetailDefinition(context) {
       ? getWeaponPurchaseStatRows(definition, quality)
       : getAttachmentPurchaseStatRows({ key: context.key }, quality)
   };
+}
+
+function shouldLogLoadoutDebug() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    return params.get("debug") === "1" || params.get("mp") === "staging" || Boolean(window.LUPEN_DEBUG_LOADOUT);
+  } catch (_err) {
+    return Boolean(window.LUPEN_DEBUG_LOADOUT);
+  }
+}
+
+function logLoadoutEquipValidation(reason, detail = {}) {
+  if (!shouldLogLoadoutDebug()) return;
+  const selected = selectedLoadoutItemContext || {};
+  const selectedCategory = selected.categoryKey === "attachments" ? "attachments" : "guns";
+  const availableCount = detail.availableCount ?? (
+    selected.key ? getAvailableLoadoutEntryCount(selected.key, selected.quality || "standard", selectedCategory, selected.level || 1) : 0
+  );
+  const payload = {
+    equipValidationReason: reason,
+    selectedShipId: selectedHangarShipId,
+    selectedSlotType: selectedCategory === "guns" ? "weapon" : "attachment",
+    selectedSlotIndex: Number(selected.index ?? -1),
+    selectedItemId: detail.itemId || (selectedCategory === "guns" ? `gun:${selected.key || ""}` : `attachment:${selected.key || ""}`),
+    selectedItemInstanceId: detail.inventoryId ?? selected.inventoryId ?? "",
+    selectedItemBaseId: detail.baseId || selected.baseId || selected.key || "",
+    selectedItemCategory: selectedCategory,
+    selectedItemQuality: detail.quality || selected.quality || "standard",
+    selectedItemLevel: Number(detail.level || selected.level || 1),
+    itemAvailableCount: Number(availableCount || 0),
+    shipWeaponSlots: getGunSlotLimit(selectedHangarShipId),
+    shipAttachmentSlots: getAttachmentSlotLimit(selectedHangarShipId)
+  };
+  console.debug("[loadout:equip]", payload);
 }
 
 function renderLoadoutItemDetail() {
@@ -1453,9 +1492,19 @@ function renderLoadoutItemDetail() {
 
 function equipSelectedLoadoutItem() {
   const detail = getLoadoutDetailDefinition(selectedLoadoutItemContext);
-  if (!detail || detail.availableCount <= 0) return;
+  if (!detail) {
+    logLoadoutEquipValidation("missing_selected_item");
+    return;
+  }
+  if (detail.availableCount <= 0) {
+    logLoadoutEquipValidation("item_unavailable", detail);
+    return;
+  }
   equipLoadoutVaultEntry({
     key: detail.key,
+    baseId: detail.baseId,
+    inventoryId: detail.inventoryId,
+    groupKey: detail.groupKey,
     quality: detail.quality,
     level: detail.level,
     categoryKey: detail.categoryKey,
@@ -2097,8 +2146,11 @@ function getInventoryEntriesForCategory(categoryKey) {
   });
 }
 
-function removeOneInventoryItem(key, quality, level = null) {
-  const index = inventoryItems.findIndex(item => item.key === key &&
+function removeOneInventoryItem(key, quality, level = null, inventoryId = "") {
+  const safeInventoryId = String(inventoryId || "");
+  const index = inventoryItems.findIndex(item => safeInventoryId
+    ? String(item?.id || "") === safeInventoryId && item.key === key
+    : item.key === key &&
     item.quality === quality &&
     (level === null || Math.max(1, Number(item.level || 1)) === Math.max(1, Number(level || 1))));
   if (index === -1) return null;
@@ -2374,13 +2426,25 @@ function consumeLoadoutVaultEntry(entry) {
     }
     return makeLeveledLoadoutEntry(entry.key, quality, 1);
   }
-  const removed = removeOneInventoryItem(entry.key, quality, level);
-  if (!removed) return null;
+  const removed = removeOneInventoryItem(entry.key, quality, level, entry.inventoryId || "");
+  if (!removed) {
+    logLoadoutEquipValidation("inventory_item_missing", {
+      inventoryId: entry.inventoryId || "",
+      baseId: entry.baseId || entry.key,
+      quality,
+      level,
+      availableCount: entry.storedCount
+    });
+    return null;
+  }
   return makeLeveledLoadoutEntry(entry.key, quality, Math.max(1, Number(removed.level || level)));
 }
 
 function equipLoadoutVaultEntry(entry) {
-  if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return;
+  if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) {
+    logLoadoutEquipValidation("invalid_category", entry || {});
+    return;
+  }
   ensureSelectedLoadoutSlot();
   const selected = selectedLoadoutItemContext || {};
   const categoryKey = entry.categoryKey;
@@ -2394,6 +2458,10 @@ function equipLoadoutVaultEntry(entry) {
     if (index < 0) index = list.length < limit ? list.length : -1;
   }
   if (index < 0 || index >= limit) {
+    logLoadoutEquipValidation(categoryKey === "guns" ? "weapon_slot_unsupported" : "attachment_slot_unsupported", {
+      ...entry,
+      availableCount: entry.storedCount
+    });
     alert(categoryKey === "guns" ? "No empty weapon slots." : "No empty attachment slots.");
     return;
   }

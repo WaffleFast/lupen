@@ -736,6 +736,99 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("Azure Striker equips and persists a Godlike Ion Blaster in weapon slot two", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.eval(`
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        selectedShipyardShipId = "falcon";
+        ownedShips = ["falcon"];
+        ownedGuns.pulseLaser = 0;
+        ownedGuns.ionBlaster = 0;
+        inventoryItems = [{
+          id: "godlike-ion-slot-two",
+          key: "ionBlaster",
+          quality: "godlike",
+          level: 1
+        }];
+        shipLoadouts.falcon = {
+          attachments: [],
+          guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)]
+        };
+        shipConditions = {};
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("overview");
+        saveGame();
+      `);
+    });
+
+    await expect(page.locator("#hangarScreen")).toHaveClass(/active/);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(1);
+    await page.locator("#installedGuns .loadout-grid-slot.empty").click();
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Weapon 02");
+
+    await page.locator("#loadoutVaultFilterGuns").click();
+    const godlikeIon = page.locator("#gunInventory .hangar-equipment-card[data-item-key='ionBlaster']");
+    await expect(godlikeIon).toHaveCount(1);
+    await godlikeIon.click();
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Ion Blaster");
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText(/Godlike/i);
+    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip", exact: true })).toBeEnabled();
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip", exact: true }).click();
+
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(2);
+    let loadoutState = await page.evaluate(() => ({
+      guns: shipLoadouts.falcon.guns.map(entry => ({ key: getEquipmentKey(entry), quality: getEquipmentQuality(entry), level: getEquipmentLevel(entry) })),
+      inventoryCount: inventoryItems.filter(item => item.key === "ionBlaster" && item.quality === "godlike").length
+    }));
+    expect(loadoutState.guns[1]).toMatchObject({ key: "ionBlaster", quality: "godlike", level: 1 });
+    expect(loadoutState.inventoryCount).toBe(0);
+
+    await page.reload();
+    await openHangar(page);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(2);
+    loadoutState = await page.evaluate(() => ({
+      guns: shipLoadouts.falcon.guns.map(entry => ({ key: getEquipmentKey(entry), quality: getEquipmentQuality(entry), level: getEquipmentLevel(entry) })),
+      inventoryCount: inventoryItems.filter(item => item.key === "ionBlaster" && item.quality === "godlike").length
+    }));
+    expect(loadoutState.guns[1]).toMatchObject({ key: "ionBlaster", quality: "godlike", level: 1 });
+    expect(loadoutState.inventoryCount).toBe(0);
+
+    await page.evaluate(() => {
+      selectEquippedLoadoutVaultItem("guns", 1);
+    });
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Ion Blaster");
+    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" })).toBeEnabled();
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" }).click();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+    loadoutState = await page.evaluate(() => ({
+      guns: shipLoadouts.falcon.guns.map(entry => ({ key: getEquipmentKey(entry), quality: getEquipmentQuality(entry), level: getEquipmentLevel(entry) })),
+      inventoryCount: inventoryItems.filter(item => item.key === "ionBlaster" && item.quality === "godlike").length
+    }));
+    expect(loadoutState.guns.some(entry => entry.key === "ionBlaster")).toBe(false);
+    expect(loadoutState.inventoryCount).toBe(1);
+
+    await page.reload();
+    await openHangar(page);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+    loadoutState = await page.evaluate(() => ({
+      guns: shipLoadouts.falcon.guns.map(entry => ({ key: getEquipmentKey(entry), quality: getEquipmentQuality(entry), level: getEquipmentLevel(entry) })),
+      inventoryCount: inventoryItems.filter(item => item.key === "ionBlaster" && item.quality === "godlike").length
+    }));
+    expect(loadoutState.guns.some(entry => entry.key === "ionBlaster")).toBe(false);
+    expect(loadoutState.inventoryCount).toBe(1);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("all new ships accept guns, equipment, combat stats, and cargo math", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
