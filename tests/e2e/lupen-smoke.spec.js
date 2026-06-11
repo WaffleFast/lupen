@@ -75,6 +75,174 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("signup waits for an authenticated session before creating a profile", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      window.__profileUpsertCount = 0;
+      window.__fakeGetSupabaseClient = () => ({
+        auth: {
+          signUp: async () => ({
+            data: {
+              user: {
+                id: "11111111-1111-4111-8111-111111111111",
+                email: "newpilot@example.test",
+                user_metadata: { pilot_name: "New Pilot" }
+              },
+              session: null
+            },
+            error: null
+          })
+        },
+        from: () => ({
+          upsert: () => {
+            window.__profileUpsertCount += 1;
+            return {
+              select: () => ({
+                single: async () => ({ data: null, error: null })
+              })
+            };
+          }
+        })
+      });
+      window.eval("getSupabaseClient = window.__fakeGetSupabaseClient;");
+      window.showScreen("createScreen");
+      document.getElementById("createEmail").value = "newpilot@example.test";
+      document.getElementById("createUsername").value = "New Pilot";
+      document.getElementById("createPassword").value = "password123";
+      document.getElementById("createConfirm").value = "password123";
+    });
+
+    await page.evaluate(() => window.createAccount());
+
+    await expect(page.locator("#createMessage")).toContainText("check your email");
+    await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
+    await expect(page.evaluate(() => window.__profileUpsertCount)).resolves.toBe(0);
+    await expect(page.evaluate(() => localStorage.getItem("lupenPendingPilotName"))).resolves.toBe("New Pilot");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("signup profile RLS failure shows a friendly setup message and does not continue", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      window.__profileUpsertPayload = null;
+      window.__signOutCount = 0;
+      const sessionUser = {
+        id: "22222222-2222-4222-8222-222222222222",
+        email: "rls@example.test",
+        user_metadata: { pilot_name: "Rls Pilot" }
+      };
+      window.__fakeGetSupabaseClient = () => ({
+        auth: {
+          signUp: async () => ({
+            data: { user: sessionUser, session: { user: sessionUser } },
+            error: null
+          }),
+          signOut: async () => {
+            window.__signOutCount += 1;
+            return { error: null };
+          }
+        },
+        from: () => ({
+          upsert: (payload) => {
+            window.__profileUpsertPayload = payload;
+            return {
+              select: () => ({
+                single: async () => ({
+                  data: null,
+                  error: { message: "new row violates row-level security policy for table \"profiles\"" }
+                })
+              })
+            };
+          }
+        })
+      });
+      window.eval("getSupabaseClient = window.__fakeGetSupabaseClient;");
+      window.showScreen("createScreen");
+      document.getElementById("createEmail").value = "rls@example.test";
+      document.getElementById("createUsername").value = "Rls Pilot";
+      document.getElementById("createPassword").value = "password123";
+      document.getElementById("createConfirm").value = "password123";
+    });
+
+    await page.evaluate(() => window.createAccount());
+
+    await expect(page.locator("#createMessage")).toContainText("Account created, but profile setup failed. Please refresh or contact support.");
+    await expect(page.evaluate(() => window.__profileUpsertPayload?.id)).resolves.toBe("22222222-2222-4222-8222-222222222222");
+    await expect(page.evaluate(() => window.__signOutCount)).resolves.toBe(1);
+    await expect(page.evaluate(() => localStorage.getItem("lupenPlayerAccount"))).resolves.toBe(null);
+    await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("login does not show local save migration until the profile matches the authenticated user", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      localStorage.setItem("lupenGameSave", JSON.stringify({ credits: 12000, ownedShips: ["falcon"] }));
+      window.__migrationPromptCount = 0;
+      const user = {
+        id: "33333333-3333-4333-8333-333333333333",
+        email: "login@example.test",
+        user_metadata: { pilot_name: "Login Pilot" }
+      };
+      window.__fakeGetSupabaseClient = () => ({
+        auth: {
+          signInWithPassword: async () => ({ data: { user }, error: null }),
+          getUser: async () => ({ data: { user }, error: null })
+        },
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { id: "44444444-4444-4444-8444-444444444444", pilot_name: "Wrong Pilot", last_seen: null },
+                error: null
+              })
+            })
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: async () => ({
+                  data: { id: "44444444-4444-4444-8444-444444444444", pilot_name: "Wrong Pilot", last_seen: null },
+                  error: null
+                })
+              })
+            })
+          })
+        })
+      });
+      window.eval("getSupabaseClient = window.__fakeGetSupabaseClient;");
+      window.promptUploadLocalSaveToSupabase = async () => {
+        window.__migrationPromptCount += 1;
+        return "skip";
+      };
+      window.showScreen("loginScreen");
+      document.getElementById("loginUser").value = "login@example.test";
+      document.getElementById("loginPassword").value = "password123";
+    });
+
+    await page.evaluate(() => window.login());
+
+    await expect(page.locator("#loginMessage")).toContainText("Login succeeded, but profile setup failed. Please refresh or contact support.");
+    await expect(page.evaluate(() => window.__migrationPromptCount)).resolves.toBe(0);
+    await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("normal trade terminal opens without performing buy or sell actions", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -702,6 +870,7 @@ test.describe("Lupen browser smoke", () => {
       const entry = shipLoadouts.falcon?.guns?.[0];
       return entry && getEquipmentKey(entry) === "pulseLaser" && getEquipmentQuality(entry) !== "standard";
     }, null, { timeout: 5000 });
+    await page.waitForFunction(() => getCurrentTutorialStep()?.id === "return-after-forge", null, { timeout: 5000 });
 
     let forgeState = await page.evaluate(() => ({
       quality: getEquipmentQuality(shipLoadouts.falcon.guns[0]),

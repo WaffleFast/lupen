@@ -410,6 +410,17 @@ function getAuthErrorMessage(error, fallback) {
   return message;
 }
 
+function getProfileSetupErrorMessage(error, fallback = "Account created, but profile setup failed. Please refresh or contact support.") {
+  const message = String(error?.message || "");
+  if (/duplicate key|profiles_pilot_name_lower_unique/i.test(message)) return "That pilot name is already taken.";
+  if (/row-level security|permission denied|not authorized|violates row-level/i.test(message)) return fallback;
+  return message || fallback;
+}
+
+function isValidSupabaseProfileForUser(user, profile) {
+  return Boolean(user?.id && profile?.id === user.id && profile?.pilot_name);
+}
+
 function shouldLogSupabaseAuthDebug() {
   return ["localhost", "127.0.0.1"].includes(window.location.hostname) || new URLSearchParams(window.location.search).has("debug");
 }
@@ -442,6 +453,7 @@ async function loadSupabaseProfile(client, user) {
 }
 
 async function upsertSupabaseProfile(client, user, pilotName) {
+  if (!user?.id) throw new Error("Missing authenticated user for profile setup.");
   const response = await client
     .from("profiles")
     .upsert({
@@ -457,6 +469,14 @@ async function upsertSupabaseProfile(client, user, pilotName) {
   const { data, error } = response;
   if (error) throw error;
   return data;
+}
+
+async function signOutAfterProfileSetupFailure(client) {
+  try {
+    await client?.auth?.signOut?.();
+  } catch (error) {
+    console.warn("Unable to sign out after profile setup failure.", error);
+  }
 }
 
 async function touchSupabaseProfile(client, user) {
@@ -534,22 +554,31 @@ async function createAccount() {
 
   localStorage.setItem("lupenPendingPilotName", pilotName);
 
+  const sessionUser = authData?.session?.user;
+  if (!sessionUser?.id) {
+    setAccountMessage(message, "Account created. Please check your email to confirm your account, then log in.");
+    return;
+  }
+
+  if (sessionUser.id !== user.id) {
+    await signOutAfterProfileSetupFailure(client);
+    setAccountMessage(message, "Account created, but profile setup failed. Please refresh or contact support.");
+    return;
+  }
+
   let profile;
   try {
-    profile = await upsertSupabaseProfile(client, user, pilotName);
+    profile = await upsertSupabaseProfile(client, sessionUser, pilotName);
   } catch (error) {
-    setAccountMessage(message, error?.message || "Account created, but pilot profile setup failed.");
+    console.warn("Supabase profile setup failed after signup.", error);
+    await signOutAfterProfileSetupFailure(client);
+    setAccountMessage(message, getProfileSetupErrorMessage(error));
     return;
   }
 
   localStorage.removeItem("lupenPendingPilotName");
 
-  if (!authData.session) {
-    setAccountMessage(message, "Account created. Please check your email to confirm your account, then log in.");
-    return;
-  }
-
-  rememberSupabaseAccount(user, profile);
+  rememberSupabaseAccount(sessionUser, profile);
 
   resetToNoShipStarterState();
   saveGame();
@@ -616,7 +645,8 @@ async function login() {
         profile = await upsertSupabaseProfile(client, user, pendingPilotName);
         localStorage.removeItem("lupenPendingPilotName");
       } catch (profileError) {
-        setAccountMessage(message, profileError?.message || "Login succeeded, but profile setup failed.");
+        console.warn("Supabase profile setup failed after login.", profileError);
+        setAccountMessage(message, getProfileSetupErrorMessage(profileError, "Login succeeded, but profile setup failed. Please refresh or contact support."));
         return;
       }
     } else {
@@ -629,6 +659,11 @@ async function login() {
     profile = await touchSupabaseProfile(client, user);
   } catch (error) {
     console.warn("Unable to update profile last_seen.", error);
+  }
+
+  if (!isValidSupabaseProfileForUser(user, profile)) {
+    setAccountMessage(message, "Login succeeded, but profile setup failed. Please refresh or contact support.");
+    return;
   }
 
   rememberSupabaseAccount(user, profile);
