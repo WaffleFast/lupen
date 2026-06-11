@@ -221,6 +221,37 @@ function getForgeItemIdFromVaultGroup(groupKey) {
   return match?.id || null;
 }
 
+function isTutorialForgeStepActive() {
+  if (!tutorialState?.active || typeof getCurrentTutorialStep !== "function") return false;
+  return ["open-forge", "forge-upgrade-weapon"].includes(getCurrentTutorialStep()?.id);
+}
+
+function hasTutorialPulseLaserQualityUpgrade() {
+  return getForgeUpgradeableItems().some(item =>
+    item.key === "pulseLaser" &&
+    item.categoryKey === "guns" &&
+    item.quality &&
+    item.quality !== "standard"
+  );
+}
+
+function getTutorialPulseLaserForgeItemId() {
+  const items = getForgeUpgradeableItems().filter(item => item.key === "pulseLaser" && item.categoryKey === "guns");
+  if (!items.length) return null;
+  const currentEquipped = items.find(item => item.source === "equipped" && item.shipId === currentShipId && item.quality === "standard");
+  const anyEquipped = items.find(item => item.source === "equipped" && item.quality === "standard");
+  const inventory = items.find(item => item.source === "inventory" && item.quality === "standard");
+  const owned = items.find(item => item.source === "owned" && item.quality === "standard");
+  return (currentEquipped || anyEquipped || inventory || owned || items[0])?.id || null;
+}
+
+function prepareTutorialForgeSelection() {
+  if (!isTutorialForgeStepActive()) return;
+  forgeUpgradeMode = "quality";
+  const pulseLaserItemId = getTutorialPulseLaserForgeItemId();
+  if (pulseLaserItemId) selectedForgeItemId = pulseLaserItemId;
+}
+
 function setForgeMode(mode) {
   if (forgeAnimating) return;
   forgeUpgradeMode = mode === "level" ? "level" : "quality";
@@ -597,6 +628,9 @@ function startForgeUpgrade() {
     }
     addActivityLog(`${getForgeItemDisplayName(item)} ${forgeUpgradeMode === "level" ? `raised to level ${getForgeItemLevelRoman(requirements.targetLevel)}` : `advanced to ${titleCaseQuality(requirements.targetQuality)}`}.`);
     if (typeof addHudToast === "function") addHudToast(forgeUpgradeMode === "level" ? "Forge complete: Level increased." : "Forge complete: Quality advanced.");
+    if (item.key === "pulseLaser" && forgeUpgradeMode === "quality") {
+      tutorialEvent("upgradedTutorialWeapon", { key: item.key, quality: requirements.targetQuality });
+    }
     renderUpgradeForge();
     updateProgressDisplays();
     updateSpaceHUD();
@@ -855,6 +889,7 @@ function renderForgeSummary(item, requirements) {
 
 function renderUpgradeForge() {
   upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+  prepareTutorialForgeSelection();
   const items = getForgeUpgradeableItems();
   const item = getForgeSelectedItem();
   const requirements = getForgeRequirements(item);

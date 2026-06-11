@@ -327,12 +327,12 @@ function resetToNoShipStarterState() {
   cargoCostBasis = {};
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
-  currentShipId = starterShipId;
+  currentShipId = "";
   selectedHangarShipId = starterShipId;
   selectedFleetShipId = starterShipId;
   selectedShipyardShipId = starterShipId;
-  ownedShips = [starterShipId];
-  shipLoadouts = { [starterShipId]: { attachments: [], guns: ["pulseLaser"] } };
+  ownedShips = [];
+  shipLoadouts = {};
   shipConditions = {};
 
   Object.keys(ownedAttachments || {}).forEach(key => { ownedAttachments[key] = 0; });
@@ -368,7 +368,6 @@ function resetToNoShipStarterState() {
 }
 
 function grantStarterShipKit() {
-  ownedGuns.pulseLaser = Math.max(ownedGuns.pulseLaser || 0, 2);
   ownedAttachments.cargoPod = Math.max(ownedAttachments.cargoPod || 0, 1);
   ownedAttachments.jumpDrive = Math.max(ownedAttachments.jumpDrive || 0, 1);
 }

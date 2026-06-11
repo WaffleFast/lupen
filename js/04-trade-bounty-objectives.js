@@ -2839,6 +2839,13 @@ function claimBountyReward(contractId) {
   const contract = getBountyContract(contractId);
   if (!contract || contract.status !== "readyToClaim") return;
 
+  if (tutorialState?.active && ["claim-bounty", "continue-after-bounty-reward"].includes(getCurrentTutorialStep()?.id)) {
+    contract.reward = {
+      ...cloneBountyReward(contract.reward),
+      lupenCores: Math.max(1, Number(contract.reward?.lupenCores || 0))
+    };
+  }
+
   let bonusDrops = [];
   if (Math.random() < Number(contract.lootChance || 0)) {
     bonusDrops = generateBotLootItems();

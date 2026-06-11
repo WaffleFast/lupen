@@ -564,6 +564,172 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("starter tutorial definitions match current progression loop", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const tutorial = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        resetToNoShipStarterState();
+        showScreen("gameScreen");
+        startStarterTutorial(true);
+        const steps = STARTER_TUTORIAL_STEPS.map(step => ({
+          id: step.id,
+          title: step.title,
+          text: step.text,
+          target: step.target,
+          event: step.event,
+          speaker: step.speaker || "",
+          voiceCue: step.voiceCue || ""
+        }));
+        return {
+          hasActiveShip: hasActiveShip(),
+          ownedShips: ownedShips.slice(),
+          currentShipId,
+          firstTitle: document.getElementById("tutorialTitle")?.textContent || "",
+          label: document.getElementById("tutorialStepLabel")?.textContent || "",
+          steps
+        };
+      })()
+    `));
+
+    expect(tutorial.hasActiveShip).toBe(false);
+    expect(tutorial.ownedShips).toEqual([]);
+    expect(tutorial.currentShipId).toBe("");
+    expect(tutorial.firstTitle).toBe("Welcome, Pilot");
+    expect(tutorial.label).toContain("Station AI / Starter Pilot Programme");
+
+    const stepById = Object.fromEntries(tutorial.steps.map(step => [step.id, step]));
+    expect(stepById["buy-first-ship"]).toMatchObject({
+      title: "Claim the Falcon",
+      target: "tutorial:firstShipBuy",
+      event: "boughtFirstShip"
+    });
+    expect(stepById["buy-equipment"]).toMatchObject({
+      title: "Buy first weapon",
+      target: "tutorial:storePulseLaser",
+      event: "boughtStoreGun"
+    });
+    expect(stepById["equip-item"]).toMatchObject({
+      title: "Equip weapon",
+      target: "tutorial:spareWeapon",
+      event: "equippedItem"
+    });
+    expect(stepById["open-forge"]).toMatchObject({
+      title: "Open Forge",
+      event: "openedForge"
+    });
+    expect(stepById["forge-upgrade-weapon"]).toMatchObject({
+      title: "Upgrade Pulse Laser",
+      target: "tutorial:forgeUpgradeButton",
+      event: "upgradedTutorialWeapon"
+    });
+    expect(stepById.complete.text).toContain("Combat Level 2");
+    expect(stepById.complete.text).toContain("Bison Cargo Hauler");
+    expect(stepById.complete.text).toContain("Forge");
+    expect(stepById.complete.voiceCue).toBe("tutorial_outro_complete");
+
+    const allCopy = tutorial.steps.map(step => `${step.title} ${step.text} ${step.target} ${step.event}`).join("\n");
+    expect(allCopy).not.toMatch(/LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix|tutorial:spareAttachment/);
+    expect(allCopy).toMatch(/Bison|credits|XP|bounties|better gear/i);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("tutorial bounty grants a Core and Forge upgrade persists on Pulse Laser", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const rewardState = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        selectedShipyardShipId = "falcon";
+        ownedShips = ["falcon"];
+        ownedGuns.pulseLaser = 0;
+        inventoryItems = [];
+        shipLoadouts = {
+          falcon: normalizeShipLoadout({ attachments: [], guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)] }, "falcon")
+        };
+        shipConditions = {};
+        upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 0 });
+        ensureDailyBounties();
+        const contract = dailyBountyContracts[0];
+        contract.status = "readyToClaim";
+        contract.progress = getBountyRequiredKills(contract);
+        contract.reward = { credits: 0, xp: 125, lupenCores: 0, lupenShards: 0 };
+        selectedBountyContractId = contract.id;
+        tutorialState = {
+          active: true,
+          completed: false,
+          stepIndex: STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "claim-bounty"),
+          lastStartedAt: new Date().toISOString()
+        };
+        saveTutorialState();
+        showScreen("gameScreen");
+        claimBountyReward(contract.id);
+        const claimed = getBountyContract(contract.id);
+        return {
+          coreCount: getLupenCoreCount(),
+          contractCores: claimed.reward.lupenCores,
+          status: claimed.status,
+          overlayText: document.getElementById("bountyRewardOverlay")?.textContent || ""
+        };
+      })()
+    `));
+
+    expect(rewardState).toMatchObject({
+      coreCount: 1,
+      contractCores: 1,
+      status: "claimed"
+    });
+    expect(rewardState.overlayText).toContain("1x Lupen Core");
+
+    await page.evaluate(() => window.eval(`
+      setTutorialStepById("forge-upgrade-weapon");
+      openUpgradeForge();
+      startForgeUpgrade();
+    `));
+
+    await page.waitForFunction(() => {
+      const entry = shipLoadouts.falcon?.guns?.[0];
+      return entry && getEquipmentKey(entry) === "pulseLaser" && getEquipmentQuality(entry) !== "standard";
+    }, null, { timeout: 5000 });
+
+    let forgeState = await page.evaluate(() => ({
+      quality: getEquipmentQuality(shipLoadouts.falcon.guns[0]),
+      coreCount: getLupenCoreCount(),
+      selectedForgeItemId,
+      tutorialStep: getCurrentTutorialStep()?.id || ""
+    }));
+    expect(forgeState.quality).toBe("refined");
+    expect(forgeState.coreCount).toBe(0);
+    expect(forgeState.selectedForgeItemId).toContain("equipped:falcon:guns:0");
+    expect(forgeState.tutorialStep).toBe("return-after-forge");
+
+    await page.reload();
+    await waitForGameGlobals(page);
+    forgeState = await page.evaluate(() => ({
+      quality: getEquipmentQuality(shipLoadouts.falcon.guns[0]),
+      key: getEquipmentKey(shipLoadouts.falcon.guns[0]),
+      coreCount: getLupenCoreCount()
+    }));
+    expect(forgeState).toMatchObject({
+      key: "pulseLaser",
+      quality: "refined",
+      coreCount: 0
+    });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("ship switching restores each hull condition instead of inheriting previous hull", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

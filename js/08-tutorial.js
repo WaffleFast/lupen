@@ -1,5 +1,6 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
+const TUTORIAL_NARRATOR_LABEL = "Station AI";
 let tutorialState = loadTutorialState();
 let tutorialAdvanceTimeout = null;
 
@@ -7,7 +8,9 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "welcome-new-pilot",
     title: "Welcome, Pilot",
-    text: "Your journey starts here. You have no ship, no fleet and no reputation. Build your first vessel, trade for credits, hunt hostile targets, and carve your name into the stars.",
+    speaker: TUTORIAL_NARRATOR_LABEL,
+    voiceCue: "tutorial_intro_welcome",
+    text: "Welcome to Lupen. I will guide your Starter Pilot Programme: claim a Falcon, earn credits through trade, fit a weapon, and complete your first bounty. Every step moves you toward stronger ships, better gear, and Combat Level 2.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin",
@@ -17,56 +20,28 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-first-ship",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. With no active vessel, the bay will take you straight to the Vessel Exchange.",
+    text: "Open Hangar Bay. With no active vessel assigned, the bay will route you to the Vessel Exchange.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "buy-first-ship",
-    title: "Buy Your First Hull",
-    text: "Buy the LF-1 Origin. It is the starter hull, and the loadout you fit next will decide what kind of pilot it becomes.",
+    title: "Claim the Falcon",
+    text: "Claim the Azure Striker, your Falcon-class starter hull. It is fast, forgiving, and ready to earn the credits that lead to specialised ships.",
     target: "tutorial:firstShipBuy",
     event: "boughtFirstShip"
   },
   {
     id: "open-first-loadout",
     title: "Open Loadout",
-    text: "Open the Loadout tab. This is where weapons, equipment and repairs live for your active vessel.",
+    text: "Open Loadout. This is where your active ship carries weapons, equipment, hull condition, and future upgrades.",
     target: "tutorial:hangarLoadoutTab",
     event: "openedHangarLoadout"
   },
   {
-    id: "equip-first-gun",
-    title: "Equip First Gun",
-    text: "Fit your first gun from Available Equipment. The Weapons rail will show it installed around the ship.",
-    target: "tutorial:firstGun",
-    event: "equippedFirstGun"
-  },
-  {
-    id: "equip-second-gun",
-    title: "Equip Second Gun",
-    text: "Fit a second gun. Multiple weapon slots combine into your active attack system in combat.",
-    target: "tutorial:secondGun",
-    event: "equippedSecondGun"
-  },
-  {
-    id: "equip-cargo-pod",
-    title: "Fit Cargo Pod",
-    text: "Fit the Cargo Pod. Cargo upgrades let you carry more goods, which means bigger trade runs and better profit potential.",
-    target: "tutorial:cargoPod",
-    event: "equippedCargoPod"
-  },
-  {
-    id: "equip-jump-drive",
-    title: "Fit Jump Drive",
-    text: "Fit the Jump Drive. Jump upgrades help your ship recover faster between jumps, so longer routes feel smoother.",
-    target: "tutorial:jumpDrive",
-    event: "equippedJumpDrive"
-  },
-  {
     id: "return-after-first-loadout",
     title: "Return to station",
-    text: "Return to the station hub. Your ship is ready for your first trade.",
+    text: "Return to the station hub. First objective: complete a trade run. Trading is the safest way to build credits.",
     target: "#hangarScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -74,14 +49,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-trade",
     title: "Open Trade Terminal",
-    text: "Click Trade Terminal. This is how you will earn steady credits.",
+    text: "Open the Trade Terminal. Credits are your route to stronger or more specialised ships, including the Bison-class cargo hauler.",
     target: ".hub-actions button[onclick='openMarketplace()']",
     event: "openedTradeTerminal"
   },
   {
     id: "select-market-resource",
     title: "Select a resource",
-    text: "Select a resource on the market board. The Trade Builder will calculate the route numbers.",
+    text: "Select a resource on the Market Board. The Trade Builder will calculate the route numbers.",
     target: ".market-board-table tbody tr",
     event: "selectedMarketResource"
   },
@@ -102,7 +77,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "buy-cargo",
     title: "Buy cargo",
-    text: "Now press Buy Cargo. The route objective will guide you to the selected destination.",
+    text: "Press Buy Cargo. The route objective will guide you to the selected destination.",
     target: "tutorial:buyCargo",
     event: "boughtTradeCargo"
   },
@@ -117,7 +92,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "launch",
     title: "Launch into orbit",
-    text: "Click Launch Ship. Your market route will remain active in space.",
+    text: "Launch your ship. Your market route will remain active in space.",
     target: ".hub-launch-btn",
     event: "launched"
   },
@@ -152,14 +127,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "sell-cargo",
     title: "Sell cargo",
-    text: "Sell your route cargo to complete the trade and bank your profit.",
+    text: "Sell your route cargo to complete the trade and bank your profit. Each clean run brings better ships within reach.",
     target: "tutorial:sellCargo",
     event: "soldTradeCargo"
   },
   {
     id: "return-after-trade",
     title: "Return to station",
-    text: "Return to the station hub. Next, you will add more options to your loadout.",
+    text: "Return to the station hub. Next objective: buy a weapon so combat can start paying XP and bounty rewards.",
     target: "#marketScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -167,21 +142,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-store",
     title: "Open Store",
-    text: "Open the Store. This is where you can buy extra guns and attachments.",
+    text: "Open the Store. Better weapons let you take greater risks and clear tougher contracts.",
     target: ".hub-actions button[onclick='openStore()']",
     event: "openedStore"
   },
   {
     id: "buy-equipment",
-    title: "Buy spare attachment",
-    text: "Buy an Evasion Matrix from the Store. Your gun slots are full, so this upgrade uses your remaining equipment slot and improves survivability.",
-    target: "tutorial:storeEvasionMatrix",
-    event: "boughtStoreEvasionMatrix"
+    title: "Buy first weapon",
+    text: "Buy a Pulse Laser from the Store. It is reliable, affordable, and enough to begin your first bounty contract.",
+    target: "tutorial:storePulseLaser",
+    event: "boughtStoreGun"
   },
   {
     id: "return-after-store",
     title: "Return to station",
-    text: "Return to the station hub, then open Hangar Bay to fit your new equipment.",
+    text: "Return to the station hub, then open Hangar Bay to fit your new weapon.",
     target: "#storeScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -189,21 +164,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-equip",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. This is where you will manage your active ship and fitted equipment.",
+    text: "Open Hangar Bay. Loadout changes happen here, and fitted gear persists with your ship.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "equip-item",
-    title: "Equip spare attachment",
-    text: "Fit the spare attachment you just bought. Your gun slots are already full, but your ship still has one equipment slot free.",
-    target: "tutorial:spareAttachment",
-    event: "equippedAttachment"
+    title: "Equip weapon",
+    text: "Fit the Pulse Laser into an open weapon slot. Better weapons become a core part of your progression loop.",
+    target: "tutorial:spareWeapon",
+    event: "equippedItem"
   },
   {
     id: "return-after-equip",
     title: "Return to station",
-    text: "Return to the station hub. Next, you will accept your first bounty.",
+    text: "Return to the station hub. Next objective: accept a bounty and convert combat into XP and rewards.",
     target: "#hangarScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -211,14 +186,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-bounty",
     title: "Open Bounty Board",
-    text: "Open the Bounty Board and choose your first starter contract.",
+    text: "Open the Bounty Board and choose a starter contract. Bounties give you a clear combat objective.",
     target: ".hub-actions button[onclick='openBountyBoard()']",
     event: "openedBountyBoard"
   },
   {
     id: "accept-bounty",
     title: "Accept bounty",
-    text: "Accept a bounty. Combat contracts give you XP, credits and rare loot chances.",
+    text: "Accept a bounty. Combat earns XP, credits, and reward materials that will matter more as upgrades expand.",
     target: ".bounty-detail-panel button, .bounty-action-btn",
     event: "acceptedBounty"
   },
@@ -247,7 +222,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "scan-for-bots",
     title: "Scan for bots",
-    text: "Use the Bots scan. Scans reveal hostile signals and help you choose where to jump.",
+    text: "Use the Bots scan. Scans reveal hostile signals and help you choose where to jump next.",
     target: "#sectorScanBotsBtn",
     event: "scannedBots",
     place: "left"
@@ -262,7 +237,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "destroy-bot",
     title: "Destroy the bounty bots",
-    text: "Use Jump, Bots scan and ENGAGE as needed, then fight normally until the bounty objective is complete.",
+    text: "Use Jump, Bots scan, and ENGAGE as needed. Destroy the target to gain XP and advance the bounty.",
     target: "tutorial:destroyBountyBot",
     event: ["destroyedBountyBot", "openedSectorMap", "scannedBots", "jumpedNode"],
     place: "left"
@@ -298,14 +273,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "claim-bounty",
     title: "Claim bounty reward",
-    text: "Claim your completed bounty. Combat payouts now include credits, XP, Lupen Shards and Lupen Cores.",
+    text: "Claim your completed bounty. Combat payouts include credits, XP, Lupen Shards, and Lupen Cores.",
     target: "tutorial:claimBountyReward",
     event: ["openedBountyBoard", "claimedBountyReward"]
   },
   {
     id: "continue-after-bounty-reward",
     title: "Reward claimed",
-    text: "Press Continue, then return to the station hub.",
+    text: "Press Continue, then return to the station hub. The Lupen Core you claimed is your first Forge catalyst.",
     target: "#bountyRewardOverlay button, .reward-overlay button",
     event: "closedBountyReward",
     place: "left"
@@ -321,14 +296,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-forge",
     title: "Open Forge",
-    text: "Open the Forge. Lupen Shards raise item levels, while Lupen Cores support quality upgrades.",
+    text: "Open the Forge. Lupen Cores improve equipment quality. We will upgrade your Pulse Laser once and keep the lesson simple.",
     target: ".hub-actions button[onclick='openUpgradeForge()']",
     event: "openedForge"
   },
   {
+    id: "forge-upgrade-weapon",
+    title: "Upgrade Pulse Laser",
+    text: "Start the Quality Upgrade. Your Pulse Laser will advance beyond Standard and stay with your loadout.",
+    target: "tutorial:forgeUpgradeButton",
+    event: "upgradedTutorialWeapon"
+  },
+  {
     id: "return-after-forge",
     title: "Back to station",
-    text: "Return to the station hub. Before the starter route ends, check your ship after combat.",
+    text: "Forge complete. Return to the station hub. Before the starter route ends, check your ship after combat.",
     target: "#upgradeForgeScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -336,14 +318,16 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "repair-reminder",
     title: "Repair check",
-    text: "Open Hangar after combat and check your hull and shield condition. Repair before risky launches if your hull took damage.",
+    text: "Open Hangar after combat and check hull and shield condition. Repair before risky launches if your hull took damage.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "complete",
-    title: "Good luck, Pilot",
-    text: "Your starter route is complete. Trade builds credits, bounties feed the Forge, and Hangar keeps your fleet ready. Build carefully and fly smart.",
+    title: "Programme Complete",
+    speaker: TUTORIAL_NARRATOR_LABEL,
+    voiceCue: "tutorial_outro_complete",
+    text: "Starter route complete. Continue trading to save for the Bison Cargo Hauler, run bounties for XP and upgrade rewards, improve weapons through the Forge, and work toward Combat Level 2. I will keep your next objective ready.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin your journey",
@@ -662,26 +646,27 @@ function getDynamicTutorialTarget(step) {
     return document.querySelector("#jumpBtn") || document.querySelector("#sectorSvg");
   }
 
-  if (step.target === "tutorial:storeEvasionMatrix") {
+  if (step.target === "tutorial:storePulseLaser") {
     const selected = typeof getStoreSelectedItem === "function" ? getStoreSelectedItem() : null;
-    const evasionBuy = document.querySelector(".store-detail-buy-action[data-item-key='evasionMatrix']:not(:disabled)");
-    const evasionCard = document.querySelector(".store-catalog-card[data-item-key='evasionMatrix']:not(.sold-out)");
+    const pulseBuy = document.querySelector(".store-detail-buy-action[data-item-key='pulseLaser']:not(:disabled)");
+    const pulseCard = document.querySelector(".store-catalog-card[data-item-key='pulseLaser']:not(.sold-out)");
 
-    if (selected?.key === "evasionMatrix" && evasionBuy) {
-      return evasionBuy;
+    if (selected?.key === "pulseLaser" && pulseBuy) {
+      return pulseBuy;
     }
 
-    return evasionCard || evasionBuy || document.querySelector(".store-detail-actions button:not(:disabled)");
+    return pulseCard || pulseBuy || document.querySelector(".store-detail-actions button:not(:disabled)");
   }
 
-  if (step.target === "tutorial:storeAttachment") {
-    return document.querySelector(".store-buy-attachment-action[data-item-key='shieldBooster']:not(:disabled)") ||
-           document.querySelector(".store-buy-attachment-action[data-item-key='evasionMatrix']:not(:disabled)") ||
-           document.querySelector(".store-buy-attachment-action:not(:disabled)");
+  if (step.target === "tutorial:spareWeapon") {
+    return document.querySelector("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']:not(:disabled)") ||
+           document.querySelector("#gunInventory .hangar-equipment-card:not(:disabled)");
   }
 
-  if (step.target === "tutorial:spareAttachment") {
-    return document.querySelector("#attachmentInventory .hangar-equipment-card:not(:disabled)");
+  if (step.target === "tutorial:forgeUpgradeButton") {
+    return document.querySelector("#forgeStartBtn:not(:disabled)") ||
+           document.querySelector("#forgeQualityModeBtn") ||
+           document.querySelector("#forgeChamber");
   }
 
   return null;
@@ -711,7 +696,7 @@ function highlightTutorialTarget(step) {
   const spotlight = document.getElementById("tutorialSpotlight");
   if (!target || !spotlight) return;
 
-  if (step?.target === "tutorial:storeEvasionMatrix") {
+  if (step?.target === "tutorial:storePulseLaser") {
     target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }
 
@@ -872,11 +857,20 @@ function isTutorialClickAllowed(event) {
   }
 
   if (step?.id === "buy-equipment") {
-    const evasionCard = event.target.closest?.(".store-catalog-card[data-item-key='evasionMatrix']");
-    const evasionBuy = event.target.closest?.(".store-detail-buy-action[data-item-key='evasionMatrix']");
+    const pulseCard = event.target.closest?.(".store-catalog-card[data-item-key='pulseLaser']");
+    const pulseBuy = event.target.closest?.(".store-detail-buy-action[data-item-key='pulseLaser']");
     const selected = typeof getStoreSelectedItem === "function" ? getStoreSelectedItem() : null;
-    const selectedBuy = selected?.key === "evasionMatrix" && event.target.closest?.(".store-detail-actions button");
-    if (evasionCard || evasionBuy || selectedBuy) return true;
+    const selectedBuy = selected?.key === "pulseLaser" && event.target.closest?.(".store-detail-actions button");
+    if (pulseCard || pulseBuy || selectedBuy) return true;
+  }
+
+  if (step?.id === "forge-upgrade-weapon") {
+    if (
+      event.target.closest?.("#forgeStartBtn") ||
+      event.target.closest?.("#forgeQualityModeBtn") ||
+      event.target.closest?.("#forgeSelectedPanel") ||
+      event.target.closest?.("#forgeInventoryPicker")
+    ) return true;
   }
 
   return false;
@@ -963,6 +957,10 @@ function renderStarterTutorial() {
 
   const step = getCurrentTutorialStep();
 
+  if (step?.id === "forge-upgrade-weapon" && typeof hasTutorialPulseLaserQualityUpgrade === "function" && hasTutorialPulseLaserQualityUpgrade()) {
+    setTimeout(() => tutorialEvent("upgradedTutorialWeapon"), 80);
+  }
+
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   if (step?.id === "buy-first-ship" && !hasActiveShip() && selectedShipyardShipId !== starterShipId) {
     selectedShipyardShipId = starterShipId;
@@ -985,7 +983,10 @@ function renderStarterTutorial() {
   overlay.classList.toggle("tutorial-bottom-card", step.place === "bottom");
   if (title) title.textContent = step.title;
   if (text) text.textContent = step.text;
-  if (label) label.textContent = `Starter Pilot Programme / ${Math.min(tutorialState.stepIndex + 1, STARTER_TUTORIAL_STEPS.length)} / ${STARTER_TUTORIAL_STEPS.length}`;
+  if (label) {
+    const speaker = step.speaker || TUTORIAL_NARRATOR_LABEL;
+    label.textContent = `${speaker} / Starter Pilot Programme / ${Math.min(tutorialState.stepIndex + 1, STARTER_TUTORIAL_STEPS.length)} / ${STARTER_TUTORIAL_STEPS.length}`;
+  }
   if (progress) {
     progress.innerHTML = STARTER_TUTORIAL_STEPS.map((item, index) => `<i class="${index < tutorialState.stepIndex ? "done" : index === tutorialState.stepIndex ? "active" : ""}"></i>`).join("");
   }

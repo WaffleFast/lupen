@@ -3327,7 +3327,7 @@ function selectStoreItem(itemId) {
   }
   renderStore();
 
-  // Step 25 is a two-part action: select Evasion Matrix, then buy it.
+  // The weapon purchase step is two-part: select Pulse Laser, then buy it.
   // Refresh the tutorial after selection so the highlight moves onto the Buy button.
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
     setTimeout(renderStarterTutorial, 40);
@@ -3344,10 +3344,10 @@ function renderStore() {
   requestMultiplayerStagingStoreItemsIfNeeded();
 
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
-    storeFilter = "attachments";
+    storeFilter = "guns";
     selectedStoreQuality = "standard";
-    const evasionItem = getStoreCatalogItems().find(item => item.key === "evasionMatrix" && item.kind === "attachment");
-    if (evasionItem) selectedStoreItemId = evasionItem.id;
+    const pulseItem = getStoreCatalogItems().find(item => item.key === "pulseLaser" && item.kind === "gun");
+    if (pulseItem) selectedStoreItemId = pulseItem.id;
   }
 
   const node = sectorNodes[currentNode] || sectorNodes[lastPlanetNode] || { name: "Asteron Prime" };
