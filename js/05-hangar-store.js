@@ -37,6 +37,7 @@ let multiplayerStagingLoadoutEquipPendingItemId = "";
 let multiplayerStagingLoadoutUnequipPending = false;
 let selectedVaultActionContext = null;
 let selectedLoadoutItemContext = null;
+let selectedLoadoutStatusMessage = "";
 let selectedLoadoutSlotCategory = "guns";
 let selectedLoadoutVaultFilter = "guns";
 let selectedLoadoutVaultSearch = "";
@@ -811,6 +812,7 @@ function selectVaultItem(groupKey) {
 }
 
 function selectEquippedLoadoutVaultItem(categoryKey, index) {
+  selectedLoadoutStatusMessage = "";
   selectedLoadoutSlotCategory = categoryKey === "attachments" ? "attachments" : "guns";
   selectedLoadoutVaultFilter = selectedLoadoutSlotCategory;
   const loadout = getShipLoadout(selectedHangarShipId);
@@ -1314,6 +1316,7 @@ function unequipSelectedVaultItem() {
 
 function selectAvailableLoadoutItem(categoryKey, entry) {
   if (!entry || !["guns", "attachments"].includes(categoryKey)) return;
+  selectedLoadoutStatusMessage = "";
   const currentIndex = selectedLoadoutItemContext?.categoryKey === categoryKey
     ? Number(selectedLoadoutItemContext.index || 0)
     : 0;
@@ -1417,6 +1420,26 @@ function logLoadoutEquipValidation(reason, detail = {}) {
   console.debug("[loadout:equip]", payload);
 }
 
+function getLoadoutEquipValidationMessage(reason, detail = {}) {
+  const categoryKey = detail.categoryKey || selectedLoadoutItemContext?.categoryKey || selectedLoadoutSlotCategory;
+  const isWeapon = categoryKey !== "attachments";
+  if (reason === "missing_selected_item") return "Select a compatible item before equipping.";
+  if (reason === "item_unavailable" || reason === "inventory_item_missing") return "That item is no longer available in the vault.";
+  if (reason === "invalid_category") return "That item cannot be equipped in this slot.";
+  if (reason === "weapon_slot_unsupported") return "This ship has no empty weapon slots for that item.";
+  if (reason === "attachment_slot_unsupported") return "This ship has no empty attachment slots for that item.";
+  return isWeapon ? "That weapon cannot be equipped on this ship." : "That attachment cannot be equipped on this ship.";
+}
+
+function showLoadoutEquipValidationMessage(reason, detail = {}) {
+  logLoadoutEquipValidation(reason, detail);
+  const message = getLoadoutEquipValidationMessage(reason, detail);
+  selectedLoadoutStatusMessage = message;
+  renderLoadoutItemDetail();
+  if (typeof addHudToast === "function") addHudToast(message);
+  else if (typeof alert === "function") alert(message);
+}
+
 function renderLoadoutItemDetail() {
   const panel = document.getElementById("loadoutItemDetailPanel");
   if (!panel) return;
@@ -1483,6 +1506,7 @@ function renderLoadoutItemDetail() {
           </div>
         `).join("")}
       </div>
+      ${selectedLoadoutStatusMessage ? `<div class="loadout-detail-status">${escapeHtml(selectedLoadoutStatusMessage)}</div>` : ""}
       <div class="loadout-detail-actions">
         ${actionButton}
       </div>
@@ -1493,11 +1517,11 @@ function renderLoadoutItemDetail() {
 function equipSelectedLoadoutItem() {
   const detail = getLoadoutDetailDefinition(selectedLoadoutItemContext);
   if (!detail) {
-    logLoadoutEquipValidation("missing_selected_item");
+    showLoadoutEquipValidationMessage("missing_selected_item");
     return;
   }
   if (detail.availableCount <= 0) {
-    logLoadoutEquipValidation("item_unavailable", detail);
+    showLoadoutEquipValidationMessage("item_unavailable", detail);
     return;
   }
   equipLoadoutVaultEntry({
@@ -2015,6 +2039,7 @@ function ensureSelectedLoadoutSlot() {
 }
 
 function setLoadoutSlotCategory(categoryKey) {
+  selectedLoadoutStatusMessage = "";
   selectedLoadoutSlotCategory = categoryKey === "attachments" ? "attachments" : "guns";
   selectedLoadoutVaultFilter = selectedLoadoutSlotCategory;
   const limit = selectedLoadoutSlotCategory === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
@@ -2428,9 +2453,10 @@ function consumeLoadoutVaultEntry(entry) {
   }
   const removed = removeOneInventoryItem(entry.key, quality, level, entry.inventoryId || "");
   if (!removed) {
-    logLoadoutEquipValidation("inventory_item_missing", {
+    showLoadoutEquipValidationMessage("inventory_item_missing", {
       inventoryId: entry.inventoryId || "",
       baseId: entry.baseId || entry.key,
+      categoryKey: entry.categoryKey,
       quality,
       level,
       availableCount: entry.storedCount
@@ -2442,7 +2468,7 @@ function consumeLoadoutVaultEntry(entry) {
 
 function equipLoadoutVaultEntry(entry) {
   if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) {
-    logLoadoutEquipValidation("invalid_category", entry || {});
+    showLoadoutEquipValidationMessage("invalid_category", entry || {});
     return;
   }
   ensureSelectedLoadoutSlot();
@@ -2458,11 +2484,10 @@ function equipLoadoutVaultEntry(entry) {
     if (index < 0) index = list.length < limit ? list.length : -1;
   }
   if (index < 0 || index >= limit) {
-    logLoadoutEquipValidation(categoryKey === "guns" ? "weapon_slot_unsupported" : "attachment_slot_unsupported", {
+    showLoadoutEquipValidationMessage(categoryKey === "guns" ? "weapon_slot_unsupported" : "attachment_slot_unsupported", {
       ...entry,
       availableCount: entry.storedCount
     });
-    alert(categoryKey === "guns" ? "No empty weapon slots." : "No empty attachment slots.");
     return;
   }
 
@@ -2477,6 +2502,7 @@ function equipLoadoutVaultEntry(entry) {
 
   const nextEntry = consumeLoadoutVaultEntry(entry);
   if (!nextEntry) return;
+  selectedLoadoutStatusMessage = "";
 
   if (list[index]) returnLoadoutEntryToVault(list[index], categoryKey);
   list[index] = nextEntry;

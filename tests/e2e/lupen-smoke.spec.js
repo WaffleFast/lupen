@@ -585,7 +585,8 @@ test.describe("Lupen browser smoke", () => {
         };
         shipConditions = {
           falcon: { hull: 620, shield: 111 },
-          bison: { hull: 930, shield: 77 }
+          bison: { hull: 930, shield: 77 },
+          monolith: { hull: 99999, shield: 99999 }
         };
         hull = 620;
         shield = 111;
@@ -939,6 +940,63 @@ test.describe("Lupen browser smoke", () => {
       expect(row.weaponShieldDamage, row.name).toBeGreaterThan(0);
       expect(row.weaponName, row.name).toContain("Pulse Laser");
     }
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("desktop bounty board keeps selected contract actions visible", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.eval(`
+        localStorage.clear();
+        activeObjective = null;
+        activeBountyId = null;
+        ensureDailyBounties();
+        selectedBountyContractId = dailyBountyContracts[0]?.id || null;
+        showScreen("gameScreen");
+        openBountyBoard();
+      `);
+    });
+
+    await expect(page.locator("#bountyScreen")).toHaveClass(/active/);
+    await expect(page.locator(".selected-contract-panel")).toBeVisible();
+    await expect(page.locator(".accept-bounty-button")).toBeVisible();
+
+    const measureSelectedPanelAction = async (selector) => page.evaluate((buttonSelector) => {
+      const screen = document.querySelector("#bountyScreen")?.getBoundingClientRect();
+      const panel = document.querySelector(".selected-contract-panel")?.getBoundingClientRect();
+      const actions = document.querySelector(".selected-contract-actions")?.getBoundingClientRect();
+      const button = document.querySelector(buttonSelector)?.getBoundingClientRect();
+      if (!screen || !panel || !actions || !button) return null;
+      return {
+        actionVisible: button.width > 0 && button.height > 0,
+        panelFitsScreen: panel.top >= screen.top && panel.left >= screen.left && panel.right <= screen.right + 1 && panel.bottom <= screen.bottom + 1,
+        actionsFitPanel: actions.top >= panel.top && actions.left >= panel.left && actions.right <= panel.right + 1 && actions.bottom <= panel.bottom + 1,
+        buttonFitsPanel: button.top >= panel.top && button.left >= panel.left && button.right <= panel.right + 1 && button.bottom <= panel.bottom + 1
+      };
+    }, selector);
+
+    const acceptGeometry = await measureSelectedPanelAction(".accept-bounty-button");
+    expect(acceptGeometry).toMatchObject({
+      actionVisible: true,
+      panelFitsScreen: true,
+      actionsFitPanel: true,
+      buttonFitsPanel: true
+    });
+
+    await page.locator(".accept-bounty-button").click();
+    await expect(page.locator(".bounty-cancel-btn")).toBeVisible();
+    const cancelGeometry = await measureSelectedPanelAction(".bounty-cancel-btn");
+    expect(cancelGeometry).toMatchObject({
+      actionVisible: true,
+      panelFitsScreen: true,
+      actionsFitPanel: true,
+      buttonFitsPanel: true
+    });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
