@@ -327,6 +327,71 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("staging clearLocalSave removes local progress keys without touching Supabase auth storage", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.setItem("lupenGameState", JSON.stringify({ credits: 12000, ownedShips: ["falcon"] }));
+      localStorage.setItem("lupenGameSave", JSON.stringify({ credits: 13000 }));
+      localStorage.setItem("lupenStarterPilotTutorial", JSON.stringify({ active: true }));
+      localStorage.setItem("lupenVaultClearedForIntegratedHangarV2", "true");
+      localStorage.setItem("lupenPendingPilotName", "Pending Pilot");
+      localStorage.setItem("sectorOneLoggedIn", "Legacy Pilot");
+      localStorage.setItem("lupenStagingFlowHintDismissed", "1");
+      localStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-auth");
+      sessionStorage.setItem("lupenGameState", "session-save");
+      sessionStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-session-auth");
+    });
+
+    await page.goto("/?mp=staging&clearLocalSave=1");
+    await waitForGameGlobals(page);
+
+    const storage = await page.evaluate(() => ({
+      href: window.location.href,
+      helperType: typeof window.lupenClearLocalSave,
+      game: localStorage.getItem("lupenGameState"),
+      legacyGame: localStorage.getItem("lupenGameSave"),
+      tutorial: localStorage.getItem("lupenStarterPilotTutorial"),
+      vaultReset: localStorage.getItem("lupenVaultClearedForIntegratedHangarV2"),
+      pendingPilot: localStorage.getItem("lupenPendingPilotName"),
+      legacyPilot: localStorage.getItem("sectorOneLoggedIn"),
+      stagingHint: localStorage.getItem("lupenStagingFlowHintDismissed"),
+      supabaseAuth: localStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
+      sessionGame: sessionStorage.getItem("lupenGameState"),
+      sessionSupabaseAuth: sessionStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
+      blankMeaningful: hasMeaningfulLocalSave({}),
+      defaultShellMeaningful: hasMeaningfulLocalSave({
+        credits: 10000,
+        ownedShips: ["falcon"],
+        playerProgress: { combatXp: 0, totals: {} },
+        ownedGuns: {},
+        ownedAttachments: {},
+        inventoryItems: [],
+        cargo: {}
+      })
+    }));
+
+    expect(storage.href).not.toContain("clearLocalSave=1");
+    expect(storage.href).toContain("mp=staging");
+    expect(storage.helperType).toBe("function");
+    expect(storage.game).toBe(null);
+    expect(storage.legacyGame).toBe(null);
+    expect(storage.tutorial).toBe(null);
+    expect(storage.vaultReset).toBe(null);
+    expect(storage.pendingPilot).toBe(null);
+    expect(storage.legacyPilot).toBe(null);
+    expect(storage.stagingHint).toBe(null);
+    expect(storage.supabaseAuth).toBe("keep-auth");
+    expect(storage.sessionGame).toBe(null);
+    expect(storage.sessionSupabaseAuth).toBe("keep-session-auth");
+    expect(storage.blankMeaningful).toBe(false);
+    expect(storage.defaultShellMeaningful).toBe(false);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("normal trade terminal opens without performing buy or sell actions", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

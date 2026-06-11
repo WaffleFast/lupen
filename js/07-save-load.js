@@ -1,5 +1,67 @@
 ﻿/* Save / load */
 
+const LUPEN_LOCAL_SAVE_RESET_KEYS = Object.freeze([
+  STORAGE_GAME_KEY,
+  "lupenGameSave",
+  "lupenStarterPilotTutorial",
+  STORAGE_VAULT_RESET_KEY,
+  "lupenPendingPilotName",
+  "sectorOneLoggedIn",
+  "lupenStagingFlowHintDismissed"
+]);
+
+const LUPEN_LOCAL_SAVE_RESET_PREFIXES = Object.freeze([
+  `${STORAGE_GAME_KEY}.corrupt.`,
+  "lupenGameSave.corrupt.",
+  "lupenStarterPilotTutorial.corrupt."
+]);
+
+function removeLupenLocalSaveKeysFromStorage(storage) {
+  if (!storage) return [];
+  const removed = [];
+  LUPEN_LOCAL_SAVE_RESET_KEYS.forEach(key => {
+    if (storage.getItem(key) !== null) {
+      storage.removeItem(key);
+      removed.push(key);
+    }
+  });
+
+  for (let index = storage.length - 1; index >= 0; index -= 1) {
+    const key = storage.key(index);
+    if (!key || !LUPEN_LOCAL_SAVE_RESET_PREFIXES.some(prefix => key.startsWith(prefix))) continue;
+    storage.removeItem(key);
+    removed.push(key);
+  }
+  return removed;
+}
+
+function lupenClearLocalSave() {
+  const removedLocalStorageKeys = removeLupenLocalSaveKeysFromStorage(window.localStorage);
+  const removedSessionStorageKeys = removeLupenLocalSaveKeysFromStorage(window.sessionStorage);
+  const result = { removedLocalStorageKeys, removedSessionStorageKeys };
+  console.info("[Lupen staging] Cleared local save/tutorial browser keys.", result);
+  return result;
+}
+
+window.lupenClearLocalSave = lupenClearLocalSave;
+
+function handleStagingClearLocalSaveParam() {
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  if (params.get("mp") !== "staging" || params.get("clearLocalSave") !== "1") return false;
+
+  const result = lupenClearLocalSave();
+  params.delete("clearLocalSave");
+  const nextUrl = `${url.pathname}${params.toString() ? `?${params}` : ""}${url.hash}`;
+  try {
+    window.history.replaceState({}, document.title, nextUrl);
+  } catch (error) {
+    console.warn("[Lupen staging] Unable to remove clearLocalSave query parameter.", error);
+  }
+  console.info("[Lupen staging] Applied clearLocalSave=1 before loading local game state.", result);
+  return true;
+}
+
 function getMultiplayerUnderAttackState() {
   const multiplayerState = window.lupenMultiplayerState || window.multiplayerState || null;
   return Boolean(
@@ -375,8 +437,17 @@ function getLocalSavePayloadForCloudMigration() {
   return migrateSavedGame(LupenSaveService.readJsonLocalStorage(STORAGE_GAME_KEY));
 }
 
-function hasMeaningfulLocalSave(saved = getLocalSavePayloadForCloudMigration()) {
-  if (!saved) return false;
+function getLocalSaveMigrationSource() {
+  const raw = LupenSaveService.readLocalStorage(STORAGE_GAME_KEY);
+  return {
+    key: STORAGE_GAME_KEY,
+    raw,
+    payload: raw ? migrateSavedGame(LupenSaveService.readJsonLocalStorage(STORAGE_GAME_KEY)) : null
+  };
+}
+
+function analyzeLocalSaveForCloudMigration(saved = getLocalSavePayloadForCloudMigration(), sourceKey = STORAGE_GAME_KEY) {
+  if (!saved) return { meaningful: false, sourceKey, reasons: ["missing_save"] };
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   const starterShipIds = new Set([starterShipId, "lupenOrigin"]);
@@ -391,20 +462,44 @@ function hasMeaningfulLocalSave(saved = getLocalSavePayloadForCloudMigration()) 
   const hasOwnedGuns = saved.ownedGuns && Object.values(saved.ownedGuns).some(count => Number(count || 0) > 0);
   const hasOwnedAttachments = saved.ownedAttachments && Object.values(saved.ownedAttachments).some(count => Number(count || 0) > 0);
   const hasTradeOrBounty = Boolean(saved.activeTradeRoute || saved.activeObjective);
-  const hasDifferentCredits = Number(saved.credits || 0) !== 10000;
+  const hasDifferentCredits = saved.credits !== undefined && Number(saved.credits) !== 10000;
 
-  return Boolean(
-    hasNonStarterShip ||
-    (!hasOnlyDefaultStarterShip && ownedShipIds.length > 0) ||
-    hasProgressTotals ||
-    hasCombatXp ||
-    hasCargo ||
-    hasInventory ||
-    hasOwnedGuns ||
-    hasOwnedAttachments ||
-    hasTradeOrBounty ||
-    hasDifferentCredits
-  );
+  const checks = [
+    ["non_starter_ship", hasNonStarterShip],
+    ["non_default_ship_shell", !hasOnlyDefaultStarterShip && ownedShipIds.length > 0],
+    ["progress_totals", hasProgressTotals],
+    ["combat_xp", hasCombatXp],
+    ["cargo", hasCargo],
+    ["inventory", hasInventory],
+    ["owned_guns", hasOwnedGuns],
+    ["owned_attachments", hasOwnedAttachments],
+    ["trade_or_bounty_objective", hasTradeOrBounty],
+    ["credits_changed", hasDifferentCredits]
+  ];
+  const reasons = checks.filter(([, active]) => active).map(([reason]) => reason);
+
+  return {
+    meaningful: reasons.length > 0,
+    sourceKey,
+    reasons: reasons.length ? reasons : ["default_or_blank_save_shell"]
+  };
+}
+
+function hasMeaningfulLocalSave(saved = getLocalSavePayloadForCloudMigration()) {
+  return analyzeLocalSaveForCloudMigration(saved).meaningful;
+}
+
+function isStagingLocalSaveLoggingEnabled() {
+  try {
+    return new URLSearchParams(window.location.search || "").get("mp") === "staging";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function logStagingLocalSaveMigration(label, detail = {}) {
+  if (!isStagingLocalSaveLoggingEnabled()) return;
+  console.info(`[Lupen staging] ${label}`, detail);
 }
 
 async function uploadLocalSavePayloadToSupabase(localSavePayload) {
@@ -416,6 +511,11 @@ async function uploadLocalSavePayloadToSupabase(localSavePayload) {
 
 function promptUploadLocalSaveToSupabase() {
   return new Promise(resolve => {
+    logStagingLocalSaveMigration("Showing local save migration prompt.", {
+      sourceKey: window.lupenLastLocalSaveMigrationAnalysis?.sourceKey || STORAGE_GAME_KEY,
+      meaningful: window.lupenLastLocalSaveMigrationAnalysis?.meaningful === true,
+      reasons: window.lupenLastLocalSaveMigrationAnalysis?.reasons || []
+    });
     let overlay = document.getElementById("localSaveMigrationOverlay");
     if (!overlay) {
       overlay = document.createElement("div");
@@ -944,6 +1044,7 @@ function debugResetSave() {
 }
 
 window.onload = function () {
+  if (typeof handleStagingClearLocalSaveParam === "function") handleStagingClearLocalSaveParam();
   loadGame();
 
   if (!homePlanet || !sectorNodes[homePlanet] || sectorNodes[homePlanet].type !== "planet") {

@@ -679,14 +679,32 @@ async function login() {
   }
 
   if (!cloudSaveResult.exists) {
-    const localSavePayload = typeof getLocalSavePayloadForCloudMigration === "function" ? getLocalSavePayloadForCloudMigration() : null;
-    const hasLocalProgress = typeof hasMeaningfulLocalSave === "function" ? hasMeaningfulLocalSave(localSavePayload) : false;
+    const localSaveSource = typeof getLocalSaveMigrationSource === "function"
+      ? getLocalSaveMigrationSource()
+      : { key: "unknown", payload: typeof getLocalSavePayloadForCloudMigration === "function" ? getLocalSavePayloadForCloudMigration() : null };
+    const localSavePayload = localSaveSource.payload || null;
+    const localSaveAnalysis = typeof analyzeLocalSaveForCloudMigration === "function"
+      ? analyzeLocalSaveForCloudMigration(localSavePayload, localSaveSource.key)
+      : { meaningful: typeof hasMeaningfulLocalSave === "function" ? hasMeaningfulLocalSave(localSavePayload) : false, sourceKey: localSaveSource.key, reasons: [] };
+    window.lupenLastLocalSaveMigrationAnalysis = localSaveAnalysis;
+    const hasLocalProgress = localSaveAnalysis.meaningful === true;
 
     console.info("Local-to-cloud save migration check.", {
       cloudSaveExists: cloudSaveResult.exists,
       cloudSaveReason: cloudSaveResult.reason,
-      hasLocalProgress
+      hasLocalProgress,
+      localSaveKey: localSaveAnalysis.sourceKey,
+      localSaveReasons: localSaveAnalysis.reasons
     });
+    if (typeof logStagingLocalSaveMigration === "function") {
+      logStagingLocalSaveMigration("Local save migration check.", {
+        cloudSaveExists: cloudSaveResult.exists,
+        cloudSaveReason: cloudSaveResult.reason,
+        sourceKey: localSaveAnalysis.sourceKey,
+        meaningful: hasLocalProgress,
+        reasons: localSaveAnalysis.reasons
+      });
+    }
 
     if (hasLocalProgress && typeof promptUploadLocalSaveToSupabase === "function") {
       const decision = await promptUploadLocalSaveToSupabase();
