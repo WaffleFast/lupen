@@ -83,19 +83,23 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => {
       localStorage.clear();
       window.__profileUpsertCount = 0;
+      window.__signUpPayload = null;
       window.__fakeGetSupabaseClient = () => ({
         auth: {
-          signUp: async () => ({
-            data: {
-              user: {
-                id: "11111111-1111-4111-8111-111111111111",
-                email: "newpilot@example.test",
-                user_metadata: { pilot_name: "New Pilot" }
+          signUp: async (payload) => {
+            window.__signUpPayload = payload;
+            return {
+              data: {
+                user: {
+                  id: "11111111-1111-4111-8111-111111111111",
+                  email: "newpilot@example.test",
+                  user_metadata: { pilot_name: "New Pilot" }
+                },
+                session: null
               },
-              session: null
-            },
-            error: null
-          })
+              error: null
+            };
+          }
         },
         from: () => ({
           upsert: () => {
@@ -118,9 +122,10 @@ test.describe("Lupen browser smoke", () => {
 
     await page.evaluate(() => window.createAccount());
 
-    await expect(page.locator("#createMessage")).toContainText("check your email");
+    await expect(page.locator("#createMessage")).toContainText("Account created. Please check your email to confirm your account before logging in.");
     await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
     await expect(page.evaluate(() => window.__profileUpsertCount)).resolves.toBe(0);
+    await expect(page.evaluate(() => window.__signUpPayload?.options?.data?.pilot_name)).resolves.toBe("New Pilot");
     await expect(page.evaluate(() => localStorage.getItem("lupenPendingPilotName"))).resolves.toBe("New Pilot");
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -179,6 +184,85 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.evaluate(() => window.__profileUpsertPayload?.id)).resolves.toBe("22222222-2222-4222-8222-222222222222");
     await expect(page.evaluate(() => window.__signOutCount)).resolves.toBe(1);
     await expect(page.evaluate(() => localStorage.getItem("lupenPlayerAccount"))).resolves.toBe(null);
+    await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("login creates a missing profile from auth metadata or Pilot fallback", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      window.__profileUpsertPayload = null;
+      const user = {
+        id: "55555555-5555-4555-8555-555555555555",
+        email: "fallback@example.test",
+        user_metadata: {}
+      };
+      window.__fakeGetSupabaseClient = () => ({
+        auth: {
+          signInWithPassword: async () => ({ data: { user }, error: null }),
+          getUser: async () => ({ data: { user }, error: null })
+        },
+        from: (table) => {
+          if (table === "profiles") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  single: async () => ({
+                    data: null,
+                    error: { code: "PGRST116", message: "No rows found" }
+                  })
+                })
+              }),
+              upsert: (payload) => {
+                window.__profileUpsertPayload = payload;
+                return {
+                  select: () => ({
+                    single: async () => ({
+                      data: { id: payload.id, pilot_name: payload.pilot_name, last_seen: payload.last_seen },
+                      error: null
+                    })
+                  })
+                };
+              },
+              update: (payload) => ({
+                eq: () => ({
+                  select: () => ({
+                    single: async () => ({
+                      data: { id: user.id, pilot_name: window.__profileUpsertPayload?.pilot_name || "Pilot", last_seen: payload.last_seen },
+                      error: null
+                    })
+                  })
+                })
+              })
+            };
+          }
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: null })
+              })
+            })
+          };
+        }
+      });
+      window.eval("getSupabaseClient = window.__fakeGetSupabaseClient;");
+      window.showScreen("loginScreen");
+      document.getElementById("loginUser").value = "fallback@example.test";
+      document.getElementById("loginPassword").value = "password123";
+    });
+
+    await page.evaluate(() => window.login());
+
+    await expect(page.evaluate(() => window.__profileUpsertPayload)).resolves.toMatchObject({
+      id: "55555555-5555-4555-8555-555555555555",
+      pilot_name: "Pilot"
+    });
+    await expect(page.evaluate(() => JSON.parse(localStorage.getItem("sectorOneAccount"))?.pilot_name)).resolves.toBe("Pilot");
     await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
 
     await expectNoUnexpectedBrowserErrors(failures);

@@ -30,5 +30,3 @@ for update
 to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
-
-supabase/migrations/20260611_profiles_rls_self_profile_policies.sql

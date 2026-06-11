@@ -421,6 +421,11 @@ function isValidSupabaseProfileForUser(user, profile) {
   return Boolean(user?.id && profile?.id === user.id && profile?.pilot_name);
 }
 
+function getPilotNameForProfileSetup(user, fallback = "Pilot") {
+  const candidate = String(user?.user_metadata?.pilot_name || localStorage.getItem("lupenPendingPilotName") || fallback || "Pilot").trim();
+  return candidate || "Pilot";
+}
+
 function shouldLogSupabaseAuthDebug() {
   return ["localhost", "127.0.0.1"].includes(window.location.hostname) || new URLSearchParams(window.location.search).has("debug");
 }
@@ -548,7 +553,7 @@ async function createAccount() {
 
   const user = authData?.user || authData?.session?.user;
   if (!user) {
-    setAccountMessage(message, "Account created. Please check your email to confirm your account, then log in.");
+    setAccountMessage(message, "Account created. Please check your email to confirm your account before logging in.");
     return;
   }
 
@@ -556,7 +561,7 @@ async function createAccount() {
 
   const sessionUser = authData?.session?.user;
   if (!sessionUser?.id) {
-    setAccountMessage(message, "Account created. Please check your email to confirm your account, then log in.");
+    setAccountMessage(message, "Account created. Please check your email to confirm your account before logging in.");
     return;
   }
 
@@ -639,18 +644,13 @@ async function login() {
   try {
     profile = await loadSupabaseProfile(client, user);
   } catch (error) {
-    const pendingPilotName = localStorage.getItem("lupenPendingPilotName") || user.user_metadata?.pilot_name || "";
-    if (pendingPilotName.length >= 3) {
-      try {
-        profile = await upsertSupabaseProfile(client, user, pendingPilotName);
-        localStorage.removeItem("lupenPendingPilotName");
-      } catch (profileError) {
-        console.warn("Supabase profile setup failed after login.", profileError);
-        setAccountMessage(message, getProfileSetupErrorMessage(profileError, "Login succeeded, but profile setup failed. Please refresh or contact support."));
-        return;
-      }
-    } else {
-      setAccountMessage(message, "Login succeeded, but no pilot profile was found. Please create the account again with a pilot name.");
+    const pilotName = getPilotNameForProfileSetup(user);
+    try {
+      profile = await upsertSupabaseProfile(client, user, pilotName);
+      localStorage.removeItem("lupenPendingPilotName");
+    } catch (profileError) {
+      console.warn("Supabase profile setup failed after login.", profileError);
+      setAccountMessage(message, getProfileSetupErrorMessage(profileError, "Login succeeded, but profile setup failed. Please refresh or contact support."));
       return;
     }
   }
