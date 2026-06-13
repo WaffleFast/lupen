@@ -2822,12 +2822,12 @@ function renderShipyardDetail() {
     secondaryAction = `<button class="exchange-footer-primary" onclick="showHangarSection('overview');">Open Loadout</button>`;
   } else if (owned) {
     primaryAction = `<button class="exchange-footer-secondary" disabled>Owned</button>`;
-    secondaryAction = `<button class="exchange-footer-primary" onclick="equipShip('${ship.id}'); showHangarSection('shipyard');">Set Active</button>`;
+    secondaryAction = `<button class="exchange-footer-primary set-active-ship-action" ${ship.id === starterShipId ? "data-tutorial-target=\"firstShipBuy\"" : ""} onclick="equipShip('${ship.id}'); showHangarSection('shipyard');">Set Active</button>`;
   } else if (unlock.locked) {
     primaryAction = `<button class="exchange-footer-primary buy-ship-action locked-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')">Locked</button>`;
     secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   } else {
-    primaryAction = `<button class="exchange-footer-primary buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>${starterClaim ? "Claim Starter Ship" : "Buy Hull"}</button>`;
+    primaryAction = `<button class="exchange-footer-primary buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford && !starterClaim ? "disabled" : ""}>${starterClaim ? "Claim Starter Ship" : "Buy Hull"}</button>`;
     secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   }
 
@@ -4043,13 +4043,16 @@ function buyShip(shipId) {
     return;
   }
 
-  if (credits < ship.price) {
+  const hadNoShip = !hasActiveShip();
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const starterClaim = hadNoShip && shipId === starterShipId;
+
+  if (!starterClaim && credits < ship.price) {
     alert("Not enough credits.");
     return;
   }
 
-  const hadNoShip = !hasActiveShip();
-  credits -= ship.price;
+  credits -= starterClaim ? 0 : ship.price;
   ownedShips.push(shipId);
   selectedHangarShipId = shipId;
   selectedFleetShipId = shipId;
@@ -4089,6 +4092,10 @@ function equipShip(shipId) {
   applyShipStats(false);
   renderHangar();
   addHudToast(`${SHIPS[shipId]?.name || "Ship"} is ready to fly.`);
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  if (tutorialState?.active && getCurrentTutorialStep?.()?.id === "buy-first-ship" && shipId === starterShipId) {
+    tutorialEvent("boughtFirstShip");
+  }
   saveGame();
 }
 

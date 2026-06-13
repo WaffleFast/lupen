@@ -1230,35 +1230,94 @@ test.describe("Lupen browser smoke", () => {
     await page.goto("/");
     await waitForGameGlobals(page);
 
+    await page.evaluate(() => window.eval(`
+      localStorage.clear();
+      resetToNoShipStarterState();
+      saveGame();
+    `));
+    await page.reload();
+    await waitForGameGlobals(page);
+
     const cta = await page.evaluate(() => window.eval(`
       (() => {
-        localStorage.clear();
-        resetToNoShipStarterState();
         showScreen("gameScreen");
         openHangar();
         showHangarSection("shipyard");
+        startStarterTutorial(true);
+        setTutorialStepById("buy-first-ship");
         selectedShipyardShipId = STARTER_SHIP_ID;
         renderShipShop();
         renderShipyardDetail();
+        renderStarterTutorial();
         const button = document.querySelector("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']");
         const panel = document.querySelector("#shipyardDetailPanel");
         const buttonRect = button?.getBoundingClientRect();
         const panelRect = panel?.getBoundingClientRect();
+        const visibleShipNames = Array.from(document.querySelectorAll(".vessel-exchange-card .fleet-card-name")).map(node => node.textContent.trim());
+        const lockedShipNames = Array.from(document.querySelectorAll(".vessel-exchange-card.progression-locked .fleet-card-name")).map(node => node.textContent.trim());
         return {
           text: button?.textContent?.trim() || "",
           visible: Boolean(button && button.offsetParent !== null),
           disabled: Boolean(button?.disabled),
           selectedShipName: SHIPS[selectedShipyardShipId]?.name || "",
-          insidePanel: Boolean(buttonRect && panelRect && buttonRect.bottom <= panelRect.bottom + 1 && buttonRect.top >= panelRect.top - 1)
+          hasActiveShip: hasActiveShip(),
+          currentShipId,
+          ownedShips: ownedShips.slice(),
+          insidePanel: Boolean(buttonRect && panelRect && buttonRect.bottom <= panelRect.bottom + 1 && buttonRect.top >= panelRect.top - 1),
+          visibleShipNames,
+          lockedShipNames
         };
       })()
     `));
 
     expect(cta.selectedShipName).toBe("Azure Striker");
+    expect(cta.hasActiveShip).toBe(false);
+    expect(cta.currentShipId).toBe("");
+    expect(cta.ownedShips).toEqual([]);
     expect(cta.text).toBe("Claim Starter Ship");
     expect(cta.visible).toBe(true);
     expect(cta.disabled).toBe(false);
     expect(cta.insidePanel).toBe(true);
+    expect(cta.visibleShipNames).toEqual(expect.arrayContaining(["Azure Striker", "Buu Hauler", "Nightshade Hawk"]));
+    expect(cta.lockedShipNames).toEqual(expect.arrayContaining(["Buu Hauler", "Nightshade Hawk"]));
+
+    await page.locator("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") !== "buy-first-ship");
+
+    const claimed = await page.evaluate(() => window.eval(`({
+      currentShipId,
+      ownsStarter: ownedShips.includes(STARTER_SHIP_ID),
+      stepId: getCurrentTutorialStep().id
+    })`));
+    expect(claimed.currentShipId).toBe("falcon");
+    expect(claimed.ownsStarter).toBe(true);
+    expect(claimed.stepId).toBe("open-first-loadout");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("starter claim step advances gracefully when Azure Striker is already active", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      localStorage.clear();
+      currentShipId = STARTER_SHIP_ID;
+      selectedHangarShipId = STARTER_SHIP_ID;
+      selectedFleetShipId = STARTER_SHIP_ID;
+      selectedShipyardShipId = STARTER_SHIP_ID;
+      ownedShips = [STARTER_SHIP_ID];
+      shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: [] }, STARTER_SHIP_ID) };
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("shipyard");
+      startStarterTutorial(true);
+      setTutorialStepById("buy-first-ship");
+    `));
+
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") !== "buy-first-ship");
+    await expect(page.evaluate(() => window.eval("getCurrentTutorialStep().id"))).resolves.toBe("open-first-loadout");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

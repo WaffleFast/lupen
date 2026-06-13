@@ -697,9 +697,11 @@ function applyLoadedGameState(rawSaved) {
   cargoCostBasis = saved.cargoCostBasis ?? cargoCostBasis;
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
-  ownedShips = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : ownedShips;
-  if (!ownedShips.length && SHIPS[starterShipId]) ownedShips = [starterShipId];
-  currentShipId = SHIPS[saved.currentShipId] && ownedShips.includes(saved.currentShipId) ? saved.currentShipId : (ownedShips[0] || starterShipId);
+  const savedOwnedShips = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : ownedShips;
+  const noShipStarterState = Array.isArray(saved.ownedShips) && saved.ownedShips.length === 0 && !saved.currentShipId;
+  ownedShips = savedOwnedShips;
+  if (!ownedShips.length && !noShipStarterState && SHIPS[starterShipId]) ownedShips = [starterShipId];
+  currentShipId = noShipStarterState ? "" : (SHIPS[saved.currentShipId] && ownedShips.includes(saved.currentShipId) ? saved.currentShipId : (ownedShips[0] || starterShipId));
   selectedHangarShipId = SHIPS[saved.selectedHangarShipId] ? saved.selectedHangarShipId : (currentShipId || starterShipId);
   selectedFleetShipId = SHIPS[saved.selectedFleetShipId] ? saved.selectedFleetShipId : (currentShipId || starterShipId);
   shipLoadouts = saved.shipLoadouts && typeof saved.shipLoadouts === "object" ? saved.shipLoadouts : shipLoadouts;

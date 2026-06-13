@@ -567,7 +567,8 @@ function getDynamicTutorialTarget(step) {
 
   if (step.target === "tutorial:firstShipBuy") {
     const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
-    return document.querySelector(".buy-ship-action:not(:disabled)") || document.querySelector(`.vessel-exchange-card[data-ship-id='${starterShipId}']`);
+    return document.querySelector("[data-tutorial-target='firstShipBuy']:not(:disabled)") ||
+           document.querySelector(`.vessel-exchange-card[data-ship-id='${starterShipId}']`);
   }
 
   if (step.target === "tutorial:firstGun") {
@@ -1012,6 +1013,15 @@ function renderStarterTutorial() {
     if (document.getElementById("hangarShipyardSection")?.classList.contains("active")) {
       renderShipShop();
     }
+  }
+  if (step?.id === "buy-first-ship" && currentShipId === starterShipId && ownedShips.includes(starterShipId)) {
+    if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
+    tutorialAdvanceTimeout = setTimeout(() => {
+      if (tutorialState.active && getCurrentTutorialStep()?.id === "buy-first-ship") {
+        addHudToast("Azure Striker is already active. Continuing the Starter Pilot Programme.");
+        tutorialEvent("boughtFirstShip");
+      }
+    }, 120);
   }
 
   const title = document.getElementById("tutorialTitle");
