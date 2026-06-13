@@ -10,7 +10,7 @@ const STARTER_TUTORIAL_STEPS = [
     title: "Welcome, Pilot",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_intro_welcome",
-    text: "Welcome to Lupen. I will guide your Starter Pilot Programme: claim a Falcon, earn credits through trade, fit a weapon, and complete your first bounty. Every step moves you toward stronger ships, better gear, and Combat Level 2.",
+    text: "Welcome, Pilot. Your path through Lupen starts here. Trade when you need credits, fight when you are ready to prove yourself, upgrade your gear, and keep moving until the stars begin to feel within reach.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin",
@@ -20,28 +20,28 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-first-ship",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. With no active vessel assigned, the bay will route you to the Vessel Exchange.",
+    text: "Open Hangar Bay. You do not have an active vessel yet, so I will route you to the Vessel Exchange.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "buy-first-ship",
-    title: "Claim the Falcon",
-    text: "Claim the Azure Striker, your Falcon-class starter hull. It is fast, forgiving, and ready to earn the credits that lead to specialised ships.",
+    title: "Claim Azure Striker",
+    text: "Claim the Azure Striker. She is quick, forgiving, and ready to carry your first credits home.",
     target: "tutorial:firstShipBuy",
     event: "boughtFirstShip"
   },
   {
     id: "open-first-loadout",
     title: "Open Loadout",
-    text: "Open Loadout. This is where your active ship carries weapons, equipment, hull condition, and future upgrades.",
+    text: "Open Loadout. This is where your ship carries weapons, equipment, hull condition, and every upgrade that keeps you alive longer.",
     target: "tutorial:hangarLoadoutTab",
     event: "openedHangarLoadout"
   },
   {
     id: "return-after-first-loadout",
     title: "Return to station",
-    text: "Return to the station hub. First objective: complete a trade run. Trading is the safest way to build credits.",
+    text: "Return to the station hub. First objective: a trade run. Trading is the safest way to build the credits that open new routes.",
     target: "#hangarScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -49,21 +49,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-trade",
     title: "Open Trade Terminal",
-    text: "Open the Trade Terminal. Credits are your route to stronger or more specialised ships, including the Bison-class cargo hauler.",
+    text: "Open the Trade Terminal. Credits move you toward stronger or more specialised ships, including the Buu Hauler.",
     target: ".hub-actions button[onclick='openMarketplace()']",
     event: "openedTradeTerminal"
   },
   {
     id: "select-market-resource",
     title: "Select a resource",
-    text: "Select a resource on the Market Board. The Trade Builder will calculate the route numbers.",
+    text: "Select a resource on the Market Board. I will let the Trade Builder calculate the route numbers.",
     target: ".market-board-table tbody tr",
     event: "selectedMarketResource"
   },
   {
     id: "select-market-target",
     title: "Choose destination",
-    text: "Choose a target planet in the Trade Builder. Sell price and estimated profit update from live market prices.",
+    text: "Choose a target planet in the Trade Builder. Watch the sell price and profit estimate before you commit.",
     target: ".market-target-select",
     event: "selectedMarketTarget"
   },
@@ -77,14 +77,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "buy-cargo",
     title: "Buy cargo",
-    text: "Press Buy Cargo. The route objective will guide you to the selected destination.",
+    text: "Press Buy Cargo. I will keep the route objective active until the cargo is sold.",
     target: "tutorial:buyCargo",
     event: "boughtTradeCargo"
   },
   {
     id: "return-to-station-for-launch",
     title: "Back to station",
-    text: "Return to the station hub, then launch your ship into orbit.",
+    text: "Return to the station hub, then take Azure Striker into orbit.",
     target: "#marketScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -92,7 +92,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "launch",
     title: "Launch into orbit",
-    text: "Launch your ship. Your market route will remain active in space.",
+    text: "Launch your ship. Your market route will stay locked while you travel.",
     target: ".hub-launch-btn",
     event: "launched"
   },
@@ -106,7 +106,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "make-jump",
     title: "Continue route",
-    text: "After each jump, let the Jump bar recharge. Use Jump again and keep following the highlighted route.",
+    text: "After each jump, let the Jump bar recharge. Follow the highlighted route and keep the run clean.",
     target: "dynamicTradeRoute",
     event: "jumpedNode"
   },
@@ -127,7 +127,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "sell-cargo",
     title: "Sell cargo",
-    text: "Sell your route cargo to complete the trade and bank your profit. Each clean run brings better ships within reach.",
+    text: "Sell your route cargo and bank the profit. Each clean run brings better ships within reach.",
     target: "tutorial:sellCargo",
     event: "soldTradeCargo"
   },
@@ -142,14 +142,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-store",
     title: "Open Store",
-    text: "Open the Store. Better weapons let you take greater risks and clear tougher contracts.",
+    text: "Open the Store. Better weapons let you take greater risks and survive the contracts that follow.",
     target: ".hub-actions button[onclick='openStore()']",
     event: "openedStore"
   },
   {
     id: "buy-equipment",
     title: "Buy first weapon",
-    text: "Buy a Pulse Laser from the Store. It is reliable, affordable, and enough to begin your first bounty contract.",
+    text: "Buy a Pulse Laser from the Store. It is reliable, affordable, and enough to begin your first bounty.",
     target: "tutorial:storePulseLaser",
     event: "boughtStoreGun"
   },
@@ -164,21 +164,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-equip",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. Loadout changes happen here, and fitted gear persists with your ship.",
+    text: "Open Hangar Bay. Loadout changes happen here, and fitted gear stays with your ship.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "equip-item",
     title: "Equip weapon",
-    text: "Fit the Pulse Laser into an open weapon slot. Better weapons become a core part of your progression loop.",
+    text: "Fit the Pulse Laser into an open weapon slot. Better weapons are how small risks become survivable ones.",
     target: "tutorial:spareWeapon",
     event: "equippedItem"
   },
   {
     id: "return-after-equip",
     title: "Return to station",
-    text: "Return to the station hub. Next objective: accept a bounty and convert combat into XP and rewards.",
+    text: "Return to the station hub. Next objective: accept a bounty and turn combat into XP, credits, and upgrade rewards.",
     target: "#hangarScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -186,14 +186,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-bounty",
     title: "Open Bounty Board",
-    text: "Open the Bounty Board and choose a starter contract. Bounties give you a clear combat objective.",
+    text: "Open the Bounty Board and choose a starter contract. Bounties give your weapons a purpose.",
     target: ".hub-actions button[onclick='openBountyBoard()']",
     event: "openedBountyBoard"
   },
   {
     id: "accept-bounty",
     title: "Accept bounty",
-    text: "Accept a bounty. Combat earns XP, credits, and reward materials that will matter more as upgrades expand.",
+    text: "Accept a bounty. Combat earns XP, credits, and materials that will matter more with every upgrade.",
     target: ".bounty-detail-panel button, .bounty-action-btn",
     event: "acceptedBounty"
   },
@@ -208,7 +208,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "launch-for-combat",
     title: "Launch for combat",
-    text: "Launch your ship. Your bounty objective will remain active in orbit.",
+    text: "Launch your ship. Your bounty objective will stay active in orbit.",
     target: ".hub-launch-btn",
     event: "launched"
   },
@@ -222,7 +222,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "scan-for-bots",
     title: "Scan for bots",
-    text: "Use the Bots scan. Scans reveal hostile signals and help you choose where to jump next.",
+    text: "Use the Bots scan. Hostile signals are easier to face when you see them first.",
     target: "#sectorScanBotsBtn",
     event: "scannedBots",
     place: "left"
@@ -237,7 +237,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "destroy-bot",
     title: "Destroy the bounty bots",
-    text: "Use Jump, Bots scan, and ENGAGE as needed. Destroy the target to gain XP and advance the bounty.",
+    text: "Use Jump, Bots scan, and ENGAGE as needed. Destroy the target, gain XP, and push the bounty forward.",
     target: "tutorial:destroyBountyBot",
     event: ["destroyedBountyBot", "openedSectorMap", "scannedBots", "jumpedNode"],
     place: "left"
@@ -245,28 +245,28 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-map-return-bounty",
     title: "Return to a planet",
-    text: "Bounty complete. Open the sector map and return to a planet to claim your reward.",
+    text: "Bounty complete. Open the sector map and return to a planet; rewards are claimed while docked.",
     target: "tutorial:bountyClaimReturn",
     event: ["openedSectorMap", "landedOnPlanet"],
     place: "left"  },
   {
     id: "return-to-planet-after-bounty",
     title: "Jump back to station space",
-    text: "Follow the route back to the nearest planet. Recharge your Jump bar between jumps.",
+    text: "Follow the route back to the nearest planet. Keep the ship steady and let the Jump bar recharge between jumps.",
     target: "tutorial:bountyReturnRoute",
     event: ["jumpedNode", "landedOnPlanet"],
     place: "left"  },
   {
     id: "land-after-bounty",
     title: "Land at the planet",
-    text: "Use Jump until you reach a planet, then click the highlighted planet to return to the station hub.",
+    text: "Use Jump until you reach a planet, then land and return to the station hub.",
     target: "tutorial:bountyLanding",
     event: "landedOnPlanet",
     place: "left"  },
   {
     id: "open-bounty-to-claim",
     title: "Open Bounty Board",
-    text: "Open the Bounty Board and claim the reward you earned.",
+    text: "Open the Bounty Board and claim what you earned.",
     target: ".hub-actions button[onclick='openBountyBoard()'], #bountyBoardHubBtn",
     event: "openedBountyBoard"
   },
@@ -288,7 +288,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "return-after-bounty-claim",
     title: "Back to station",
-    text: "Leave the Bounty Board and head back to the station hub.",
+    text: "Leave the Bounty Board and return to the station hub. You have earned enough to learn the Forge.",
     target: "#bountyScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -296,21 +296,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-forge",
     title: "Open Forge",
-    text: "Open the Forge. Lupen Cores improve equipment quality. We will upgrade your Pulse Laser once and keep the lesson simple.",
+    text: "Open the Forge. Lupen Cores improve equipment quality; for now, we will upgrade your Pulse Laser once and keep the lesson clean.",
     target: ".hub-actions button[onclick='openUpgradeForge()']",
     event: "openedForge"
   },
   {
     id: "forge-upgrade-weapon",
     title: "Upgrade Pulse Laser",
-    text: "Start the Quality Upgrade. Your Pulse Laser will advance beyond Standard and stay with your loadout.",
+    text: "Start the Quality Upgrade. Your Pulse Laser will advance beyond Standard and remain fitted to your loadout.",
     target: "tutorial:forgeUpgradeButton",
     event: "upgradedTutorialWeapon"
   },
   {
     id: "return-after-forge",
     title: "Back to station",
-    text: "Forge complete. Return to the station hub. Before the starter route ends, check your ship after combat.",
+    text: "Forge complete. Return to the station hub. Before the starter route ends, we will check your ship after combat.",
     target: "#upgradeForgeScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -327,7 +327,7 @@ const STARTER_TUTORIAL_STEPS = [
     title: "Programme Complete",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_outro_complete",
-    text: "Starter route complete. Continue trading to save for the Bison Cargo Hauler, run bounties for XP and upgrade rewards, improve weapons through the Forge, and work toward Combat Level 2. I will keep your next objective ready.",
+    text: "Starter route complete. Run trades to save for the Buu Hauler, take bounties for XP and upgrade rewards, strengthen weapons through the Forge, and work toward Combat Level 2. The Nightshade Hawk waits for pilots who prove they are ready.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin your journey",
@@ -379,6 +379,51 @@ function startStarterTutorial(reset = true) {
 
 function replayStarterTutorial() {
   startStarterTutorial(true);
+}
+
+function clearStarterTutorialState() {
+  localStorage.removeItem(TUTORIAL_STORAGE_KEY);
+  tutorialState = {
+    active: false,
+    completed: false,
+    stepIndex: 0,
+    lastStartedAt: null
+  };
+}
+
+function lupenResetTutorial(options = {}) {
+  const resetProgress = options.resetProgress === true;
+  clearStarterTutorialState();
+  if (resetProgress && typeof resetToNoShipStarterState === "function") {
+    resetToNoShipStarterState();
+  }
+  startStarterTutorial(true);
+  const result = {
+    tutorialKeyCleared: TUTORIAL_STORAGE_KEY,
+    resetProgress
+  };
+  console.info("[Lupen staging] Starter Pilot Programme reset.", result);
+  return result;
+}
+
+window.lupenResetTutorial = lupenResetTutorial;
+window.lupenResetStarterPilotProgramme = lupenResetTutorial;
+
+function handleStagingResetTutorialParam() {
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  if (params.get("mp") !== "staging" || params.get("resetTutorial") !== "1") return false;
+
+  const result = lupenResetTutorial();
+  params.delete("resetTutorial");
+  const nextUrl = `${url.pathname}${params.toString() ? `?${params}` : ""}${url.hash}`;
+  try {
+    window.history.replaceState({}, document.title, nextUrl);
+  } catch (error) {
+    console.warn("[Lupen staging] Unable to remove resetTutorial query parameter.", error);
+  }
+  console.info("[Lupen staging] Applied resetTutorial=1.", result);
+  return true;
 }
 
 function skipStarterTutorial() {

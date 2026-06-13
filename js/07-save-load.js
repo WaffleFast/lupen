@@ -1076,6 +1076,7 @@ function debugResetSave() {
 
 window.onload = function () {
   if (typeof handleStagingClearLocalSaveParam === "function") handleStagingClearLocalSaveParam();
+  if (typeof handleStagingResetTutorialParam === "function") handleStagingResetTutorialParam();
   loadGame();
 
   if (!homePlanet || !sectorNodes[homePlanet] || sectorNodes[homePlanet].type !== "planet") {

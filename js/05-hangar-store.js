@@ -2810,6 +2810,8 @@ function renderShipyardDetail() {
   const canAfford = credits >= ship.price;
   const stats = getShipStats(ship.id);
   const unlock = getShipUnlockStatus(ship.id);
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const starterClaim = !hasActiveShip() && ship.id === starterShipId;
   const status = document.getElementById("shipyardDetailStatus");
   if (status) status.textContent = unlock.state === "locked" ? "Locked" : equipped ? "Active" : owned ? "Owned" : "Available";
 
@@ -2825,7 +2827,7 @@ function renderShipyardDetail() {
     primaryAction = `<button class="exchange-footer-primary buy-ship-action locked-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')">Locked</button>`;
     secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   } else {
-    primaryAction = `<button class="exchange-footer-primary buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>Buy Hull</button>`;
+    primaryAction = `<button class="exchange-footer-primary buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford ? "disabled" : ""}>${starterClaim ? "Claim Starter Ship" : "Buy Hull"}</button>`;
     secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   }
 

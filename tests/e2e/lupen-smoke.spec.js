@@ -1129,7 +1129,7 @@ test.describe("Lupen browser smoke", () => {
 
     const stepById = Object.fromEntries(tutorial.steps.map(step => [step.id, step]));
     expect(stepById["buy-first-ship"]).toMatchObject({
-      title: "Claim the Falcon",
+      title: "Claim Azure Striker",
       target: "tutorial:firstShipBuy",
       event: "boughtFirstShip"
     });
@@ -1153,13 +1153,112 @@ test.describe("Lupen browser smoke", () => {
       event: "upgradedTutorialWeapon"
     });
     expect(stepById.complete.text).toContain("Combat Level 2");
-    expect(stepById.complete.text).toContain("Bison Cargo Hauler");
+    expect(stepById.complete.text).toContain("Buu Hauler");
+    expect(stepById.complete.text).toContain("Nightshade Hawk");
     expect(stepById.complete.text).toContain("Forge");
     expect(stepById.complete.voiceCue).toBe("tutorial_outro_complete");
 
     const allCopy = tutorial.steps.map(step => `${step.title} ${step.text} ${step.target} ${step.event}`).join("\n");
-    expect(allCopy).not.toMatch(/LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix|tutorial:spareAttachment/);
-    expect(allCopy).toMatch(/Bison|credits|XP|bounties|better gear/i);
+    expect(allCopy).not.toMatch(/Falcon|LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix|tutorial:spareAttachment/);
+    expect(allCopy).toMatch(/Azure Striker|Buu Hauler|Nightshade Hawk|credits|XP|bounties|Forge/i);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("staging tutorial reset URL and helper restart the programme without clearing saves", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.eval(`
+        credits = 32100;
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        selectedShipyardShipId = "falcon";
+        ownedShips = ["falcon"];
+        shipLoadouts = { falcon: normalizeShipLoadout({ attachments: [], guns: [] }, "falcon") };
+        saveGame();
+      `);
+      localStorage.setItem("lupenStarterPilotTutorial", JSON.stringify({ active: false, completed: true, stepIndex: 99 }));
+      localStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-auth");
+    });
+
+    await page.goto("/?mp=staging&resetTutorial=1");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.showScreen("gameScreen");
+      window.eval("renderStarterTutorial();");
+    });
+
+    const urlReset = await page.evaluate(() => ({
+      href: window.location.href,
+      helperType: typeof window.lupenResetTutorial,
+      save: JSON.parse(localStorage.getItem("lupenGameState")),
+      tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")),
+      auth: localStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
+      title: document.getElementById("tutorialTitle")?.textContent || ""
+    }));
+
+    expect(urlReset.href).not.toContain("resetTutorial=1");
+    expect(urlReset.href).toContain("mp=staging");
+    expect(urlReset.helperType).toBe("function");
+    expect(urlReset.save.credits).toBe(32100);
+    expect(urlReset.auth).toBe("keep-auth");
+    expect(urlReset.tutorial.active).toBe(true);
+    expect(urlReset.tutorial.completed).toBe(false);
+    expect(urlReset.tutorial.stepIndex).toBe(0);
+    expect(urlReset.title).toBe("Welcome, Pilot");
+
+    const helperReset = await page.evaluate(() => {
+      window.eval(`
+        tutorialState = { active: false, completed: true, stepIndex: 8, lastStartedAt: "old" };
+        saveTutorialState();
+      `);
+      return window.lupenResetTutorial();
+    });
+    expect(helperReset).toMatchObject({ tutorialKeyCleared: "lupenStarterPilotTutorial", resetProgress: false });
+    await expect(page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")).active)).resolves.toBe(true);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("Vessel Exchange starter ship CTA is visible for the tutorial claim step", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const cta = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        resetToNoShipStarterState();
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("shipyard");
+        selectedShipyardShipId = STARTER_SHIP_ID;
+        renderShipShop();
+        renderShipyardDetail();
+        const button = document.querySelector("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']");
+        const panel = document.querySelector("#shipyardDetailPanel");
+        const buttonRect = button?.getBoundingClientRect();
+        const panelRect = panel?.getBoundingClientRect();
+        return {
+          text: button?.textContent?.trim() || "",
+          visible: Boolean(button && button.offsetParent !== null),
+          disabled: Boolean(button?.disabled),
+          selectedShipName: SHIPS[selectedShipyardShipId]?.name || "",
+          insidePanel: Boolean(buttonRect && panelRect && buttonRect.bottom <= panelRect.bottom + 1 && buttonRect.top >= panelRect.top - 1)
+        };
+      })()
+    `));
+
+    expect(cta.selectedShipName).toBe("Azure Striker");
+    expect(cta.text).toBe("Claim Starter Ship");
+    expect(cta.visible).toBe(true);
+    expect(cta.disabled).toBe(false);
+    expect(cta.insidePanel).toBe(true);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

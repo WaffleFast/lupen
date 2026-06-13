@@ -39433,6 +39433,52 @@ input::placeholder {
   -webkit-line-clamp: 3 !important;
 }
 
+/* Keep tutorial-critical Vessel Exchange actions visible in the desktop detail panel. */
+#hangarShipyardSection #shipyardDetailPanel.fleet-detail-body,
+#hangarShipyardSection #shipyardDetailPanel.shipyard-detail-body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-gutter: stable;
+}
+
+#hangarShipyardSection .exchange-detail-stack {
+  grid-template-rows: minmax(112px, 0.9fr) auto minmax(74px, auto) minmax(66px, auto) auto !important;
+  height: auto !important;
+  min-height: 100% !important;
+  overflow: visible !important;
+  padding-bottom: 0 !important;
+}
+
+#hangarShipyardSection .exchange-detail-preview {
+  height: auto !important;
+  min-height: 112px !important;
+  max-height: 148px !important;
+}
+
+#hangarShipyardSection .exchange-detail-preview img {
+  max-height: 136px !important;
+}
+
+#hangarShipyardSection .exchange-detail-loadout {
+  height: auto !important;
+  min-height: 66px !important;
+}
+
+#hangarShipyardSection .exchange-detail-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  height: auto !important;
+  min-height: 44px !important;
+  padding-top: 7px;
+  background: linear-gradient(180deg, rgba(1, 10, 20, 0), rgba(1, 10, 20, 0.96) 30%);
+}
+
+#hangarShipyardSection .exchange-detail-footer button {
+  min-height: 42px !important;
+  white-space: normal;
+}
+
 .progression-locked {
   filter: grayscale(0.82) brightness(0.62) !important;
   opacity: 0.78 !important;
