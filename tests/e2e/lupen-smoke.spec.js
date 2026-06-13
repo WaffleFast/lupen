@@ -749,8 +749,8 @@ test.describe("Lupen browser smoke", () => {
 
     await openTradeTerminal(page);
 
-    await expect(page.locator("#marketScreen")).toContainText(/Server Buy|Preview Unavailable/);
-    await expect(page.locator("#marketScreen")).not.toContainText("Buy Cargo");
+    await expect(page.locator("#marketScreen")).toContainText(/Buy Cargo|Preview Unavailable/);
+    await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
     await expect(page.locator("#marketScreen")).toContainText(/MP staging|server/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -818,7 +818,7 @@ test.describe("Lupen browser smoke", () => {
     });
 
     await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
-    await expect(page.locator("#marketScreen")).toContainText("Server Buy");
+    await expect(page.locator("#marketScreen")).toContainText("Buy Cargo");
     await expect(page.locator("#marketScreen")).not.toContainText("Preview Unavailable");
     await expect(page.locator("#marketScreen")).toContainText(/Crystal Shards[\s\S]*Asteron Prime > Nyxara|Iron[\s\S]*Asteron Prime > Virella/i);
 
@@ -923,7 +923,7 @@ test.describe("Lupen browser smoke", () => {
           if (typeof window.renderMarketplace === "function") window.renderMarketplace();
         }, resource);
         await expect(page.locator("#marketScreen")).toContainText(resource);
-        await expect(page.locator("#marketScreen")).toContainText("Server Buy");
+        await expect(page.locator("#marketScreen")).toContainText("Buy Cargo");
       }
     }
 
@@ -987,7 +987,7 @@ test.describe("Lupen browser smoke", () => {
       if (typeof window.renderMarketplace === "function") window.renderMarketplace();
     });
 
-    await expect(page.locator("#marketScreen")).toContainText("Server Sell");
+    await expect(page.locator("#marketScreen")).toContainText("Sell Cargo");
     await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Virella/);
     await expect(page.locator("#marketScreen")).toContainText(/Sell 6 of 6 carried/);
     await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
@@ -1009,7 +1009,7 @@ test.describe("Lupen browser smoke", () => {
       if (typeof window.renderMarketplace === "function") window.renderMarketplace();
     });
 
-    await expect(page.locator("#marketScreen")).toContainText("Server Sell");
+    await expect(page.locator("#marketScreen")).toContainText("Sell Cargo");
     await expect(page.locator("#marketScreen")).toContainText(/Asteron Prime > Nyxara/);
     await expect(page.locator("#marketScreen")).toContainText(/Sell 64 of 64 carried/);
     await expect(page.locator("#marketScreen")).toContainText("Sell Revenue");
@@ -1033,7 +1033,7 @@ test.describe("Lupen browser smoke", () => {
     });
 
     const builder = page.locator("#marketScreen .market-builder-panel");
-    await expect(builder).toContainText("Server Sell");
+    await expect(builder).toContainText("Sell Cargo");
     await expect(builder).toContainText("Recovered resource");
     await expect(builder).toContainText("Mined cargo");
     await expect(builder).toContainText(/Sell 24 of 24 carried/);
@@ -1580,10 +1580,10 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("first trade tutorial path buys and sells cargo with current Market Board UI events", async ({ page }) => {
+  test("first trade tutorial path buys and sells guaranteed Iron route in staging", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
-    await page.goto("/");
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await waitForGameGlobals(page);
 
     const tradeBuy = await page.evaluate(() => window.eval(`
@@ -1612,11 +1612,13 @@ test.describe("Lupen browser smoke", () => {
         return {
           selectionStep,
           route,
+          creditsAfterBuy: credits,
           cargoAfterBuy: cargo[route.good] || 0
         };
       })()
     `));
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-to-station-for-launch");
+    await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
     const tradeSell = await page.evaluate(() => window.eval(`
       (() => {
@@ -1642,9 +1644,11 @@ test.describe("Lupen browser smoke", () => {
 
     expect(tradeBuy.selectionStep).toBe("buy-cargo");
     expect(tradeBuy.cargoAfterBuy).toBeGreaterThan(0);
-    expect(tradeBuy.route.good).toBe("Crystal Shards");
+    expect(tradeBuy.creditsAfterBuy).toBeLessThan(10000);
+    expect(tradeBuy.route.good).toBe("Iron");
     expect(tradeBuy.route.origin).toBe("Asteron Prime");
-    expect(tradeBuy.route.destination).toBe("Nyxara");
+    expect(tradeBuy.route.destination).toBe("Virella");
+    expect(tradeBuy.route.tutorialTrade).toBe(true);
     expect(tradeSell.cargoAfterSell).toBe(0);
     expect(tradeSell.tradeProfit).toBeGreaterThan(0);
     expect(tradeSell.tradesCompleted).toBe(1);

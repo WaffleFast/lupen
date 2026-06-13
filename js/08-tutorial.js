@@ -1,6 +1,11 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
 const TUTORIAL_NARRATOR_LABEL = "Station AI";
+const TUTORIAL_TRADE_ROUTE = Object.freeze({
+  origin: "Asteron Prime",
+  good: "Iron",
+  destination: "Virella"
+});
 let tutorialState = loadTutorialState();
 let tutorialAdvanceTimeout = null;
 
@@ -56,14 +61,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "select-market-resource",
     title: "Select a resource",
-    text: "Select a resource on the Market Board. I will let the Trade Builder calculate the route numbers.",
+    text: "Select Iron on the Market Board. I have marked a stable beginner route from Asteron Prime to Virella.",
     target: ".market-board-table tbody tr",
     event: "selectedMarketResource"
   },
   {
     id: "select-market-target",
     title: "Choose destination",
-    text: "Choose a target planet in the Trade Builder. Watch the sell price and profit estimate before you commit.",
+    text: "Choose Virella as the target planet. The sell price is higher there, so the route stays profitable.",
     target: ".market-target-select",
     event: "selectedMarketTarget"
   },
@@ -77,7 +82,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "buy-cargo",
     title: "Buy cargo",
-    text: "Press Buy Cargo. I will keep the route objective active until the cargo is sold.",
+    text: "Buy the marked cargo. I will keep the route objective active until the Iron is sold.",
     target: "tutorial:buyCargo",
     event: "boughtTradeCargo"
   },
@@ -408,30 +413,46 @@ function hasTutorialTradeCargo() {
 
 function isTutorialTradeSelectionReady() {
   const currentPlanet = typeof getCurrentMarketPlanet === "function" ? getCurrentMarketPlanet() : currentNode;
-  return MAP_ONE_TRADE_RESOURCES.includes(selectedMarketResource) &&
-    MAP_ONE_MARKET_PLANETS.includes(selectedMarketTargetPlanet) &&
-    selectedMarketTargetPlanet !== currentPlanet &&
+  return selectedMarketResource === TUTORIAL_TRADE_ROUTE.good &&
+    selectedMarketTargetPlanet === TUTORIAL_TRADE_ROUTE.destination &&
+    currentPlanet === TUTORIAL_TRADE_ROUTE.origin &&
     Number(selectedMarketQuantity || 0) > 0;
+}
+
+function isTutorialGuaranteedTradeStep(stepId = getCurrentTutorialStep()?.id) {
+  return [
+    "select-market-resource",
+    "select-market-target",
+    "select-buy-amount",
+    "buy-cargo",
+    "return-to-station-for-launch",
+    "launch",
+    "map-route",
+    "make-jump",
+    "land-destination",
+    "open-trade-to-sell",
+    "sell-cargo"
+  ].includes(stepId);
+}
+
+function shouldUseLocalTutorialTrade() {
+  if (!tutorialState?.active) return false;
+  if (hasCompletedTutorialTrade()) return false;
+  const step = getCurrentTutorialStep();
+  if (!isTutorialGuaranteedTradeStep(step?.id)) return false;
+  return true;
 }
 
 function prepareTutorialTradeSelection() {
   if (hasTutorialTradeCargo() || hasCompletedTutorialTrade()) return;
   const currentPlanet = typeof getCurrentMarketPlanet === "function" ? getCurrentMarketPlanet() : currentNode;
-  const route = [
-    ["Crystal Shards", "Nyxara"],
-    ["Iron", "Virella"],
-    ["Copper", "Nyxara"],
-    ["Cobalt", "Virella"]
-  ].find(([good, destination]) => {
-    if (destination === currentPlanet) return false;
-    const buy = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(good, currentPlanet) : 0;
-    const sell = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(good, destination) : 0;
-    return buy > 0 && sell > buy && Number(credits || 0) >= buy;
-  });
-  if (!route) return;
-  selectedMarketResource = route[0];
-  selectedMarketTargetPlanet = route[1];
-  const limit = typeof getMarketMaxBuyQuantity === "function" ? getMarketMaxBuyQuantity(route[0], currentPlanet) : 1;
+  if (currentPlanet !== TUTORIAL_TRADE_ROUTE.origin) return;
+  const buy = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(TUTORIAL_TRADE_ROUTE.good, currentPlanet) : 0;
+  const sell = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(TUTORIAL_TRADE_ROUTE.good, TUTORIAL_TRADE_ROUTE.destination) : 0;
+  if (buy <= 0 || sell <= buy || Number(credits || 0) < buy) return;
+  selectedMarketResource = TUTORIAL_TRADE_ROUTE.good;
+  selectedMarketTargetPlanet = TUTORIAL_TRADE_ROUTE.destination;
+  const limit = typeof getMarketMaxBuyQuantity === "function" ? getMarketMaxBuyQuantity(TUTORIAL_TRADE_ROUTE.good, currentPlanet) : 1;
   selectedMarketQuantity = Math.max(1, Math.min(Number(selectedMarketQuantity || 1), Math.max(1, limit)));
 }
 

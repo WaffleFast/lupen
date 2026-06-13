@@ -14,6 +14,10 @@ function isMultiplayerStagingActive() {
   }
 }
 
+function isLocalTutorialTradeActive() {
+  return typeof shouldUseLocalTutorialTrade === "function" && shouldUseLocalTutorialTrade();
+}
+
 let multiplayerStagingTradePending = null;
 let multiplayerStagingTradeLastHandledAt = 0;
 let multiplayerStagingTradeSyncStatus = null;
@@ -993,7 +997,8 @@ function getOrderedMapOneMarketPlanets(currentPlanet = getCurrentMarketPlanet())
 
 function normalizeMarketBuilderState() {
   const currentPlanet = getCurrentMarketPlanet();
-  if (isMultiplayerStagingActive()) requestMultiplayerStagingTradeOffersIfNeeded();
+  const tutorialTradeActive = isLocalTutorialTradeActive();
+  if (isMultiplayerStagingActive() && !tutorialTradeActive) requestMultiplayerStagingTradeOffersIfNeeded();
   const activeMarketTrade = activeTradeRoute?.marketTrade && activeTradeRoute.good === selectedMarketResource
     ? activeTradeRoute
     : null;
@@ -1002,7 +1007,7 @@ function normalizeMarketBuilderState() {
     selectedMarketResource = "Crystal Shards";
   }
 
-  if (isMultiplayerStagingActive() && getMultiplayerStagingTradeOffers().length) {
+  if (isMultiplayerStagingActive() && !tutorialTradeActive && getMultiplayerStagingTradeOffers().length) {
     const sellableCargo = getMultiplayerStagingSellableCargoAt(currentPlanet);
     if (!canSelectMultiplayerStagingMarketResource(selectedMarketResource, currentPlanet)) {
       selectedMarketResource = sellableCargo[0] || getMultiplayerStagingBuyOffersAt(currentPlanet)[0]?.resourceName || selectedMarketResource;
@@ -1022,11 +1027,11 @@ function normalizeMarketBuilderState() {
     selectedMarketTargetPlanet = MAP_ONE_MARKET_PLANETS.find(planet => planet !== currentPlanet) || "Nyxara";
   }
 
-  const stagingSellOffer = isMultiplayerStagingActive() && Number(cargo[selectedMarketResource] || 0) > 0
+  const stagingSellOffer = isMultiplayerStagingActive() && !tutorialTradeActive && Number(cargo[selectedMarketResource] || 0) > 0
     ? findMultiplayerStagingSellOffer({ good: selectedMarketResource, destination: currentPlanet })
     : null;
   const maxBuy = getMarketMaxBuyQuantity(selectedMarketResource, currentPlanet);
-  const maxQuantity = isMultiplayerStagingActive()
+  const maxQuantity = isMultiplayerStagingActive() && !tutorialTradeActive
     ? getMultiplayerStagingTradeQuantityLimit({
       operation: stagingSellOffer ? "sell" : "buy",
       good: selectedMarketResource,
@@ -1115,7 +1120,8 @@ function renderMarketplace() {
 function renderMapOneMarketTerminal(goodsBox) {
   normalizeMarketBuilderState();
 
-  const stagingTradeLocked = isMultiplayerStagingActive();
+  const tutorialTradeActive = isLocalTutorialTradeActive();
+  const stagingTradeLocked = isMultiplayerStagingActive() && !tutorialTradeActive;
   const currentPlanet = getCurrentMarketPlanet();
   const orderedMarketPlanets = getOrderedMapOneMarketPlanets(currentPlanet);
   const resource = selectedMarketResource;
@@ -1250,9 +1256,9 @@ function renderMapOneMarketTerminal(goodsBox) {
               <strong>${stagingSellMode ? `Sell ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} carried` : `${formatNumber(effectiveQuantity)} units`}</strong>
               ${stagingSellMode
                 ? `<button type="button" onclick="setMarketQuantityMax()" ${sellQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
-                  <button class="trade-primary-action" onclick="sellMarketCargo()" ${sellStagingOffer && !sellPending ? "" : "disabled"}>${sellStagingOffer ? sellPending ? "Applying..." : "Server Sell" : "Preview Unavailable"}</button>`
+                  <button class="trade-primary-action" onclick="sellMarketCargo()" ${sellStagingOffer && !sellPending ? "" : "disabled"}>${sellStagingOffer ? sellPending ? "Applying..." : "Sell Cargo" : "Preview Unavailable"}</button>`
                 : `<button type="button" onclick="setMarketQuantityMax()" ${buyActionQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
-                  <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Server Buy" : "Preview Unavailable" : "Buy Cargo"}</button>`}
+                  <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Buy Cargo" : "Preview Unavailable" : "Buy Cargo"}</button>`}
             </div>
           </label>
         </div>
@@ -1268,7 +1274,7 @@ function renderMapOneMarketTerminal(goodsBox) {
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
           <div class="trade-preview-note staging-sell-summary">
-            <strong>${stagingRecoveredCargoSale ? "Mined cargo" : stagingTradeLocked ? "Server sell cargo" : "Cargo ready to sell"}</strong>
+            <strong>${stagingRecoveredCargoSale ? "Mined cargo" : "Cargo ready to sell"}</strong>
             <span>${stagingSellMode ? `Selling ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} ${resource} at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `Carrying ${formatNumber(held)} ${resource} / current route sell support unavailable here`}</span>
           </div>
           ${stagingTradeLocked
@@ -1283,12 +1289,12 @@ function renderMapOneMarketTerminal(goodsBox) {
 
 function setMarketResource(good) {
   if (!MAP_ONE_TRADE_RESOURCES.includes(good)) return;
-  if (isMultiplayerStagingActive() && !canSelectMultiplayerStagingMarketResource(good, getCurrentMarketPlanet())) {
+  if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && !canSelectMultiplayerStagingMarketResource(good, getCurrentMarketPlanet())) {
     if (typeof addHudToast === "function") addHudToast("No server-backed staging route for that resource at this planet.");
     return;
   }
   selectedMarketResource = good;
-  if (isMultiplayerStagingActive()) {
+  if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive()) {
     const currentPlanet = getCurrentMarketPlanet();
     const sellOffer = Number(cargo[good] || 0) > 0
       ? findMultiplayerStagingSellOffer({ good, destination: currentPlanet })
@@ -1308,7 +1314,7 @@ function setMarketResource(good) {
 
 function setMarketTargetPlanet(planet) {
   if (!MAP_ONE_MARKET_PLANETS.includes(planet)) return;
-  if (isMultiplayerStagingActive() && getMultiplayerStagingTradeOffers().length) {
+  if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && getMultiplayerStagingTradeOffers().length) {
     const targets = getMultiplayerStagingTargetPlanetsForResource(selectedMarketResource, getCurrentMarketPlanet());
     if (targets.length && !targets.includes(planet)) {
       if (typeof addHudToast === "function") addHudToast("That target is not part of the server-backed staging route.");
@@ -1342,7 +1348,7 @@ function setMarketQuantityMax() {
 }
 
 function getMarketQuantityLimit() {
-  if (isMultiplayerStagingActive()) {
+  if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive()) {
     const currentPlanet = getCurrentMarketPlanet();
     const sellOffer = Number(cargo[selectedMarketResource] || 0) > 0
       ? findMultiplayerStagingSellOffer({ good: selectedMarketResource, destination: currentPlanet })
@@ -1362,7 +1368,16 @@ function buyMarketCargo() {
 
   const currentPlanet = getCurrentMarketPlanet();
   const good = selectedMarketResource;
-  const quantity = isMultiplayerStagingActive()
+  const tutorialTradeActive = isLocalTutorialTradeActive();
+  if (tutorialTradeActive && activeTradeRoute?.marketTrade && activeTradeRoute.good === good && Number(cargo[good] || 0) > 0) {
+    tutorialEvent("boughtTradeCargo");
+    renderMarketplace();
+    updateCargoSummary();
+    updateSpaceHUD();
+    renderObjectiveHud();
+    return;
+  }
+  const quantity = isMultiplayerStagingActive() && !tutorialTradeActive
     ? clampNumber(selectedMarketQuantity || 1, 1, getMultiplayerStagingTradeQuantityLimit({
       operation: "buy",
       good,
@@ -1370,7 +1385,7 @@ function buyMarketCargo() {
       destination: selectedMarketTargetPlanet
     }))
     : selectedMarketQuantity;
-  if (isMultiplayerStagingActive()) {
+  if (isMultiplayerStagingActive() && !tutorialTradeActive) {
     const offer = findMultiplayerStagingTradeOffer({
       good,
       origin: currentPlanet,
@@ -1411,7 +1426,8 @@ function buyMarketCargo() {
     maxUnits: quantity,
     purchasedUnits: quantity,
     realizedProfit: 0,
-    marketTrade: true
+    marketTrade: true,
+    tutorialTrade: tutorialTradeActive
   });
 
   tutorialEvent("boughtTradeCargo");
@@ -1427,7 +1443,8 @@ function sellMarketCargo() {
   normalizeMarketBuilderState();
   const good = selectedMarketResource;
   const held = cargo[good] || 0;
-  if (isMultiplayerStagingActive()) {
+  const tutorialTradeActive = isLocalTutorialTradeActive();
+  if (isMultiplayerStagingActive() && !tutorialTradeActive) {
     const currentPlanet = getCurrentMarketPlanet();
     const origin = activeTradeRoute?.marketTrade && activeTradeRoute.good === good
       ? activeTradeRoute.origin
@@ -3381,8 +3398,7 @@ function renderTradeQuantityControls(good, mode, maxValue, defaultValue = 0, act
   const value = clampNumber(defaultValue || 0, 0, max);
   const actionFn = mode === "sell" ? "sellGood" : "buyGood";
   const escapedGood = escapeJsString(good);
-  const stagingTradeLocked = isMultiplayerStagingActive();
-  const safeActionLabel = stagingTradeLocked ? "Server Preview" : actionLabel;
+  const safeActionLabel = actionLabel;
 
   return `
     <div class="trade-quantity-panel">
