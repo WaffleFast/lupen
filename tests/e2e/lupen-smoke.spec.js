@@ -1317,6 +1317,7 @@ test.describe("Lupen browser smoke", () => {
     expect(tutorial.currentShipId).toBe("");
     expect(tutorial.firstTitle).toBe("Welcome, Pilot");
     expect(tutorial.label).toContain("Station AI / Starter Pilot Programme");
+    expect(tutorial.label).not.toMatch(/\d+\s*\/\s*\d+/);
 
     const stepById = Object.fromEntries(tutorial.steps.map(step => [step.id, step]));
     expect(stepById["buy-first-ship"]).toMatchObject({
@@ -1712,25 +1713,59 @@ test.describe("Lupen browser smoke", () => {
         openMarketplace();
         startStarterTutorial(true);
         setTutorialStepById("select-market-resource");
-        const selectionStep = getCurrentTutorialStep().id;
+        const resourceTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketResourceIron']"));
+        setMarketResource("Iron");
+        setTutorialStepById("select-market-target");
+        const targetTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketTargetConfirm']"));
+        confirmMarketTargetPlanet();
+        setTutorialStepById("select-buy-amount");
+        setMarketQuantityMax();
+        const maxQuantity = selectedMarketQuantity;
+        setTutorialStepById("buy-cargo");
         buyMarketCargo();
         const route = { ...activeTradeRoute };
         return {
-          selectionStep,
+          resourceTargetExists,
+          targetTargetExists,
+          maxQuantity,
           route,
           creditsAfterBuy: credits,
-          cargoAfterBuy: cargo[route.good] || 0
+          cargoAfterBuy: cargo[route.good] || 0,
+          buyStep: getCurrentTutorialStep().id
         };
       })()
     `));
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-to-station-for-launch");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
-    const tradeSell = await page.evaluate(() => window.eval(`
+    const landingState = await page.evaluate(() => window.eval(`
       (() => {
         const route = { ...activeTradeRoute };
         currentNode = route.destination;
         lastPlanetNode = route.destination;
+        showScreen("spaceScreen");
+        updateCurrentNodeUI();
+        setTutorialStepById("land-destination");
+        renderStarterTutorial();
+        const beforeStep = getCurrentTutorialStep().id;
+        const landTarget = document.querySelector("#planetLandBtn");
+        const highlighted = landTarget?.classList.contains("tutorial-highlight-target") || false;
+        const visible = landTarget && !landTarget.hidden && getComputedStyle(landTarget).display !== "none";
+        landOnPlanet();
+        return {
+          beforeStep,
+          highlighted,
+          visible,
+          currentScreenLanded: document.getElementById("gameScreen")?.classList.contains("active") || false
+        };
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-trade-to-sell");
+
+    const tradeSell = await page.evaluate(() => window.eval(`
+      (() => {
+        const route = { ...activeTradeRoute };
+        openMarketplace();
         selectedMarketResource = route.good;
         selectedMarketTargetPlanet = route.destination;
         renderMarketplace();
@@ -1748,13 +1783,19 @@ test.describe("Lupen browser smoke", () => {
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-after-trade");
     const finalStep = await page.evaluate(() => window.eval("getCurrentTutorialStep().id"));
 
-    expect(tradeBuy.selectionStep).toBe("buy-cargo");
+    expect(tradeBuy.resourceTargetExists).toBe(true);
+    expect(tradeBuy.targetTargetExists).toBe(true);
+    expect(tradeBuy.maxQuantity).toBeGreaterThan(0);
     expect(tradeBuy.cargoAfterBuy).toBeGreaterThan(0);
     expect(tradeBuy.creditsAfterBuy).toBeLessThan(10000);
     expect(tradeBuy.route.good).toBe("Iron");
     expect(tradeBuy.route.origin).toBe("Asteron Prime");
     expect(tradeBuy.route.destination).toBe("Virella");
     expect(tradeBuy.route.tutorialTrade).toBe(true);
+    expect(landingState.beforeStep).toBe("land-destination");
+    expect(landingState.highlighted).toBe(true);
+    expect(landingState.visible).toBe(true);
+    expect(landingState.currentScreenLanded).toBe(true);
     expect(tradeSell.cargoAfterSell).toBe(0);
     expect(tradeSell.tradeProfit).toBeGreaterThan(0);
     expect(tradeSell.tradesCompleted).toBe(1);

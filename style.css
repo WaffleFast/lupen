@@ -12754,6 +12754,25 @@ input::placeholder {
   font-size: 0.82rem;
 }
 
+.market-target-confirm {
+  min-height: 30px;
+  border: 1px solid rgba(127, 223, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(7, 26, 46, 0.92);
+  color: #d9f7ff;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.market-target-confirm:hover {
+  border-color: rgba(127, 223, 255, 0.72);
+  color: #ffffff;
+}
+
 .market-amount-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 62px minmax(104px, 0.9fr);
@@ -12794,6 +12813,17 @@ input::placeholder {
 .market-amount-control button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+@keyframes tutorialLandingPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(127, 223, 255, 0.48));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(127, 223, 255, 0.86));
+    transform: scale(1.045);
+  }
 }
 
 .market-builder-summary,
@@ -42080,4 +42110,17 @@ input::placeholder {
   font-size: 13px !important;
   display: grid !important;
   place-items: center !important;
+}
+
+/* Tutorial landing target: keep old overrides from pinning the planet hitbox away from JS positioning. */
+#planetLandBtn.tutorial-highlight-target {
+  right: auto !important;
+  border: 2px solid rgba(127, 223, 255, 1) !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(127, 223, 255, 0.08), transparent 66%) !important;
+  box-shadow:
+    0 0 0 5px rgba(127, 223, 255, 0.18),
+    0 0 34px rgba(127, 223, 255, 0.62),
+    inset 0 0 26px rgba(127, 223, 255, 0.18) !important;
+  animation: tutorialLandingPulse 1.18s ease-in-out infinite;
 }

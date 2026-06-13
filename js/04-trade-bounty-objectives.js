@@ -1205,7 +1205,10 @@ function renderMapOneMarketTerminal(goodsBox) {
                 const rowInfo = commodityInfo[good] || {};
                 const stagingResourceSupported = canSelectMultiplayerStagingMarketResource(good, currentPlanet);
                 return `
-                  <tr class="${good === resource ? "selected-market-row" : ""} ${stagingTradeLocked && !stagingResourceSupported ? "route-preview-only" : ""}" onclick="setMarketResource('${escapeJsString(good)}')">
+                  <tr
+                    class="${good === resource ? "selected-market-row" : ""} ${stagingTradeLocked && !stagingResourceSupported ? "route-preview-only" : ""}"
+                    data-tutorial-target="${good === "Iron" ? "marketResourceIron" : ""}"
+                    onclick="setMarketResource('${escapeJsString(good)}')">
                     <td>
                       <div class="market-resource-cell">
                         <span class="commodity-icon market-board-icon">
@@ -1246,19 +1249,20 @@ function renderMapOneMarketTerminal(goodsBox) {
         <div class="market-builder-controls">
           <label>
             <span>Target Planet</span>
-            <select class="market-target-select" onchange="setMarketTargetPlanet(this.value)">
+            <select class="market-target-select" data-tutorial-target="marketTargetSelect" onchange="setMarketTargetPlanet(this.value)">
               ${targetPlanetOptions.map(planet => `<option value="${planet}" ${planet === targetPlanet ? "selected" : ""}>${planet}</option>`).join("")}
             </select>
+            <button type="button" class="market-target-confirm" data-tutorial-target="marketTargetConfirm" onclick="confirmMarketTargetPlanet()">Confirm Target</button>
           </label>
           <label>
             <span>${stagingSellMode ? "Sell Amount" : "Buy Amount"}</span>
             <div class="market-amount-control">
               <strong>${stagingSellMode ? `Sell ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} carried` : `${formatNumber(effectiveQuantity)} units`}</strong>
               ${stagingSellMode
-                ? `<button type="button" onclick="setMarketQuantityMax()" ${sellQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
-                  <button class="trade-primary-action" onclick="sellMarketCargo()" ${sellStagingOffer && !sellPending ? "" : "disabled"}>${sellStagingOffer ? sellPending ? "Applying..." : "Sell Cargo" : "Preview Unavailable"}</button>`
-                : `<button type="button" onclick="setMarketQuantityMax()" ${buyActionQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
-                  <button class="trade-primary-action" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Buy Cargo" : "Preview Unavailable" : "Buy Cargo"}</button>`}
+                ? `<button type="button" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${sellQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
+                  <button class="trade-primary-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${sellStagingOffer && !sellPending ? "" : "disabled"}>${sellStagingOffer ? sellPending ? "Applying..." : "Sell Cargo" : "Preview Unavailable"}</button>`
+                : `<button type="button" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyActionQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
+                  <button class="trade-primary-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Buy Cargo" : "Preview Unavailable" : "Buy Cargo"}</button>`}
             </div>
           </label>
         </div>
@@ -1279,7 +1283,7 @@ function renderMapOneMarketTerminal(goodsBox) {
           </div>
           ${stagingTradeLocked
             ? ""
-            : `<button class="trade-primary-action market-sell-action" onclick="sellMarketCargo()" ${atTargetWithCargo ? "" : "disabled"}>${atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>`}
+            : `<button class="trade-primary-action market-sell-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${atTargetWithCargo ? "" : "disabled"}>${atTargetWithCargo ? "Sell Cargo" : "Sell Here"}</button>`}
         </div>` : ""}
         ${stagingTradeNotice}
       </aside>
@@ -1324,6 +1328,10 @@ function setMarketTargetPlanet(planet) {
   selectedMarketTargetPlanet = planet;
   tutorialEvent("selectedMarketTarget");
   renderMarketplace();
+}
+
+function confirmMarketTargetPlanet() {
+  setMarketTargetPlanet(selectedMarketTargetPlanet);
 }
 
 function syncMarketQuantity(value) {

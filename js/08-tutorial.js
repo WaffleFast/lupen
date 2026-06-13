@@ -54,28 +54,28 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-trade",
     title: "Open Trade Terminal",
-    text: "Open the Trade Terminal. Credits move you toward stronger or more specialised ships, including the Buu Hauler.",
+    text: "Open the Trade Terminal. A good pilot does not just move cargo. They read the market.",
     target: ".hub-actions button[onclick='openMarketplace()']",
     event: "openedTradeTerminal"
   },
   {
     id: "select-market-resource",
     title: "Select a resource",
-    text: "Select Iron on the Market Board. I have marked a stable beginner route from Asteron Prime to Virella.",
-    target: ".market-board-table tbody tr",
+    text: "Buy where supply is cheap. Sell where demand is hungry. Select Iron on the Market Board.",
+    target: "tutorial:marketResourceIron",
     event: "selectedMarketResource"
   },
   {
     id: "select-market-target",
     title: "Choose destination",
-    text: "Choose Virella as the target planet. The sell price is higher there, so the route stays profitable.",
-    target: ".market-target-select",
+    text: "Confirm Virella as the target planet. Asteron Prime sells Iron cheap; Virella pays more.",
+    target: "tutorial:marketTarget",
     event: "selectedMarketTarget"
   },
   {
     id: "select-buy-amount",
     title: "Choose buy amount",
-    text: "Choose how much cargo you want to buy. MAX fills the run using your credits and free cargo space.",
+    text: "Press MAX. We will fill the run using your credits and free cargo space.",
     target: "tutorial:buyAmount",
     event: "selectedBuyAmount"
   },
@@ -104,7 +104,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "map-route",
     title: "Open the sector map",
-    text: "Wait for your Jump bar to recharge, then click Jump to open the sector map.",
+    text: "Open Jump and follow the highlighted route. The objective stays active until the Iron is sold.",
     target: "#jumpBtn",
     event: "openedSectorMap"
   },
@@ -118,7 +118,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "land-destination",
     title: "Land at destination",
-    text: "Click the highlighted planet to land at your trade destination.",
+    text: "You are in Virella orbit. Click the pulsing planet landing target to dock and sell.",
     target: "#planetLandBtn",
     event: "landedOnPlanet",
     place: "left"  },
@@ -452,8 +452,10 @@ function prepareTutorialTradeSelection() {
   if (buy <= 0 || sell <= buy || Number(credits || 0) < buy) return;
   selectedMarketResource = TUTORIAL_TRADE_ROUTE.good;
   selectedMarketTargetPlanet = TUTORIAL_TRADE_ROUTE.destination;
-  const limit = typeof getMarketMaxBuyQuantity === "function" ? getMarketMaxBuyQuantity(TUTORIAL_TRADE_ROUTE.good, currentPlanet) : 1;
-  selectedMarketQuantity = Math.max(1, Math.min(Number(selectedMarketQuantity || 1), Math.max(1, limit)));
+  if (["select-buy-amount", "buy-cargo"].includes(getCurrentTutorialStep()?.id)) {
+    const limit = typeof getMarketMaxBuyQuantity === "function" ? getMarketMaxBuyQuantity(TUTORIAL_TRADE_ROUTE.good, currentPlanet) : 1;
+    selectedMarketQuantity = Math.max(1, Math.min(Number(selectedMarketQuantity || 1), Math.max(1, limit)));
+  }
 }
 
 function isTutorialBountyReadyToClaim() {
@@ -478,12 +480,15 @@ function getTutorialStateCompletionReason(step) {
     case "select-market-resource":
     case "select-market-target":
     case "select-buy-amount":
-      return hasTutorialTradeCargo() || hasCompletedTutorialTrade() || isTutorialTradeSelectionReady() ? "trade_selection_ready" : "";
+      return hasTutorialTradeCargo() || hasCompletedTutorialTrade() ? "trade_cargo_already_loaded" : "";
     case "buy-cargo":
       return hasTutorialTradeCargo() || hasCompletedTutorialTrade() ? "trade_cargo_already_loaded" : "";
     case "make-jump":
-    case "land-destination":
       return hasCompletedTutorialTrade() || isAtActiveTradeDestination() ? "trade_destination_reached" : "";
+    case "land-destination":
+      return hasCompletedTutorialTrade() || isLandedAtActiveTradeDestination() ? "trade_destination_landed" : "";
+    case "open-trade-to-sell":
+      return hasCompletedTutorialTrade() ? "trade_already_completed" : "";
     case "sell-cargo":
       return hasCompletedTutorialTrade() ? "trade_already_completed" : "";
     case "open-store":
@@ -743,6 +748,10 @@ function isAtActiveTradeDestination() {
   return Boolean(destination && currentNode === destination);
 }
 
+function isLandedAtActiveTradeDestination() {
+  return isAtActiveTradeDestination() && document.getElementById("gameScreen")?.classList.contains("active");
+}
+
 function getDynamicTutorialTarget(step) {
   if (!step) return null;
 
@@ -775,18 +784,31 @@ function getDynamicTutorialTarget(step) {
   }
 
   if (step.target === "tutorial:buyAmount") {
-    return document.querySelector(".market-amount-control button:not(.trade-primary-action):not(:disabled)") ||
+    return document.querySelector("[data-tutorial-target='marketMaxAmount']:not(:disabled)") ||
+           document.querySelector(".market-amount-control button:not(.trade-primary-action):not(:disabled)") ||
            document.querySelector(".market-amount-control button:not(:disabled)");
   }
 
   if (step.target === "tutorial:buyCargo") {
-    return document.querySelector(".market-amount-control .trade-primary-action:not(:disabled)") ||
+    return document.querySelector("[data-tutorial-target='buyCargo']:not(:disabled)") ||
+           document.querySelector(".market-amount-control .trade-primary-action:not(:disabled)") ||
            document.querySelector(".market-builder-panel .trade-primary-action:not(:disabled)");
   }
 
   if (step.target === "tutorial:sellCargo") {
-    return document.querySelector(".market-sell-action:not(:disabled)") ||
+    return document.querySelector("[data-tutorial-target='sellCargo']:not(:disabled)") ||
+           document.querySelector(".market-sell-action:not(:disabled)") ||
            document.querySelector(".market-builder-actions .trade-primary-action:not(:disabled)");
+  }
+
+  if (step.target === "tutorial:marketResourceIron") {
+    return document.querySelector("[data-tutorial-target='marketResourceIron']") ||
+           document.querySelector(".market-board-table tbody tr");
+  }
+
+  if (step.target === "tutorial:marketTarget") {
+    return document.querySelector("[data-tutorial-target='marketTargetConfirm']:not(:disabled)") ||
+           document.querySelector("[data-tutorial-target='marketTargetSelect']");
   }
 
   if (step.target === "tutorial:destroyBountyBot") {
@@ -1226,7 +1248,7 @@ function renderStarterTutorial() {
   if (text) text.textContent = step.text;
   if (label) {
     const speaker = step.speaker || TUTORIAL_NARRATOR_LABEL;
-    label.textContent = `${speaker} / Starter Pilot Programme / ${Math.min(tutorialState.stepIndex + 1, STARTER_TUTORIAL_STEPS.length)} / ${STARTER_TUTORIAL_STEPS.length}`;
+    label.textContent = `${speaker} / Starter Pilot Programme`;
   }
   if (progress) {
     progress.innerHTML = STARTER_TUTORIAL_STEPS.map((item, index) => `<i class="${index < tutorialState.stepIndex ? "done" : index === tutorialState.stepIndex ? "active" : ""}"></i>`).join("");
