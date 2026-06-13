@@ -1438,6 +1438,98 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("resetPilot staging starter claim CTA owns and activates Azure Striker without server purchase", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&resetPilot=1");
+    await waitForGameGlobals(page);
+    await page.waitForFunction(() => !window.location.href.includes("resetPilot=1"));
+
+    await page.evaluate(() => window.eval(`
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("shipyard");
+      setTutorialStepById("buy-first-ship");
+      selectedShipyardShipId = STARTER_SHIP_ID;
+      renderShipShop();
+      renderShipyardDetail();
+      renderStarterTutorial();
+    `));
+
+    await expect(page.locator("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']")).toHaveText("Claim Starter Ship");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("Free Starter Hull");
+    await page.locator("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-first-loadout");
+
+    const claim = await page.evaluate(() => window.eval(`({
+      currentShipId,
+      ownsStarter: ownedShips.includes(STARTER_SHIP_ID),
+      loadout: shipLoadouts[STARTER_SHIP_ID],
+      condition: shipConditions[STARTER_SHIP_ID],
+      hull,
+      shield,
+      credits,
+      stepId: getCurrentTutorialStep().id,
+      saved: JSON.parse(localStorage.getItem("lupenGameState"))
+    })`));
+
+    expect(claim.currentShipId).toBe("falcon");
+    expect(claim.ownsStarter).toBe(true);
+    expect(claim.loadout).toMatchObject({ guns: [], attachments: [] });
+    expect(claim.condition.hull).toBeGreaterThan(0);
+    expect(claim.condition.shield).toBeGreaterThan(0);
+    expect(claim.hull).toBeGreaterThan(0);
+    expect(claim.shield).toBeGreaterThan(0);
+    expect(claim.credits).toBe(10000);
+    expect(claim.stepId).toBe("open-first-loadout");
+    expect(claim.saved.currentShipId).toBe("falcon");
+    expect(claim.saved.ownedShips).toContain("falcon");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("starter claim tolerates missing ownership and loadout containers", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging");
+    await waitForGameGlobals(page);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        resetToNoShipStarterState();
+        ownedShips = null;
+        shipLoadouts = null;
+        shipConditions = null;
+        showScreen("gameScreen");
+        startStarterTutorial(true);
+        setTutorialStepById("buy-first-ship");
+        buyShip(STARTER_SHIP_ID);
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-first-loadout");
+
+    const claim = await page.evaluate(() => window.eval(`
+      (() => {
+        return {
+          currentShipId,
+          ownedShips,
+          loadout: shipLoadouts[STARTER_SHIP_ID],
+          condition: shipConditions[STARTER_SHIP_ID],
+          stepId: getCurrentTutorialStep().id
+        };
+      })()
+    `));
+
+    expect(claim.currentShipId).toBe("falcon");
+    expect(claim.ownedShips).toEqual(["falcon"]);
+    expect(claim.loadout).toMatchObject({ guns: [], attachments: [] });
+    expect(claim.condition.hull).toBeGreaterThan(0);
+    expect(claim.stepId).toBe("open-first-loadout");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("starter claim step advances gracefully when Azure Striker is already active", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

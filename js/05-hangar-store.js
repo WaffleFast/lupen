@@ -2828,7 +2828,7 @@ function renderShipyardDetail() {
     secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
   } else {
     primaryAction = `<button class="exchange-footer-primary buy-ship-action" data-tutorial-target="firstShipBuy" onclick="buyShip('${ship.id}')" ${!canAfford && !starterClaim ? "disabled" : ""}>${starterClaim ? "Claim Starter Ship" : "Buy Hull"}</button>`;
-    secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>CR ${formatNumber(ship.price)}</button>`;
+    secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>${starterClaim ? "Free Starter Hull" : `CR ${formatNumber(ship.price)}`}</button>`;
   }
 
   const requirementHtml = unlock.requirementLines.length ? `
@@ -4025,16 +4025,39 @@ function removeGun(index) {
 }
 
 function buyShip(shipId) {
-  if (isMultiplayerStagingStoreActive()) {
-    const ship = SHIPS[shipId];
+  const ship = SHIPS[shipId];
+  if (!ship) return;
+
+  ownedShips = Array.isArray(ownedShips) ? ownedShips : [];
+  shipLoadouts = shipLoadouts && typeof shipLoadouts === "object" ? shipLoadouts : {};
+  shipConditions = shipConditions && typeof shipConditions === "object" ? shipConditions : {};
+
+  const hadNoShip = !hasActiveShip();
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const starterClaim = hadNoShip && shipId === starterShipId;
+
+  if (isMultiplayerStagingStoreActive() && !starterClaim) {
     if (ship && !ship.hiddenFromExchange && !ownedShips.includes(shipId) && getStagingStoreItemId({ kind: "ship", key: shipId })) {
       requestStagingStorePurchase({ kind: "ship", key: shipId });
       return;
     }
   }
-  if (blockStoreMutationInMultiplayerStaging()) return;
-  const ship = SHIPS[shipId];
-  if (!ship || ownedShips.includes(shipId)) return;
+  if (!starterClaim && blockStoreMutationInMultiplayerStaging()) return;
+
+  if (ownedShips.includes(shipId)) {
+    if (starterClaim) {
+      currentShipId = shipId;
+      selectedHangarShipId = shipId;
+      selectedFleetShipId = shipId;
+      selectedShipyardShipId = shipId;
+      ensureShipCondition(shipId);
+      applyShipStats(true);
+      tutorialEvent("boughtFirstShip");
+      saveGame();
+    }
+    return;
+  }
+
   const unlock = getShipUnlockStatus(shipId);
   if (unlock.locked) {
     if (typeof addHudToast === "function") addHudToast(unlock.message);
@@ -4042,10 +4065,6 @@ function buyShip(shipId) {
     renderShipShop();
     return;
   }
-
-  const hadNoShip = !hasActiveShip();
-  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
-  const starterClaim = hadNoShip && shipId === starterShipId;
 
   if (!starterClaim && credits < ship.price) {
     alert("Not enough credits.");
@@ -4057,7 +4076,7 @@ function buyShip(shipId) {
   selectedHangarShipId = shipId;
   selectedFleetShipId = shipId;
   selectedShipyardShipId = shipId;
-  shipLoadouts[shipId] = { attachments: [], guns: [] };
+  shipLoadouts[shipId] = normalizeShipLoadout({ attachments: [], guns: [] }, shipId);
   shipConditions[shipId] = normalizeShipCondition(shipId);
 
   if (hadNoShip) {
