@@ -1792,14 +1792,30 @@ test.describe("Lupen browser smoke", () => {
       (() => {
         const route = { ...activeTradeRoute };
         openMarketplace();
+        const sellButton = document.querySelector("[data-tutorial-target='sellCargo']");
+        const buyButton = document.querySelector("[data-tutorial-target='buyCargo']");
+        const builderText = document.querySelector(".market-builder-panel")?.textContent || "";
+        const creditsBeforeSell = credits;
+        const cargoBeforeSell = cargo[route.good] || 0;
         selectedMarketResource = route.good;
         selectedMarketTargetPlanet = route.destination;
         renderMarketplace();
         setTutorialStepById("sell-cargo");
         sellMarketCargo();
+        const creditsAfterFirstSell = credits;
+        sellMarketCargo();
         return {
           route,
+          sellButtonPresent: Boolean(sellButton),
+          sellButtonDisabled: Boolean(sellButton?.disabled),
+          buyButtonPresent: Boolean(buyButton),
+          builderText,
+          creditsBeforeSell,
+          creditsAfterFirstSell,
+          creditsAfterDoubleSell: credits,
+          cargoBeforeSell,
           cargoAfterSell: cargo[route.good] || 0,
+          activeTradeCleared: activeTradeRoute === null && activeObjective === null,
           tradeProfit: playerProgress.totals.tradeProfit || 0,
           tradesCompleted: playerProgress.totals.tradesCompleted || 0,
           finalStep: getCurrentTutorialStep().id
@@ -1828,7 +1844,17 @@ test.describe("Lupen browser smoke", () => {
     expect(landingState.clickable).toBe(true);
     expect(landingState.mapNodeExists).toBe(true);
     expect(landingState.currentScreenLanded).toBe(true);
+    expect(tradeSell.sellButtonPresent).toBe(true);
+    expect(tradeSell.sellButtonDisabled).toBe(false);
+    expect(tradeSell.buyButtonPresent).toBe(false);
+    expect(tradeSell.builderText).toContain("Sell Amount");
+    expect(tradeSell.builderText).toContain("Cargo ready to sell");
+    expect(tradeSell.builderText).not.toContain("current route sell support unavailable");
+    expect(tradeSell.cargoBeforeSell).toBeGreaterThan(0);
+    expect(tradeSell.creditsAfterFirstSell).toBeGreaterThan(tradeSell.creditsBeforeSell);
+    expect(tradeSell.creditsAfterDoubleSell).toBe(tradeSell.creditsAfterFirstSell);
     expect(tradeSell.cargoAfterSell).toBe(0);
+    expect(tradeSell.activeTradeCleared).toBe(true);
     expect(tradeSell.tradeProfit).toBeGreaterThan(0);
     expect(tradeSell.tradesCompleted).toBe(1);
     expect(finalStep).toBe("return-after-trade");

@@ -125,14 +125,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-trade-to-sell",
     title: "Open Trade Terminal",
-    text: "Click Trade Terminal, then sell the cargo you carried here.",
+    text: "Good. The cargo is intact. Open the Trade Terminal and sell it into Virella's market.",
     target: ".hub-actions button[onclick='openMarketplace()']",
     event: "openedTradeTerminal"
   },
   {
     id: "sell-cargo",
     title: "Sell cargo",
-    text: "Sell your route cargo and bank the profit. Each clean run brings better ships within reach.",
+    text: "Sell the Iron. The profit is yours, and every clean run brings the Buu Hauler closer.",
     target: "tutorial:sellCargo",
     event: "soldTradeCargo"
   },
@@ -488,7 +488,7 @@ function getTutorialStateCompletionReason(step) {
     case "land-destination":
       return hasCompletedTutorialTrade() || isLandedAtActiveTradeDestination() ? "trade_destination_landed" : "";
     case "open-trade-to-sell":
-      return hasCompletedTutorialTrade() ? "trade_already_completed" : "";
+      return hasCompletedTutorialTrade() ? "trade_already_completed" : document.getElementById("marketScreen")?.classList.contains("active") ? "trade_terminal_open" : "";
     case "sell-cargo":
       return hasCompletedTutorialTrade() ? "trade_already_completed" : "";
     case "open-store":
@@ -757,7 +757,10 @@ function isAtActiveTradeDestination() {
 }
 
 function isLandedAtActiveTradeDestination() {
-  return isAtActiveTradeDestination() && document.getElementById("gameScreen")?.classList.contains("active");
+  return isAtActiveTradeDestination() && (
+    document.getElementById("gameScreen")?.classList.contains("active") ||
+    document.getElementById("marketScreen")?.classList.contains("active")
+  );
 }
 
 function getDynamicTutorialTarget(step) {
