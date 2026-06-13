@@ -1929,6 +1929,10 @@ function getVisibleHostileBots() {
 }
 
 function isStagingLocalCombatBotVisualGuardActive() {
+  if (typeof shouldUseLocalTutorialBountyFallback === "function" && shouldUseLocalTutorialBountyFallback()) {
+    return false;
+  }
+
   let isStagingUrl = false;
   try {
     isStagingUrl = new URLSearchParams(window.location.search).get("mp") === "staging";

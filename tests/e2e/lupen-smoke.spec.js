@@ -1917,6 +1917,63 @@ test.describe("Lupen browser smoke", () => {
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await waitForGameGlobals(page);
 
+    const offlineFallbackState = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        activeObjective = null;
+        dailyBountyDate = "";
+        dailyBountyContracts = [];
+        activeBountyId = null;
+        window.LupenMultiplayerClient = {
+          ...(window.LupenMultiplayerClient || {}),
+          getStatus: () => ({
+            enabled: true,
+            isConnected: false,
+            lastStagingBountyStatus: null,
+            lastStagingBountyList: null
+          })
+        };
+        showScreen("gameScreen");
+        startStarterTutorial(true);
+        setTutorialStepById("accept-bounty");
+        openBountyBoard();
+        renderStarterTutorial();
+        const button = document.querySelector(".accept-bounty-button");
+        const beforeText = document.getElementById("bountyScreen")?.textContent || "";
+        return {
+          beforeText,
+          disabled: Boolean(button?.disabled),
+          buttonText: button?.textContent || ""
+        };
+      })()
+    `));
+    expect(offlineFallbackState.disabled).toBe(false);
+    await page.locator(".accept-bounty-button").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-for-combat-launch");
+    const offlineFallbackAccepted = await page.evaluate(() => window.eval(`
+      ({
+        step: getCurrentTutorialStep().id,
+        objectiveType: activeObjective?.type || "",
+        contractId: activeObjective?.contractId || "",
+        killsRequired: activeObjective?.killsRequired || 0,
+        localCombatGuardActive: isStagingLocalCombatBotVisualGuardActive()
+      })
+    `));
+
+    expect(offlineFallbackState.beforeText).toContain("STARTER BOUNTY");
+    expect(offlineFallbackState.beforeText).toContain("Erebus Patrol Sweep");
+    expect(offlineFallbackState.beforeText).toContain("Accept Bounty");
+    expect(offlineFallbackState.beforeText).not.toContain("Waiting For Server");
+    expect(offlineFallbackState.buttonText).toContain("Accept Bounty");
+    expect(offlineFallbackAccepted.step).toBe("return-for-combat-launch");
+    expect(offlineFallbackAccepted.objectiveType).toBe("bounty");
+    expect(offlineFallbackAccepted.contractId).toBe("tutorial-erebus-patrol");
+    expect(offlineFallbackAccepted.killsRequired).toBe(2);
+    expect(offlineFallbackAccepted.localCombatGuardActive).toBe(false);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
     const activeStagingState = await page.evaluate(() => window.eval(`
       (() => {
         localStorage.clear();

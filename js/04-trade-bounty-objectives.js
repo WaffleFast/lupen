@@ -2488,6 +2488,10 @@ function ensureDailyBounties() {
 }
 
 function getBountyContract(contractId) {
+  if (shouldUseLocalTutorialBountyFallback()) {
+    const existing = dailyBountyContracts.find(contract => contract.id === contractId);
+    if (existing) return existing;
+  }
   ensureDailyBounties();
   return dailyBountyContracts.find(contract => contract.id === contractId);
 }
@@ -2505,6 +2509,94 @@ function getBountyStatusLabel(contract) {
   }
   if (contract.status === "completed" || contract.status === "claimed") return "CLAIMED";
   return "AVAILABLE";
+}
+
+function isStarterTutorialBountyStepActive() {
+  if (!tutorialState?.active || typeof getCurrentTutorialStep !== "function") return false;
+  return [
+    "open-bounty",
+    "accept-bounty",
+    "return-for-combat-launch",
+    "launch-for-combat",
+    "open-map-for-bounty",
+    "scan-for-bots",
+    "jump-to-bounty-zone",
+    "destroy-bot",
+    "open-map-return-bounty",
+    "return-to-planet-after-bounty",
+    "land-after-bounty",
+    "open-bounty-to-claim",
+    "claim-bounty",
+    "continue-after-bounty-reward",
+    "return-after-bounty-claim"
+  ].includes(getCurrentTutorialStep()?.id);
+}
+
+function shouldUseLocalTutorialBountyFallback() {
+  if (!isMultiplayerStagingActive() || !isStarterTutorialBountyStepActive()) return false;
+  if (activeObjective?.type === "bounty") return true;
+  if (getActiveMultiplayerStagingBountyObjective()) return false;
+  return !isMultiplayerStagingBountyReady();
+}
+
+function applyTutorialBountyFallbackContract() {
+  ensureDailyBounties();
+  const template = DAILY_BOUNTY_CONTRACTS[0] || {};
+  const existing = dailyBountyContracts.find(contract => contract.id === "tutorial-erebus-patrol") ||
+    dailyBountyContracts.find(contract => contract.id === template.id) ||
+    dailyBountyContracts[0];
+  const preserveExistingTutorialState = existing?.id === "tutorial-erebus-patrol";
+  const preservedStatus = preserveExistingTutorialState && ["active", "readyToClaim", "claimed"].includes(existing?.status) ? existing.status : "available";
+  const preservedProgress = preserveExistingTutorialState ? Math.max(0, Number(existing?.progress || 0)) : 0;
+  const fallback = {
+    ...template,
+    ...existing,
+    id: "tutorial-erebus-patrol",
+    name: "Erebus Patrol Sweep",
+    title: "Erebus Patrol Sweep",
+    subtitle: "Destroy 2 Erebus bots",
+    description: "Clear a short Erebus patrol so Station AI can certify your first combat route.",
+    type: "standard",
+    chipLabel: "TUTORIAL",
+    contractType: "Tutorial Bounty",
+    area: "Any Hostile Zone",
+    targetArea: "anyHostile",
+    targetBotType: "any_erebus",
+    targetBotLabel: "Erebus Bot",
+    requiredKills: 2,
+    killsRequired: 2,
+    progress: Math.min(2, preservedProgress),
+    threat: "Low",
+    reward: {
+      ...cloneBountyReward(existing?.reward || template.reward || BOUNTY_REWARD_DEFAULT),
+      lupenCores: Math.max(1, Number(existing?.reward?.lupenCores || template.reward?.lupenCores || 1))
+    },
+    timed: false,
+    timeLimitSeconds: null,
+    expiresAt: null,
+    status: preservedStatus,
+    accent: "blue",
+    icon: "bounty-patrol-sweep",
+    fallbackIcon: "assets/bounties/bounty-patrol-sweep.png",
+    tutorialFallback: true
+  };
+  dailyBountyContracts = [fallback, ...dailyBountyContracts.filter(contract => !["tutorial-erebus-patrol", template.id].includes(contract.id))];
+  selectedBountyContractId = fallback.id;
+  if (activeObjective?.type === "bounty" && activeObjective.contractId !== fallback.id && activeObjective.title === fallback.title) {
+    activeObjective.contractId = fallback.id;
+  }
+  return fallback;
+}
+
+function ensureTutorialBountyFallbackObjective() {
+  if (!shouldUseLocalTutorialBountyFallback()) return false;
+  if (activeObjective?.type === "bounty") return true;
+  const contract = dailyBountyContracts.find(item => item.id === "tutorial-erebus-patrol" && item.status === "active");
+  if (!contract) return false;
+  activeObjective = createBountyObjective(contract);
+  activeBountyId = contract.id;
+  selectedBountyContractId = contract.id;
+  return true;
 }
 
 function renderMultiplayerStagingBountyBoard() {
@@ -2629,18 +2721,23 @@ function renderMultiplayerStagingBountyDetail() {
 }
 
 function renderBountyBoard() {
-  if (isMultiplayerStagingActive()) {
+  if (isMultiplayerStagingActive() && !shouldUseLocalTutorialBountyFallback()) {
     renderMultiplayerStagingBountyBoard();
     return;
   }
 
   ensureDailyBounties();
+  if (shouldUseLocalTutorialBountyFallback()) {
+    applyTutorialBountyFallbackContract();
+  }
   updateBountyResetCountdown();
 
   const title = document.getElementById("bountyLocationTitle");
   const grid = document.getElementById("bountyContractGrid");
+  const countLabel = document.querySelector(".bounty-list-count");
 
-  if (title) title.textContent = `DAILY SECTOR BOUNTIES`;
+  if (title) title.textContent = shouldUseLocalTutorialBountyFallback() ? "STARTER BOUNTY" : `DAILY SECTOR BOUNTIES`;
+  if (countLabel && shouldUseLocalTutorialBountyFallback()) countLabel.textContent = "TUTORIAL CONTRACT";
 
   if (activeObjective?.type === "bounty" && activeObjective.status === "readyToClaim") {
     selectedBountyContractId = activeObjective.contractId;

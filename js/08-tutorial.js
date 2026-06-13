@@ -464,6 +464,7 @@ function isTutorialBountyReadyToClaim() {
 }
 
 function isTutorialBountyAccepted() {
+  if (typeof ensureTutorialBountyFallbackObjective === "function" && ensureTutorialBountyFallbackObjective()) return true;
   const stagingBounty = typeof getActiveMultiplayerStagingBountyObjective === "function"
     ? getActiveMultiplayerStagingBountyObjective()
     : null;
