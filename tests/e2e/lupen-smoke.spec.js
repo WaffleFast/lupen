@@ -1801,19 +1801,37 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
+    const sellStepHomeHighlightState = await page.evaluate(() => window.eval(`
+      (() => {
+        setTutorialStepById("sell-cargo");
+        renderStarterTutorial();
+        const terminal = document.querySelector("[data-tutorial-target='planetTradeTerminal']");
+        return {
+          step: getCurrentTutorialStep().id,
+          exists: Boolean(terminal),
+          highlighted: terminal?.classList.contains("tutorial-highlight-target") || false,
+          text: terminal?.textContent || "",
+          screen: document.querySelector("section.active")?.id || ""
+        };
+      })()
+    `));
+
     const tradeSell = await page.evaluate(() => window.eval(`
       (() => {
         const route = { ...activeTradeRoute };
         openMarketplace();
-        const sellButton = document.querySelector("[data-tutorial-target='sellCargo']");
-        const buyButton = document.querySelector("[data-tutorial-target='buyCargo']");
-        const builderText = document.querySelector(".market-builder-panel")?.textContent || "";
         const creditsBeforeSell = credits;
         const cargoBeforeSell = cargo[route.good] || 0;
         selectedMarketResource = route.good;
         selectedMarketTargetPlanet = route.destination;
         renderMarketplace();
         setTutorialStepById("sell-cargo");
+        const sellButton = document.querySelector("[data-tutorial-target='sellCargo']");
+        const buyButton = document.querySelector("[data-tutorial-target='buyCargo']");
+        const terminal = document.querySelector("[data-tutorial-target='planetTradeTerminal']");
+        const sellButtonHighlightedInTerminal = sellButton?.classList.contains("tutorial-highlight-target") || false;
+        const terminalHighlightedInTerminal = terminal?.classList.contains("tutorial-highlight-target") || false;
+        const builderText = document.querySelector(".market-builder-panel")?.textContent || "";
         sellMarketCargo();
         const creditsAfterFirstSell = credits;
         sellMarketCargo();
@@ -1821,6 +1839,8 @@ test.describe("Lupen browser smoke", () => {
           route,
           sellButtonPresent: Boolean(sellButton),
           sellButtonDisabled: Boolean(sellButton?.disabled),
+          sellButtonHighlightedInTerminal,
+          terminalHighlightedInTerminal,
           buyButtonPresent: Boolean(buyButton),
           builderText,
           creditsBeforeSell,
@@ -1861,8 +1881,15 @@ test.describe("Lupen browser smoke", () => {
     expect(terminalHighlightState.exists).toBe(true);
     expect(terminalHighlightState.highlighted).toBe(true);
     expect(terminalHighlightState.text).toContain("Trade");
+    expect(sellStepHomeHighlightState.step).toBe("sell-cargo");
+    expect(sellStepHomeHighlightState.screen).toBe("gameScreen");
+    expect(sellStepHomeHighlightState.exists).toBe(true);
+    expect(sellStepHomeHighlightState.highlighted).toBe(true);
+    expect(sellStepHomeHighlightState.text).toContain("Trade");
     expect(tradeSell.sellButtonPresent).toBe(true);
     expect(tradeSell.sellButtonDisabled).toBe(false);
+    expect(tradeSell.sellButtonHighlightedInTerminal).toBe(true);
+    expect(tradeSell.terminalHighlightedInTerminal).toBe(false);
     expect(tradeSell.buyButtonPresent).toBe(false);
     expect(tradeSell.builderText).toContain("Sell Amount");
     expect(tradeSell.builderText).toContain("Cargo ready to sell");

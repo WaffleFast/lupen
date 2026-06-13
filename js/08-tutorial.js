@@ -813,6 +813,11 @@ function getDynamicTutorialTarget(step) {
   }
 
   if (step.target === "tutorial:sellCargo") {
+    const marketOpen = document.getElementById("marketScreen")?.classList.contains("active");
+    if (!marketOpen && isLandedAtActiveTradeDestination() && hasTutorialTradeCargo()) {
+      return document.querySelector("[data-tutorial-target='planetTradeTerminal']") ||
+             document.querySelector(".hub-actions button[onclick='openMarketplace()']");
+    }
     return document.querySelector("[data-tutorial-target='sellCargo']:not(:disabled)") ||
            document.querySelector(".market-sell-action:not(:disabled)") ||
            document.querySelector(".market-builder-actions .trade-primary-action:not(:disabled)");

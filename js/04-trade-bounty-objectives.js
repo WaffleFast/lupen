@@ -2434,7 +2434,11 @@ function ensureDailyBounties() {
   const today = getTodayKey();
   const templateIds = DAILY_BOUNTY_CONTRACTS.map(contract => contract.id).join("|");
   const currentIds = Array.isArray(dailyBountyContracts) ? dailyBountyContracts.map(contract => contract.id).join("|") : "";
-  if (dailyBountyDate !== today || !Array.isArray(dailyBountyContracts) || !dailyBountyContracts.length || currentIds !== templateIds) {
+  const tutorialFallbackIds = Array.isArray(dailyBountyContracts)
+    ? dailyBountyContracts.map(contract => contract.id === "tutorial-erebus-patrol" ? DAILY_BOUNTY_CONTRACTS[0]?.id : contract.id).join("|")
+    : "";
+  const hasExpectedIds = currentIds === templateIds || tutorialFallbackIds === templateIds;
+  if (dailyBountyDate !== today || !Array.isArray(dailyBountyContracts) || !dailyBountyContracts.length || !hasExpectedIds) {
     dailyBountyDate = today;
     dailyBountyContracts = createDailyBountyContracts();
     selectedBountyContractId = dailyBountyContracts[0]?.id || null;
@@ -2591,8 +2595,13 @@ function applyTutorialBountyFallbackContract() {
 function ensureTutorialBountyFallbackObjective() {
   if (!shouldUseLocalTutorialBountyFallback()) return false;
   if (activeObjective?.type === "bounty") return true;
-  const contract = dailyBountyContracts.find(item => item.id === "tutorial-erebus-patrol" && item.status === "active");
+  const fallback = applyTutorialBountyFallbackContract();
+  const contract = dailyBountyContracts.find(item => item.id === fallback.id && item.status === "active") ||
+    dailyBountyContracts.find(item => item.tutorialFallback && item.status === "active") ||
+    dailyBountyContracts.find(item => item.status === "active" && (item.title === fallback.title || item.name === fallback.name));
   if (!contract) return false;
+  contract.id = fallback.id;
+  contract.tutorialFallback = true;
   activeObjective = createBountyObjective(contract);
   activeBountyId = contract.id;
   selectedBountyContractId = contract.id;
