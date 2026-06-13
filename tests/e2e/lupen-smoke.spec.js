@@ -340,9 +340,18 @@ test.describe("Lupen browser smoke", () => {
       localStorage.setItem("lupenPendingPilotName", "Pending Pilot");
       localStorage.setItem("sectorOneLoggedIn", "Legacy Pilot");
       localStorage.setItem("lupenStagingFlowHintDismissed", "1");
+      localStorage.setItem("lupenDebugTools", "true");
+      localStorage.setItem("lupenMultiplayerServer", "ws://stale.example.test");
+      localStorage.setItem("lupenPlayerAccount", JSON.stringify({ pilotName: "Legacy" }));
       localStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-auth");
       sessionStorage.setItem("lupenGameState", "session-save");
+      sessionStorage.setItem("lupenDebugTools", "true");
       sessionStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-session-auth");
+      window.eval(`
+        credits = 12000;
+        currentShipId = "falcon";
+        ownedShips = ["falcon"];
+      `);
     });
 
     await page.goto("/?mp=staging&clearLocalSave=1");
@@ -358,9 +367,16 @@ test.describe("Lupen browser smoke", () => {
       pendingPilot: localStorage.getItem("lupenPendingPilotName"),
       legacyPilot: localStorage.getItem("sectorOneLoggedIn"),
       stagingHint: localStorage.getItem("lupenStagingFlowHintDismissed"),
+      debugTools: localStorage.getItem("lupenDebugTools"),
+      multiplayerServer: localStorage.getItem("lupenMultiplayerServer"),
+      legacyAccount: localStorage.getItem("lupenPlayerAccount"),
       supabaseAuth: localStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
       sessionGame: sessionStorage.getItem("lupenGameState"),
+      sessionDebugTools: sessionStorage.getItem("lupenDebugTools"),
+      localResetMarker: sessionStorage.getItem("lupenLocalSaveResetAt"),
       sessionSupabaseAuth: sessionStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
+      runtimeShipId: window.eval("currentShipId"),
+      runtimeOwnedShips: window.eval("ownedShips"),
       blankMeaningful: hasMeaningfulLocalSave({}),
       defaultShellMeaningful: hasMeaningfulLocalSave({
         credits: 10000,
@@ -383,11 +399,100 @@ test.describe("Lupen browser smoke", () => {
     expect(storage.pendingPilot).toBe(null);
     expect(storage.legacyPilot).toBe(null);
     expect(storage.stagingHint).toBe(null);
+    expect(storage.debugTools).toBe(null);
+    expect(storage.multiplayerServer).toBe(null);
+    expect(storage.legacyAccount).toBe(null);
     expect(storage.supabaseAuth).toBe("keep-auth");
     expect(storage.sessionGame).toBe(null);
+    expect(storage.sessionDebugTools).toBe(null);
+    expect(storage.localResetMarker).toBeTruthy();
     expect(storage.sessionSupabaseAuth).toBe("keep-session-auth");
+    expect(storage.runtimeShipId).toBe("");
+    expect(storage.runtimeOwnedShips).toEqual([]);
     expect(storage.blankMeaningful).toBe(false);
     expect(storage.defaultShellMeaningful).toBe(false);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("missing cloud save starts fresh instead of silently uploading stale local progress", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      localStorage.setItem("lupenGameState", JSON.stringify({
+        credits: 50000,
+        currentShipId: "falcon",
+        ownedShips: ["falcon"],
+        playerProgress: { combatXp: 3, totals: { botsDestroyed: 2 } }
+      }));
+      localStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-auth");
+      window.__migrationPromptCount = 0;
+      window.__uploadCount = 0;
+      const user = {
+        id: "66666666-6666-4666-8666-666666666666",
+        email: "fresh@example.test",
+        user_metadata: { pilot_name: "Fresh Pilot" }
+      };
+      const profile = { id: user.id, pilot_name: "Fresh Pilot", last_seen: null };
+      window.__fakeGetSupabaseClient = () => ({
+        auth: {
+          signInWithPassword: async () => ({ data: { user }, error: null }),
+          getUser: async () => ({ data: { user }, error: null })
+        },
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: profile, error: null }),
+              maybeSingle: async () => ({ data: null, error: null })
+            })
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: async () => ({ data: profile, error: null })
+              })
+            })
+          })
+        })
+      });
+      window.eval(`
+        getSupabaseClient = window.__fakeGetSupabaseClient;
+        loadGameFromSupabase = async () => ({ loaded: false, exists: false, reason: "missing" });
+        uploadLocalSavePayloadToSupabase = async () => {
+          window.__uploadCount += 1;
+          return true;
+        };
+      `);
+      window.promptUploadLocalSaveToSupabase = async () => {
+        window.__migrationPromptCount += 1;
+        return "fresh";
+      };
+      window.showScreen("loginScreen");
+      document.getElementById("loginUser").value = "fresh@example.test";
+      document.getElementById("loginPassword").value = "password123";
+    });
+
+    await page.evaluate(() => window.login());
+
+    const state = await page.evaluate(() => ({
+      promptCount: window.__migrationPromptCount,
+      uploadCount: window.__uploadCount,
+      supabaseAuth: localStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
+      saved: JSON.parse(localStorage.getItem("lupenGameState")),
+      tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial"))
+    }));
+
+    expect(state.promptCount).toBe(1);
+    expect(state.uploadCount).toBe(0);
+    expect(state.supabaseAuth).toBe("keep-auth");
+    expect(state.saved.credits).toBe(10000);
+    expect(state.saved.currentShipId).toBe("");
+    expect(state.saved.ownedShips).toEqual([]);
+    expect(state.tutorial.active).toBe(true);
+    expect(state.tutorial.completed).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

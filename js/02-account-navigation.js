@@ -600,6 +600,26 @@ async function createAccount() {
   setTimeout(renderStarterTutorial, 120);
 }
 
+function prepareFreshLocalStateAfterMissingCloudSave() {
+  if (typeof lupenClearLocalSave === "function") {
+    lupenClearLocalSave();
+  } else {
+    resetToNoShipStarterState();
+  }
+  if (typeof startStarterTutorial === "function") {
+    startStarterTutorial(true);
+  } else {
+    const welcomeStep = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "welcome-new-pilot");
+    tutorialState = {
+      active: true,
+      completed: false,
+      stepIndex: welcomeStep >= 0 ? welcomeStep : 0,
+      lastStartedAt: new Date().toISOString()
+    };
+    saveTutorialState();
+  }
+}
+
 async function login() {
   const email = document.getElementById("loginUser")?.value.trim() || "";
   const password = document.getElementById("loginPassword")?.value || "";
@@ -669,6 +689,7 @@ async function login() {
   rememberSupabaseAccount(user, profile);
 
   let cloudSaveResult = { loaded: false, exists: false, reason: "unavailable" };
+  let shouldKeepStarterTutorialActive = false;
   try {
     cloudSaveResult = typeof loadGameFromSupabase === "function" ? await loadGameFromSupabase() : cloudSaveResult;
     if (cloudSaveResult.loaded) console.info("Loaded Supabase player save.");
@@ -678,7 +699,7 @@ async function login() {
     cloudSaveResult = { loaded: false, exists: false, reason: "error" };
   }
 
-  if (!cloudSaveResult.exists) {
+  if (!cloudSaveResult.exists && cloudSaveResult.reason !== "error") {
     const localSaveSource = typeof getLocalSaveMigrationSource === "function"
       ? getLocalSaveMigrationSource()
       : { key: "unknown", payload: typeof getLocalSavePayloadForCloudMigration === "function" ? getLocalSavePayloadForCloudMigration() : null };
@@ -717,17 +738,40 @@ async function login() {
         } catch (error) {
           console.warn("Unable to upload local save payload to Supabase. Continuing locally.", error);
         }
+      } else {
+        prepareFreshLocalStateAfterMissingCloudSave();
+        shouldKeepStarterTutorialActive = true;
+        if (typeof logStagingLocalSaveMigration === "function") {
+          logStagingLocalSaveMigration("Started fresh because local save migration was declined.", {
+            decision,
+            sourceKey: localSaveAnalysis.sourceKey,
+            reasons: localSaveAnalysis.reasons
+          });
+        }
+      }
+    } else {
+      prepareFreshLocalStateAfterMissingCloudSave();
+      shouldKeepStarterTutorialActive = true;
+      if (typeof logStagingLocalSaveMigration === "function") {
+        logStagingLocalSaveMigration("Started fresh because no meaningful local save was available.", {
+          hasPrompt: typeof promptUploadLocalSaveToSupabase === "function",
+          sourceKey: localSaveAnalysis.sourceKey,
+          reasons: localSaveAnalysis.reasons
+        });
       }
     }
   }
 
   setAccountMessage(message, "");
 
-  tutorialState.active = false;
-  saveTutorialState();
-  clearTutorialOverlayOnly();
+  if (!shouldKeepStarterTutorialActive) {
+    tutorialState.active = false;
+    saveTutorialState();
+    clearTutorialOverlayOnly();
+  }
 
   enterHubFromLogin();
+  if (shouldKeepStarterTutorialActive) setTimeout(renderStarterTutorial, 120);
 }
 
 async function logout() {

@@ -7,7 +7,10 @@ const LUPEN_LOCAL_SAVE_RESET_KEYS = Object.freeze([
   STORAGE_VAULT_RESET_KEY,
   "lupenPendingPilotName",
   "sectorOneLoggedIn",
-  "lupenStagingFlowHintDismissed"
+  "lupenStagingFlowHintDismissed",
+  "lupenDebugTools",
+  "lupenMultiplayerServer",
+  "lupenPlayerAccount"
 ]);
 
 const LUPEN_LOCAL_SAVE_RESET_PREFIXES = Object.freeze([
@@ -15,6 +18,8 @@ const LUPEN_LOCAL_SAVE_RESET_PREFIXES = Object.freeze([
   "lupenGameSave.corrupt.",
   "lupenStarterPilotTutorial.corrupt."
 ]);
+
+const LUPEN_LOCAL_SAVE_RESET_SESSION_MARKER = "lupenLocalSaveResetAt";
 
 function removeLupenLocalSaveKeysFromStorage(storage) {
   if (!storage) return [];
@@ -35,10 +40,27 @@ function removeLupenLocalSaveKeysFromStorage(storage) {
   return removed;
 }
 
-function lupenClearLocalSave() {
+function resetLupenRuntimeStateForLocalSaveClear() {
+  if (typeof resetToNoShipStarterState === "function") {
+    resetToNoShipStarterState();
+  }
+  window.lupenLastLocalSaveMigrationAnalysis = null;
+  window.lupenTrustedStagingXpAfter = null;
+  window.lupenLastStagingXpRefresh = null;
+  if (typeof clearTutorialOverlayOnly === "function") clearTutorialOverlayOnly();
+}
+
+function lupenClearLocalSave(options = {}) {
   const removedLocalStorageKeys = removeLupenLocalSaveKeysFromStorage(window.localStorage);
   const removedSessionStorageKeys = removeLupenLocalSaveKeysFromStorage(window.sessionStorage);
-  const result = { removedLocalStorageKeys, removedSessionStorageKeys };
+  const shouldResetRuntime = options.resetRuntime !== false;
+  if (shouldResetRuntime) resetLupenRuntimeStateForLocalSaveClear();
+  try {
+    window.sessionStorage?.setItem?.(LUPEN_LOCAL_SAVE_RESET_SESSION_MARKER, new Date().toISOString());
+  } catch (error) {
+    console.warn("[Lupen staging] Unable to store local reset marker.", error);
+  }
+  const result = { removedLocalStorageKeys, removedSessionStorageKeys, resetRuntime: shouldResetRuntime };
   console.info("[Lupen staging] Cleared local save/tutorial browser keys.", result);
   return result;
 }
@@ -61,6 +83,15 @@ function handleStagingClearLocalSaveParam() {
   console.info("[Lupen staging] Applied clearLocalSave=1 before loading local game state.", result);
   return true;
 }
+
+window.addEventListener("pageshow", event => {
+  if (!event.persisted) return;
+  const localResetAt = window.sessionStorage?.getItem?.(LUPEN_LOCAL_SAVE_RESET_SESSION_MARKER);
+  if (!localResetAt) return;
+  resetLupenRuntimeStateForLocalSaveClear();
+  if (typeof loadGame === "function") loadGame();
+  console.info("[Lupen staging] Re-applied local save reset after browser history restore.", { localResetAt });
+});
 
 function getMultiplayerUnderAttackState() {
   const multiplayerState = window.lupenMultiplayerState || window.multiplayerState || null;
@@ -528,10 +559,10 @@ function promptUploadLocalSaveToSupabase() {
       <div class="reward-modal local-save-migration-modal">
         <div class="reward-kicker">Cloud Save</div>
         <h2>Local progress found</h2>
-        <p>Upload this save to your account?</p>
+        <p>No cloud save was found for this account. Start fresh, or use this browser's local progress?</p>
         <div class="reward-modal-actions">
-          <button id="uploadLocalSaveBtn" type="button">Upload Local Save</button>
-          <button id="skipLocalSaveUploadBtn" class="secondary" type="button">Continue Without Uploading</button>
+          <button id="startFreshLocalSaveBtn" type="button">Start Fresh</button>
+          <button id="uploadLocalSaveBtn" class="secondary" type="button">Use Local Save</button>
         </div>
       </div>
     `;
@@ -542,7 +573,7 @@ function promptUploadLocalSaveToSupabase() {
     };
 
     overlay.querySelector("#uploadLocalSaveBtn")?.addEventListener("click", () => close("upload"), { once: true });
-    overlay.querySelector("#skipLocalSaveUploadBtn")?.addEventListener("click", () => close("skip"), { once: true });
+    overlay.querySelector("#startFreshLocalSaveBtn")?.addEventListener("click", () => close("fresh"), { once: true });
     requestAnimationFrame(() => overlay.classList.add("active"));
   });
 }
