@@ -2,6 +2,12 @@
   box-sizing: border-box;
 }
 
+:root {
+  --game-shell-width: min(1200px, 96vw);
+  --game-shell-height: min(700px, 92vh);
+  --game-shell-height: min(700px, 92dvh);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -129,9 +135,10 @@ input::placeholder {
 .hangar-screen,
 .space-screen {
   display: none;
-  width: 100%;
-  max-width: 1180px;
-  height: 665px;
+  width: var(--game-shell-width);
+  max-width: 1200px;
+  height: var(--game-shell-height);
+  max-height: 700px;
   border-radius: 18px;
   overflow: hidden;
   position: relative;
@@ -2620,9 +2627,9 @@ input::placeholder {
 
 /* ===== Player orbit HUD final compact scale ===== */
 .space-screen.player-orbit-screen {
-  height: 665px !important;
+  height: var(--game-shell-height) !important;
   min-height: 0 !important;
-  max-height: 665px !important;
+  max-height: 700px !important;
 }
 
 .player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
@@ -3611,9 +3618,9 @@ input::placeholder {
 
 /* ===== Player orbit HUD browser-size/action clarity fix ===== */
 .space-screen.player-orbit-screen {
-  height: 665px !important;
+  height: var(--game-shell-height) !important;
   min-height: 0 !important;
-  max-height: 665px !important;
+  max-height: 700px !important;
 }
 
 .player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
@@ -21110,7 +21117,7 @@ input::placeholder {
 
 /* Keep normal tutorial cards closer to the game frame rather than floating far outside it. */
 .tutorial-card {
-  right: max(18px, calc((100vw - 1180px) / 2 + 18px)) !important;
+  right: max(18px, calc((100vw - 1200px) / 2 + 18px)) !important;
   top: 18px !important;
 }
 
@@ -21118,7 +21125,7 @@ input::placeholder {
 .tutorial-overlay.tutorial-intro-active .tutorial-card {
   top: 118px !important;
   right: auto !important;
-  left: max(28px, calc((100vw - 1180px) / 2 + 52px)) !important;
+  left: max(28px, calc((100vw - 1200px) / 2 + 52px)) !important;
   width: min(430px, calc(100vw - 64px)) !important;
   padding: 20px !important;
   background:
@@ -21403,7 +21410,7 @@ input::placeholder {
 
 /* ===== Tutorial placement and robust target polish ===== */
 .tutorial-overlay.tutorial-left-card .tutorial-card {
-  left: max(18px, calc((100vw - 1180px) / 2 + 18px)) !important;
+  left: max(18px, calc((100vw - 1200px) / 2 + 18px)) !important;
   right: auto !important;
   top: 18px !important;
 }
@@ -21459,7 +21466,7 @@ input::placeholder {
 /* First card should feel like a welcome transmission, and only Begin should be highlighted. */
 .tutorial-overlay.tutorial-intro-active .tutorial-card {
   top: 92px !important;
-  left: max(34px, calc((100vw - 1180px) / 2 + 58px)) !important;
+  left: max(34px, calc((100vw - 1200px) / 2 + 58px)) !important;
   right: auto !important;
   width: min(460px, calc(100vw - 68px)) !important;
   padding: 22px !important;
@@ -21493,7 +21500,7 @@ input::placeholder {
 
 /* When the required action is a screen Back button, move the tutorial box away from it. */
 .tutorial-overlay.tutorial-left-card .tutorial-card {
-  left: max(18px, calc((100vw - 1180px) / 2 + 18px)) !important;
+  left: max(18px, calc((100vw - 1200px) / 2 + 18px)) !important;
   right: auto !important;
   top: 18px !important;
 }
@@ -21764,7 +21771,7 @@ input::placeholder {
 @media (min-width: 901px) {
   .tutorial-overlay.tutorial-left-card .tutorial-card {
     top: 18px !important;
-    left: max(18px, calc((100vw - 1180px) / 2 + 18px)) !important;
+    left: max(18px, calc((100vw - 1200px) / 2 + 18px)) !important;
     right: auto !important;
   }
 }
@@ -26200,10 +26207,10 @@ input::placeholder {
 }
 
 .upgrade-forge-screen {
-  width: 100%;
-  max-width: 1180px;
-  height: 665px;
-  max-height: 665px;
+  width: var(--game-shell-width);
+  max-width: 1200px;
+  height: var(--game-shell-height);
+  max-height: 700px;
   min-height: 0;
   display: none;
   flex-direction: column;
@@ -27754,10 +27761,10 @@ input::placeholder {
 
 /* ===== Planet Landing Hub PNG pass ===== */
 .hub-screen {
-  width: min(calc(100vw - 24px), calc((100dvh - 24px) * 16 / 9), 1180px);
-  max-width: 1180px;
-  height: min(calc((100vw - 24px) * 9 / 16), calc(100dvh - 24px), 665px);
-  max-height: 665px;
+  width: var(--game-shell-width);
+  max-width: 1200px;
+  height: var(--game-shell-height);
+  max-height: 700px;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -28067,10 +28074,10 @@ input::placeholder {
 
 /* ===== Planet Home v2 unified dock ===== */
 .hub-screen.planet-home-screen {
-  width: min(calc(100vw - 24px), calc((100dvh - 24px) * 16 / 9), 1180px);
-  max-width: 1180px;
-  height: min(calc((100vw - 24px) * 9 / 16), calc(100dvh - 24px), 665px);
-  max-height: 665px;
+  width: var(--game-shell-width);
+  max-width: 1200px;
+  height: var(--game-shell-height);
+  max-height: 700px;
   min-height: 0;
   position: relative;
   overflow: hidden;
@@ -28912,9 +28919,9 @@ input::placeholder {
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 10px !important;
   width: 100%;
-  max-width: 1180px;
-  height: min(665px, calc(100vh - 24px));
-  max-height: min(665px, calc(100vh - 24px));
+  max-width: 1200px;
+  height: var(--game-shell-height);
+  max-height: 700px;
   overflow: hidden !important;
   padding: 22px;
   box-sizing: border-box;
@@ -31136,7 +31143,7 @@ input::placeholder {
   display: grid !important;
   grid-template-rows: 132px minmax(0, 1fr) !important;
   gap: 14px !important;
-  height: 665px !important;
+  height: var(--game-shell-height) !important;
   padding: 24px 36px 26px !important;
   overflow: hidden !important;
 }
@@ -31707,7 +31714,7 @@ input::placeholder {
   display: grid !important;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
-  height: 665px;
+  height: var(--game-shell-height);
   padding: 28px 44px 30px;
   overflow: hidden !important;
 }
@@ -33117,9 +33124,9 @@ input::placeholder {
 
 /* ===== Player orbit HUD true final compact scale ===== */
 .space-screen.player-orbit-screen {
-  height: 665px !important;
+  height: var(--game-shell-height) !important;
   min-height: 0 !important;
-  max-height: 665px !important;
+  max-height: 700px !important;
 }
 
 .player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
@@ -35248,17 +35255,16 @@ input::placeholder {
 
 /* Final pass: keep home screen on the shared game canvas and tighten Vessel Exchange. */
 .hub-screen.planet-home-screen {
-  width: min(calc(100vw - 24px), calc((100dvh - 18px) * 16 / 9), 1180px) !important;
-  max-width: 1180px !important;
-  height: min(calc(100dvh - 18px), 665px) !important;
-  max-height: 665px !important;
-  aspect-ratio: 16 / 9 !important;
+  width: var(--game-shell-width) !important;
+  max-width: 1200px !important;
+  height: var(--game-shell-height) !important;
+  max-height: 700px !important;
 }
 
 #hangarScreen.hangar-screen.active:has(#hangarShipyardSection.active) {
-  width: 100% !important;
-  max-width: 1180px !important;
-  height: 665px !important;
+  width: var(--game-shell-width) !important;
+  max-width: 1200px !important;
+  height: var(--game-shell-height) !important;
   grid-template-rows: 86px 38px minmax(0, 1fr) !important;
   gap: 5px !important;
   padding: 14px 26px 18px !important;
@@ -35987,9 +35993,9 @@ input::placeholder {
 /* Unify Fleet and Vessel Exchange: same cards, same detail panel, different actions only. */
 #hangarScreen.hangar-screen.active:has(#hangarOwnedSection.active),
 #hangarScreen.hangar-screen.active:has(#hangarShipyardSection.active) {
-  width: 100% !important;
-  max-width: 1180px !important;
-  height: 665px !important;
+  width: var(--game-shell-width) !important;
+  max-width: 1200px !important;
+  height: var(--game-shell-height) !important;
 }
 
 #hangarShipyardSection .vessel-exchange-layout {
@@ -38362,9 +38368,9 @@ input::placeholder {
 
 /* ===== Vessel Exchange shell correction ===== */
 #hangarScreen.hangar-screen.active:has(#hangarShipyardSection.active) {
-  width: 100% !important;
-  max-width: 1180px !important;
-  height: 665px !important;
+  width: var(--game-shell-width) !important;
+  max-width: 1200px !important;
+  height: var(--game-shell-height) !important;
   padding: 20px 25px 20px !important;
   grid-template-rows: 88px 39px minmax(0, 1fr) !important;
   gap: 10px !important;
@@ -39888,9 +39894,9 @@ input::placeholder {
 
 /* ===== Fleet uses final Vessel Exchange layout ===== */
 #hangarScreen.hangar-screen.active:has(#hangarOwnedSection.active) {
-  width: 100% !important;
-  max-width: 1180px !important;
-  height: 665px !important;
+  width: var(--game-shell-width) !important;
+  max-width: 1200px !important;
+  height: var(--game-shell-height) !important;
   padding: 20px 25px 20px !important;
   grid-template-rows: 88px 39px minmax(0, 1fr) !important;
   gap: 10px !important;
@@ -40511,9 +40517,9 @@ input::placeholder {
 
 /* ===== Station Vault two-column redesign ===== */
 #hangarScreen.hangar-screen.active:has(#hangarVaultSection.active) {
-  width: 100% !important;
-  max-width: 1180px !important;
-  height: 665px !important;
+  width: var(--game-shell-width) !important;
+  max-width: 1200px !important;
+  height: var(--game-shell-height) !important;
   padding: 20px 25px !important;
   grid-template-rows: 88px 39px minmax(0, 1fr) !important;
   gap: 10px !important;

@@ -75,6 +75,112 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("desktop game shell uses the larger frame and keeps key screens in view", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    const seedDockedPilot = () => {
+      localStorage.clear();
+      ownedShips = ["falcon"];
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      selectedShipyardShipId = "falcon";
+      if (typeof applyShipStats === "function") applyShipStats(true);
+      tutorialState = { active: false, completed: true, stepIndex: 0 };
+    };
+    const measureShell = async (selector) => page.evaluate((shellSelector) => {
+      const shell = document.querySelector(shellSelector);
+      if (!shell) return null;
+      const rect = shell.getBoundingClientRect();
+      return {
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        overflowX: Math.ceil(rect.right - window.innerWidth),
+        overflowY: Math.ceil(rect.bottom - window.innerHeight)
+      };
+    }, selector);
+    const expectShellFitsViewport = (geometry, label) => {
+      expect(geometry, label).not.toBeNull();
+      expect(geometry.left, label).toBeGreaterThanOrEqual(0);
+      expect(geometry.top, label).toBeGreaterThanOrEqual(0);
+      expect(geometry.overflowX, label).toBeLessThanOrEqual(0);
+      expect(geometry.overflowY, label).toBeLessThanOrEqual(0);
+    };
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+    await page.evaluate(seedDockedPilot);
+    await page.evaluate(() => {
+      window.showScreen("gameScreen");
+      window.openMarketplace();
+    });
+    await expect(page.locator("#marketScreen")).toHaveClass(/active/);
+
+    const roomyTrade = await measureShell("#marketScreen");
+    expectShellFitsViewport(roomyTrade, "Trade Terminal roomy desktop shell");
+    expect(roomyTrade.width).toBe(1200);
+    expect(roomyTrade.height).toBe(700);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+
+    const checks = [
+      ["Trade Terminal", "#marketScreen", () => {
+        window.showScreen("gameScreen");
+        window.openMarketplace();
+      }],
+      ["Hangar / Loadout", "#hangarScreen", () => {
+        window.showScreen("gameScreen");
+        window.openHangar();
+        window.showHangarSection("overview");
+      }],
+      ["Vessel Exchange", "#hangarScreen", () => {
+        window.showScreen("gameScreen");
+        window.openHangar();
+        window.showHangarSection("shipyard");
+      }],
+      ["Fleet", "#hangarScreen", () => {
+        window.showScreen("gameScreen");
+        window.openHangar();
+        window.showHangarSection("owned");
+      }],
+      ["Vault", "#hangarScreen", () => {
+        window.showScreen("gameScreen");
+        window.openHangar();
+        window.showHangarSection("vault");
+      }],
+      ["Forge", "#upgradeForgeScreen", () => {
+        window.showScreen("gameScreen");
+        window.openUpgradeForge();
+      }],
+      ["Bounty Board", "#bountyScreen", () => {
+        window.showScreen("gameScreen");
+        window.openBountyBoard();
+      }],
+      ["Sector / multiplayer staging overlay", "#spaceScreen", () => {
+        window.showScreen("spaceScreen");
+      }]
+    ];
+
+    for (const [label, selector, openScreen] of checks) {
+      await page.evaluate(seedDockedPilot);
+      await page.evaluate(openScreen);
+      await expect(page.locator(selector)).toHaveClass(/active/);
+      const geometry = await measureShell(selector);
+      expectShellFitsViewport(geometry, label);
+      expect(geometry.width, label).toBeLessThanOrEqual(1200);
+      expect(geometry.height, label).toBeLessThanOrEqual(700);
+    }
+
+    await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("signup waits for an authenticated session before creating a profile", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
