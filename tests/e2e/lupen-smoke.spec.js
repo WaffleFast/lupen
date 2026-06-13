@@ -415,6 +415,91 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("staging resetPilot clears progress, preserves Supabase auth, and writes a clean cloud save", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.addInitScript(() => {
+      localStorage.setItem("lupenGameState", JSON.stringify({
+        credits: 999999,
+        currentShipId: "monolith",
+        ownedShips: ["falcon", "monolith"],
+        ownedGuns: { pulseLaser: 4, ionBlaster: 2 },
+        inventoryItems: [{ id: "stale-item", key: "lupenCore", quality: "core" }],
+        playerProgress: { combatXp: 8800, totals: { botsDestroyed: 99, erebusBotsDestroyed: 44, tradeProfit: 77777 } },
+        activeObjective: { type: "bounty", status: "active" }
+      }));
+      localStorage.setItem("lupenStarterPilotTutorial", JSON.stringify({ active: false, completed: true, stepIndex: 31 }));
+      localStorage.setItem("lupenPendingPilotName", "Stale Pilot");
+      localStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-auth");
+      sessionStorage.setItem("sb-ylzglwiehkypetcdkqxd-auth-token", "keep-session-auth");
+      window.__pilotResetCloudUpserts = [];
+      const user = {
+        id: "77777777-7777-4777-8777-777777777777",
+        email: "reset@example.test"
+      };
+      const fakeClient = {
+        auth: {
+          getUser: async () => ({ data: { user }, error: null })
+        },
+        from: (table) => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null })
+            })
+          }),
+          upsert: async (payload) => {
+            window.__pilotResetCloudUpserts.push({ table, payload });
+            return { data: payload, error: null };
+          }
+        })
+      };
+      window.lupenSupabase = fakeClient;
+      window.supabase = { createClient: () => fakeClient };
+    });
+
+    await page.goto("/?mp=staging&resetPilot=1");
+    await waitForGameGlobals(page);
+    await page.waitForFunction(() => !window.location.href.includes("resetPilot=1"));
+
+    const reset = await page.evaluate(() => ({
+      href: window.location.href,
+      helperType: typeof window.lupenResetPilotProgress,
+      auth: localStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
+      sessionAuth: sessionStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
+      pendingPilot: localStorage.getItem("lupenPendingPilotName"),
+      saved: JSON.parse(localStorage.getItem("lupenGameState")),
+      tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")),
+      cloudUpserts: window.__pilotResetCloudUpserts
+    }));
+
+    expect(reset.href).toContain("mp=staging");
+    expect(reset.href).not.toContain("resetPilot=1");
+    expect(reset.helperType).toBe("function");
+    expect(reset.auth).toBe("keep-auth");
+    expect(reset.sessionAuth).toBe("keep-session-auth");
+    expect(reset.pendingPilot).toBe(null);
+    expect(reset.saved.credits).toBe(10000);
+    expect(reset.saved.currentShipId).toBe("");
+    expect(reset.saved.ownedShips).toEqual([]);
+    expect(reset.saved.inventoryItems).toEqual([]);
+    expect(reset.saved.activeObjective).toBe(null);
+    expect(reset.saved.playerProgress.combatXp).toBe(0);
+    expect(reset.saved.playerProgress.totals.botsDestroyed).toBe(0);
+    expect(reset.saved.playerProgress.totals.erebusBotsDestroyed).toBe(0);
+    expect(reset.saved.playerProgress.totals.tradeProfit).toBe(0);
+    expect(reset.tutorial.active).toBe(true);
+    expect(reset.tutorial.completed).toBe(false);
+    expect(reset.tutorial.stepIndex).toBe(0);
+    expect(reset.cloudUpserts).toHaveLength(1);
+    expect(reset.cloudUpserts[0].table).toBe("player_saves");
+    expect(reset.cloudUpserts[0].payload.user_id).toBe("77777777-7777-4777-8777-777777777777");
+    expect(reset.cloudUpserts[0].payload.save_data.credits).toBe(10000);
+    expect(reset.cloudUpserts[0].payload.save_data.currentShipId).toBe("");
+    expect(reset.cloudUpserts[0].payload.save_data.ownedShips).toEqual([]);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("missing cloud save starts fresh instead of silently uploading stale local progress", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

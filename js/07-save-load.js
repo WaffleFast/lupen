@@ -67,20 +67,87 @@ function lupenClearLocalSave(options = {}) {
 
 window.lupenClearLocalSave = lupenClearLocalSave;
 
+function isLupenPilotResetAllowed() {
+  const params = new URLSearchParams(window.location.search || "");
+  const host = String(window.location.hostname || "").toLowerCase();
+  return params.get("mp") === "staging" ||
+    params.has("debug") ||
+    ["localhost", "127.0.0.1", "::1"].includes(host);
+}
+
+function removeResetParamFromUrl(paramName) {
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  params.delete(paramName);
+  const nextUrl = `${url.pathname}${params.toString() ? `?${params}` : ""}${url.hash}`;
+  try {
+    window.history.replaceState({}, document.title, nextUrl);
+  } catch (error) {
+    console.warn(`[Lupen staging] Unable to remove ${paramName} query parameter.`, error);
+  }
+}
+
 function handleStagingClearLocalSaveParam() {
   const url = new URL(window.location.href);
   const params = url.searchParams;
   if (params.get("mp") !== "staging" || params.get("clearLocalSave") !== "1") return false;
 
   const result = lupenClearLocalSave();
-  params.delete("clearLocalSave");
-  const nextUrl = `${url.pathname}${params.toString() ? `?${params}` : ""}${url.hash}`;
-  try {
-    window.history.replaceState({}, document.title, nextUrl);
-  } catch (error) {
-    console.warn("[Lupen staging] Unable to remove clearLocalSave query parameter.", error);
-  }
+  removeResetParamFromUrl("clearLocalSave");
   console.info("[Lupen staging] Applied clearLocalSave=1 before loading local game state.", result);
+  return true;
+}
+
+async function lupenResetPilotProgress(options = {}) {
+  if (!isLupenPilotResetAllowed()) {
+    console.warn("[Lupen staging] Pilot progress reset blocked outside staging/dev.");
+    return { ok: false, reason: "staging_or_dev_required" };
+  }
+
+  const localReset = lupenClearLocalSave();
+  if (typeof resetToNoShipStarterState === "function") resetToNoShipStarterState();
+  if (typeof clearStarterTutorialState === "function") clearStarterTutorialState();
+  if (typeof startStarterTutorial === "function") startStarterTutorial(true);
+
+  const cleanState = buildSaveState({ leaveSave: false });
+  LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, cleanState);
+
+  let cloudSaved = false;
+  let cloudReason = "not_authenticated";
+  const auth = await getAuthenticatedSupabaseUser();
+  if (auth) {
+    await saveGameStateToSupabaseForUser(auth.client, auth.user, cleanState);
+    cloudSaved = true;
+    cloudReason = "saved";
+  }
+
+  if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (typeof updateHudDock === "function") updateHudDock();
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  if (typeof renderObjectiveHud === "function") renderObjectiveHud();
+  if (typeof renderPilotProfileIfActive === "function") renderPilotProfileIfActive();
+
+  const result = {
+    ok: true,
+    localReset,
+    cloudSaved,
+    cloudReason,
+    resetState: "no_ship_starter_claim",
+    reloaded: options.reload === true
+  };
+  console.info("Lupen pilot progress reset complete.", result);
+  return result;
+}
+
+window.lupenResetPilotProgress = lupenResetPilotProgress;
+
+async function handleStagingResetPilotParam() {
+  const params = new URLSearchParams(window.location.search || "");
+  if (params.get("mp") !== "staging" || params.get("resetPilot") !== "1") return false;
+
+  const result = await lupenResetPilotProgress();
+  removeResetParamFromUrl("resetPilot");
+  console.info("[Lupen staging] Applied resetPilot=1.", result);
   return true;
 }
 
@@ -1076,9 +1143,14 @@ function debugResetSave() {
   window.location.reload();
 }
 
-window.onload = function () {
-  if (typeof handleStagingClearLocalSaveParam === "function") handleStagingClearLocalSaveParam();
-  if (typeof handleStagingResetTutorialParam === "function") handleStagingResetTutorialParam();
+window.onload = async function () {
+  const pilotResetApplied = typeof handleStagingResetPilotParam === "function"
+    ? await handleStagingResetPilotParam()
+    : false;
+  if (!pilotResetApplied) {
+    if (typeof handleStagingClearLocalSaveParam === "function") handleStagingClearLocalSaveParam();
+    if (typeof handleStagingResetTutorialParam === "function") handleStagingResetTutorialParam();
+  }
   loadGame();
 
   if (!homePlanet || !sectorNodes[homePlanet] || sectorNodes[homePlanet].type !== "planet") {
