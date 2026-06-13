@@ -55,7 +55,7 @@ const STARTER_TUTORIAL_STEPS = [
     id: "open-trade",
     title: "Open Trade Terminal",
     text: "Open the Trade Terminal. A good pilot does not just move cargo. They read the market.",
-    target: ".hub-actions button[onclick='openMarketplace()']",
+    target: "tutorial:planetTradeTerminal",
     event: "openedTradeTerminal"
   },
   {
@@ -125,8 +125,8 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-trade-to-sell",
     title: "Open Trade Terminal",
-    text: "Good. The cargo is intact. Open the Trade Terminal and sell it into Virella's market.",
-    target: ".hub-actions button[onclick='openMarketplace()']",
+    text: "Open the Trade Terminal and sell the cargo you carried here.",
+    target: "tutorial:planetTradeTerminal",
     event: "openedTradeTerminal"
   },
   {
@@ -464,7 +464,12 @@ function isTutorialBountyReadyToClaim() {
 }
 
 function isTutorialBountyAccepted() {
-  return activeObjective?.type === "bounty" || dailyBountyContracts?.some?.(contract => contract.status === "active" || contract.status === "readyToClaim");
+  const stagingBounty = typeof getActiveMultiplayerStagingBountyObjective === "function"
+    ? getActiveMultiplayerStagingBountyObjective()
+    : null;
+  return activeObjective?.type === "bounty" ||
+    dailyBountyContracts?.some?.(contract => contract.status === "active" || contract.status === "readyToClaim") ||
+    Boolean(stagingBounty?.accepted || stagingBounty?.claimAvailable || stagingBounty?.completed);
 }
 
 function isTutorialForgeComplete() {
@@ -820,6 +825,11 @@ function getDynamicTutorialTarget(step) {
   if (step.target === "tutorial:marketTarget") {
     return document.querySelector("[data-tutorial-target='marketTargetConfirm']:not(:disabled)") ||
            document.querySelector("[data-tutorial-target='marketTargetSelect']");
+  }
+
+  if (step.target === "tutorial:planetTradeTerminal") {
+    return document.querySelector("[data-tutorial-target='planetTradeTerminal']") ||
+           document.querySelector(".hub-actions button[onclick='openMarketplace()']");
   }
 
   if (step.target === "tutorial:destroyBountyBot") {

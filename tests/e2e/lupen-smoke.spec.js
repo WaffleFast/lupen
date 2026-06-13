@@ -1788,6 +1788,19 @@ test.describe("Lupen browser smoke", () => {
     `));
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-trade-to-sell");
 
+    const terminalHighlightState = await page.evaluate(() => window.eval(`
+      (() => {
+        renderStarterTutorial();
+        const terminal = document.querySelector("[data-tutorial-target='planetTradeTerminal']");
+        return {
+          step: getCurrentTutorialStep().id,
+          exists: Boolean(terminal),
+          highlighted: terminal?.classList.contains("tutorial-highlight-target") || false,
+          text: terminal?.textContent || ""
+        };
+      })()
+    `));
+
     const tradeSell = await page.evaluate(() => window.eval(`
       (() => {
         const route = { ...activeTradeRoute };
@@ -1844,6 +1857,10 @@ test.describe("Lupen browser smoke", () => {
     expect(landingState.clickable).toBe(true);
     expect(landingState.mapNodeExists).toBe(true);
     expect(landingState.currentScreenLanded).toBe(true);
+    expect(terminalHighlightState.step).toBe("open-trade-to-sell");
+    expect(terminalHighlightState.exists).toBe(true);
+    expect(terminalHighlightState.highlighted).toBe(true);
+    expect(terminalHighlightState.text).toContain("Trade");
     expect(tradeSell.sellButtonPresent).toBe(true);
     expect(tradeSell.sellButtonDisabled).toBe(false);
     expect(tradeSell.buyButtonPresent).toBe(false);
@@ -1858,6 +1875,89 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeSell.tradeProfit).toBeGreaterThan(0);
     expect(tradeSell.tradesCompleted).toBe(1);
     expect(finalStep).toBe("return-after-trade");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("starter bounty tutorial handles available and already-active bounty states", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const availableState = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        activeObjective = null;
+        ensureDailyBounties();
+        dailyBountyContracts.forEach(contract => {
+          contract.status = "available";
+          contract.progress = 0;
+        });
+        showScreen("gameScreen");
+        openBountyBoard();
+        startStarterTutorial(true);
+        setTutorialStepById("accept-bounty");
+        renderStarterTutorial();
+        const button = document.querySelector(".accept-bounty-button");
+        return {
+          step: getCurrentTutorialStep().id,
+          buttonText: button?.textContent || "",
+          highlighted: button?.classList.contains("tutorial-highlight-target") || false,
+          disabled: Boolean(button?.disabled)
+        };
+      })()
+    `));
+
+    expect(availableState.step).toBe("accept-bounty");
+    expect(availableState.buttonText).toContain("Accept Bounty");
+    expect(availableState.highlighted).toBe(true);
+    expect(availableState.disabled).toBe(false);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const activeStagingState = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        const active = {
+          id: "staging_erebus_patrol_2",
+          title: "Erebus Patrol Sweep",
+          description: "Destroy server-owned staging Erebus bots.",
+          requiredKills: 2,
+          progress: 0,
+          xpReward: 40,
+          accepted: true,
+          completed: false,
+          claimAvailable: false,
+          claimed: false
+        };
+        window.LupenMultiplayerClient = {
+          ...(window.LupenMultiplayerClient || {}),
+          getStatus: () => ({
+            enabled: true,
+            isConnected: true,
+            lastStagingBountyStatus: { active },
+            lastStagingBountyList: { active, bounties: [active] }
+          })
+        };
+        showScreen("gameScreen");
+        openBountyBoard();
+        startStarterTutorial(true);
+        setTutorialStepById("accept-bounty");
+        renderStarterTutorial();
+        const before = document.getElementById("bountyDetailPanel")?.textContent || "";
+        const step = getCurrentTutorialStep().id;
+        return {
+          step,
+          detailText: before
+        };
+      })()
+    `));
+
+    expect(activeStagingState.step).toBe("return-for-combat-launch");
+    expect(activeStagingState.detailText).toContain("Active Bounty");
+    expect(activeStagingState.detailText).not.toContain("Active Staging Bounty");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

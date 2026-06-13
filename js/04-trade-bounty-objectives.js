@@ -2579,11 +2579,11 @@ function renderMultiplayerStagingBountyDetail() {
 
   const actionHtml = bounty.claimed
     ? `<button class="selected-contract-action bounty-accept-btn" disabled>Claimed</button>`
-    : bounty.claimAvailable || bounty.completed
-      ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claim Pending" : "Claim XP"}</button>`
+      : bounty.claimAvailable || bounty.completed
+        ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claim Pending" : "Claim XP"}</button>`
       : bounty.accepted
-        ? `<button class="selected-contract-action bounty-accept-btn" disabled>Active Staging Bounty</button>`
-        : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accept Pending" : connected ? "Accept Staging Bounty" : "Waiting For Server"}</button>`;
+        ? `<button class="selected-contract-action bounty-accept-btn" disabled>Active Bounty</button>`
+        : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accept Pending" : connected ? "Accept Bounty" : "Waiting For Server"}</button>`;
 
   const connectionNote = connected
     ? "Server-tracked staging bounty."
