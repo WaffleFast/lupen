@@ -1738,24 +1738,50 @@ test.describe("Lupen browser smoke", () => {
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-to-station-for-launch");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
-    const landingState = await page.evaluate(() => window.eval(`
+    const arrivalState = await page.evaluate(() => window.eval(`
       (() => {
         const route = { ...activeTradeRoute };
-        currentNode = route.destination;
-        lastPlanetNode = route.destination;
         showScreen("spaceScreen");
+        setTutorialStepById("make-jump");
+        ["West Link 2", "West Link 1", route.destination].forEach(node => {
+          jumpCharge = jumpMax;
+          jumpToNode(node);
+        });
+        renderStarterTutorial();
+        return {
+          currentNode,
+          screen: document.querySelector("section.active")?.id || "",
+          step: getCurrentTutorialStep().id
+        };
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "land-destination");
+
+    const landingState = await page.evaluate(() => window.eval(`
+      (() => {
         updateCurrentNodeUI();
-        setTutorialStepById("land-destination");
         renderStarterTutorial();
         const beforeStep = getCurrentTutorialStep().id;
         const landTarget = document.querySelector("#planetLandBtn");
         const highlighted = landTarget?.classList.contains("tutorial-highlight-target") || false;
         const visible = landTarget && !landTarget.hidden && getComputedStyle(landTarget).display !== "none";
-        landOnPlanet();
+        const label = getComputedStyle(landTarget, "::after").content || "";
+        const clickable = document.elementFromPoint(
+          landTarget.getBoundingClientRect().left + (landTarget.getBoundingClientRect().width / 2),
+          landTarget.getBoundingClientRect().top + (landTarget.getBoundingClientRect().height / 2)
+        )?.closest?.("#planetLandBtn")?.id === "planetLandBtn";
+        jumpCharge = jumpMax;
+        openSectorMap();
+        const virellaNode = document.querySelector("#sectorSvg [data-node='Virella']");
+        const mapNodeExists = Boolean(virellaNode);
+        virellaNode?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
         return {
           beforeStep,
           highlighted,
           visible,
+          label,
+          clickable,
+          mapNodeExists,
           currentScreenLanded: document.getElementById("gameScreen")?.classList.contains("active") || false
         };
       })()
@@ -1792,9 +1818,15 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeBuy.route.origin).toBe("Asteron Prime");
     expect(tradeBuy.route.destination).toBe("Virella");
     expect(tradeBuy.route.tutorialTrade).toBe(true);
+    expect(arrivalState.currentNode).toBe("Virella");
+    expect(arrivalState.screen).toBe("spaceScreen");
+    expect(arrivalState.step).toBe("land-destination");
     expect(landingState.beforeStep).toBe("land-destination");
     expect(landingState.highlighted).toBe(true);
     expect(landingState.visible).toBe(true);
+    expect(landingState.label).toContain("LAND");
+    expect(landingState.clickable).toBe(true);
+    expect(landingState.mapNodeExists).toBe(true);
     expect(landingState.currentScreenLanded).toBe(true);
     expect(tradeSell.cargoAfterSell).toBe(0);
     expect(tradeSell.tradeProfit).toBeGreaterThan(0);

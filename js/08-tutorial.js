@@ -532,6 +532,14 @@ function reconcileTutorialStepWithCurrentState() {
   if (!tutorialState.active) return;
   for (let guard = 0; guard < STARTER_TUTORIAL_STEPS.length; guard += 1) {
     const step = getCurrentTutorialStep();
+    if (["open-trade-to-sell", "sell-cargo"].includes(step?.id) && isAtActiveTradeDestination() && !isLandedAtActiveTradeDestination()) {
+      const landingStep = STARTER_TUTORIAL_STEPS.findIndex(item => item.id === "land-destination");
+      if (landingStep >= 0) {
+        tutorialState.stepIndex = landingStep;
+        saveTutorialState();
+        return;
+      }
+    }
     if (["select-market-resource", "select-market-target", "select-buy-amount", "buy-cargo"].includes(step?.id)) {
       prepareTutorialTradeSelection();
       if (document.getElementById("marketScreen")?.classList.contains("active") && typeof renderMarketplace === "function") {

@@ -1655,7 +1655,14 @@ function drawNodes(svg) {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
     group.style.cursor = canJump || isCurrent ? "pointer" : "default";
-    group.onclick = () => jumpToNode(name);
+    group.setAttribute("data-node", name);
+    group.onclick = () => {
+      if (isCurrent && node.type === "planet" && typeof landOnPlanet === "function") {
+        landOnPlanet();
+        return;
+      }
+      jumpToNode(name);
+    };
     group.setAttribute("class", `${isCurrent ? "svg-player-node current-map-node" : ""} ${canJump && !isCurrent ? "reachable-map-node" : ""} ${!canJump && !isCurrent ? "unreachable-map-node" : ""} ${isObjectiveTarget ? "svg-objective-target-node" : ""} ${isObjectivePath ? "svg-objective-path-node" : ""}`);
 
     if (node.type === "planet") {

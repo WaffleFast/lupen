@@ -42114,6 +42114,8 @@ input::placeholder {
 
 /* Tutorial landing target: keep old overrides from pinning the planet hitbox away from JS positioning. */
 #planetLandBtn.tutorial-highlight-target {
+  display: grid !important;
+  place-items: center !important;
   right: auto !important;
   border: 2px solid rgba(127, 223, 255, 1) !important;
   border-radius: 50% !important;
@@ -42123,4 +42125,21 @@ input::placeholder {
     0 0 34px rgba(127, 223, 255, 0.62),
     inset 0 0 26px rgba(127, 223, 255, 0.18) !important;
   animation: tutorialLandingPulse 1.18s ease-in-out infinite;
+}
+
+#planetLandBtn.tutorial-highlight-target::after {
+  content: "LAND";
+  display: grid;
+  place-items: center;
+  min-width: 64px;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 232, 163, 0.76);
+  border-radius: 8px;
+  background: rgba(3, 13, 28, 0.88);
+  color: #ffe8a3;
+  font-size: clamp(12px, 1.2vw, 16px);
+  font-weight: 1000;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 10px rgba(255, 220, 120, 0.42);
 }
