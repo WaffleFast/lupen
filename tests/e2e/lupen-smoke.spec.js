@@ -1165,6 +1165,63 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("audits live boot and fresh starter tutorial state", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const audit = await page.evaluate(() => window.eval(`
+      (() => {
+        const boot = {
+          ship: currentShipId,
+          ownedShips: ownedShips.slice(),
+          guns: (shipLoadouts[STARTER_SHIP_ID]?.guns || []).map(entry => getEquipmentKey(entry)),
+          attachments: (shipLoadouts[STARTER_SHIP_ID]?.attachments || []).map(entry => getEquipmentKey(entry)),
+          ownedPulseLaser: ownedGuns.pulseLaser || 0,
+          ownedCargoPod: ownedAttachments.cargoPod || 0,
+          ownedJumpDrive: ownedAttachments.jumpDrive || 0,
+          credits,
+          cargoUsed: cargoUsed(),
+          currentNode,
+          tutorialState: { ...tutorialState }
+        };
+        resetToNoShipStarterState();
+        const fresh = {
+          ship: currentShipId,
+          ownedShips: ownedShips.slice(),
+          selectedShipyardShipId,
+          shipLoadouts: { ...shipLoadouts },
+          ownedPulseLaser: ownedGuns.pulseLaser || 0,
+          ownedCargoPod: ownedAttachments.cargoPod || 0,
+          ownedJumpDrive: ownedAttachments.jumpDrive || 0,
+          credits,
+          cargoUsed: cargoUsed(),
+          currentNode
+        };
+        return { boot, fresh };
+      })()
+    `));
+
+    expect(audit.boot.ship).toBe("falcon");
+    expect(audit.boot.ownedShips).toContain("falcon");
+    expect(audit.boot.guns).toContain("pulseLaser");
+    expect(audit.boot.credits).toBe(10000);
+    expect(audit.boot.currentNode).toBe("Asteron Prime");
+
+    expect(audit.fresh.ship).toBe("");
+    expect(audit.fresh.ownedShips).toEqual([]);
+    expect(audit.fresh.selectedShipyardShipId).toBe("falcon");
+    expect(audit.fresh.ownedPulseLaser).toBe(0);
+    expect(audit.fresh.ownedCargoPod).toBe(0);
+    expect(audit.fresh.ownedJumpDrive).toBe(0);
+    expect(audit.fresh.credits).toBe(10000);
+    expect(audit.fresh.cargoUsed).toBe(0);
+    expect(audit.fresh.currentNode).toBe("Asteron Prime");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("staging tutorial reset URL and helper restart the programme without clearing saves", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -1318,6 +1375,103 @@ test.describe("Lupen browser smoke", () => {
 
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") !== "buy-first-ship");
     await expect(page.evaluate(() => window.eval("getCurrentTutorialStep().id"))).resolves.toBe("open-first-loadout");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("tutorial replay skips weapon purchase and equip when Pulse Laser is already mounted", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      localStorage.clear();
+      currentShipId = STARTER_SHIP_ID;
+      selectedHangarShipId = STARTER_SHIP_ID;
+      selectedFleetShipId = STARTER_SHIP_ID;
+      ownedShips = [STARTER_SHIP_ID];
+      shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: ["pulseLaser", "pulseLaser"] }, STARTER_SHIP_ID) };
+      ownedGuns.pulseLaser = 0;
+      showScreen("gameScreen");
+      startStarterTutorial(true);
+      setTutorialStepById("open-store");
+    `));
+
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-bounty");
+    await expect(page.evaluate(() => window.eval("getCurrentTutorialStep().id"))).resolves.toBe("open-bounty");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("first trade tutorial path buys and sells cargo with current Market Board UI events", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const tradeBuy = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: ["pulseLaser"] }, STARTER_SHIP_ID) };
+        credits = 10000;
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        activeTradeRoute = null;
+        activeObjective = null;
+        playerProgress = normalizePlayerProgress({ combatXp: 0, totals: {} });
+        mineralKeys.forEach(key => { cargo[key] = 0; });
+        cargoCostBasis = {};
+        showScreen("gameScreen");
+        openMarketplace();
+        startStarterTutorial(true);
+        setTutorialStepById("select-market-resource");
+        const selectionStep = getCurrentTutorialStep().id;
+        buyMarketCargo();
+        const route = { ...activeTradeRoute };
+        return {
+          selectionStep,
+          route,
+          cargoAfterBuy: cargo[route.good] || 0
+        };
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-to-station-for-launch");
+
+    const tradeSell = await page.evaluate(() => window.eval(`
+      (() => {
+        const route = { ...activeTradeRoute };
+        currentNode = route.destination;
+        lastPlanetNode = route.destination;
+        selectedMarketResource = route.good;
+        selectedMarketTargetPlanet = route.destination;
+        renderMarketplace();
+        setTutorialStepById("sell-cargo");
+        sellMarketCargo();
+        return {
+          route,
+          cargoAfterSell: cargo[route.good] || 0,
+          tradeProfit: playerProgress.totals.tradeProfit || 0,
+          tradesCompleted: playerProgress.totals.tradesCompleted || 0,
+          finalStep: getCurrentTutorialStep().id
+        };
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-after-trade");
+    const finalStep = await page.evaluate(() => window.eval("getCurrentTutorialStep().id"));
+
+    expect(tradeBuy.selectionStep).toBe("buy-cargo");
+    expect(tradeBuy.cargoAfterBuy).toBeGreaterThan(0);
+    expect(tradeBuy.route.good).toBe("Crystal Shards");
+    expect(tradeBuy.route.origin).toBe("Asteron Prime");
+    expect(tradeBuy.route.destination).toBe("Nyxara");
+    expect(tradeSell.cargoAfterSell).toBe(0);
+    expect(tradeSell.tradeProfit).toBeGreaterThan(0);
+    expect(tradeSell.tradesCompleted).toBe(1);
+    expect(finalStep).toBe("return-after-trade");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

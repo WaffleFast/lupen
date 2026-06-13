@@ -20,14 +20,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-first-ship",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. You do not have an active vessel yet, so I will route you to the Vessel Exchange.",
+    text: "Open Hangar Bay. We will confirm your Azure Striker and inspect the systems that carry you through the first route.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "buy-first-ship",
     title: "Claim Azure Striker",
-    text: "Claim the Azure Striker. She is quick, forgiving, and ready to carry your first credits home.",
+    text: "Claim Azure Striker if she is waiting in the Vessel Exchange. If she is already active, I will move us forward.",
     target: "tutorial:firstShipBuy",
     event: "boughtFirstShip"
   },
@@ -142,14 +142,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-store",
     title: "Open Store",
-    text: "Open the Store. Better weapons let you take greater risks and survive the contracts that follow.",
+    text: "Open the Store if you still need a starter weapon. Better weapons let you take greater risks and survive the contracts that follow.",
     target: ".hub-actions button[onclick='openStore()']",
     event: "openedStore"
   },
   {
     id: "buy-equipment",
     title: "Buy first weapon",
-    text: "Buy a Pulse Laser from the Store. It is reliable, affordable, and enough to begin your first bounty.",
+    text: "Buy a Pulse Laser if one is not already in your hold or mounted on Azure Striker. It is reliable enough for your first bounty.",
     target: "tutorial:storePulseLaser",
     event: "boughtStoreGun"
   },
@@ -171,7 +171,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "equip-item",
     title: "Equip weapon",
-    text: "Fit the Pulse Laser into an open weapon slot. Better weapons are how small risks become survivable ones.",
+    text: "Fit the Pulse Laser into an open weapon slot if needed. If your starter weapons are already online, we continue.",
     target: "tutorial:spareWeapon",
     event: "equippedItem"
   },
@@ -352,6 +352,170 @@ function saveTutorialState() {
 
 function getCurrentTutorialStep() {
   return STARTER_TUTORIAL_STEPS[Math.min(tutorialState.stepIndex, STARTER_TUTORIAL_STEPS.length - 1)];
+}
+
+function getStarterShipId() {
+  return typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+}
+
+function getTutorialShipLoadout(shipId = currentShipId || getStarterShipId()) {
+  return typeof getShipLoadout === "function"
+    ? getShipLoadout(shipId)
+    : (shipLoadouts?.[shipId] || { attachments: [], guns: [] });
+}
+
+function tutorialEntryKey(entry) {
+  return typeof getEquipmentKey === "function" ? getEquipmentKey(entry) : (typeof entry === "string" ? entry : entry?.key);
+}
+
+function hasTutorialPulseLaserEquipped() {
+  return Object.values(shipLoadouts || {}).some(loadout =>
+    (loadout?.guns || []).some(entry => tutorialEntryKey(entry) === "pulseLaser")
+  );
+}
+
+function hasTutorialPulseLaserAvailable() {
+  return hasTutorialPulseLaserEquipped() ||
+    Number(ownedGuns?.pulseLaser || 0) > 0 ||
+    (Array.isArray(inventoryItems) && inventoryItems.some(item => item?.key === "pulseLaser"));
+}
+
+function hasTutorialCombatWeaponEquipped() {
+  return Object.values(shipLoadouts || {}).some(loadout => (loadout?.guns || []).length > 0);
+}
+
+function hasOpenTutorialWeaponSlot() {
+  const shipId = currentShipId || getStarterShipId();
+  const loadout = getTutorialShipLoadout(shipId);
+  const limit = typeof getGunSlotLimit === "function" ? getGunSlotLimit(shipId) : 0;
+  return (loadout.guns || []).length < limit;
+}
+
+function hasCompletedTutorialTrade() {
+  const totals = playerProgress?.totals || {};
+  return Number(totals.tradeProfit || totals.totalTradingProfit || 0) > 0 ||
+    Number(totals.tradesCompleted || 0) > 0;
+}
+
+function hasTutorialTradeCargo() {
+  const objective = typeof getActiveObjective === "function" ? getActiveObjective() : activeObjective;
+  return Boolean(
+    activeTradeRoute?.marketTrade && Number(cargo?.[activeTradeRoute.good] || 0) > 0 ||
+    objective?.type === "trade" && Number(cargo?.[objective.good] || 0) > 0 ||
+    typeof cargoUsed === "function" && cargoUsed() > 0
+  );
+}
+
+function isTutorialTradeSelectionReady() {
+  const currentPlanet = typeof getCurrentMarketPlanet === "function" ? getCurrentMarketPlanet() : currentNode;
+  return MAP_ONE_TRADE_RESOURCES.includes(selectedMarketResource) &&
+    MAP_ONE_MARKET_PLANETS.includes(selectedMarketTargetPlanet) &&
+    selectedMarketTargetPlanet !== currentPlanet &&
+    Number(selectedMarketQuantity || 0) > 0;
+}
+
+function prepareTutorialTradeSelection() {
+  if (hasTutorialTradeCargo() || hasCompletedTutorialTrade()) return;
+  const currentPlanet = typeof getCurrentMarketPlanet === "function" ? getCurrentMarketPlanet() : currentNode;
+  const route = [
+    ["Crystal Shards", "Nyxara"],
+    ["Iron", "Virella"],
+    ["Copper", "Nyxara"],
+    ["Cobalt", "Virella"]
+  ].find(([good, destination]) => {
+    if (destination === currentPlanet) return false;
+    const buy = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(good, currentPlanet) : 0;
+    const sell = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(good, destination) : 0;
+    return buy > 0 && sell > buy && Number(credits || 0) >= buy;
+  });
+  if (!route) return;
+  selectedMarketResource = route[0];
+  selectedMarketTargetPlanet = route[1];
+  const limit = typeof getMarketMaxBuyQuantity === "function" ? getMarketMaxBuyQuantity(route[0], currentPlanet) : 1;
+  selectedMarketQuantity = Math.max(1, Math.min(Number(selectedMarketQuantity || 1), Math.max(1, limit)));
+}
+
+function isTutorialBountyReadyToClaim() {
+  return activeObjective?.type === "bounty" && activeObjective.status === "readyToClaim" ||
+    dailyBountyContracts?.some?.(contract => contract.status === "readyToClaim");
+}
+
+function isTutorialBountyAccepted() {
+  return activeObjective?.type === "bounty" || dailyBountyContracts?.some?.(contract => contract.status === "active" || contract.status === "readyToClaim");
+}
+
+function isTutorialForgeComplete() {
+  return typeof hasTutorialPulseLaserQualityUpgrade === "function" && hasTutorialPulseLaserQualityUpgrade();
+}
+
+function getTutorialStateCompletionReason(step) {
+  if (!step) return "";
+  const starterShipId = getStarterShipId();
+  switch (step.id) {
+    case "buy-first-ship":
+      return currentShipId === starterShipId && ownedShips.includes(starterShipId) ? "starter_ship_active" : "";
+    case "select-market-resource":
+    case "select-market-target":
+    case "select-buy-amount":
+      return hasTutorialTradeCargo() || hasCompletedTutorialTrade() || isTutorialTradeSelectionReady() ? "trade_selection_ready" : "";
+    case "buy-cargo":
+      return hasTutorialTradeCargo() || hasCompletedTutorialTrade() ? "trade_cargo_already_loaded" : "";
+    case "make-jump":
+    case "land-destination":
+      return hasCompletedTutorialTrade() || isAtActiveTradeDestination() ? "trade_destination_reached" : "";
+    case "sell-cargo":
+      return hasCompletedTutorialTrade() ? "trade_already_completed" : "";
+    case "open-store":
+    case "buy-equipment":
+    case "return-after-store":
+      return hasTutorialPulseLaserAvailable() || hasTutorialCombatWeaponEquipped() ? "starter_weapon_available" : "";
+    case "open-hangar-equip":
+    case "equip-item":
+    case "return-after-equip":
+      if (hasTutorialPulseLaserEquipped()) return "pulse_laser_equipped";
+      if (!hasOpenTutorialWeaponSlot() && hasTutorialCombatWeaponEquipped()) return "weapon_slots_already_filled";
+      return "";
+    case "accept-bounty":
+      return isTutorialBountyAccepted() ? "bounty_already_active" : "";
+    case "destroy-bot":
+    case "open-map-return-bounty":
+    case "return-to-planet-after-bounty":
+    case "land-after-bounty":
+      return isTutorialBountyReadyToClaim() ? "bounty_ready_to_claim" : "";
+    case "claim-bounty":
+    case "continue-after-bounty-reward":
+      return !activeObjective && Number(playerProgress?.totals?.bountiesClaimed || 0) > 0 ? "bounty_already_claimed" : "";
+    case "forge-upgrade-weapon":
+      return isTutorialForgeComplete() ? "pulse_laser_already_upgraded" : "";
+    default:
+      return "";
+  }
+}
+
+function advanceTutorialStepFromState(reason) {
+  const step = getCurrentTutorialStep();
+  console.info("[Lupen tutorial] Auto-completed step from current state.", {
+    step: step?.id,
+    reason
+  });
+  tutorialState.stepIndex = Math.min(STARTER_TUTORIAL_STEPS.length - 1, tutorialState.stepIndex + 1);
+  saveTutorialState();
+}
+
+function reconcileTutorialStepWithCurrentState() {
+  if (!tutorialState.active) return;
+  for (let guard = 0; guard < STARTER_TUTORIAL_STEPS.length; guard += 1) {
+    const step = getCurrentTutorialStep();
+    if (["select-market-resource", "select-market-target", "select-buy-amount", "buy-cargo"].includes(step?.id)) {
+      prepareTutorialTradeSelection();
+      if (document.getElementById("marketScreen")?.classList.contains("active") && typeof renderMarketplace === "function") {
+        renderMarketplace();
+      }
+    }
+    const reason = getTutorialStateCompletionReason(step);
+    if (!reason) return;
+    advanceTutorialStepFromState(reason);
+  }
 }
 
 
@@ -1001,6 +1165,7 @@ function renderStarterTutorial() {
     return;
   }
 
+  reconcileTutorialStepWithCurrentState();
   const step = getCurrentTutorialStep();
 
   if (step?.id === "forge-upgrade-weapon" && typeof hasTutorialPulseLaserQualityUpgrade === "function" && hasTutorialPulseLaserQualityUpgrade()) {
