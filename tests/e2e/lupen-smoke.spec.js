@@ -2043,6 +2043,112 @@ test.describe("Lupen browser smoke", () => {
     expect(activeStagingState.detailText).toContain("Active Bounty");
     expect(activeStagingState.detailText).not.toContain("Active Staging Bounty");
 
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const stagingBotState = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        const active = {
+          id: "staging_erebus_patrol_2",
+          title: "Erebus Patrol Sweep",
+          description: "Destroy server-owned staging Erebus bots.",
+          requiredKills: 2,
+          progress: 0,
+          xpReward: 40,
+          accepted: true,
+          completed: false,
+          claimAvailable: false,
+          claimed: false
+        };
+        const bot = {
+          id: "staging-bot-1",
+          name: "Erebus Watcher",
+          displayName: "Erebus Watcher",
+          currentNode: "Lower Lane West B",
+          x: 42,
+          y: 46,
+          hull: 720,
+          maxHull: 720,
+          shield: 180,
+          maxShield: 180,
+          disabled: false,
+          alive: true
+        };
+        window.__selectedStagingBotId = "";
+        window.LupenMultiplayerClient = {
+          ...(window.LupenMultiplayerClient || {}),
+          getStatus: () => ({
+            enabled: true,
+            isConnected: true,
+            lastStagingBountyStatus: { active },
+            lastStagingBountyList: { active, bounties: [active] },
+            selectedTargetBotId: window.__selectedStagingBotId
+          }),
+          getBots: () => [bot],
+          getBotsInCurrentNode: () => currentNode === bot.currentNode ? [bot] : [],
+          getBotById: id => String(id) === bot.id ? bot : null,
+          selectStagingBot: id => {
+            window.__selectedStagingBotId = id;
+          },
+          clearStagingTarget: () => {
+            window.__selectedStagingBotId = "";
+          }
+        };
+        currentNode = bot.currentNode;
+        showScreen("spaceScreen");
+        updateCurrentNodeUI();
+        updateAsteroidUI();
+        const marker = document.createElement("button");
+        marker.type = "button";
+        marker.className = "lupen-mp-space-bot";
+        marker.dataset.botId = bot.id;
+        marker.textContent = "Erebus Watcher";
+        marker.style.left = "42%";
+        marker.style.top = "46%";
+        marker.onclick = event => {
+          event.preventDefault();
+          event.stopPropagation();
+          selectStagingBotTarget(bot.id);
+        };
+        document.getElementById("spaceScreen")?.appendChild(marker);
+        startStarterTutorial(true);
+        setTutorialStepById("jump-to-bounty-zone");
+        renderStarterTutorial();
+        return {
+          step: getCurrentTutorialStep().id,
+          markerHighlighted: marker.classList.contains("tutorial-highlight-target"),
+          selectedType: selectedTarget?.type || "",
+          engageDisabled: document.getElementById("objectEngageBtn")?.disabled ?? true
+        };
+      })()
+    `));
+
+    expect(stagingBotState.step).toBe("destroy-bot");
+    expect(stagingBotState.markerHighlighted).toBe(true);
+    expect(stagingBotState.selectedType).toBe("");
+    expect(stagingBotState.engageDisabled).toBe(true);
+
+    await page.locator(".lupen-mp-space-bot").click();
+    await page.waitForFunction(() => window.eval("selectedTarget?.type") === "stagingBot");
+    const stagingBotSelectedState = await page.evaluate(() => window.eval(`
+      (() => {
+        renderStarterTutorial();
+        const engage = document.getElementById("objectEngageBtn");
+        return {
+          step: getCurrentTutorialStep().id,
+          selectedType: selectedTarget?.type || "",
+          engageDisabled: engage?.disabled ?? true,
+          engageHighlighted: engage?.classList.contains("tutorial-highlight-target") || false
+        };
+      })()
+    `));
+
+    expect(stagingBotSelectedState.step).toBe("destroy-bot");
+    expect(stagingBotSelectedState.selectedType).toBe("stagingBot");
+    expect(stagingBotSelectedState.engageDisabled).toBe(false);
+    expect(stagingBotSelectedState.engageHighlighted).toBe(true);
+
     await expectNoUnexpectedBrowserErrors(failures);
   });
 

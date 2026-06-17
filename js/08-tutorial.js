@@ -473,6 +473,25 @@ function isTutorialBountyAccepted() {
     Boolean(stagingBounty?.accepted || stagingBounty?.claimAvailable || stagingBounty?.completed);
 }
 
+function isAtTutorialBountyCombatTarget() {
+  if (typeof isAtActiveBountyCombatNode === "function" && isAtActiveBountyCombatNode()) return true;
+
+  const stagingBounty = typeof getActiveMultiplayerStagingBountyObjective === "function"
+    ? getActiveMultiplayerStagingBountyObjective()
+    : null;
+  if (!stagingBounty?.accepted || stagingBounty.claimAvailable || stagingBounty.completed) return false;
+
+  const visibleStagingBots = typeof getVisibleStagingBotTargets === "function"
+    ? getVisibleStagingBotTargets()
+    : [];
+  if (visibleStagingBots.some(bot => bot?.alive && (bot.currentNodeId || bot.node) === currentNode)) return true;
+
+  const stagingTarget = typeof getMultiplayerStagingBountyTargetNode === "function"
+    ? getMultiplayerStagingBountyTargetNode()
+    : null;
+  return Boolean(stagingTarget && stagingTarget === currentNode);
+}
+
 function isTutorialForgeComplete() {
   return typeof hasTutorialPulseLaserQualityUpgrade === "function" && hasTutorialPulseLaserQualityUpgrade();
 }
@@ -509,6 +528,8 @@ function getTutorialStateCompletionReason(step) {
       return "";
     case "accept-bounty":
       return isTutorialBountyAccepted() ? "bounty_already_active" : "";
+    case "jump-to-bounty-zone":
+      return isAtTutorialBountyCombatTarget() ? "bounty_target_reached" : "";
     case "destroy-bot":
     case "open-map-return-bounty":
     case "return-to-planet-after-bounty":
@@ -692,7 +713,7 @@ function tutorialEvent(eventName, detail = {}) {
     return;
   }
 
-  if (step.id === "jump-to-bounty-zone" && eventName === "jumpedNode" && !isAtActiveBountyCombatNode()) {
+  if (step.id === "jump-to-bounty-zone" && eventName === "jumpedNode" && !isAtTutorialBountyCombatTarget()) {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
       addHudToast("Continue toward the hostile bot signal.");
@@ -843,6 +864,7 @@ function getDynamicTutorialTarget(step) {
     const selected = typeof getSelectedTargetEntity === "function" ? getSelectedTargetEntity() : null;
     const engaged = typeof getEngagedTargetEntity === "function" ? getEngagedTargetEntity() : null;
     const visibleBot = document.querySelector(".enemy-bot-target");
+    const visibleStagingBot = document.querySelector(".lupen-mp-space-bot:not(.is-disabled)");
     const sectorMap = document.getElementById("sectorMap");
 
     if (selected?.alive && selected.node === currentNode && engageButton && !engaged) {
@@ -853,6 +875,7 @@ function getDynamicTutorialTarget(step) {
       return document.querySelector("#objectActionPanel") || engageButton || visibleBot;
     }
 
+    if (visibleStagingBot) return visibleStagingBot;
     if (visibleBot) return visibleBot;
 
     // If this node is clear but the bounty still needs more kills, guide the player back to Jump/Scan.
@@ -1088,6 +1111,7 @@ function isTutorialClickAllowed(event) {
     event.target.closest?.(".sector-scan-btn") ||
     event.target.closest?.("#objectEngageBtn") ||
     event.target.closest?.("#objectActionPanel") ||
+    event.target.closest?.(".lupen-mp-space-bot") ||
     event.target.closest?.(".enemy-bot-target")
   ) return true;
 
@@ -1116,6 +1140,7 @@ function isTutorialClickAllowed(event) {
       event.target.closest?.("#sectorSvg") ||
       event.target.closest?.("#jumpBtn") ||
       event.target.closest?.("#sectorScanBotsBtn") ||
+      event.target.closest?.(".lupen-mp-space-bot") ||
       event.target.closest?.(".enemy-bot-target") ||
       event.target.closest?.("#objectEngageBtn") ||
       event.target.closest?.("#objectActionPanel")
@@ -1126,6 +1151,7 @@ function isTutorialClickAllowed(event) {
     if (
       event.target.closest?.("#jumpBtn") ||
       (isAtPlanetNode() && event.target.closest?.("#planetLandBtn")) ||
+      event.target.closest?.(".lupen-mp-space-bot") ||
       event.target.closest?.(".enemy-bot-target") ||
       event.target.closest?.("#objectEngageBtn") ||
       event.target.closest?.("#objectActionPanel")

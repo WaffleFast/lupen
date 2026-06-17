@@ -81,6 +81,10 @@ function selectStagingBotTarget(botId) {
   updateAsteroidUI();
   updateTargetPanel();
   updateObjectActionPanel(retargeted);
+
+  if (tutorialState?.active && ["jump-to-bounty-zone", "destroy-bot"].includes(getCurrentTutorialStep()?.id)) {
+    setTimeout(renderStarterTutorial, 40);
+  }
 }
 
 function engageTarget() {
