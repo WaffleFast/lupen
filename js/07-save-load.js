@@ -107,7 +107,8 @@ async function lupenResetPilotProgress(options = {}) {
   const localReset = lupenClearLocalSave();
   if (typeof resetToNoShipStarterState === "function") resetToNoShipStarterState();
   if (typeof clearStarterTutorialState === "function") clearStarterTutorialState();
-  if (typeof startStarterTutorial === "function") startStarterTutorial(true);
+  if (typeof saveTutorialState === "function") saveTutorialState();
+  if (typeof clearTutorialOverlayOnly === "function") clearTutorialOverlayOnly();
 
   const cleanState = buildSaveState({ leaveSave: false });
   LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, cleanState);
@@ -1170,6 +1171,7 @@ window.onload = async function () {
   if (stationVaultWasClearedThisSession) saveGame();
   showScreen("startScreen");
   ensureDebugToolsPanel();
+  if (typeof handleStagingStartTutorialParam === "function") handleStagingStartTutorialParam();
 };
 
 window.addEventListener("pagehide", saveGameBeforeLeave);

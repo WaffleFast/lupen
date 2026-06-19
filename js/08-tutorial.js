@@ -606,6 +606,15 @@ function replayStarterTutorial() {
   startStarterTutorial(true);
 }
 
+function resetStarterTutorialState() {
+  clearStarterTutorialState();
+  saveTutorialState();
+  clearTutorialOverlayOnly();
+  return {
+    tutorialKeyCleared: TUTORIAL_STORAGE_KEY
+  };
+}
+
 function clearStarterTutorialState() {
   localStorage.removeItem(TUTORIAL_STORAGE_KEY);
   tutorialState = {
@@ -618,21 +627,28 @@ function clearStarterTutorialState() {
 
 function lupenResetTutorial(options = {}) {
   const resetProgress = options.resetProgress === true;
-  clearStarterTutorialState();
+  const shouldStart = options.start === true || options.launch === true;
+  const result = resetStarterTutorialState();
   if (resetProgress && typeof resetToNoShipStarterState === "function") {
     resetToNoShipStarterState();
   }
-  startStarterTutorial(true);
-  const result = {
-    tutorialKeyCleared: TUTORIAL_STORAGE_KEY,
+  if (shouldStart) startStarterTutorial(true);
+  const response = {
+    ...result,
+    started: shouldStart,
     resetProgress
   };
-  console.info("[Lupen staging] Starter Pilot Programme reset.", result);
-  return result;
+  console.info("[Lupen staging] Starter Pilot Programme reset.", response);
+  return response;
 }
 
 window.lupenResetTutorial = lupenResetTutorial;
 window.lupenResetStarterPilotProgramme = lupenResetTutorial;
+window.lupenStartTutorial = () => {
+  startStarterTutorial(true);
+  return { started: true, step: getCurrentTutorialStep()?.id || "" };
+};
+window.lupenReplayTutorial = window.lupenStartTutorial;
 
 function handleStagingResetTutorialParam() {
   const url = new URL(window.location.href);
@@ -648,6 +664,23 @@ function handleStagingResetTutorialParam() {
     console.warn("[Lupen staging] Unable to remove resetTutorial query parameter.", error);
   }
   console.info("[Lupen staging] Applied resetTutorial=1.", result);
+  return true;
+}
+
+function handleStagingStartTutorialParam() {
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  if (params.get("mp") !== "staging" || params.get("startTutorial") !== "1") return false;
+
+  startStarterTutorial(true);
+  params.delete("startTutorial");
+  const nextUrl = `${url.pathname}${params.toString() ? `?${params}` : ""}${url.hash}`;
+  try {
+    window.history.replaceState({}, document.title, nextUrl);
+  } catch (error) {
+    console.warn("[Lupen staging] Unable to remove startTutorial query parameter.", error);
+  }
+  console.info("[Lupen staging] Applied startTutorial=1.");
   return true;
 }
 

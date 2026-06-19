@@ -575,7 +575,8 @@ test.describe("Lupen browser smoke", () => {
       pendingPilot: localStorage.getItem("lupenPendingPilotName"),
       saved: JSON.parse(localStorage.getItem("lupenGameState")),
       tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")),
-      cloudUpserts: window.__pilotResetCloudUpserts
+      cloudUpserts: window.__pilotResetCloudUpserts,
+      overlayActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false
     }));
 
     expect(reset.href).toContain("mp=staging");
@@ -593,15 +594,39 @@ test.describe("Lupen browser smoke", () => {
     expect(reset.saved.playerProgress.totals.botsDestroyed).toBe(0);
     expect(reset.saved.playerProgress.totals.erebusBotsDestroyed).toBe(0);
     expect(reset.saved.playerProgress.totals.tradeProfit).toBe(0);
-    expect(reset.tutorial.active).toBe(true);
+    expect(reset.tutorial.active).toBe(false);
     expect(reset.tutorial.completed).toBe(false);
     expect(reset.tutorial.stepIndex).toBe(0);
+    expect(reset.overlayActive).toBe(false);
     expect(reset.cloudUpserts).toHaveLength(1);
     expect(reset.cloudUpserts[0].table).toBe("player_saves");
     expect(reset.cloudUpserts[0].payload.user_id).toBe("77777777-7777-4777-8777-777777777777");
     expect(reset.cloudUpserts[0].payload.save_data.credits).toBe(10000);
     expect(reset.cloudUpserts[0].payload.save_data.currentShipId).toBe("");
     expect(reset.cloudUpserts[0].payload.save_data.ownedShips).toEqual([]);
+
+    const starterClaim = await page.evaluate(() => window.eval(`
+      (() => {
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("shipyard");
+        selectedShipyardShipId = STARTER_SHIP_ID;
+        renderShipShop();
+        renderShipyardDetail();
+        const button = document.querySelector("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']");
+        return {
+          text: button?.textContent?.trim() || "",
+          disabled: Boolean(button?.disabled),
+          visible: Boolean(button && button.offsetParent !== null),
+          selectedShipName: SHIPS[selectedShipyardShipId]?.name || ""
+        };
+      })()
+    `));
+
+    expect(starterClaim.selectedShipName).toBe("Azure Striker");
+    expect(starterClaim.text).toBe("Claim Starter Ship");
+    expect(starterClaim.disabled).toBe(false);
+    expect(starterClaim.visible).toBe(true);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -682,7 +707,7 @@ test.describe("Lupen browser smoke", () => {
     expect(state.saved.credits).toBe(10000);
     expect(state.saved.currentShipId).toBe("");
     expect(state.saved.ownedShips).toEqual([]);
-    expect(state.tutorial.active).toBe(true);
+    expect(state.tutorial.active).toBe(false);
     expect(state.tutorial.completed).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -810,6 +835,12 @@ test.describe("Lupen browser smoke", () => {
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
+    const tutorialDefault = await page.evaluate(() => ({
+      tutorial: window.eval("({ ...tutorialState })"),
+      overlayActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false
+    }));
+    expect(tutorialDefault.tutorial.active).toBe(false);
+    expect(tutorialDefault.overlayActive).toBe(false);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText("Multiplayer Staging Loop", { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*Store upgrades[\s\S]*Launch[\s\S]*Engage bots[\s\S]*Claim bounty XP/i);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/No PvP[\s\S]*bots return fire locally/i);
@@ -1414,7 +1445,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("staging tutorial reset URL and helper restart the programme without clearing saves", async ({ page }) => {
+  test("staging tutorial reset stays inactive and manual launch starts the programme", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -1444,21 +1475,47 @@ test.describe("Lupen browser smoke", () => {
     const urlReset = await page.evaluate(() => ({
       href: window.location.href,
       helperType: typeof window.lupenResetTutorial,
+      startHelperType: typeof window.lupenStartTutorial,
+      replayHelperType: typeof window.lupenReplayTutorial,
       save: JSON.parse(localStorage.getItem("lupenGameState")),
       tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")),
       auth: localStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
-      title: document.getElementById("tutorialTitle")?.textContent || ""
+      overlayActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false
     }));
 
     expect(urlReset.href).not.toContain("resetTutorial=1");
     expect(urlReset.href).toContain("mp=staging");
     expect(urlReset.helperType).toBe("function");
+    expect(urlReset.startHelperType).toBe("function");
+    expect(urlReset.replayHelperType).toBe("function");
     expect(urlReset.save.credits).toBe(32100);
     expect(urlReset.auth).toBe("keep-auth");
-    expect(urlReset.tutorial.active).toBe(true);
+    expect(urlReset.tutorial.active).toBe(false);
     expect(urlReset.tutorial.completed).toBe(false);
     expect(urlReset.tutorial.stepIndex).toBe(0);
-    expect(urlReset.title).toBe("Welcome, Pilot");
+    expect(urlReset.overlayActive).toBe(false);
+
+    await page.goto("/?mp=staging&startTutorial=1");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.showScreen("gameScreen");
+      window.eval("renderStarterTutorial();");
+    });
+
+    const urlStart = await page.evaluate(() => ({
+      href: window.location.href,
+      tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")),
+      title: document.getElementById("tutorialTitle")?.textContent || "",
+      overlayActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false
+    }));
+
+    expect(urlStart.href).toContain("mp=staging");
+    expect(urlStart.href).not.toContain("startTutorial=1");
+    expect(urlStart.tutorial.active).toBe(true);
+    expect(urlStart.tutorial.completed).toBe(false);
+    expect(urlStart.tutorial.stepIndex).toBe(0);
+    expect(urlStart.title).toBe("Welcome, Pilot");
+    expect(urlStart.overlayActive).toBe(true);
 
     const helperReset = await page.evaluate(() => {
       window.eval(`
@@ -1467,7 +1524,14 @@ test.describe("Lupen browser smoke", () => {
       `);
       return window.lupenResetTutorial();
     });
-    expect(helperReset).toMatchObject({ tutorialKeyCleared: "lupenStarterPilotTutorial", resetProgress: false });
+    expect(helperReset).toMatchObject({ tutorialKeyCleared: "lupenStarterPilotTutorial", resetProgress: false, started: false });
+    await expect(page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")).active)).resolves.toBe(false);
+
+    const helperStart = await page.evaluate(() => {
+      window.showScreen("gameScreen");
+      return window.lupenStartTutorial();
+    });
+    expect(helperStart).toMatchObject({ started: true, step: "welcome-new-pilot" });
     await expect(page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")).active)).resolves.toBe(true);
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -1556,6 +1620,7 @@ test.describe("Lupen browser smoke", () => {
       showScreen("gameScreen");
       openHangar();
       showHangarSection("shipyard");
+      startStarterTutorial(true);
       setTutorialStepById("buy-first-ship");
       selectedShipyardShipId = STARTER_SHIP_ID;
       renderShipShop();

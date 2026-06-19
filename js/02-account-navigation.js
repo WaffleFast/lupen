@@ -588,16 +588,9 @@ async function createAccount() {
   resetToNoShipStarterState();
   saveGame();
   enterHubFromLogin();
-
-  const welcomeStep = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "welcome-new-pilot");
-  tutorialState = {
-    active: true,
-    completed: false,
-    stepIndex: welcomeStep >= 0 ? welcomeStep : 0,
-    lastStartedAt: new Date().toISOString()
-  };
-  saveTutorialState();
-  setTimeout(renderStarterTutorial, 120);
+  if (typeof clearStarterTutorialState === "function") clearStarterTutorialState();
+  if (typeof saveTutorialState === "function") saveTutorialState();
+  if (typeof clearTutorialOverlayOnly === "function") clearTutorialOverlayOnly();
 }
 
 function prepareFreshLocalStateAfterMissingCloudSave() {
@@ -606,18 +599,9 @@ function prepareFreshLocalStateAfterMissingCloudSave() {
   } else {
     resetToNoShipStarterState();
   }
-  if (typeof startStarterTutorial === "function") {
-    startStarterTutorial(true);
-  } else {
-    const welcomeStep = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "welcome-new-pilot");
-    tutorialState = {
-      active: true,
-      completed: false,
-      stepIndex: welcomeStep >= 0 ? welcomeStep : 0,
-      lastStartedAt: new Date().toISOString()
-    };
-    saveTutorialState();
-  }
+  if (typeof clearStarterTutorialState === "function") clearStarterTutorialState();
+  if (typeof saveTutorialState === "function") saveTutorialState();
+  if (typeof clearTutorialOverlayOnly === "function") clearTutorialOverlayOnly();
 }
 
 async function login() {
@@ -689,7 +673,6 @@ async function login() {
   rememberSupabaseAccount(user, profile);
 
   let cloudSaveResult = { loaded: false, exists: false, reason: "unavailable" };
-  let shouldKeepStarterTutorialActive = false;
   try {
     cloudSaveResult = typeof loadGameFromSupabase === "function" ? await loadGameFromSupabase() : cloudSaveResult;
     if (cloudSaveResult.loaded) console.info("Loaded Supabase player save.");
@@ -740,7 +723,6 @@ async function login() {
         }
       } else {
         prepareFreshLocalStateAfterMissingCloudSave();
-        shouldKeepStarterTutorialActive = true;
         if (typeof logStagingLocalSaveMigration === "function") {
           logStagingLocalSaveMigration("Started fresh because local save migration was declined.", {
             decision,
@@ -751,7 +733,6 @@ async function login() {
       }
     } else {
       prepareFreshLocalStateAfterMissingCloudSave();
-      shouldKeepStarterTutorialActive = true;
       if (typeof logStagingLocalSaveMigration === "function") {
         logStagingLocalSaveMigration("Started fresh because no meaningful local save was available.", {
           hasPrompt: typeof promptUploadLocalSaveToSupabase === "function",
@@ -764,14 +745,10 @@ async function login() {
 
   setAccountMessage(message, "");
 
-  if (!shouldKeepStarterTutorialActive) {
-    tutorialState.active = false;
-    saveTutorialState();
-    clearTutorialOverlayOnly();
-  }
-
+  tutorialState.active = false;
+  saveTutorialState();
+  clearTutorialOverlayOnly();
   enterHubFromLogin();
-  if (shouldKeepStarterTutorialActive) setTimeout(renderStarterTutorial, 120);
 }
 
 async function logout() {
