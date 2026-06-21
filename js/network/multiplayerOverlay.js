@@ -1185,7 +1185,7 @@
   function getSafeShipImageSrc(player) {
     const src = String(player?.shipImage || player?.shipImageSrc || player?.shipImagePath || getKnownShipImageSrc(player)).trim().replace(/\\/g, "/");
     if (!src) return "";
-    if (!/^assets\/(?:ships|player-ships|hub\/ships)\/[a-z0-9-]+\.png$/i.test(src)) return "";
+    if (!/^assets\/(?:ships|player-ships|hub\/ships)\/[a-z0-9-/.]+\.(?:png|webp|jpg|jpeg)$/i.test(src)) return "";
     if (src.includes("..") || src.includes("//")) return "";
     return src;
   }

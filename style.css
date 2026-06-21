@@ -33366,6 +33366,7 @@ input::placeholder {
   grid-template-rows: 18px 18px minmax(0, 1fr) 28px !important;
   gap: 3px !important;
   min-height: 0 !important;
+  overflow: visible !important;
 }
 
 #chatPanel .chat-panel-top {
@@ -33412,6 +33413,9 @@ input::placeholder {
 }
 
 #chatPanel .local-chat-input-row {
+  display: grid !important;
+  position: relative !important;
+  z-index: 3 !important;
   width: 100% !important;
   min-width: 0 !important;
   height: 28px !important;
@@ -33695,6 +33699,7 @@ input::placeholder {
   grid-template-rows: 16px 17px minmax(76px, 1fr) 26px !important;
   gap: 3px !important;
   min-height: 0 !important;
+  overflow: visible !important;
 }
 
 #chatPanel .chat-panel-top,
@@ -33727,6 +33732,9 @@ input::placeholder {
 }
 
 #chatPanel .local-chat-input-row {
+  display: grid !important;
+  position: relative !important;
+  z-index: 3 !important;
   height: 26px !important;
   min-height: 26px !important;
   grid-template-columns: minmax(0, 1fr) 64px !important;

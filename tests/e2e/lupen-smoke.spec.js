@@ -927,11 +927,63 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#chatPanel .chat-channel-tabs")).toContainText(/Local[\s\S]*Sector[\s\S]*Guild/);
     await expect(page.locator("#onlinePilotsList")).toContainText(/Chat unavailable while disconnected|Online Pilots/i);
     await page.evaluate(() => {
-      const input = document.getElementById("localChatInput");
-      input.value = "  staging hello  ";
-      window.sendLocalChatMessage();
+      if (typeof window.showScreen === "function") window.showScreen("spaceScreen");
     });
+    await expect(page.locator("#localChatInput")).toBeVisible();
+    await page.fill("#localChatInput", "  staging hello  ");
+    await page.press("#localChatInput", "Enter");
     await expect(page.locator("#localChatFeed")).toContainText("Chat unavailable while disconnected");
+    const remoteShipRender = await page.evaluate(() => {
+      const originalClient = window.LupenMultiplayerClient;
+      currentNode = "Asteron Prime";
+      window.LupenMultiplayerClient = {
+        enabled: true,
+        getStatus: () => ({
+          enabled: true,
+          isConnected: true,
+          enabledReason: "staging_enabled",
+          sessionId: "local-session"
+        }),
+        getPlayers: ({ includeSelf = true } = {}) => [
+          ...(includeSelf ? [{
+            isSelf: true,
+            sessionId: "local-session",
+            displayName: "Local Pilot",
+            currentNode: "Asteron Prime",
+            currentShipId: "falcon",
+            shipName: "Azure Striker",
+            shipImage: "assets/ships/azure-striker/azure-striker-medium.webp",
+            lastSeenAt: Date.now()
+          }] : []),
+          {
+            isSelf: false,
+            sessionId: "remote-session",
+            displayName: "Remote Pilot",
+            currentNode: "Asteron Prime",
+            currentShipId: "zeusExplorer",
+            shipName: "Nightshade Hawk",
+            shipImage: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
+            lastSeenAt: Date.now()
+          }
+        ],
+        getBots: () => [],
+        getSelectedStagingBot: () => null,
+        getChatMessages: () => [],
+        onServerState: () => ({ unsubscribe() {} })
+      };
+      window.LupenMultiplayerOverlay.render();
+      const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
+      const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
+      const result = {
+        src: image?.getAttribute("src") || "",
+        note: note?.textContent || ""
+      };
+      window.LupenMultiplayerClient = originalClient;
+      window.LupenMultiplayerOverlay.render();
+      return result;
+    });
+    expect(remoteShipRender.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
+    expect(remoteShipRender.note).toContain("Nightshade Hawk");
     await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
     await expect(page.locator("#debugToolsPanel")).toHaveCount(0);
 
