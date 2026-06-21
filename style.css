@@ -33363,7 +33363,7 @@ input::placeholder {
 }
 
 #chatPanel.comms-panel.active {
-  grid-template-rows: 18px minmax(0, 1fr) 28px !important;
+  grid-template-rows: 18px 18px minmax(0, 1fr) 28px !important;
   gap: 3px !important;
   min-height: 0 !important;
 }
@@ -33382,6 +33382,33 @@ input::placeholder {
 #chatPanel .local-chat-feed {
   min-height: 0 !important;
   padding: 2px 6px 2px 0 !important;
+}
+
+#chatPanel .online-pilots-list {
+  min-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(194, 238, 255, 0.76);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+#chatPanel .chat-line {
+  display: block;
+  line-height: 1.35;
+}
+
+#chatPanel .chat-line em {
+  margin-left: 5px;
+  color: rgba(174, 206, 219, 0.64);
+  font-style: normal;
+  font-size: 9px;
+}
+
+#chatPanel .chat-line.system strong,
+#chatPanel .chat-line.muted strong {
+  color: #ffd99a;
 }
 
 #chatPanel .local-chat-input-row {
@@ -33665,7 +33692,7 @@ input::placeholder {
 
 #chatPanel.comms-panel.active {
   display: grid !important;
-  grid-template-rows: 16px minmax(92px, 1fr) 26px !important;
+  grid-template-rows: 16px 17px minmax(76px, 1fr) 26px !important;
   gap: 3px !important;
   min-height: 0 !important;
 }
@@ -33683,9 +33710,14 @@ input::placeholder {
 }
 
 #chatPanel .local-chat-feed {
-  min-height: 92px !important;
+  min-height: 76px !important;
   gap: 1px !important;
   padding: 3px 7px 3px 0 !important;
+}
+
+#chatPanel .online-pilots-list {
+  min-height: 17px !important;
+  font-size: 9px !important;
 }
 
 #chatPanel .chat-line {

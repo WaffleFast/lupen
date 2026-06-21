@@ -4347,6 +4347,72 @@ try {
   assert(playerFrom(roomA, roomA.sessionId)?.supabaseAccessToken === undefined, "Raw Supabase token leaked into room state.");
   console.log("both clients see each other");
 
+  const [sectorMessageA, sectorMessageB] = await Promise.all([
+    expectRoomMessage(roomA, "chat:message", () => {}),
+    expectRoomMessage(roomB, "chat:message", () => {}),
+    Promise.resolve().then(() => roomA.send("chat:send", { channel: "sector", message: "Hello sector <script>" }))
+  ]);
+  assert(sectorMessageA?.channel === "sector", "Sector chat did not echo to sender.");
+  assert(sectorMessageB?.channel === "sector", "Sector chat did not reach second client.");
+  assert(sectorMessageB?.displayName === "Regression Pilot A", "Sector chat did not use pilot display name.");
+  assert(sectorMessageB?.message === "Hello sector <script>", "Sector chat message text changed unexpectedly.");
+
+  const localMessageB = await expectRoomMessage(roomB, "chat:message", () => {
+    roomA.send("chat:send", { channel: "local", message: "Same node local" });
+  });
+  assert(localMessageB?.channel === "local", "Local chat did not reach same-node pilot.");
+  assert(localMessageB?.currentNode === "Asteron Prime", "Local chat did not include sender node.");
+
+  const blockedGuild = await expectRoomMessage(roomA, "chat:message", () => {
+    roomA.send("chat:send", { channel: "guild", message: "Guild ping" });
+  });
+  assert(blockedGuild?.reason === "guild_unavailable", "Guild chat without guild did not return placeholder.");
+  assert(/Guild chat will unlock/.test(blockedGuild?.message || ""), "Guild placeholder copy was missing.");
+
+  const longText = "x".repeat(240);
+  const trimmedSector = await expectRoomMessage(roomB, "chat:message", () => {
+    roomA.send("chat:send", { channel: "sector", message: longText });
+  });
+  assert(trimmedSector?.message?.length === 200, `Long chat was not limited to 200 characters: ${trimmedSector?.message?.length}`);
+
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    shipImage: "assets/ships/lupen-origin.png",
+    shipClass: "Balanced Starter Hull",
+    currentNode: "Virella",
+    x: 56,
+    y: 50
+  });
+  await waitFor("client B to receive chat node separation movement", () => {
+    return playerFrom(roomB, roomA.sessionId)?.currentNode === "Virella";
+  });
+  const roomBLocalMessages = [];
+  roomB.onMessage("chat:message", (message) => roomBLocalMessages.push(message));
+  roomA.send("chat:send", { channel: "local", message: "Different node local" });
+  await sleep(350);
+  assert(!roomBLocalMessages.some((message) => message?.message === "Different node local"), "Local chat crossed node boundaries.");
+  const crossNodeSector = await expectRoomMessage(roomB, "chat:message", () => {
+    roomA.send("chat:send", { channel: "sector", message: "Cross-node sector" });
+  });
+  assert(crossNodeSector?.message === "Cross-node sector", "Sector chat did not cross node boundaries.");
+
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    shipImage: "assets/ships/lupen-origin.png",
+    shipClass: "Balanced Starter Hull",
+    currentNode: "Asteron Prime",
+    x: 50,
+    y: 50
+  });
+  await waitFor("client A returns to starting node after chat routing test", () => {
+    return playerFrom(roomB, roomA.sessionId)?.currentNode === "Asteron Prime";
+  });
+  console.log("multichannel chat routed sector/local/guild safely");
+
   const bountyList = await expectRoomMessage(roomA, "stagingBounty:listResult", () => {
     roomA.send("stagingBounty:list", {});
   });

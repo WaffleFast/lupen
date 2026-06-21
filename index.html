@@ -636,14 +636,15 @@
             <div id="chatPanel" class="hud-panel comms-panel active">
               <div class="chat-panel-top">
                 <div class="chat-channel-tabs" aria-label="Chat channels">
-                  <button class="active" type="button">Local</button>
-                  <button class="locked" type="button" title="Future channel">Guild</button>
-                  <button class="locked" type="button" title="Future channel">Sector</button>
+                  <button id="chatChannelLocalBtn" type="button" onclick="setChatChannel('local')">Local</button>
+                  <button id="chatChannelSectorBtn" class="active" type="button" onclick="setChatChannel('sector')">Sector</button>
+                  <button id="chatChannelGuildBtn" type="button" onclick="setChatChannel('guild')">Guild</button>
                 </div>
               </div>
+              <div id="onlinePilotsList" class="online-pilots-list"></div>
               <div id="localChatFeed" class="local-chat-feed"></div>
               <div class="local-chat-input-row">
-                <input id="localChatInput" type="text" maxlength="120" placeholder="Type message..." onkeydown="handleLocalChatKey(event)" />
+                <input id="localChatInput" type="text" maxlength="200" placeholder="Type message..." onkeydown="handleLocalChatKey(event)" />
                 <button onclick="sendLocalChatMessage()">Send</button>
               </div>
             </div>

@@ -755,7 +755,26 @@ function syncMultiplayerPresence(reason = "position_update") {
   });
 }
 
-function addLocalChatLine(author, message, type = "") {
+let selectedChatChannel = "sector";
+const fallbackChatMessages = [];
+
+function formatChatTime(timestamp = Date.now()) {
+  const date = new Date(Number(timestamp || Date.now()));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function getChatChannelLabel(channel = selectedChatChannel) {
+  const labels = { local: "Local", sector: "Sector", guild: "Guild" };
+  return labels[channel] || "Sector";
+}
+
+function setChatChannel(channel) {
+  selectedChatChannel = ["local", "sector", "guild"].includes(channel) ? channel : "sector";
+  renderMultiplayerChatHud();
+}
+
+function addLocalChatLine(author, message, type = "", meta = {}) {
   const feed = document.getElementById("localChatFeed");
   if (!feed) return;
 
@@ -763,9 +782,19 @@ function addLocalChatLine(author, message, type = "") {
   line.className = `chat-line ${type}`.trim();
 
   const cleanAuthor = String(author || "Pilot").slice(0, 28);
-  const cleanMessage = String(message || "").slice(0, 160);
+  const cleanMessage = String(message || "").slice(0, 200);
 
-  line.innerHTML = `<strong>${cleanAuthor}:</strong> <span>${cleanMessage}</span>`;
+  const header = document.createElement("strong");
+  header.textContent = `${cleanAuthor}:`;
+  const text = document.createElement("span");
+  text.textContent = ` ${cleanMessage}`;
+  line.appendChild(header);
+  line.appendChild(text);
+  if (meta.channel || meta.receivedAt) {
+    const stamp = document.createElement("em");
+    stamp.textContent = `${meta.channel ? ` ${getChatChannelLabel(meta.channel)}` : ""}${meta.receivedAt ? ` ${formatChatTime(meta.receivedAt)}` : ""}`;
+    line.appendChild(stamp);
+  }
   feed.appendChild(line);
   feed.scrollTop = feed.scrollHeight;
 
@@ -774,14 +803,108 @@ function addLocalChatLine(author, message, type = "") {
   }
 }
 
+function renderOnlinePilots(players = null) {
+  const panel = document.getElementById("onlinePilotsList");
+  if (!panel) return;
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.() || {};
+  const allPlayers = players || client?.getPlayers?.({ includeSelf: true }) || [];
+  if (!status.enabled) {
+    panel.textContent = "Online pilots unavailable.";
+    return;
+  }
+  if (!status.isConnected) {
+    panel.textContent = "Chat unavailable while disconnected.";
+    return;
+  }
+  const currentNodeName = getMultiplayerPresencePayload().currentNode || currentNode || "";
+  const rows = allPlayers.slice(0, 8).map((player) => {
+    const name = String(player.displayName || "Pilot").slice(0, 18);
+    const node = String(player.currentNode || "Unknown").slice(0, 24);
+    const sameNode = node.toLowerCase() === String(currentNodeName || "").toLowerCase();
+    return `${name} - ${sameNode ? "here" : node}`;
+  });
+  panel.textContent = rows.length ? `Online Pilots: ${rows.join(" | ")}` : "Online Pilots: only you";
+}
+
+function renderMultiplayerChatHud(statusOverride = null, playersOverride = null) {
+  const feed = document.getElementById("localChatFeed");
+  const input = document.getElementById("localChatInput");
+  if (!feed) return;
+
+  document.querySelectorAll("#chatPanel .chat-channel-tabs button").forEach((button) => {
+    button.classList.toggle("active", button.id === `chatChannel${getChatChannelLabel(selectedChatChannel)}Btn`);
+  });
+
+  const client = window.LupenMultiplayerClient;
+  const status = statusOverride || client?.getStatus?.() || {};
+  renderOnlinePilots(playersOverride || client?.getPlayers?.({ includeSelf: true }) || []);
+  feed.innerHTML = "";
+
+  if (input) {
+    input.maxLength = 200;
+    input.placeholder = selectedChatChannel === "guild"
+      ? "Guild chat..."
+      : `${getChatChannelLabel(selectedChatChannel)} message...`;
+  }
+
+  if (selectedChatChannel === "guild" && !status.guildId) {
+    addLocalChatLine("System", "Guild chat will unlock when you join a guild.", "system", { channel: "guild", receivedAt: Date.now() });
+    return;
+  }
+
+  if (status.enabled && !status.isConnected) {
+    addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: selectedChatChannel, receivedAt: Date.now() });
+    return;
+  }
+
+  const sourceMessages = status.enabled && client?.getChatMessages
+    ? client.getChatMessages({ channel: selectedChatChannel })
+    : fallbackChatMessages;
+  const messages = sourceMessages
+    .filter((message) => message.type === "system" || message.channel === selectedChatChannel)
+    .slice(-30);
+
+  if (!messages.length) {
+    addLocalChatLine("System", `${getChatChannelLabel(selectedChatChannel)} chat ready.`, "muted", { channel: selectedChatChannel, receivedAt: Date.now() });
+    return;
+  }
+
+  messages.forEach((entry) => {
+    addLocalChatLine(entry.displayName || "Pilot", entry.message || "", entry.type === "system" ? "system" : "", {
+      channel: entry.channel,
+      receivedAt: entry.receivedAt
+    });
+  });
+}
+
 function sendLocalChatMessage() {
   const input = document.getElementById("localChatInput");
   if (!input) return;
 
-  const message = input.value.trim();
+  const message = input.value.replace(/\s+/g, " ").trim().slice(0, 200);
   if (!message) return;
 
-  addLocalChatLine(getPilotName(), message);
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.() || {};
+  if (status.enabled) {
+    if (!status.isConnected || !client?.sendChatMessage) {
+      addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: selectedChatChannel, receivedAt: Date.now() });
+      input.value = "";
+      return;
+    }
+    client.sendChatMessage({ channel: selectedChatChannel, message });
+  } else {
+    fallbackChatMessages.push({
+      type: "chat",
+      channel: selectedChatChannel,
+      displayName: getPilotName(),
+      message,
+      receivedAt: Date.now()
+    });
+    while (fallbackChatMessages.length > 30) fallbackChatMessages.shift();
+    renderMultiplayerChatHud(status);
+  }
   input.value = "";
 }
 

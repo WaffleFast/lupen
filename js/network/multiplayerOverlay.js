@@ -3541,6 +3541,7 @@
     renderSpaceBots(bots);
     renderSpaceShot(allPlayers, bots, status);
     renderStagingCombatPanel(status, selectedBot);
+    global.renderMultiplayerChatHud?.(status, allPlayers);
     renderDiagnostics(players, bots);
   }
 

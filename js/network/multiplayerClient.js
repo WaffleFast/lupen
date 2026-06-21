@@ -55,6 +55,8 @@
     lastStagingBountyList: null,
     lastStagingBountyStatus: null,
     lastStagingBountyClaimResult: null,
+    chatMessages: [],
+    presenceEvents: [],
     lastError: null
   };
   const identity = {
@@ -886,6 +888,60 @@
       .replace(/\s+/g, " ");
   }
 
+  function normalizeChatChannel(value = "") {
+    const channel = String(value || "sector").trim().toLowerCase();
+    if (channel === "local" || channel === "sector" || channel === "guild") return channel;
+    return "sector";
+  }
+
+  function normalizeChatText(value = "") {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  }
+
+  function normalizeChatMessage(message = {}) {
+    const text = normalizeChatText(message.message || message.text);
+    const type = String(message.type || "chat");
+    if (!text && type !== "system") return null;
+    return {
+      id: String(message.id || `${message.receivedAt || Date.now()}-${message.sessionId || type}`),
+      ok: message.ok !== false,
+      type,
+      channel: normalizeChatChannel(message.channel),
+      message: text || String(message.message || ""),
+      displayName: String(message.displayName || (type === "system" ? "System" : "Pilot")).slice(0, 80),
+      sessionId: String(message.sessionId || ""),
+      currentNode: String(message.currentNode || ""),
+      reason: String(message.reason || ""),
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
+    };
+  }
+
+  function pushChatMessage(message) {
+    const normalized = normalizeChatMessage(message);
+    if (!normalized) return null;
+    connection.chatMessages.push(normalized);
+    while (connection.chatMessages.length > 80) connection.chatMessages.shift();
+    return normalized;
+  }
+
+  function normalizePresenceEvent(event = {}) {
+    return {
+      type: String(event.type || "presence"),
+      sessionId: String(event.sessionId || ""),
+      displayName: String(event.displayName || "Pilot").slice(0, 80),
+      currentNode: String(event.currentNode || ""),
+      previousNode: String(event.previousNode || ""),
+      receivedAt: Number.isFinite(Number(event.receivedAt)) ? Number(event.receivedAt) : Date.now()
+    };
+  }
+
+  function pushPresenceEvent(event) {
+    const normalized = normalizePresenceEvent(event);
+    connection.presenceEvents.push(normalized);
+    while (connection.presenceEvents.length > 60) connection.presenceEvents.shift();
+    return normalized;
+  }
+
   function normalizePlayer(player, fallbackId = "") {
     if (!player) return null;
 
@@ -904,6 +960,7 @@
       authTokenReceived: player.authTokenReceived === true,
       authVerificationAttempted: player.authVerificationAttempted === true,
       authVerificationReason: String(player.authVerificationReason || ""),
+      guildId: String(player.guildId || ""),
       currentShipId: String(player.currentShipId || ""),
       shipName: String(player.shipName || player.ship || ""),
       shipImage: String(player.shipImage || player.shipImageSrc || player.shipImagePath || ""),
@@ -1994,6 +2051,34 @@
       logDev("server presence warning", message);
     });
 
+    activeRoom.onMessage("chat:message", (message) => {
+      pushChatMessage(message);
+      logDev("server chat message", message);
+      notifyServerState(activeRoom?.state || null);
+    });
+
+    ["playerJoined", "playerLeft", "playerMoved"].forEach((type) => {
+      activeRoom.onMessage(type, (message) => {
+        const event = pushPresenceEvent({ ...message, type: message?.type || type });
+        const verb = type === "playerJoined"
+          ? "joined"
+          : type === "playerLeft"
+            ? "left"
+            : "moved";
+        const nodeText = event.currentNode ? ` ${verb === "moved" ? "to" : "at"} ${event.currentNode}` : "";
+        pushChatMessage({
+          type: "system",
+          channel: "sector",
+          displayName: "System",
+          message: `${event.displayName || "Pilot"} ${verb}${nodeText}.`,
+          currentNode: event.currentNode,
+          receivedAt: event.receivedAt
+        });
+        logDev(`server ${type}`, message);
+        notifyServerState(activeRoom?.state || null);
+      });
+    });
+
     activeRoom.onMessage("combat:rejected", (message) => {
       connection.lastCombatResponse = {
         ok: message?.ok === true,
@@ -2520,6 +2605,8 @@
       colyseusClient = null;
       playersById.clear();
       botsById.clear();
+      connection.chatMessages = [];
+      connection.presenceEvents = [];
       notifyServerState(null);
     });
   }
@@ -2626,6 +2713,7 @@
       supabaseTokenVerificationAttempted: selfPlayer?.authVerificationAttempted === true || identity.tokenVerificationAttempted,
       supabaseTokenVerificationReason: selfPlayer?.authVerificationReason || identity.tokenVerificationReason || "",
       displayName: selfPlayer?.displayName || identity.displayName || localPresence.displayName || "Pilot",
+      guildId: selfPlayer?.guildId || localPresence.guildId || "",
       playerClientNode: localPresence.currentNode || "",
       playerServerNode: selfPlayer?.currentNode || "",
       playerPresenceNode: selfPlayer?.currentNode || "",
@@ -2759,6 +2847,8 @@
         connection.sessionId = null;
         playersById.clear();
         botsById.clear();
+        connection.chatMessages = [];
+        connection.presenceEvents = [];
         return statusResult("disconnect", true, { alreadyDisconnected: true });
       }
 
@@ -2770,6 +2860,8 @@
       room = null;
       colyseusClient = null;
       botsById.clear();
+      connection.chatMessages = [];
+      connection.presenceEvents = [];
       return statusResult("disconnect");
     },
 
@@ -2779,6 +2871,13 @@
 
     sendMovementIntent(intent = {}) {
       return sendRoomMessage("sendMovementIntent", "movement:update", intent);
+    },
+
+    sendChatMessage(options = {}) {
+      const channel = normalizeChatChannel(options.channel);
+      const message = normalizeChatText(options.message || options.text);
+      if (!message) return statusResult("sendChatMessage", false, { reason: "empty_message" });
+      return sendRoomMessage("sendChatMessage", "chat:send", { channel, message });
     },
 
     sendCombatIntent(intent = {}) {
@@ -2999,6 +3098,17 @@
       return Array.from(playersById.values())
         .filter((player) => includeSelf || !player.isSelf)
         .map((player) => ({ ...player }));
+    },
+
+    getChatMessages(options = {}) {
+      const channel = options.channel ? normalizeChatChannel(options.channel) : "";
+      return connection.chatMessages
+        .filter((message) => !channel || message.channel === channel || message.type === "system")
+        .map((message) => ({ ...message }));
+    },
+
+    getPresenceEvents() {
+      return connection.presenceEvents.map((event) => ({ ...event }));
     },
 
     getBots() {

@@ -250,6 +250,7 @@ const STAGING_BOT_DISABLED_RESET_MS = 6500;
 const SUPABASE_VERIFY_TIMEOUT_MS = 4000;
 const STAGING_REWARD_DRY_RUN_XP = 100;
 const STAGING_REWARD_DRY_RUN_CREDITS = 0;
+const CHAT_MESSAGE_MAX_LENGTH = 200;
 
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 22, hull: 48 },
@@ -275,6 +276,7 @@ type("boolean")(LupenSectorPlayer.prototype, "authTokenReceived");
 type("boolean")(LupenSectorPlayer.prototype, "authVerificationAttempted");
 type("string")(LupenSectorPlayer.prototype, "authVerificationReason");
 type("string")(LupenSectorPlayer.prototype, "displayName");
+type("string")(LupenSectorPlayer.prototype, "guildId");
 type("string")(LupenSectorPlayer.prototype, "currentShipId");
 type("string")(LupenSectorPlayer.prototype, "shipName");
 type("string")(LupenSectorPlayer.prototype, "shipImage");
@@ -453,6 +455,20 @@ function getSafeShipClass(message = {}) {
 
 function getSafeIdentityValue(value, fallback = "") {
   return getStringValue(value, fallback).slice(0, 120);
+}
+
+function normalizeChatChannel(value = "") {
+  const channel = getStringValue(value, "sector").toLowerCase();
+  if (channel === "local" || channel === "guild" || channel === "sector") return channel;
+  return "sector";
+}
+
+function normalizeChatMessageText(value = "") {
+  return getStringValue(value).replace(/\s+/g, " ").slice(0, CHAT_MESSAGE_MAX_LENGTH);
+}
+
+function normalizePresenceNode(value = "") {
+  return getStringValue(value).toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ");
 }
 
 function getAuthStatus(options = {}) {
@@ -1021,6 +1037,10 @@ export class LupenSectorRoom extends Room {
       this.applyPresenceUpdate(client, message, "movement:update");
     });
 
+    this.onMessage("chat:send", (client, message = {}) => {
+      this.routeChatMessage(client, message);
+    });
+
     // Staging-only combat intent pipeline. This validates lock-on state against
     // server-owned visual bots, then applies clamped shield-first test damage
     // without granting rewards. Future authoritative combat can replace this
@@ -1212,6 +1232,7 @@ export class LupenSectorRoom extends Room {
       authVerificationAttempted: authTokenReceived,
       authVerificationReason: verifiedIdentity.reason || (trustedPlayerId ? "supabase_token_verified" : authTokenReceived ? "supabase_token_unverified" : "supabase_token_missing"),
       displayName,
+      guildId: getSafeIdentityValue(options.guildId),
       currentShipId: getSafeIdentityValue(options.currentShipId),
       shipName: getShipName(options),
       shipImage: getSafeShipImagePath(getShipImageValue(options)),
@@ -1238,9 +1259,14 @@ export class LupenSectorRoom extends Room {
       lastFireAt: 0,
       nextFireAt: 0
     }));
+    this.broadcast("playerJoined", this.buildPresenceEvent("joined", this.state.players.get(client.sessionId)));
   }
 
   onLeave(client) {
+    const player = this.state.players.get(client.sessionId);
+    if (player) {
+      this.broadcast("playerLeft", this.buildPresenceEvent("left", player));
+    }
     this.state.players.delete(client.sessionId);
     this.stagingBountyStates.delete(client.sessionId);
     this.clearStagingReturnFireForSession(client.sessionId);
@@ -1330,6 +1356,74 @@ export class LupenSectorRoom extends Room {
       messageType,
       sessionId: client.sessionId,
       receivedAt: Date.now()
+    });
+  }
+
+  buildPresenceEvent(type, player, extra = {}) {
+    return {
+      type,
+      sessionId: player?.sessionId || "",
+      displayName: getSafeIdentityValue(player?.displayName, "Pilot") || "Pilot",
+      currentNode: player?.currentNode || "",
+      receivedAt: Date.now(),
+      ...extra
+    };
+  }
+
+  sendChatNotice(client, channel, message, reason = "notice") {
+    client.send("chat:message", {
+      ok: reason === "notice",
+      type: "system",
+      channel,
+      reason,
+      message,
+      displayName: "System",
+      currentNode: this.state.players.get(client.sessionId)?.currentNode || "",
+      sessionId: "system",
+      receivedAt: Date.now()
+    });
+  }
+
+  routeChatMessage(client, message = {}) {
+    const player = this.touchPlayer(client.sessionId);
+    if (!player) {
+      this.sendChatNotice(client, "sector", "Chat unavailable while disconnected.", "not_connected");
+      return;
+    }
+
+    const channel = normalizeChatChannel(message.channel);
+    const text = normalizeChatMessageText(message.message ?? message.text);
+    if (!text) {
+      this.sendChatNotice(client, channel, "Empty messages cannot be sent.", "empty_message");
+      return;
+    }
+
+    if (channel === "guild" && !getStringValue(player.guildId)) {
+      this.sendChatNotice(client, "guild", "Guild chat will unlock when you join a guild.", "guild_unavailable");
+      return;
+    }
+
+    const payload = {
+      ok: true,
+      type: "chat",
+      id: `${Date.now()}-${client.sessionId}`,
+      channel,
+      message: text,
+      displayName: getSafeIdentityValue(player.displayName, "Pilot") || "Pilot",
+      sessionId: client.sessionId,
+      playerId: player.trustedPlayerId || player.playerId || "",
+      currentNode: player.currentNode || "",
+      guildId: player.guildId || "",
+      receivedAt: Date.now()
+    };
+
+    const senderNode = normalizePresenceNode(player.currentNode);
+    this.clients.forEach((targetClient) => {
+      const targetPlayer = this.state.players.get(targetClient.sessionId);
+      if (!targetPlayer) return;
+      if (channel === "local" && normalizePresenceNode(targetPlayer.currentNode) !== senderNode) return;
+      if (channel === "guild" && getStringValue(targetPlayer.guildId) !== getStringValue(player.guildId)) return;
+      targetClient.send("chat:message", payload);
     });
   }
 
@@ -3161,6 +3255,7 @@ export class LupenSectorRoom extends Room {
 
     const player = this.touchPlayer(client.sessionId);
     if (!player) return;
+    const previousNode = player.currentNode || "";
 
     const x = Number(message.x);
     const y = Number(message.y);
@@ -3205,6 +3300,12 @@ export class LupenSectorRoom extends Room {
 
     const currentNode = getStringValue(message.currentNode);
     if (currentNode) player.currentNode = currentNode;
+    if (currentNode && normalizePresenceNode(previousNode) !== normalizePresenceNode(currentNode)) {
+      this.broadcast("playerMoved", this.buildPresenceEvent("moved", player, {
+        previousNode,
+        currentNode
+      }));
+    }
     this.reconcilePlayerSelection(player);
   }
 }
