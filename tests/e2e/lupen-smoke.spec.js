@@ -2217,6 +2217,107 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("staging bot kill fallback awards XP once, refreshes UI, and persists", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        playerProgress = normalizePlayerProgress({ combatXp: 0, totals: { botsDestroyed: 0, erebusBotsDestroyed: 0 } });
+        const active = {
+          id: "staging_erebus_patrol_2",
+          title: "Erebus Patrol Sweep",
+          requiredKills: 2,
+          progress: 1,
+          xpReward: 40,
+          accepted: true,
+          completed: false,
+          claimAvailable: false,
+          claimed: false
+        };
+        window.LupenMultiplayerClient = {
+          ...(window.LupenMultiplayerClient || {}),
+          getStatus: () => ({
+            enabled: true,
+            isConnected: true,
+            lastStagingBountyStatus: { active },
+            lastStagingBountyList: { active, bounties: [active] }
+          })
+        };
+
+        showScreen("spaceScreen");
+        updateProgressDisplays();
+        const first = awardLocalStagingBotKillXpFromServer({
+          ok: true,
+          applied: false,
+          botId: "staging-bot-1",
+          botName: "Erebus Watcher",
+          destructionInstanceId: "staging-bot-1:kill-1",
+          receivedAt: 1000
+        });
+        const duplicate = awardLocalStagingBotKillXpFromServer({
+          ok: true,
+          applied: false,
+          botId: "staging-bot-1",
+          botName: "Erebus Watcher",
+          destructionInstanceId: "staging-bot-1:kill-1",
+          receivedAt: 1001
+        });
+        const secondWithBounty = awardLocalStagingBotKillXpFromServer({
+          ok: true,
+          applied: false,
+          botId: "staging-bot-2",
+          botName: "Erebus Drone",
+          destructionInstanceId: "staging-bot-2:kill-1",
+          receivedAt: 1002
+        });
+
+        const hudText = document.getElementById("hudProgressStrip")?.textContent || "";
+        showScreen("pilotProfileScreen");
+        if (typeof renderPilotProfile === "function") renderPilotProfile();
+        const pilotText = document.getElementById("pilotProfileScreen")?.textContent || "";
+        const saved = JSON.parse(localStorage.getItem(STORAGE_GAME_KEY) || "{}");
+        playerProgress = normalizePlayerProgress({ combatXp: 0, totals: { botsDestroyed: 0, erebusBotsDestroyed: 0 } });
+        applyLoadedGameState(saved);
+
+        return {
+          first,
+          duplicate,
+          secondWithBounty,
+          restoredXp: playerProgress.combatXp,
+          restoredZoneXp: playerProgress.zoneCombatXp[XP_CONFIG.combatZoneKey],
+          savedXp: saved.playerProgress?.combatXp,
+          savedZoneXp: saved.playerProgress?.zoneCombatXp?.[XP_CONFIG.combatZoneKey],
+          botsDestroyed: saved.playerProgress?.totals?.botsDestroyed,
+          erebusBotsDestroyed: saved.playerProgress?.totals?.erebusBotsDestroyed,
+          hudText,
+          pilotText,
+          activeBountyProgress: window.LupenMultiplayerClient.getStatus().lastStagingBountyStatus.active.progress
+        };
+      })()
+    `));
+
+    expect(state.first.applied).toBe(true);
+    expect(state.first.xpDelta).toBe(100);
+    expect(state.duplicate.applied).toBe(false);
+    expect(state.duplicate.reason).toBe("duplicate_staging_bot_kill_xp");
+    expect(state.secondWithBounty.applied).toBe(true);
+    expect(state.savedXp).toBe(200);
+    expect(state.savedZoneXp).toBe(200);
+    expect(state.restoredXp).toBe(200);
+    expect(state.restoredZoneXp).toBe(200);
+    expect(state.botsDestroyed).toBe(2);
+    expect(state.erebusBotsDestroyed).toBe(2);
+    expect(state.hudText).toContain("200");
+    expect(state.pilotText).toContain("200");
+    expect(state.activeBountyProgress).toBe(1);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("tutorial bounty grants a Core and Forge upgrade persists on Pulse Laser", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

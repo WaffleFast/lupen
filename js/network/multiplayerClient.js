@@ -2289,6 +2289,27 @@
           `bot-xp:${result.destructionInstanceId || result.idempotencyKey || result.botId}:${result.xpAfter}`,
           `Destroyed ${result.botName || "Staging Bot"}.${xpDelta > 0 ? ` +${xpDelta} XP.` : ""}`
         );
+      } else if (typeof global.awardLocalStagingBotKillXpFromServer === "function") {
+        const localResult = global.awardLocalStagingBotKillXpFromServer(connection.lastStagingBotXpResult);
+        connection.lastStagingBotXpResult = {
+          ...connection.lastStagingBotXpResult,
+          localFallbackApplied: localResult?.applied === true,
+          localFallbackReason: String(localResult?.reason || ""),
+          localFallbackXpDelta: Number.isFinite(Number(localResult?.xpDelta)) ? Number(localResult.xpDelta) : 0,
+          localFallbackXpAfter: Number.isFinite(Number(localResult?.xpAfter)) ? Number(localResult.xpAfter) : null
+        };
+        if (localResult?.applied === true) {
+          connection.lastStagingXpRefresh = {
+            source: "localBotKillFallback",
+            status: "local_applied",
+            trustedXpAfter: null,
+            refreshXp: Number(localResult.xpAfter),
+            matched: true,
+            stale: false,
+            reason: localResult.reason,
+            checkedAt: Date.now()
+          };
+        }
       }
       refreshCloudSaveAfterStagingXpClaim(connection.lastStagingBotXpResult);
       scheduleStagingCombatProgressRefresh("botKillXp", connection.lastStagingBotXpResult);

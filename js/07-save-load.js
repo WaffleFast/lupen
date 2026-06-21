@@ -521,6 +521,84 @@ function applyStagingXpClaimToLoadedState(result = {}) {
 }
 
 window.applyStagingXpClaimToLoadedState = applyStagingXpClaimToLoadedState;
+
+function getStagingBotKillXpKey(result = {}) {
+  const key = String(
+    result.destructionInstanceId ||
+    result.botXpSourceEventId ||
+    result.rewardPreviewId ||
+    result.idempotencyKey ||
+    ""
+  ).trim();
+  if (key) return key;
+  const botId = String(result.botId || "").trim();
+  const receivedAt = String(result.receivedAt || "").trim();
+  return botId && receivedAt ? `${botId}:${receivedAt}` : "";
+}
+
+function getLocalStagingBotKillXpAmount(result = {}) {
+  const configured = typeof getCombatXpPerBot === "function" ? Number(getCombatXpPerBot()) : 0;
+  const preview = Number(result.previewXp ?? result.claimStatus?.xpDelta ?? 0);
+  const amount = configured > 0 ? configured : preview > 0 ? preview : 4;
+  return Math.max(0, Math.round(amount));
+}
+
+function awardLocalStagingBotKillXpFromServer(result = {}) {
+  const alreadyApplied = result.applied === true ||
+    result.botXpApplied === true ||
+    result.saveWritten === true ||
+    result.playerSavePatchResult?.applied === true ||
+    result.playerSave?.written === true ||
+    result.claimStatus?.playerSave?.written === true;
+  if (alreadyApplied) return { applied: false, reason: "server_xp_already_applied" };
+
+  const key = getStagingBotKillXpKey(result);
+  if (!key) return { applied: false, reason: "staging_bot_kill_key_missing" };
+
+  if (!window.lupenStagingBotKillXpAwardedKeys) {
+    window.lupenStagingBotKillXpAwardedKeys = new Set();
+  }
+  if (window.lupenStagingBotKillXpAwardedKeys.has(key)) {
+    return { applied: false, reason: "duplicate_staging_bot_kill_xp" };
+  }
+
+  const xp = getLocalStagingBotKillXpAmount(result);
+  if (xp <= 0) return { applied: false, reason: "staging_bot_kill_xp_zero" };
+
+  window.lupenStagingBotKillXpAwardedKeys.add(key);
+  playerProgress = normalizePlayerProgress(playerProgress);
+  playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
+  playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
+
+  const xpResult = addCombatXp(xp, "stagingBotKill");
+  const botName = String(result.botName || "Erebus Bot").trim() || "Erebus Bot";
+  if (typeof addHudToast === "function") addHudToast(`${botName} destroyed. +${formatNumber(xpResult.gained)} XP.`);
+  if (typeof addActivityLog === "function") addActivityLog(`${botName} destroyed. +${formatNumber(xpResult.gained)} XP.`);
+  saveGame();
+  redrawProgressAfterStagingXp();
+
+  window.lupenLastStagingXpRefresh = {
+    source: "localBotKillFallback",
+    stale: false,
+    trustedXpAfter: null,
+    refreshedXp: playerProgress.combatXp,
+    appliedXp: playerProgress.combatXp,
+    hudXpAfterPatch: playerProgress.combatXp,
+    redrawTriggered: true,
+    reason: "local_staging_bot_xp_awarded",
+    checkedAt: Date.now()
+  };
+
+  return {
+    applied: true,
+    reason: "local_staging_bot_xp_awarded",
+    xpDelta: xpResult.gained,
+    xpAfter: playerProgress.combatXp,
+    key
+  };
+}
+
+window.awardLocalStagingBotKillXpFromServer = awardLocalStagingBotKillXpFromServer;
 window.getLupenCombatXpSnapshot = function getLupenCombatXpSnapshot() {
   return {
     combatXp: Number(playerProgress?.combatXp || 0),

@@ -2083,6 +2083,8 @@
       } else {
         lines.push(`Bot XP applied: +${Math.round(Number(botXp.xpDelta || 0))}.`);
       }
+    } else if (botXp?.botId === selectedBot?.id && botXp.localFallbackApplied) {
+      lines.push(`Bot XP applied locally: +${Math.round(Number(botXp.localFallbackXpDelta || 0))}.`);
     } else if (botXp?.botId === selectedBot?.id && botXp.mode === "blocked") {
       lines.push(`Bot XP blocked: ${getFriendlyBotXpReason(botXp)}.`);
     } else {
@@ -3391,11 +3393,14 @@
       }
       if (status.lastStagingBotXpResult) {
         const botXp = status.lastStagingBotXpResult;
-        const botXpStatus = botXp.applied ? "applied" : getFriendlyBotXpReason(botXp);
+        const botXpStatus = botXp.applied ? "applied" : botXp.localFallbackApplied ? "local applied" : getFriendlyBotXpReason(botXp);
         const persisted = botXp.persistenceVerified
           ? `persisted ${formatPreviewValue(botXp.persistedXp)} / zone ${formatPreviewValue(botXp.persistedZoneXp)}`
-          : botXp.botXpBlockReason || botXp.debugReason || botXp.reason || "not verified";
-        setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP ${formatPreviewValue(botXp.xpBefore)} -> ${formatPreviewValue(botXp.xpAfter)} / ${botXpStatus} / ${persisted}`);
+          : botXp.localFallbackApplied
+            ? `local ${formatPreviewValue(botXp.localFallbackXpAfter)}`
+            : botXp.botXpBlockReason || botXp.debugReason || botXp.reason || "not verified";
+        const xpAfter = botXp.localFallbackApplied ? botXp.localFallbackXpAfter : botXp.xpAfter;
+        setDiagnosticsRow(panel, "bot XP", `${botXp.mode || "unknown"} / XP ${formatPreviewValue(botXp.xpBefore)} -> ${formatPreviewValue(xpAfter)} / ${botXpStatus} / ${persisted}`);
       } else if (status.lastRewardPreview?.botId) {
         setDiagnosticsRow(panel, "bot XP", `preview only / XP +${Math.round(Number(status.lastRewardPreview.previewXp || 0))} / no apply result`);
       }

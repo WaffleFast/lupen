@@ -3161,7 +3161,7 @@ async function assertStagingBountyHelpers() {
     finalHitBy: "session-a",
     disabledBySessionId: "session-a",
     topContributorSessionId: "session-a",
-    previewXp: 8
+    previewXp: 100
   };
   const botKillRewardPlan = buildRewardWritePlan({
     preview: botKillPreview,
@@ -3185,7 +3185,7 @@ async function assertStagingBountyHelpers() {
     sourceEventId: botKillPreview.rewardPreviewId
   });
   assert(botKillPatchPlan.eligible === true, `Staging bot kill XP patch plan was blocked: ${botKillPatchPlan.skippedReason}`);
-  assert(botKillPatchPlan.xpDelta === 8 && botKillPatchPlan.creditsDelta === 0, "Staging bot kill patch plan was not XP-only.");
+  assert(botKillPatchPlan.xpDelta === 100 && botKillPatchPlan.creditsDelta === 0, "Staging bot kill patch plan was not XP-only.");
 
   const botKillPatchCalls = [];
   let botKillPersistedSave = bountySave;
@@ -3211,8 +3211,8 @@ async function assertStagingBountyHelpers() {
   assert(botKillPatchResult.applied === true, "Staging bot kill XP-only patch did not apply in mocked write mode.");
   assert(botKillPatchResult.persistenceVerified === true, "Staging bot kill XP-only patch was not verified after write.");
   const botKillPatchedBody = JSON.parse(botKillPatchCalls[1].body);
-  assert(botKillPatchedBody.save_data.playerProgress.combatXp === 18, "Staging bot kill patch did not add XP.");
-  assert(botKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 18, "Staging bot kill patch did not mirror sector-one XP.");
+  assert(botKillPatchedBody.save_data.playerProgress.combatXp === 110, "Staging bot kill patch did not add XP.");
+  assert(botKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 110, "Staging bot kill patch did not mirror sector-one XP.");
   assert(botKillPatchedBody.save_data.credits === 777, "Staging bot kill patch changed credits.");
   assert(botKillPatchedBody.save_data.inventoryItems[0].id === "loot-stays", "Staging bot kill patch changed inventory.");
 
@@ -3274,8 +3274,8 @@ async function assertStagingBountyHelpers() {
   });
   assert(secondBotKillPatchResult.applied === true, "Second staging bot kill XP-only patch did not apply in mocked write mode.");
   const secondBotKillPatchedBody = JSON.parse(secondBotKillPatchCalls[1].body);
-  assert(secondBotKillPatchedBody.save_data.playerProgress.combatXp === 26, "Second staging bot kill patch did not add another XP award.");
-  assert(secondBotKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 26, "Second staging bot kill patch did not mirror second sector-one XP award.");
+  assert(secondBotKillPatchedBody.save_data.playerProgress.combatXp === 210, "Second staging bot kill patch did not add another XP award.");
+  assert(secondBotKillPatchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 210, "Second staging bot kill patch did not mirror second sector-one XP award.");
 
   let threeKillSave = {
     ...bountySave,
@@ -3292,7 +3292,7 @@ async function assertStagingBountyHelpers() {
       preview: {
         ...botKillPreview,
         rewardPreviewId,
-        previewXp: 8
+        previewXp: 100
       },
       claimantIdentity: {
         sessionId: "session-a",
@@ -3335,14 +3335,14 @@ async function assertStagingBountyHelpers() {
     assert(patchResult.persistenceVerified === true, `Bot kill ${killIndex} was not verified after write.`);
     threeKillSeenKeys.add(patchPlan.idempotencyKey);
   }
-  assert(threeKillSave.playerProgress.combatXp === 40, "Three legitimate bot destructions did not persist final XP 40.");
-  assert(threeKillSave.playerProgress.zoneCombatXp["sector-one"] === 40, "Three legitimate bot destructions did not mirror final sector-one XP 40.");
+  assert(threeKillSave.playerProgress.combatXp === 316, "Three legitimate bot destructions did not persist final XP 316.");
+  assert(threeKillSave.playerProgress.zoneCombatXp["sector-one"] === 316, "Three legitimate bot destructions did not mirror final sector-one XP 316.");
 
   const duplicateThreeKillRewardPlan = buildRewardWritePlan({
     preview: {
       ...botKillPreview,
       rewardPreviewId: "staging_bot_xp:staging-bot-a:live-kill-3",
-      previewXp: 8
+      previewXp: 100
     },
     claimantIdentity: {
       sessionId: "session-a",
@@ -5145,7 +5145,7 @@ try {
   assert(!contributorA?.trustedPlayerId && !contributorA?.playerId, "Contributor A unverified identity was trusted.");
   assert(!contributorB?.trustedPlayerId && !contributorB?.playerId, "Contributor B unverified identity was trusted.");
   assert(contributorA?.displayName === "Regression Pilot A", "Contributor A display name was not included in preview.");
-  assert(rewardPreview?.previewXp === 8, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
+  assert(rewardPreview?.previewXp === 100, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
   assert(rewardPreview?.previewCredits === 0, `Unexpected reward preview credits: ${rewardPreview?.previewCredits}`);
   assert(rewardPreview?.inventoryWritten === false && rewardPreview?.saveWritten === false, "Reward preview reported inventory/save writes.");
   assert(rewardPreview?.creditsWritten === false && rewardPreview?.cargoWritten === false && rewardPreview?.bountyWritten === false, "Reward preview reported economy/bounty writes.");
