@@ -2709,13 +2709,13 @@
 
     const panel = global.document.createElement("div");
     panel.id = stagingTradePanelId;
-    panel.setAttribute("aria-label", "Staging trade preview");
+    panel.setAttribute("aria-label", "Debug staging trade preview");
 
     const inner = global.document.createElement("div");
     inner.className = "lupen-mp-trade-inner";
 
     const title = global.document.createElement("strong");
-    title.textContent = "Staging Trade Preview";
+    title.textContent = "Debug Preview Only";
     inner.appendChild(title);
 
     const controls = global.document.createElement("div");
@@ -2805,7 +2805,7 @@
 
     const note = global.document.createElement("div");
     note.className = "lupen-mp-trade-note";
-    note.textContent = "Dry run only - no credits, cargo, inventory, saves, bounties, loot, or economy changed.";
+    note.textContent = "Debug preview only - no credits, cargo, inventory, saves, bounties, loot, or economy changed.";
     inner.appendChild(note);
 
     panel.appendChild(inner);

@@ -580,6 +580,14 @@ function getMultiplayerStagingTradeSyncLine(result) {
   return `${actionLabel}. Reload or reopen to sync full save display.`;
 }
 
+function getMultiplayerStagingPlayerTradeStatusLine(offerId, operation = "buy") {
+  const operationLabel = operation === "sell" ? "Sell" : "Buy";
+  if (!offerId) {
+    return `<div class="trade-preview-note staging-trade-status compact">No staging route available for this ${operation === "sell" ? "sale" : "purchase"}.</div>`;
+  }
+  return `<div class="trade-preview-note staging-trade-status compact">${operationLabel} applies to this pilot save immediately. Debug previews stay in the MP diagnostics panel.</div>`;
+}
+
 function getMultiplayerStagingTradeSellProfit(result) {
   const quantity = Math.max(0, Number(result?.quantity || Math.abs(result?.cargoDelta || 0)));
   const revenue = Math.max(0, Number(result?.revenue || result?.creditsDelta || 0));
@@ -729,41 +737,23 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
 
 function renderMultiplayerStagingTradePreviewResult(offerId, { operation = "buy" } = {}) {
   if (!isMultiplayerStagingActive()) return "";
+  const debugMode = isMultiplayerStagingDebugActive();
+  if (!debugMode) return getMultiplayerStagingPlayerTradeStatusLine(offerId, operation);
+
   const result = getLastMatchingMultiplayerStagingTradePreview(offerId, operation);
   const operationLabel = operation === "sell" ? "sell" : "buy";
   if (!offerId) {
-    return `<div class="trade-preview-note staging-trade-status compact">Server ${operationLabel} unavailable for this route.</div>`;
+    return `<div class="trade-preview-note staging-trade-status compact">Debug ${operationLabel} preview unavailable for this route.</div>`;
   }
   if (!result) {
-    return `<div class="trade-preview-note staging-trade-status compact">Server ${operationLabel} ready.</div>`;
+    return `<div class="trade-preview-note staging-trade-status compact">Debug ${operationLabel} preview ready.</div>`;
   }
 
-  const debugMode = isMultiplayerStagingDebugActive();
   const debugLine = debugMode
     ? `<span>${result.validationMode || "unknown"} / trusted ${result.trustedStateAvailable ? "yes" : "no"} / snapshot ${result.snapshotUsed ? "yes" : "no"}</span>`
     : "";
   const applied = result.applied === true && result.mode === "trade_write";
   const resultOperation = result.operation || operationLabel;
-  if (!debugMode) {
-    if (applied) {
-      return `
-        <div class="trade-preview-note staging-trade-status compact">
-          <strong>Server ${resultOperation} applied.</strong>
-          <span>${getMultiplayerStagingTradeSyncLine(result) || "Cloud save refresh pending."}</span>
-        </div>
-      `;
-    }
-    if (result.mode === "blocked" || result.ok === false || result.wouldPass === false) {
-      return `
-        <div class="trade-preview-note staging-trade-status compact">
-          <strong>Server ${operationLabel} blocked.</strong>
-          ${getMultiplayerStagingTradeWriteBlockLine(result) || `<span>${getMultiplayerStagingTradeValidationLabel(result)}</span>`}
-        </div>
-      `;
-    }
-    return `<div class="trade-preview-note staging-trade-status compact">Server ${operationLabel} ready.</div>`;
-  }
-
   const resultTitle = applied ? `MP staging: server ${resultOperation} applied` : "MP staging: server preview only";
   const writeLine = applied
     ? `<span>Staging ${resultOperation} applied: CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(result.creditsAfter)} (${result.creditsDelta < 0 ? "-" : "+"}${formatNumber(Math.abs(result.creditsDelta))})</span>
@@ -1405,14 +1395,17 @@ function getMarketQuantityLimit() {
   return Math.max(1, getMarketMaxBuyQuantity());
 }
 
+let marketBuyInProgress = false;
 let marketSellInProgress = false;
 
 function buyMarketCargo() {
+  if (marketBuyInProgress) return;
   normalizeMarketBuilderState();
 
   const currentPlanet = getCurrentMarketPlanet();
   const good = selectedMarketResource;
   const tutorialTradeActive = isLocalTutorialTradeActive();
+  const stagingTradeActive = isMultiplayerStagingActive() && !tutorialTradeActive;
   if (tutorialTradeActive && activeTradeRoute?.marketTrade && activeTradeRoute.good === good && Number(cargo[good] || 0) > 0) {
     tutorialEvent("boughtTradeCargo");
     renderMarketplace();
@@ -1421,7 +1414,14 @@ function buyMarketCargo() {
     renderObjectiveHud();
     return;
   }
-  const quantity = isMultiplayerStagingActive() && !tutorialTradeActive
+  const stagingOffer = stagingTradeActive
+    ? findMultiplayerStagingTradeOffer({
+      good,
+      origin: currentPlanet,
+      destination: selectedMarketTargetPlanet
+    })
+    : null;
+  const quantity = stagingTradeActive
     ? clampNumber(selectedMarketQuantity || 1, 1, getMultiplayerStagingTradeQuantityLimit({
       operation: "buy",
       good,
@@ -1429,22 +1429,16 @@ function buyMarketCargo() {
       destination: selectedMarketTargetPlanet
     }))
     : selectedMarketQuantity;
-  if (isMultiplayerStagingActive() && !tutorialTradeActive) {
-    const offer = findMultiplayerStagingTradeOffer({
-      good,
-      origin: currentPlanet,
-      destination: selectedMarketTargetPlanet
-    });
-    requestMultiplayerStagingTradeDryRun({
-      operation: "buy",
-      offerId: offer?.offerId || "",
-      quantity
-    });
-    blockRealTradeMutationInMultiplayerStaging();
+  if (stagingTradeActive && !stagingOffer) {
+    const message = "No staging trade route is available for that purchase.";
+    if (typeof addHudToast === "function") addHudToast(message);
+    if (typeof addActivityLog === "function") addActivityLog(message);
     return;
   }
 
-  const price = getMapOneMarketPrice(good, currentPlanet);
+  const price = stagingTradeActive ? Number(stagingOffer.buyPrice || 0) : getMapOneMarketPrice(good, currentPlanet);
+  const sellPrice = stagingTradeActive ? Number(stagingOffer.sellPrice || 0) : getMapOneMarketPrice(good, selectedMarketTargetPlanet);
+  const destination = stagingTradeActive ? stagingOffer.sellNode : selectedMarketTargetPlanet;
   const totalCost = price * quantity;
   const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
 
@@ -1456,24 +1450,29 @@ function buyMarketCargo() {
   const previousHeld = cargo[good] || 0;
   const previousBasis = cargoCostBasis[good] || price;
 
+  marketBuyInProgress = true;
   credits -= totalCost;
-  cargo[good] += quantity;
+  cargo[good] = previousHeld + quantity;
   cargoCostBasis[good] = Math.round(((previousHeld * previousBasis) + totalCost) / Math.max(1, previousHeld + quantity));
   setActiveTradeObjective({
-    id: `market-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+    id: stagingTradeActive ? `staging-trade-${stagingOffer.offerId || Date.now()}` : `market-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
     good,
     origin: currentPlanet,
-    destination: selectedMarketTargetPlanet,
+    destination,
     buyPrice: price,
-    sellPrice: getMapOneMarketPrice(good, selectedMarketTargetPlanet),
-    profitPerUnit: getMapOneMarketPrice(good, selectedMarketTargetPlanet) - price,
+    sellPrice,
+    profitPerUnit: sellPrice - price,
     maxUnits: quantity,
     purchasedUnits: quantity,
     realizedProfit: 0,
     marketTrade: true,
+    stagingTrade: stagingTradeActive,
     tutorialTrade: tutorialTradeActive
   });
 
+  if (stagingTradeActive && typeof addActivityLog === "function") {
+    addActivityLog(`Bought ${formatNumber(quantity)} ${good} for CR ${formatNumber(totalCost)}. Deliver to ${destination} for estimated profit CR ${formatNumber(Math.max(0, (sellPrice - price) * quantity))}.`);
+  }
   tutorialEvent("boughtTradeCargo");
   saveGame();
   renderMarketplace();
@@ -1481,6 +1480,7 @@ function buyMarketCargo() {
   updateSpaceHUD();
   renderObjectiveHud();
   if (document.getElementById("sectorMap")?.classList.contains("active")) renderSectorMap();
+  marketBuyInProgress = false;
 }
 
 function sellMarketCargo() {
@@ -1489,43 +1489,47 @@ function sellMarketCargo() {
   const good = selectedMarketResource;
   const held = cargo[good] || 0;
   const tutorialTradeActive = isLocalTutorialTradeActive();
-  if (isMultiplayerStagingActive() && !tutorialTradeActive) {
-    const currentPlanet = getCurrentMarketPlanet();
-    const origin = activeTradeRoute?.marketTrade && activeTradeRoute.good === good
-      ? activeTradeRoute.origin
-      : findMultiplayerStagingSellOffer({ good, destination: currentPlanet })?.buyNode || "";
-    const offer = findMultiplayerStagingTradeOffer({ good, origin, destination: currentPlanet });
-    const quantity = clampNumber(selectedMarketQuantity || 1, 1, getMultiplayerStagingTradeQuantityLimit({
-      operation: "sell",
-      good,
-      origin: currentPlanet,
-      destination: currentPlanet
-    }));
-    requestMultiplayerStagingTradeDryRun({
-      operation: "sell",
-      offerId: offer?.offerId || "",
-      quantity
-    });
-    blockRealTradeMutationInMultiplayerStaging();
-    return;
-  }
+  const stagingTradeActive = isMultiplayerStagingActive() && !tutorialTradeActive;
 
   if (held <= 0) {
     if (typeof addHudToast === "function") addHudToast(`No ${good} cargo to sell.`);
     return;
   }
 
-  marketSellInProgress = true;
   const currentPlanet = getCurrentMarketPlanet();
-  const price = getEffectiveSellPrice(good, currentPlanet);
-  const unitCost = cargoCostBasis[good] || getEffectiveBuyPrice(good, currentPlanet) || price;
-  const saleRevenue = price * held;
-  const tradeProfit = held * (price - unitCost);
+  const stagingOffer = stagingTradeActive
+    ? findMultiplayerStagingSellOffer({ good, destination: currentPlanet })
+    : null;
+  if (stagingTradeActive && !stagingOffer) {
+    const message = `No staging buyer is available for ${good} at ${currentPlanet}.`;
+    if (typeof addHudToast === "function") addHudToast(message);
+    if (typeof addActivityLog === "function") addActivityLog(message);
+    return;
+  }
 
-  cargo[good] = 0;
+  const quantity = stagingTradeActive
+    ? clampNumber(selectedMarketQuantity || held, 1, Math.min(held, getMultiplayerStagingTradeQuantityLimit({
+      operation: "sell",
+      good,
+      origin: currentPlanet,
+      destination: currentPlanet
+    })))
+    : held;
+  const price = stagingTradeActive ? Number(stagingOffer.sellPrice || 0) : getEffectiveSellPrice(good, currentPlanet);
+  const unitCost = cargoCostBasis[good] || (stagingTradeActive ? Number(stagingOffer.buyPrice || 0) : getEffectiveBuyPrice(good, currentPlanet)) || price;
+  const saleRevenue = price * quantity;
+  const tradeProfit = quantity * (price - unitCost);
+
+  if (quantity <= 0 || !price) {
+    if (typeof addHudToast === "function") addHudToast(`Cannot sell ${good} at this market.`);
+    return;
+  }
+
+  marketSellInProgress = true;
+  cargo[good] = Math.max(0, held - quantity);
   credits += saleRevenue;
-  delete cargoCostBasis[good];
-  playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + held;
+  if (cargo[good] <= 0) delete cargoCostBasis[good];
+  playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + quantity;
 
   const activeTrade = getActiveTradePricing(good);
   if (activeTrade && currentPlanet === activeTrade.destination) {
@@ -1534,7 +1538,10 @@ function sellMarketCargo() {
     });
   }
 
-  showTradeResultBurst({ good, quantity: held, profit: tradeProfit, revenue: saleRevenue });
+  if (stagingTradeActive && typeof addActivityLog === "function") {
+    addActivityLog(`Sold ${formatNumber(quantity)} ${good} at ${currentPlanet} for ${tradeProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(tradeProfit))} profit.`);
+  }
+  showTradeResultBurst({ good, quantity, profit: tradeProfit, revenue: saleRevenue });
   showTradeMiniFloat({ profit: tradeProfit });
   completeActiveTradeIfReady(good);
   tutorialEvent("soldTradeCargo");

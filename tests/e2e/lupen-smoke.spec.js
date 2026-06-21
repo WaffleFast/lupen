@@ -878,8 +878,23 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     await expect(page.locator(".vessel-exchange-card[data-ship-id='zeusExplorer']")).toHaveClass(/progression-locked/);
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Destroy Erebus bots: 12 / 25");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Requires Combat Level 2");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Unlock Requirements");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Ship Stats");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Combat Level");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("1 / 2");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Erebus Bots Destroyed");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("12 / 25");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Weapon Slots");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Equipment Slots");
+
+    await page.evaluate(() => window.eval("selectShipyardShip('monolith')"));
+    await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).toHaveClass(/progression-locked/);
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Unlock Requirements");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Combat Level");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Erebus Bots Destroyed");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Bounties Completed");
+    await expect(page.locator("#shipyardDetailPanel .locked-action")).toHaveText("Locked");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 48,000");
 
     await page.reload();
     await waitForGameGlobals(page);
@@ -953,7 +968,7 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#marketScreen")).toContainText(/Buy Cargo|Preview Unavailable/);
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
-    await expect(page.locator("#marketScreen")).toContainText(/MP staging|server/i);
+    await expect(page.locator("#marketScreen")).toContainText(/pilot save immediately|staging/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -1042,6 +1057,8 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("CR 1,134");
     await expect(page.locator("#marketScreen")).toContainText("CR 1,890");
     await expect(page.locator("#marketScreen")).toContainText("+CR 756");
+    await expect(page.locator("#marketScreen")).toContainText(/Buy applies to this pilot save immediately/);
+    await expect(page.locator("#marketScreen")).not.toContainText("Dry run only");
 
     await page.evaluate(() => {
       window.eval(`
@@ -1059,24 +1076,42 @@ test.describe("Lupen browser smoke", () => {
     });
     await expect(page.locator("#marketScreen .market-builder-selected")).toContainText(/Iron[\s\S]*Asteron Prime > Virella/);
 
-    await page.evaluate(() => {
-      if (typeof window.applyMultiplayerStagingTradeObjective === "function") {
-        window.applyMultiplayerStagingTradeObjective({
-          applied: true,
-          operation: "buy",
-          offerId: "staging-iron-asteron-virella",
-          resourceName: "Iron",
-          buyNode: "Asteron Prime",
-          sellNode: "Virella",
-          quantity: 6,
-          buyPrice: 18,
-          sellPrice: 30,
-          cost: 108,
-          projectedRevenue: 180,
-          cargoDelta: 6
-        });
-      }
-    });
+    const buyMutation = await page.evaluate(() => window.eval(`
+      (() => {
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        credits = 10000;
+        cargo.Iron = 0;
+        delete cargoCostBasis.Iron;
+        activeTradeRoute = null;
+        activeObjective = null;
+        selectedMarketResource = "Iron";
+        selectedMarketTargetPlanet = "Virella";
+        selectedMarketQuantity = 6;
+        renderMarketplace();
+        buyMarketCargo();
+        const saved = JSON.parse(localStorage.getItem(STORAGE_GAME_KEY) || "{}");
+        return {
+          credits,
+          cargoIron: cargo.Iron || 0,
+          cargoBasis: cargoCostBasis.Iron || 0,
+          route: { ...activeTradeRoute },
+          objective: { ...activeObjective },
+          savedCredits: saved.credits,
+          savedCargoIron: saved.cargo?.Iron || 0,
+          savedRoute: saved.activeTradeRoute
+        };
+      })()
+    `));
+    expect(buyMutation.credits).toBe(9892);
+    expect(buyMutation.cargoIron).toBe(6);
+    expect(buyMutation.cargoBasis).toBe(18);
+    expect(buyMutation.route.stagingTrade).toBe(true);
+    expect(buyMutation.route.destination).toBe("Virella");
+    expect(buyMutation.objective.destination).toBe("Virella");
+    expect(buyMutation.savedCredits).toBe(9892);
+    expect(buyMutation.savedCargoIron).toBe(6);
+    expect(buyMutation.savedRoute.destination).toBe("Virella");
     await expect(page.locator("#activeObjectiveSummary")).toContainText("Deliver 6 Iron");
     await expect(page.locator("#activeObjectiveSummary")).toContainText("Asteron Prime -> Virella");
     await expect(page.locator("#activeObjectiveSummary")).toContainText("+CR 72");
@@ -1181,10 +1216,30 @@ test.describe("Lupen browser smoke", () => {
       window.eval(`
         currentNode = "Virella";
         lastPlanetNode = "Virella";
+        credits = 9892;
         cargo.Iron = 6;
         cargoCostBasis.Iron = 18;
+        activeTradeRoute = {
+          id: "staging-trade-staging-iron-asteron-virella",
+          type: "trade",
+          marketTrade: true,
+          stagingTrade: true,
+          good: "Iron",
+          origin: "Asteron Prime",
+          destination: "Virella",
+          buyPrice: 18,
+          sellPrice: 30,
+          profitPerUnit: 12,
+          maxUnits: 6,
+          purchasedUnits: 6,
+          realizedProfit: 0,
+          status: "active"
+        };
+        activeObjective = createTradeObjective(activeTradeRoute);
+        playerProgress = normalizePlayerProgress({ combatXp: 0, totals: {} });
         selectedMarketResource = "Iron";
         selectedMarketTargetPlanet = "Virella";
+        selectedMarketQuantity = 6;
       `);
       if (typeof window.renderMarketplace === "function") window.renderMarketplace();
     });
@@ -1196,6 +1251,39 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).toContainText("CR 180");
     await expect(page.locator("#marketScreen")).toContainText("+CR 72");
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
+    await expect(page.locator("#marketScreen")).toContainText(/Sell applies to this pilot save immediately/);
+    await expect(page.locator("#marketScreen")).not.toContainText("Dry run only");
+
+    const sellMutation = await page.evaluate(() => window.eval(`
+      (() => {
+        sellMarketCargo();
+        const creditsAfterFirstSell = credits;
+        sellMarketCargo();
+        const saved = JSON.parse(localStorage.getItem(STORAGE_GAME_KEY) || "{}");
+        return {
+          creditsAfterFirstSell,
+          creditsAfterDoubleSell: credits,
+          cargoIron: cargo.Iron || 0,
+          activeTradeCleared: activeTradeRoute === null && activeObjective === null,
+          tradeProfit: playerProgress.totals.tradeProfit || 0,
+          tradesCompleted: playerProgress.totals.tradesCompleted || 0,
+          savedCredits: saved.credits,
+          savedCargoIron: saved.cargo?.Iron || 0,
+          savedTradeProfit: saved.playerProgress?.totals?.tradeProfit || 0,
+          savedActiveRoute: saved.activeTradeRoute
+        };
+      })()
+    `));
+    expect(sellMutation.creditsAfterFirstSell).toBe(10072);
+    expect(sellMutation.creditsAfterDoubleSell).toBe(10072);
+    expect(sellMutation.cargoIron).toBe(0);
+    expect(sellMutation.activeTradeCleared).toBe(true);
+    expect(sellMutation.tradeProfit).toBe(72);
+    expect(sellMutation.tradesCompleted).toBe(1);
+    expect(sellMutation.savedCredits).toBe(10072);
+    expect(sellMutation.savedCargoIron).toBe(0);
+    expect(sellMutation.savedTradeProfit).toBe(72);
+    expect(sellMutation.savedActiveRoute).toBeNull();
 
     await page.evaluate(() => {
       window.eval(`

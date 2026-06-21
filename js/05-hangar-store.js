@@ -2800,6 +2800,62 @@ function renderExchangeHardpointRail(shipId) {
   `;
 }
 
+function getExchangeRequirementLabel(key) {
+  if (key === "combatLevel") return "Combat Level";
+  if (key === "erebusBotsDestroyed") return "Erebus Bots Destroyed";
+  if (key === "totalTradingProfit") return "Trading Profit";
+  if (key === "bountiesClaimed") return "Bounties Completed";
+  return String(key || "Requirement").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function formatExchangeRequirementValue(key, value) {
+  const safeValue = Math.max(0, Math.round(Number(value || 0)));
+  return key === "totalTradingProfit" ? `CR ${formatNumber(safeValue)}` : formatNumber(safeValue);
+}
+
+function renderExchangeRequirementRows(unlock) {
+  const progress = Array.isArray(unlock?.progress) ? unlock.progress : [];
+  if (!progress.length) return "";
+
+  return `
+    <section class="exchange-detail-section exchange-unlock-section ${unlock.locked ? "locked" : "met"}">
+      <div class="exchange-section-heading">
+        <span>Unlock Requirements</span>
+        <strong>${unlock.locked ? "Locked" : "Met"}</strong>
+      </div>
+      <div class="exchange-requirement-rows">
+        ${progress.map(item => `
+          <div class="exchange-requirement-row ${item.met ? "met" : "missing"}">
+            <span>${escapeHtml(getExchangeRequirementLabel(item.key))}</span>
+            <strong>${escapeHtml(formatExchangeRequirementValue(item.key, Math.min(item.current, item.required)))} / ${escapeHtml(formatExchangeRequirementValue(item.key, item.required))}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderExchangeShipStatsSection(shipId, stats) {
+  return `
+    <section class="exchange-detail-section exchange-stat-section">
+      <div class="exchange-section-heading">
+        <span>Ship Stats</span>
+      </div>
+      <div class="exchange-detail-stat-grid">
+        ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
+        ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
+        ${renderFleetStatChip("Armor", formatNumber(stats.armor), "armor-stat")}
+        ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
+        ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
+        ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
+      </div>
+      <div class="exchange-detail-loadout">
+        ${renderExchangeHardpointRail(shipId)}
+      </div>
+    </section>
+  `;
+}
+
 function renderShipyardDetail() {
   const panel = document.getElementById("shipyardDetailPanel");
   if (!panel) return;
@@ -2831,15 +2887,13 @@ function renderShipyardDetail() {
     secondaryAction = `<button class="exchange-footer-secondary shipyard-price-action" disabled>${starterClaim ? "Free Starter Hull" : `CR ${formatNumber(ship.price)}`}</button>`;
   }
 
-  const requirementHtml = unlock.requirementLines.length ? `
-    <div class="progression-requirement-list ${unlock.locked ? "locked" : "met"}">
-      ${unlock.requirementLines.map(line => `<span>${escapeHtml(line)}</span>`).join("")}
-    </div>
-  ` : "";
+  const requirementHtml = renderExchangeRequirementRows(unlock);
+  const statusLabel = unlock.state === "locked" ? "Locked" : equipped ? "Active" : owned ? "Owned" : "Available";
 
   panel.innerHTML = `
-    <div class="exchange-detail-stack">
+    <div class="exchange-detail-stack ${unlock.locked ? "is-locked" : "is-open"}">
       <div class="exchange-detail-preview">
+        <div class="exchange-detail-status-chip ${unlock.state}">${statusLabel}</div>
         <div class="exchange-detail-glow"></div>
         <div class="exchange-hero-ring"></div>
         <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
@@ -2851,18 +2905,7 @@ function renderShipyardDetail() {
       </div>
       ${requirementHtml}
 
-      <div class="exchange-detail-stat-grid">
-        ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
-        ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
-        ${renderFleetStatChip("Armor", formatNumber(stats.armor), "armor-stat")}
-        ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
-        ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
-        ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
-      </div>
-
-      <div class="exchange-detail-loadout">
-        ${renderExchangeHardpointRail(ship.id)}
-      </div>
+      ${renderExchangeShipStatsSection(ship.id, stats)}
 
       <div class="exchange-detail-footer">
         ${primaryAction}
