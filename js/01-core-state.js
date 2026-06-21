@@ -2184,6 +2184,62 @@ function getShipUnlockStatus(shipId) {
   };
 }
 
+function getUnlockProgressItem(status, key) {
+  return (status?.progress || []).find(item => item.key === key) || null;
+}
+
+function addProgressionActivity(message) {
+  if (typeof addActivityLog === "function") addActivityLog(message);
+}
+
+function addShipUnlockedFeedback(shipId) {
+  const ship = SHIPS[shipId];
+  if (!ship) return;
+  const message = `Unlocked: ${ship.name} is now available in Vessel Exchange.`;
+  if (typeof addHudToast === "function") addHudToast(message);
+  else addProgressionActivity(message);
+  if (typeof renderShipShop === "function" && document.getElementById("hangarShipyardSection")?.classList.contains("active")) {
+    renderShipShop();
+  }
+}
+
+function reportShipUnlockTransition(shipId, beforeStatus) {
+  const afterStatus = getShipUnlockStatus(shipId);
+  if (beforeStatus?.locked && afterStatus.unlocked && !ownedShips.includes(shipId)) {
+    addShipUnlockedFeedback(shipId);
+  }
+  return afterStatus;
+}
+
+function reportErebusBotShipProgress(beforeNightshadeStatus) {
+  const afterStatus = getShipUnlockStatus("zeusExplorer");
+  const botProgress = getUnlockProgressItem(afterStatus, "erebusBotsDestroyed");
+  if (beforeNightshadeStatus?.locked && botProgress && !botProgress.met) {
+    addProgressionActivity(`Erebus destroyed. Nightshade Hawk progress: ${formatNumber(Math.min(botProgress.current, botProgress.required))} / ${formatNumber(botProgress.required)}.`);
+  }
+  reportShipUnlockTransition("zeusExplorer", beforeNightshadeStatus);
+}
+
+function reportTradingShipProgress(beforeHaulerStatus) {
+  const afterStatus = getShipUnlockStatus("bison");
+  const profitProgress = getUnlockProgressItem(afterStatus, "totalTradingProfit");
+  if (beforeHaulerStatus?.locked && profitProgress && !profitProgress.met) {
+    addProgressionActivity(`Trade profit banked. Buu Hauler progress: CR ${formatNumber(Math.min(profitProgress.current, profitProgress.required))} / CR ${formatNumber(profitProgress.required)}.`);
+  }
+  reportShipUnlockTransition("bison", beforeHaulerStatus);
+}
+
+function recordBotDestroyedProgress(bot) {
+  playerProgress = normalizePlayerProgress(playerProgress);
+  const isErebus = !bot || bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_");
+  const beforeNightshadeStatus = isErebus ? getShipUnlockStatus("zeusExplorer") : null;
+  playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
+  if (isErebus) {
+    playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
+    reportErebusBotShipProgress(beforeNightshadeStatus);
+  }
+}
+
 function getEquipmentUnlockRequirements(categoryKey, itemKey) {
   const normalizedCategory = categoryKey === "attachments" || categoryKey === "attachment" ? "attachments" : "guns";
   return EQUIPMENT_UNLOCK_REQUIREMENTS[normalizedCategory]?.[itemKey] || { combatLevel: 1 };
@@ -2238,10 +2294,7 @@ function addCombatXp(amount, source = "") {
 
 function awardCombatXpFromBot(bot) {
   const award = Number(bot?.xpReward || getCombatXpPerBot());
-  playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
-  if (!bot || bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_")) {
-    playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
-  }
+  recordBotDestroyedProgress(bot);
 
   if (award <= 0) {
     updateProgressDisplays();
@@ -2259,10 +2312,12 @@ function awardTradingXpFromProfit(profit) {
   const safeProfit = Math.max(0, Math.round(Number(profit || 0)));
   if (safeProfit <= 0) return 0;
 
+  const beforeHaulerStatus = getShipUnlockStatus("bison");
   playerProgress.totals.tradesCompleted = Math.max(0, Number(playerProgress.totals.tradesCompleted || 0)) + 1;
   playerProgress.totals.tradeProfit = Math.max(0, Number(playerProgress.totals.tradeProfit || 0)) + safeProfit;
   playerProgress.totals.totalTradingProfit = Math.max(0, Number(playerProgress.totals.totalTradingProfit || 0)) + safeProfit;
   addActivityLog(`Trade completed: CR ${formatNumber(safeProfit)} profit.`);
+  reportTradingShipProgress(beforeHaulerStatus);
   updateProgressDisplays();
   return 0;
 }

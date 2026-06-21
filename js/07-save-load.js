@@ -565,13 +565,22 @@ function awardLocalStagingBotKillXpFromServer(result = {}) {
   const xp = getLocalStagingBotKillXpAmount(result);
   if (xp <= 0) return { applied: false, reason: "staging_bot_kill_xp_zero" };
 
+  const botName = String(result.botName || "Erebus Bot").trim() || "Erebus Bot";
   window.lupenStagingBotKillXpAwardedKeys.add(key);
-  playerProgress = normalizePlayerProgress(playerProgress);
-  playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
-  playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
+  if (typeof recordBotDestroyedProgress === "function") {
+    recordBotDestroyedProgress({
+      id: result.botId || "",
+      name: botName,
+      faction: "erebus",
+      botType: "erebus_staging"
+    });
+  } else {
+    playerProgress = normalizePlayerProgress(playerProgress);
+    playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
+    playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
+  }
 
   const xpResult = addCombatXp(xp, "stagingBotKill");
-  const botName = String(result.botName || "Erebus Bot").trim() || "Erebus Bot";
   if (typeof addHudToast === "function") addHudToast(`${botName} destroyed. +${formatNumber(xpResult.gained)} XP.`);
   if (typeof addActivityLog === "function") addActivityLog(`${botName} destroyed. +${formatNumber(xpResult.gained)} XP.`);
   saveGame();
