@@ -2510,9 +2510,6 @@ test.describe("Lupen browser smoke", () => {
         window.LupenMultiplayerOverlay?.render?.();
         const targetCard = document.querySelector(".lupen-target-card.hostile");
         const botMarker = document.querySelector("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-locked");
-        const botMarkerLabel = botMarker?.querySelector(".lupen-mp-space-bot-label");
-        const botMarkerNote = botMarker?.querySelector(".lupen-mp-space-bot-note");
-        const botMarkerBars = botMarker?.querySelector(".lupen-mp-bot-bars");
         return {
           step: getCurrentTutorialStep().id,
           selectedType: selectedTarget?.type || "",
@@ -2520,7 +2517,7 @@ test.describe("Lupen browser smoke", () => {
           engageHighlighted: engage?.classList.contains("tutorial-highlight-target") || false,
           targetCardText: targetCard?.textContent || "",
           targetBars: targetCard?.querySelectorAll(".lupen-target-bar-track").length || 0,
-          selectedMarkerExtraHidden: [botMarkerLabel, botMarkerNote, botMarkerBars].every(node => !node || getComputedStyle(node).display === "none"),
+          markerHasInlineLabel: !!botMarker?.querySelector(".lupen-mp-space-bot-label, .lupen-mp-space-bot-note, .lupen-mp-bot-bars"),
           oldDebugCopyVisible: document.getElementById("spaceScreen")?.textContent?.includes("STAGING BOT / LOCK") || false
         };
       })()
@@ -2536,7 +2533,7 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.targetCardText).not.toContain("Hull");
     expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
     expect(stagingBotSelectedState.targetBars).toBe(2);
-    expect(stagingBotSelectedState.selectedMarkerExtraHidden).toBe(true);
+    expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
     expect(stagingBotSelectedState.oldDebugCopyVisible).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);

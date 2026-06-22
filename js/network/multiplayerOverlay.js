@@ -739,35 +739,6 @@
         pointer-events: none;
       }
 
-      .lupen-mp-space-bot-label {
-        position: relative;
-        z-index: 1;
-        padding: 2px 5px;
-        border: 1px solid rgba(255, 163, 92, 0.46);
-        border-radius: 4px;
-        background: rgba(18, 8, 2, 0.72);
-        color: #ffd9b0;
-        font: 800 9px/1.15 Arial, sans-serif;
-        text-transform: uppercase;
-        white-space: nowrap;
-        pointer-events: none;
-      }
-
-      .lupen-mp-space-bot-note {
-        position: relative;
-        z-index: 1;
-        color: rgba(255, 213, 172, 0.8);
-        font: 700 8px/1 Arial, sans-serif;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        text-shadow: 0 1px 3px rgba(10, 2, 0, 0.9);
-        pointer-events: none;
-      }
-
-      .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-note::after {
-        content: "";
-      }
-
       .lupen-target-card {
         position: absolute;
         transform: translate(-50%, 0);
@@ -857,12 +828,6 @@
       @keyframes lupen-target-pulse {
         0%, 100% { filter: drop-shadow(0 0 8px var(--target-glow)); }
         50% { filter: drop-shadow(0 0 18px var(--target-glow)); }
-      }
-
-      .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-label,
-      .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-note,
-      .lupen-mp-space-bot.is-locked .lupen-mp-bot-bars {
-        display: none;
       }
 
       .lupen-mp-space-bot-damage {
@@ -2032,10 +1997,11 @@
     layer.setAttribute("aria-hidden", "true");
 
     localBots.slice(0, 6).forEach((bot, index) => {
+      const isSelected = getSelectedTargetBotId() === bot.id;
       const marker = global.document.createElement("div");
       marker.className = "lupen-mp-space-bot";
       marker.dataset.botId = bot.id || "";
-      if (getSelectedTargetBotId() === bot.id) marker.classList.add("is-locked");
+      if (isSelected) marker.classList.add("is-locked");
       if (bot.disabled) marker.classList.add("is-disabled");
       if (wasRecentlyHit(bot)) marker.classList.add("is-hit");
       marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards`;
@@ -2079,18 +2045,6 @@
         ship.appendChild(fallback);
       }
       marker.appendChild(ship);
-
-      const label = global.document.createElement("div");
-      label.className = "lupen-mp-space-bot-label";
-      label.textContent = getBotLabel(bot);
-      marker.appendChild(label);
-
-      const note = global.document.createElement("div");
-      note.className = "lupen-mp-space-bot-note";
-      note.textContent = bot.disabled ? "DISABLED" : getBotModeLabel();
-      marker.appendChild(note);
-
-      marker.appendChild(createCompactHealthBars(bot));
 
       const damageAmount = getRecentDamageAmount(bot);
       if (damageAmount > 0) {
