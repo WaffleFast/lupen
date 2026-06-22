@@ -4816,6 +4816,34 @@ try {
   assert(playerFrom(roomB, roomA.sessionId)?.shipImage === "assets/ships/lupen-origin.png", "Unsafe ship image changed stored ship metadata.");
   console.log("unsafe ship image metadata rejected safely without blocking node sync");
 
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    currentNode: "Virella",
+    presenceStatus: "docked",
+    x: 50,
+    y: 50
+  });
+  await waitFor("client B to receive docked presence status", () => {
+    const player = playerFrom(roomB, roomA.sessionId);
+    return player?.currentNode === "Virella" && player?.presenceStatus === "docked";
+  });
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    currentNode: "Virella",
+    presenceStatus: "space",
+    x: 50,
+    y: 50
+  });
+  await waitFor("client B to receive launched presence status", () => {
+    const player = playerFrom(roomB, roomA.sessionId);
+    return player?.currentNode === "Virella" && player?.presenceStatus === "space";
+  });
+  console.log("docked and launched presence status replicated promptly");
+
   await waitFor("dummy bots to appear", () => botCount(roomA) >= 10 && botCount(roomB) >= 10);
   assertAllowedBotNodes(roomA);
   assertAllowedBotNodes(roomB);

@@ -951,6 +951,7 @@
       displayName: String(event.displayName || "Pilot").slice(0, 80),
       currentNode: String(event.currentNode || ""),
       previousNode: String(event.previousNode || ""),
+      presenceStatus: String(event.presenceStatus || event.status || "space") === "docked" ? "docked" : "space",
       receivedAt: Number.isFinite(Number(event.receivedAt)) ? Number(event.receivedAt) : Date.now()
     };
   }
@@ -1041,6 +1042,7 @@
       x: Number.isFinite(Number(player.x)) ? Number(player.x) : 50,
       y: Number.isFinite(Number(player.y)) ? Number(player.y) : 50,
       currentNode: String(player.currentNode || "Asteron Prime"),
+      presenceStatus: String(player.presenceStatus || player.status || "space") === "docked" ? "docked" : "space",
       joinedAt: Number.isFinite(Number(player.joinedAt)) ? Number(player.joinedAt) : 0,
       lastSeenAt: Number.isFinite(Number(player.lastSeenAt)) ? Number(player.lastSeenAt) : 0,
       lastFireAt: Number.isFinite(Number(player.lastFireAt)) ? Number(player.lastFireAt) : 0,
@@ -2686,6 +2688,7 @@
       roomName: connection.roomName,
       sessionId: connection.sessionId,
       currentNode: localPresence.currentNode || "",
+      presenceStatus: localPresence.presenceStatus || "space",
       clientLoadSource: connection.clientLoadSource,
       clientLoadError: connection.clientLoadError,
       lastError: connection.lastError,

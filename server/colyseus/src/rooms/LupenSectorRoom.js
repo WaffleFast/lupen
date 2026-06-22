@@ -292,6 +292,7 @@ type("string")(LupenSectorPlayer.prototype, "equippedWeaponKey");
 type("string")(LupenSectorPlayer.prototype, "equippedWeaponKeys");
 type("string")(LupenSectorPlayer.prototype, "multiplayerMode");
 type("string")(LupenSectorPlayer.prototype, "currentNode");
+type("string")(LupenSectorPlayer.prototype, "presenceStatus");
 type("string")(LupenSectorPlayer.prototype, "selectedTargetBotId");
 type("string")(LupenSectorPlayer.prototype, "lastCombatIntentReason");
 type("string")(LupenSectorPlayer.prototype, "lastLockOnClearReason");
@@ -442,6 +443,11 @@ function getShipName(message = {}) {
     typeof message.shipName === "string" ? message.shipName : message.ship,
     ""
   );
+}
+
+function getSafePresenceStatus(value = "") {
+  const status = getStringValue(value).toLowerCase();
+  return status === "docked" ? "docked" : "space";
 }
 
 function getShipImageValue(message = {}) {
@@ -1274,6 +1280,7 @@ export class LupenSectorRoom extends Room {
         : String(options.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 20).join(","),
       multiplayerMode: getSafeIdentityValue(options.multiplayerMode, "dev"),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
+      presenceStatus: getSafePresenceStatus(options.presenceStatus || options.status),
       selectedTargetBotId: "",
       lastCombatIntentReason: "",
       lastLockOnClearReason: "",
@@ -1388,6 +1395,7 @@ export class LupenSectorRoom extends Room {
       sessionId: player?.sessionId || "",
       displayName: getSafeIdentityValue(player?.displayName, "Pilot") || "Pilot",
       currentNode: player?.currentNode || "",
+      presenceStatus: player?.presenceStatus || "space",
       receivedAt: Date.now(),
       ...extra
     };
@@ -3272,6 +3280,7 @@ export class LupenSectorRoom extends Room {
     const player = this.touchPlayer(client.sessionId);
     if (!player) return;
     const previousNode = player.currentNode || "";
+    const previousPresenceStatus = player.presenceStatus || "space";
 
     const x = Number(message.x);
     const y = Number(message.y);
@@ -3316,10 +3325,16 @@ export class LupenSectorRoom extends Room {
 
     const currentNode = getStringValue(message.currentNode);
     if (currentNode) player.currentNode = currentNode;
-    if (currentNode && normalizePresenceNode(previousNode) !== normalizePresenceNode(currentNode)) {
+    if (typeof message.presenceStatus === "string" || typeof message.status === "string") {
+      player.presenceStatus = getSafePresenceStatus(message.presenceStatus || message.status);
+    }
+    const presenceStatusChanged = previousPresenceStatus !== (player.presenceStatus || "space");
+    if (currentNode && (normalizePresenceNode(previousNode) !== normalizePresenceNode(currentNode) || presenceStatusChanged)) {
       this.broadcast("playerMoved", this.buildPresenceEvent("moved", player, {
         previousNode,
-        currentNode
+        currentNode,
+        previousPresenceStatus,
+        presenceStatus: player.presenceStatus || "space"
       }));
     }
     this.reconcilePlayerSelection(player);

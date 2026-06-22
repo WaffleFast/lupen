@@ -992,9 +992,21 @@ test.describe("Lupen browser smoke", () => {
             sessionId: "remote-session",
             displayName: "Remote Pilot",
             currentNode: "Asteron Prime",
+            presenceStatus: "space",
             currentShipId: "zeusExplorer",
             shipName: "Nightshade Hawk",
             shipImage: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
+            lastSeenAt: Date.now()
+          },
+          {
+            isSelf: false,
+            sessionId: "docked-remote-session",
+            displayName: "Docked Pilot",
+            currentNode: "Asteron Prime",
+            presenceStatus: "docked",
+            currentShipId: "bison",
+            shipName: "Buu Hauler",
+            shipImage: "assets/ships/buu-hauler/buu-hauler-medium.webp",
             lastSeenAt: Date.now()
           }
         ],
@@ -1040,6 +1052,8 @@ test.describe("Lupen browser smoke", () => {
       const result = {
         src: image?.getAttribute("src") || "",
         note: note?.textContent || "",
+        ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
+        dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
         playerTargetText: targetCard?.textContent || "",
         playerTargetSelected: document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "",
         engageVisibleForPlayer: engagePanel?.classList.contains("visible") || false,
@@ -1057,6 +1071,8 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
+    expect(connectedHudState.ghostCount).toBe(1);
+    expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
     expect(connectedHudState.playerTargetText).not.toContain("Nightshade Hawk");
     expect(connectedHudState.playerTargetText).not.toContain("PLAYER");
@@ -1064,7 +1080,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.engageVisibleForPlayer).toBe(false);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
-    expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot");
+    expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot, Docked Pilot");
     expect(connectedHudState.onlineText).not.toContain("here");
     expect(connectedHudState.visiblePlayerMessageCount).toBe(1);
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");

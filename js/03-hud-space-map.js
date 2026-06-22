@@ -713,7 +713,7 @@ function getPilotName() {
   return savedAccount?.username || localPilot || "Pilot";
 }
 
-function getMultiplayerPresencePayload() {
+function getMultiplayerPresencePayload(overrides = {}) {
   const node = sectorNodes[currentNode] || {};
   const ship = SHIPS[currentShipId] || {};
   const loadout = typeof getShipLoadout === "function" ? getShipLoadout(currentShipId) : { guns: [] };
@@ -725,8 +725,11 @@ function getMultiplayerPresencePayload() {
     : [];
   const shipName = ship.name || "";
   const shipImage = typeof getShipAsset === "function" ? getShipAsset(currentShipId, "medium") : (ship.image || "");
+  const spaceScreen = document.getElementById("spaceScreen");
+  const inferredPresenceStatus = spaceScreen?.classList.contains("active") ? "space" : "docked";
   return {
     currentNode,
+    presenceStatus: overrides.presenceStatus || inferredPresenceStatus,
     x: Number.isFinite(Number(node.x)) ? Number(node.x) : 50,
     y: Number.isFinite(Number(node.y)) ? Number(node.y) : 50,
     displayName: getPilotName(),
@@ -738,19 +741,20 @@ function getMultiplayerPresencePayload() {
     shipName,
     ship: shipName,
     equippedWeaponKey: equippedWeaponKeys[0] || "",
-    equippedWeaponKeys
+    equippedWeaponKeys,
+    ...overrides
   };
 }
 
 window.getLupenMultiplayerPresence = getMultiplayerPresencePayload;
 
-function syncMultiplayerPresence(reason = "position_update") {
+function syncMultiplayerPresence(reason = "position_update", overrides = {}) {
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.();
   if (!status?.enabled || !status?.isConnected) return;
 
   client.sendMovementIntent({
-    ...getMultiplayerPresencePayload(),
+    ...getMultiplayerPresencePayload(overrides),
     reason
   });
 }
@@ -2019,7 +2023,7 @@ function jumpToNode(destination) {
   updateCurrentNodeUI();
   updateSpaceHUD();
   updateAsteroidUI();
-  syncMultiplayerPresence("jump");
+  syncMultiplayerPresence("jump", { presenceStatus: "space" });
   tutorialEvent("jumpedNode");
   if (tutorialState?.active) setTimeout(renderStarterTutorial, 120);
   startJumpRecharge();

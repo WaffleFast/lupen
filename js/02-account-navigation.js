@@ -1224,7 +1224,7 @@ function launchShip() {
   updateAsteroidUI();
   updateTargetPanel();
   openHudPanel("sector");
-  if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("launch");
+  if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("launch", { presenceStatus: "space" });
 
   if (jumpCharge < jumpMax) {
     startJumpRecharge();
@@ -1249,6 +1249,7 @@ function landOnPlanet() {
   disengageTarget(true);
   updateHubLocation();
   showScreen("gameScreen");
+  if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("land", { presenceStatus: "docked" });
 
   tutorialEvent("landedOnPlanet");
 

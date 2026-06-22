@@ -1896,6 +1896,8 @@ function getRemotePlayerTargetById(id) {
   });
   if (!player) return null;
   const node = player.currentNode || player.currentNodeId || player.node;
+  const presenceStatus = String(player.presenceStatus || player.status || "space").toLowerCase();
+  if (presenceStatus === "docked") return null;
   return {
     ...player,
     id: player.sessionId || player.id,

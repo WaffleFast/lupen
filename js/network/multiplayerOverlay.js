@@ -1394,6 +1394,10 @@
     return Date.now() - lastSeenAt < 30000;
   }
 
+  function isPilotInSpace(player) {
+    return String(player?.presenceStatus || player?.status || "space").toLowerCase() !== "docked";
+  }
+
   function getPlayerIdentityKey(player = {}) {
     const trustedId = String(player.trustedPlayerId || player.playerId || player.supabaseUserId || "").trim().toLowerCase();
     if (trustedId) return `account:${trustedId}`;
@@ -1929,7 +1933,7 @@
 
     svg.querySelector(`.${layerClass}`)?.remove();
 
-    const visiblePlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player));
+    const visiblePlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player) && isPilotInSpace(player));
     if (!visiblePlayers.length) return;
 
     const layer = global.document.createElementNS(SVG_NS, "g");
@@ -1976,7 +1980,7 @@
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
-    const localPlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player) && isSameCurrentNode(player));
+    const localPlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player) && isPilotInSpace(player) && isSameCurrentNode(player));
     if (!localPlayers.length) return;
 
     ensureStyles();
