@@ -818,7 +818,22 @@ function renderOnlinePilots(players = null) {
     return;
   }
   const currentNodeName = getMultiplayerPresencePayload().currentNode || currentNode || "";
-  const rows = allPlayers.slice(0, 8).map((player) => {
+  const playerByIdentity = new Map();
+  allPlayers.forEach((player) => {
+    const accountKey = String(player.trustedPlayerId || player.playerId || player.supabaseUserId || "").trim().toLowerCase();
+    const displayKey = String(player.displayName || "").trim().toLowerCase();
+    const sessionKey = String(player.sessionId || player.id || "").trim().toLowerCase();
+    const identityKey = accountKey ? `account:${accountKey}` : displayKey ? `display:${displayKey}` : sessionKey ? `session:${sessionKey}` : "";
+    if (!identityKey) return;
+    const current = playerByIdentity.get(identityKey);
+    const currentSeenAt = Number(current?.lastSeenAt || current?.joinedAt || 0);
+    const playerSeenAt = Number(player.lastSeenAt || player.joinedAt || 0);
+    if (!current || playerSeenAt > currentSeenAt || (playerSeenAt === currentSeenAt && String(player.sessionId || player.id || "") > String(current.sessionId || current.id || ""))) {
+      playerByIdentity.set(identityKey, player);
+    }
+  });
+  const dedupedPlayers = Array.from(playerByIdentity.values());
+  const rows = dedupedPlayers.slice(0, 8).map((player) => {
     const name = String(player.displayName || "Pilot").slice(0, 18);
     const node = String(player.currentNode || "Unknown").slice(0, 24);
     const sameNode = node.toLowerCase() === String(currentNodeName || "").toLowerCase();
@@ -830,6 +845,7 @@ function renderOnlinePilots(players = null) {
 function renderMultiplayerChatHud(statusOverride = null, playersOverride = null) {
   const feed = document.getElementById("localChatFeed");
   const input = document.getElementById("localChatInput");
+  const sendButton = document.querySelector("#chatPanel .local-chat-input-row button");
   if (!feed) return;
 
   document.querySelectorAll("#chatPanel .chat-channel-tabs button").forEach((button) => {
@@ -842,10 +858,24 @@ function renderMultiplayerChatHud(statusOverride = null, playersOverride = null)
   feed.innerHTML = "";
 
   if (input) {
+    const canUseChat = !status.enabled ||
+      (status.isConnected && (selectedChatChannel !== "guild" || !!status.guildId));
+    input.disabled = !canUseChat;
+    input.readOnly = !canUseChat;
     input.maxLength = 200;
     input.placeholder = selectedChatChannel === "guild"
-      ? "Guild chat..."
-      : `${getChatChannelLabel(selectedChatChannel)} message...`;
+      ? status.guildId ? "Guild chat..." : "Guild unavailable"
+      : status.enabled && !status.isConnected
+        ? "Chat reconnecting..."
+        : `${getChatChannelLabel(selectedChatChannel)} message...`;
+    input.setAttribute("aria-disabled", canUseChat ? "false" : "true");
+  }
+
+  if (sendButton) {
+    const canSend = !status.enabled ||
+      (status.isConnected && (selectedChatChannel !== "guild" || !!status.guildId));
+    sendButton.disabled = !canSend;
+    sendButton.setAttribute("aria-disabled", canSend ? "false" : "true");
   }
 
   if (selectedChatChannel === "guild" && !status.guildId) {

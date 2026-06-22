@@ -471,6 +471,14 @@ function normalizePresenceNode(value = "") {
   return getStringValue(value).toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ");
 }
 
+export function getPresenceIdentityKey(values = {}) {
+  const trustedPlayerId = getSafeIdentityValue(values.trustedPlayerId || values.playerId || "").toLowerCase();
+  const supabaseUserId = getSafeIdentityValue(values.supabaseUserId || "").toLowerCase();
+  if (trustedPlayerId) return `verified:${trustedPlayerId}`;
+  if (supabaseUserId) return `supabase:${supabaseUserId}`;
+  return "";
+}
+
 function getAuthStatus(options = {}) {
   const requestedStatus = getSafeIdentityValue(options.authStatus, "guest").toLowerCase();
 
@@ -1218,7 +1226,25 @@ export class LupenSectorRoom extends Room {
     const displayName = verifiedIdentity.displayName || getSafeIdentityValue(options.displayName, "Pilot") || "Pilot";
     const trustedPlayerId = verifiedIdentity.trustedPlayerId || "";
     const authTokenReceived = !!getStringValue(options.supabaseAccessToken);
-    this.state.players.set(client.sessionId, new LupenSectorPlayer({
+    const replacementIdentityKey = getPresenceIdentityKey({
+      trustedPlayerId,
+      playerId: trustedPlayerId,
+      supabaseUserId: verifiedIdentity.supabaseUserId || trustedPlayerId
+    });
+    if (replacementIdentityKey) {
+      this.state.players.forEach((player, sessionId) => {
+        if (sessionId === client.sessionId) return;
+        if (getPresenceIdentityKey(player) !== replacementIdentityKey) return;
+        this.broadcast("playerLeft", this.buildPresenceEvent("left", player, {
+          reason: "replaced_by_reconnect"
+        }));
+        this.state.players.delete(sessionId);
+        this.stagingBountyStates.delete(sessionId);
+        this.clearStagingReturnFireForSession(sessionId);
+      });
+    }
+
+    const joinedPlayer = new LupenSectorPlayer({
       id: client.sessionId,
       sessionId: client.sessionId,
       // Staging identity is preparation metadata only. Only verified tokens
@@ -1258,8 +1284,10 @@ export class LupenSectorRoom extends Room {
       lastSeenAt: now,
       lastFireAt: 0,
       nextFireAt: 0
-    }));
-    this.broadcast("playerJoined", this.buildPresenceEvent("joined", this.state.players.get(client.sessionId)));
+    });
+
+    this.state.players.set(client.sessionId, joinedPlayer);
+    this.broadcast("playerJoined", this.buildPresenceEvent("joined", joinedPlayer));
   }
 
   onLeave(client) {

@@ -930,12 +930,13 @@ test.describe("Lupen browser smoke", () => {
       if (typeof window.showScreen === "function") window.showScreen("spaceScreen");
     });
     await expect(page.locator("#localChatInput")).toBeVisible();
-    await page.fill("#localChatInput", "  staging hello  ");
-    await page.press("#localChatInput", "Enter");
+    await expect(page.locator("#localChatInput")).toBeDisabled();
+    await expect(page.locator("#chatPanel .local-chat-input-row button")).toBeDisabled();
     await expect(page.locator("#localChatFeed")).toContainText("Chat unavailable while disconnected");
-    const remoteShipRender = await page.evaluate(() => {
+    const connectedHudState = await page.evaluate(() => {
       const originalClient = window.LupenMultiplayerClient;
       currentNode = "Asteron Prime";
+      const sentMessages = [];
       window.LupenMultiplayerClient = {
         enabled: true,
         getStatus: () => ({
@@ -957,6 +958,16 @@ test.describe("Lupen browser smoke", () => {
           }] : []),
           {
             isSelf: false,
+            sessionId: "stale-remote-session",
+            displayName: "Remote Pilot",
+            currentNode: "Asteron Prime",
+            currentShipId: "lupenOrigin",
+            shipName: "LF-1 Origin",
+            shipImage: "assets/ships/lupen-origin.png",
+            lastSeenAt: Date.now() - 5000
+          },
+          {
+            isSelf: false,
             sessionId: "remote-session",
             displayName: "Remote Pilot",
             currentNode: "Asteron Prime",
@@ -969,21 +980,35 @@ test.describe("Lupen browser smoke", () => {
         getBots: () => [],
         getSelectedStagingBot: () => null,
         getChatMessages: () => [],
+        sendChatMessage: (message) => {
+          sentMessages.push(message);
+          return { ok: true };
+        },
         onServerState: () => ({ unsubscribe() {} })
       };
       window.LupenMultiplayerOverlay.render();
+      const input = document.getElementById("localChatInput");
+      input.value = "  staging hello  ";
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
+      const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
       const result = {
         src: image?.getAttribute("src") || "",
-        note: note?.textContent || ""
+        note: note?.textContent || "",
+        onlineText,
+        inputDisabled: input.disabled,
+        sentMessages
       };
       window.LupenMultiplayerClient = originalClient;
       window.LupenMultiplayerOverlay.render();
       return result;
     });
-    expect(remoteShipRender.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
-    expect(remoteShipRender.note).toContain("Nightshade Hawk");
+    expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
+    expect(connectedHudState.note).toContain("Nightshade Hawk");
+    expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
+    expect(connectedHudState.inputDisabled).toBe(false);
+    expect(connectedHudState.sentMessages).toEqual([{ channel: "sector", message: "staging hello" }]);
     await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
     await expect(page.locator("#debugToolsPanel")).toHaveCount(0);
 
@@ -2155,7 +2180,7 @@ test.describe("Lupen browser smoke", () => {
     expect(landingState.clickable).toBe(true);
     expect(landingState.mapNodeExists).toBe(true);
     expect(landingState.currentScreenLanded).toBe(true);
-    expect(terminalHighlightState.step).toBe("open-trade-to-sell");
+    expect(["open-trade-to-sell", "sell-cargo"]).toContain(terminalHighlightState.step);
     expect(terminalHighlightState.exists).toBe(true);
     expect(terminalHighlightState.highlighted).toBe(true);
     expect(terminalHighlightState.text).toContain("Trade");

@@ -443,6 +443,8 @@
       connection.sessionId = null;
       playersById.clear();
       botsById.clear();
+      connection.presenceEvents = [];
+      notifyServerState(null);
       await client.connect({ sendInitialPing: false });
     };
 
@@ -483,6 +485,8 @@
     identity.authReconnectAttempted = true;
     playersById.clear();
     botsById.clear();
+    connection.presenceEvents = [];
+    notifyServerState(null);
     await client.connect({ sendInitialPing: false });
   }
 
@@ -942,6 +946,46 @@
     return normalized;
   }
 
+  function getPlayerIdentityKey(player = {}) {
+    const trustedId = String(player.trustedPlayerId || player.playerId || player.supabaseUserId || "").trim().toLowerCase();
+    if (trustedId) return `account:${trustedId}`;
+    const displayName = String(player.displayName || "").trim().toLowerCase();
+    return displayName ? `display:${displayName}` : "";
+  }
+
+  function shouldReplacePlayerSnapshot(existing, candidate) {
+    if (!existing) return true;
+    if (candidate.isSelf) return true;
+    if (existing.isSelf && !candidate.isSelf) return false;
+    const existingSeenAt = Number(existing.lastSeenAt || existing.joinedAt || 0);
+    const candidateSeenAt = Number(candidate.lastSeenAt || candidate.joinedAt || 0);
+    if (candidateSeenAt !== existingSeenAt) return candidateSeenAt > existingSeenAt;
+    return String(candidate.sessionId || "") > String(existing.sessionId || "");
+  }
+
+  function setPlayerSnapshot(snapshot) {
+    if (!snapshot) return;
+    const identityKey = getPlayerIdentityKey(snapshot);
+    if (identityKey) {
+      let keepCandidate = true;
+      Array.from(playersById.entries()).forEach(([id, existing]) => {
+        if (id === snapshot.id) return;
+        if (getPlayerIdentityKey(existing) !== identityKey) return;
+        if (shouldReplacePlayerSnapshot(existing, snapshot)) {
+          playersById.delete(id);
+        } else {
+          keepCandidate = false;
+        }
+      });
+      if (!keepCandidate) return;
+    }
+
+    const current = playersById.get(snapshot.id);
+    if (!current || shouldReplacePlayerSnapshot(current, snapshot)) {
+      playersById.set(snapshot.id, snapshot);
+    }
+  }
+
   function normalizePlayer(player, fallbackId = "") {
     if (!player) return null;
 
@@ -998,14 +1042,14 @@
     if (typeof players.forEach === "function") {
       players.forEach((player, key) => {
         const snapshot = normalizePlayer(player, key);
-        if (snapshot) playersById.set(snapshot.id, snapshot);
+        setPlayerSnapshot(snapshot);
       });
       return;
     }
 
     Object.entries(players).forEach(([key, player]) => {
       const snapshot = normalizePlayer(player, key);
-      if (snapshot) playersById.set(snapshot.id, snapshot);
+      setPlayerSnapshot(snapshot);
     });
   }
 
@@ -2859,9 +2903,11 @@
       connection.sessionId = null;
       room = null;
       colyseusClient = null;
+      playersById.clear();
       botsById.clear();
       connection.chatMessages = [];
       connection.presenceEvents = [];
+      notifyServerState(null);
       return statusResult("disconnect");
     },
 

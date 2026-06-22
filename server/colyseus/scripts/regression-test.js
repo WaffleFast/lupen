@@ -4,6 +4,7 @@ import {
   STAGING_BOT_ALLOWED_NODE_IDS,
   buildRewardClaimStatus,
   buildRewardWritePlan,
+  getPresenceIdentityKey,
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
 import {
@@ -4214,6 +4215,13 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   console.log("identity verification and reward dry-run helper checks passed");
 }
 
+function assertPresenceIdentityHelpers() {
+  assert(getPresenceIdentityKey({ trustedPlayerId: "Pilot-123" }) === "verified:pilot-123", "Trusted presence identity key was not normalized.");
+  assert(getPresenceIdentityKey({ playerId: "Pilot-123" }) === "verified:pilot-123", "Player presence identity key was not normalized.");
+  assert(getPresenceIdentityKey({ supabaseUserId: "User-123" }) === "supabase:user-123", "Supabase presence identity key was not normalized.");
+  assert(getPresenceIdentityKey({ displayName: "Pilot" }) === "", "Display-only presence should not produce a server replacement key.");
+}
+
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -4275,6 +4283,7 @@ try {
   await assertFullCargoPodTradeLoopHelpers();
   await assertStagingBountyHelpers();
   await assertIdentityVerificationAndRewardPlanHelpers();
+  assertPresenceIdentityHelpers();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot A",

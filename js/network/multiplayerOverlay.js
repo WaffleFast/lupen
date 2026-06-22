@@ -1249,6 +1249,35 @@
     return Date.now() - lastSeenAt < 30000;
   }
 
+  function getPlayerIdentityKey(player = {}) {
+    const trustedId = String(player.trustedPlayerId || player.playerId || player.supabaseUserId || "").trim().toLowerCase();
+    if (trustedId) return `account:${trustedId}`;
+    const displayName = String(player.displayName || "").trim().toLowerCase();
+    return displayName ? `display:${displayName}` : String(player.sessionId || player.id || "").trim().toLowerCase();
+  }
+
+  function shouldUsePlayerCandidate(current, candidate) {
+    if (!current) return true;
+    if (candidate?.isSelf) return true;
+    if (current?.isSelf && !candidate?.isSelf) return false;
+    const currentSeenAt = Number(current.lastSeenAt || current.joinedAt || 0);
+    const candidateSeenAt = Number(candidate.lastSeenAt || candidate.joinedAt || 0);
+    if (candidateSeenAt !== currentSeenAt) return candidateSeenAt > currentSeenAt;
+    return String(candidate.sessionId || candidate.id || "") > String(current.sessionId || current.id || "");
+  }
+
+  function dedupePlayers(players = []) {
+    const byIdentity = new Map();
+    players.forEach((player) => {
+      const key = getPlayerIdentityKey(player);
+      if (!key) return;
+      if (shouldUsePlayerCandidate(byIdentity.get(key), player)) {
+        byIdentity.set(key, player);
+      }
+    });
+    return Array.from(byIdentity.values());
+  }
+
   function getBotLabel(bot) {
     return String(bot.name || bot.type || "DEV BOT").trim().slice(0, 18) || "DEV BOT";
   }
@@ -1658,7 +1687,7 @@
 
     svg.querySelector(`.${layerClass}`)?.remove();
 
-    const visiblePlayers = players.filter((player) => isFreshRemotePilot(player));
+    const visiblePlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player));
     if (!visiblePlayers.length) return;
 
     const layer = global.document.createElementNS(SVG_NS, "g");
@@ -1705,7 +1734,7 @@
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
-    const localPlayers = players.filter((player) => isFreshRemotePilot(player) && isSameCurrentNode(player));
+    const localPlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player) && isSameCurrentNode(player));
     if (!localPlayers.length) return;
 
     ensureStyles();
