@@ -1102,6 +1102,16 @@ function updateSpaceHUD() {
   document.getElementById("shieldFill").style.height = `${safeShieldMax > 0 ? Math.max(0, Math.min(100, (shield / safeShieldMax) * 100)) : 0}%`;
   document.getElementById("shieldValue").textContent = formatNumber(Math.floor(shield));
 
+  const isHullCritical = hull > 0 && (hull / safeHullMax) <= 0.25;
+  const isShieldDepleted = safeShieldMax > 0 && shield <= 0 && hull > 0;
+  const spaceScreen = document.getElementById("spaceScreen");
+  const statPanel = document.querySelector(".vertical-stats");
+  [spaceScreen, statPanel].forEach(panel => {
+    if (!panel) return;
+    panel.classList.toggle("player-hull-critical", isHullCritical);
+    panel.classList.toggle("player-shield-depleted", isShieldDepleted);
+  });
+
   const shipImage = document.getElementById("hudShipImage");
   if (shipImage) {
     shipImage.src = typeof getShipAsset === "function" ? getShipAsset(currentShipId, "small") : ship.image;

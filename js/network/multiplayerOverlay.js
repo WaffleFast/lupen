@@ -814,6 +814,10 @@
         animation: lupen-target-pulse 1.3s ease-in-out infinite;
       }
 
+      .lupen-target-card.hit-confirmed {
+        box-shadow: 0 0 20px var(--target-glow), 0 0 38px rgba(255, 255, 255, 0.16);
+      }
+
       .lupen-target-card strong {
         max-width: 138px;
         overflow: hidden;
@@ -853,20 +857,19 @@
         background: linear-gradient(90deg, #19aaff, #7df5ff);
       }
 
+      .lupen-target-bar-fill.is-low {
+        background: linear-gradient(90deg, #ff3028, #ff8d2d);
+        box-shadow: 0 0 7px rgba(255, 82, 48, 0.72);
+      }
+
+      .lupen-target-bar-fill.is-empty {
+        background: linear-gradient(90deg, #4b1512, #9b241c);
+        box-shadow: none;
+      }
+
       @keyframes lupen-target-pulse {
         0%, 100% { filter: drop-shadow(0 0 8px var(--target-glow)); }
         50% { filter: drop-shadow(0 0 18px var(--target-glow)); }
-      }
-
-      .lupen-mp-space-bot-damage {
-        position: absolute;
-        left: 50%;
-        top: -18px;
-        transform: translateX(-50%);
-        color: #fff1b2;
-        font: 900 13px/1 Arial, sans-serif;
-        text-shadow: 0 0 8px rgba(255, 93, 52, 0.92), 0 1px 2px rgba(10, 2, 0, 0.95);
-        animation: lupen-mp-damage-float 0.78s ease-out forwards;
       }
 
       .lupen-mp-space-bot-bars {
@@ -1020,21 +1023,6 @@
         100% {
           opacity: 0.72;
           filter: drop-shadow(0 0 1.8px rgba(255, 113, 55, 0.72));
-        }
-      }
-
-      @keyframes lupen-mp-damage-float {
-        0% {
-          opacity: 0;
-          transform: translate(-50%, 8px) scale(0.9);
-        }
-        25% {
-          opacity: 1;
-          transform: translate(-50%, 0) scale(1);
-        }
-        100% {
-          opacity: 0;
-          transform: translate(-50%, -14px) scale(1.04);
         }
       }
 
@@ -1524,10 +1512,6 @@
     return Date.now() - Number(response.receivedAt || 0) < 1200;
   }
 
-  function getRecentDamageAmount(bot, status = getClient()?.getStatus?.()) {
-    return wasRecentlyHit(bot, status) ? Math.max(0, Math.round(Number(status.lastCombatResponse.damage || 0))) : 0;
-  }
-
   function getShotEventAge(status = getClient()?.getStatus?.()) {
     return Date.now() - Number(status?.lastShotEvent?.receivedAt || status?.lastShotEvent?.timestamp || 0);
   }
@@ -1613,8 +1597,9 @@
     const track = global.document.createElement("div");
     track.className = "lupen-target-bar-track";
     const fill = global.document.createElement("span");
-    fill.className = `lupen-target-bar-fill ${type}`;
-    fill.style.width = `${getPercent(value, maxValue)}%`;
+    const percent = getPercent(value, maxValue);
+    fill.className = `lupen-target-bar-fill ${type}${percent <= 0 ? " is-empty" : percent <= 25 ? " is-low" : ""}`;
+    fill.style.width = `${percent}%`;
     track.appendChild(fill);
     row.appendChild(track);
     parent.appendChild(row);
@@ -1646,8 +1631,9 @@
 
     const target = selectedBot || selectedPlayer;
     const position = getSpacePercentPosition(target);
+    const hitConfirmed = selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id && getShotEventAge(status) < 900;
     const card = global.document.createElement("div");
-    card.className = `lupen-target-card ${selectedBot ? "hostile" : "player"}${selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id ? " locked" : ""}`;
+    card.className = `lupen-target-card ${selectedBot ? "hostile" : "player"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
     card.style.left = `${position.x}%`;
     card.style.top = `${getCardTopForPosition(position)}%`;
 
@@ -1830,23 +1816,6 @@
       lockRing.setAttribute("stroke-dasharray", "0.9 0.7");
       lockRing.setAttribute("pointer-events", "none");
       group.appendChild(lockRing);
-    }
-
-    const damageAmount = getRecentDamageAmount(bot);
-    if (damageAmount > 0) {
-      const damageText = global.document.createElementNS(SVG_NS, "text");
-      damageText.setAttribute("x", "0");
-      damageText.setAttribute("y", "-3.6");
-      damageText.setAttribute("fill", "#fff1b2");
-      damageText.setAttribute("font-size", "1.25");
-      damageText.setAttribute("font-weight", "900");
-      damageText.setAttribute("paint-order", "stroke");
-      damageText.setAttribute("stroke", "rgba(25, 5, 0, 0.96)");
-      damageText.setAttribute("stroke-width", "0.28");
-      damageText.setAttribute("text-anchor", "middle");
-      damageText.setAttribute("pointer-events", "none");
-      damageText.textContent = `-${damageAmount}`;
-      group.appendChild(damageText);
     }
 
     const botImage = getBotImageRenderSrc(bot);
@@ -2082,14 +2051,6 @@
         ship.appendChild(fallback);
       }
       marker.appendChild(ship);
-
-      const damageAmount = getRecentDamageAmount(bot);
-      if (damageAmount > 0) {
-        const damage = global.document.createElement("div");
-        damage.className = "lupen-mp-space-bot-damage";
-        damage.textContent = `-${damageAmount}`;
-        marker.appendChild(damage);
-      }
 
       layer.appendChild(marker);
     });

@@ -2519,10 +2519,13 @@ test.describe("Lupen browser smoke", () => {
           damage: 8,
           receivedAt: Date.now()
         };
+        window.__stagingVisualBot.hull = 120;
+        window.__stagingVisualBot.shield = 0;
         window.LupenMultiplayerOverlay?.render?.();
         const targetCard = document.querySelector(".lupen-target-card.hostile");
         const botMarker = document.querySelector("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-locked");
         const shotLayer = document.getElementById("lupenMultiplayerSpaceShotLayer");
+        const targetFills = Array.from(targetCard?.querySelectorAll(".lupen-target-bar-fill") || []);
         return {
           step: getCurrentTutorialStep().id,
           selectedType: selectedTarget?.type || "",
@@ -2535,6 +2538,9 @@ test.describe("Lupen browser smoke", () => {
           localShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-local").length || 0,
           muzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle").length || 0,
           hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0,
+          lowBarCount: targetFills.filter(fill => fill.classList.contains("is-low")).length,
+          emptyBarCount: targetFills.filter(fill => fill.classList.contains("is-empty")).length,
+          floatingDamageCount: document.querySelectorAll(".lupen-mp-space-bot-damage").length,
           oldDebugCopyVisible: document.getElementById("spaceScreen")?.textContent?.includes("STAGING BOT / LOCK") || false
         };
       })()
@@ -2555,6 +2561,9 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.localShotBeamCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.muzzleCount).toBe(1);
     expect(stagingBotSelectedState.hitCount).toBe(1);
+    expect(stagingBotSelectedState.lowBarCount).toBeGreaterThanOrEqual(1);
+    expect(stagingBotSelectedState.emptyBarCount).toBeGreaterThanOrEqual(1);
+    expect(stagingBotSelectedState.floatingDamageCount).toBe(0);
     expect(stagingBotSelectedState.oldDebugCopyVisible).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -2685,11 +2694,20 @@ test.describe("Lupen browser smoke", () => {
           projectileColor: "#7fd6ff"
         });
         incomingLaserBurstFromBot(target, 0, { count: 5 });
+        hullMax = 720;
+        shieldMax = 180;
+        hull = 120;
+        shield = 0;
+        updateSpaceHUD();
         return {
           playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
           muzzleCount: document.querySelectorAll("#laserLayer .weapon-muzzle-flash").length,
           incomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser").length,
-          heavyIncomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser-heavy").length
+          heavyIncomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser-heavy").length,
+          statPanelCritical: document.querySelector(".vertical-stats")?.classList.contains("player-hull-critical") || false,
+          statPanelShieldDepleted: document.querySelector(".vertical-stats")?.classList.contains("player-shield-depleted") || false,
+          screenCritical: document.getElementById("spaceScreen")?.classList.contains("player-hull-critical") || false,
+          screenShieldDepleted: document.getElementById("spaceScreen")?.classList.contains("player-shield-depleted") || false
         };
       })()
     `));
@@ -2698,6 +2716,10 @@ test.describe("Lupen browser smoke", () => {
     expect(visualState.muzzleCount).toBeGreaterThanOrEqual(4);
     expect(visualState.incomingCount).toBeGreaterThanOrEqual(5);
     expect(visualState.heavyIncomingCount).toBeGreaterThanOrEqual(1);
+    expect(visualState.statPanelCritical).toBe(true);
+    expect(visualState.statPanelShieldDepleted).toBe(true);
+    expect(visualState.screenCritical).toBe(true);
+    expect(visualState.screenShieldDepleted).toBe(true);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
