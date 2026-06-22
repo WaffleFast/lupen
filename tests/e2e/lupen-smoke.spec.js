@@ -950,6 +950,14 @@ test.describe("Lupen browser smoke", () => {
       const originalClient = window.LupenMultiplayerClient;
       currentNode = "Asteron Prime";
       const sentMessages = [];
+      const duplicatePlayerMessage = {
+        id: "msg-1",
+        type: "chat",
+        channel: "sector",
+        displayName: "Remote Pilot",
+        message: "Visible player message",
+        receivedAt: Date.now()
+      };
       window.LupenMultiplayerClient = {
         enabled: true,
         getStatus: () => ({
@@ -992,7 +1000,18 @@ test.describe("Lupen browser smoke", () => {
         ],
         getBots: () => [],
         getSelectedStagingBot: () => null,
-        getChatMessages: () => [],
+        getChatMessages: () => [
+          duplicatePlayerMessage,
+          { ...duplicatePlayerMessage },
+          {
+            id: "system-1",
+            type: "system",
+            channel: "sector",
+            displayName: "System",
+            message: "Remote Pilot joined at Asteron Prime.",
+            receivedAt: Date.now()
+          }
+        ],
         sendChatMessage: (message) => {
           sentMessages.push(message);
           return { ok: true };
@@ -1003,6 +1022,8 @@ test.describe("Lupen browser smoke", () => {
       const input = document.getElementById("localChatInput");
       input.value = "  staging hello  ";
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      input.value = "  staging hello  ";
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       input.value = "   ";
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       input.value = "x".repeat(240);
@@ -1010,10 +1031,13 @@ test.describe("Lupen browser smoke", () => {
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
+      const chatText = document.getElementById("localChatFeed")?.textContent || "";
       const result = {
         src: image?.getAttribute("src") || "",
         note: note?.textContent || "",
         onlineText,
+        chatText,
+        visiblePlayerMessageCount: (chatText.match(/Visible player message/g) || []).length,
         placeholder: input.placeholder,
         inputDisabled: input.disabled,
         sentMessages
@@ -1027,6 +1051,8 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
     expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot");
     expect(connectedHudState.onlineText).not.toContain("here");
+    expect(connectedHudState.visiblePlayerMessageCount).toBe(1);
+    expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([

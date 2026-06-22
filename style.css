@@ -33764,9 +33764,9 @@ input::placeholder {
 #chatPanel.comms-panel.active {
   position: relative !important;
   display: grid !important;
-  grid-template-rows: 18px minmax(0, 1fr) !important;
-  gap: 4px !important;
-  padding-bottom: 34px !important;
+  grid-template-rows: 16px minmax(0, 1fr) !important;
+  gap: 3px !important;
+  padding: 4px 0 32px !important;
   overflow: hidden !important;
 }
 
@@ -33776,14 +33776,42 @@ input::placeholder {
 
 #chatPanel .online-pilots-list {
   grid-row: 1 !important;
+  min-height: 16px !important;
+  line-height: 16px !important;
+  padding: 0 4px !important;
+  border-bottom: 1px solid rgba(0, 205, 255, 0.14) !important;
 }
 
 #chatPanel .local-chat-feed {
   grid-row: 2 !important;
   min-height: 0 !important;
   height: auto !important;
-  padding-bottom: 8px !important;
+  padding: 3px 6px 7px 2px !important;
   overflow-y: auto !important;
+}
+
+#chatPanel .chat-line {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 4px !important;
+  min-height: 16px !important;
+  padding: 1px 0 !important;
+  border-bottom: 1px solid rgba(90, 190, 255, 0.08) !important;
+}
+
+#chatPanel .chat-line strong {
+  flex: 0 0 auto !important;
+  color: #76eaff !important;
+}
+
+#chatPanel .chat-line span {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+}
+
+#chatPanel .chat-line.muted {
+  color: rgba(184, 216, 232, 0.72) !important;
+  font-style: italic !important;
 }
 
 #chatPanel .local-chat-input-row {
@@ -33793,10 +33821,10 @@ input::placeholder {
   bottom: 0 !important;
   z-index: 20 !important;
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) 70px !important;
-  gap: 6px !important;
-  height: 30px !important;
-  min-height: 30px !important;
+  grid-template-columns: minmax(0, 1fr) 68px !important;
+  gap: 5px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   margin: 0 !important;
   padding: 0 !important;
   background: rgba(2, 13, 25, 0.96) !important;
@@ -33809,8 +33837,8 @@ input::placeholder {
 
 #chatPanel .local-chat-input-row input,
 #chatPanel .local-chat-input-row button {
-  height: 30px !important;
-  min-height: 30px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -33827,8 +33855,8 @@ input::placeholder {
 }
 
 #chatPanel .local-chat-input-row button {
-  width: 70px !important;
-  min-width: 70px !important;
+  width: 68px !important;
+  min-width: 68px !important;
   border: 1px solid rgba(0, 205, 255, 0.82) !important;
   background: linear-gradient(180deg, rgba(0, 146, 210, 0.92), rgba(0, 65, 120, 0.95)) !important;
   color: #f1fdff !important;

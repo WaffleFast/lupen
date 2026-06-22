@@ -82,6 +82,12 @@
   const playersById = new Map();
   const botsById = new Map();
   const stagingActivityLogKeys = new Set();
+  const chatMessageKeys = new Set();
+
+  function clearChatMessages() {
+    connection.chatMessages = [];
+    chatMessageKeys.clear();
+  }
 
   function hasDevFlag() {
     return getMultiplayerMode() === "1";
@@ -444,6 +450,7 @@
       playersById.clear();
       botsById.clear();
       connection.presenceEvents = [];
+      clearChatMessages();
       notifyServerState(null);
       await client.connect({ sendInitialPing: false });
     };
@@ -486,6 +493,7 @@
     playersById.clear();
     botsById.clear();
     connection.presenceEvents = [];
+    clearChatMessages();
     notifyServerState(null);
     await client.connect({ sendInitialPing: false });
   }
@@ -921,8 +929,18 @@
   function pushChatMessage(message) {
     const normalized = normalizeChatMessage(message);
     if (!normalized) return null;
+    const dedupeKey = normalized.id ||
+      `${normalized.type}|${normalized.channel}|${normalized.sessionId}|${normalized.displayName}|${normalized.message}|${normalized.receivedAt}`;
+    if (chatMessageKeys.has(dedupeKey)) return null;
+    chatMessageKeys.add(dedupeKey);
     connection.chatMessages.push(normalized);
-    while (connection.chatMessages.length > 80) connection.chatMessages.shift();
+    while (connection.chatMessages.length > 80) {
+      const removed = connection.chatMessages.shift();
+      if (removed) {
+        chatMessageKeys.delete(removed.id ||
+          `${removed.type}|${removed.channel}|${removed.sessionId}|${removed.displayName}|${removed.message}|${removed.receivedAt}`);
+      }
+    }
     return normalized;
   }
 
@@ -2101,21 +2119,7 @@
 
     ["playerJoined", "playerLeft", "playerMoved"].forEach((type) => {
       activeRoom.onMessage(type, (message) => {
-        const event = pushPresenceEvent({ ...message, type: message?.type || type });
-        const verb = type === "playerJoined"
-          ? "joined"
-          : type === "playerLeft"
-            ? "left"
-            : "moved";
-        const nodeText = event.currentNode ? ` ${verb === "moved" ? "to" : "at"} ${event.currentNode}` : "";
-        pushChatMessage({
-          type: "system",
-          channel: "sector",
-          displayName: "System",
-          message: `${event.displayName || "Pilot"} ${verb}${nodeText}.`,
-          currentNode: event.currentNode,
-          receivedAt: event.receivedAt
-        });
+        pushPresenceEvent({ ...message, type: message?.type || type });
         logDev(`server ${type}`, message);
         notifyServerState(activeRoom?.state || null);
       });
@@ -2647,7 +2651,7 @@
       colyseusClient = null;
       playersById.clear();
       botsById.clear();
-      connection.chatMessages = [];
+      clearChatMessages();
       connection.presenceEvents = [];
       notifyServerState(null);
     });
@@ -2889,7 +2893,7 @@
         connection.sessionId = null;
         playersById.clear();
         botsById.clear();
-        connection.chatMessages = [];
+        clearChatMessages();
         connection.presenceEvents = [];
         return statusResult("disconnect", true, { alreadyDisconnected: true });
       }
@@ -2903,7 +2907,7 @@
       colyseusClient = null;
       playersById.clear();
       botsById.clear();
-      connection.chatMessages = [];
+      clearChatMessages();
       connection.presenceEvents = [];
       notifyServerState(null);
       return statusResult("disconnect");

@@ -757,6 +757,8 @@ function syncMultiplayerPresence(reason = "position_update") {
 
 let selectedChatChannel = "sector";
 const fallbackChatMessages = [];
+let lastLocalChatSendKey = "";
+let lastLocalChatSendAt = 0;
 
 function formatChatTime(timestamp = Date.now()) {
   const date = new Date(Number(timestamp || Date.now()));
@@ -789,9 +791,9 @@ function addLocalChatLine(author, message, type = "", meta = {}) {
   text.textContent = ` ${cleanMessage}`;
   line.appendChild(header);
   line.appendChild(text);
-  if (meta.channel || meta.receivedAt) {
+  if (meta.receivedAt && meta.showTime !== false) {
     const stamp = document.createElement("em");
-    stamp.textContent = `${meta.channel ? ` ${getChatChannelLabel(meta.channel)}` : ""}${meta.receivedAt ? ` ${formatChatTime(meta.receivedAt)}` : ""}`;
+    stamp.textContent = ` ${formatChatTime(meta.receivedAt)}`;
     line.appendChild(stamp);
   }
   feed.appendChild(line);
@@ -872,25 +874,31 @@ function renderMultiplayerChatHud(statusOverride = null, playersOverride = null)
   }
 
   if (status.enabled && !status.isConnected) {
-    addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: "sector", receivedAt: Date.now() });
+    addLocalChatLine("Chat", "Chat unavailable while disconnected.", "muted", { showTime: false });
     return;
   }
 
   const sourceMessages = status.enabled && client?.getChatMessages
     ? client.getChatMessages({ channel: "sector" })
     : fallbackChatMessages;
+  const seenMessageKeys = new Set();
   const messages = sourceMessages
-    .filter((message) => message.type === "system" || !message.channel || message.channel === "sector")
+    .filter((message) => message.type !== "system" && (!message.channel || message.channel === "sector"))
+    .filter((message) => {
+      const key = String(message.id || `${message.displayName || ""}|${message.message || ""}|${message.receivedAt || ""}`);
+      if (seenMessageKeys.has(key)) return false;
+      seenMessageKeys.add(key);
+      return true;
+    })
     .slice(-30);
 
   if (!messages.length) {
-    addLocalChatLine("System", "Sector chat ready.", "muted", { channel: "sector", receivedAt: Date.now() });
+    addLocalChatLine("Chat", "No player messages yet.", "muted", { showTime: false });
     return;
   }
 
   messages.forEach((entry) => {
-    addLocalChatLine(entry.displayName || "Pilot", entry.message || "", entry.type === "system" ? "system" : "", {
-      channel: entry.channel,
+    addLocalChatLine(entry.displayName || "Pilot", entry.message || "", "", {
       receivedAt: entry.receivedAt
     });
   });
@@ -902,12 +910,20 @@ function sendLocalChatMessage() {
 
   const message = input.value.replace(/\s+/g, " ").trim().slice(0, 200);
   if (!message) return;
+  const now = Date.now();
+  const sendKey = `sector|${message}`;
+  if (sendKey === lastLocalChatSendKey && now - lastLocalChatSendAt < 750) {
+    input.value = "";
+    return;
+  }
+  lastLocalChatSendKey = sendKey;
+  lastLocalChatSendAt = now;
 
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.() || {};
   if (status.enabled) {
     if (!status.isConnected || !client?.sendChatMessage) {
-      addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: "sector", receivedAt: Date.now() });
+      addLocalChatLine("Chat", "Chat unavailable while disconnected.", "muted", { showTime: false });
       input.value = "";
       return;
     }
