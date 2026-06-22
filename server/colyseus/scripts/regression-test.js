@@ -4366,17 +4366,22 @@ try {
   assert(sectorMessageB?.displayName === "Regression Pilot A", "Sector chat did not use pilot display name.");
   assert(sectorMessageB?.message === "Hello sector <script>", "Sector chat message text changed unexpectedly.");
 
-  const localMessageB = await expectRoomMessage(roomB, "chat:message", () => {
-    roomA.send("chat:send", { channel: "local", message: "Same node local" });
+  const legacyLocalMessageB = await expectRoomMessage(roomB, "chat:message", () => {
+    roomA.send("chat:send", { channel: "local", message: "Legacy local now broadcasts sector" });
   });
-  assert(localMessageB?.channel === "local", "Local chat did not reach same-node pilot.");
-  assert(localMessageB?.currentNode === "Asteron Prime", "Local chat did not include sender node.");
+  assert(legacyLocalMessageB?.channel === "sector", "Legacy local chat was not simplified to sector.");
+  assert(legacyLocalMessageB?.currentNode === "Asteron Prime", "Simplified sector chat did not include sender node.");
 
-  const blockedGuild = await expectRoomMessage(roomA, "chat:message", () => {
+  const legacyGuild = await expectRoomMessage(roomB, "chat:message", () => {
     roomA.send("chat:send", { channel: "guild", message: "Guild ping" });
   });
-  assert(blockedGuild?.reason === "guild_unavailable", "Guild chat without guild did not return placeholder.");
-  assert(/Guild chat will unlock/.test(blockedGuild?.message || ""), "Guild placeholder copy was missing.");
+  assert(legacyGuild?.channel === "sector", "Legacy guild chat was not simplified to sector.");
+  assert(legacyGuild?.message === "Guild ping", "Legacy guild chat message changed unexpectedly.");
+
+  const emptyChatNotice = await expectRoomMessage(roomA, "chat:message", () => {
+    roomA.send("chat:send", { channel: "sector", message: "   " });
+  });
+  assert(emptyChatNotice?.reason === "empty_message", "Empty chat did not return a sender notice.");
 
   const longText = "x".repeat(240);
   const trimmedSector = await expectRoomMessage(roomB, "chat:message", () => {
@@ -4397,11 +4402,10 @@ try {
   await waitFor("client B to receive chat node separation movement", () => {
     return playerFrom(roomB, roomA.sessionId)?.currentNode === "Virella";
   });
-  const roomBLocalMessages = [];
-  roomB.onMessage("chat:message", (message) => roomBLocalMessages.push(message));
-  roomA.send("chat:send", { channel: "local", message: "Different node local" });
-  await sleep(350);
-  assert(!roomBLocalMessages.some((message) => message?.message === "Different node local"), "Local chat crossed node boundaries.");
+  const crossNodeLegacyLocal = await expectRoomMessage(roomB, "chat:message", () => {
+    roomA.send("chat:send", { channel: "local", message: "Different node local" });
+  });
+  assert(crossNodeLegacyLocal?.channel === "sector", "Cross-node legacy local chat was not simplified to sector.");
   const crossNodeSector = await expectRoomMessage(roomB, "chat:message", () => {
     roomA.send("chat:send", { channel: "sector", message: "Cross-node sector" });
   });
@@ -4420,7 +4424,7 @@ try {
   await waitFor("client A returns to starting node after chat routing test", () => {
     return playerFrom(roomB, roomA.sessionId)?.currentNode === "Asteron Prime";
   });
-  console.log("multichannel chat routed sector/local/guild safely");
+  console.log("simplified sector chat broadcast safely");
 
   const bountyList = await expectRoomMessage(roomA, "stagingBounty:listResult", () => {
     roomA.send("stagingBounty:list", {});

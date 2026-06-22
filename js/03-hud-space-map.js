@@ -765,12 +765,11 @@ function formatChatTime(timestamp = Date.now()) {
 }
 
 function getChatChannelLabel(channel = selectedChatChannel) {
-  const labels = { local: "Local", sector: "Sector", guild: "Guild" };
-  return labels[channel] || "Sector";
+  return "Sector";
 }
 
 function setChatChannel(channel) {
-  selectedChatChannel = ["local", "sector", "guild"].includes(channel) ? channel : "sector";
+  selectedChatChannel = "sector";
   renderMultiplayerChatHud();
 }
 
@@ -817,7 +816,6 @@ function renderOnlinePilots(players = null) {
     panel.textContent = "Chat unavailable while disconnected.";
     return;
   }
-  const currentNodeName = getMultiplayerPresencePayload().currentNode || currentNode || "";
   const playerByIdentity = new Map();
   allPlayers.forEach((player) => {
     const accountKey = String(player.trustedPlayerId || player.playerId || player.supabaseUserId || "").trim().toLowerCase();
@@ -834,12 +832,9 @@ function renderOnlinePilots(players = null) {
   });
   const dedupedPlayers = Array.from(playerByIdentity.values());
   const rows = dedupedPlayers.slice(0, 8).map((player) => {
-    const name = String(player.displayName || "Pilot").slice(0, 18);
-    const node = String(player.currentNode || "Unknown").slice(0, 24);
-    const sameNode = node.toLowerCase() === String(currentNodeName || "").toLowerCase();
-    return `${name} - ${sameNode ? "here" : node}`;
+    return String(player.displayName || "Pilot").slice(0, 18);
   });
-  panel.textContent = rows.length ? `Online Pilots: ${rows.join(" | ")}` : "Online Pilots: only you";
+  panel.textContent = rows.length ? `Online Pilots: ${rows.join(", ")}` : "Online Pilots: only you";
 }
 
 function renderMultiplayerChatHud(statusOverride = null, playersOverride = null) {
@@ -848,8 +843,10 @@ function renderMultiplayerChatHud(statusOverride = null, playersOverride = null)
   const sendButton = document.querySelector("#chatPanel .local-chat-input-row button");
   if (!feed) return;
 
+  selectedChatChannel = "sector";
   document.querySelectorAll("#chatPanel .chat-channel-tabs button").forEach((button) => {
-    button.classList.toggle("active", button.id === `chatChannel${getChatChannelLabel(selectedChatChannel)}Btn`);
+    button.classList.toggle("active", button.id === "chatChannelSectorBtn");
+    button.disabled = button.id !== "chatChannelSectorBtn";
   });
 
   const client = window.LupenMultiplayerClient;
@@ -858,45 +855,36 @@ function renderMultiplayerChatHud(statusOverride = null, playersOverride = null)
   feed.innerHTML = "";
 
   if (input) {
-    const canUseChat = !status.enabled ||
-      (status.isConnected && (selectedChatChannel !== "guild" || !!status.guildId));
+    const canUseChat = !status.enabled || status.isConnected;
     input.disabled = !canUseChat;
     input.readOnly = !canUseChat;
     input.maxLength = 200;
-    input.placeholder = selectedChatChannel === "guild"
-      ? status.guildId ? "Guild chat..." : "Guild unavailable"
-      : status.enabled && !status.isConnected
-        ? "Chat reconnecting..."
-        : `${getChatChannelLabel(selectedChatChannel)} message...`;
+    input.placeholder = status.enabled && !status.isConnected
+      ? "Chat unavailable while disconnected."
+      : "Sector message...";
     input.setAttribute("aria-disabled", canUseChat ? "false" : "true");
   }
 
   if (sendButton) {
-    const canSend = !status.enabled ||
-      (status.isConnected && (selectedChatChannel !== "guild" || !!status.guildId));
+    const canSend = !status.enabled || status.isConnected;
     sendButton.disabled = !canSend;
     sendButton.setAttribute("aria-disabled", canSend ? "false" : "true");
   }
 
-  if (selectedChatChannel === "guild" && !status.guildId) {
-    addLocalChatLine("System", "Guild chat will unlock when you join a guild.", "system", { channel: "guild", receivedAt: Date.now() });
-    return;
-  }
-
   if (status.enabled && !status.isConnected) {
-    addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: selectedChatChannel, receivedAt: Date.now() });
+    addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: "sector", receivedAt: Date.now() });
     return;
   }
 
   const sourceMessages = status.enabled && client?.getChatMessages
-    ? client.getChatMessages({ channel: selectedChatChannel })
+    ? client.getChatMessages({ channel: "sector" })
     : fallbackChatMessages;
   const messages = sourceMessages
-    .filter((message) => message.type === "system" || message.channel === selectedChatChannel)
+    .filter((message) => message.type === "system" || !message.channel || message.channel === "sector")
     .slice(-30);
 
   if (!messages.length) {
-    addLocalChatLine("System", `${getChatChannelLabel(selectedChatChannel)} chat ready.`, "muted", { channel: selectedChatChannel, receivedAt: Date.now() });
+    addLocalChatLine("System", "Sector chat ready.", "muted", { channel: "sector", receivedAt: Date.now() });
     return;
   }
 
@@ -919,15 +907,15 @@ function sendLocalChatMessage() {
   const status = client?.getStatus?.() || {};
   if (status.enabled) {
     if (!status.isConnected || !client?.sendChatMessage) {
-      addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: selectedChatChannel, receivedAt: Date.now() });
+      addLocalChatLine("System", "Chat unavailable while disconnected.", "system", { channel: "sector", receivedAt: Date.now() });
       input.value = "";
       return;
     }
-    client.sendChatMessage({ channel: selectedChatChannel, message });
+    client.sendChatMessage({ channel: "sector", message });
   } else {
     fallbackChatMessages.push({
       type: "chat",
-      channel: selectedChatChannel,
+      channel: "sector",
       displayName: getPilotName(),
       message,
       receivedAt: Date.now()

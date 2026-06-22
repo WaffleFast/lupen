@@ -924,7 +924,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText("Multiplayer Staging Loop", { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*Store upgrades[\s\S]*Launch[\s\S]*Engage bots[\s\S]*Claim bounty XP/i);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/No PvP[\s\S]*bots return fire locally/i);
-    await expect(page.locator("#chatPanel .chat-channel-tabs")).toContainText(/Local[\s\S]*Sector[\s\S]*Guild/);
+    await expect(page.locator("#chatPanel .chat-channel-tabs")).toBeHidden();
     await expect(page.locator("#onlinePilotsList")).toContainText(/Chat unavailable while disconnected|Online Pilots/i);
     await page.evaluate(() => {
       if (typeof window.showScreen === "function") window.showScreen("spaceScreen");
@@ -990,6 +990,10 @@ test.describe("Lupen browser smoke", () => {
       const input = document.getElementById("localChatInput");
       input.value = "  staging hello  ";
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      input.value = "   ";
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      input.value = "x".repeat(240);
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
@@ -997,6 +1001,7 @@ test.describe("Lupen browser smoke", () => {
         src: image?.getAttribute("src") || "",
         note: note?.textContent || "",
         onlineText,
+        placeholder: input.placeholder,
         inputDisabled: input.disabled,
         sentMessages
       };
@@ -1007,8 +1012,14 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
+    expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot");
+    expect(connectedHudState.onlineText).not.toContain("here");
+    expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
-    expect(connectedHudState.sentMessages).toEqual([{ channel: "sector", message: "staging hello" }]);
+    expect(connectedHudState.sentMessages).toEqual([
+      { channel: "sector", message: "staging hello" },
+      { channel: "sector", message: "x".repeat(200) }
+    ]);
     await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
     await expect(page.locator("#debugToolsPanel")).toHaveCount(0);
 

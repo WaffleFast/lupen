@@ -893,8 +893,6 @@
   }
 
   function normalizeChatChannel(value = "") {
-    const channel = String(value || "sector").trim().toLowerCase();
-    if (channel === "local" || channel === "sector" || channel === "guild") return channel;
     return "sector";
   }
 
@@ -2920,10 +2918,9 @@
     },
 
     sendChatMessage(options = {}) {
-      const channel = normalizeChatChannel(options.channel);
       const message = normalizeChatText(options.message || options.text);
       if (!message) return statusResult("sendChatMessage", false, { reason: "empty_message" });
-      return sendRoomMessage("sendChatMessage", "chat:send", { channel, message });
+      return sendRoomMessage("sendChatMessage", "chat:send", { channel: "sector", message });
     },
 
     sendCombatIntent(intent = {}) {

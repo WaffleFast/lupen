@@ -458,8 +458,6 @@ function getSafeIdentityValue(value, fallback = "") {
 }
 
 function normalizeChatChannel(value = "") {
-  const channel = getStringValue(value, "sector").toLowerCase();
-  if (channel === "local" || channel === "guild" || channel === "sector") return channel;
   return "sector";
 }
 
@@ -1419,15 +1417,10 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
-    const channel = normalizeChatChannel(message.channel);
+    const channel = "sector";
     const text = normalizeChatMessageText(message.message ?? message.text);
     if (!text) {
       this.sendChatNotice(client, channel, "Empty messages cannot be sent.", "empty_message");
-      return;
-    }
-
-    if (channel === "guild" && !getStringValue(player.guildId)) {
-      this.sendChatNotice(client, "guild", "Guild chat will unlock when you join a guild.", "guild_unavailable");
       return;
     }
 
@@ -1445,12 +1438,7 @@ export class LupenSectorRoom extends Room {
       receivedAt: Date.now()
     };
 
-    const senderNode = normalizePresenceNode(player.currentNode);
     this.clients.forEach((targetClient) => {
-      const targetPlayer = this.state.players.get(targetClient.sessionId);
-      if (!targetPlayer) return;
-      if (channel === "local" && normalizePresenceNode(targetPlayer.currentNode) !== senderNode) return;
-      if (channel === "guild" && getStringValue(targetPlayer.guildId) !== getStringValue(player.guildId)) return;
       targetClient.send("chat:message", payload);
     });
   }
