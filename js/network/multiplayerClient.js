@@ -537,9 +537,7 @@
           equippedWeaponKeys,
           weaponName: "Staging Fallback",
           weaponFamily: "staging-fallback",
-          damage: 5,
-          fireRate: 1,
-          cooldownMs: 900
+          weaponType: "staging-fallback"
         };
       }
 
@@ -557,19 +555,8 @@
         weaponName: String(weapon.name || "Equipped Weapon").slice(0, 80),
         weaponFamily: String(weapon.familyId || weapon.family || weapon.fireStyle || weapon.type || ""),
         weaponType: String(weapon.type || weapon.fireStyle || ""),
-        damage: Number.isFinite(Number(weapon.damage)) ? Number(weapon.damage) : 5,
-        damageLayers: weapon.damageLayers && typeof weapon.damageLayers === "object"
-          ? {
-            shield: Number.isFinite(Number(weapon.damageLayers.shield)) ? Number(weapon.damageLayers.shield) : 0,
-            armor: Number.isFinite(Number(weapon.damageLayers.armor)) ? Number(weapon.damageLayers.armor) : 0,
-            hull: Number.isFinite(Number(weapon.damageLayers.hull)) ? Number(weapon.damageLayers.hull) : 0
-          }
-          : undefined,
-        fireRate: Number.isFinite(Number(weapon.fireRate)) ? Number(weapon.fireRate) : 1,
-        cooldownMs: Number.isFinite(Number(weapon.speed)) ? Number(weapon.speed) : 900,
         quality: String(weapon.quality || ""),
-        level: Number.isFinite(Number(weapon.level)) ? Number(weapon.level) : 0,
-        count: Number.isFinite(Number(weapon.count)) ? Number(weapon.count) : 0
+        level: Number.isFinite(Number(weapon.level)) ? Number(weapon.level) : 0
       };
     } catch (err) {
       logDev("staging weapon payload fallback", err);
@@ -580,9 +567,7 @@
         equippedWeaponKeys: [],
         weaponName: "Staging Fallback",
         weaponFamily: "staging-fallback",
-        damage: 5,
-        fireRate: 1,
-        cooldownMs: 900
+        weaponType: "staging-fallback"
       };
     }
   }
@@ -2211,6 +2196,8 @@
         rejectedWeaponCount: Number.isFinite(Number(message?.rejectedWeaponCount)) ? Number(message.rejectedWeaponCount) : 0,
         firstRejectedWeaponReason: String(message?.firstRejectedWeaponReason || ""),
         fallbackDamageUsed: message?.fallbackDamageUsed === true,
+        clientDamageIgnored: message?.clientDamageIgnored === true,
+        serverAuthoritative: message?.serverAuthoritative === true,
         pulseLaserDetected: message?.pulseLaserDetected === true,
         serverDamageUsed: Number.isFinite(Number(message?.serverDamageUsed)) ? Number(message.serverDamageUsed) : null,
         damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
@@ -2273,6 +2260,10 @@
         damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
         weaponName: String(message?.weaponName || ""),
         weaponFamily: String(message?.weaponFamily || message?.weaponType || ""),
+        damageSource: String(message?.damageSource || ""),
+        fallbackDamageUsed: message?.fallbackDamageUsed === true,
+        clientDamageIgnored: message?.clientDamageIgnored === true,
+        serverAuthoritative: message?.serverAuthoritative === true,
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         disabled: message?.disabled === true,

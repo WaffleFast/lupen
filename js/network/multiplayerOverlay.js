@@ -3035,8 +3035,8 @@
   function sendStagingTestFire(selectedBot) {
     if (!canSendStagingTestFire(getClient()?.getStatus?.(), selectedBot)) return;
 
-    // Diagnostics-only staging damage path. This does not call local combat,
-    // projectile, sound, bounty, reward, save, or targeting systems.
+    // Intent-only staging combat path. The server resolves weapon damage,
+    // cooldown, bot health, rewards, and shared shot events.
     getClient()?.sendSelectedStagingBotCombatIntent?.({
       targetBotId: selectedBot.id,
       currentNode: getCurrentNodeName(),

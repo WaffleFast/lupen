@@ -963,48 +963,43 @@ function resolveStagingWeapon(message = {}, player = null) {
   const weaponKey = payloadKey || payloadListKey || presenceKey || presenceListKey || weaponIdKey;
   const known = STAGING_WEAPON_STATS[weaponKey] || null;
   const requestedDamage = getRequestedDamageFromPayload(message);
-  const payloadCount = getNumberValue(message.count, 0);
-  const hasMultiWeaponLoadout = payloadCount > 1 || String(message.weaponName || "").includes(" + ");
   const debug = getWeaponSourceDebug(message, player, weaponKey);
 
   if (known) {
     const knownDamage = clampNumber(Math.round(known.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
-    const aggregateDamage = hasMultiWeaponLoadout && requestedDamage > knownDamage
-      ? clampNumber(Math.round(requestedDamage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX)
-      : knownDamage;
     return {
       weaponKey: known.key,
       weaponName: known.name,
       weaponFamily: known.family,
       weaponType: known.type,
-      damage: aggregateDamage,
+      damage: knownDamage,
       cooldownMs: clampNumber(Math.round(known.cooldownMs), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS),
-      damageSource: aggregateDamage === knownDamage ? "server_known_weapon" : "client_loadout_aggregate",
+      damageSource: "server_known_weapon",
       fallbackDamageUsed: false,
       pulseLaserDetected: known.key === "pulseLaser",
       requestedDamage,
+      clientDamageIgnored: requestedDamage > 0 && Math.round(requestedDamage) !== knownDamage,
+      serverAuthoritative: true,
       ...debug,
-      weaponSourceReason: aggregateDamage === knownDamage ? "server_known_weapon" : "client_loadout_aggregate"
+      weaponSourceReason: "server_known_weapon"
     };
   }
-
-  const clampedRequestedDamage = hasMultiWeaponLoadout && requestedDamage > 0
-    ? clampNumber(Math.round(requestedDamage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX)
-    : STAGING_TEST_DAMAGE;
 
   return {
     weaponKey,
     weaponName: getStringValue(message.weaponName, "Staging Fallback") || "Staging Fallback",
     weaponFamily: getStringValue(message.weaponFamily || message.weaponType || "staging-fallback"),
     weaponType: getStringValue(message.weaponType || message.weaponFamily || "staging-fallback"),
-    damage: clampedRequestedDamage,
+    damage: STAGING_TEST_DAMAGE,
     cooldownMs: STAGING_FIRE_COOLDOWN_MS,
-    damageSource: hasMultiWeaponLoadout && requestedDamage > 0 ? "client_loadout_aggregate" : (weaponKey ? "fallback_unknown_weapon" : "fallback_no_weapon"),
-    fallbackDamageUsed: !(hasMultiWeaponLoadout && requestedDamage > 0),
+    damageSource: weaponKey ? "fallback_unknown_weapon" : "fallback_no_weapon",
+    fallbackDamageUsed: true,
     pulseLaserDetected: false,
     requestedDamage,
+    clientDamageIgnored: requestedDamage > 0 && Math.round(requestedDamage) !== STAGING_TEST_DAMAGE,
+    serverAuthoritative: true,
     ...debug,
-    weaponSourceReason: hasMultiWeaponLoadout && requestedDamage > 0 ? "client_loadout_aggregate" : debug.weaponSourceReason
+    weaponSourceReason: debug.weaponSourceReason
   };
 }
 
@@ -3278,6 +3273,8 @@ export class LupenSectorRoom extends Room {
       serverDamageUsed: stagingDamage,
       damageSource: resolvedWeapon.damageSource,
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
+      clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,
+      serverAuthoritative: resolvedWeapon.serverAuthoritative === true,
       pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
       weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
       combatIntentReason: "staging_damage_applied",
@@ -3313,6 +3310,8 @@ export class LupenSectorRoom extends Room {
       weaponType: resolvedWeapon.weaponType,
       damageSource: resolvedWeapon.damageSource,
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
+      clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,
+      serverAuthoritative: resolvedWeapon.serverAuthoritative === true,
       pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
       weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
       shield: result.shield,

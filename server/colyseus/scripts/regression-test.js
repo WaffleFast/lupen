@@ -5036,6 +5036,8 @@ try {
   assert(combatResponse?.requestedDamage === 9999, "Combat response did not preserve requested damage for diagnostics.");
   assert(combatResponse?.damageSource === "server_known_weapon", `Pulse Laser did not use server-known weapon stats: ${combatResponse?.damageSource}`);
   assert(combatResponse?.fallbackDamageUsed === false, "Pulse Laser incorrectly used fallback damage.");
+  assert(combatResponse?.serverAuthoritative === true, "Pulse Laser combat was not marked server-authoritative.");
+  assert(combatResponse?.clientDamageIgnored === true, "Spoofed Pulse Laser damage was not marked ignored.");
   assert(combatResponse?.pulseLaserDetected === true, "Pulse Laser was not detected by server weapon resolver.");
   assert(combatResponse?.weaponName === "Pulse Laser", "Combat response did not use server-known weapon name.");
   assert(combatResponse?.rewardsGranted === false, "Staging combat intent granted rewards.");
@@ -5068,6 +5070,10 @@ try {
       shotB.weaponName === "Pulse Laser" &&
       shotA.damageSource === "server_known_weapon" &&
       shotB.damageSource === "server_known_weapon" &&
+      shotA.serverAuthoritative === true &&
+      shotB.serverAuthoritative === true &&
+      shotA.clientDamageIgnored === true &&
+      shotB.clientDamageIgnored === true &&
       shotA.rewardsGranted === false &&
       shotB.rewardsGranted === false;
   });
@@ -5133,6 +5139,8 @@ try {
   assert(implicitRepeaterCombatResponse?.damage === 5, `Unexpected Repeater staging damage: ${implicitRepeaterCombatResponse?.damage}`);
   assert(implicitRepeaterCombatResponse?.damageSource === "server_known_weapon", `Repeater did not use server-known weapon stats: ${implicitRepeaterCombatResponse?.damageSource}`);
   assert(implicitRepeaterCombatResponse?.fallbackDamageUsed === false, "Repeater incorrectly used fallback damage.");
+  assert(implicitRepeaterCombatResponse?.serverAuthoritative === true, "Repeater combat was not marked server-authoritative.");
+  assert(implicitRepeaterCombatResponse?.clientDamageIgnored === true, "Spoofed Repeater damage was not marked ignored.");
   await waitFor("implicit combat lock to mirror into room state", () => {
     return playerFrom(roomA, roomA.sessionId)?.selectedTargetBotId === inspectedBotBeforeCombat.id;
   });
@@ -5156,6 +5164,8 @@ try {
   assert(clientBContributionResponse?.damage === 5, `Unknown client B weapon should use fallback damage: ${clientBContributionResponse?.damage}`);
   assert(clientBContributionResponse?.damageSource === "fallback_unknown_weapon", `Unknown client B weapon had unexpected damage source: ${clientBContributionResponse?.damageSource}`);
   assert(clientBContributionResponse?.fallbackDamageUsed === true, "Unknown client B weapon did not report fallback damage.");
+  assert(clientBContributionResponse?.serverAuthoritative === true, "Unknown weapon fallback was not marked server-authoritative.");
+  assert(clientBContributionResponse?.clientDamageIgnored === true, "Unknown weapon client damage was not marked ignored.");
   assert(clientBContributionResponse?.rewardsGranted === false, "Client B staging combat intent granted rewards.");
   await waitFor("both clients to receive client B contribution damage", () => {
     const botA = botById(roomA, inspectedBotBeforeCombat.id);
@@ -5185,15 +5195,18 @@ try {
     });
   });
 
-  assert(multiWeaponCombatResponse?.stagingDamage === 37, `Multi-weapon aggregate damage was not accepted: ${multiWeaponCombatResponse?.stagingDamage}`);
-  assert(multiWeaponCombatResponse?.damageSource === "client_loadout_aggregate", `Multi-weapon aggregate had unexpected source: ${multiWeaponCombatResponse?.damageSource}`);
-  assert(multiWeaponCombatResponse?.fallbackDamageUsed === false, "Multi-weapon aggregate incorrectly used fallback damage.");
-  assert(multiWeaponCombatResponse?.weaponKey === "pulseLaser", `Multi-weapon aggregate did not prefer equipped gun keys over generic weaponId: ${multiWeaponCombatResponse?.weaponKey}`);
+  assert(multiWeaponCombatResponse?.stagingDamage === 10, `Multi-weapon payload did not use server-known Pulse Laser damage: ${multiWeaponCombatResponse?.stagingDamage}`);
+  assert(multiWeaponCombatResponse?.requestedDamage === 37, "Multi-weapon requested damage was not kept for diagnostics.");
+  assert(multiWeaponCombatResponse?.damageSource === "server_known_weapon", `Multi-weapon payload had unexpected source: ${multiWeaponCombatResponse?.damageSource}`);
+  assert(multiWeaponCombatResponse?.fallbackDamageUsed === false, "Multi-weapon known weapon incorrectly used fallback damage.");
+  assert(multiWeaponCombatResponse?.clientDamageIgnored === true, "Multi-weapon client aggregate damage was not marked ignored.");
+  assert(multiWeaponCombatResponse?.serverAuthoritative === true, "Multi-weapon combat was not marked server-authoritative.");
+  assert(multiWeaponCombatResponse?.weaponKey === "pulseLaser", `Multi-weapon payload did not prefer equipped gun keys over generic weaponId: ${multiWeaponCombatResponse?.weaponKey}`);
   assert(Number(multiWeaponCombatResponse?.activeShipWeaponCount || 0) === 8, `Unexpected active weapon debug count: ${multiWeaponCombatResponse?.activeShipWeaponCount}`);
   assert(Number(multiWeaponCombatResponse?.validCombatWeaponCount || 0) === 6, `Unexpected valid weapon debug count: ${multiWeaponCombatResponse?.validCombatWeaponCount}`);
   assert(Number(multiWeaponCombatResponse?.rejectedWeaponCount || 0) === 3, `Unexpected rejected weapon debug count: ${multiWeaponCombatResponse?.rejectedWeaponCount}`);
   assert(String(multiWeaponCombatResponse?.firstRejectedWeaponReason || "").startsWith("unknown_weapon:"), `Missing first rejected weapon reason: ${multiWeaponCombatResponse?.firstRejectedWeaponReason}`);
-  await waitFor("both clients to receive multi-weapon aggregate damage", () => {
+  await waitFor("both clients to receive server-authoritative multi-weapon damage", () => {
     const botA = botById(roomA, inspectedBotBeforeCombat.id);
     const botB = botById(roomB, inspectedBotBeforeCombat.id);
     return botA && botB &&
@@ -5204,7 +5217,7 @@ try {
   });
   const inspectedBotAfterMultiWeaponCombat = botById(roomA, inspectedBotBeforeCombat.id);
   assert(botHealthTotal(inspectedBotAfterMultiWeaponCombat) === botHealthTotal(inspectedBotAfterClientBCombat) - Number(multiWeaponCombatResponse.damage || 0), "Multi-weapon aggregate did not apply resolved staging damage.");
-  console.log("multi-weapon staging loadout aggregate damage applied within server clamp");
+  console.log("multi-weapon client aggregate damage ignored in favor of server-known weapon damage");
 
   await waitForFireReady(roomA, roomA.sessionId);
   const oversizedCombatResponse = await expectCombatResolved(roomA, () => {
@@ -5223,6 +5236,8 @@ try {
   assert(oversizedCombatResponse?.stagingDamage === 5, `Oversized unknown weapon did not use fallback damage: ${oversizedCombatResponse?.stagingDamage}`);
   assert(oversizedCombatResponse?.requestedDamage === 9999, "Oversized requested damage was not kept for diagnostics.");
   assert(oversizedCombatResponse?.damageSource === "fallback_unknown_weapon", `Oversized unknown weapon had unexpected source: ${oversizedCombatResponse?.damageSource}`);
+  assert(oversizedCombatResponse?.clientDamageIgnored === true, "Oversized client damage was not marked ignored.");
+  assert(oversizedCombatResponse?.serverAuthoritative === true, "Oversized fallback combat was not marked server-authoritative.");
   assert(oversizedCombatResponse?.rewardsGranted === false, "Oversized staging combat intent granted rewards.");
   await waitFor("client B to receive clamped oversized staging damage", () => {
     const botA = botById(roomA, inspectedBotBeforeCombat.id);
