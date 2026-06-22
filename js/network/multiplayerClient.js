@@ -2153,6 +2153,19 @@
         targetNode: String(message?.targetNode || ""),
         weaponName: String(message?.weaponName || ""),
         cooldownRemainingMs: Number.isFinite(Number(message?.cooldownRemainingMs)) ? Number(message.cooldownRemainingMs) : 0,
+        pvpIntent: message?.pvpIntent === true,
+        targetType: String(message?.targetType || ""),
+        targetPlayerId: String(message?.targetPlayerId || ""),
+        targetSessionId: String(message?.targetSessionId || ""),
+        attackerSessionId: String(message?.attackerSessionId || ""),
+        attackerNode: String(message?.attackerNode || ""),
+        targetPlayerNode: String(message?.targetPlayerNode || ""),
+        attackerPresenceStatus: String(message?.attackerPresenceStatus || ""),
+        targetPresenceStatus: String(message?.targetPresenceStatus || ""),
+        attackerGuildId: String(message?.attackerGuildId || ""),
+        targetGuildId: String(message?.targetGuildId || ""),
+        attackerShipId: String(message?.attackerShipId || ""),
+        targetShipId: String(message?.targetShipId || ""),
         pvpRulePreview: String(message?.pvpRulePreview || ""),
         pvpEligibility: message?.pvpEligibility && typeof message.pvpEligibility === "object"
           ? {
@@ -2161,6 +2174,9 @@
             pvpEnabled: message.pvpEligibility.pvpEnabled === true
           }
           : null,
+        pvpDamageApplied: message?.pvpDamageApplied === true,
+        playerDamageApplied: message?.playerDamageApplied === true,
+        mutatedPlayerState: message?.mutatedPlayerState === true,
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
@@ -2940,7 +2956,21 @@
 
     sendCombatIntent(intent = {}) {
       if (intent?.targetPlayerId || intent?.targetSessionId || intent?.targetType === "remotePlayer") {
-        return statusResult("sendCombatIntent", false, { reason: "pvp_unavailable_in_staging" });
+        return statusResult("sendCombatIntent", false, {
+          reason: "pvp_unavailable_in_staging",
+          pvpIntent: true,
+          targetType: String(intent?.targetType || "remotePlayer"),
+          targetPlayerId: String(intent?.targetPlayerId || intent?.targetSessionId || ""),
+          pvpRulePreview: "client_pvp_disabled",
+          pvpEligibility: {
+            allowed: false,
+            reason: "client_pvp_disabled",
+            pvpEnabled: false
+          },
+          pvpDamageApplied: false,
+          playerDamageApplied: false,
+          mutatedPlayerState: false
+        });
       }
       return sendRoomMessage("sendCombatIntent", "combat:intent", intent);
     },

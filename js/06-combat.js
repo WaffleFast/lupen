@@ -98,12 +98,33 @@ function selectRemotePlayerTarget(playerId) {
   updateObjectActionPanel(false);
 }
 
+function getRemotePlayerEngageBlockMessage(player = {}) {
+  const targetNode = player.currentNodeId || player.node || "";
+  const status = String(player.presenceStatus || player.status || "space").toLowerCase();
+  if (status === "docked") return "Target is docked.";
+  if (targetNode && targetNode !== currentNode) return "Target is no longer in this node.";
+
+  const node = typeof sectorNodes !== "undefined" ? sectorNodes[currentNode] : null;
+  if (node?.type === "planet" || ["Asteron Prime", "Virella", "Nyxara"].includes(String(currentNode || ""))) {
+    return "PvP disabled in safe areas.";
+  }
+
+  const localGuildId = String(window.LupenMultiplayerClient?.getStatus?.()?.guildId || "").trim();
+  const targetGuildId = String(player.guildId || "").trim();
+  if (localGuildId && targetGuildId && localGuildId === targetGuildId) {
+    return "Cannot engage guild allies.";
+  }
+
+  return "PvP is unavailable in staging.";
+}
+
 function engageTarget() {
   let target = getSelectedTargetEntity();
 
   if (target?.remotePlayer) {
-    if (typeof addHudToast === "function") addHudToast("PvP is unavailable in staging.");
-    else if (typeof addActivityLog === "function") addActivityLog("PvP is unavailable in staging.");
+    const message = getRemotePlayerEngageBlockMessage(target);
+    if (typeof addHudToast === "function") addHudToast(message);
+    else if (typeof addActivityLog === "function") addActivityLog(message);
     updateObjectActionPanel(false);
     return;
   }

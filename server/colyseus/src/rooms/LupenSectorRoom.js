@@ -467,6 +467,51 @@ function getPvpEligibilityPreview(attacker = null, target = null, currentNode = 
   return { allowed: false, reason: "pvp_disabled", pvpEnabled: false };
 }
 
+function getSafeWeaponList(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => getSafeIdentityValue(item))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function getPvpCombatIntentDiagnostics({
+  attacker = null,
+  target = null,
+  message = {},
+  targetPlayerId = "",
+  pvpEligibility = null,
+  now = Date.now()
+} = {}) {
+  return {
+    pvpIntent: true,
+    targetType: getStringValue(message.targetType || "remotePlayer"),
+    targetPlayerId: getStringValue(targetPlayerId),
+    targetSessionId: getStringValue(target?.sessionId || target?.id || targetPlayerId),
+    attackerSessionId: getStringValue(attacker?.sessionId || attacker?.id),
+    attackerNode: getStringValue(attacker?.currentNode || message.currentNode),
+    targetPlayerNode: getStringValue(target?.currentNode),
+    attackerPresenceStatus: getSafePresenceStatus(attacker?.presenceStatus),
+    targetPresenceStatus: target ? getSafePresenceStatus(target?.presenceStatus) : "",
+    attackerGuildId: getSafeIdentityValue(attacker?.guildId),
+    targetGuildId: getSafeIdentityValue(target?.guildId),
+    attackerShipId: getSafeIdentityValue(attacker?.currentShipId || attacker?.shipId),
+    targetShipId: getSafeIdentityValue(target?.currentShipId || target?.shipId),
+    weaponId: getSafeIdentityValue(message.weaponId),
+    weaponKey: getSafeIdentityValue(message.weaponKey),
+    weaponFamily: getSafeIdentityValue(message.weaponFamily),
+    weaponName: getStringValue(message.weaponName || message.weaponLabel).slice(0, 80),
+    equippedWeaponKeys: getSafeWeaponList(message.equippedWeaponKeys || message.weaponKeys),
+    pvpRulePreview: getStringValue(pvpEligibility?.reason),
+    pvpEligibility: pvpEligibility || { allowed: false, reason: "pvp_disabled", pvpEnabled: false },
+    pvpDamageApplied: false,
+    playerDamageApplied: false,
+    mutatedPlayerState: false,
+    rewardsGranted: false,
+    intentTimestamp: now
+  };
+}
+
 function getShipImageValue(message = {}) {
   return message.shipImage || message.shipImageSrc || message.shipImagePath || "";
 }
@@ -3107,15 +3152,20 @@ export class LupenSectorRoom extends Room {
     if (targetPlayerId || getStringValue(message.targetType) === "remotePlayer") {
       const targetPlayer = targetPlayerId ? this.state.players.get(targetPlayerId) : null;
       const pvpEligibility = getPvpEligibilityPreview(player, targetPlayer, message.currentNode);
+      const pvpDiagnostics = getPvpCombatIntentDiagnostics({
+        attacker: player,
+        target: targetPlayer,
+        message,
+        targetPlayerId,
+        pvpEligibility,
+        now
+      });
       if (player) {
         player.lastCombatIntentReason = "pvp_unavailable_in_staging";
         player.lastCombatNodeValidationReason = "";
       }
       this.sendCombatRejected(client, "pvp_unavailable_in_staging", message, messageType, "pvp_unavailable_in_staging", {
-        targetPlayerId,
-        targetType: getStringValue(message.targetType || "remotePlayer"),
-        pvpRulePreview: pvpEligibility.reason,
-        pvpEligibility
+        ...pvpDiagnostics
       });
       return;
     }

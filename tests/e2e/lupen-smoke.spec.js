@@ -1039,7 +1039,16 @@ test.describe("Lupen browser smoke", () => {
         },
         sendCombatIntent: (intent) => {
           if (intent?.targetPlayerId || intent?.targetSessionId || intent?.targetType === "remotePlayer") {
-            return { ok: false, reason: "pvp_unavailable_in_staging" };
+            return {
+              ok: false,
+              reason: "pvp_unavailable_in_staging",
+              pvpIntent: true,
+              pvpRulePreview: "client_pvp_disabled",
+              pvpEligibility: { allowed: false, reason: "client_pvp_disabled", pvpEnabled: false },
+              pvpDamageApplied: false,
+              playerDamageApplied: false,
+              mutatedPlayerState: false
+            };
           }
           return { ok: true };
         },
@@ -1066,6 +1075,7 @@ test.describe("Lupen browser smoke", () => {
         targetType: "remotePlayer",
         targetPlayerId: "remote-session"
       });
+      if (typeof engageTarget === "function") engageTarget();
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
       const chatText = document.getElementById("localChatFeed")?.textContent || "";
       const result = {
@@ -1080,6 +1090,8 @@ test.describe("Lupen browser smoke", () => {
         engageDisabledForPlayer: engageButton?.disabled ?? false,
         engageTextForPlayer: engageButton?.textContent || "",
         pvpGuardReason: pvpGuard?.reason || "",
+        pvpGuardPreview: pvpGuard?.pvpRulePreview || "",
+        pvpGuardDamageApplied: pvpGuard?.playerDamageApplied === true || pvpGuard?.pvpDamageApplied === true,
         onlineText,
         chatText,
         activityText: document.getElementById("activityLogFeed")?.textContent || "",
@@ -1105,12 +1117,15 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
     expect(connectedHudState.engageTextForPlayer).toContain("PVP UNAVAILABLE");
     expect(connectedHudState.pvpGuardReason).toBe("pvp_unavailable_in_staging");
+    expect(connectedHudState.pvpGuardPreview).toBe("client_pvp_disabled");
+    expect(connectedHudState.pvpGuardDamageApplied).toBe(false);
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
     expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot, Docked Pilot");
     expect(connectedHudState.onlineText).not.toContain("here");
     expect(connectedHudState.visiblePlayerMessageCount).toBe(1);
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
     expect(connectedHudState.activityText).toContain("Remote Pilot entered Asteron Prime.");
+    expect(connectedHudState.activityText).toContain("PvP disabled in safe areas.");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([
