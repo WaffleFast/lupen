@@ -1019,6 +1019,8 @@ test.describe("Lupen browser smoke", () => {
         onServerState: () => ({ unsubscribe() {} })
       };
       window.LupenMultiplayerOverlay.render();
+      selectRemotePlayerTarget("remote-session");
+      window.LupenMultiplayerOverlay.render();
       const input = document.getElementById("localChatInput");
       input.value = "  staging hello  ";
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -1030,11 +1032,19 @@ test.describe("Lupen browser smoke", () => {
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
+      const targetCard = document.querySelector(".lupen-target-card.player");
+      const engagePanel = document.getElementById("objectActionPanel");
+      const engageButton = document.getElementById("objectEngageBtn");
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
       const chatText = document.getElementById("localChatFeed")?.textContent || "";
       const result = {
         src: image?.getAttribute("src") || "",
         note: note?.textContent || "",
+        playerTargetText: targetCard?.textContent || "",
+        playerTargetKicker: targetCard?.dataset.kicker || "",
+        playerTargetSelected: document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "",
+        engageVisibleForPlayer: engagePanel?.classList.contains("visible") || false,
+        engageDisabledForPlayer: engageButton?.disabled ?? false,
         onlineText,
         chatText,
         visiblePlayerMessageCount: (chatText.match(/Visible player message/g) || []).length,
@@ -1048,6 +1058,13 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
+    expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
+    expect(connectedHudState.playerTargetText).toContain("Nightshade Hawk");
+    expect(connectedHudState.playerTargetText).toContain("PLAYER");
+    expect(connectedHudState.playerTargetKicker).toBe("SELECTED PLAYER");
+    expect(connectedHudState.playerTargetSelected).toBe("remote-session");
+    expect(connectedHudState.engageVisibleForPlayer).toBe(false);
+    expect(connectedHudState.engageDisabledForPlayer).toBe(true);
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
     expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot");
     expect(connectedHudState.onlineText).not.toContain("here");
@@ -2418,6 +2435,7 @@ test.describe("Lupen browser smoke", () => {
           id: "staging-bot-1",
           name: "Erebus Watcher",
           displayName: "Erebus Watcher",
+          level: 1,
           currentNode: "Lower Lane West B",
           x: 42,
           y: 46,
@@ -2434,6 +2452,7 @@ test.describe("Lupen browser smoke", () => {
           getStatus: () => ({
             enabled: true,
             isConnected: true,
+            enabledReason: "staging_enabled",
             lastStagingBountyStatus: { active },
             lastStagingBountyList: { active, bounties: [active] },
             selectedTargetBotId: window.__selectedStagingBotId
@@ -2462,7 +2481,9 @@ test.describe("Lupen browser smoke", () => {
         marker.onclick = event => {
           event.preventDefault();
           event.stopPropagation();
+          window.__selectedStagingBotId = bot.id;
           selectStagingBotTarget(bot.id);
+          window.LupenMultiplayerOverlay?.render?.();
         };
         document.getElementById("spaceScreen")?.appendChild(marker);
         startStarterTutorial(true);
@@ -2488,11 +2509,18 @@ test.describe("Lupen browser smoke", () => {
       (() => {
         renderStarterTutorial();
         const engage = document.getElementById("objectEngageBtn");
+        window.LupenMultiplayerOverlay?.render?.();
+        const targetCard = document.querySelector(".lupen-target-card.hostile");
+        const botMarker = document.querySelector("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-locked");
         return {
           step: getCurrentTutorialStep().id,
           selectedType: selectedTarget?.type || "",
           engageDisabled: engage?.disabled ?? true,
-          engageHighlighted: engage?.classList.contains("tutorial-highlight-target") || false
+          engageHighlighted: engage?.classList.contains("tutorial-highlight-target") || false,
+          targetCardText: targetCard?.textContent || "",
+          targetCardKicker: targetCard?.dataset.kicker || "",
+          botMarkerText: botMarker?.textContent || "",
+          oldDebugCopyVisible: document.getElementById("spaceScreen")?.textContent?.includes("STAGING BOT / LOCK") || false
         };
       })()
     `));
@@ -2501,6 +2529,12 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.selectedType).toBe("stagingBot");
     expect(stagingBotSelectedState.engageDisabled).toBe(false);
     expect(stagingBotSelectedState.engageHighlighted).toBe(true);
+    expect(stagingBotSelectedState.targetCardText).toContain("Erebus Watcher");
+    expect(stagingBotSelectedState.targetCardText).toContain("HOSTILE BOT");
+    expect(stagingBotSelectedState.targetCardText).toContain("LEVEL 1");
+    expect(stagingBotSelectedState.targetCardKicker).toBe("SELECTED ENEMY");
+    expect(stagingBotSelectedState.botMarkerText).toContain("HOSTILE BOT");
+    expect(stagingBotSelectedState.oldDebugCopyVisible).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

@@ -15,6 +15,7 @@
   const spaceLayerId = "lupenMultiplayerSpaceGhostLayer";
   const spaceBotLayerId = "lupenMultiplayerSpaceBotLayer";
   const spaceShotLayerId = "lupenMultiplayerSpaceShotLayer";
+  const spaceSelectionLayerId = "lupenMultiplayerSpaceSelectionLayer";
   const statusChipId = "lupenMultiplayerStatusChip";
   const stagingFlowHintId = "lupenMultiplayerStagingFlowHint";
   const diagnosticsPanelId = "lupenMultiplayerDiagnostics";
@@ -129,6 +130,14 @@
         position: absolute;
         inset: 84px 18px 170px;
         z-index: 10;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      #${spaceSelectionLayerId} {
+        position: absolute;
+        inset: 84px 18px 170px;
+        z-index: 11;
         pointer-events: none;
         overflow: hidden;
       }
@@ -516,8 +525,40 @@
         gap: 3px;
         transform: translate(-50%, -50%);
         opacity: 0.9;
-        pointer-events: none;
+        pointer-events: auto;
+        cursor: pointer;
         filter: drop-shadow(0 0 13px rgba(93, 232, 255, 0.62));
+      }
+
+      .lupen-mp-space-ghost.is-selected {
+        opacity: 1;
+        filter: drop-shadow(0 0 18px rgba(89, 238, 255, 0.88));
+      }
+
+      .lupen-mp-space-ghost.is-selected::after,
+      .lupen-mp-space-bot.is-locked::before {
+        content: "";
+        position: absolute;
+        inset: -8px -12px 12px;
+        pointer-events: none;
+        background:
+          linear-gradient(currentColor, currentColor) left top / 20px 3px no-repeat,
+          linear-gradient(currentColor, currentColor) left top / 3px 20px no-repeat,
+          linear-gradient(currentColor, currentColor) right top / 20px 3px no-repeat,
+          linear-gradient(currentColor, currentColor) right top / 3px 20px no-repeat,
+          linear-gradient(currentColor, currentColor) left bottom / 20px 3px no-repeat,
+          linear-gradient(currentColor, currentColor) left bottom / 3px 20px no-repeat,
+          linear-gradient(currentColor, currentColor) right bottom / 20px 3px no-repeat,
+          linear-gradient(currentColor, currentColor) right bottom / 3px 20px no-repeat;
+        filter: drop-shadow(0 0 10px currentColor);
+      }
+
+      .lupen-mp-space-ghost.is-selected::after {
+        color: rgba(111, 245, 255, 0.92);
+      }
+
+      .lupen-mp-space-bot.is-locked::before {
+        color: rgba(255, 180, 78, 0.95);
       }
 
       .lupen-mp-space-ghost-ship {
@@ -724,8 +765,118 @@
       }
 
       .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-note::after {
-        content: " / LOCK";
-        color: #fff4c7;
+        content: "";
+      }
+
+      .lupen-target-card {
+        position: absolute;
+        transform: translate(-50%, 0);
+        min-width: 184px;
+        max-width: 230px;
+        display: grid;
+        justify-items: center;
+        gap: 4px;
+        padding: 8px 10px 10px;
+        border: 1px solid rgba(110, 230, 255, 0.64);
+        border-radius: 4px;
+        background: linear-gradient(180deg, rgba(4, 14, 28, 0.92), rgba(1, 6, 14, 0.78));
+        box-shadow: 0 0 22px rgba(0, 190, 255, 0.18);
+        color: #e9fdff;
+        text-align: center;
+        text-transform: uppercase;
+        font-family: Arial, sans-serif;
+      }
+
+      .lupen-target-card::before {
+        content: attr(data-kicker);
+        position: absolute;
+        top: -22px;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 150px;
+        color: var(--target-accent);
+        font: 900 12px/1 Arial, sans-serif;
+        letter-spacing: 0.14em;
+        text-shadow: 0 0 10px var(--target-glow);
+      }
+
+      .lupen-target-card.hostile {
+        --target-accent: #ff9a35;
+        --target-glow: rgba(255, 138, 45, 0.76);
+        border-color: rgba(255, 166, 74, 0.72);
+        box-shadow: 0 0 24px rgba(255, 124, 46, 0.28);
+      }
+
+      .lupen-target-card.player {
+        --target-accent: #18d7ff;
+        --target-glow: rgba(42, 218, 255, 0.76);
+      }
+
+      .lupen-target-card.locked {
+        animation: lupen-target-pulse 1.3s ease-in-out infinite;
+      }
+
+      .lupen-target-card strong {
+        font: 900 18px/1 Arial, sans-serif;
+        letter-spacing: 0.02em;
+        text-shadow: 0 2px 7px rgba(0, 0, 0, 0.85);
+      }
+
+      .lupen-target-card span {
+        color: var(--target-accent);
+        font: 900 11px/1 Arial, sans-serif;
+        letter-spacing: 0.06em;
+      }
+
+      .lupen-target-badge {
+        margin-top: 1px;
+        padding: 3px 12px;
+        border: 1px solid currentColor;
+        border-radius: 3px;
+        color: var(--target-accent);
+        font: 900 10px/1 Arial, sans-serif;
+        letter-spacing: 0.08em;
+        background: rgba(0, 0, 0, 0.35);
+      }
+
+      .lupen-target-bars {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 2px;
+      }
+
+      .lupen-target-bar {
+        display: grid;
+        gap: 2px;
+        color: rgba(244, 251, 255, 0.88);
+        font: 800 9px/1 Arial, sans-serif;
+        text-align: left;
+      }
+
+      .lupen-target-bar-track {
+        height: 5px;
+        border: 1px solid rgba(255, 232, 180, 0.3);
+        background: rgba(0, 0, 0, 0.52);
+      }
+
+      .lupen-target-bar-fill {
+        display: block;
+        height: 100%;
+      }
+
+      .lupen-target-bar-fill.hull {
+        background: linear-gradient(90deg, #ff533f, #ffbc3d);
+      }
+
+      .lupen-target-bar-fill.shield {
+        background: linear-gradient(90deg, #19aaff, #7df5ff);
+      }
+
+      @keyframes lupen-target-pulse {
+        0%, 100% { filter: drop-shadow(0 0 8px var(--target-glow)); }
+        50% { filter: drop-shadow(0 0 18px var(--target-glow)); }
       }
 
       .lupen-mp-space-bot-damage {
@@ -1085,6 +1236,7 @@
   function removeLayers() {
     removeSectorLayer();
     removeSpaceLayer();
+    global.document?.getElementById(spaceSelectionLayerId)?.remove();
     removeDiagnosticsPanel();
     removeStatusChip();
     removeStagingFlowHint();
@@ -1360,11 +1512,18 @@
   }
 
   function getBotModeLabel() {
-    return isStagingMode() ? "STAGING BOT" : "DEV BOT";
+    return isStagingMode() ? "HOSTILE BOT" : "DEV BOT";
   }
 
   function getSelectedTargetBotId() {
     return getClient()?.getStatus?.()?.selectedTargetBotId || "";
+  }
+
+  function getSelectedRemotePlayerId() {
+    const target = typeof global.getSelectedRemotePlayerTarget === "function"
+      ? global.getSelectedRemotePlayerTarget()
+      : null;
+    return String(target?.sessionId || target?.id || "");
   }
 
   function isSameCurrentNode(entity) {
@@ -1440,8 +1599,102 @@
     }
   }
 
+  function selectRemotePlayer(player) {
+    const playerId = String(player?.sessionId || player?.id || "");
+    if (!playerId || !isSameCurrentNode(player)) return;
+    if (typeof global.selectRemotePlayerTarget === "function") {
+      global.selectRemotePlayerTarget(playerId);
+      scheduleRender();
+    }
+  }
+
   function getCompactBotModeLabel() {
-    return isStagingMode() ? "STG BOT" : "DEV BOT";
+    return isStagingMode() ? "HOSTILE BOT" : "DEV BOT";
+  }
+
+  function getBotClassification(bot) {
+    const level = Number(bot?.level || 0);
+    return `HOSTILE BOT${level > 0 ? ` / LEVEL ${Math.round(level)}` : ""}`;
+  }
+
+  function getPercent(value, maxValue) {
+    const max = Number(maxValue || 0);
+    if (!max) return 0;
+    return Math.max(0, Math.min(100, (Number(value || 0) / max) * 100));
+  }
+
+  function appendTargetBar(parent, label, value, maxValue, type) {
+    const row = global.document.createElement("div");
+    row.className = "lupen-target-bar";
+    const text = global.document.createElement("span");
+    text.textContent = `${label} ${Math.round(getPercent(value, maxValue))}%`;
+    row.appendChild(text);
+
+    const track = global.document.createElement("div");
+    track.className = "lupen-target-bar-track";
+    const fill = global.document.createElement("span");
+    fill.className = `lupen-target-bar-fill ${type}`;
+    fill.style.width = `${getPercent(value, maxValue)}%`;
+    track.appendChild(fill);
+    row.appendChild(track);
+    parent.appendChild(row);
+  }
+
+  function getCardTopForPosition(position) {
+    return Math.max(10, Math.min(76, position.y + 8));
+  }
+
+  function renderSelectedTargetCard(players, bots, status) {
+    global.document?.getElementById(spaceSelectionLayerId)?.remove();
+    if (!isEnabled()) return;
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return;
+
+    const selectedBotId = getSelectedTargetBotId();
+    const selectedPlayerId = getSelectedRemotePlayerId();
+    const selectedBot = selectedBotId
+      ? bots.find((bot) => String(bot.id || "") === String(selectedBotId) && isSameCurrentNode(bot))
+      : null;
+    const selectedPlayer = selectedPlayerId
+      ? players.find((player) => String(player.sessionId || player.id || "") === selectedPlayerId && isSameCurrentNode(player))
+      : null;
+
+    if (!selectedBot && !selectedPlayer) return;
+
+    const layer = global.document.createElement("div");
+    layer.id = spaceSelectionLayerId;
+
+    const target = selectedBot || selectedPlayer;
+    const position = getSpacePercentPosition(target);
+    const card = global.document.createElement("div");
+    card.className = `lupen-target-card ${selectedBot ? "hostile" : "player"}${selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id ? " locked" : ""}`;
+    card.dataset.kicker = selectedBot ? "SELECTED ENEMY" : "SELECTED PLAYER";
+    card.style.left = `${position.x}%`;
+    card.style.top = `${getCardTopForPosition(position)}%`;
+
+    const title = global.document.createElement("strong");
+    title.textContent = selectedBot ? getBotLabel(selectedBot) : getPilotLabel(selectedPlayer);
+    card.appendChild(title);
+
+    const subtitle = global.document.createElement("span");
+    subtitle.textContent = selectedBot ? getBotClassification(selectedBot) : getShipLabel(selectedPlayer);
+    card.appendChild(subtitle);
+
+    if (selectedBot) {
+      const bars = global.document.createElement("div");
+      bars.className = "lupen-target-bars";
+      appendTargetBar(bars, "Hull", selectedBot.hull, selectedBot.hullMax ?? selectedBot.maxHull, "hull");
+      appendTargetBar(bars, "Shield", selectedBot.shield, selectedBot.shieldMax ?? selectedBot.maxShield, "shield");
+      card.appendChild(bars);
+    }
+
+    const badge = global.document.createElement("div");
+    badge.className = "lupen-target-badge";
+    badge.textContent = selectedBot ? "HOSTILE TARGET" : "PLAYER";
+    card.appendChild(badge);
+
+    layer.appendChild(card);
+    spaceScreen.appendChild(layer);
   }
 
   function getLabelOffset(position) {
@@ -1742,13 +1995,20 @@
     const layer = global.document.createElement("div");
     layer.id = spaceLayerId;
     layer.setAttribute("aria-hidden", "true");
+    const selectedPlayerId = getSelectedRemotePlayerId();
 
     localPlayers.slice(0, 6).forEach((player, index) => {
       const marker = global.document.createElement("div");
       marker.className = "lupen-mp-space-ghost";
+      if (String(player.sessionId || player.id || "") === selectedPlayerId) marker.classList.add("is-selected");
       marker.dataset.sessionId = player.sessionId || player.id || "";
       marker.style.left = `${50 + getStableOffset(player, index)}%`;
       marker.style.top = `${24 + (index % 3) * 12}%`;
+      marker.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectRemotePlayer(player);
+      });
 
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-ghost-ship";
@@ -3568,6 +3828,7 @@
     renderSectorBots(bots);
     renderSpaceGhosts(players);
     renderSpaceBots(bots);
+    renderSelectedTargetCard(players, bots, status);
     renderSpaceShot(allPlayers, bots, status);
     renderStagingCombatPanel(status, selectedBot);
     global.renderMultiplayerChatHud?.(status, allPlayers);

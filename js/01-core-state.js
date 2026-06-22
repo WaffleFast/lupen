@@ -1887,14 +1887,41 @@ function getStagingBotTargetById(id) {
   };
 }
 
+function getRemotePlayerTargetById(id) {
+  if (!id || typeof window === "undefined") return null;
+  const client = window.LupenMultiplayerClient;
+  const player = client?.getPlayers?.({ includeSelf: false })?.find(item => {
+    const candidateId = String(item?.sessionId || item?.id || "");
+    return candidateId === String(id);
+  });
+  if (!player) return null;
+  const node = player.currentNode || player.currentNodeId || player.node;
+  return {
+    ...player,
+    id: player.sessionId || player.id,
+    currentNodeId: node,
+    node,
+    alive: true,
+    name: player.displayName || "Unknown Pilot",
+    shipName: player.shipName || player.ship || "Unknown Ship",
+    remotePlayer: true
+  };
+}
+
 function getSelectedStagingBotTarget() {
   return selectedTarget?.type === "stagingBot"
     ? getStagingBotTargetById(selectedTarget.id)
     : null;
 }
 
+function getSelectedRemotePlayerTarget() {
+  return selectedTarget?.type === "remotePlayer"
+    ? getRemotePlayerTargetById(selectedTarget.id)
+    : null;
+}
+
 function getSelectedTargetEntity() {
-  return getSelectedStagingBotTarget() || getSelectedHostileBot() || getSelectedAsteroid();
+  return getSelectedRemotePlayerTarget() || getSelectedStagingBotTarget() || getSelectedHostileBot() || getSelectedAsteroid();
 }
 
 function getEngagedTargetEntity() {
@@ -1916,6 +1943,7 @@ function getEngagedTargetEntity() {
 }
 
 function getTargetTypeFromEntity(target) {
+  if (target?.remotePlayer) return "remotePlayer";
   if (target?.stagingBot) return "stagingBot";
   return target?.faction === "erebus" || target?.id?.startsWith("erebus-bot") ? "hostileBot" : "asteroid";
 }

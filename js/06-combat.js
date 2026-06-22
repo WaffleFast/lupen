@@ -87,8 +87,21 @@ function selectStagingBotTarget(botId) {
   }
 }
 
+function selectRemotePlayerTarget(playerId) {
+  const player = getRemotePlayerTargetById(playerId);
+  if (!player || (player.currentNodeId || player.node) !== currentNode) return;
+
+  selectedTarget = { type: "remotePlayer", id: player.id };
+  showTargetPanel();
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(false);
+}
+
 function engageTarget() {
   let target = getSelectedTargetEntity();
+
+  if (target?.remotePlayer) return;
 
   if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
     target = getVisibleTargets()[0];

@@ -961,6 +961,14 @@ function updateObjectActionPanel(forceVisible = false) {
   if (!panel || !actionBtn) return;
 
   const targetType = target ? getTargetTypeFromEntity(target) : "";
+  if (targetType === "remotePlayer") {
+    panel.classList.remove("visible");
+    actionBtn.disabled = true;
+    actionBtn.textContent = "ENGAGE";
+    actionBtn.classList.remove("disengage-action");
+    return;
+  }
+
   const isRelevant = target
     && (target.currentNodeId || target.node) === currentNode
     && target.alive
