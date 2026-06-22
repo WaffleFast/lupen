@@ -144,24 +144,52 @@
 
       #${spaceShotLayerId} .lupen-mp-shot-beam {
         position: absolute;
-        height: 4px;
+        height: 5px;
         transform-origin: 0 50%;
         border-radius: 999px;
-        background: linear-gradient(90deg, rgba(117, 242, 255, 0), rgba(131, 243, 255, 0.96) 18%, rgba(255, 239, 180, 0.94) 62%, rgba(255, 126, 65, 0));
-        box-shadow: 0 0 14px rgba(110, 229, 255, 0.78), 0 0 22px rgba(255, 126, 65, 0.4);
-        animation: lupen-mp-shot-beam 0.42s ease-out forwards;
+        background: linear-gradient(90deg, rgba(112, 252, 255, 0), rgba(129, 250, 255, 0.98) 12%, rgba(255, 255, 255, 1) 42%, rgba(255, 231, 142, 0.96) 66%, rgba(255, 126, 65, 0));
+        box-shadow: 0 0 16px rgba(110, 229, 255, 0.92), 0 0 31px rgba(45, 232, 255, 0.5), 0 0 22px rgba(255, 126, 65, 0.4);
+        mix-blend-mode: screen;
+        animation: lupen-mp-shot-beam 0.46s ease-out forwards;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-local {
+        height: 6px;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing {
+        height: 3px;
+        opacity: 0.86;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-spark {
+        height: 2px;
+        opacity: 0.7;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-muzzle {
+        position: absolute;
+        width: 34px;
+        height: 34px;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.92), rgba(96, 238, 255, 0.72) 28%, transparent 68%);
+        box-shadow: 0 0 18px rgba(100, 236, 255, 0.78), 0 0 34px rgba(255, 160, 80, 0.35);
+        mix-blend-mode: screen;
+        animation: lupen-mp-shot-muzzle 0.34s ease-out forwards;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-hit {
         position: absolute;
-        width: 30px;
-        height: 30px;
+        width: 44px;
+        height: 44px;
         transform: translate(-50%, -50%);
         border: 2px solid rgba(255, 229, 156, 0.88);
         border-radius: 50%;
         background: radial-gradient(circle, rgba(255, 233, 157, 0.8), rgba(255, 111, 54, 0.26) 48%, rgba(255, 111, 54, 0) 72%);
-        box-shadow: 0 0 16px rgba(255, 159, 73, 0.72);
-        animation: lupen-mp-shot-hit 0.62s ease-out forwards;
+        box-shadow: 0 0 18px rgba(255, 159, 73, 0.86), 0 0 34px rgba(255, 76, 54, 0.35);
+        mix-blend-mode: screen;
+        animation: lupen-mp-shot-hit 0.7s ease-out forwards;
       }
 
       #${stagingCombatPanelId} {
@@ -1013,16 +1041,25 @@
       @keyframes lupen-mp-shot-beam {
         0% {
           opacity: 0;
-          transform: rotate(var(--shot-angle)) scaleX(0.1);
+          transform: rotate(var(--shot-angle)) scaleX(0.14);
+          filter: brightness(1.45);
         }
-        35% {
+        24% {
           opacity: 1;
-          transform: rotate(var(--shot-angle)) scaleX(1);
+          transform: rotate(var(--shot-angle)) scaleX(1.05);
+          filter: brightness(1.35);
         }
         100% {
           opacity: 0;
-          transform: rotate(var(--shot-angle)) scaleX(1);
+          transform: rotate(var(--shot-angle)) scaleX(0.5);
+          filter: brightness(0.78);
         }
+      }
+
+      @keyframes lupen-mp-shot-muzzle {
+        0% { opacity: 0; transform: translate(-50%, -50%) scale(0.34); }
+        26% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        100% { opacity: 0; transform: translate(-50%, -50%) scale(1.48); }
       }
 
       @keyframes lupen-mp-shot-hit {
@@ -2088,14 +2125,31 @@
     const dy = targetPosition.y - attackerPosition.y;
     const distance = Math.max(8, Math.sqrt(dx * dx + dy * dy));
     const angle = Math.atan2(dy, dx);
+    const isLocalShot = status.lastShotEvent.attackerSessionId === status.sessionId;
+    const beamFan = [
+      { x: 0, y: 0, scale: 1, className: isLocalShot ? "is-local" : "" },
+      { x: -1.8, y: 0.9, scale: 0.95, className: "is-wing" },
+      { x: 1.8, y: -0.9, scale: 0.95, className: "is-wing" },
+      { x: -3.1, y: -1.1, scale: 0.78, className: "is-spark" },
+      { x: 3.1, y: 1.1, scale: 0.78, className: "is-spark" }
+    ];
 
-    const beam = global.document.createElement("div");
-    beam.className = "lupen-mp-shot-beam";
-    beam.style.left = `${attackerPosition.x}%`;
-    beam.style.top = `${attackerPosition.y}%`;
-    beam.style.width = `${distance}%`;
-    beam.style.setProperty("--shot-angle", `${angle}rad`);
-    layer.appendChild(beam);
+    const muzzle = global.document.createElement("div");
+    muzzle.className = "lupen-mp-shot-muzzle";
+    muzzle.style.left = `${attackerPosition.x}%`;
+    muzzle.style.top = `${attackerPosition.y}%`;
+    layer.appendChild(muzzle);
+
+    beamFan.forEach((beamDef, index) => {
+      const beam = global.document.createElement("div");
+      beam.className = `lupen-mp-shot-beam ${beamDef.className}`.trim();
+      beam.style.left = `${attackerPosition.x + beamDef.x}%`;
+      beam.style.top = `${attackerPosition.y + beamDef.y}%`;
+      beam.style.width = `${Math.max(7, distance * beamDef.scale)}%`;
+      beam.style.setProperty("--shot-angle", `${angle + (index - 2) * 0.012}rad`);
+      beam.style.animationDelay = `${Math.min(index * 28, 96)}ms`;
+      layer.appendChild(beam);
+    });
 
     const hit = global.document.createElement("div");
     hit.className = "lupen-mp-shot-hit";

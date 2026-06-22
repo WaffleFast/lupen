@@ -2445,15 +2445,19 @@ test.describe("Lupen browser smoke", () => {
           alive: true
         };
         window.__selectedStagingBotId = "";
+        window.__lastShotEvent = null;
+        window.__stagingVisualBot = bot;
         window.LupenMultiplayerClient = {
           ...(window.LupenMultiplayerClient || {}),
           getStatus: () => ({
             enabled: true,
             isConnected: true,
+            sessionId: "local-session",
             enabledReason: "staging_enabled",
             lastStagingBountyStatus: { active },
             lastStagingBountyList: { active, bounties: [active] },
-            selectedTargetBotId: window.__selectedStagingBotId
+            selectedTargetBotId: window.__selectedStagingBotId,
+            lastShotEvent: window.__lastShotEvent
           }),
           getBots: () => [bot],
           getBotsInCurrentNode: () => currentNode === bot.currentNode ? [bot] : [],
@@ -2507,9 +2511,18 @@ test.describe("Lupen browser smoke", () => {
       (() => {
         renderStarterTutorial();
         const engage = document.getElementById("objectEngageBtn");
+        window.__lastShotEvent = {
+          ok: true,
+          attackerSessionId: "local-session",
+          targetBotId: window.__stagingVisualBot.id,
+          currentNode,
+          damage: 8,
+          receivedAt: Date.now()
+        };
         window.LupenMultiplayerOverlay?.render?.();
         const targetCard = document.querySelector(".lupen-target-card.hostile");
         const botMarker = document.querySelector("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-locked");
+        const shotLayer = document.getElementById("lupenMultiplayerSpaceShotLayer");
         return {
           step: getCurrentTutorialStep().id,
           selectedType: selectedTarget?.type || "",
@@ -2518,6 +2531,10 @@ test.describe("Lupen browser smoke", () => {
           targetCardText: targetCard?.textContent || "",
           targetBars: targetCard?.querySelectorAll(".lupen-target-bar-track").length || 0,
           markerHasInlineLabel: !!botMarker?.querySelector(".lupen-mp-space-bot-label, .lupen-mp-space-bot-note, .lupen-mp-bot-bars"),
+          shotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam").length || 0,
+          localShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-local").length || 0,
+          muzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle").length || 0,
+          hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0,
           oldDebugCopyVisible: document.getElementById("spaceScreen")?.textContent?.includes("STAGING BOT / LOCK") || false
         };
       })()
@@ -2534,6 +2551,10 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
     expect(stagingBotSelectedState.targetBars).toBe(2);
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
+    expect(stagingBotSelectedState.shotBeamCount).toBeGreaterThanOrEqual(5);
+    expect(stagingBotSelectedState.localShotBeamCount).toBeGreaterThanOrEqual(1);
+    expect(stagingBotSelectedState.muzzleCount).toBe(1);
+    expect(stagingBotSelectedState.hitCount).toBe(1);
     expect(stagingBotSelectedState.oldDebugCopyVisible).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -2636,6 +2657,47 @@ test.describe("Lupen browser smoke", () => {
     expect(state.hudText).toContain("200");
     expect(state.pilotText).toContain("200");
     expect(state.activeBountyProgress).toBe(1);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("combat laser feedback renders intense outgoing and incoming bursts", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const visualState = await page.evaluate(() => window.eval(`
+      (() => {
+        showScreen("spaceScreen");
+        const target = {
+          id: "staging-bot-visual",
+          name: "Erebus Scout",
+          currentNode,
+          x: 52,
+          y: 32,
+          alive: true
+        };
+        pulseLaserBurstToTarget(target, {
+          name: "Pulse Laser",
+          count: 1,
+          fireStyle: "pulse",
+          projectileColor: "#7fd6ff"
+        });
+        incomingLaserBurstFromBot(target, 0, { count: 5 });
+        return {
+          playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
+          muzzleCount: document.querySelectorAll("#laserLayer .weapon-muzzle-flash").length,
+          incomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser").length,
+          heavyIncomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser-heavy").length
+        };
+      })()
+    `));
+
+    expect(visualState.playerShotCount).toBeGreaterThanOrEqual(4);
+    expect(visualState.muzzleCount).toBeGreaterThanOrEqual(4);
+    expect(visualState.incomingCount).toBeGreaterThanOrEqual(5);
+    expect(visualState.heavyIncomingCount).toBeGreaterThanOrEqual(1);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

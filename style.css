@@ -903,6 +903,24 @@ input::placeholder {
   mix-blend-mode: screen;
 }
 
+.weapon-muzzle-flash {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  margin-top: -17px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.94), var(--weapon-muzzle-color, #7fd6ff) 34%, transparent 70%);
+  box-shadow:
+    0 0 14px var(--weapon-muzzle-color, #7fd6ff),
+    0 0 28px color-mix(in srgb, var(--weapon-muzzle-color, #7fd6ff) 58%, transparent),
+    0 0 42px rgba(255, 255, 255, 0.26);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: weaponMuzzleFlash 260ms ease-out forwards;
+}
+
 .player-shot-rapid {
   opacity: 0.94;
 }
@@ -987,6 +1005,23 @@ input::placeholder {
   100% {
     opacity: 0;
     transform: scale(1.8);
+  }
+}
+
+@keyframes weaponMuzzleFlash {
+  0% {
+    opacity: 0;
+    transform: scale(0.38);
+  }
+
+  28% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
   }
 }
 
@@ -4404,20 +4439,29 @@ input::placeholder {
 /* ===== Enemy incoming fire + repair panel ===== */
 
 .enemy-incoming-laser {
-  height: 3px;
+  height: 5px;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 86, 46, 0), rgba(255, 92, 42, 0.82) 22%, rgba(255, 244, 178, 0.98) 48%, rgba(255, 178, 54, 0.72) 68%, rgba(255, 70, 44, 0));
+  background: linear-gradient(90deg, rgba(255, 86, 46, 0), rgba(255, 68, 42, 0.92) 14%, rgba(255, 245, 190, 1) 44%, rgba(255, 170, 50, 0.86) 68%, rgba(255, 70, 44, 0));
   box-shadow:
-    0 0 5px rgba(255, 232, 146, 0.72),
-    0 0 11px rgba(255, 116, 48, 0.58),
-    0 0 20px rgba(255, 64, 48, 0.24);
+    0 0 8px rgba(255, 232, 146, 0.84),
+    0 0 17px rgba(255, 116, 48, 0.72),
+    0 0 32px rgba(255, 64, 48, 0.36);
   transform-origin: left center;
   transform: rotate(var(--incoming-angle, 0deg)) translateX(0);
-  animation: incomingLaserBurst 380ms ease-out forwards;
+  mix-blend-mode: screen;
+  animation: incomingLaserBurst 440ms ease-out forwards;
 }
 
 .enemy-incoming-laser-burst {
-  height: 2px;
+  height: 3px;
+}
+
+.enemy-incoming-laser-heavy {
+  height: 7px;
+  box-shadow:
+    0 0 10px rgba(255, 244, 186, 0.92),
+    0 0 24px rgba(255, 94, 42, 0.78),
+    0 0 46px rgba(255, 42, 36, 0.42);
 }
 
 @keyframes incomingLaserBurst {
@@ -4451,18 +4495,18 @@ input::placeholder {
 
 .incoming-hit-flash.shield-impact::after {
   background:
-    radial-gradient(ellipse at 50% 92%, rgba(95, 221, 255, 0.13), transparent 30%),
-    radial-gradient(ellipse at 50% 100%, transparent 48%, rgba(84, 210, 255, 0.20) 72%, transparent 100%),
-    linear-gradient(90deg, rgba(86, 211, 255, 0.16), transparent 16%, transparent 84%, rgba(86, 211, 255, 0.16)),
-    linear-gradient(180deg, rgba(86, 211, 255, 0.08), transparent 20%, transparent 76%, rgba(86, 211, 255, 0.11));
+    radial-gradient(ellipse at 50% 90%, rgba(95, 221, 255, 0.20), transparent 30%),
+    radial-gradient(ellipse at 50% 100%, transparent 44%, rgba(84, 210, 255, 0.30) 72%, transparent 100%),
+    linear-gradient(90deg, rgba(86, 211, 255, 0.23), transparent 16%, transparent 84%, rgba(86, 211, 255, 0.23)),
+    linear-gradient(180deg, rgba(86, 211, 255, 0.12), transparent 20%, transparent 76%, rgba(86, 211, 255, 0.17));
 }
 
 .incoming-hit-flash.hull-impact::after {
   background:
-    radial-gradient(ellipse at 50% 92%, rgba(255, 126, 72, 0.16), transparent 31%),
-    radial-gradient(ellipse at 50% 100%, transparent 46%, rgba(255, 88, 58, 0.22) 74%, transparent 100%),
-    linear-gradient(90deg, rgba(255, 92, 64, 0.18), transparent 15%, transparent 85%, rgba(255, 92, 64, 0.18)),
-    linear-gradient(180deg, rgba(255, 95, 64, 0.09), transparent 20%, transparent 74%, rgba(255, 76, 62, 0.14));
+    radial-gradient(ellipse at 50% 90%, rgba(255, 126, 72, 0.24), transparent 31%),
+    radial-gradient(ellipse at 50% 100%, transparent 44%, rgba(255, 88, 58, 0.34) 74%, transparent 100%),
+    linear-gradient(90deg, rgba(255, 92, 64, 0.28), transparent 15%, transparent 85%, rgba(255, 92, 64, 0.28)),
+    linear-gradient(180deg, rgba(255, 95, 64, 0.14), transparent 20%, transparent 74%, rgba(255, 76, 62, 0.22));
 }
 
 @keyframes pilotHitFlash {
@@ -4500,13 +4544,14 @@ input::placeholder {
 }
 
 .incoming-impact-shake {
-  animation: hostileImpactJolt 190ms ease-out;
+  animation: hostileImpactJolt 230ms ease-out;
 }
 
 @keyframes hostileImpactJolt {
   0% { transform: translate3d(0, 0, 0); }
-  32% { transform: translate3d(-0.75px, 0.75px, 0); }
-  62% { transform: translate3d(0.75px, -0.75px, 0); }
+  28% { transform: translate3d(-1.25px, 1px, 0); }
+  58% { transform: translate3d(1.2px, -1.15px, 0); }
+  80% { transform: translate3d(-0.55px, 0.45px, 0); }
   100% { transform: translate3d(0, 0, 0); }
 }
 

@@ -192,25 +192,25 @@ function getShotVisualProfile(shotWeapon = {}) {
   const color = shotWeapon.projectileColor || "#7fd6ff";
   const profile = {
     color,
-    height: 3,
-    durationMs: 150,
+    height: 4,
+    durationMs: 185,
     streakScale: 1,
-    offsetSpread: 3,
-    glowScale: 1
+    offsetSpread: 5,
+    glowScale: 1.32
   };
 
   if (style === "rapid") {
-    Object.assign(profile, { height: 2, durationMs: 115, streakScale: 0.78, offsetSpread: 5, glowScale: 0.94 });
+    Object.assign(profile, { height: 3, durationMs: 140, streakScale: 0.82, offsetSpread: 7, glowScale: 1.12 });
   } else if (style === "ion") {
-    Object.assign(profile, { height: 3, durationMs: 135, streakScale: 0.9, offsetSpread: 4, glowScale: 1.18 });
+    Object.assign(profile, { height: 4, durationMs: 160, streakScale: 0.94, offsetSpread: 6, glowScale: 1.42 });
   } else if (style === "melt") {
-    Object.assign(profile, { height: 5, durationMs: 175, streakScale: 0.94, offsetSpread: 3, glowScale: 1.22 });
+    Object.assign(profile, { height: 6, durationMs: 205, streakScale: 0.98, offsetSpread: 4, glowScale: 1.48 });
   } else if (style === "heavy") {
-    Object.assign(profile, { height: 6, durationMs: 180, streakScale: 1, offsetSpread: 2, glowScale: 1.28 });
+    Object.assign(profile, { height: 7, durationMs: 215, streakScale: 1.04, offsetSpread: 3, glowScale: 1.58 });
   } else if (style === "sniper") {
-    Object.assign(profile, { height: 2, durationMs: 165, streakScale: 1.08, offsetSpread: 1, glowScale: 1.32 });
+    Object.assign(profile, { height: 3, durationMs: 190, streakScale: 1.12, offsetSpread: 2, glowScale: 1.62 });
   } else if (style === "disruptor" || style === "ripper") {
-    Object.assign(profile, { height: 4, durationMs: 155, streakScale: 0.88, offsetSpread: 6, glowScale: 1.18 });
+    Object.assign(profile, { height: 5, durationMs: 180, streakScale: 0.92, offsetSpread: 8, glowScale: 1.44 });
   }
 
   return profile;
@@ -254,7 +254,10 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   const endY = (target.y / 100) * screenRect.height;
   const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
   const visualWeapons = getVisibleShotWeapons(resolvedWeapon);
-  const barrageWeapons = visualWeapons.length === 1 ? [visualWeapons[0], visualWeapons[0]] : visualWeapons;
+  const minimumBarrage = visualWeapons.length === 1
+    ? [visualWeapons[0], visualWeapons[0], visualWeapons[0], visualWeapons[0]]
+    : visualWeapons.flatMap((item, index) => index < 2 ? [item, item] : [item]);
+  const barrageWeapons = minimumBarrage.slice(0, 8);
   const visualCapApplied = Number(resolvedWeapon?.count || visualWeapons.length) > visualWeapons.length;
 
   const makeBeam = (shotWeapon, laneIndex = 0, delay = 0) => {
@@ -274,6 +277,15 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
     const length = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     const shotLength = Math.max(54, length * profile.streakScale);
+    const muzzle = document.createElement("div");
+    muzzle.className = "weapon-muzzle-flash";
+    muzzle.style.left = `${startX}px`;
+    muzzle.style.top = `${startY}px`;
+    muzzle.style.setProperty("--weapon-muzzle-color", profile.color);
+    muzzle.style.animationDelay = `${delay}ms`;
+    layer.appendChild(muzzle);
+    setTimeout(() => muzzle.remove(), delay + 300);
+
     const beam = document.createElement("div");
     beam.className = `laser-burst player-shot player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
     beam.style.left = `${startX}px`;
@@ -281,7 +293,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
     beam.style.width = `${shotLength}px`;
     beam.style.height = `${profile.height}px`;
     beam.style.background = `linear-gradient(90deg, transparent 0%, ${profile.color} 16%, #ffffff 44%, ${profile.color} 68%, transparent 100%)`;
-    beam.style.boxShadow = `0 0 ${Math.round(12 * profile.glowScale)}px ${profile.color}, 0 0 ${Math.round(24 * profile.glowScale)}px ${profile.color}`;
+    beam.style.boxShadow = `0 0 ${Math.round(14 * profile.glowScale)}px ${profile.color}, 0 0 ${Math.round(30 * profile.glowScale)}px ${profile.color}, 0 0 ${Math.round(46 * profile.glowScale)}px rgba(255, 255, 255, 0.28)`;
     beam.style.transform = `rotate(${angle}deg)`;
     beam.style.animationDuration = `${profile.durationMs}ms`;
     beam.style.animationDelay = `${delay}ms`;
@@ -318,24 +330,24 @@ function incomingLaserBurstFromBot(bot, delay = 0, options = {}) {
 
   const startX = (bot.x / 100) * screenRect.width;
   const startY = (bot.y / 100) * screenRect.height;
-  const count = Math.max(1, Math.min(4, Math.round(Number(options.count || 1))));
+  const count = Math.max(2, Math.min(7, Math.round(Number(options.count || 1))));
 
   for (let index = 0; index < count; index += 1) {
     // Aim at the pilot/camera position, not the ship icon.
-    const endX = screenRect.width * (0.475 + Math.random() * 0.05);
-    const endY = screenRect.height * (0.84 + Math.random() * 0.07);
-    const beamDelay = delay + index * 48;
-    const startJitterX = (Math.random() - 0.5) * 16;
-    const startJitterY = (Math.random() - 0.5) * 12;
+    const endX = screenRect.width * (0.44 + Math.random() * 0.12);
+    const endY = screenRect.height * (0.82 + Math.random() * 0.14);
+    const beamDelay = delay + index * 38;
+    const startJitterX = (Math.random() - 0.5) * 24;
+    const startJitterY = (Math.random() - 0.5) * 18;
     const dx = endX - (startX + startJitterX);
     const dy = endY - (startY + startJitterY);
     const length = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    const streakLength = Math.max(58, Math.min(150, length * 0.28));
+    const streakLength = Math.max(80, Math.min(230, length * 0.42));
     const travelDistance = Math.max(72, length - streakLength * 0.72);
 
     const beam = document.createElement("div");
-    beam.className = `laser-burst enemy-incoming-laser${count > 1 ? " enemy-incoming-laser-burst" : ""}`;
+    beam.className = `laser-burst enemy-incoming-laser${index % 3 === 0 ? " enemy-incoming-laser-heavy" : ""}${count > 1 ? " enemy-incoming-laser-burst" : ""}`;
     beam.style.left = `${startX + startJitterX}px`;
     beam.style.top = `${startY + startJitterY}px`;
     beam.style.width = `${streakLength}px`;
