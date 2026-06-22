@@ -930,6 +930,19 @@ test.describe("Lupen browser smoke", () => {
       if (typeof window.showScreen === "function") window.showScreen("spaceScreen");
     });
     await expect(page.locator("#localChatInput")).toBeVisible();
+    await expect(page.locator("#chatPanel .local-chat-input-row button")).toBeVisible();
+    const chatComposerLayout = await page.evaluate(() => {
+      const input = document.getElementById("localChatInput")?.getBoundingClientRect();
+      const button = document.querySelector("#chatPanel .local-chat-input-row button")?.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      return {
+        inputVisibleInViewport: Boolean(input && input.left >= 0 && input.top >= 0 && input.right <= viewportWidth && input.bottom <= viewportHeight && input.width > 80 && input.height >= 24),
+        buttonVisibleInViewport: Boolean(button && button.left >= 0 && button.top >= 0 && button.right <= viewportWidth && button.bottom <= viewportHeight && button.width >= 50 && button.height >= 24)
+      };
+    });
+    expect(chatComposerLayout.inputVisibleInViewport).toBe(true);
+    expect(chatComposerLayout.buttonVisibleInViewport).toBe(true);
     await expect(page.locator("#localChatInput")).toBeDisabled();
     await expect(page.locator("#chatPanel .local-chat-input-row button")).toBeDisabled();
     await expect(page.locator("#localChatFeed")).toContainText("Chat unavailable while disconnected");

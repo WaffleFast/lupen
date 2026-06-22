@@ -33759,6 +33759,82 @@ input::placeholder {
   font-size: 10px !important;
 }
 
+/* ===== Sector chat composer lockdown ===== */
+/* Keep the basic chat composer visible in the compact desktop HUD. */
+#chatPanel.comms-panel.active {
+  position: relative !important;
+  display: grid !important;
+  grid-template-rows: 18px minmax(0, 1fr) !important;
+  gap: 4px !important;
+  padding-bottom: 34px !important;
+  overflow: hidden !important;
+}
+
+#chatPanel .chat-panel-top.single-sector-chat[hidden] {
+  display: none !important;
+}
+
+#chatPanel .online-pilots-list {
+  grid-row: 1 !important;
+}
+
+#chatPanel .local-chat-feed {
+  grid-row: 2 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding-bottom: 8px !important;
+  overflow-y: auto !important;
+}
+
+#chatPanel .local-chat-input-row {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 20 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 70px !important;
+  gap: 6px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: rgba(2, 13, 25, 0.96) !important;
+  border-top: 1px solid rgba(0, 220, 255, 0.36) !important;
+  box-shadow: 0 -6px 12px rgba(0, 0, 0, 0.34) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+#chatPanel .local-chat-input-row input,
+#chatPanel .local-chat-input-row button {
+  height: 30px !important;
+  min-height: 30px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+#chatPanel .local-chat-input-row input {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 9px !important;
+  border: 1px solid rgba(0, 205, 255, 0.7) !important;
+  background: rgba(4, 18, 34, 0.96) !important;
+  color: #e8fbff !important;
+}
+
+#chatPanel .local-chat-input-row button {
+  width: 70px !important;
+  min-width: 70px !important;
+  border: 1px solid rgba(0, 205, 255, 0.82) !important;
+  background: linear-gradient(180deg, rgba(0, 146, 210, 0.92), rgba(0, 65, 120, 0.95)) !important;
+  color: #f1fdff !important;
+  font-weight: 900 !important;
+}
+
 .player-orbit-screen .player-bottom-hud .objectives-panel.active,
 .player-orbit-screen .player-bottom-hud .activity-panel.active {
   display: grid !important;
