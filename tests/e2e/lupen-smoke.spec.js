@@ -1041,7 +1041,6 @@ test.describe("Lupen browser smoke", () => {
         src: image?.getAttribute("src") || "",
         note: note?.textContent || "",
         playerTargetText: targetCard?.textContent || "",
-        playerTargetKicker: targetCard?.dataset.kicker || "",
         playerTargetSelected: document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "",
         engageVisibleForPlayer: engagePanel?.classList.contains("visible") || false,
         engageDisabledForPlayer: engageButton?.disabled ?? false,
@@ -1059,9 +1058,8 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
-    expect(connectedHudState.playerTargetText).toContain("Nightshade Hawk");
-    expect(connectedHudState.playerTargetText).toContain("PLAYER");
-    expect(connectedHudState.playerTargetKicker).toBe("SELECTED PLAYER");
+    expect(connectedHudState.playerTargetText).not.toContain("Nightshade Hawk");
+    expect(connectedHudState.playerTargetText).not.toContain("PLAYER");
     expect(connectedHudState.playerTargetSelected).toBe("remote-session");
     expect(connectedHudState.engageVisibleForPlayer).toBe(false);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
@@ -2512,14 +2510,17 @@ test.describe("Lupen browser smoke", () => {
         window.LupenMultiplayerOverlay?.render?.();
         const targetCard = document.querySelector(".lupen-target-card.hostile");
         const botMarker = document.querySelector("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-locked");
+        const botMarkerLabel = botMarker?.querySelector(".lupen-mp-space-bot-label");
+        const botMarkerNote = botMarker?.querySelector(".lupen-mp-space-bot-note");
+        const botMarkerBars = botMarker?.querySelector(".lupen-mp-bot-bars");
         return {
           step: getCurrentTutorialStep().id,
           selectedType: selectedTarget?.type || "",
           engageDisabled: engage?.disabled ?? true,
           engageHighlighted: engage?.classList.contains("tutorial-highlight-target") || false,
           targetCardText: targetCard?.textContent || "",
-          targetCardKicker: targetCard?.dataset.kicker || "",
-          botMarkerText: botMarker?.textContent || "",
+          targetBars: targetCard?.querySelectorAll(".lupen-target-bar-track").length || 0,
+          selectedMarkerExtraHidden: [botMarkerLabel, botMarkerNote, botMarkerBars].every(node => !node || getComputedStyle(node).display === "none"),
           oldDebugCopyVisible: document.getElementById("spaceScreen")?.textContent?.includes("STAGING BOT / LOCK") || false
         };
       })()
@@ -2530,10 +2531,12 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.engageDisabled).toBe(false);
     expect(stagingBotSelectedState.engageHighlighted).toBe(true);
     expect(stagingBotSelectedState.targetCardText).toContain("Erebus Watcher");
-    expect(stagingBotSelectedState.targetCardText).toContain("HOSTILE BOT");
-    expect(stagingBotSelectedState.targetCardText).toContain("LEVEL 1");
-    expect(stagingBotSelectedState.targetCardKicker).toBe("SELECTED ENEMY");
-    expect(stagingBotSelectedState.botMarkerText).toContain("HOSTILE BOT");
+    expect(stagingBotSelectedState.targetCardText).not.toContain("HOSTILE BOT");
+    expect(stagingBotSelectedState.targetCardText).not.toContain("LEVEL 1");
+    expect(stagingBotSelectedState.targetCardText).not.toContain("Hull");
+    expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
+    expect(stagingBotSelectedState.targetBars).toBe(2);
+    expect(stagingBotSelectedState.selectedMarkerExtraHidden).toBe(true);
     expect(stagingBotSelectedState.oldDebugCopyVisible).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);

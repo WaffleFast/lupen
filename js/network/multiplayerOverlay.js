@@ -771,16 +771,16 @@
       .lupen-target-card {
         position: absolute;
         transform: translate(-50%, 0);
-        min-width: 184px;
-        max-width: 230px;
+        min-width: 112px;
+        max-width: 154px;
         display: grid;
         justify-items: center;
-        gap: 4px;
-        padding: 8px 10px 10px;
+        gap: 3px;
+        padding: 5px 7px 6px;
         border: 1px solid rgba(110, 230, 255, 0.64);
         border-radius: 4px;
-        background: linear-gradient(180deg, rgba(4, 14, 28, 0.92), rgba(1, 6, 14, 0.78));
-        box-shadow: 0 0 22px rgba(0, 190, 255, 0.18);
+        background: linear-gradient(180deg, rgba(4, 14, 28, 0.78), rgba(1, 6, 14, 0.62));
+        box-shadow: 0 0 16px rgba(0, 190, 255, 0.14);
         color: #e9fdff;
         text-align: center;
         text-transform: uppercase;
@@ -788,16 +788,15 @@
       }
 
       .lupen-target-card::before {
-        content: attr(data-kicker);
+        content: "";
         position: absolute;
-        top: -22px;
+        top: -8px;
         left: 50%;
         transform: translateX(-50%);
-        min-width: 150px;
-        color: var(--target-accent);
-        font: 900 12px/1 Arial, sans-serif;
-        letter-spacing: 0.14em;
-        text-shadow: 0 0 10px var(--target-glow);
+        width: 42px;
+        height: 1px;
+        background: var(--target-accent);
+        box-shadow: 0 0 8px var(--target-glow);
       }
 
       .lupen-target-card.hostile {
@@ -817,46 +816,27 @@
       }
 
       .lupen-target-card strong {
-        font: 900 18px/1 Arial, sans-serif;
+        max-width: 138px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font: 900 12px/1 Arial, sans-serif;
         letter-spacing: 0.02em;
         text-shadow: 0 2px 7px rgba(0, 0, 0, 0.85);
       }
 
-      .lupen-target-card span {
-        color: var(--target-accent);
-        font: 900 11px/1 Arial, sans-serif;
-        letter-spacing: 0.06em;
-      }
-
-      .lupen-target-badge {
-        margin-top: 1px;
-        padding: 3px 12px;
-        border: 1px solid currentColor;
-        border-radius: 3px;
-        color: var(--target-accent);
-        font: 900 10px/1 Arial, sans-serif;
-        letter-spacing: 0.08em;
-        background: rgba(0, 0, 0, 0.35);
-      }
-
       .lupen-target-bars {
-        width: 100%;
+        width: 88px;
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 2px;
+        gap: 2px;
       }
 
       .lupen-target-bar {
-        display: grid;
-        gap: 2px;
-        color: rgba(244, 251, 255, 0.88);
-        font: 800 9px/1 Arial, sans-serif;
-        text-align: left;
+        display: block;
       }
 
       .lupen-target-bar-track {
-        height: 5px;
+        height: 4px;
         border: 1px solid rgba(255, 232, 180, 0.3);
         background: rgba(0, 0, 0, 0.52);
       }
@@ -877,6 +857,12 @@
       @keyframes lupen-target-pulse {
         0%, 100% { filter: drop-shadow(0 0 8px var(--target-glow)); }
         50% { filter: drop-shadow(0 0 18px var(--target-glow)); }
+      }
+
+      .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-label,
+      .lupen-mp-space-bot.is-locked .lupen-mp-space-bot-note,
+      .lupen-mp-space-bot.is-locked .lupen-mp-bot-bars {
+        display: none;
       }
 
       .lupen-mp-space-bot-damage {
@@ -1612,23 +1598,15 @@
     return isStagingMode() ? "HOSTILE BOT" : "DEV BOT";
   }
 
-  function getBotClassification(bot) {
-    const level = Number(bot?.level || 0);
-    return `HOSTILE BOT${level > 0 ? ` / LEVEL ${Math.round(level)}` : ""}`;
-  }
-
   function getPercent(value, maxValue) {
     const max = Number(maxValue || 0);
     if (!max) return 0;
     return Math.max(0, Math.min(100, (Number(value || 0) / max) * 100));
   }
 
-  function appendTargetBar(parent, label, value, maxValue, type) {
+  function appendTargetBar(parent, value, maxValue, type) {
     const row = global.document.createElement("div");
     row.className = "lupen-target-bar";
-    const text = global.document.createElement("span");
-    text.textContent = `${label} ${Math.round(getPercent(value, maxValue))}%`;
-    row.appendChild(text);
 
     const track = global.document.createElement("div");
     track.className = "lupen-target-bar-track";
@@ -1668,7 +1646,6 @@
     const position = getSpacePercentPosition(target);
     const card = global.document.createElement("div");
     card.className = `lupen-target-card ${selectedBot ? "hostile" : "player"}${selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id ? " locked" : ""}`;
-    card.dataset.kicker = selectedBot ? "SELECTED ENEMY" : "SELECTED PLAYER";
     card.style.left = `${position.x}%`;
     card.style.top = `${getCardTopForPosition(position)}%`;
 
@@ -1676,22 +1653,13 @@
     title.textContent = selectedBot ? getBotLabel(selectedBot) : getPilotLabel(selectedPlayer);
     card.appendChild(title);
 
-    const subtitle = global.document.createElement("span");
-    subtitle.textContent = selectedBot ? getBotClassification(selectedBot) : getShipLabel(selectedPlayer);
-    card.appendChild(subtitle);
-
     if (selectedBot) {
       const bars = global.document.createElement("div");
       bars.className = "lupen-target-bars";
-      appendTargetBar(bars, "Hull", selectedBot.hull, selectedBot.hullMax ?? selectedBot.maxHull, "hull");
-      appendTargetBar(bars, "Shield", selectedBot.shield, selectedBot.shieldMax ?? selectedBot.maxShield, "shield");
+      appendTargetBar(bars, selectedBot.hull, selectedBot.hullMax ?? selectedBot.maxHull, "hull");
+      appendTargetBar(bars, selectedBot.shield, selectedBot.shieldMax ?? selectedBot.maxShield, "shield");
       card.appendChild(bars);
     }
-
-    const badge = global.document.createElement("div");
-    badge.className = "lupen-target-badge";
-    badge.textContent = selectedBot ? "HOSTILE TARGET" : "PLAYER";
-    card.appendChild(badge);
 
     layer.appendChild(card);
     spaceScreen.appendChild(layer);
