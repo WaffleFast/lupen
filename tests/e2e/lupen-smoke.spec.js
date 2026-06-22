@@ -1028,6 +1028,12 @@ test.describe("Lupen browser smoke", () => {
           sentMessages.push(message);
           return { ok: true };
         },
+        sendCombatIntent: (intent) => {
+          if (intent?.targetPlayerId || intent?.targetSessionId || intent?.targetType === "remotePlayer") {
+            return { ok: false, reason: "pvp_unavailable_in_staging" };
+          }
+          return { ok: true };
+        },
         onServerState: () => ({ unsubscribe() {} })
       };
       window.LupenMultiplayerOverlay.render();
@@ -1047,6 +1053,10 @@ test.describe("Lupen browser smoke", () => {
       const targetCard = document.querySelector(".lupen-target-card.player");
       const engagePanel = document.getElementById("objectActionPanel");
       const engageButton = document.getElementById("objectEngageBtn");
+      const pvpGuard = window.LupenMultiplayerClient.sendCombatIntent({
+        targetType: "remotePlayer",
+        targetPlayerId: "remote-session"
+      });
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
       const chatText = document.getElementById("localChatFeed")?.textContent || "";
       const result = {
@@ -1058,6 +1068,8 @@ test.describe("Lupen browser smoke", () => {
         playerTargetSelected: document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "",
         engageVisibleForPlayer: engagePanel?.classList.contains("visible") || false,
         engageDisabledForPlayer: engageButton?.disabled ?? false,
+        engageTextForPlayer: engageButton?.textContent || "",
+        pvpGuardReason: pvpGuard?.reason || "",
         onlineText,
         chatText,
         visiblePlayerMessageCount: (chatText.match(/Visible player message/g) || []).length,
@@ -1074,11 +1086,13 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.ghostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
-    expect(connectedHudState.playerTargetText).not.toContain("Nightshade Hawk");
-    expect(connectedHudState.playerTargetText).not.toContain("PLAYER");
+    expect(connectedHudState.playerTargetText).toContain("Nightshade Hawk");
+    expect(connectedHudState.playerTargetText).toContain("PVP LOCKED");
     expect(connectedHudState.playerTargetSelected).toBe("remote-session");
-    expect(connectedHudState.engageVisibleForPlayer).toBe(false);
+    expect(connectedHudState.engageVisibleForPlayer).toBe(true);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
+    expect(connectedHudState.engageTextForPlayer).toContain("PVP UNAVAILABLE");
+    expect(connectedHudState.pvpGuardReason).toBe("pvp_unavailable_in_staging");
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
     expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot, Docked Pilot");
     expect(connectedHudState.onlineText).not.toContain("here");

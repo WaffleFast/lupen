@@ -4356,6 +4356,17 @@ try {
   assert(playerFrom(roomA, roomA.sessionId)?.supabaseAccessToken === undefined, "Raw Supabase token leaked into room state.");
   console.log("both clients see each other");
 
+  const pvpRejected = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Asteron Prime"
+    });
+  });
+  assert(pvpRejected?.reason === "pvp_unavailable_in_staging", `Unexpected PvP rejection reason: ${pvpRejected?.reason}`);
+  assert(pvpRejected?.validation === "pvp_unavailable_in_staging", `Unexpected PvP validation: ${pvpRejected?.validation}`);
+  console.log("player-vs-player combat intent rejected explicitly");
+
   const [sectorMessageA, sectorMessageB] = await Promise.all([
     expectRoomMessage(roomA, "chat:message", () => {}),
     expectRoomMessage(roomB, "chat:message", () => {}),

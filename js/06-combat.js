@@ -101,7 +101,12 @@ function selectRemotePlayerTarget(playerId) {
 function engageTarget() {
   let target = getSelectedTargetEntity();
 
-  if (target?.remotePlayer) return;
+  if (target?.remotePlayer) {
+    if (typeof addHudToast === "function") addHudToast("PvP is unavailable in staging.");
+    else if (typeof addActivityLog === "function") addActivityLog("PvP is unavailable in staging.");
+    updateObjectActionPanel(false);
+    return;
+  }
 
   if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
     target = getVisibleTargets()[0];

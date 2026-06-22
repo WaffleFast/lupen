@@ -966,9 +966,9 @@ function updateObjectActionPanel(forceVisible = false) {
 
   const targetType = target ? getTargetTypeFromEntity(target) : "";
   if (targetType === "remotePlayer") {
-    panel.classList.remove("visible");
+    panel.classList.add("visible");
     actionBtn.disabled = true;
-    actionBtn.textContent = "ENGAGE";
+    actionBtn.textContent = "PVP UNAVAILABLE";
     actionBtn.classList.remove("disengage-action");
     return;
   }

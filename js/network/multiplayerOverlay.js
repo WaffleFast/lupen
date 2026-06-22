@@ -845,6 +845,26 @@
         text-shadow: 0 2px 7px rgba(0, 0, 0, 0.85);
       }
 
+      .lupen-target-card small {
+        max-width: 136px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: rgba(157, 235, 255, 0.88);
+        font: 800 8px/1.15 Arial, sans-serif;
+        letter-spacing: 0.04em;
+      }
+
+      .lupen-target-card .lupen-target-status {
+        border: 1px solid rgba(88, 219, 255, 0.42);
+        border-radius: 3px;
+        padding: 2px 5px;
+        color: #7df4ff;
+        background: rgba(0, 33, 52, 0.5);
+        font: 900 7px/1 Arial, sans-serif;
+        letter-spacing: 0.06em;
+      }
+
       .lupen-target-bars {
         width: 88px;
         display: grid;
@@ -1687,6 +1707,15 @@
       appendTargetBar(bars, selectedBot.hull, selectedBot.hullMax ?? selectedBot.maxHull, "hull");
       appendTargetBar(bars, selectedBot.shield, selectedBot.shieldMax ?? selectedBot.maxShield, "shield");
       card.appendChild(bars);
+    } else if (selectedPlayer) {
+      const ship = global.document.createElement("small");
+      ship.textContent = getShipLabel(selectedPlayer);
+      card.appendChild(ship);
+
+      const statusTag = global.document.createElement("span");
+      statusTag.className = "lupen-target-status";
+      statusTag.textContent = "PVP LOCKED";
+      card.appendChild(statusTag);
     }
 
     layer.appendChild(card);

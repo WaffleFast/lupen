@@ -2931,6 +2931,9 @@
     },
 
     sendCombatIntent(intent = {}) {
+      if (intent?.targetPlayerId || intent?.targetSessionId || intent?.targetType === "remotePlayer") {
+        return statusResult("sendCombatIntent", false, { reason: "pvp_unavailable_in_staging" });
+      }
       return sendRoomMessage("sendCombatIntent", "combat:intent", intent);
     },
 

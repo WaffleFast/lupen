@@ -3086,6 +3086,18 @@ export class LupenSectorRoom extends Room {
   async resolveCombatIntent(client, message = {}, messageType = "combat:intent") {
     const player = this.touchPlayer(client.sessionId);
     const now = Date.now();
+    const targetPlayerId = getStringValue(message.targetPlayerId || message.targetSessionId || message.playerTargetId);
+    if (targetPlayerId || getStringValue(message.targetType) === "remotePlayer") {
+      if (player) {
+        player.lastCombatIntentReason = "pvp_unavailable_in_staging";
+        player.lastCombatNodeValidationReason = "";
+      }
+      this.sendCombatRejected(client, "pvp_unavailable_in_staging", message, messageType, "pvp_unavailable_in_staging", {
+        targetPlayerId,
+        targetType: getStringValue(message.targetType || "remotePlayer")
+      });
+      return;
+    }
     const payloadWarning = validateCombatIntentPayload(message);
     const targetBotId = getStringValue(message.targetBotId);
     const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
