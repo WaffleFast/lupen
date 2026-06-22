@@ -451,13 +451,20 @@ function getSafePresenceStatus(value = "") {
   return status === "docked" ? "docked" : "space";
 }
 
-function getPvpRulePreview(attacker = null, target = null, currentNode = "") {
+function getPvpEligibilityPreview(attacker = null, target = null, currentNode = "") {
   const node = getStringValue(currentNode || attacker?.currentNode || target?.currentNode);
-  if (PVP_SAFE_NODE_IDS.has(node)) return "safe_area";
+  const targetId = getStringValue(target?.sessionId || target?.id);
+  const attackerId = getStringValue(attacker?.sessionId || attacker?.id);
+  if (!attacker) return { allowed: false, reason: "attacker_not_found", pvpEnabled: false };
+  if (!target) return { allowed: false, reason: "target_not_found", pvpEnabled: false };
+  if (attackerId && targetId && attackerId === targetId) return { allowed: false, reason: "self_target", pvpEnabled: false };
+  if (getSafePresenceStatus(target?.presenceStatus) === "docked") return { allowed: false, reason: "target_docked", pvpEnabled: false };
+  if (normalizePresenceNode(attacker?.currentNode) !== normalizePresenceNode(target?.currentNode)) return { allowed: false, reason: "not_same_node", pvpEnabled: false };
+  if (PVP_SAFE_NODE_IDS.has(node)) return { allowed: false, reason: "safe_area", pvpEnabled: false };
   const attackerGuild = getSafeIdentityValue(attacker?.guildId);
   const targetGuild = getSafeIdentityValue(target?.guildId);
-  if (attackerGuild && targetGuild && attackerGuild === targetGuild) return "guild_ally";
-  return "staging_pvp_disabled";
+  if (attackerGuild && targetGuild && attackerGuild === targetGuild) return { allowed: false, reason: "guild_ally", pvpEnabled: false };
+  return { allowed: false, reason: "pvp_disabled", pvpEnabled: false };
 }
 
 function getShipImageValue(message = {}) {
@@ -3099,6 +3106,7 @@ export class LupenSectorRoom extends Room {
     const targetPlayerId = getStringValue(message.targetPlayerId || message.targetSessionId || message.playerTargetId);
     if (targetPlayerId || getStringValue(message.targetType) === "remotePlayer") {
       const targetPlayer = targetPlayerId ? this.state.players.get(targetPlayerId) : null;
+      const pvpEligibility = getPvpEligibilityPreview(player, targetPlayer, message.currentNode);
       if (player) {
         player.lastCombatIntentReason = "pvp_unavailable_in_staging";
         player.lastCombatNodeValidationReason = "";
@@ -3106,7 +3114,8 @@ export class LupenSectorRoom extends Room {
       this.sendCombatRejected(client, "pvp_unavailable_in_staging", message, messageType, "pvp_unavailable_in_staging", {
         targetPlayerId,
         targetType: getStringValue(message.targetType || "remotePlayer"),
-        pvpRulePreview: getPvpRulePreview(player, targetPlayer, message.currentNode)
+        pvpRulePreview: pvpEligibility.reason,
+        pvpEligibility
       });
       return;
     }
@@ -3313,6 +3322,10 @@ export class LupenSectorRoom extends Room {
 
     const displayName = getStringValue(message.displayName);
     if (displayName) player.displayName = displayName;
+
+    if (typeof message.guildId === "string") {
+      player.guildId = getSafeIdentityValue(message.guildId);
+    }
 
     // Presence updates may refresh display-only identity labels, but they do
     // not upgrade trusted identity. Only onJoin token verification can do that.

@@ -4366,7 +4366,80 @@ try {
   assert(pvpRejected?.reason === "pvp_unavailable_in_staging", `Unexpected PvP rejection reason: ${pvpRejected?.reason}`);
   assert(pvpRejected?.validation === "pvp_unavailable_in_staging", `Unexpected PvP validation: ${pvpRejected?.validation}`);
   assert(pvpRejected?.pvpRulePreview === "safe_area", `Unexpected PvP rule preview: ${pvpRejected?.pvpRulePreview}`);
-  console.log("player-vs-player combat intent rejected explicitly");
+
+  const selfPvpRejected = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomA.sessionId,
+      currentNode: "Asteron Prime"
+    });
+  });
+  assert(selfPvpRejected?.pvpRulePreview === "self_target", `Unexpected self PvP preview: ${selfPvpRejected?.pvpRulePreview}`);
+
+  roomA.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "space", x: 50, y: 43 });
+  roomB.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "docked", x: 50, y: 43 });
+  await waitFor("PvP target docked setup", () => {
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === "Upper Gate Core" &&
+      playerFrom(roomA, roomB.sessionId)?.presenceStatus === "docked";
+  });
+  const dockedPvpRejected = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Upper Gate Core"
+    });
+  });
+  assert(dockedPvpRejected?.pvpRulePreview === "target_docked", `Unexpected docked PvP preview: ${dockedPvpRejected?.pvpRulePreview}`);
+
+  roomB.send("movement:update", { currentNode: "Virella", presenceStatus: "space", x: 14, y: 50 });
+  await waitFor("PvP different-node setup", () => {
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === "Upper Gate Core" &&
+      playerFrom(roomA, roomB.sessionId)?.currentNode === "Virella";
+  });
+  const differentNodePvpRejected = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Upper Gate Core"
+    });
+  });
+  assert(differentNodePvpRejected?.pvpRulePreview === "not_same_node", `Unexpected different-node PvP preview: ${differentNodePvpRejected?.pvpRulePreview}`);
+
+  roomA.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "space", guildId: "guild-one", x: 50, y: 43 });
+  roomB.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "space", guildId: "guild-one", x: 50, y: 43 });
+  await waitFor("PvP guild ally setup", () => {
+    return playerFrom(roomA, roomA.sessionId)?.guildId === "guild-one" &&
+      playerFrom(roomA, roomB.sessionId)?.guildId === "guild-one" &&
+      playerFrom(roomA, roomB.sessionId)?.presenceStatus === "space";
+  });
+  const guildPvpRejected = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Upper Gate Core"
+    });
+  });
+  assert(guildPvpRejected?.pvpRulePreview === "guild_ally", `Unexpected guild PvP preview: ${guildPvpRejected?.pvpRulePreview}`);
+
+  roomB.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "space", guildId: "guild-two", x: 50, y: 43 });
+  await waitFor("PvP global disabled setup", () => playerFrom(roomA, roomB.sessionId)?.guildId === "guild-two");
+  const combatSpacePvpRejected = await expectCombatRejected(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Upper Gate Core"
+    });
+  });
+  assert(combatSpacePvpRejected?.pvpRulePreview === "pvp_disabled", `Unexpected combat-space PvP preview: ${combatSpacePvpRejected?.pvpRulePreview}`);
+  assert(combatSpacePvpRejected?.pvpEligibility?.pvpEnabled === false, "PvP eligibility unexpectedly enabled combat.");
+  console.log("player-vs-player combat intents rejected with future rule previews");
+
+  roomA.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });
+  roomB.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });
+  await waitFor("clients returned to Asteron after PvP rule checks", () => {
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === "Asteron Prime" &&
+      playerFrom(roomA, roomB.sessionId)?.currentNode === "Asteron Prime";
+  });
 
   const [sectorMessageA, sectorMessageB] = await Promise.all([
     expectRoomMessage(roomA, "chat:message", () => {}),

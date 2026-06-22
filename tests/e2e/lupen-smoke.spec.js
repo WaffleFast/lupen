@@ -1099,7 +1099,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
     expect(connectedHudState.playerTargetText).toContain("Nightshade Hawk");
-    expect(connectedHudState.playerTargetText).toContain("PVP LOCKED");
+    expect(connectedHudState.playerTargetText).toContain("SAFE AREA");
     expect(connectedHudState.playerTargetSelected).toBe("remote-session");
     expect(connectedHudState.engageVisibleForPlayer).toBe(true);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);

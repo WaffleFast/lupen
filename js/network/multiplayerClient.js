@@ -2153,6 +2153,14 @@
         targetNode: String(message?.targetNode || ""),
         weaponName: String(message?.weaponName || ""),
         cooldownRemainingMs: Number.isFinite(Number(message?.cooldownRemainingMs)) ? Number(message.cooldownRemainingMs) : 0,
+        pvpRulePreview: String(message?.pvpRulePreview || ""),
+        pvpEligibility: message?.pvpEligibility && typeof message.pvpEligibility === "object"
+          ? {
+            allowed: message.pvpEligibility.allowed === true,
+            reason: String(message.pvpEligibility.reason || ""),
+            pvpEnabled: message.pvpEligibility.pvpEnabled === true
+          }
+          : null,
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };

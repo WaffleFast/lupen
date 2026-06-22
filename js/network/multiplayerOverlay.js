@@ -1461,6 +1461,22 @@
     return String(player?.presenceStatus || player?.status || "space").toLowerCase() !== "docked";
   }
 
+  function isPvpSafeNode(nodeName = getCurrentNodeName()) {
+    const node = typeof sectorNodes !== "undefined" ? sectorNodes[nodeName] : null;
+    return node?.type === "planet" || ["Asteron Prime", "Virella", "Nyxara"].includes(String(nodeName || ""));
+  }
+
+  function getRemotePlayerPvpLabel(player, status = getClient()?.getStatus?.()) {
+    if (!player) return "PVP LOCKED";
+    if (!isPilotInSpace(player)) return "DOCKED";
+    if (!isSameCurrentNode(player)) return "OUT OF RANGE";
+    if (isPvpSafeNode()) return "SAFE AREA";
+    const localGuild = String(status?.guildId || "").trim();
+    const targetGuild = String(player.guildId || "").trim();
+    if (localGuild && targetGuild && localGuild === targetGuild) return "ALLY";
+    return "PVP LOCKED";
+  }
+
   function getRemotePilotKey(player = {}) {
     return String(player.sessionId || player.id || "");
   }
@@ -1826,7 +1842,7 @@
 
       const statusTag = global.document.createElement("span");
       statusTag.className = "lupen-target-status";
-      statusTag.textContent = "PVP LOCKED";
+      statusTag.textContent = getRemotePlayerPvpLabel(selectedPlayer, status);
       card.appendChild(statusTag);
     }
 
