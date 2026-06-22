@@ -111,6 +111,7 @@ const KNOWN_SECTOR_NODES = new Set([
   "Lower Gate Core",
   "Lower Gate East"
 ]);
+const PVP_SAFE_NODE_IDS = new Set(["Asteron Prime", "Virella", "Nyxara"]);
 const STAGING_STORE_WRITE_ITEM_IDS = new Set(getStagingStoreItemIds());
 const STAGING_LOADOUT_WRITE_ITEM_IDS = new Set(STAGING_LOADOUT_ITEM_IDS);
 
@@ -448,6 +449,15 @@ function getShipName(message = {}) {
 function getSafePresenceStatus(value = "") {
   const status = getStringValue(value).toLowerCase();
   return status === "docked" ? "docked" : "space";
+}
+
+function getPvpRulePreview(attacker = null, target = null, currentNode = "") {
+  const node = getStringValue(currentNode || attacker?.currentNode || target?.currentNode);
+  if (PVP_SAFE_NODE_IDS.has(node)) return "safe_area";
+  const attackerGuild = getSafeIdentityValue(attacker?.guildId);
+  const targetGuild = getSafeIdentityValue(target?.guildId);
+  if (attackerGuild && targetGuild && attackerGuild === targetGuild) return "guild_ally";
+  return "staging_pvp_disabled";
 }
 
 function getShipImageValue(message = {}) {
@@ -3088,13 +3098,15 @@ export class LupenSectorRoom extends Room {
     const now = Date.now();
     const targetPlayerId = getStringValue(message.targetPlayerId || message.targetSessionId || message.playerTargetId);
     if (targetPlayerId || getStringValue(message.targetType) === "remotePlayer") {
+      const targetPlayer = targetPlayerId ? this.state.players.get(targetPlayerId) : null;
       if (player) {
         player.lastCombatIntentReason = "pvp_unavailable_in_staging";
         player.lastCombatNodeValidationReason = "";
       }
       this.sendCombatRejected(client, "pvp_unavailable_in_staging", message, messageType, "pvp_unavailable_in_staging", {
         targetPlayerId,
-        targetType: getStringValue(message.targetType || "remotePlayer")
+        targetType: getStringValue(message.targetType || "remotePlayer"),
+        pvpRulePreview: getPvpRulePreview(player, targetPlayer, message.currentNode)
       });
       return;
     }

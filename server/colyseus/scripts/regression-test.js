@@ -4365,6 +4365,7 @@ try {
   });
   assert(pvpRejected?.reason === "pvp_unavailable_in_staging", `Unexpected PvP rejection reason: ${pvpRejected?.reason}`);
   assert(pvpRejected?.validation === "pvp_unavailable_in_staging", `Unexpected PvP validation: ${pvpRejected?.validation}`);
+  assert(pvpRejected?.pvpRulePreview === "safe_area", `Unexpected PvP rule preview: ${pvpRejected?.pvpRulePreview}`);
   console.log("player-vs-player combat intent rejected explicitly");
 
   const [sectorMessageA, sectorMessageB] = await Promise.all([

@@ -1012,6 +1012,15 @@ test.describe("Lupen browser smoke", () => {
         ],
         getBots: () => [],
         getSelectedStagingBot: () => null,
+        getPresenceEvents: () => [{
+          type: "playerMoved",
+          sessionId: "remote-session",
+          displayName: "Remote Pilot",
+          previousNode: "Upper Gate Core",
+          currentNode: "Asteron Prime",
+          presenceStatus: "space",
+          receivedAt: Date.now()
+        }],
         getChatMessages: () => [
           duplicatePlayerMessage,
           { ...duplicatePlayerMessage },
@@ -1063,6 +1072,7 @@ test.describe("Lupen browser smoke", () => {
         src: image?.getAttribute("src") || "",
         note: note?.textContent || "",
         ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
+        arrivingGhostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-arriving").length,
         dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
         playerTargetText: targetCard?.textContent || "",
         playerTargetSelected: document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "",
@@ -1072,6 +1082,7 @@ test.describe("Lupen browser smoke", () => {
         pvpGuardReason: pvpGuard?.reason || "",
         onlineText,
         chatText,
+        activityText: document.getElementById("activityLogFeed")?.textContent || "",
         visiblePlayerMessageCount: (chatText.match(/Visible player message/g) || []).length,
         placeholder: input.placeholder,
         inputDisabled: input.disabled,
@@ -1084,6 +1095,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
     expect(connectedHudState.ghostCount).toBe(1);
+    expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
     expect(connectedHudState.playerTargetText).toContain("Nightshade Hawk");
@@ -1098,6 +1110,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.onlineText).not.toContain("here");
     expect(connectedHudState.visiblePlayerMessageCount).toBe(1);
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
+    expect(connectedHudState.activityText).toContain("Remote Pilot entered Asteron Prime.");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([

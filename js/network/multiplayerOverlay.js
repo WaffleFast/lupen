@@ -34,6 +34,10 @@
   let lastRewardPanelXpRefreshKey = "";
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
+  const remoteGhostSnapshots = new Map();
+  const remoteGhostDepartures = new Map();
+  const remoteGhostArrivals = new Map();
+  const handledPresenceEventKeys = new Set();
   const shipImageById = {
     falcon: "assets/ships/azure-striker/azure-striker-medium.webp",
     bison: "assets/ships/buu-hauler/buu-hauler-medium.webp",
@@ -563,6 +567,15 @@
         filter: drop-shadow(0 0 18px rgba(89, 238, 255, 0.88));
       }
 
+      .lupen-mp-space-ghost.is-arriving {
+        animation: lupen-mp-ghost-arrival 640ms ease-out both;
+      }
+
+      .lupen-mp-space-ghost.is-departing {
+        pointer-events: none;
+        animation: lupen-mp-ghost-departure 520ms ease-in forwards;
+      }
+
       .lupen-mp-space-ghost.is-selected::after,
       .lupen-mp-space-bot.is-locked::before {
         content: "";
@@ -662,6 +675,36 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
         text-shadow: 0 1px 3px rgba(0, 4, 10, 0.9);
+      }
+
+      @keyframes lupen-mp-ghost-arrival {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.92);
+          filter: drop-shadow(0 0 2px rgba(93, 232, 255, 0.1));
+        }
+        34% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1.06);
+          filter: drop-shadow(0 0 22px rgba(93, 232, 255, 0.92));
+        }
+        100% {
+          opacity: 0.9;
+          transform: translate(-50%, -50%) scale(1);
+          filter: drop-shadow(0 0 13px rgba(93, 232, 255, 0.62));
+        }
+      }
+
+      @keyframes lupen-mp-ghost-departure {
+        0% {
+          opacity: 0.9;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.86);
+          filter: drop-shadow(0 0 2px rgba(93, 232, 255, 0.12));
+        }
       }
 
       .lupen-mp-space-bot {
@@ -1418,6 +1461,75 @@
     return String(player?.presenceStatus || player?.status || "space").toLowerCase() !== "docked";
   }
 
+  function getRemotePilotKey(player = {}) {
+    return String(player.sessionId || player.id || "");
+  }
+
+  function getPresenceEventKey(event = {}) {
+    return [
+      event.type || "presence",
+      event.sessionId || "",
+      event.previousNode || "",
+      event.currentNode || "",
+      event.presenceStatus || "",
+      event.receivedAt || ""
+    ].join("|");
+  }
+
+  function processSpacePresenceEffects(players = []) {
+    const client = getClient();
+    const events = client?.getPresenceEvents?.() || [];
+    const currentNodeName = getCurrentNodeName();
+    const now = Date.now();
+
+    Array.from(remoteGhostDepartures.entries()).forEach(([id, entry]) => {
+      if (!entry || Number(entry.expiresAt || 0) <= now) remoteGhostDepartures.delete(id);
+    });
+    Array.from(remoteGhostArrivals.entries()).forEach(([id, expiresAt]) => {
+      if (Number(expiresAt || 0) <= now) remoteGhostArrivals.delete(id);
+    });
+
+    events.forEach((event) => {
+      const eventKey = getPresenceEventKey(event);
+      if (handledPresenceEventKeys.has(eventKey)) return;
+      handledPresenceEventKeys.add(eventKey);
+      while (handledPresenceEventKeys.size > 120) {
+        handledPresenceEventKeys.delete(handledPresenceEventKeys.values().next().value);
+      }
+
+      const sessionId = String(event.sessionId || "");
+      if (!sessionId || sessionId === String(client?.getStatus?.()?.sessionId || "")) return;
+      const enteredCurrentNode = normalizeNodeKey(event.currentNode) === normalizeNodeKey(currentNodeName) && event.presenceStatus !== "docked";
+      const leftCurrentNode = normalizeNodeKey(event.previousNode) === normalizeNodeKey(currentNodeName) &&
+        (normalizeNodeKey(event.currentNode) !== normalizeNodeKey(currentNodeName) || event.presenceStatus === "docked");
+
+      if (enteredCurrentNode) {
+        remoteGhostArrivals.set(sessionId, now + 900);
+        if (typeof global.addActivityLog === "function") {
+          const label = String(event.displayName || "Pilot").slice(0, 28);
+          global.addActivityLog(`${label} entered ${currentNodeName}.`);
+        }
+        return;
+      }
+
+      if (leftCurrentNode) {
+        const snapshot = remoteGhostSnapshots.get(sessionId);
+        if (snapshot) {
+          remoteGhostDepartures.set(sessionId, {
+            ...snapshot,
+            departing: true,
+            expiresAt: now + 560
+          });
+        }
+      }
+    });
+
+    players.forEach((player) => {
+      const id = getRemotePilotKey(player);
+      if (id) remoteGhostSnapshots.set(id, { ...player });
+    });
+  }
+
   function getPlayerIdentityKey(player = {}) {
     const trustedId = String(player.trustedPlayerId || player.playerId || player.supabaseUserId || "").trim().toLowerCase();
     if (trustedId) return `account:${trustedId}`;
@@ -2002,6 +2114,58 @@
     return ((seed % 9) - 4) * 5.5;
   }
 
+  function appendSpaceGhostMarker(layer, player, index, options = {}) {
+    const selectedPlayerId = options.selectedPlayerId || "";
+    const marker = global.document.createElement("div");
+    marker.className = "lupen-mp-space-ghost";
+    if (String(player.sessionId || player.id || "") === selectedPlayerId) marker.classList.add("is-selected");
+    if (options.arriving) marker.classList.add("is-arriving");
+    if (options.departing) marker.classList.add("is-departing");
+    marker.dataset.sessionId = player.sessionId || player.id || "";
+    marker.style.left = `${Number.isFinite(Number(player.spaceLeft)) ? Number(player.spaceLeft) : 50 + getStableOffset(player, index)}%`;
+    marker.style.top = `${Number.isFinite(Number(player.spaceTop)) ? Number(player.spaceTop) : 24 + (index % 3) * 12}%`;
+    if (!options.departing) {
+      marker.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectRemotePlayer(player);
+      });
+    }
+
+    const ship = global.document.createElement("div");
+    ship.className = "lupen-mp-space-ghost-ship";
+    const shipImage = getShipImageRenderSrc(player);
+    if (shipImage) {
+      ship.classList.add("has-image");
+      const image = global.document.createElement("img");
+      image.src = shipImage;
+      image.alt = "";
+      image.onload = () => {
+        shipImageLoadStatus.set(shipImage, "loaded");
+      };
+      image.onerror = () => {
+        shipImageLoadStatus.set(shipImage, "failed");
+        image.remove();
+        ship.classList.remove("has-image");
+        scheduleRender();
+      };
+      ship.appendChild(image);
+    }
+    marker.appendChild(ship);
+
+    const label = global.document.createElement("div");
+    label.className = "lupen-mp-space-ghost-label";
+    label.textContent = getPilotLabel(player);
+    marker.appendChild(label);
+
+    const note = global.document.createElement("div");
+    note.className = "lupen-mp-space-ghost-note";
+    note.textContent = getDevGhostLabel(player);
+    if (note.textContent) marker.appendChild(note);
+
+    layer.appendChild(marker);
+  }
+
   function renderSpaceGhosts(players) {
     removeSpaceLayer();
     if (!isEnabled()) return;
@@ -2009,8 +2173,10 @@
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
+    processSpacePresenceEffects(players);
     const localPlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player) && isPilotInSpace(player) && isSameCurrentNode(player));
-    if (!localPlayers.length) return;
+    const departingPlayers = Array.from(remoteGhostDepartures.values());
+    if (!localPlayers.length && !departingPlayers.length) return;
 
     ensureStyles();
 
@@ -2020,50 +2186,21 @@
     const selectedPlayerId = getSelectedRemotePlayerId();
 
     localPlayers.slice(0, 6).forEach((player, index) => {
-      const marker = global.document.createElement("div");
-      marker.className = "lupen-mp-space-ghost";
-      if (String(player.sessionId || player.id || "") === selectedPlayerId) marker.classList.add("is-selected");
-      marker.dataset.sessionId = player.sessionId || player.id || "";
-      marker.style.left = `${50 + getStableOffset(player, index)}%`;
-      marker.style.top = `${24 + (index % 3) * 12}%`;
-      marker.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        selectRemotePlayer(player);
+      const spaceLeft = 50 + getStableOffset(player, index);
+      const spaceTop = 24 + (index % 3) * 12;
+      remoteGhostSnapshots.set(getRemotePilotKey(player), { ...player, spaceLeft, spaceTop });
+      appendSpaceGhostMarker(layer, { ...player, spaceLeft, spaceTop }, index, {
+        selectedPlayerId,
+        arriving: Number(remoteGhostArrivals.get(getRemotePilotKey(player)) || 0) > Date.now()
       });
+    });
 
-      const ship = global.document.createElement("div");
-      ship.className = "lupen-mp-space-ghost-ship";
-      const shipImage = getShipImageRenderSrc(player);
-      if (shipImage) {
-        ship.classList.add("has-image");
-        const image = global.document.createElement("img");
-        image.src = shipImage;
-        image.alt = "";
-        image.onload = () => {
-          shipImageLoadStatus.set(shipImage, "loaded");
-        };
-        image.onerror = () => {
-          shipImageLoadStatus.set(shipImage, "failed");
-          image.remove();
-          ship.classList.remove("has-image");
-          scheduleRender();
-        };
-        ship.appendChild(image);
-      }
-      marker.appendChild(ship);
-
-      const label = global.document.createElement("div");
-      label.className = "lupen-mp-space-ghost-label";
-      label.textContent = getPilotLabel(player);
-      marker.appendChild(label);
-
-      const note = global.document.createElement("div");
-      note.className = "lupen-mp-space-ghost-note";
-      note.textContent = getDevGhostLabel(player);
-      if (note.textContent) marker.appendChild(note);
-
-      layer.appendChild(marker);
+    departingPlayers.forEach((player, index) => {
+      if (localPlayers.some((localPlayer) => getRemotePilotKey(localPlayer) === getRemotePilotKey(player))) return;
+      appendSpaceGhostMarker(layer, player, localPlayers.length + index, {
+        selectedPlayerId,
+        departing: true
+      });
     });
 
     spaceScreen.appendChild(layer);
