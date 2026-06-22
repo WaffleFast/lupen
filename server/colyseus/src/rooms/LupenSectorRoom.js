@@ -188,6 +188,7 @@ const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_BOT_RETURN_FIRE_DAMAGE = 4;
 const STAGING_BOT_RETURN_FIRE_INTERVAL_MS = 2600;
+const STAGING_BOT_RETURN_FIRE_VARIANCE_MS = 650;
 const STAGING_WEAPON_STATS = Object.freeze({
   heavyLance: Object.freeze({
     key: "heavyLance",
@@ -255,8 +256,14 @@ const CHAT_MESSAGE_MAX_LENGTH = 200;
 const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 22, hull: 48 },
   { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Lane East B", level: 1, shield: 18, hull: 44 },
-  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B", level: 2, shield: 28, hull: 56 },
-  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East", level: 2, shield: 24, hull: 52 }
+  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B", level: 1, shield: 28, hull: 56 },
+  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East", level: 1, shield: 24, hull: 52 },
+  { id: "dev-bot-erebus-5", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Gate Core", level: 1, shield: 20, hull: 48 },
+  { id: "dev-bot-erebus-6", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Gate Core", level: 1, shield: 28, hull: 56 },
+  { id: "dev-bot-erebus-7", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Mid West B", level: 1, shield: 22, hull: 48 },
+  { id: "dev-bot-erebus-8", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Mid East B", level: 1, shield: 18, hull: 44 },
+  { id: "dev-bot-erebus-9", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Mid West B", level: 1, shield: 24, hull: 52 },
+  { id: "dev-bot-erebus-10", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Mid East B", level: 1, shield: 28, hull: 56 }
 ];
 
 export class LupenSectorPlayer extends Schema {
@@ -1313,15 +1320,15 @@ export class LupenSectorRoom extends Room {
         name: definition.name,
         faction: "Erebus",
         currentNode: patrolNode.node,
-        x: patrolNode.x + (index % 2 === 0 ? 1.2 : -1.2),
-        y: patrolNode.y + (index % 2 === 0 ? -1.2 : 1.2),
+        x: patrolNode.x,
+        y: patrolNode.y,
         level: Number(definition.level || 1),
         shield: Number(definition.shield || 0),
         shieldMax: Number(definition.shield || 0),
         hull: Number(definition.hull || 1),
         hullMax: Number(definition.hull || 1),
         lastUpdatedAt: now,
-        nextMoveAt: now + BOT_NODE_MOVE_MS + index * 2500,
+        nextMoveAt: 0,
         visualOnly: true,
         disabled: false,
         disabledUntil: 0
@@ -1344,19 +1351,9 @@ export class LupenSectorRoom extends Room {
 
       if (bot.disabled) return;
 
-      const shouldChangeNode = now >= Number(bot.nextMoveAt || 0);
-      const activeBotIndex = this.botStep % Math.max(1, this.state.bots.size);
-
-      if (shouldChangeNode && index === activeBotIndex) {
-        bot.currentNode = this.getNextBotNode(bot.currentNode, index);
-        bot.nextMoveAt = now + BOT_NODE_MOVE_MS + index * 1250;
-      }
-
       const nodePosition = BOT_NODE_POSITIONS.get(bot.currentNode) || STAGING_BOT_NODES[0];
-      const driftX = (((this.botStep + index) % 5) - 2) * 0.55;
-      const driftY = (((this.botStep * 2 + index) % 5) - 2) * 0.4;
-      bot.x = clampNumber(nodePosition.x + driftX, 4, 96);
-      bot.y = clampNumber(nodePosition.y + driftY, 4, 96);
+      bot.x = clampNumber(nodePosition.x, 4, 96);
+      bot.y = clampNumber(nodePosition.y, 4, 96);
       bot.lastUpdatedAt = now;
     });
 
@@ -1730,7 +1727,10 @@ export class LupenSectorRoom extends Room {
     const nextAllowedAt = Number(this.stagingBotReturnFireCooldowns.get(cooldownKey) || 0);
     if (nextAllowedAt > now) return null;
 
-    const nextReturnFireAt = now + STAGING_BOT_RETURN_FIRE_INTERVAL_MS;
+    const rhythmSeed = String(bot.id || "").split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const rhythmOffset = (rhythmSeed % (STAGING_BOT_RETURN_FIRE_VARIANCE_MS * 2 + 1)) - STAGING_BOT_RETURN_FIRE_VARIANCE_MS;
+    const cooldownMs = Math.max(1600, STAGING_BOT_RETURN_FIRE_INTERVAL_MS + rhythmOffset);
+    const nextReturnFireAt = now + cooldownMs;
     this.stagingBotReturnFireCooldowns.set(cooldownKey, nextReturnFireAt);
 
     const payload = {
@@ -1750,7 +1750,7 @@ export class LupenSectorRoom extends Room {
       cargoLossEnabled: true,
       botAttackStatus: "cooldown",
       botAttackReason: "return_fire_sent",
-      cooldownMs: STAGING_BOT_RETURN_FIRE_INTERVAL_MS,
+      cooldownMs,
       nextReturnFireAt,
       receivedAt: now
     };

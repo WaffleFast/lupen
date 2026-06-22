@@ -2444,6 +2444,17 @@ test.describe("Lupen browser smoke", () => {
           disabled: false,
           alive: true
         };
+        const bots = [
+          bot,
+          ...Array.from({ length: 9 }, (_, index) => ({
+            ...bot,
+            id: "staging-bot-extra-" + (index + 1),
+            name: index % 2 === 0 ? "Erebus Scout" : "Erebus Drone",
+            displayName: index % 2 === 0 ? "Erebus Scout" : "Erebus Drone",
+            x: 34 + index * 3,
+            y: 38 + (index % 3) * 4
+          }))
+        ];
         window.__selectedStagingBotId = "";
         window.__lastShotEvent = null;
         window.__stagingVisualBot = bot;
@@ -2459,9 +2470,9 @@ test.describe("Lupen browser smoke", () => {
             selectedTargetBotId: window.__selectedStagingBotId,
             lastShotEvent: window.__lastShotEvent
           }),
-          getBots: () => [bot],
-          getBotsInCurrentNode: () => currentNode === bot.currentNode ? [bot] : [],
-          getBotById: id => String(id) === bot.id ? bot : null,
+          getBots: () => bots,
+          getBotsInCurrentNode: () => currentNode === bot.currentNode ? bots : [],
+          getBotById: id => bots.find(candidate => String(id) === candidate.id) || null,
           selectStagingBot: id => {
             window.__selectedStagingBotId = id;
           },
@@ -2491,11 +2502,14 @@ test.describe("Lupen browser smoke", () => {
         startStarterTutorial(true);
         setTutorialStepById("jump-to-bounty-zone");
         renderStarterTutorial();
+        window.LupenMultiplayerOverlay?.render?.();
         return {
           step: getCurrentTutorialStep().id,
           markerHighlighted: marker.classList.contains("tutorial-highlight-target"),
           selectedType: selectedTarget?.type || "",
-          engageDisabled: document.getElementById("objectEngageBtn")?.disabled ?? true
+          engageDisabled: document.getElementById("objectEngageBtn")?.disabled ?? true,
+          overlayBotCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot").length,
+          bountyTargetCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-bounty-target").length
         };
       })()
     `));
@@ -2504,8 +2518,16 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotState.markerHighlighted).toBe(true);
     expect(stagingBotState.selectedType).toBe("");
     expect(stagingBotState.engageDisabled).toBe(true);
+    expect(stagingBotState.overlayBotCount).toBe(10);
+    expect(stagingBotState.bountyTargetCount).toBe(10);
 
-    await page.locator(".lupen-mp-space-bot").click();
+    await page.evaluate(() => window.eval(`
+      (() => {
+        window.__selectedStagingBotId = "staging-bot-1";
+        selectStagingBotTarget("staging-bot-1");
+        window.LupenMultiplayerOverlay?.render?.();
+      })()
+    `));
     await page.waitForFunction(() => window.eval("selectedTarget?.type") === "stagingBot");
     const stagingBotSelectedState = await page.evaluate(() => window.eval(`
       (() => {
@@ -2541,6 +2563,8 @@ test.describe("Lupen browser smoke", () => {
           lowBarCount: targetFills.filter(fill => fill.classList.contains("is-low")).length,
           emptyBarCount: targetFills.filter(fill => fill.classList.contains("is-empty")).length,
           floatingDamageCount: document.querySelectorAll(".lupen-mp-space-bot-damage").length,
+          engagedMarkerCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-engaged").length,
+          bountyTargetCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-bounty-target").length,
           oldDebugCopyVisible: document.getElementById("spaceScreen")?.textContent?.includes("STAGING BOT / LOCK") || false
         };
       })()
@@ -2564,6 +2588,8 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.lowBarCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.emptyBarCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.floatingDamageCount).toBe(0);
+    expect(stagingBotSelectedState.engagedMarkerCount).toBeGreaterThanOrEqual(1);
+    expect(stagingBotSelectedState.bountyTargetCount).toBe(10);
     expect(stagingBotSelectedState.oldDebugCopyVisible).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);

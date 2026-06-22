@@ -720,6 +720,23 @@
         animation: lupen-mp-staging-hit 0.62s ease-out;
       }
 
+      .lupen-mp-space-bot.is-engaged .lupen-mp-space-bot-ship {
+        transform: rotate(-5deg) translateY(-1px);
+        filter: drop-shadow(0 0 12px rgba(255, 185, 95, 0.52));
+      }
+
+      .lupen-mp-space-bot.is-bounty-target .lupen-mp-space-bot-ship::before {
+        content: "";
+        position: absolute;
+        inset: 8px 5px 8px;
+        border: 1px solid rgba(255, 211, 95, 0.7);
+        border-top-color: transparent;
+        border-radius: 50%;
+        opacity: 0.9;
+        pointer-events: none;
+        filter: drop-shadow(0 0 7px rgba(255, 194, 68, 0.56));
+      }
+
       .${botMarkerClass}.is-hit {
         animation: lupen-mp-sector-bot-hit 0.62s ease-out;
       }
@@ -1512,6 +1529,25 @@
     return Date.now() - Number(response.receivedAt || 0) < 1200;
   }
 
+  function isRecentlyEngagedBot(bot, status = getClient()?.getStatus?.()) {
+    if (!bot?.id) return false;
+    const now = Date.now();
+    const shot = status?.lastShotEvent;
+    const returnFire = status?.lastStagingReturnFire;
+    if (shot?.targetBotId === bot.id && now - Number(shot.receivedAt || shot.timestamp || 0) < 2400) return true;
+    if (returnFire?.attackerBotId === bot.id && now - Number(returnFire.receivedAt || 0) < 2800) return true;
+    return false;
+  }
+
+  function isBountyTargetBot(bot, status = getClient()?.getStatus?.()) {
+    if (!bot || bot.disabled) return false;
+    const bounty = getActiveStagingBounty(status);
+    if (!bounty?.accepted || bounty.claimed || bounty.completed || bounty.claimAvailable) return false;
+    const targetType = normalizeNodeKey(bounty.targetType || "erebus");
+    const botFaction = normalizeNodeKey(bot.faction || bot.type || bot.name || "");
+    return targetType.includes("erebus") && botFaction.includes("erebus");
+  }
+
   function getShotEventAge(status = getClient()?.getStatus?.()) {
     return Date.now() - Number(status?.lastShotEvent?.receivedAt || status?.lastShotEvent?.timestamp || 0);
   }
@@ -1760,6 +1796,7 @@
   }
 
   function drawSectorBot(layer, bot, selectedTargetBotId = "") {
+    const status = getClient()?.getStatus?.() || {};
     const basePosition = getServerBotMapPosition(bot);
     const offset = getStableMapOffset(bot, 1.55);
     const position = {
@@ -1769,7 +1806,7 @@
     const labelOffset = position.x > 82 ? -2.9 : 2.9;
     const canSelectOnMap = isSameCurrentNode(bot);
     const group = global.document.createElementNS(SVG_NS, "g");
-    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}${wasRecentlyHit(bot) ? " is-hit" : ""}`);
+    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}${wasRecentlyHit(bot) ? " is-hit" : ""}${isRecentlyEngagedBot(bot, status) ? " is-engaged" : ""}${isBountyTargetBot(bot, status) ? " is-bounty-target" : ""}`);
     group.setAttribute("data-bot-id", bot.id || "");
     group.setAttribute("pointer-events", canSelectOnMap ? "auto" : "none");
     group.style.cursor = canSelectOnMap ? "crosshair" : "default";
@@ -1816,6 +1853,19 @@
       lockRing.setAttribute("stroke-dasharray", "0.9 0.7");
       lockRing.setAttribute("pointer-events", "none");
       group.appendChild(lockRing);
+    }
+
+    if (isBountyTargetBot(bot, status)) {
+      const bountyRing = global.document.createElementNS(SVG_NS, "circle");
+      bountyRing.setAttribute("cx", "0");
+      bountyRing.setAttribute("cy", "0");
+      bountyRing.setAttribute("r", "2.65");
+      bountyRing.setAttribute("fill", "none");
+      bountyRing.setAttribute("stroke", "rgba(255, 210, 92, 0.82)");
+      bountyRing.setAttribute("stroke-width", "0.16");
+      bountyRing.setAttribute("stroke-dasharray", "0.6 0.75");
+      bountyRing.setAttribute("pointer-events", "none");
+      group.appendChild(bountyRing);
     }
 
     const botImage = getBotImageRenderSrc(bot);
@@ -2002,12 +2052,17 @@
     layer.id = spaceBotLayerId;
     layer.setAttribute("aria-hidden", "true");
 
-    localBots.slice(0, 6).forEach((bot, index) => {
+    const status = getClient()?.getStatus?.() || {};
+    localBots.slice(0, 10).forEach((bot, index) => {
       const isSelected = getSelectedTargetBotId() === bot.id;
+      const isEngaged = isRecentlyEngagedBot(bot, status);
+      const isBountyTarget = isBountyTargetBot(bot, status);
       const marker = global.document.createElement("div");
       marker.className = "lupen-mp-space-bot";
       marker.dataset.botId = bot.id || "";
       if (isSelected) marker.classList.add("is-locked");
+      if (isEngaged) marker.classList.add("is-engaged");
+      if (isBountyTarget) marker.classList.add("is-bounty-target");
       if (bot.disabled) marker.classList.add("is-disabled");
       if (wasRecentlyHit(bot)) marker.classList.add("is-hit");
       marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards`;

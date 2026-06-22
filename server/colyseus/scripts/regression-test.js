@@ -4816,31 +4816,36 @@ try {
   assert(playerFrom(roomB, roomA.sessionId)?.shipImage === "assets/ships/lupen-origin.png", "Unsafe ship image changed stored ship metadata.");
   console.log("unsafe ship image metadata rejected safely without blocking node sync");
 
-  await waitFor("dummy bots to appear", () => botCount(roomA) > 0 && botCount(roomB) > 0);
+  await waitFor("dummy bots to appear", () => botCount(roomA) >= 10 && botCount(roomB) >= 10);
   assertAllowedBotNodes(roomA);
   assertAllowedBotNodes(roomB);
   assertBotDisplayFields(roomA);
   assertBotDisplayFields(roomB);
+  assert(botCount(roomA) === 10 && botCount(roomB) === 10, `Expected 10 staging bots, saw A=${botCount(roomA)} B=${botCount(roomB)}`);
   console.log(`dummy bot count: A=${botCount(roomA)} B=${botCount(roomB)}`);
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
   const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
+  const initialBotPositions = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}`).join("|");
 
   await waitFor("shared server bot update", () => {
     return latestBotUpdateAt(roomA) > initialBotUpdateAt &&
       latestBotUpdateAt(roomB) >= latestBotUpdateAt(roomA) &&
       botSnapshotKey(roomA) === botSnapshotKey(roomB);
   }, 7000);
-  console.log("both clients received matching server bot movement update");
+  console.log("both clients received matching server bot presence update");
 
-  await waitFor("a staging bot node change", () => {
+  await waitFor("staging bots remain passive and position-stable", () => {
     assertAllowedBotNodes(roomA);
     assertAllowedBotNodes(roomB);
     assertBotDisplayFields(roomA);
     assertBotDisplayFields(roomB);
     const currentBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
-    return currentBotNodes !== initialBotNodes && botSnapshotKey(roomA) === botSnapshotKey(roomB);
-  }, 22000);
-  console.log("staging bot node change stayed on allowed combat nodes");
+    const currentBotPositions = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}`).join("|");
+    return currentBotNodes === initialBotNodes &&
+      currentBotPositions === initialBotPositions &&
+      botSnapshotKey(roomA) === botSnapshotKey(roomB);
+  }, 7000);
+  console.log("staging bots stayed passive and position-stable before combat");
 
   const inspectedBotBeforeCombat = botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
@@ -4909,7 +4914,9 @@ try {
       returnFire.playerDeathEnabled === true &&
       returnFire.cargoLossEnabled === true &&
       returnFire.botAttackStatus === "cooldown" &&
-      returnFire.botAttackReason === "return_fire_sent";
+      returnFire.botAttackReason === "return_fire_sent" &&
+      returnFire.cooldownMs >= 1600 &&
+      returnFire.cooldownMs <= 3250;
   });
   console.log("staging bot return fire stayed light, session-only, and player-damage enabled");
 
