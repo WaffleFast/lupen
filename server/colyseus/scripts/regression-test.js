@@ -5344,6 +5344,19 @@ try {
       botA.hull === botB.hull;
   });
   assert(botDisabledEvents.some((event) => event?.botId === inspectedBotBeforeCombat.id), "bot:disabled event was not observed.");
+  const botDisabledReceipt = botDisabledEvents.find((event) => event?.botId === inspectedBotBeforeCombat.id && event?.finalHitBy === roomA.sessionId);
+  assert(botDisabledReceipt?.rewardReceipt === true, "bot:disabled did not include a reward receipt marker.");
+  assert(botDisabledReceipt?.destructionInstanceId, "bot:disabled did not include a stable destruction id.");
+  assert(botDisabledReceipt?.rewardPreviewId?.startsWith("staging_bot_reward:"), `Unexpected bot disabled reward preview id: ${botDisabledReceipt?.rewardPreviewId}`);
+  assert(botDisabledReceipt?.botXpSourceEventId?.startsWith("staging_bot_xp:"), `Unexpected bot disabled XP source id: ${botDisabledReceipt?.botXpSourceEventId}`);
+  assert(botDisabledReceipt?.xpAwardedByServer === true, "bot:disabled did not indicate server XP result was queued.");
+  assert(botDisabledReceipt?.xpReceiptPending === true, "bot:disabled did not mark XP receipt as pending.");
+  assert(botDisabledReceipt?.previewXp === 100, `Unexpected bot disabled XP preview: ${botDisabledReceipt?.previewXp}`);
+  assert(botDisabledReceipt?.rewardsGranted === false, "bot:disabled incorrectly reported direct reward grants.");
+  assert(botDisabledReceipt?.bountyProgressChanged === true, "bot:disabled did not include changed bounty progress.");
+  assert(botDisabledReceipt?.bountyProgress?.progress === 1, `Unexpected bot disabled bounty progress: ${botDisabledReceipt?.bountyProgress?.progress}`);
+  assert(botDisabledReceipt?.bountyProgress?.requiredKills === 2, `Unexpected bot disabled bounty requirement: ${botDisabledReceipt?.bountyProgress?.requiredKills}`);
+  assert(Array.isArray(botDisabledReceipt?.contributors) && botDisabledReceipt.contributors.length >= 2, "bot:disabled did not include contributor summary.");
   await waitFor("staging reward preview after bot disabled", () => {
     return rewardPreviewEvents.some((event) => {
       const contributors = Array.isArray(event?.contributors) ? event.contributors : [];

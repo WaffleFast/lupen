@@ -37,6 +37,7 @@
     lastCombatResponse: null,
     lastTargetResponse: null,
     lastBotEvent: null,
+    lastBotRewardReceipt: null,
     lastShotEvent: null,
     lastStagingReturnFire: null,
     lastRewardPreview: null,
@@ -294,6 +295,7 @@
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
+      lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
@@ -2217,16 +2219,45 @@
     });
 
     activeRoom.onMessage("bot:disabled", (message) => {
+      const contributors = Array.isArray(message?.contributors)
+        ? message.contributors.map(normalizeRewardContributor).filter(Boolean)
+        : [];
+      const bountyProgress = normalizeStagingBounty(message?.bountyProgress);
       connection.lastBotEvent = {
         type: "bot:disabled",
         botId: String(message?.botId || ""),
+        botName: String(message?.botName || "Staging Bot"),
         currentNode: String(message?.currentNode || ""),
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         disabledUntil: Number.isFinite(Number(message?.disabledUntil)) ? Number(message.disabledUntil) : 0,
+        destructionInstanceId: String(message?.destructionInstanceId || ""),
+        rewardPreviewId: String(message?.rewardPreviewId || ""),
+        botXpSourceEventId: String(message?.botXpSourceEventId || ""),
+        disabledBySessionId: String(message?.disabledBySessionId || message?.finalHitBy || ""),
+        finalHitBy: String(message?.finalHitBy || message?.disabledBySessionId || ""),
+        topContributorSessionId: String(message?.topContributorSessionId || ""),
+        contributors,
+        previewXp: Number.isFinite(Number(message?.previewXp)) ? Number(message.previewXp) : 0,
+        previewCredits: Number.isFinite(Number(message?.previewCredits)) ? Number(message.previewCredits) : 0,
+        bountyProgress,
+        bountyProgressChanged: message?.bountyProgressChanged === true,
+        bountyProgressReason: String(message?.bountyProgressReason || ""),
+        xpAwardedByServer: message?.xpAwardedByServer === true,
+        xpReceiptPending: message?.xpReceiptPending === true,
+        rewardReceipt: message?.rewardReceipt === true,
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
+      if (connection.lastBotEvent.rewardReceipt) {
+        connection.lastBotRewardReceipt = { ...connection.lastBotEvent };
+        if (bountyProgress?.accepted && Number(bountyProgress.requiredKills || 0) > 0) {
+          addStagingActivityLogOnce(
+            `bot-reward-receipt:${connection.lastBotEvent.destructionInstanceId || connection.lastBotEvent.rewardPreviewId || connection.lastBotEvent.botId}`,
+            `Bounty progress: ${Number(bountyProgress.progress || 0)} / ${Number(bountyProgress.requiredKills || 0)}.`
+          );
+        }
+      }
       logDev("server bot disabled", message);
       if (typeof global.clearStagingBotTargetIfSelected === "function") {
         global.clearStagingBotTargetIfSelected(connection.lastBotEvent.botId);
@@ -2711,6 +2742,7 @@
       lastCombatResponse: connection.lastCombatResponse ? { ...connection.lastCombatResponse } : null,
       lastTargetResponse: connection.lastTargetResponse ? { ...connection.lastTargetResponse } : null,
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
+      lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,

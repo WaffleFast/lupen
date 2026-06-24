@@ -2076,6 +2076,7 @@ export class LupenSectorRoom extends Room {
       .filter(Boolean);
     if (disabledBySessionId) contributorSessionIds.push(getStringValue(disabledBySessionId));
     const uniqueContributors = Array.from(new Set(contributorSessionIds));
+    let disabledByResult = null;
 
     uniqueContributors.forEach((sessionId) => {
       const currentState = this.getStagingBountyState(sessionId);
@@ -2084,6 +2085,7 @@ export class LupenSectorRoom extends Room {
         contributorSessionIds: uniqueContributors,
         now: Date.now()
       });
+      if (sessionId === disabledBySessionId) disabledByResult = result;
       if (!result.changed) return;
       this.stagingBountyStates.set(sessionId, result.state);
       const targetClient = this.clients.find((candidate) => candidate.sessionId === sessionId);
@@ -2095,6 +2097,8 @@ export class LupenSectorRoom extends Room {
         receivedAt: Date.now()
       });
     });
+
+    return disabledByResult;
   }
 
   buildStagingBountyRewardWritePlan(client, bountyState) {
@@ -3329,7 +3333,7 @@ export class LupenSectorRoom extends Room {
     if (result.disabled) {
       this.clearStagingReturnFireForBot(targetBot.id);
       const contributionSummary = this.getContributionSummary(targetBot.id);
-      this.updateStagingBountyProgressForDisabledBot(targetBot, contributionSummary, client.sessionId);
+      const bountyProgressResult = this.updateStagingBountyProgressForDisabledBot(targetBot, contributionSummary, client.sessionId);
       const destructionInstanceId = this.getStagingBountyDestructionKey(targetBot);
       const rewardPreview = this.buildRewardPreviewPayload(targetBot, client.sessionId, contributionSummary, Date.now(), destructionInstanceId);
       this.rewardPreviews.set(targetBot.id, rewardPreview);
@@ -3342,7 +3346,26 @@ export class LupenSectorRoom extends Room {
         shield: targetBot.shield,
         hull: targetBot.hull,
         disabledUntil: targetBot.disabledUntil,
+        destructionInstanceId,
+        rewardPreviewId: rewardPreview.rewardPreviewId,
+        botXpSourceEventId: rewardPreview.botXpSourceEventId,
+        botName: rewardPreview.botName,
+        disabledBySessionId: client.sessionId,
+        finalHitBy: client.sessionId,
+        topContributorSessionId: contributionSummary.topContributorSessionId,
+        contributors: contributionSummary.contributors,
+        previewXp: rewardPreview.previewXp,
+        previewCredits: rewardPreview.previewCredits,
+        bountyProgress: bountyProgressResult?.changed === true
+          ? getPublicStagingBountyState(bountyProgressResult.state)
+          : null,
+        bountyProgressChanged: bountyProgressResult?.changed === true,
+        bountyProgressReason: getStringValue(bountyProgressResult?.reason),
+        xpResultEventType: "stagingXp:botKillResult",
+        xpAwardedByServer: true,
+        xpReceiptPending: true,
         rewardsGranted: false,
+        rewardReceipt: true,
         receivedAt: Date.now()
       });
 
