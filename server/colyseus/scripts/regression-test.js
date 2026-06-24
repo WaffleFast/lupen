@@ -5064,6 +5064,8 @@ try {
     return shotA && shotB &&
       shotA.attackerSessionId === roomA.sessionId &&
       shotB.attackerSessionId === roomA.sessionId &&
+      shotA.attackerDisplayName === "Regression Pilot A" &&
+      shotB.attackerDisplayName === "Regression Pilot A" &&
       shotA.currentNode === inspectedBotBeforeCombat.currentNode &&
       shotB.currentNode === inspectedBotBeforeCombat.currentNode &&
       shotA.weaponName === "Pulse Laser" &&

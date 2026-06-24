@@ -1188,6 +1188,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("MP Staging", { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText(/offline|connecting|connected/i);
+    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("presence");
+    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("online names");
+    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("chat send");
+    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("Connect");
+    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("Refresh Presence");
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toHaveCount(0);
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -2514,6 +2519,7 @@ test.describe("Lupen browser smoke", () => {
           }))
         ];
         window.__selectedStagingBotId = "";
+        window.__remoteSelectedStagingBotId = "";
         window.__lastShotEvent = null;
         window.__stagingVisualBot = bot;
         window.LupenMultiplayerClient = {
@@ -2528,6 +2534,29 @@ test.describe("Lupen browser smoke", () => {
             selectedTargetBotId: window.__selectedStagingBotId,
             lastShotEvent: window.__lastShotEvent
           }),
+          getPlayers: options => {
+            const local = {
+              id: "local-session",
+              sessionId: "local-session",
+              displayName: "Local Pilot",
+              currentNode,
+              x: 50,
+              y: 66,
+              isSelf: true,
+              selectedTargetBotId: window.__selectedStagingBotId
+            };
+            const remote = {
+              id: "remote-session",
+              sessionId: "remote-session",
+              displayName: "WaffleFast",
+              currentNode,
+              x: 58,
+              y: 42,
+              isSelf: false,
+              selectedTargetBotId: window.__remoteSelectedStagingBotId
+            };
+            return options?.includeSelf === false ? [remote] : [local, remote];
+          },
           getBots: () => bots,
           getBotsInCurrentNode: () => currentNode === bot.currentNode ? bots : [],
           getBotById: id => bots.find(candidate => String(id) === candidate.id) || null,
@@ -2591,6 +2620,7 @@ test.describe("Lupen browser smoke", () => {
       (() => {
         renderStarterTutorial();
         const engage = document.getElementById("objectEngageBtn");
+        window.__remoteSelectedStagingBotId = window.__stagingVisualBot.id;
         window.__lastShotEvent = {
           ok: true,
           attackerSessionId: "local-session",
@@ -2616,6 +2646,7 @@ test.describe("Lupen browser smoke", () => {
           markerHasInlineLabel: !!botMarker?.querySelector(".lupen-mp-space-bot-label, .lupen-mp-space-bot-note, .lupen-mp-bot-bars"),
           shotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam").length || 0,
           localShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-local").length || 0,
+          coopEngagedMarkerCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-coop-engaged").length,
           muzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle").length || 0,
           hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0,
           lowBarCount: targetFills.filter(fill => fill.classList.contains("is-low")).length,
@@ -2641,6 +2672,7 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
     expect(stagingBotSelectedState.shotBeamCount).toBeGreaterThanOrEqual(5);
     expect(stagingBotSelectedState.localShotBeamCount).toBeGreaterThanOrEqual(1);
+    expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.muzzleCount).toBe(1);
     expect(stagingBotSelectedState.hitCount).toBe(1);
     expect(stagingBotSelectedState.lowBarCount).toBeGreaterThanOrEqual(1);
@@ -2649,6 +2681,32 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.engagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.bountyTargetCount).toBe(10);
     expect(stagingBotSelectedState.oldDebugCopyVisible).toBe(false);
+
+    const stagingBotRemoteShotState = await page.evaluate(() => window.eval(`
+      (() => {
+        window.__lastShotEvent = {
+          ok: true,
+          attackerSessionId: "remote-session",
+          targetBotId: window.__stagingVisualBot.id,
+          currentNode,
+          damage: 8,
+          receivedAt: Date.now()
+        };
+        window.LupenMultiplayerOverlay?.render?.();
+        const shotLayer = document.getElementById("lupenMultiplayerSpaceShotLayer");
+        return {
+          remoteShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-remote").length || 0,
+          remoteMuzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle.is-remote").length || 0,
+          attackerLabelText: shotLayer?.querySelector(".lupen-mp-shot-attacker-label")?.textContent || "",
+          coopEngagedMarkerCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-coop-engaged").length
+        };
+      })()
+    `));
+
+    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBeGreaterThanOrEqual(5);
+    expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(1);
+    expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
+    expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

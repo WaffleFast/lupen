@@ -45,6 +45,7 @@
     lastStagingBotXpResult: null,
     lastStagingXpRefresh: null,
     lastStagingLootClaimResult: null,
+    lastChatSend: null,
     lastStagingTradeOffers: null,
     lastStagingTradePreview: null,
     lastStagingTradeWriteResult: null,
@@ -303,6 +304,7 @@
       lastStagingBotXpResult: connection.lastStagingBotXpResult ? { ...connection.lastStagingBotXpResult } : null,
       lastStagingXpRefresh: connection.lastStagingXpRefresh ? { ...connection.lastStagingXpRefresh } : null,
       lastStagingLootClaimResult: connection.lastStagingLootClaimResult ? { ...connection.lastStagingLootClaimResult } : null,
+      lastChatSend: connection.lastChatSend ? { ...connection.lastChatSend } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers ? { ...connection.lastStagingTradeOffers } : null,
       lastStagingTradePreview: connection.lastStagingTradePreview ? { ...connection.lastStagingTradePreview } : null,
       lastStagingTradeWriteResult: connection.lastStagingTradeWriteResult ? { ...connection.lastStagingTradeWriteResult } : null,
@@ -2283,10 +2285,13 @@
     });
 
     activeRoom.onMessage("staging:shot", (message) => {
+      const attackerSessionId = String(message?.attackerSessionId || "");
+      const targetBotId = String(message?.targetBotId || "");
       connection.lastShotEvent = {
         ok: message?.ok === true,
-        attackerSessionId: String(message?.attackerSessionId || ""),
-        targetBotId: String(message?.targetBotId || ""),
+        attackerSessionId,
+        attackerDisplayName: String(message?.attackerDisplayName || ""),
+        targetBotId,
         currentNode: String(message?.currentNode || ""),
         damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
         weaponName: String(message?.weaponName || ""),
@@ -2302,6 +2307,14 @@
         timestamp: Number.isFinite(Number(message?.timestamp)) ? Number(message.timestamp) : Date.now(),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
+      const selectedTargetBotId = playersById.get(connection.sessionId)?.selectedTargetBotId || "";
+      if (attackerSessionId && attackerSessionId !== connection.sessionId && targetBotId && selectedTargetBotId === targetBotId) {
+        const bot = botsById.get(targetBotId);
+        addStagingActivityLogOnce(
+          `assist:${attackerSessionId}:${targetBotId}:${connection.lastShotEvent.timestamp || connection.lastShotEvent.receivedAt}`,
+          `Assist registered on ${bot?.name || bot?.type || "Staging Bot"}.`
+        );
+      }
       logDev("server staging shot", message);
       notifyServerState(activeRoom.state || null);
     });
@@ -2749,6 +2762,7 @@
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
       lastStagingBotXpResult: connection.lastStagingBotXpResult ? { ...connection.lastStagingBotXpResult } : null,
       lastStagingLootClaimResult: connection.lastStagingLootClaimResult ? { ...connection.lastStagingLootClaimResult } : null,
+      lastChatSend: connection.lastChatSend ? { ...connection.lastChatSend } : null,
       lastStagingTradeOffers: connection.lastStagingTradeOffers
         ? {
           ...connection.lastStagingTradeOffers,
@@ -2973,8 +2987,26 @@
 
     sendChatMessage(options = {}) {
       const message = normalizeChatText(options.message || options.text);
-      if (!message) return statusResult("sendChatMessage", false, { reason: "empty_message" });
-      return sendRoomMessage("sendChatMessage", "chat:send", { channel: "sector", message });
+      if (!message) {
+        connection.lastChatSend = {
+          ok: false,
+          reason: "empty_message",
+          channel: "sector",
+          length: 0,
+          sentAt: Date.now()
+        };
+        return statusResult("sendChatMessage", false, { reason: "empty_message" });
+      }
+      const result = sendRoomMessage("sendChatMessage", "chat:send", { channel: "sector", message });
+      connection.lastChatSend = {
+        ok: result.ok === true,
+        reason: String(result.reason || (result.ok ? "sent" : "not_sent")),
+        channel: "sector",
+        length: message.length,
+        connected: result.connected === true,
+        sentAt: Date.now()
+      };
+      return result;
     },
 
     sendCombatIntent(intent = {}) {

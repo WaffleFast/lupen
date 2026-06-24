@@ -161,6 +161,11 @@
         height: 6px;
       }
 
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-remote {
+        background: linear-gradient(90deg, rgba(89, 212, 255, 0), rgba(111, 224, 255, 0.9) 14%, rgba(235, 255, 255, 0.96) 45%, rgba(98, 255, 199, 0.82) 72%, rgba(98, 255, 199, 0));
+        box-shadow: 0 0 13px rgba(80, 221, 255, 0.72), 0 0 24px rgba(68, 255, 202, 0.34);
+      }
+
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing {
         height: 3px;
         opacity: 0.86;
@@ -181,6 +186,32 @@
         box-shadow: 0 0 18px rgba(100, 236, 255, 0.78), 0 0 34px rgba(255, 160, 80, 0.35);
         mix-blend-mode: screen;
         animation: lupen-mp-shot-muzzle 0.34s ease-out forwards;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-muzzle.is-remote {
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.88), rgba(95, 255, 205, 0.55) 28%, transparent 68%);
+        box-shadow: 0 0 15px rgba(86, 228, 255, 0.56), 0 0 27px rgba(86, 255, 201, 0.32);
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-attacker-label {
+        position: absolute;
+        transform: translate(-50%, 12px);
+        max-width: 96px;
+        padding: 2px 6px;
+        border: 1px solid rgba(105, 232, 255, 0.5);
+        border-radius: 4px;
+        color: #bff7ff;
+        background: rgba(5, 15, 25, 0.74);
+        font-size: 9px;
+        line-height: 1.2;
+        text-align: center;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-shadow: 0 0 7px rgba(69, 220, 255, 0.9);
+        opacity: 0;
+        animation: lupen-mp-shot-label 0.72s ease-out forwards;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-hit {
@@ -768,6 +799,23 @@
         filter: drop-shadow(0 0 12px rgba(255, 185, 95, 0.52));
       }
 
+      .lupen-mp-space-bot.is-coop-engaged .lupen-mp-space-bot-ship {
+        filter: drop-shadow(0 0 12px rgba(98, 236, 255, 0.56));
+      }
+
+      .lupen-mp-space-bot.is-coop-engaged .lupen-mp-space-bot-ship::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: -8px;
+        width: 22px;
+        height: 2px;
+        transform: translateX(-50%);
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, rgba(121, 240, 255, 0.92), transparent);
+        box-shadow: 0 0 8px rgba(89, 224, 255, 0.76);
+      }
+
       .lupen-mp-space-bot.is-bounty-target .lupen-mp-space-bot-ship::before {
         content: "";
         position: absolute;
@@ -1143,6 +1191,12 @@
           opacity: 0;
           transform: translate(-50%, -50%) scale(1.45);
         }
+      }
+
+      @keyframes lupen-mp-shot-label {
+        0% { opacity: 0; transform: translate(-50%, 9px); }
+        18% { opacity: 0.88; transform: translate(-50%, 12px); }
+        100% { opacity: 0; transform: translate(-50%, 15px); }
       }
 
       #${diagnosticsPanelId} {
@@ -1691,6 +1745,15 @@
     return false;
   }
 
+  function getRemoteBotEngagerCount(bot, players = []) {
+    if (!bot?.id) return 0;
+    return players.filter((player) => {
+      if (!player || player.isSelf) return false;
+      if (!isSameCurrentNode(player)) return false;
+      return String(player.selectedTargetBotId || "") === String(bot.id);
+    }).length;
+  }
+
   function isBountyTargetBot(bot, status = getClient()?.getStatus?.()) {
     if (!bot || bot.disabled) return false;
     const bounty = getActiveStagingBounty(status);
@@ -2222,7 +2285,7 @@
     spaceScreen.appendChild(layer);
   }
 
-  function renderSpaceBots(bots) {
+  function renderSpaceBots(bots, players = []) {
     global.document?.getElementById(spaceBotLayerId)?.remove();
     if (!isEnabled()) return;
 
@@ -2242,16 +2305,18 @@
     localBots.slice(0, 10).forEach((bot, index) => {
       const isSelected = getSelectedTargetBotId() === bot.id;
       const isEngaged = isRecentlyEngagedBot(bot, status);
+      const remoteEngagerCount = getRemoteBotEngagerCount(bot, players);
       const isBountyTarget = isBountyTargetBot(bot, status);
       const marker = global.document.createElement("div");
       marker.className = "lupen-mp-space-bot";
       marker.dataset.botId = bot.id || "";
       if (isSelected) marker.classList.add("is-locked");
       if (isEngaged) marker.classList.add("is-engaged");
+      if (remoteEngagerCount > 0) marker.classList.add("is-coop-engaged");
       if (isBountyTarget) marker.classList.add("is-bounty-target");
       if (bot.disabled) marker.classList.add("is-disabled");
       if (wasRecentlyHit(bot)) marker.classList.add("is-hit");
-      marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)} / staging damage test only / no rewards`;
+      marker.title = `${getBotLabel(bot)} / ${getBotLayerSummary(bot)} / ${getBotHullSummary(bot)}${remoteEngagerCount ? ` / engaged by ${remoteEngagerCount} pilot${remoteEngagerCount === 1 ? "" : "s"}` : ""} / staging damage test only / no rewards`;
       marker.style.left = `${clampMapCoordinate(bot.x || 50)}%`;
       marker.style.top = `${clampMapCoordinate(bot.y || 50)}%`;
       marker.addEventListener("click", (event) => {
@@ -2328,19 +2393,29 @@
     const distance = Math.max(8, Math.sqrt(dx * dx + dy * dy));
     const angle = Math.atan2(dy, dx);
     const isLocalShot = status.lastShotEvent.attackerSessionId === status.sessionId;
+    const shotOwnerClass = isLocalShot ? "is-local" : "is-remote";
     const beamFan = [
-      { x: 0, y: 0, scale: 1, className: isLocalShot ? "is-local" : "" },
-      { x: -1.8, y: 0.9, scale: 0.95, className: "is-wing" },
-      { x: 1.8, y: -0.9, scale: 0.95, className: "is-wing" },
-      { x: -3.1, y: -1.1, scale: 0.78, className: "is-spark" },
-      { x: 3.1, y: 1.1, scale: 0.78, className: "is-spark" }
+      { x: 0, y: 0, scale: 1, className: shotOwnerClass },
+      { x: -1.8, y: 0.9, scale: 0.95, className: `${shotOwnerClass} is-wing` },
+      { x: 1.8, y: -0.9, scale: 0.95, className: `${shotOwnerClass} is-wing` },
+      { x: -3.1, y: -1.1, scale: 0.78, className: `${shotOwnerClass} is-spark` },
+      { x: 3.1, y: 1.1, scale: 0.78, className: `${shotOwnerClass} is-spark` }
     ];
 
     const muzzle = global.document.createElement("div");
-    muzzle.className = "lupen-mp-shot-muzzle";
+    muzzle.className = `lupen-mp-shot-muzzle ${shotOwnerClass}`;
     muzzle.style.left = `${attackerPosition.x}%`;
     muzzle.style.top = `${attackerPosition.y}%`;
     layer.appendChild(muzzle);
+
+    if (!isLocalShot && (attacker || status.lastShotEvent.attackerDisplayName)) {
+      const label = global.document.createElement("div");
+      label.className = "lupen-mp-shot-attacker-label";
+      label.textContent = String(attacker?.displayName || attacker?.name || status.lastShotEvent.attackerDisplayName || "Pilot").slice(0, 18);
+      label.style.left = `${attackerPosition.x}%`;
+      label.style.top = `${attackerPosition.y}%`;
+      layer.appendChild(label);
+    }
 
     beamFan.forEach((beamDef, index) => {
       const beam = global.document.createElement("div");
@@ -3018,6 +3093,44 @@
     panel.appendChild(row);
   }
 
+  function getPilotNameList(players = []) {
+    const names = [];
+    const seen = new Set();
+    players.forEach((player) => {
+      const name = String(player.displayName || player.name || player.playerName || player.id || "").trim();
+      if (!name || seen.has(name.toLowerCase())) return;
+      seen.add(name.toLowerCase());
+      names.push(name);
+    });
+    return names.length ? names.slice(0, 8).join(", ") : "none";
+  }
+
+  function getPresenceStatusLabel(status = {}) {
+    const presenceStatus = String(status.presenceStatus || status.localPresenceStatus || "").trim() || "space";
+    const node = getCurrentNodeName() || "unknown";
+    return `${presenceStatus} / ${node}`;
+  }
+
+  function getLastChatSendLabel(status = {}) {
+    const chat = status.lastChatSend;
+    if (!chat) return status.isConnected ? "ready / no sends yet" : "unavailable while disconnected";
+    const state = chat.ok ? "sent" : "blocked";
+    const reason = String(chat.reason || "").trim();
+    const length = Math.max(0, Math.round(Number(chat.length || 0)));
+    return `${state} / ${chat.channel || "sector"} / ${length} chars${reason ? ` / ${reason}` : ""}`;
+  }
+
+  function getBotRewardReceiptLabel(status = {}) {
+    const receipt = status.lastBotRewardReceipt;
+    if (!receipt) return "none";
+    const botName = String(receipt.botName || "bot").slice(0, 28);
+    const xpId = String(receipt.botXpSourceEventId || receipt.rewardPreviewId || "").replace(/^staging_bot_xp:/, "").slice(0, 26);
+    const bounty = receipt.bountyProgress
+      ? ` / bounty ${Math.round(Number(receipt.bountyProgress.progress || 0))}/${Math.round(Number(receipt.bountyProgress.requiredKills || 0))}`
+      : "";
+    return `${botName} / XP event ${xpId || "pending"}${bounty}`;
+  }
+
   function canShowStagingTestFire(status, selectedBot) {
     return isStagingMode(status) &&
       !!status?.enabled &&
@@ -3042,6 +3155,28 @@
       currentNode: getCurrentNodeName(),
       timestamp: Date.now()
     });
+  }
+
+  function refreshDiagnosticsPresence(status = {}) {
+    const client = getClient();
+    if (!client?.sendMovementIntent) return;
+    client.sendMovementIntent({
+      currentNode: getCurrentNodeName(),
+      presenceStatus: status.presenceStatus || "space",
+      reason: "debug_presence_refresh"
+    });
+    scheduleRender();
+  }
+
+  function reconnectDiagnosticsClient() {
+    const client = getClient();
+    if (!client?.disconnect || !client?.connect) return;
+    client.disconnect();
+    global.setTimeout(() => {
+      client.connect?.();
+      scheduleRender();
+    }, 120);
+    scheduleRender();
   }
 
   function canClaimRewardPreview(status, selectedBot = null) {
@@ -3372,10 +3507,38 @@
   }
 
   function addDiagnosticsActions(panel, status, selectedBot) {
-    if (!canShowStagingTestFire(status, selectedBot) && typeof global.lupenDebugGrantTestFunds !== "function") return;
+    if (!status?.enabled && !canShowStagingTestFire(status, selectedBot) && typeof global.lupenDebugGrantTestFunds !== "function") return;
 
     const actions = global.document.createElement("div");
     actions.className = "lupen-mp-diagnostics-actions";
+
+    if (status?.enabled) {
+      const refreshButton = global.document.createElement("button");
+      refreshButton.type = "button";
+      refreshButton.className = "lupen-mp-test-fire-button";
+      refreshButton.textContent = "Refresh Presence";
+      refreshButton.title = "Send the current node and presence status to the multiplayer room.";
+      refreshButton.disabled = !status.isConnected;
+      refreshButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        refreshDiagnosticsPresence(status);
+      });
+      actions.appendChild(refreshButton);
+
+      const reconnectButton = global.document.createElement("button");
+      reconnectButton.type = "button";
+      reconnectButton.className = "lupen-mp-test-fire-button";
+      reconnectButton.textContent = status.isConnected ? "Reconnect" : "Connect";
+      reconnectButton.title = "Reconnect the multiplayer client and request fresh room state.";
+      reconnectButton.disabled = status.isConnecting === true;
+      reconnectButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        reconnectDiagnosticsClient();
+      });
+      actions.appendChild(reconnectButton);
+    }
 
     if (typeof global.lupenDebugGrantTestFunds === "function") {
       const grantButton = global.document.createElement("button");
@@ -3757,6 +3920,7 @@
     setDiagnosticsRow(panel, "server", getCompactServerLabel(status));
     setDiagnosticsRow(panel, "client", status.clientLoadSource || "not loaded");
     setDiagnosticsRow(panel, "node", getCurrentNodeName() || "unknown");
+    setDiagnosticsRow(panel, "presence", getPresenceStatusLabel(status));
     if (isStagingMode(status)) {
       setDiagnosticsRow(panel, "auth", `${status.authStatus || "guest"} / trusted id ${status.trustedPlayerIdPresent ? "present" : "missing"}`);
       setDiagnosticsRow(panel, "auth handoff", `session ${status.supabaseSessionPresent ? "yes" : "no"} / token sent ${status.supabaseTokenSent ? "yes" : "no"} / verify ${status.supabaseTokenVerificationAttempted ? "yes" : "no"} / wait ${status.supabaseSessionWaitTimedOut ? "timed out" : "ok"}`);
@@ -3766,6 +3930,8 @@
       setDiagnosticsRow(panel, "identity", String(status.displayName || "Pilot").slice(0, 24));
     }
     setDiagnosticsRow(panel, "remote pilots", `${players.length} total / ${sameNodePlayers.length} same node`);
+    setDiagnosticsRow(panel, "online names", getPilotNameList(getClient()?.getPlayers?.({ includeSelf: true }) || players));
+    setDiagnosticsRow(panel, "chat send", getLastChatSendLabel(status));
     if (isStagingMode(status)) {
       const firstRemote = players[0] || {};
       const remoteShipImage = getSafeShipImageSrc(firstRemote);
@@ -3819,6 +3985,7 @@
       if (status.firstRejectedWeaponReason) setDiagnosticsRow(panel, "weapon reject", String(status.firstRejectedWeaponReason).slice(0, 56));
       setDiagnosticsRow(panel, "fire cooldown", formatCooldown(status.fireCooldownRemainingMs));
       setDiagnosticsRow(panel, "bot event", getLastBotEventLabel(status));
+      setDiagnosticsRow(panel, "kill receipt", getBotRewardReceiptLabel(status));
       setDiagnosticsRow(panel, "shot event", getLastShotEventLabel(status));
       const returnFire = status.lastStagingReturnFire;
       const botAttackCooldown = returnFire?.nextReturnFireAt
@@ -4005,7 +4172,7 @@
     renderSectorGhosts(players);
     renderSectorBots(bots);
     renderSpaceGhosts(players);
-    renderSpaceBots(bots);
+    renderSpaceBots(bots, players);
     renderSelectedTargetCard(players, bots, status);
     renderSpaceShot(allPlayers, bots, status);
     renderStagingCombatPanel(status, selectedBot);

@@ -3305,6 +3305,7 @@ export class LupenSectorRoom extends Room {
     this.broadcast("staging:shot", {
       ok: true,
       attackerSessionId: client.sessionId,
+      attackerDisplayName: player.displayName || "Pilot",
       targetBotId,
       currentNode: player.currentNode,
       damage: result.damage,
