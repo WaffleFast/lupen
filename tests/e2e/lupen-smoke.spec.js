@@ -1075,6 +1075,19 @@ test.describe("Lupen browser smoke", () => {
       window.LupenMultiplayerOverlay.render();
       selectRemotePlayerTarget("remote-session");
       window.LupenMultiplayerOverlay.render();
+      const playerTargetCard = document.querySelector(".lupen-target-card.player");
+      const playerTargetText = playerTargetCard?.textContent || "";
+      const playerTargetSelected = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "";
+      const engagePanel = document.getElementById("objectActionPanel");
+      const engageButton = document.getElementById("objectEngageBtn");
+      const engageVisibleForPlayer = engagePanel?.classList.contains("visible") || false;
+      const engageDisabledForPlayer = engageButton?.disabled ?? false;
+      const engageTextForPlayer = engageButton?.textContent || "";
+      const pvpGuard = window.LupenMultiplayerClient.sendCombatIntent({
+        targetType: "remotePlayer",
+        targetPlayerId: "remote-session"
+      });
+      if (typeof engageTarget === "function") engageTarget();
       const input = document.getElementById("localChatInput");
       input.value = "  staging hello  ";
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -1086,16 +1099,12 @@ test.describe("Lupen browser smoke", () => {
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       const resourceMarker = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource");
       resourceMarker?.click();
+      window.LupenMultiplayerOverlay.render();
+      const resourceCard = document.querySelector(".lupen-target-card.resource");
+      const mineButton = resourceCard?.querySelector(".lupen-target-mine");
+      mineButton?.click();
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
-      const targetCard = document.querySelector(".lupen-target-card.player");
-      const engagePanel = document.getElementById("objectActionPanel");
-      const engageButton = document.getElementById("objectEngageBtn");
-      const pvpGuard = window.LupenMultiplayerClient.sendCombatIntent({
-        targetType: "remotePlayer",
-        targetPlayerId: "remote-session"
-      });
-      if (typeof engageTarget === "function") engageTarget();
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
       const chatText = document.getElementById("localChatFeed")?.textContent || "";
       const result = {
@@ -1103,14 +1112,17 @@ test.describe("Lupen browser smoke", () => {
         note: note?.textContent || "",
         ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
         resourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource").length,
+        selectedResourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource.is-selected").length,
         resourceTitle: resourceMarker?.getAttribute("title") || "",
+        resourceCardText: resourceCard?.textContent || "",
+        mineButtonDisabled: mineButton?.disabled ?? null,
         arrivingGhostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-arriving").length,
         dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
-        playerTargetText: targetCard?.textContent || "",
-        playerTargetSelected: document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "",
-        engageVisibleForPlayer: engagePanel?.classList.contains("visible") || false,
-        engageDisabledForPlayer: engageButton?.disabled ?? false,
-        engageTextForPlayer: engageButton?.textContent || "",
+        playerTargetText,
+        playerTargetSelected,
+        engageVisibleForPlayer,
+        engageDisabledForPlayer,
+        engageTextForPlayer,
         pvpGuardReason: pvpGuard?.reason || "",
         pvpGuardPreview: pvpGuard?.pvpRulePreview || "",
         pvpGuardDamageApplied: pvpGuard?.playerDamageApplied === true || pvpGuard?.pvpDamageApplied === true,
@@ -1131,7 +1143,11 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.note).toContain("Nightshade Hawk");
     expect(connectedHudState.ghostCount).toBe(1);
     expect(connectedHudState.resourceCount).toBe(1);
+    expect(connectedHudState.selectedResourceCount).toBe(1);
     expect(connectedHudState.resourceTitle).toContain("Iron asteroid");
+    expect(connectedHudState.resourceCardText).toContain("Iron Asteroid");
+    expect(connectedHudState.resourceCardText).toContain("Mine");
+    expect(connectedHudState.mineButtonDisabled).toBe(false);
     expect(connectedHudState.sentResourceMines).toEqual([
       { resourceId: "staging-resource-test-iron", currentNode: "Asteron Prime" }
     ]);
@@ -1154,6 +1170,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
     expect(connectedHudState.activityText).toContain("Remote Pilot entered Asteron Prime.");
     expect(connectedHudState.activityText).toContain("PvP disabled in safe areas.");
+    expect(connectedHudState.activityText).toContain("Mining Iron asteroid...");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([

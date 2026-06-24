@@ -33,6 +33,8 @@
   let stagingBountyRequested = false;
   let stagingFlowHintDismissed = false;
   let lastRewardPanelXpRefreshKey = "";
+  let selectedResourceId = "";
+  const resourceMineActivityAt = new Map();
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const remoteGhostSnapshots = new Map();
@@ -903,6 +905,21 @@
         filter: drop-shadow(0 0 13px rgba(127, 223, 255, 0.48));
       }
 
+      .lupen-mp-space-resource.is-selected {
+        opacity: 1;
+        filter: drop-shadow(0 0 16px rgba(245, 230, 140, 0.58));
+      }
+
+      .lupen-mp-space-resource.is-selected::after {
+        content: "";
+        position: absolute;
+        inset: -5px -6px 8px;
+        border: 1px solid rgba(245, 230, 140, 0.72);
+        border-radius: 8px;
+        pointer-events: none;
+        box-shadow: 0 0 12px rgba(245, 230, 140, 0.26);
+      }
+
       .lupen-mp-space-resource.is-hit {
         animation: lupen-mp-resource-hit 0.62s ease-out;
       }
@@ -999,6 +1016,17 @@
         --target-glow: rgba(42, 218, 255, 0.76);
       }
 
+      .lupen-target-card.resource {
+        --target-accent: #f5e68c;
+        --target-glow: rgba(245, 230, 140, 0.58);
+        border-color: rgba(245, 230, 140, 0.58);
+        box-shadow: 0 0 18px rgba(245, 206, 116, 0.18);
+      }
+
+      .lupen-target-card.resource .lupen-target-bar-fill.shield {
+        background: linear-gradient(90deg, #21b4ff, #f5e68c);
+      }
+
       .lupen-target-card.locked {
         animation: lupen-target-pulse 1.3s ease-in-out infinite;
       }
@@ -1035,6 +1063,26 @@
         background: rgba(0, 33, 52, 0.5);
         font: 900 7px/1 Arial, sans-serif;
         letter-spacing: 0.06em;
+      }
+
+      .lupen-target-card .lupen-target-mine {
+        min-width: 72px;
+        min-height: 24px;
+        margin-top: 2px;
+        border: 1px solid rgba(245, 230, 140, 0.68);
+        border-radius: 4px;
+        background: linear-gradient(180deg, rgba(203, 125, 34, 0.94), rgba(105, 58, 18, 0.92));
+        color: #fff7df;
+        cursor: pointer;
+        font: 900 9px/1 Arial, sans-serif;
+        text-transform: uppercase;
+        box-shadow: 0 0 11px rgba(245, 171, 75, 0.22);
+      }
+
+      .lupen-target-card .lupen-target-mine:disabled {
+        opacity: 0.48;
+        cursor: default;
+        box-shadow: none;
       }
 
       .lupen-target-bars {
@@ -1807,6 +1855,16 @@
     return String(target?.sessionId || target?.id || "");
   }
 
+  function getSelectedResourceId() {
+    return String(selectedResourceId || "");
+  }
+
+  function getSelectedResource(resources = []) {
+    const id = getSelectedResourceId();
+    if (!id) return null;
+    return resources.find((resource) => String(resource.id || "") === id && isSameCurrentNode(resource) && !resource.depleted) || null;
+  }
+
   function isSameCurrentNode(entity) {
     return normalizeNodeKey(entity?.currentNode) === normalizeNodeKey(getCurrentNodeName());
   }
@@ -1926,6 +1984,7 @@
     if (!bot?.id) return;
     if (!isSameCurrentNode(bot)) return;
     if (bot.disabled && !isMpDebugEnabled()) return;
+    selectedResourceId = "";
     const client = getClient();
     const status = client?.getStatus?.();
     if (!status?.enabled || !status?.isConnected) return;
@@ -1938,6 +1997,7 @@
   function selectRemotePlayer(player) {
     const playerId = String(player?.sessionId || player?.id || "");
     if (!playerId || !isSameCurrentNode(player)) return;
+    selectedResourceId = "";
     if (typeof global.selectRemotePlayerTarget === "function") {
       global.selectRemotePlayerTarget(playerId);
       scheduleRender();
@@ -1949,7 +2009,28 @@
     const client = getClient();
     const status = client?.getStatus?.();
     if (!status?.enabled || !status?.isConnected) return;
+    const now = Date.now();
+    const lastLogAt = Number(resourceMineActivityAt.get(resource.id) || 0);
+    if (now - lastLogAt > 6000) {
+      resourceMineActivityAt.set(resource.id, now);
+      global.addActivityLog?.(`Mining ${resource.resourceName || "resource"} asteroid...`);
+    }
     client.mineStagingResource?.(resource.id, { currentNode: getCurrentNodeName() });
+  }
+
+  function selectStagingResource(resource) {
+    if (!resource?.id || !isSameCurrentNode(resource) || resource.depleted) return;
+    selectedResourceId = String(resource.id);
+    try {
+      if (typeof global.disengageTarget === "function") {
+        global.disengageTarget(false);
+      } else if (typeof selectedTarget !== "undefined") {
+        selectedTarget = null;
+      }
+    } catch (_err) {
+      // Resource selection is overlay-only; failing to clear a local target is non-fatal.
+    }
+    scheduleRender();
   }
 
   function getCompactBotModeLabel() {
@@ -1981,7 +2062,7 @@
     return Math.max(10, Math.min(76, position.y + 8));
   }
 
-  function renderSelectedTargetCard(players, bots, status) {
+  function renderSelectedTargetCard(players, bots, resources, status) {
     global.document?.getElementById(spaceSelectionLayerId)?.remove();
     if (!isEnabled()) return;
     const spaceScreen = global.document?.getElementById("spaceScreen");
@@ -1989,6 +2070,7 @@
 
     const selectedBotId = getSelectedTargetBotId();
     const selectedPlayerId = getSelectedRemotePlayerId();
+    const selectedResource = getSelectedResource(resources);
     const selectedBot = selectedBotId
       ? bots.find((bot) => String(bot.id || "") === String(selectedBotId) && isSameCurrentNode(bot))
       : null;
@@ -1996,21 +2078,25 @@
       ? players.find((player) => String(player.sessionId || player.id || "") === selectedPlayerId && isSameCurrentNode(player))
       : null;
 
-    if (!selectedBot && !selectedPlayer) return;
+    if (!selectedBot && !selectedPlayer && !selectedResource) return;
 
     const layer = global.document.createElement("div");
     layer.id = spaceSelectionLayerId;
 
-    const target = selectedBot || selectedPlayer;
+    const target = selectedBot || selectedPlayer || selectedResource;
     const position = getSpacePercentPosition(target);
     const hitConfirmed = selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id && getShotEventAge(status) < 900;
     const card = global.document.createElement("div");
-    card.className = `lupen-target-card ${selectedBot ? "hostile" : "player"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
+    card.className = `lupen-target-card ${selectedBot ? "hostile" : selectedPlayer ? "player" : "resource"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
     card.style.left = `${position.x}%`;
     card.style.top = `${getCardTopForPosition(position)}%`;
 
     const title = global.document.createElement("strong");
-    title.textContent = selectedBot ? getBotLabel(selectedBot) : getPilotLabel(selectedPlayer);
+    title.textContent = selectedBot
+      ? getBotLabel(selectedBot)
+      : selectedPlayer
+        ? getPilotLabel(selectedPlayer)
+        : `${selectedResource.resourceName || "Resource"} Asteroid`;
     card.appendChild(title);
 
     if (selectedBot) {
@@ -2028,6 +2114,23 @@
       statusTag.className = "lupen-target-status";
       statusTag.textContent = getRemotePlayerPvpLabel(selectedPlayer, status);
       card.appendChild(statusTag);
+    } else if (selectedResource) {
+      const bars = global.document.createElement("div");
+      bars.className = "lupen-target-bars";
+      appendTargetBar(bars, selectedResource.hp, selectedResource.hpMax, "shield");
+      card.appendChild(bars);
+
+      const mineButton = global.document.createElement("button");
+      mineButton.type = "button";
+      mineButton.className = "lupen-target-mine";
+      mineButton.textContent = "Mine";
+      mineButton.disabled = !status?.isConnected || selectedResource.depleted === true;
+      mineButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        mineStagingResource(selectedResource);
+      });
+      card.appendChild(mineButton);
     }
 
     layer.appendChild(card);
@@ -2501,6 +2604,7 @@
     const layer = global.document.createElement("div");
     layer.id = spaceResourceLayerId;
     layer.setAttribute("aria-hidden", "true");
+    const selectedId = getSelectedResourceId();
 
     localResources.slice(0, 12).forEach((resource) => {
       const marker = global.document.createElement("button");
@@ -2510,14 +2614,15 @@
       marker.style.left = `${clampMapCoordinate(resource.x || 50)}%`;
       marker.style.top = `${clampMapCoordinate(resource.y || 50)}%`;
       marker.style.setProperty("--resource-glow", getResourceAccent(resource.resourceName));
-      marker.title = `${resource.resourceName || "Resource"} asteroid / ${getResourceHealthSummary(resource)} / click to mine`;
-      marker.setAttribute("aria-label", `Mine ${resource.resourceName || "resource"} asteroid`);
+      marker.title = `${resource.resourceName || "Resource"} asteroid / ${getResourceHealthSummary(resource)} / click to select`;
+      marker.setAttribute("aria-label", `Select ${resource.resourceName || "resource"} asteroid`);
+      if (String(resource.id || "") === selectedId) marker.classList.add("is-selected");
       if (resource.depleted) marker.classList.add("is-depleted");
       if (wasRecentlyMined(resource, status)) marker.classList.add("is-hit");
       marker.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        mineStagingResource(resource);
+        selectStagingResource(resource);
       });
 
       const rock = global.document.createElement("span");
@@ -4357,6 +4462,9 @@
     const resources = getClient()?.getResources?.() || [];
     const status = getClient()?.getStatus?.() || {};
     const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
+    if (selectedResourceId && !getSelectedResource(resources)) {
+      selectedResourceId = "";
+    }
     renderStatusChip(status);
     renderStagingFlowHint(status, selectedBot, players, bots);
     renderStagingBountyPanel(status);
@@ -4366,7 +4474,7 @@
     renderSpaceGhosts(players);
     renderSpaceResources(resources);
     renderSpaceBots(bots, players);
-    renderSelectedTargetCard(players, bots, status);
+    renderSelectedTargetCard(players, bots, resources, status);
     renderSpaceShot(allPlayers, bots, status);
     renderStagingCombatPanel(status, selectedBot);
     global.renderMultiplayerChatHud?.(status, allPlayers);
