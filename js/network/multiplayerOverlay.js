@@ -13,6 +13,7 @@
   const botLayerClass = "svg-mp-bot-layer";
   const botMarkerClass = "svg-mp-bot";
   const spaceLayerId = "lupenMultiplayerSpaceGhostLayer";
+  const spaceResourceLayerId = "lupenMultiplayerSpaceResourceLayer";
   const spaceBotLayerId = "lupenMultiplayerSpaceBotLayer";
   const spaceShotLayerId = "lupenMultiplayerSpaceShotLayer";
   const spaceSelectionLayerId = "lupenMultiplayerSpaceSelectionLayer";
@@ -126,6 +127,14 @@
         position: absolute;
         inset: 84px 18px 170px;
         z-index: 8;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      #${spaceResourceLayerId} {
+        position: absolute;
+        inset: 84px 18px 170px;
+        z-index: 7;
         pointer-events: none;
         overflow: hidden;
       }
@@ -875,6 +884,78 @@
         pointer-events: none;
       }
 
+      .lupen-mp-space-resource {
+        position: absolute;
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        width: 46px;
+        min-height: 48px;
+        transform: translate(-50%, -50%);
+        opacity: 0.84;
+        pointer-events: auto;
+        cursor: crosshair;
+        filter: drop-shadow(0 0 9px rgba(127, 223, 255, 0.26));
+      }
+
+      .lupen-mp-space-resource:hover {
+        opacity: 1;
+        filter: drop-shadow(0 0 13px rgba(127, 223, 255, 0.48));
+      }
+
+      .lupen-mp-space-resource.is-hit {
+        animation: lupen-mp-resource-hit 0.62s ease-out;
+      }
+
+      .lupen-mp-space-resource.is-depleted {
+        opacity: 0.32;
+        cursor: default;
+        pointer-events: none;
+      }
+
+      .lupen-mp-resource-rock {
+        width: 38px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 45% 55% 48% 52%;
+        background:
+          radial-gradient(circle at 35% 28%, rgba(242, 255, 255, 0.56), rgba(242, 255, 255, 0) 18%),
+          radial-gradient(circle at 58% 54%, var(--resource-glow), rgba(0, 0, 0, 0) 34%),
+          linear-gradient(145deg, rgba(43, 55, 66, 0.98), rgba(10, 16, 22, 0.94));
+        border: 1px solid rgba(201, 240, 255, 0.3);
+        box-shadow: inset -5px -6px 8px rgba(0, 0, 0, 0.42), 0 0 10px var(--resource-glow);
+      }
+
+      .lupen-mp-resource-rock img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+        opacity: 0.82;
+        pointer-events: none;
+      }
+
+      .lupen-mp-resource-bars {
+        width: 42px;
+        height: 4px;
+        border: 1px solid rgba(137, 230, 255, 0.34);
+        background: rgba(0, 0, 0, 0.48);
+        overflow: hidden;
+      }
+
+      .lupen-mp-resource-bars span {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #21b4ff, #f5e68c);
+        box-shadow: 0 0 8px rgba(102, 225, 255, 0.5);
+      }
+
+      @keyframes lupen-mp-resource-hit {
+        0% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 8px rgba(127, 223, 255, 0.28)); }
+        38% { transform: translate(-50%, -50%) scale(1.08); filter: drop-shadow(0 0 20px rgba(255, 231, 142, 0.74)); }
+        100% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 9px rgba(127, 223, 255, 0.26)); }
+      }
+
       .lupen-target-card {
         position: absolute;
         transform: translate(-50%, 0);
@@ -1296,6 +1377,7 @@
 
   function removeSpaceLayer() {
     global.document?.getElementById(spaceLayerId)?.remove();
+    global.document?.getElementById(spaceResourceLayerId)?.remove();
     global.document?.getElementById(spaceBotLayerId)?.remove();
     global.document?.getElementById(spaceShotLayerId)?.remove();
   }
@@ -1729,6 +1811,37 @@
     return normalizeNodeKey(entity?.currentNode) === normalizeNodeKey(getCurrentNodeName());
   }
 
+  function getResourceHealthSummary(resource) {
+    if (!resource) return "none";
+    const hp = `${Math.round(Number(resource.hp || 0))}/${Math.round(Number(resource.hpMax || 0))}`;
+    return `${resource.depleted ? "DEPLETED / " : ""}${resource.resourceName || "Resource"} HP ${hp}`;
+  }
+
+  function getResourceEventAge(status = getClient()?.getStatus?.()) {
+    return Date.now() - Number(status?.lastStagingResourceEvent?.receivedAt || status?.lastStagingResourceEvent?.timestamp || 0);
+  }
+
+  function wasRecentlyMined(resource, status = getClient()?.getStatus?.()) {
+    const event = status?.lastStagingResourceEvent;
+    if (!resource?.id || !event?.resourceId || event.resourceId !== resource.id) return false;
+    return getResourceEventAge(status) < 1100;
+  }
+
+  function getResourceAccent(resourceName = "") {
+    const key = String(resourceName || "").toLowerCase();
+    if (key.includes("copper")) return "rgba(255, 153, 83, 0.5)";
+    if (key.includes("cobalt")) return "rgba(95, 152, 255, 0.52)";
+    if (key.includes("titanium")) return "rgba(223, 245, 255, 0.5)";
+    return "rgba(158, 224, 255, 0.46)";
+  }
+
+  function getResourceImage(resource) {
+    if (typeof global.getCommodityImage === "function") {
+      return global.getCommodityImage(resource?.resourceName || resource?.name || "Iron");
+    }
+    return "";
+  }
+
   function wasRecentlyHit(bot, status = getClient()?.getStatus?.()) {
     const response = status?.lastCombatResponse;
     if (!bot?.id || !response?.ok || response.targetBotId !== bot.id) return false;
@@ -1829,6 +1942,14 @@
       global.selectRemotePlayerTarget(playerId);
       scheduleRender();
     }
+  }
+
+  function mineStagingResource(resource) {
+    if (!resource?.id || !isSameCurrentNode(resource) || resource.depleted) return;
+    const client = getClient();
+    const status = client?.getStatus?.();
+    if (!status?.enabled || !status?.isConnected) return;
+    client.mineStagingResource?.(resource.id, { currentNode: getCurrentNodeName() });
   }
 
   function getCompactBotModeLabel() {
@@ -2357,6 +2478,65 @@
         ship.appendChild(fallback);
       }
       marker.appendChild(ship);
+
+      layer.appendChild(marker);
+    });
+
+    spaceScreen.appendChild(layer);
+  }
+
+  function renderSpaceResources(resources) {
+    global.document?.getElementById(spaceResourceLayerId)?.remove();
+    if (!isEnabled()) return;
+
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return;
+
+    const localResources = resources.filter((resource) => isSameCurrentNode(resource) && (!resource.depleted || isMpDebugEnabled()));
+    if (!localResources.length) return;
+
+    ensureStyles();
+
+    const status = getClient()?.getStatus?.() || {};
+    const layer = global.document.createElement("div");
+    layer.id = spaceResourceLayerId;
+    layer.setAttribute("aria-hidden", "true");
+
+    localResources.slice(0, 12).forEach((resource) => {
+      const marker = global.document.createElement("button");
+      marker.type = "button";
+      marker.className = "lupen-mp-space-resource";
+      marker.dataset.resourceId = resource.id || "";
+      marker.style.left = `${clampMapCoordinate(resource.x || 50)}%`;
+      marker.style.top = `${clampMapCoordinate(resource.y || 50)}%`;
+      marker.style.setProperty("--resource-glow", getResourceAccent(resource.resourceName));
+      marker.title = `${resource.resourceName || "Resource"} asteroid / ${getResourceHealthSummary(resource)} / click to mine`;
+      marker.setAttribute("aria-label", `Mine ${resource.resourceName || "resource"} asteroid`);
+      if (resource.depleted) marker.classList.add("is-depleted");
+      if (wasRecentlyMined(resource, status)) marker.classList.add("is-hit");
+      marker.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        mineStagingResource(resource);
+      });
+
+      const rock = global.document.createElement("span");
+      rock.className = "lupen-mp-resource-rock";
+      const imageSrc = getResourceImage(resource);
+      if (imageSrc) {
+        const image = global.document.createElement("img");
+        image.src = imageSrc;
+        image.alt = "";
+        rock.appendChild(image);
+      }
+      marker.appendChild(rock);
+
+      const bars = global.document.createElement("span");
+      bars.className = "lupen-mp-resource-bars";
+      const fill = global.document.createElement("span");
+      fill.style.width = `${getPercent(resource.hp, resource.hpMax)}%`;
+      bars.appendChild(fill);
+      marker.appendChild(bars);
 
       layer.appendChild(marker);
     });
@@ -3894,7 +4074,7 @@
     spaceScreen.appendChild(panel);
   }
 
-  function renderDiagnostics(players, bots) {
+  function renderDiagnostics(players, bots, resources = []) {
     removeDiagnosticsPanel();
     if (!isEnabled()) return;
     if (!isMpDebugEnabled()) return;
@@ -3904,7 +4084,9 @@
     const status = getClient()?.getStatus?.() || {};
     const sameNodePlayers = getSameNodePlayers(players);
     const sameNodeBots = getSameNodeBots(bots);
+    const sameNodeResources = resources.filter((resource) => isSameCurrentNode(resource));
     const inspectedBot = getInspectedBot(bots);
+    const inspectedResource = sameNodeResources[0] || resources[0] || null;
     const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
     const panel = global.document.createElement("div");
     panel.id = diagnosticsPanelId;
@@ -3943,6 +4125,15 @@
       setDiagnosticsRow(panel, "remote ships", getShipImageStatus(players));
     }
     setDiagnosticsRow(panel, isStagingMode(status) ? "staging bots" : "dev bots", `${bots.length} total / ${sameNodeBots.length} same node`);
+    if (isStagingMode(status)) {
+      setDiagnosticsRow(panel, "resources", `${resources.length} total / ${sameNodeResources.length} same node`);
+      setDiagnosticsRow(panel, "resource inspect", getResourceHealthSummary(inspectedResource));
+      if (status.lastStagingResourceEvent) {
+        const event = status.lastStagingResourceEvent;
+        const action = String(event.type || "resource").replace("stagingResource:", "");
+        setDiagnosticsRow(panel, "resource event", `${action} / ${event.resourceName || "Resource"} / +${Math.round(Number(event.cargoDelta || 0))}`);
+      }
+    }
     setDiagnosticsRow(panel, "bot update", formatRelativeAge(status.lastBotUpdateAt));
     if (isStagingMode(status)) {
       const weaponIntent = getClient()?.getStagingWeaponIntent?.() || {};
@@ -4163,6 +4354,7 @@
     const players = getClient()?.getPlayers?.({ includeSelf: false }) || [];
     const allPlayers = getClient()?.getPlayers?.({ includeSelf: true }) || [];
     const bots = getClient()?.getBots?.() || [];
+    const resources = getClient()?.getResources?.() || [];
     const status = getClient()?.getStatus?.() || {};
     const selectedBot = getClient()?.getSelectedStagingBot?.() || null;
     renderStatusChip(status);
@@ -4172,12 +4364,13 @@
     renderSectorGhosts(players);
     renderSectorBots(bots);
     renderSpaceGhosts(players);
+    renderSpaceResources(resources);
     renderSpaceBots(bots, players);
     renderSelectedTargetCard(players, bots, status);
     renderSpaceShot(allPlayers, bots, status);
     renderStagingCombatPanel(status, selectedBot);
     global.renderMultiplayerChatHud?.(status, allPlayers);
-    renderDiagnostics(players, bots);
+    renderDiagnostics(players, bots, resources);
   }
 
   function scheduleRender() {

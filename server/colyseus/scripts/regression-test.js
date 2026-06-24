@@ -172,6 +172,44 @@ function latestBotUpdateAt(room) {
   return botSnapshots(room).reduce((latest, bot) => Math.max(latest, Number(bot.lastUpdatedAt || 0)), 0);
 }
 
+function resourceCount(room) {
+  return room?.state?.resources?.size || 0;
+}
+
+function resourceSnapshots(room) {
+  return Array.from(room?.state?.resources?.values?.() || [])
+    .map((resource) => ({
+      id: resource.id,
+      resourceName: resource.resourceName,
+      currentNode: resource.currentNode,
+      x: resource.x,
+      y: resource.y,
+      hp: resource.hp,
+      hpMax: resource.hpMax,
+      yieldAmount: resource.yieldAmount,
+      depleted: resource.depleted,
+      depletedUntil: resource.depletedUntil,
+      lastUpdatedAt: resource.lastUpdatedAt
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function resourceById(room, resourceId) {
+  return resourceSnapshots(room).find((resource) => resource.id === resourceId) || null;
+}
+
+function assertResourceDisplayFields(room) {
+  resourceSnapshots(room).forEach((resource) => {
+    assert(resource.id, "Resource is missing a stable id.");
+    assert(resource.resourceName, `Resource ${resource.id} is missing resourceName.`);
+    assert(resource.currentNode, `Resource ${resource.id} is missing currentNode.`);
+    assert(Number(resource.hpMax) > 0, `Resource ${resource.id} has invalid hpMax.`);
+    assert(Number(resource.hp) >= 0 && Number(resource.hp) <= Number(resource.hpMax), `Resource ${resource.id} has invalid hp.`);
+    assert(Number(resource.yieldAmount) > 0, `Resource ${resource.id} has invalid yieldAmount.`);
+    assert(resource.depleted === true || resource.depleted === false, `Resource ${resource.id} is missing depleted state.`);
+  });
+}
+
 function assertAllowedBotNodes(room) {
   const allowedNodes = new Set(STAGING_BOT_ALLOWED_NODE_IDS);
   const invalidBot = botSnapshots(room).find((bot) => !allowedNodes.has(bot.currentNode));
@@ -4320,6 +4358,9 @@ try {
   const roomAShotEvents = [];
   const roomBShotEvents = [];
   const roomAReturnFireEvents = [];
+  const resourceShotEventsA = [];
+  const resourceShotEventsB = [];
+  const resourceDepletedEventsB = [];
   const rewardPreviewEvents = [];
   const bountyStatusEvents = [];
   roomA.onMessage("bot:disabled", (message) => botDisabledEvents.push(message));
@@ -4330,6 +4371,12 @@ try {
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
   roomA.onMessage("staging:return_fire", (message) => roomAReturnFireEvents.push(message));
   roomB.onMessage("staging:return_fire", () => {});
+  roomA.onMessage("stagingResource:shot", (message) => resourceShotEventsA.push(message));
+  roomB.onMessage("stagingResource:shot", (message) => resourceShotEventsB.push(message));
+  roomA.onMessage("stagingResource:depleted", () => {});
+  roomB.onMessage("stagingResource:depleted", (message) => resourceDepletedEventsB.push(message));
+  roomA.onMessage("stagingResource:respawned", () => {});
+  roomB.onMessage("stagingResource:respawned", () => {});
   roomA.onMessage("staging:reward_preview", (message) => rewardPreviewEvents.push(message));
   roomB.onMessage("staging:reward_preview", () => {});
   roomA.onMessage("stagingXp:botKillResult", () => {});
@@ -4982,6 +5029,96 @@ try {
       botSnapshotKey(roomA) === botSnapshotKey(roomB);
   }, 7000);
   console.log("staging bots stayed passive and position-stable before combat");
+
+  await waitFor("server resources to appear", () => resourceCount(roomA) >= 4 && resourceCount(roomB) >= 4);
+  assertResourceDisplayFields(roomA);
+  assertResourceDisplayFields(roomB);
+  const inspectedResourceBeforeMine = resourceSnapshots(roomA)[0];
+  assert(inspectedResourceBeforeMine, "No staging resource available for mining test.");
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    shipName: "LF-1 Origin",
+    currentNode: inspectedResourceBeforeMine.currentNode,
+    x: inspectedResourceBeforeMine.x,
+    y: inspectedResourceBeforeMine.y
+  });
+  await waitFor("client A to move to staging resource node", () => {
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === inspectedResourceBeforeMine.currentNode;
+  });
+
+  const firstResourceMine = await expectRoomMessage(roomA, "stagingResource:mineResult", () => {
+    roomA.send("stagingResource:mine", {
+      resourceId: inspectedResourceBeforeMine.id,
+      weaponId: "pulseLaser",
+      weaponFamily: "pulse",
+      damage: 9999,
+      currentNode: inspectedResourceBeforeMine.currentNode,
+      timestamp: Date.now()
+    });
+  });
+  assert(firstResourceMine?.ok === true, "Valid staging resource mine did not resolve.");
+  assert(firstResourceMine?.serverAuthoritative === true, "Resource mine was not marked server-authoritative.");
+  assert(firstResourceMine?.damage === 10, `Unexpected Pulse Laser resource mining damage: ${firstResourceMine?.damage}`);
+  assert(firstResourceMine?.cargoDelta === 0, "Non-depleting resource mine unexpectedly paid cargo.");
+  assert(firstResourceMine?.cargoWritten === false && firstResourceMine?.saveWritten === false, "Resource mine reported server cargo/save writes.");
+  await waitFor("resource mine damage to replicate to both clients", () => {
+    const resourceA = resourceById(roomA, inspectedResourceBeforeMine.id);
+    const resourceB = resourceById(roomB, inspectedResourceBeforeMine.id);
+    return resourceA && resourceB &&
+      resourceA.hp === firstResourceMine.hp &&
+      resourceB.hp === firstResourceMine.hp &&
+      resourceA.depleted === false &&
+      resourceB.depleted === false;
+  });
+  assert(resourceShotEventsA.some((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10), "Client A did not receive staging resource shot.");
+  assert(resourceShotEventsB.some((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10), "Client B did not receive staging resource shot.");
+
+  let depletedMine = null;
+  for (let attempt = 0; attempt < 6 && !depletedMine; attempt += 1) {
+    await sleep(1050);
+    const result = await expectRoomMessage(roomA, "stagingResource:mineResult", () => {
+      roomA.send("stagingResource:mine", {
+        resourceId: inspectedResourceBeforeMine.id,
+        weaponId: "pulseLaser",
+        weaponFamily: "pulse",
+        currentNode: inspectedResourceBeforeMine.currentNode,
+        timestamp: Date.now()
+      });
+    });
+    if (result?.depleted === true) depletedMine = result;
+  }
+  assert(depletedMine, "Staging resource did not deplete after repeated valid mining.");
+  assert(depletedMine.cargoDelta === inspectedResourceBeforeMine.yieldAmount, `Unexpected resource payout: ${depletedMine.cargoDelta}`);
+  assert(depletedMine.localApplySuggested === true, "Resource depletion did not suggest local save-path cargo application.");
+  assert(depletedMine.cargoWritten === false && depletedMine.saveWritten === false, "Resource depletion reported server cargo/save writes.");
+  assert(depletedMine.resourceRewardId, "Resource depletion did not include an idempotent reward id.");
+  await waitFor("depleted resource to replicate to both clients", () => {
+    const resourceA = resourceById(roomA, inspectedResourceBeforeMine.id);
+    const resourceB = resourceById(roomB, inspectedResourceBeforeMine.id);
+    return resourceA && resourceB &&
+      resourceA.depleted === true &&
+      resourceB.depleted === true &&
+      resourceA.hp === 0 &&
+      resourceB.hp === 0 &&
+      resourceB.depletedUntil === resourceA.depletedUntil;
+  });
+  assert(resourceDepletedEventsB.some((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.cargoDelta === inspectedResourceBeforeMine.yieldAmount), "Client B did not receive shared resource depletion event.");
+
+  const depletedResourceBeforeDuplicate = resourceById(roomA, inspectedResourceBeforeMine.id);
+  const duplicateResourceMine = await expectRoomMessage(roomA, "stagingResource:mineRejected", () => {
+    roomA.send("stagingResource:mine", {
+      resourceId: inspectedResourceBeforeMine.id,
+      weaponId: "pulseLaser",
+      currentNode: inspectedResourceBeforeMine.currentNode,
+      timestamp: Date.now()
+    });
+  });
+  assert(duplicateResourceMine?.reason === "staging_resource_depleted", `Unexpected duplicate resource mine reason: ${duplicateResourceMine?.reason}`);
+  assert(duplicateResourceMine?.cargoDelta === 0, "Duplicate depleted resource mine reported cargo.");
+  const depletedResourceAfterDuplicate = resourceById(roomA, inspectedResourceBeforeMine.id);
+  assert(depletedResourceAfterDuplicate?.hp === depletedResourceBeforeDuplicate?.hp, "Duplicate depleted resource mine changed hp.");
+  console.log("server-owned staging resource mining depleted once, paid once, and blocked duplicates");
 
   const inspectedBotBeforeCombat = botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");

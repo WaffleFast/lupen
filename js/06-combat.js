@@ -936,6 +936,57 @@ function depositLootToCargo(drops) {
   return { collected, overflow, collectedAmount, overflowAmount };
 }
 
+function applyStagingResourceMineResult(result = {}) {
+  const resourceName = String(result.resourceName || "").trim();
+  const cargoDelta = Math.max(0, Math.round(Number(result.cargoDelta || 0)));
+  if (!result || result.ok !== true || cargoDelta <= 0 || !mineralKeys.includes(resourceName)) {
+    return { applied: false, reason: "invalid_resource_award", collectedAmount: 0, overflowAmount: 0 };
+  }
+
+  if (!window.lupenStagingResourceAwardedKeys) {
+    window.lupenStagingResourceAwardedKeys = new Set();
+  }
+
+  const awardKey = String(
+    result.resourceRewardId ||
+    result.depletionInstanceId ||
+    `${result.resourceId || resourceName}:${result.depletedUntil || result.receivedAt || Date.now()}:${cargoDelta}`
+  );
+
+  if (window.lupenStagingResourceAwardedKeys.has(awardKey)) {
+    return { applied: false, reason: "duplicate_resource_award", collectedAmount: 0, overflowAmount: 0, awardKey };
+  }
+
+  window.lupenStagingResourceAwardedKeys.add(awardKey);
+  const deposit = depositLootToCargo({ [resourceName]: cargoDelta });
+  const collectedAmount = Math.max(0, Number(deposit.collectedAmount || 0));
+  const overflowAmount = Math.max(0, Number(deposit.overflowAmount || 0));
+  const collectedText = collectedAmount > 0
+    ? `+${formatNumber(collectedAmount)} ${resourceName}`
+    : "cargo full";
+  const overflowText = overflowAmount > 0
+    ? ` ${formatNumber(overflowAmount)} left as salvage.`
+    : "";
+  const message = `${resourceName} asteroid depleted. ${collectedText}.${overflowText}`;
+
+  if (typeof addActivityLog === "function") addActivityLog(message);
+  if (typeof addHudToast === "function") addHudToast(message);
+  updateTargetPanel();
+  saveGame();
+
+  return {
+    applied: collectedAmount > 0 || overflowAmount > 0,
+    reason: "staging_resource_award_applied",
+    resourceName,
+    cargoDelta,
+    collectedAmount,
+    overflowAmount,
+    awardKey
+  };
+}
+
+window.applyStagingResourceMineResult = applyStagingResourceMineResult;
+
 function collectLoot(mineralToCollect = null) {
   const loot = lootByNode[currentNode];
   if (!loot) return;

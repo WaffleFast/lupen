@@ -190,6 +190,8 @@ const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_BOT_RETURN_FIRE_DAMAGE = 4;
 const STAGING_BOT_RETURN_FIRE_INTERVAL_MS = 2600;
 const STAGING_BOT_RETURN_FIRE_VARIANCE_MS = 650;
+const STAGING_RESOURCE_RESPAWN_MS = 12000;
+const STAGING_RESOURCE_MINE_COOLDOWN_MS = 950;
 const STAGING_WEAPON_STATS = Object.freeze({
   heavyLance: Object.freeze({
     key: "heavyLance",
@@ -267,6 +269,17 @@ const DUMMY_BOT_DEFINITIONS = [
   { id: "dev-bot-erebus-10", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Mid East B", level: 1, shield: 28, hull: 56 }
 ];
 
+const STAGING_RESOURCE_DEFINITIONS = [
+  { id: "staging-resource-iron-upper-core-west", resourceName: "Iron", startNode: "Upper Lane Core West", x: 42, y: 35, hp: 30, yield: 12 },
+  { id: "staging-resource-copper-upper-core-east", resourceName: "Copper", startNode: "Upper Lane Core East", x: 58, y: 35, hp: 30, yield: 12 },
+  { id: "staging-resource-iron-upper-gate", resourceName: "Iron", startNode: "Upper Gate Core", x: 44, y: 45, hp: 32, yield: 14 },
+  { id: "staging-resource-cobalt-upper-gate-east", resourceName: "Cobalt", startNode: "Upper Gate East", x: 78, y: 41, hp: 34, yield: 10 },
+  { id: "staging-resource-iron-lower-core-west", resourceName: "Iron", startNode: "Lower Lane Core West", x: 42, y: 65, hp: 30, yield: 12 },
+  { id: "staging-resource-copper-lower-core-east", resourceName: "Copper", startNode: "Lower Lane Core East", x: 58, y: 65, hp: 30, yield: 12 },
+  { id: "staging-resource-cobalt-lower-gate", resourceName: "Cobalt", startNode: "Lower Gate Core", x: 52, y: 55, hp: 34, yield: 10 },
+  { id: "staging-resource-titanium-lower-apex", resourceName: "Titanium", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 8 }
+];
+
 export class LupenSectorPlayer extends Schema {
   constructor(values = {}) {
     super();
@@ -335,16 +348,37 @@ type("boolean")(LupenSectorBot.prototype, "visualOnly");
 type("boolean")(LupenSectorBot.prototype, "disabled");
 type("number")(LupenSectorBot.prototype, "disabledUntil");
 
+export class LupenSectorResource extends Schema {
+  constructor(values = {}) {
+    super();
+    Object.assign(this, values);
+  }
+}
+
+type("string")(LupenSectorResource.prototype, "id");
+type("string")(LupenSectorResource.prototype, "resourceName");
+type("string")(LupenSectorResource.prototype, "currentNode");
+type("number")(LupenSectorResource.prototype, "x");
+type("number")(LupenSectorResource.prototype, "y");
+type("number")(LupenSectorResource.prototype, "hp");
+type("number")(LupenSectorResource.prototype, "hpMax");
+type("number")(LupenSectorResource.prototype, "yieldAmount");
+type("number")(LupenSectorResource.prototype, "lastUpdatedAt");
+type("boolean")(LupenSectorResource.prototype, "depleted");
+type("number")(LupenSectorResource.prototype, "depletedUntil");
+
 export class LupenSectorState extends Schema {
   constructor() {
     super();
     this.players = new MapSchema();
     this.bots = new MapSchema();
+    this.resources = new MapSchema();
   }
 }
 
 type({ map: LupenSectorPlayer })(LupenSectorState.prototype, "players");
 type({ map: LupenSectorBot })(LupenSectorState.prototype, "bots");
+type({ map: LupenSectorResource })(LupenSectorState.prototype, "resources");
 
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -1090,10 +1124,16 @@ export class LupenSectorRoom extends Room {
     // Session-only return-fire cooldowns for Map 1 staging bots. The room never
     // persists player damage, saves, cargo loss, PvP, credits, loot, or death.
     this.stagingBotReturnFireCooldowns = new Map();
+    // Server-owned asteroid/resource mining state for staging. Rewards are
+    // authorized once per depletion and applied by the owning browser save path.
+    this.stagingResourceMineCooldowns = new Map();
+    this.stagingResourcePayoutKeys = new Set();
 
     this.spawnDummyBots();
+    this.spawnStagingResources();
     this.botInterval = this.clock.setInterval(() => {
       this.updateStagingBots();
+      this.updateStagingResources();
     }, BOT_MOVE_TICK_MS);
 
     this.onMessage("ping", (client, message = {}) => {
@@ -1143,6 +1183,10 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("target:clear", (client) => {
       this.clearStagingBotSelection(client, "target:clear");
+    });
+
+    this.onMessage("stagingResource:mine", (client, message = {}) => {
+      this.resolveResourceMineIntent(client, message, "stagingResource:mine");
     });
 
     // Staging-only reward flow preparation. This validates a recent preview
@@ -1367,6 +1411,7 @@ export class LupenSectorRoom extends Room {
     this.state.players.delete(client.sessionId);
     this.stagingBountyStates.delete(client.sessionId);
     this.clearStagingReturnFireForSession(client.sessionId);
+    this.stagingResourceMineCooldowns.delete(client.sessionId);
   }
 
   onDispose() {
@@ -1400,6 +1445,32 @@ export class LupenSectorRoom extends Room {
     });
   }
 
+  spawnStagingResources() {
+    const now = Date.now();
+
+    STAGING_RESOURCE_DEFINITIONS.forEach((definition) => {
+      const position = BOT_NODE_POSITIONS.get(definition.startNode) || {
+        node: definition.startNode,
+        x: definition.x,
+        y: definition.y
+      };
+      const hp = Math.max(1, Math.round(Number(definition.hp || 30)));
+      this.state.resources.set(definition.id, new LupenSectorResource({
+        id: definition.id,
+        resourceName: definition.resourceName || "Iron",
+        currentNode: position.node || definition.startNode,
+        x: clampNumber(Number(definition.x ?? position.x ?? 50), 4, 96),
+        y: clampNumber(Number(definition.y ?? position.y ?? 50), 4, 96),
+        hp,
+        hpMax: hp,
+        yieldAmount: Math.max(1, Math.round(Number(definition.yield || 10))),
+        lastUpdatedAt: now,
+        depleted: false,
+        depletedUntil: 0
+      }));
+    });
+  }
+
   updateStagingBots() {
     const now = Date.now();
     this.botStep += 1;
@@ -1422,6 +1493,30 @@ export class LupenSectorRoom extends Room {
     });
 
     this.reconcilePlayerSelections();
+  }
+
+  updateStagingResources() {
+    const now = Date.now();
+
+    this.state.resources.forEach((resource) => {
+      if (!resource.depleted) return;
+      if (now < Number(resource.depletedUntil || 0)) return;
+
+      resource.hp = Number(resource.hpMax || 1);
+      resource.depleted = false;
+      resource.depletedUntil = 0;
+      resource.lastUpdatedAt = now;
+      this.broadcast("stagingResource:respawned", {
+        ok: true,
+        resourceId: resource.id,
+        resourceName: resource.resourceName || "Resource",
+        currentNode: resource.currentNode,
+        hp: resource.hp,
+        hpMax: resource.hpMax,
+        depleted: false,
+        receivedAt: now
+      });
+    });
   }
 
   getNextBotNode(currentNode, index = 0) {
@@ -1555,6 +1650,153 @@ export class LupenSectorRoom extends Room {
       receivedAt: Date.now(),
       ...extra
     });
+  }
+
+  sendResourceMineRejected(client, reason, message = {}, messageType = "stagingResource:mine", extra = {}) {
+    const player = this.state.players.get(client.sessionId);
+    const resourceId = getStringValue(message.resourceId || message.targetResourceId);
+    const resource = resourceId ? this.state.resources.get(resourceId) : null;
+    client.send("stagingResource:mineRejected", {
+      ok: false,
+      reason,
+      messageType,
+      sessionId: client.sessionId,
+      resourceId,
+      resourceName: resource?.resourceName || "",
+      currentNode: player?.currentNode || getStringValue(message.currentNode) || "",
+      resourceNode: resource?.currentNode || "",
+      cargoDelta: 0,
+      cargoWritten: false,
+      saveWritten: false,
+      serverAuthoritative: true,
+      receivedAt: Date.now(),
+      ...extra
+    });
+  }
+
+  resolveResourceMineIntent(client, message = {}, messageType = "stagingResource:mine") {
+    const player = this.touchPlayer(client.sessionId);
+    const now = Date.now();
+    const resourceId = getStringValue(message.resourceId || message.targetResourceId);
+    const resource = resourceId ? this.state.resources.get(resourceId) : null;
+    const clientCurrentNode = getStringValue(message.currentNode, player?.currentNode || "");
+    let validationReason = "";
+
+    if (!player) validationReason = "session_player_not_found";
+    if (!validationReason && !resourceId) validationReason = "missing_resource_id";
+    if (!validationReason && !resource) validationReason = `unknown_staging_resource: ${resourceId}`;
+
+    if (!validationReason && clientCurrentNode && clientCurrentNode !== player.currentNode && clientCurrentNode === resource.currentNode) {
+      player.currentNode = clientCurrentNode;
+    }
+
+    if (!validationReason && clientCurrentNode && clientCurrentNode !== player.currentNode) {
+      validationReason = "resource node does not match player node";
+    }
+
+    if (!validationReason && resource.currentNode !== player.currentNode) {
+      validationReason = "player and staging resource are not in the same node";
+    }
+
+    if (!validationReason && resource.depleted) {
+      validationReason = "staging_resource_depleted";
+    }
+
+    const nextMineAt = Number(this.stagingResourceMineCooldowns.get(client.sessionId) || 0);
+    if (!validationReason && nextMineAt > now) {
+      this.sendResourceMineRejected(client, "staging_resource_mine_cooldown", message, messageType, {
+        cooldownRemainingMs: Math.max(0, Math.ceil(nextMineAt - now))
+      });
+      return;
+    }
+
+    if (validationReason) {
+      this.sendResourceMineRejected(client, validationReason, message, messageType);
+      return;
+    }
+
+    const resolvedWeapon = resolveStagingWeapon(message, player);
+    const mineDamage = Math.max(1, Math.round(Number(resolvedWeapon.damage || STAGING_TEST_DAMAGE)));
+    const hpBefore = Math.max(0, Number(resource.hp || 0));
+    resource.hp = clampNumber(hpBefore - mineDamage, 0, Number(resource.hpMax || 1));
+    resource.lastUpdatedAt = now;
+    this.stagingResourceMineCooldowns.set(client.sessionId, now + STAGING_RESOURCE_MINE_COOLDOWN_MS);
+
+    const depleted = resource.hp <= 0;
+    let resourceRewardId = "";
+    let cargoDelta = 0;
+
+    if (depleted) {
+      resource.depleted = true;
+      resource.depletedUntil = now + STAGING_RESOURCE_RESPAWN_MS;
+      resourceRewardId = `staging_resource:${resource.id}:${resource.depletedUntil}`;
+      if (!this.stagingResourcePayoutKeys.has(resourceRewardId)) {
+        this.stagingResourcePayoutKeys.add(resourceRewardId);
+        cargoDelta = Math.max(1, Math.round(Number(resource.yieldAmount || 1)));
+      }
+    }
+
+    const basePayload = {
+      ok: true,
+      messageType,
+      sessionId: client.sessionId,
+      minerSessionId: client.sessionId,
+      minerDisplayName: player.displayName || "Pilot",
+      resourceId: resource.id,
+      resourceName: resource.resourceName || "Resource",
+      currentNode: resource.currentNode,
+      damage: mineDamage,
+      hpBefore,
+      hp: resource.hp,
+      hpMax: resource.hpMax,
+      depleted,
+      depletedUntil: resource.depletedUntil || 0,
+      weaponId: resolvedWeapon.weaponKey,
+      weaponKey: resolvedWeapon.weaponKey,
+      weaponName: resolvedWeapon.weaponName,
+      weaponFamily: resolvedWeapon.weaponFamily,
+      damageSource: resolvedWeapon.damageSource,
+      fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
+      clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,
+      serverAuthoritative: true,
+      cargoDelta,
+      cargoWritten: false,
+      saveWritten: false,
+      localApplySuggested: cargoDelta > 0,
+      resourceRewardId,
+      rewardsGranted: cargoDelta > 0,
+      receivedAt: now
+    };
+
+    client.send("stagingResource:mineResult", basePayload);
+    this.broadcast("stagingResource:shot", {
+      ...basePayload,
+      cargoDelta: 0,
+      rewardsGranted: false,
+      resourceRewardId: "",
+      timestamp: now
+    });
+
+    if (depleted) {
+      this.broadcast("stagingResource:depleted", {
+        ok: true,
+        minerSessionId: client.sessionId,
+        minerDisplayName: player.displayName || "Pilot",
+        resourceId: resource.id,
+        resourceName: resource.resourceName || "Resource",
+        currentNode: resource.currentNode,
+        hp: resource.hp,
+        hpMax: resource.hpMax,
+        depleted: true,
+        depletedUntil: resource.depletedUntil,
+        cargoDelta,
+        cargoWritten: false,
+        saveWritten: false,
+        serverAuthoritative: true,
+        resourceRewardId,
+        receivedAt: now
+      });
+    }
   }
 
   selectStagingBot(client, message = {}, messageType = "target:select") {

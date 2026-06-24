@@ -57,6 +57,8 @@
     lastStagingBountyList: null,
     lastStagingBountyStatus: null,
     lastStagingBountyClaimResult: null,
+    lastStagingResourceMineResult: null,
+    lastStagingResourceEvent: null,
     chatMessages: [],
     presenceEvents: [],
     lastError: null
@@ -83,6 +85,7 @@
   let stagingCombatRefreshRetryTimer = null;
   const playersById = new Map();
   const botsById = new Map();
+  const resourcesById = new Map();
   const stagingActivityLogKeys = new Set();
   const chatMessageKeys = new Set();
 
@@ -453,6 +456,7 @@
       connection.sessionId = null;
       playersById.clear();
       botsById.clear();
+      resourcesById.clear();
       connection.presenceEvents = [];
       clearChatMessages();
       notifyServerState(null);
@@ -496,6 +500,7 @@
     identity.authReconnectAttempted = true;
     playersById.clear();
     botsById.clear();
+    resourcesById.clear();
     connection.presenceEvents = [];
     clearChatMessages();
     notifyServerState(null);
@@ -1689,6 +1694,54 @@
     };
   }
 
+  function normalizeStagingResourceEvent(message) {
+    if (!message || typeof message !== "object") {
+      return {
+        ok: false,
+        reason: "missing_resource_event",
+        resourceId: "",
+        resourceName: "Resource",
+        currentNode: "",
+        cargoDelta: 0,
+        receivedAt: Date.now()
+      };
+    }
+
+    return {
+      ok: message.ok === true,
+      reason: String(message.reason || (message.ok === false ? "staging_resource_event_rejected" : "staging_resource_event")),
+      sessionId: String(message.sessionId || ""),
+      minerSessionId: String(message.minerSessionId || message.sessionId || ""),
+      minerDisplayName: String(message.minerDisplayName || "Pilot"),
+      resourceId: String(message.resourceId || message.targetResourceId || ""),
+      resourceName: String(message.resourceName || message.name || "Resource"),
+      currentNode: String(message.currentNode || ""),
+      resourceNode: String(message.resourceNode || message.currentNode || ""),
+      damage: Number.isFinite(Number(message.damage)) ? Math.max(0, Number(message.damage)) : 0,
+      hpBefore: Number.isFinite(Number(message.hpBefore)) ? Math.max(0, Number(message.hpBefore)) : null,
+      hp: Number.isFinite(Number(message.hp)) ? Math.max(0, Number(message.hp)) : 0,
+      hpMax: Number.isFinite(Number(message.hpMax)) ? Math.max(1, Number(message.hpMax)) : 1,
+      depleted: message.depleted === true,
+      depletedUntil: Number.isFinite(Number(message.depletedUntil)) ? Number(message.depletedUntil) : 0,
+      weaponKey: String(message.weaponKey || message.weaponId || ""),
+      weaponName: String(message.weaponName || ""),
+      weaponFamily: String(message.weaponFamily || ""),
+      damageSource: String(message.damageSource || ""),
+      fallbackDamageUsed: message.fallbackDamageUsed === true,
+      clientDamageIgnored: message.clientDamageIgnored === true,
+      serverAuthoritative: message.serverAuthoritative === true,
+      localApplySuggested: message.localApplySuggested === true,
+      cargoDelta: Number.isFinite(Number(message.cargoDelta)) ? Math.max(0, Math.round(Number(message.cargoDelta))) : 0,
+      cargoWritten: message.cargoWritten === true,
+      saveWritten: message.saveWritten === true,
+      resourceRewardId: String(message.resourceRewardId || message.depletionInstanceId || ""),
+      rewardsGranted: message.rewardsGranted === true,
+      cooldownRemainingMs: Number.isFinite(Number(message.cooldownRemainingMs)) ? Math.max(0, Number(message.cooldownRemainingMs)) : 0,
+      timestamp: Number.isFinite(Number(message.timestamp)) ? Number(message.timestamp) : 0,
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
+    };
+  }
+
   function normalizeStagingTradeOffer(offer) {
     if (!offer || typeof offer !== "object") return null;
 
@@ -2086,10 +2139,53 @@
     });
   }
 
+  function normalizeResource(resource, fallbackId = "") {
+    if (!resource) return null;
+
+    const id = String(resource.id || fallbackId || "");
+    if (!id) return null;
+
+    return {
+      id,
+      resourceName: String(resource.resourceName || resource.name || "Resource"),
+      name: String(resource.resourceName || resource.name || "Resource"),
+      x: Number.isFinite(Number(resource.x)) ? Number(resource.x) : 50,
+      y: Number.isFinite(Number(resource.y)) ? Number(resource.y) : 50,
+      hp: Number.isFinite(Number(resource.hp)) ? Number(resource.hp) : 0,
+      hpMax: Number.isFinite(Number(resource.hpMax)) ? Number(resource.hpMax) : 1,
+      yieldAmount: Number.isFinite(Number(resource.yieldAmount)) ? Number(resource.yieldAmount) : 0,
+      currentNode: String(resource.currentNode || "Asteron Prime"),
+      lastUpdatedAt: Number.isFinite(Number(resource.lastUpdatedAt)) ? Number(resource.lastUpdatedAt) : 0,
+      depleted: resource.depleted === true,
+      depletedUntil: Number.isFinite(Number(resource.depletedUntil)) ? Number(resource.depletedUntil) : 0
+    };
+  }
+
+  function updateResourcesFromServerState(serverState) {
+    resourcesById.clear();
+
+    const resources = serverState?.resources;
+    if (!resources) return;
+
+    if (typeof resources.forEach === "function") {
+      resources.forEach((resource, key) => {
+        const snapshot = normalizeResource(resource, key);
+        if (snapshot) resourcesById.set(snapshot.id, snapshot);
+      });
+      return;
+    }
+
+    Object.entries(resources).forEach(([key, resource]) => {
+      const snapshot = normalizeResource(resource, key);
+      if (snapshot) resourcesById.set(snapshot.id, snapshot);
+    });
+  }
+
   function bindRoomEvents(activeRoom) {
     activeRoom.onStateChange((serverState) => {
       updatePlayersFromServerState(serverState);
       updateBotsFromServerState(serverState);
+      updateResourcesFromServerState(serverState);
       notifyServerState(serverState);
     });
 
@@ -2341,6 +2437,46 @@
         }
       }
       notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingResource:mineResult", (message) => {
+      const normalized = normalizeStagingResourceEvent(message);
+      let localApplyResult = null;
+      if (normalized.ok && normalized.cargoDelta > 0 && typeof global.applyStagingResourceMineResult === "function") {
+        localApplyResult = global.applyStagingResourceMineResult(normalized);
+      }
+      connection.lastStagingResourceMineResult = {
+        ...normalized,
+        localApplyResult: localApplyResult && typeof localApplyResult === "object" ? { ...localApplyResult } : null,
+        localApplied: localApplyResult?.applied === true,
+        localCollected: Number.isFinite(Number(localApplyResult?.collectedAmount)) ? Number(localApplyResult.collectedAmount) : 0,
+        localOverflow: Number.isFinite(Number(localApplyResult?.overflowAmount)) ? Number(localApplyResult.overflowAmount) : 0
+      };
+      connection.lastStagingResourceEvent = { ...connection.lastStagingResourceMineResult, type: "mineResult" };
+      logDev("server staging resource mine result", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("stagingResource:mineRejected", (message) => {
+      connection.lastStagingResourceMineResult = {
+        ...normalizeStagingResourceEvent(message),
+        ok: false,
+        reason: String(message?.reason || "staging_resource_mine_rejected")
+      };
+      connection.lastStagingResourceEvent = { ...connection.lastStagingResourceMineResult, type: "mineRejected" };
+      logDev("server staging resource mine rejected", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    ["stagingResource:shot", "stagingResource:depleted", "stagingResource:respawned"].forEach((type) => {
+      activeRoom.onMessage(type, (message) => {
+        connection.lastStagingResourceEvent = {
+          ...normalizeStagingResourceEvent(message),
+          type
+        };
+        logDev(`server ${type}`, message);
+        notifyServerState(activeRoom.state || null);
+      });
     });
 
     activeRoom.onMessage("staging:reward_preview", (message) => {
@@ -2712,6 +2848,7 @@
       colyseusClient = null;
       playersById.clear();
       botsById.clear();
+      resourcesById.clear();
       clearChatMessages();
       connection.presenceEvents = [];
       notifyServerState(null);
@@ -2737,6 +2874,9 @@
     const selfPlayer = playersById.get(connection.sessionId);
     const lastBotUpdateAt = Array.from(botsById.values()).reduce((latest, bot) => {
       return Math.max(latest, Number(bot.lastUpdatedAt || 0));
+    }, 0);
+    const lastResourceUpdateAt = Array.from(resourcesById.values()).reduce((latest, resource) => {
+      return Math.max(latest, Number(resource.lastUpdatedAt || 0));
     }, 0);
 
     return {
@@ -2806,10 +2946,14 @@
           bounty: connection.lastStagingBountyClaimResult.bounty ? { ...connection.lastStagingBountyClaimResult.bounty } : null
         }
         : null,
+      lastStagingResourceMineResult: connection.lastStagingResourceMineResult ? { ...connection.lastStagingResourceMineResult } : null,
+      lastStagingResourceEvent: connection.lastStagingResourceEvent ? { ...connection.lastStagingResourceEvent } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
       botCount: botsById.size,
+      resourceCount: resourcesById.size,
       lastBotUpdateAt,
+      lastResourceUpdateAt,
       selectedTargetBotId: playersById.get(connection.sessionId)?.selectedTargetBotId || "",
       nextFireAt: playersById.get(connection.sessionId)?.nextFireAt || 0,
       fireCooldownRemainingMs: Math.max(0, Math.ceil((playersById.get(connection.sessionId)?.nextFireAt || 0) - Date.now())),
@@ -2957,6 +3101,7 @@
         connection.sessionId = null;
         playersById.clear();
         botsById.clear();
+        resourcesById.clear();
         clearChatMessages();
         connection.presenceEvents = [];
         return statusResult("disconnect", true, { alreadyDisconnected: true });
@@ -2971,6 +3116,7 @@
       colyseusClient = null;
       playersById.clear();
       botsById.clear();
+      resourcesById.clear();
       clearChatMessages();
       connection.presenceEvents = [];
       notifyServerState(null);
@@ -3051,6 +3197,16 @@
 
     clearStagingTarget() {
       return sendRoomMessage("clearStagingTarget", "target:clear", {});
+    },
+
+    mineStagingResource(resourceId, options = {}) {
+      const localPresence = getLocalPresenceOptions();
+      return sendRoomMessage("mineStagingResource", "stagingResource:mine", {
+        ...getStagingWeaponIntent(),
+        ...options,
+        resourceId: String(resourceId || options.resourceId || options.targetResourceId || ""),
+        currentNode: options.currentNode || localPresence.currentNode || ""
+      });
     },
 
     claimStagingRewardPreview(options = {}) {
@@ -3264,6 +3420,15 @@
     getBotById(id) {
       const bot = botsById.get(String(id || ""));
       return bot ? { ...bot } : null;
+    },
+
+    getResources() {
+      return Array.from(resourcesById.values()).map((resource) => ({ ...resource }));
+    },
+
+    getResourceById(id) {
+      const resource = resourcesById.get(String(id || ""));
+      return resource ? { ...resource } : null;
     },
 
     getSelectedStagingBot() {

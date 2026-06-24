@@ -950,6 +950,7 @@ test.describe("Lupen browser smoke", () => {
       const originalClient = window.LupenMultiplayerClient;
       currentNode = "Asteron Prime";
       const sentMessages = [];
+      const sentResourceMines = [];
       const duplicatePlayerMessage = {
         id: "msg-1",
         type: "chat",
@@ -1011,6 +1012,19 @@ test.describe("Lupen browser smoke", () => {
           }
         ],
         getBots: () => [],
+        getResources: () => [{
+          id: "staging-resource-test-iron",
+          resourceName: "Iron",
+          currentNode: "Asteron Prime",
+          x: 42,
+          y: 35,
+          hp: 20,
+          hpMax: 30,
+          yieldAmount: 12,
+          depleted: false,
+          depletedUntil: 0,
+          lastUpdatedAt: Date.now()
+        }],
         getSelectedStagingBot: () => null,
         getPresenceEvents: () => [{
           type: "playerMoved",
@@ -1035,6 +1049,10 @@ test.describe("Lupen browser smoke", () => {
         ],
         sendChatMessage: (message) => {
           sentMessages.push(message);
+          return { ok: true };
+        },
+        mineStagingResource: (resourceId, options) => {
+          sentResourceMines.push({ resourceId, ...options });
           return { ok: true };
         },
         sendCombatIntent: (intent) => {
@@ -1066,6 +1084,8 @@ test.describe("Lupen browser smoke", () => {
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       input.value = "x".repeat(240);
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      const resourceMarker = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource");
+      resourceMarker?.click();
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
       const targetCard = document.querySelector(".lupen-target-card.player");
@@ -1082,6 +1102,8 @@ test.describe("Lupen browser smoke", () => {
         src: image?.getAttribute("src") || "",
         note: note?.textContent || "",
         ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
+        resourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource").length,
+        resourceTitle: resourceMarker?.getAttribute("title") || "",
         arrivingGhostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-arriving").length,
         dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
         playerTargetText: targetCard?.textContent || "",
@@ -1098,7 +1120,8 @@ test.describe("Lupen browser smoke", () => {
         visiblePlayerMessageCount: (chatText.match(/Visible player message/g) || []).length,
         placeholder: input.placeholder,
         inputDisabled: input.disabled,
-        sentMessages
+        sentMessages,
+        sentResourceMines
       };
       window.LupenMultiplayerClient = originalClient;
       window.LupenMultiplayerOverlay.render();
@@ -1107,6 +1130,11 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
     expect(connectedHudState.ghostCount).toBe(1);
+    expect(connectedHudState.resourceCount).toBe(1);
+    expect(connectedHudState.resourceTitle).toContain("Iron asteroid");
+    expect(connectedHudState.sentResourceMines).toEqual([
+      { resourceId: "staging-resource-test-iron", currentNode: "Asteron Prime" }
+    ]);
     expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
