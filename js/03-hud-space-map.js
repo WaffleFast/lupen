@@ -494,6 +494,7 @@ function renderInventoryDrawerDetail(entry) {
 
   if (entry.type === "cargo") {
     const unitBasis = cargoCostBasis[entry.key] || 0;
+    const recoveredCargo = !unitBasis && Number(entry.quantity || 0) > 0;
     detail.innerHTML = `
       <div class="inventory-detail-title">
         <img src="${entry.icon}" alt="${entry.name}">
@@ -501,7 +502,8 @@ function renderInventoryDrawerDetail(entry) {
       </div>
       <div class="inventory-detail-stats">
         <span>Held <strong>${formatNumber(entry.quantity)}</strong></span>
-        <span>Avg Cost <strong>${unitBasis ? `CR ${formatNumber(Math.round(unitBasis))}` : "--"}</strong></span>
+        <span>Source <strong>${recoveredCargo ? "Recovered" : "Purchased"}</strong></span>
+        <span>Avg Cost <strong>${unitBasis ? `CR ${formatNumber(Math.round(unitBasis))}` : "None"}</strong></span>
       </div>
     `;
     return;

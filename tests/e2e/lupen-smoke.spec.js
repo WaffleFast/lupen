@@ -1591,6 +1591,15 @@ test.describe("Lupen browser smoke", () => {
     await expect(builder).not.toContainText(/Virella > Nyxara/);
 
     await page.evaluate(() => {
+      if (typeof window.openShipStorageDrawer === "function") window.openShipStorageDrawer("cargo");
+    });
+    await expect(page.locator("#inventoryDrawerDetail")).toContainText("Copper");
+    await expect(page.locator("#inventoryDrawerDetail")).toContainText("Source");
+    await expect(page.locator("#inventoryDrawerDetail")).toContainText("Recovered");
+    await expect(page.locator("#inventoryDrawerDetail")).toContainText("Avg Cost");
+    await expect(page.locator("#inventoryDrawerDetail")).toContainText("None");
+
+    await page.evaluate(() => {
       if (typeof window.showMultiplayerStagingTradeSellFeedback === "function") {
         window.showMultiplayerStagingTradeSellFeedback({
           applied: true,
@@ -1629,6 +1638,14 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#tradeResultBurst")).toContainText("Recovered Cargo Sold");
     await expect(page.locator("#tradeResultBurst")).toContainText("+CR 1,200 value");
     await expect(page.locator("#tradeResultBurst")).toContainText("Sold 24 Copper at Nyxara");
+
+    const recoveredProgress = await page.evaluate(() => window.eval(`({
+      tradeProfit: playerProgress.totals.tradeProfit || 0,
+      totalTradingProfit: playerProgress.totals.totalTradingProfit || 0
+    })`));
+    expect(recoveredProgress.tradeProfit).toBe(72);
+    expect(recoveredProgress.totalTradingProfit).toBe(72);
+    await expect(page.locator("#activityLogFeed")).toContainText("Recovered resource sale");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

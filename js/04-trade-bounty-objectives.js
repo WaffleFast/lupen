@@ -625,7 +625,7 @@ function showMultiplayerStagingTradeSellFeedback(result) {
 
   if (typeof addActivityLog === "function") {
     const line = recovered
-      ? `Sold ${formatNumber(quantity)} recovered ${resource} at ${planet} for +CR ${formatNumber(revenue)}.`
+      ? `Sold ${formatNumber(quantity)} ${resource} at ${planet} for +CR ${formatNumber(revenue)}. Recovered resource sale.`
       : `Sold ${formatNumber(quantity)} ${resource} at ${planet} for ${profit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(profit))} profit.`;
     addActivityLog(line);
   }
