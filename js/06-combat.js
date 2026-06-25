@@ -958,16 +958,19 @@ function applyStagingResourceMineResult(result = {}) {
   }
 
   window.lupenStagingResourceAwardedKeys.add(awardKey);
+  const cargoUsedBefore = cargoUsed();
+  const cargoCapacity = getShipStats().cargo;
   const deposit = depositLootToCargo({ [resourceName]: cargoDelta });
   const collectedAmount = Math.max(0, Number(deposit.collectedAmount || 0));
   const overflowAmount = Math.max(0, Number(deposit.overflowAmount || 0));
+  const cargoUsedAfter = cargoUsed();
   const collectedText = collectedAmount > 0
-    ? `+${formatNumber(collectedAmount)} ${resourceName}`
+    ? `Recovered ${formatNumber(collectedAmount)} ${resourceName}. Cargo ${formatNumber(cargoUsedAfter)}/${formatNumber(cargoCapacity)}.`
     : "cargo full";
   const overflowText = overflowAmount > 0
     ? ` ${formatNumber(overflowAmount)} left as salvage.`
     : "";
-  const message = `${resourceName} asteroid depleted. ${collectedText}.${overflowText}`;
+  const message = `${resourceName} asteroid depleted. ${collectedText}${overflowText}`;
 
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof addHudToast === "function") addHudToast(message);
@@ -981,6 +984,9 @@ function applyStagingResourceMineResult(result = {}) {
     cargoDelta,
     collectedAmount,
     overflowAmount,
+    cargoUsedBefore,
+    cargoUsedAfter,
+    cargoCapacity,
     awardKey
   };
 }

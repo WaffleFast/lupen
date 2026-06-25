@@ -1065,6 +1065,12 @@
         letter-spacing: 0.06em;
       }
 
+      .lupen-target-card .lupen-target-status.is-warning {
+        border-color: rgba(245, 210, 112, 0.52);
+        color: #ffe996;
+        background: rgba(72, 50, 6, 0.5);
+      }
+
       .lupen-target-card .lupen-target-mine {
         min-width: 72px;
         min-height: 24px;
@@ -1900,6 +1906,33 @@
     return "";
   }
 
+  function getCargoHoldSummary(resource = null) {
+    const used = typeof global.cargoUsed === "function" ? Math.max(0, Math.round(Number(global.cargoUsed() || 0))) : null;
+    const stats = typeof global.getShipStats === "function" ? global.getShipStats() || {} : {};
+    const capacity = Number.isFinite(Number(stats.cargo)) ? Math.max(0, Math.round(Number(stats.cargo))) : null;
+    const free = used !== null && capacity !== null ? Math.max(0, capacity - used) : null;
+    const expectedYield = Number.isFinite(Number(resource?.yieldAmount)) ? Math.max(0, Math.round(Number(resource.yieldAmount))) : 0;
+    const full = free !== null && free <= 0;
+    const limited = !full && free !== null && expectedYield > 0 && free < expectedYield;
+
+    return {
+      known: used !== null && capacity !== null,
+      used,
+      capacity,
+      free,
+      full,
+      limited,
+      label: used !== null && capacity !== null
+        ? `Cargo ${formatTradeNumber(used)}/${formatTradeNumber(capacity)}`
+        : "Cargo sync pending",
+      warning: full
+        ? "Hold full"
+        : limited
+          ? `${formatTradeNumber(free)} free`
+          : ""
+    };
+  }
+
   function wasRecentlyHit(bot, status = getClient()?.getStatus?.()) {
     const response = status?.lastCombatResponse;
     if (!bot?.id || !response?.ok || response.targetBotId !== bot.id) return false;
@@ -2009,6 +2042,11 @@
     const client = getClient();
     const status = client?.getStatus?.();
     if (!status?.enabled || !status?.isConnected) return;
+    const hold = getCargoHoldSummary(resource);
+    if (hold.full) {
+      global.addActivityLog?.(`Cargo hold full. Sell recovered cargo before mining ${resource.resourceName || "resource"}.`);
+      return;
+    }
     const now = Date.now();
     const lastLogAt = Number(resourceMineActivityAt.get(resource.id) || 0);
     if (now - lastLogAt > 6000) {
@@ -2120,11 +2158,17 @@
       appendTargetBar(bars, selectedResource.hp, selectedResource.hpMax, "shield");
       card.appendChild(bars);
 
+      const hold = getCargoHoldSummary(selectedResource);
+      const cargoStatus = global.document.createElement("span");
+      cargoStatus.className = `lupen-target-status${hold.full || hold.limited ? " is-warning" : ""}`;
+      cargoStatus.textContent = hold.warning ? `${hold.label} / ${hold.warning}` : hold.label;
+      card.appendChild(cargoStatus);
+
       const mineButton = global.document.createElement("button");
       mineButton.type = "button";
       mineButton.className = "lupen-target-mine";
       mineButton.textContent = "Mine";
-      mineButton.disabled = !status?.isConnected || selectedResource.depleted === true;
+      mineButton.disabled = !status?.isConnected || selectedResource.depleted === true || hold.full === true;
       mineButton.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();

@@ -1146,6 +1146,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.selectedResourceCount).toBe(1);
     expect(connectedHudState.resourceTitle).toContain("Iron asteroid");
     expect(connectedHudState.resourceCardText).toContain("Iron Asteroid");
+    expect(connectedHudState.resourceCardText).toContain("Cargo");
     expect(connectedHudState.resourceCardText).toContain("Mine");
     expect(connectedHudState.mineButtonDisabled).toBe(false);
     expect(connectedHudState.sentResourceMines).toEqual([
@@ -1571,8 +1572,17 @@ test.describe("Lupen browser smoke", () => {
         lastPlanetNode = "Nyxara";
         cargo.Iron = 0;
         cargo["Crystal Shards"] = 0;
-        cargo.Copper = 24;
+        cargo.Copper = 0;
         delete cargoCostBasis.Copper;
+        window.lupenStagingResourceAwardedKeys = new Set();
+        applyStagingResourceMineResult({
+          ok: true,
+          resourceId: "e2e-copper-asteroid",
+          resourceName: "Copper",
+          cargoDelta: 24,
+          resourceRewardId: "e2e-copper-recovered-award",
+          receivedAt: Date.now()
+        });
         selectedMarketResource = "Copper";
         selectedMarketTargetPlanet = "Nyxara";
         selectedMarketQuantity = 24;
@@ -1589,6 +1599,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(builder).toContainText("CR 1,200");
     await expect(builder).toContainText("Recovered Value");
     await expect(builder).not.toContainText(/Virella > Nyxara/);
+    await expect(page.locator("#activityLogFeed")).toContainText("Recovered 24 Copper. Cargo 24/");
 
     await page.evaluate(() => {
       if (typeof window.openShipStorageDrawer === "function") window.openShipStorageDrawer("cargo");

@@ -2450,7 +2450,10 @@
         localApplyResult: localApplyResult && typeof localApplyResult === "object" ? { ...localApplyResult } : null,
         localApplied: localApplyResult?.applied === true,
         localCollected: Number.isFinite(Number(localApplyResult?.collectedAmount)) ? Number(localApplyResult.collectedAmount) : 0,
-        localOverflow: Number.isFinite(Number(localApplyResult?.overflowAmount)) ? Number(localApplyResult.overflowAmount) : 0
+        localOverflow: Number.isFinite(Number(localApplyResult?.overflowAmount)) ? Number(localApplyResult.overflowAmount) : 0,
+        localCargoUsedBefore: Number.isFinite(Number(localApplyResult?.cargoUsedBefore)) ? Number(localApplyResult.cargoUsedBefore) : null,
+        localCargoUsedAfter: Number.isFinite(Number(localApplyResult?.cargoUsedAfter)) ? Number(localApplyResult.cargoUsedAfter) : null,
+        localCargoCapacity: Number.isFinite(Number(localApplyResult?.cargoCapacity)) ? Number(localApplyResult.cargoCapacity) : null
       };
       connection.lastStagingResourceEvent = { ...connection.lastStagingResourceMineResult, type: "mineResult" };
       logDev("server staging resource mine result", message);
