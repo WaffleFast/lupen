@@ -974,6 +974,15 @@ function applyStagingResourceMineResult(result = {}) {
 
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof addHudToast === "function") addHudToast(message);
+  if (collectedAmount > 0 && typeof showGameRewardBurst === "function") {
+    showGameRewardBurst({
+      type: "resource",
+      kicker: "Resource Recovered",
+      title: `+${formatNumber(collectedAmount)} ${resourceName}`,
+      meta: `Cargo ${formatNumber(cargoUsedAfter)}/${formatNumber(cargoCapacity)}`,
+      image: typeof getCommodityImage === "function" ? getCommodityImage(resourceName) : ""
+    });
+  }
   updateTargetPanel();
   saveGame();
 

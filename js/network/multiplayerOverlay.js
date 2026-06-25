@@ -89,6 +89,18 @@
     "erebus destroyer": "assets/bots/erebus-destroyer.png",
     "erebus behemoth": "assets/bots/erebus-behemoth.png"
   };
+  const stagingResourceValueHints = {
+    iron: [18, 30],
+    copper: [32, 50],
+    cobalt: [24, 42],
+    crystalshards: [95, 145]
+  };
+  const stagingResourceAsteroidImages = {
+    iron: "assets/asteroids/asteroid-iron.png",
+    copper: "assets/asteroids/asteroid-copper.png",
+    cobalt: "assets/asteroids/asteroid-cobalt.png",
+    crystalshards: "assets/asteroids/asteroid-crystal.png"
+  };
 
   function getClient() {
     return global.LupenMultiplayerClient || null;
@@ -1895,15 +1907,34 @@
     const key = String(resourceName || "").toLowerCase();
     if (key.includes("copper")) return "rgba(255, 153, 83, 0.5)";
     if (key.includes("cobalt")) return "rgba(95, 152, 255, 0.52)";
+    if (key.includes("crystal")) return "rgba(184, 116, 255, 0.54)";
     if (key.includes("titanium")) return "rgba(223, 245, 255, 0.5)";
     return "rgba(158, 224, 255, 0.46)";
   }
 
+  function getResourceKey(resourceName = "") {
+    return String(resourceName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
   function getResourceImage(resource) {
+    const stagingImage = stagingResourceAsteroidImages[getResourceKey(resource?.resourceName || resource?.name)];
+    if (stagingImage) return stagingImage;
+    if (typeof global.getAsteroidImage === "function") {
+      const asteroidImage = global.getAsteroidImage(resource?.resourceName || resource?.name || "Iron");
+      if (asteroidImage) return asteroidImage;
+    }
     if (typeof global.getCommodityImage === "function") {
       return global.getCommodityImage(resource?.resourceName || resource?.name || "Iron");
     }
     return "";
+  }
+
+  function getResourceValueHint(resourceName = "") {
+    const range = stagingResourceValueHints[getResourceKey(resourceName)];
+    if (!range) return "";
+    return range[0] === range[1]
+      ? `Recovered value CR ${formatTradeNumber(range[0])}/unit`
+      : `Recovered value CR ${formatTradeNumber(range[0])}-${formatTradeNumber(range[1])}/unit`;
   }
 
   function getCargoHoldSummary(resource = null) {
@@ -2157,6 +2188,13 @@
       bars.className = "lupen-target-bars";
       appendTargetBar(bars, selectedResource.hp, selectedResource.hpMax, "shield");
       card.appendChild(bars);
+
+      const valueHint = getResourceValueHint(selectedResource.resourceName);
+      if (valueHint) {
+        const value = global.document.createElement("small");
+        value.textContent = valueHint;
+        card.appendChild(value);
+      }
 
       const hold = getCargoHoldSummary(selectedResource);
       const cargoStatus = global.document.createElement("span");

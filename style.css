@@ -25974,6 +25974,20 @@ input::placeholder {
   color: #34e59a;
 }
 
+.game-reward-burst.resource .game-reward-card {
+  border-color: rgba(245, 230, 140, 0.66);
+  box-shadow:
+    0 0 0 2px rgba(245, 230, 140, 0.08),
+    0 18px 60px rgba(0, 0, 0, 0.46),
+    0 0 40px rgba(245, 190, 84, 0.18);
+}
+
+.game-reward-burst.resource .game-reward-icon,
+.game-reward-burst.resource .game-reward-kicker {
+  color: #f5e68c;
+  border-color: rgba(245, 230, 140, 0.56);
+}
+
 .game-reward-burst.core .game-reward-card {
   border-color: rgba(178, 116, 255, 0.72);
   box-shadow:

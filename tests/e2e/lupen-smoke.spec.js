@@ -1104,11 +1104,13 @@ test.describe("Lupen browser smoke", () => {
       const mineButton = resourceCard?.querySelector(".lupen-target-mine");
       mineButton?.click();
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
+      const resourceImage = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-resource-rock img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
       const chatText = document.getElementById("localChatFeed")?.textContent || "";
       const result = {
         src: image?.getAttribute("src") || "",
+        resourceImageSrc: resourceImage?.getAttribute("src") || "",
         note: note?.textContent || "",
         ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
         resourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource").length,
@@ -1140,12 +1142,14 @@ test.describe("Lupen browser smoke", () => {
       return result;
     });
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
+    expect(connectedHudState.resourceImageSrc).toContain("assets/asteroids/asteroid-iron.png");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
     expect(connectedHudState.ghostCount).toBe(1);
     expect(connectedHudState.resourceCount).toBe(1);
     expect(connectedHudState.selectedResourceCount).toBe(1);
     expect(connectedHudState.resourceTitle).toContain("Iron asteroid");
     expect(connectedHudState.resourceCardText).toContain("Iron Asteroid");
+    expect(connectedHudState.resourceCardText).toContain("Recovered value CR 18-30/unit");
     expect(connectedHudState.resourceCardText).toContain("Cargo");
     expect(connectedHudState.resourceCardText).toContain("Mine");
     expect(connectedHudState.mineButtonDisabled).toBe(false);
@@ -1600,6 +1604,9 @@ test.describe("Lupen browser smoke", () => {
     await expect(builder).toContainText("Recovered Value");
     await expect(builder).not.toContainText(/Virella > Nyxara/);
     await expect(page.locator("#activityLogFeed")).toContainText("Recovered 24 Copper. Cargo 24/");
+    await expect(page.locator("#gameRewardBurst")).toContainText("Resource Recovered");
+    await expect(page.locator("#gameRewardBurst")).toContainText("+24 Copper");
+    await expect(page.locator("#gameRewardBurst")).toContainText("Cargo 24/");
 
     await page.evaluate(() => {
       if (typeof window.openShipStorageDrawer === "function") window.openShipStorageDrawer("cargo");

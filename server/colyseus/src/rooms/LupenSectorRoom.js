@@ -277,7 +277,7 @@ const STAGING_RESOURCE_DEFINITIONS = [
   { id: "staging-resource-iron-lower-core-west", resourceName: "Iron", startNode: "Lower Lane Core West", x: 42, y: 65, hp: 30, yield: 12 },
   { id: "staging-resource-copper-lower-core-east", resourceName: "Copper", startNode: "Lower Lane Core East", x: 58, y: 65, hp: 30, yield: 12 },
   { id: "staging-resource-cobalt-lower-gate", resourceName: "Cobalt", startNode: "Lower Gate Core", x: 52, y: 55, hp: 34, yield: 10 },
-  { id: "staging-resource-titanium-lower-apex", resourceName: "Titanium", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 8 }
+  { id: "staging-resource-crystal-lower-apex", resourceName: "Crystal Shards", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 8 }
 ];
 
 export class LupenSectorPlayer extends Schema {
