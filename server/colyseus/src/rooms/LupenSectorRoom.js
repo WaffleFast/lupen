@@ -273,11 +273,11 @@ const STAGING_RESOURCE_DEFINITIONS = [
   { id: "staging-resource-iron-upper-core-west", resourceName: "Iron", startNode: "Upper Lane Core West", x: 42, y: 35, hp: 30, yield: 12 },
   { id: "staging-resource-copper-upper-core-east", resourceName: "Copper", startNode: "Upper Lane Core East", x: 58, y: 35, hp: 30, yield: 12 },
   { id: "staging-resource-iron-upper-gate", resourceName: "Iron", startNode: "Upper Gate Core", x: 44, y: 45, hp: 32, yield: 14 },
-  { id: "staging-resource-cobalt-upper-gate-east", resourceName: "Cobalt", startNode: "Upper Gate East", x: 78, y: 41, hp: 34, yield: 10 },
+  { id: "staging-resource-crystal-upper-gate-east", resourceName: "Crystal Shards", startNode: "Upper Gate East", x: 78, y: 41, hp: 34, yield: 6 },
   { id: "staging-resource-iron-lower-core-west", resourceName: "Iron", startNode: "Lower Lane Core West", x: 42, y: 65, hp: 30, yield: 12 },
   { id: "staging-resource-copper-lower-core-east", resourceName: "Copper", startNode: "Lower Lane Core East", x: 58, y: 65, hp: 30, yield: 12 },
-  { id: "staging-resource-cobalt-lower-gate", resourceName: "Cobalt", startNode: "Lower Gate Core", x: 52, y: 55, hp: 34, yield: 10 },
-  { id: "staging-resource-crystal-lower-apex", resourceName: "Crystal Shards", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 8 }
+  { id: "staging-resource-copper-lower-gate", resourceName: "Copper", startNode: "Lower Gate Core", x: 52, y: 55, hp: 34, yield: 8 },
+  { id: "staging-resource-crystal-lower-apex", resourceName: "Crystal Shards", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 5 }
 ];
 
 export class LupenSectorPlayer extends Schema {

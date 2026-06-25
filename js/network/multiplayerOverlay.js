@@ -34,7 +34,6 @@
   let stagingFlowHintDismissed = false;
   let lastRewardPanelXpRefreshKey = "";
   let selectedResourceId = "";
-  const resourceMineActivityAt = new Map();
   const shipImageLoadStatus = new Map();
   const botImageLoadStatus = new Map();
   const remoteGhostSnapshots = new Map();
@@ -1083,26 +1082,6 @@
         background: rgba(72, 50, 6, 0.5);
       }
 
-      .lupen-target-card .lupen-target-mine {
-        min-width: 72px;
-        min-height: 24px;
-        margin-top: 2px;
-        border: 1px solid rgba(245, 230, 140, 0.68);
-        border-radius: 4px;
-        background: linear-gradient(180deg, rgba(203, 125, 34, 0.94), rgba(105, 58, 18, 0.92));
-        color: #fff7df;
-        cursor: pointer;
-        font: 900 9px/1 Arial, sans-serif;
-        text-transform: uppercase;
-        box-shadow: 0 0 11px rgba(245, 171, 75, 0.22);
-      }
-
-      .lupen-target-card .lupen-target-mine:disabled {
-        opacity: 0.48;
-        cursor: default;
-        box-shadow: none;
-      }
-
       .lupen-target-bars {
         width: 88px;
         display: grid;
@@ -1897,7 +1876,7 @@
     return Date.now() - Number(status?.lastStagingResourceEvent?.receivedAt || status?.lastStagingResourceEvent?.timestamp || 0);
   }
 
-  function wasRecentlyMined(resource, status = getClient()?.getStatus?.()) {
+  function wasRecentlyEngagedResource(resource, status = getClient()?.getStatus?.()) {
     const event = status?.lastStagingResourceEvent;
     if (!resource?.id || !event?.resourceId || event.resourceId !== resource.id) return false;
     return getResourceEventAge(status) < 1100;
@@ -1933,8 +1912,8 @@
     const range = stagingResourceValueHints[getResourceKey(resourceName)];
     if (!range) return "";
     return range[0] === range[1]
-      ? `Recovered value CR ${formatTradeNumber(range[0])}/unit`
-      : `Recovered value CR ${formatTradeNumber(range[0])}-${formatTradeNumber(range[1])}/unit`;
+      ? `Estimated sale CR ${formatTradeNumber(range[0])}/unit`
+      : `Estimated sale CR ${formatTradeNumber(range[0])}-${formatTradeNumber(range[1])}/unit`;
   }
 
   function getCargoHoldSummary(resource = null) {
@@ -2068,36 +2047,11 @@
     }
   }
 
-  function mineStagingResource(resource) {
-    if (!resource?.id || !isSameCurrentNode(resource) || resource.depleted) return;
-    const client = getClient();
-    const status = client?.getStatus?.();
-    if (!status?.enabled || !status?.isConnected) return;
-    const hold = getCargoHoldSummary(resource);
-    if (hold.full) {
-      global.addActivityLog?.(`Cargo hold full. Sell recovered cargo before mining ${resource.resourceName || "resource"}.`);
-      return;
-    }
-    const now = Date.now();
-    const lastLogAt = Number(resourceMineActivityAt.get(resource.id) || 0);
-    if (now - lastLogAt > 6000) {
-      resourceMineActivityAt.set(resource.id, now);
-      global.addActivityLog?.(`Mining ${resource.resourceName || "resource"} asteroid...`);
-    }
-    client.mineStagingResource?.(resource.id, { currentNode: getCurrentNodeName() });
-  }
-
   function selectStagingResource(resource) {
     if (!resource?.id || !isSameCurrentNode(resource) || resource.depleted) return;
     selectedResourceId = String(resource.id);
-    try {
-      if (typeof global.disengageTarget === "function") {
-        global.disengageTarget(false);
-      } else if (typeof selectedTarget !== "undefined") {
-        selectedTarget = null;
-      }
-    } catch (_err) {
-      // Resource selection is overlay-only; failing to clear a local target is non-fatal.
+    if (typeof global.selectStagingResourceTarget === "function") {
+      global.selectStagingResourceTarget(resource.id);
     }
     scheduleRender();
   }
@@ -2202,17 +2156,9 @@
       cargoStatus.textContent = hold.warning ? `${hold.label} / ${hold.warning}` : hold.label;
       card.appendChild(cargoStatus);
 
-      const mineButton = global.document.createElement("button");
-      mineButton.type = "button";
-      mineButton.className = "lupen-target-mine";
-      mineButton.textContent = "Mine";
-      mineButton.disabled = !status?.isConnected || selectedResource.depleted === true || hold.full === true;
-      mineButton.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        mineStagingResource(selectedResource);
-      });
-      card.appendChild(mineButton);
+      const actionHint = global.document.createElement("small");
+      actionHint.textContent = hold.full ? "Sell cargo before engaging" : "Use ENGAGE to fire";
+      card.appendChild(actionHint);
     }
 
     layer.appendChild(card);
@@ -2700,7 +2646,7 @@
       marker.setAttribute("aria-label", `Select ${resource.resourceName || "resource"} asteroid`);
       if (String(resource.id || "") === selectedId) marker.classList.add("is-selected");
       if (resource.depleted) marker.classList.add("is-depleted");
-      if (wasRecentlyMined(resource, status)) marker.classList.add("is-hit");
+      if (wasRecentlyEngagedResource(resource, status)) marker.classList.add("is-hit");
       marker.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();

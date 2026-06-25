@@ -31,6 +31,9 @@ function retargetEngagementToSelectedTarget() {
   if (nextTargetRef.type === "stagingBot") {
     performStagingBotAttackCycle();
     engageTimer = setInterval(performStagingBotAttackCycle, 950);
+  } else if (nextTargetRef.type === "stagingResource") {
+    performStagingResourceAttackCycle();
+    engageTimer = setInterval(performStagingResourceAttackCycle, 950);
   } else {
     performAttackCycle();
     engageTimer = setInterval(performAttackCycle, getEquippedWeapon().speed);
@@ -85,6 +88,18 @@ function selectStagingBotTarget(botId) {
   if (tutorialState?.active && ["jump-to-bounty-zone", "destroy-bot"].includes(getCurrentTutorialStep()?.id)) {
     setTimeout(renderStarterTutorial, 40);
   }
+}
+
+function selectStagingResourceTarget(resourceId) {
+  const resource = getStagingResourceTargetById(resourceId);
+  if (!resource || !resource.alive || (resource.currentNodeId || resource.node) !== currentNode) return;
+
+  selectedTarget = { type: "stagingResource", id: resource.id };
+  showTargetPanel();
+  const retargeted = retargetEngagementToSelectedTarget();
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(retargeted);
 }
 
 function selectRemotePlayerTarget(playerId) {
@@ -149,6 +164,10 @@ function engageTarget() {
     if (typeof addActivityLog === "function") addActivityLog(`Engaged ${target.name || "Staging Bot"}.`);
     performStagingBotAttackCycle();
     engageTimer = setInterval(performStagingBotAttackCycle, 950);
+  } else if (engagedTarget?.type === "stagingResource") {
+    if (typeof addActivityLog === "function") addActivityLog(`Engaged ${target.name || "Resource Asteroid"}.`);
+    performStagingResourceAttackCycle();
+    engageTimer = setInterval(performStagingResourceAttackCycle, 950);
   } else {
     performAttackCycle();
     engageTimer = setInterval(performAttackCycle, getEquippedWeapon().speed);
@@ -158,7 +177,7 @@ function engageTarget() {
 
 function disengageTarget(keepTarget = false) {
   const disengagedRef = engagedTarget ? { ...engagedTarget } : null;
-  const disengagedEntity = disengagedRef?.type === "stagingBot" ? getEngagedTargetEntity() : null;
+  const disengagedEntity = ["stagingBot", "stagingResource"].includes(disengagedRef?.type) ? getEngagedTargetEntity() : null;
 
   if (engageTimer) {
     clearInterval(engageTimer);
@@ -172,6 +191,10 @@ function disengageTarget(keepTarget = false) {
       addActivityLog(`Disengaged ${disengagedEntity?.name || "Staging Bot"}.`);
     }
     window.LupenMultiplayerClient?.clearStagingTarget?.();
+  } else if (disengagedRef?.type === "stagingResource") {
+    if (typeof addActivityLog === "function") {
+      addActivityLog(`Disengaged ${disengagedEntity?.name || "Resource Asteroid"}.`);
+    }
   }
 
   if (!keepTarget) {
@@ -1112,6 +1135,32 @@ function performStagingBotAttackCycle() {
     currentNode,
     timestamp: Date.now()
   });
+}
+
+function performStagingResourceAttackCycle() {
+  const target = getEngagedTargetEntity();
+  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
+    disengageTarget(true);
+    updateObjectActionPanel(true);
+    return;
+  }
+
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.();
+  if (!status?.enabled || !status?.isConnected) return;
+
+  const cargoCapacity = typeof getShipStats === "function" ? Number(getShipStats()?.cargo || 0) : 0;
+  const usedCargo = typeof cargoUsed === "function" ? Number(cargoUsed() || 0) : 0;
+  if (cargoCapacity > 0 && usedCargo >= cargoCapacity) {
+    if (typeof addActivityLog === "function") {
+      addActivityLog(`Cargo hold full. Sell recovered cargo before engaging ${target.resourceName || "resource"} asteroid.`);
+    }
+    disengageTarget(true);
+    updateObjectActionPanel(true);
+    return;
+  }
+
+  client.mineStagingResource?.(target.id, { currentNode, timestamp: Date.now() });
 }
 
 function respawnHostileBot(botId) {

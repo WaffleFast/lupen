@@ -1887,6 +1887,23 @@ function getStagingBotTargetById(id) {
   };
 }
 
+function getStagingResourceTargetById(id) {
+  if (!id || typeof window === "undefined") return null;
+  const client = window.LupenMultiplayerClient;
+  const resource = client?.getResourceById?.(id)
+    || client?.getResources?.()?.find(item => String(item?.id || "") === String(id));
+  if (!resource) return null;
+  const node = resource.currentNode || resource.currentNodeId || resource.node;
+  return {
+    ...resource,
+    currentNodeId: node,
+    node,
+    alive: resource.depleted !== true,
+    name: `${resource.resourceName || resource.name || "Resource"} Asteroid`,
+    stagingResource: true
+  };
+}
+
 function getRemotePlayerTargetById(id) {
   if (!id || typeof window === "undefined") return null;
   const client = window.LupenMultiplayerClient;
@@ -1916,6 +1933,12 @@ function getSelectedStagingBotTarget() {
     : null;
 }
 
+function getSelectedStagingResourceTarget() {
+  return selectedTarget?.type === "stagingResource"
+    ? getStagingResourceTargetById(selectedTarget.id)
+    : null;
+}
+
 function getSelectedRemotePlayerTarget() {
   return selectedTarget?.type === "remotePlayer"
     ? getRemotePlayerTargetById(selectedTarget.id)
@@ -1923,7 +1946,7 @@ function getSelectedRemotePlayerTarget() {
 }
 
 function getSelectedTargetEntity() {
-  return getSelectedRemotePlayerTarget() || getSelectedStagingBotTarget() || getSelectedHostileBot() || getSelectedAsteroid();
+  return getSelectedRemotePlayerTarget() || getSelectedStagingResourceTarget() || getSelectedStagingBotTarget() || getSelectedHostileBot() || getSelectedAsteroid();
 }
 
 function getEngagedTargetEntity() {
@@ -1931,6 +1954,10 @@ function getEngagedTargetEntity() {
 
   if (engagedTarget.type === "stagingBot") {
     return getStagingBotTargetById(engagedTarget.id);
+  }
+
+  if (engagedTarget.type === "stagingResource") {
+    return getStagingResourceTargetById(engagedTarget.id);
   }
 
   if (engagedTarget.type === "hostileBot") {
@@ -1946,6 +1973,7 @@ function getEngagedTargetEntity() {
 
 function getTargetTypeFromEntity(target) {
   if (target?.remotePlayer) return "remotePlayer";
+  if (target?.stagingResource) return "stagingResource";
   if (target?.stagingBot) return "stagingBot";
   return target?.faction === "erebus" || target?.id?.startsWith("erebus-bot") ? "hostileBot" : "asteroid";
 }
@@ -1992,6 +2020,14 @@ function getVisibleStagingBotTargets() {
     .filter(bot => bot && bot.alive && (bot.currentNodeId || bot.node) === currentNode);
 }
 
+function getVisibleStagingResourceTargets() {
+  if (typeof window === "undefined") return [];
+  const resources = window.LupenMultiplayerClient?.getResources?.() || [];
+  return resources
+    .map(resource => getStagingResourceTargetById(resource?.id))
+    .filter(resource => resource && resource.alive && (resource.currentNodeId || resource.node) === currentNode);
+}
+
 function isBotFacingPlayer(bot) {
   return Boolean(bot && Number(bot.attackingUntil || 0) > Date.now());
 }
@@ -2036,7 +2072,7 @@ function triggerWarningBanner(text = "WARNING") {
 }
 
 function getVisibleTargets() {
-  return [...getVisibleStagingBotTargets(), ...getVisibleHostileBotsForLocalTargetUi(), ...getVisibleAsteroids()];
+  return [...getVisibleStagingBotTargets(), ...getVisibleStagingResourceTargets(), ...getVisibleHostileBotsForLocalTargetUi(), ...getVisibleAsteroids()];
 }
 
 function showScreen(screenId) {

@@ -1101,8 +1101,9 @@ test.describe("Lupen browser smoke", () => {
       resourceMarker?.click();
       window.LupenMultiplayerOverlay.render();
       const resourceCard = document.querySelector(".lupen-target-card.resource");
-      const mineButton = resourceCard?.querySelector(".lupen-target-mine");
-      mineButton?.click();
+      const resourceActionText = engageButton?.textContent || "";
+      const resourceActionDisabled = engageButton?.disabled ?? true;
+      engageButton?.click();
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const resourceImage = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-resource-rock img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
@@ -1117,7 +1118,9 @@ test.describe("Lupen browser smoke", () => {
         selectedResourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource.is-selected").length,
         resourceTitle: resourceMarker?.getAttribute("title") || "",
         resourceCardText: resourceCard?.textContent || "",
-        mineButtonDisabled: mineButton?.disabled ?? null,
+        resourceCardButtonCount: resourceCard?.querySelectorAll("button").length ?? 0,
+        resourceActionText,
+        resourceActionDisabled,
         arrivingGhostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-arriving").length,
         dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
         playerTargetText,
@@ -1149,13 +1152,18 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.selectedResourceCount).toBe(1);
     expect(connectedHudState.resourceTitle).toContain("Iron asteroid");
     expect(connectedHudState.resourceCardText).toContain("Iron Asteroid");
-    expect(connectedHudState.resourceCardText).toContain("Recovered value CR 18-30/unit");
+    expect(connectedHudState.resourceCardText).toContain("Estimated sale CR 18-30/unit");
     expect(connectedHudState.resourceCardText).toContain("Cargo");
-    expect(connectedHudState.resourceCardText).toContain("Mine");
-    expect(connectedHudState.mineButtonDisabled).toBe(false);
-    expect(connectedHudState.sentResourceMines).toEqual([
-      { resourceId: "staging-resource-test-iron", currentNode: "Asteron Prime" }
-    ]);
+    expect(connectedHudState.resourceCardText).toContain("Use ENGAGE to fire");
+    expect(connectedHudState.resourceCardButtonCount).toBe(0);
+    expect(connectedHudState.resourceActionText).toContain("ENGAGE");
+    expect(connectedHudState.resourceActionDisabled).toBe(false);
+    expect(connectedHudState.sentResourceMines).toHaveLength(1);
+    expect(connectedHudState.sentResourceMines[0]).toMatchObject({
+      resourceId: "staging-resource-test-iron",
+      currentNode: "Asteron Prime"
+    });
+    expect(typeof connectedHudState.sentResourceMines[0].timestamp).toBe("number");
     expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
@@ -1175,7 +1183,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
     expect(connectedHudState.activityText).toContain("Remote Pilot entered Asteron Prime.");
     expect(connectedHudState.activityText).toContain("PvP disabled in safe areas.");
-    expect(connectedHudState.activityText).toContain("Mining Iron asteroid...");
+    expect(connectedHudState.activityText).toContain("Engaged Iron Asteroid.");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([
@@ -1597,7 +1605,7 @@ test.describe("Lupen browser smoke", () => {
     const builder = page.locator("#marketScreen .market-builder-panel");
     await expect(builder).toContainText("Sell Cargo");
     await expect(builder).toContainText("Recovered resource");
-    await expect(builder).toContainText("Mined cargo");
+    await expect(builder).toContainText("Recovered cargo");
     await expect(builder).toContainText(/Sell 24 of 24 carried/);
     await expect(builder).toContainText("Sell Revenue");
     await expect(builder).toContainText("CR 1,200");

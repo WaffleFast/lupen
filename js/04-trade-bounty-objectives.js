@@ -1298,7 +1298,7 @@ function renderMapOneMarketTerminal(goodsBox) {
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
           <div class="trade-preview-note staging-sell-summary">
-            <strong>${stagingRecoveredCargoSale ? "Mined cargo" : sellMode ? "Cargo ready to sell" : "Cargo in hold"}</strong>
+            <strong>${stagingRecoveredCargoSale ? "Recovered cargo" : sellMode ? "Cargo ready to sell" : "Cargo in hold"}</strong>
             <span>${sellMode ? `Selling ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} ${resource} at ${currentPlanet} for CR ${formatNumber(sellUnitPrice)} each` : `Carrying ${formatNumber(held)} ${resource}. Deliver it to ${activeMarketTrade?.destination || targetPlanet} to sell the route.`}</span>
           </div>
           ${sellMode || stagingTradeLocked
