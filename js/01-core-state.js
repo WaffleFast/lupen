@@ -1894,12 +1894,27 @@ function getStagingResourceTargetById(id) {
     || client?.getResources?.()?.find(item => String(item?.id || "") === String(id));
   if (!resource) return null;
   const node = resource.currentNode || resource.currentNodeId || resource.node;
+  const resourceName = resource.resourceName || resource.resource || resource.name || "Iron";
+  const hpMax = Math.max(1, Math.round(Number(resource.hpMax || resource.maxHp || resource.hullMax || resource.maxHull || 1)));
+  const hp = Math.max(0, Math.min(hpMax, Math.round(Number(resource.hp ?? resource.hull ?? hpMax))));
   return {
     ...resource,
     currentNodeId: node,
     node,
+    resource: resourceName,
+    resourceName,
+    hp,
+    maxHp: hpMax,
+    hpMax,
+    hull: hp,
+    hullMax: hpMax,
+    maxHull: hpMax,
+    shield: 0,
+    shieldMax: 0,
+    maxShield: 0,
+    image: typeof getAsteroidImage === "function" ? getAsteroidImage(resourceName) : resource.image,
     alive: resource.depleted !== true,
-    name: `${resource.resourceName || resource.name || "Resource"} Asteroid`,
+    name: `${resourceName} Asteroid`,
     stagingResource: true
   };
 }

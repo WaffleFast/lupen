@@ -1098,7 +1098,8 @@ test.describe("Lupen browser smoke", () => {
       input.value = "x".repeat(240);
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       const resourceMarker = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource");
-      resourceMarker?.click();
+      const serverResourceTarget = document.querySelector("#asteroidField .server-resource-asteroid");
+      serverResourceTarget?.click();
       window.LupenMultiplayerOverlay.render();
       const activeResourceMarker = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource");
       const resourceMarkerStyle = activeResourceMarker ? getComputedStyle(activeResourceMarker) : null;
@@ -1108,13 +1109,19 @@ test.describe("Lupen browser smoke", () => {
       engageButton?.click();
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const resourceImage = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-resource-rock img");
+      const serverResourceImage = document.querySelector("#asteroidField .server-resource-asteroid img");
       const note = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost-note");
       const onlineText = document.getElementById("onlinePilotsList")?.textContent || "";
       const chatText = document.getElementById("localChatFeed")?.textContent || "";
       const result = {
         src: image?.getAttribute("src") || "",
         resourceImageSrc: resourceImage?.getAttribute("src") || "",
+        serverResourceImageSrc: serverResourceImage?.getAttribute("src") || "",
         note: note?.textContent || "",
+        serverResourceCount: document.querySelectorAll("#asteroidField .server-resource-asteroid").length,
+        selectedServerResourceCount: document.querySelectorAll("#asteroidField .server-resource-asteroid.is-selected").length,
+        engagedServerResourceCount: document.querySelectorAll("#asteroidField .server-resource-asteroid.engaged").length,
+        playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
         ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
         resourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource").length,
         selectedResourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource.is-selected").length,
@@ -1152,7 +1159,12 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.resourceImageSrc).toBe("");
+    expect(connectedHudState.serverResourceImageSrc).toContain("assets/asteroids/asteroid-iron.png");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
+    expect(connectedHudState.serverResourceCount).toBe(1);
+    expect(connectedHudState.selectedServerResourceCount).toBe(1);
+    expect(connectedHudState.engagedServerResourceCount).toBe(1);
+    expect(connectedHudState.playerShotCount).toBeGreaterThan(0);
     expect(connectedHudState.ghostCount).toBe(1);
     expect(connectedHudState.resourceCount).toBe(0);
     expect(connectedHudState.selectedResourceCount).toBe(0);
@@ -1163,7 +1175,14 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.resourceCardPresent).toBe(false);
     expect(connectedHudState.resourceCardText).toBe("");
     expect(connectedHudState.resourceCardButtonCount).toBe(0);
-    expect(connectedHudState.sentResourceMines).toHaveLength(0);
+    expect(connectedHudState.resourceActionText).toContain("ENGAGE");
+    expect(connectedHudState.resourceActionDisabled).toBe(false);
+    expect(connectedHudState.sentResourceMines).toHaveLength(1);
+    expect(connectedHudState.sentResourceMines[0]).toMatchObject({
+      resourceId: "staging-resource-test-iron",
+      currentNode: "Asteron Prime"
+    });
+    expect(typeof connectedHudState.sentResourceMines[0].timestamp).toBe("number");
     expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");

@@ -717,7 +717,7 @@ function renderTargetButton(target, options = {}) {
   const field = document.getElementById("asteroidField");
   if (!field) return;
   normalizeTargetCombatLayers(target);
-  const targetType = options.isHostileBot ? "hostileBot" : "asteroid";
+  const targetType = options.targetType || (options.isHostileBot ? "hostileBot" : "asteroid");
 
   const btn = document.createElement("button");
   btn.className = `${options.className || "asteroid-target"} visible`;
@@ -784,8 +784,11 @@ function updateAsteroidUI() {
     ? getVisibleHostileBotsForLocalTargetUi()
     : hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
   const visibleAsteroids = asteroids.filter(asteroid => asteroid.alive && asteroid.node === currentNode);
+  const visibleStagingResources = typeof getVisibleStagingResourceTargets === "function"
+    ? getVisibleStagingResourceTargets()
+    : [];
 
-  separateVisibleTargets([...visibleBots, ...visibleAsteroids]);
+  separateVisibleTargets([...visibleBots, ...visibleAsteroids, ...visibleStagingResources]);
 
   visibleBots.forEach(bot => {
     renderTargetButton(bot, {
@@ -802,6 +805,17 @@ function updateAsteroidUI() {
       imageSrc: asteroid.image || getAsteroidImage(asteroid.resource),
       fallbackSrc: getCommodityImage(asteroid.resource),
       onClick: () => selectAsteroid(asteroid.id)
+    });
+  });
+
+  visibleStagingResources.forEach(resource => {
+    const resourceName = resource.resourceName || resource.resource || "Iron";
+    renderTargetButton(resource, {
+      targetType: "stagingResource",
+      className: `asteroid-target resource-asteroid-target server-resource-asteroid asteroid-${getAsteroidResourceSlug(resourceName)}`,
+      imageSrc: resource.image || getAsteroidImage(resourceName),
+      fallbackSrc: getCommodityImage(resourceName),
+      onClick: () => selectStagingResourceTarget(resource.id)
     });
   });
 }
@@ -1173,6 +1187,16 @@ function performStagingResourceAttackCycle() {
     return;
   }
 
+  const weapon = getEquippedWeapon();
+  pulseLaserBurstToTarget(target, weapon, { showImpact: true });
+  target.hitFlashUntil = Date.now() + 260;
+  const soundPulseCount = Math.max(1, Math.min(6, Number(weapon?.count || 1)));
+  Array.from({ length: soundPulseCount }).forEach((_shotWeapon, index) => {
+    setTimeout(() => {
+      if (typeof playPlayerLaserPulse === "function") playPlayerLaserPulse();
+    }, Math.min(index * 75, 375));
+  });
+  updateAsteroidUI();
   client.mineStagingResource?.(target.id, { currentNode, timestamp: Date.now() });
 }
 
