@@ -1100,6 +1100,8 @@ test.describe("Lupen browser smoke", () => {
       const resourceMarker = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource");
       resourceMarker?.click();
       window.LupenMultiplayerOverlay.render();
+      const activeResourceMarker = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource");
+      const resourceMarkerStyle = activeResourceMarker ? getComputedStyle(activeResourceMarker) : null;
       const resourceCard = document.querySelector(".lupen-target-card.resource");
       const resourceActionText = engageButton?.textContent || "";
       const resourceActionDisabled = engageButton?.disabled ?? true;
@@ -1116,7 +1118,10 @@ test.describe("Lupen browser smoke", () => {
         ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
         resourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource").length,
         selectedResourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource.is-selected").length,
-        resourceTitle: resourceMarker?.getAttribute("title") || "",
+        resourceTitle: activeResourceMarker?.getAttribute("title") || "",
+        resourceMarkerBackground: resourceMarkerStyle?.backgroundColor || "",
+        resourceMarkerBorderTopWidth: resourceMarkerStyle?.borderTopWidth || "",
+        resourceMarkerPaddingTop: resourceMarkerStyle?.paddingTop || "",
         resourceCardText: resourceCard?.textContent || "",
         resourceCardButtonCount: resourceCard?.querySelectorAll("button").length ?? 0,
         resourceActionText,
@@ -1151,6 +1156,9 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.resourceCount).toBe(1);
     expect(connectedHudState.selectedResourceCount).toBe(1);
     expect(connectedHudState.resourceTitle).toContain("Iron asteroid");
+    expect(connectedHudState.resourceMarkerBackground).toBe("rgba(0, 0, 0, 0)");
+    expect(connectedHudState.resourceMarkerBorderTopWidth).toBe("0px");
+    expect(connectedHudState.resourceMarkerPaddingTop).toBe("0px");
     expect(connectedHudState.resourceCardText).toContain("Iron Asteroid");
     expect(connectedHudState.resourceCardText).toContain("Estimated sale CR 18-30/unit");
     expect(connectedHudState.resourceCardText).toContain("Cargo");
@@ -1624,6 +1632,40 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#inventoryDrawerDetail")).toContainText("Recovered");
     await expect(page.locator("#inventoryDrawerDetail")).toContainText("Avg Cost");
     await expect(page.locator("#inventoryDrawerDetail")).toContainText("None");
+
+    const recoveredSell = await page.evaluate(() => window.eval(`
+      (() => {
+        const creditsBefore = credits;
+        const tradeProfitBefore = playerProgress.totals.tradeProfit || 0;
+        const totalTradingProfitBefore = playerProgress.totals.totalTradingProfit || 0;
+        selectedMarketResource = "Copper";
+        selectedMarketTargetPlanet = "Nyxara";
+        selectedMarketQuantity = 24;
+        currentNode = "Nyxara";
+        lastPlanetNode = "Nyxara";
+        sellMarketCargo();
+        return {
+          creditsBefore,
+          creditsAfter: credits,
+          cargoAfter: cargo.Copper || 0,
+          cargoBasisAfter: cargoCostBasis.Copper || null,
+          tradeProfitBefore,
+          tradeProfitAfter: playerProgress.totals.tradeProfit || 0,
+          totalTradingProfitBefore,
+          totalTradingProfitAfter: playerProgress.totals.totalTradingProfit || 0,
+          burstText: document.getElementById("tradeResultBurst")?.textContent || "",
+          activityText: document.getElementById("activityLogFeed")?.textContent || ""
+        };
+      })()
+    `));
+    expect(recoveredSell.creditsAfter).toBe(recoveredSell.creditsBefore + 1200);
+    expect(recoveredSell.cargoAfter).toBe(0);
+    expect(recoveredSell.cargoBasisAfter).toBe(null);
+    expect(recoveredSell.tradeProfitAfter).toBe(recoveredSell.tradeProfitBefore);
+    expect(recoveredSell.totalTradingProfitAfter).toBe(recoveredSell.totalTradingProfitBefore);
+    expect(recoveredSell.burstText).toContain("Recovered Cargo Sold");
+    expect(recoveredSell.burstText).toContain("+CR 1,200 value");
+    expect(recoveredSell.activityText).toContain("Recovered resource sale");
 
     await page.evaluate(() => {
       if (typeof window.showMultiplayerStagingTradeSellFeedback === "function") {

@@ -997,14 +997,27 @@ function applyStagingResourceMineResult(result = {}) {
 
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof addHudToast === "function") addHudToast(message);
-  if (collectedAmount > 0 && typeof showGameRewardBurst === "function") {
-    showGameRewardBurst({
+  if (collectedAmount > 0) {
+    const rewardPayload = {
       type: "resource",
       kicker: "Resource Recovered",
       title: `+${formatNumber(collectedAmount)} ${resourceName}`,
       meta: `Cargo ${formatNumber(cargoUsedAfter)}/${formatNumber(cargoCapacity)}`,
       image: typeof getCommodityImage === "function" ? getCommodityImage(resourceName) : ""
-    });
+    };
+    if (typeof showGameRewardBurst === "function") {
+      showGameRewardBurst(rewardPayload);
+    } else if (typeof showTradeResultBurst === "function") {
+      showTradeResultBurst({
+        good: resourceName,
+        quantity: collectedAmount,
+        revenue: 0,
+        profit: 0,
+        valueMode: true,
+        title: "Resource Recovered",
+        detail: rewardPayload.meta
+      });
+    }
   }
   updateTargetPanel();
   saveGame();

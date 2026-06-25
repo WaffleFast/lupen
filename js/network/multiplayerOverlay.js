@@ -898,17 +898,23 @@
       }
 
       .lupen-mp-space-resource {
+        appearance: none;
         position: absolute;
         display: grid;
         justify-items: center;
         gap: 2px;
         width: 46px;
         min-height: 48px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
         transform: translate(-50%, -50%);
         opacity: 0.84;
         pointer-events: auto;
         cursor: crosshair;
         filter: drop-shadow(0 0 9px rgba(127, 223, 255, 0.26));
+        box-shadow: none;
       }
 
       .lupen-mp-space-resource:hover {

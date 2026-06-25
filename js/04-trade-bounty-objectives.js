@@ -1516,9 +1516,13 @@ function sellMarketCargo() {
     })))
     : held;
   const price = stagingTradeActive ? Number(stagingOffer.sellPrice || 0) : getEffectiveSellPrice(good, currentPlanet);
-  const unitCost = cargoCostBasis[good] || (stagingTradeActive ? Number(stagingOffer.buyPrice || 0) : getEffectiveBuyPrice(good, currentPlanet)) || price;
+  const cargoUnitBasis = getCargoCostBasisForResource(good);
+  const recoveredCargoSale = cargoUnitBasis === null;
+  const unitCost = recoveredCargoSale
+    ? 0
+    : cargoUnitBasis || (stagingTradeActive ? Number(stagingOffer.buyPrice || 0) : getEffectiveBuyPrice(good, currentPlanet)) || price;
   const saleRevenue = price * quantity;
-  const tradeProfit = quantity * (price - unitCost);
+  const tradeProfit = recoveredCargoSale ? saleRevenue : quantity * (price - unitCost);
 
   if (quantity <= 0 || !price) {
     if (typeof addHudToast === "function") addHudToast(`Cannot sell ${good} at this market.`);
@@ -1532,18 +1536,28 @@ function sellMarketCargo() {
   playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + quantity;
 
   const activeTrade = getActiveTradePricing(good);
-  if (activeTrade && currentPlanet === activeTrade.destination) {
+  if (!recoveredCargoSale && activeTrade && currentPlanet === activeTrade.destination) {
     updateActiveTradeProgress({
       realizedProfit: Math.max(0, Number(activeTrade.realizedProfit || 0)) + Math.max(0, tradeProfit)
     });
   }
 
-  if (stagingTradeActive && typeof addActivityLog === "function") {
+  if (recoveredCargoSale && typeof addActivityLog === "function") {
+    addActivityLog(`Recovered resource sale: sold ${formatNumber(quantity)} ${good} at ${currentPlanet} for CR ${formatNumber(saleRevenue)} value.`);
+  } else if (stagingTradeActive && typeof addActivityLog === "function") {
     addActivityLog(`Sold ${formatNumber(quantity)} ${good} at ${currentPlanet} for ${tradeProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(tradeProfit))} profit.`);
   }
-  showTradeResultBurst({ good, quantity, profit: tradeProfit, revenue: saleRevenue });
+  showTradeResultBurst({
+    good,
+    quantity,
+    profit: tradeProfit,
+    revenue: saleRevenue,
+    valueMode: recoveredCargoSale,
+    title: recoveredCargoSale ? "Recovered Cargo Sold" : "",
+    detail: recoveredCargoSale ? `Sold ${formatNumber(quantity)} ${good} at ${currentPlanet}` : ""
+  });
   showTradeMiniFloat({ profit: tradeProfit });
-  completeActiveTradeIfReady(good);
+  if (!recoveredCargoSale) completeActiveTradeIfReady(good);
   tutorialEvent("soldTradeCargo");
   saveGame();
   renderMarketplace();
@@ -3813,18 +3827,32 @@ function sellGood(good) {
   }
 
   const activeTrade = getActiveTradePricing(good);
-  const unitCost = cargoCostBasis[good] || activeTrade?.buyPrice || price;
-  const tradeProfit = maxSell * (price - unitCost);
-  const saleProfit = activeTrade && currentNode === activeTrade.destination
+  const cargoUnitBasis = getCargoCostBasisForResource(good);
+  const recoveredCargoSale = cargoUnitBasis === null;
+  const unitCost = recoveredCargoSale ? 0 : cargoUnitBasis || activeTrade?.buyPrice || price;
+  const tradeProfit = recoveredCargoSale ? price * maxSell : maxSell * (price - unitCost);
+  const saleProfit = !recoveredCargoSale && activeTrade && currentNode === activeTrade.destination
     ? Math.max(0, tradeProfit)
-    : Math.max(0, tradeProfit);
+    : 0;
   const saleRevenue = price * maxSell;
 
   cargo[good] -= maxSell;
   credits += saleRevenue;
   playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + maxSell;
 
-  showTradeResultBurst({ good, quantity: maxSell, profit: tradeProfit, revenue: saleRevenue });
+  if (recoveredCargoSale && typeof addActivityLog === "function") {
+    addActivityLog(`Recovered resource sale: sold ${formatNumber(maxSell)} ${good} at ${currentNode} for CR ${formatNumber(saleRevenue)} value.`);
+  }
+
+  showTradeResultBurst({
+    good,
+    quantity: maxSell,
+    profit: tradeProfit,
+    revenue: saleRevenue,
+    valueMode: recoveredCargoSale,
+    title: recoveredCargoSale ? "Recovered Cargo Sold" : "",
+    detail: recoveredCargoSale ? `Sold ${formatNumber(maxSell)} ${good} at ${currentNode}` : ""
+  });
   showTradeMiniFloat({ profit: tradeProfit });
 
   if (saleProfit > 0 && activeTrade) {
@@ -3838,7 +3866,7 @@ function sellGood(good) {
     if (selectedLooseCargoSellGood === good) selectedLooseCargoSellGood = null;
   }
 
-  completeActiveTradeIfReady(good);
+  if (!recoveredCargoSale) completeActiveTradeIfReady(good);
   tutorialEvent("soldTradeCargo");
   saveGame();
   renderMarketplace();
