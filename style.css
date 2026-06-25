@@ -25975,17 +25975,17 @@ input::placeholder {
 }
 
 .game-reward-burst.resource .game-reward-card {
-  border-color: rgba(245, 230, 140, 0.66);
+  border-color: rgba(52, 229, 154, 0.66);
   box-shadow:
-    0 0 0 2px rgba(245, 230, 140, 0.08),
+    0 0 0 2px rgba(52, 229, 154, 0.09),
     0 18px 60px rgba(0, 0, 0, 0.46),
-    0 0 40px rgba(245, 190, 84, 0.18);
+    0 0 40px rgba(52, 229, 154, 0.20);
 }
 
 .game-reward-burst.resource .game-reward-icon,
 .game-reward-burst.resource .game-reward-kicker {
-  color: #f5e68c;
-  border-color: rgba(245, 230, 140, 0.56);
+  color: #34e59a;
+  border-color: rgba(52, 229, 154, 0.58);
 }
 
 .game-reward-burst.core .game-reward-card {

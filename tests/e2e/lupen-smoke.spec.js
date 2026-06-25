@@ -1123,6 +1123,7 @@ test.describe("Lupen browser smoke", () => {
         resourceMarkerBorderTopWidth: resourceMarkerStyle?.borderTopWidth || "",
         resourceMarkerPaddingTop: resourceMarkerStyle?.paddingTop || "",
         resourceCardText: resourceCard?.textContent || "",
+        resourceCardPresent: Boolean(resourceCard),
         resourceCardButtonCount: resourceCard?.querySelectorAll("button").length ?? 0,
         resourceActionText,
         resourceActionDisabled,
@@ -1150,28 +1151,19 @@ test.describe("Lupen browser smoke", () => {
       return result;
     });
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
-    expect(connectedHudState.resourceImageSrc).toContain("assets/asteroids/asteroid-iron.png");
+    expect(connectedHudState.resourceImageSrc).toBe("");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
     expect(connectedHudState.ghostCount).toBe(1);
-    expect(connectedHudState.resourceCount).toBe(1);
-    expect(connectedHudState.selectedResourceCount).toBe(1);
-    expect(connectedHudState.resourceTitle).toContain("Iron asteroid");
-    expect(connectedHudState.resourceMarkerBackground).toBe("rgba(0, 0, 0, 0)");
-    expect(connectedHudState.resourceMarkerBorderTopWidth).toBe("0px");
-    expect(connectedHudState.resourceMarkerPaddingTop).toBe("0px");
-    expect(connectedHudState.resourceCardText).toContain("Iron Asteroid");
-    expect(connectedHudState.resourceCardText).toContain("Estimated sale CR 18-30/unit");
-    expect(connectedHudState.resourceCardText).toContain("Cargo");
-    expect(connectedHudState.resourceCardText).toContain("Use ENGAGE to fire");
+    expect(connectedHudState.resourceCount).toBe(0);
+    expect(connectedHudState.selectedResourceCount).toBe(0);
+    expect(connectedHudState.resourceTitle).toBe("");
+    expect(connectedHudState.resourceMarkerBackground).toBe("");
+    expect(connectedHudState.resourceMarkerBorderTopWidth).toBe("");
+    expect(connectedHudState.resourceMarkerPaddingTop).toBe("");
+    expect(connectedHudState.resourceCardPresent).toBe(false);
+    expect(connectedHudState.resourceCardText).toBe("");
     expect(connectedHudState.resourceCardButtonCount).toBe(0);
-    expect(connectedHudState.resourceActionText).toContain("ENGAGE");
-    expect(connectedHudState.resourceActionDisabled).toBe(false);
-    expect(connectedHudState.sentResourceMines).toHaveLength(1);
-    expect(connectedHudState.sentResourceMines[0]).toMatchObject({
-      resourceId: "staging-resource-test-iron",
-      currentNode: "Asteron Prime"
-    });
-    expect(typeof connectedHudState.sentResourceMines[0].timestamp).toBe("number");
+    expect(connectedHudState.sentResourceMines).toHaveLength(0);
     expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
@@ -1191,7 +1183,6 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
     expect(connectedHudState.activityText).toContain("Remote Pilot entered Asteron Prime.");
     expect(connectedHudState.activityText).toContain("PvP disabled in safe areas.");
-    expect(connectedHudState.activityText).toContain("Engaged Iron Asteroid.");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([
@@ -1623,6 +1614,8 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#gameRewardBurst")).toContainText("Resource Recovered");
     await expect(page.locator("#gameRewardBurst")).toContainText("+24 Copper");
     await expect(page.locator("#gameRewardBurst")).toContainText("Cargo 24/");
+    const resourceBurstStyle = await page.locator("#gameRewardBurst .game-reward-kicker").evaluate((el) => getComputedStyle(el).color);
+    expect(resourceBurstStyle).toBe("rgb(52, 229, 154)");
 
     await page.evaluate(() => {
       if (typeof window.openShipStorageDrawer === "function") window.openShipStorageDrawer("cargo");

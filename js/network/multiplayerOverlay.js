@@ -2107,7 +2107,7 @@
       ? players.find((player) => String(player.sessionId || player.id || "") === selectedPlayerId && isSameCurrentNode(player))
       : null;
 
-    if (!selectedBot && !selectedPlayer && !selectedResource) return;
+    if (!selectedBot && !selectedPlayer) return;
 
     const layer = global.document.createElement("div");
     layer.id = spaceSelectionLayerId;
@@ -2624,63 +2624,10 @@
 
   function renderSpaceResources(resources) {
     global.document?.getElementById(spaceResourceLayerId)?.remove();
-    if (!isEnabled()) return;
-
-    const spaceScreen = global.document?.getElementById("spaceScreen");
-    if (!spaceScreen) return;
-
-    const localResources = resources.filter((resource) => isSameCurrentNode(resource) && (!resource.depleted || isMpDebugEnabled()));
-    if (!localResources.length) return;
-
-    ensureStyles();
-
-    const status = getClient()?.getStatus?.() || {};
-    const layer = global.document.createElement("div");
-    layer.id = spaceResourceLayerId;
-    layer.setAttribute("aria-hidden", "true");
-    const selectedId = getSelectedResourceId();
-
-    localResources.slice(0, 12).forEach((resource) => {
-      const marker = global.document.createElement("button");
-      marker.type = "button";
-      marker.className = "lupen-mp-space-resource";
-      marker.dataset.resourceId = resource.id || "";
-      marker.style.left = `${clampMapCoordinate(resource.x || 50)}%`;
-      marker.style.top = `${clampMapCoordinate(resource.y || 50)}%`;
-      marker.style.setProperty("--resource-glow", getResourceAccent(resource.resourceName));
-      marker.title = `${resource.resourceName || "Resource"} asteroid / ${getResourceHealthSummary(resource)} / click to select`;
-      marker.setAttribute("aria-label", `Select ${resource.resourceName || "resource"} asteroid`);
-      if (String(resource.id || "") === selectedId) marker.classList.add("is-selected");
-      if (resource.depleted) marker.classList.add("is-depleted");
-      if (wasRecentlyEngagedResource(resource, status)) marker.classList.add("is-hit");
-      marker.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        selectStagingResource(resource);
-      });
-
-      const rock = global.document.createElement("span");
-      rock.className = "lupen-mp-resource-rock";
-      const imageSrc = getResourceImage(resource);
-      if (imageSrc) {
-        const image = global.document.createElement("img");
-        image.src = imageSrc;
-        image.alt = "";
-        rock.appendChild(image);
-      }
-      marker.appendChild(rock);
-
-      const bars = global.document.createElement("span");
-      bars.className = "lupen-mp-resource-bars";
-      const fill = global.document.createElement("span");
-      fill.style.width = `${getPercent(resource.hp, resource.hpMax)}%`;
-      bars.appendChild(fill);
-      marker.appendChild(bars);
-
-      layer.appendChild(marker);
-    });
-
-    spaceScreen.appendChild(layer);
+    selectedResourceId = "";
+    // Staging resources remain in server state, but Map 1 asteroid gameplay is
+    // presented through the local combat asteroid layer so lasers, hit effects,
+    // and target handling stay consistent.
   }
 
   function renderSpaceShot(players, bots, status) {
