@@ -126,6 +126,35 @@ Object.values(sectorNodes).forEach(node => {
   }
 });
 
+const NODE_ZONE_TYPES = Object.freeze({
+  protected: "protected",
+  contested: "contested"
+});
+
+function getNodeZoneType(nodeId = currentNode) {
+  const node = sectorNodes[nodeId];
+  if (!node) return NODE_ZONE_TYPES.protected;
+  if (node.type === "planet") return NODE_ZONE_TYPES.protected;
+  if (Number(node.y) > 50) return NODE_ZONE_TYPES.contested;
+  return NODE_ZONE_TYPES.protected;
+}
+
+function isProtectedNode(nodeId = currentNode) {
+  return getNodeZoneType(nodeId) === NODE_ZONE_TYPES.protected;
+}
+
+function isContestedNode(nodeId = currentNode) {
+  return getNodeZoneType(nodeId) === NODE_ZONE_TYPES.contested;
+}
+
+function getCurrentNodeZoneType() {
+  return getNodeZoneType(currentNode);
+}
+
+Object.entries(sectorNodes).forEach(([name, node]) => {
+  node.pvpZoneType = getNodeZoneType(name);
+});
+
 const nodeMineralPools = Object.fromEntries(
   Object.entries(sectorNodes).map(([name, node]) => {
     if (node.type === "planet") {

@@ -121,8 +121,11 @@ function getRemotePlayerEngageBlockMessage(player = {}) {
   if (targetNode && targetNode !== currentNode) return "Target is no longer in this node.";
 
   const node = typeof sectorNodes !== "undefined" ? sectorNodes[currentNode] : null;
-  if (node?.type === "planet" || ["Asteron Prime", "Virella", "Nyxara"].includes(String(currentNode || ""))) {
-    return "PvP disabled in safe areas.";
+  const protectedNode = typeof isProtectedNode === "function"
+    ? isProtectedNode(currentNode)
+    : (node?.type === "planet" || ["Asteron Prime", "Virella", "Nyxara"].includes(String(currentNode || "")));
+  if (protectedNode) {
+    return "PvP disabled in protected zones.";
   }
 
   const localGuildId = String(window.LupenMultiplayerClient?.getStatus?.()?.guildId || "").trim();

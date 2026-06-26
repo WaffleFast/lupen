@@ -1227,7 +1227,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.visiblePlayerMessageCount).toBe(1);
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
     expect(connectedHudState.activityText).toContain("Remote Pilot entered Asteron Prime.");
-    expect(connectedHudState.activityText).toContain("PvP disabled in safe areas.");
+    expect(connectedHudState.activityText).toContain("PvP disabled in protected zones.");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([
@@ -1296,6 +1296,85 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("Connect");
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("Refresh Presence");
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("Map 1 classifies protected and contested nodes for future PvP rules", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const zones = await page.evaluate(() => window.eval(`
+      (() => {
+        const originalNode = currentNode;
+        try {
+          currentNode = "Upper Gate Core";
+          const protectedBlockMessage = getRemotePlayerEngageBlockMessage({
+            currentNodeId: "Upper Gate Core",
+            presenceStatus: "space"
+          });
+
+          currentNode = "Lower Gate Core";
+          const contestedBlockMessage = getRemotePlayerEngageBlockMessage({
+            currentNodeId: "Lower Gate Core",
+            presenceStatus: "space"
+          });
+
+          return {
+            planets: {
+              virella: getNodeZoneType("Virella"),
+              asteronPrime: getNodeZoneType("Asteron Prime"),
+              nyxara: getNodeZoneType("Nyxara")
+            },
+            north: {
+              upperGateCore: getNodeZoneType("Upper Gate Core"),
+              upperApex: getNodeZoneType("Upper Apex")
+            },
+            middle: {
+              westLink1: getNodeZoneType("West Link 1"),
+              eastLink1: getNodeZoneType("East Link 1")
+            },
+            south: {
+              lowerGateCore: getNodeZoneType("Lower Gate Core"),
+              lowerApex: getNodeZoneType("Lower Apex")
+            },
+            unknown: getNodeZoneType("Missing Node"),
+            helpers: {
+              currentProtected: (currentNode = "Asteron Prime", getCurrentNodeZoneType()),
+              currentContested: (currentNode = "Lower Gate Core", getCurrentNodeZoneType()),
+              upperProtected: isProtectedNode("Upper Gate Core"),
+              lowerContested: isContestedNode("Lower Gate Core")
+            },
+            metadata: {
+              upperGateCore: sectorNodes["Upper Gate Core"].pvpZoneType,
+              lowerGateCore: sectorNodes["Lower Gate Core"].pvpZoneType
+            },
+            messages: {
+              protectedBlockMessage,
+              contestedBlockMessage
+            }
+          };
+        } finally {
+          currentNode = originalNode;
+        }
+      })()
+    `));
+
+    expect(Object.values(zones.planets)).toEqual(["protected", "protected", "protected"]);
+    expect(Object.values(zones.north)).toEqual(["protected", "protected"]);
+    expect(Object.values(zones.middle)).toEqual(["protected", "protected"]);
+    expect(Object.values(zones.south)).toEqual(["contested", "contested"]);
+    expect(zones.unknown).toBe("protected");
+    expect(zones.helpers.currentProtected).toBe("protected");
+    expect(zones.helpers.currentContested).toBe("contested");
+    expect(zones.helpers.upperProtected).toBe(true);
+    expect(zones.helpers.lowerContested).toBe(true);
+    expect(zones.metadata.upperGateCore).toBe("protected");
+    expect(zones.metadata.lowerGateCore).toBe("contested");
+    expect(zones.messages.protectedBlockMessage).toBe("PvP disabled in protected zones.");
+    expect(zones.messages.contestedBlockMessage).toBe("PvP is unavailable in staging.");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
