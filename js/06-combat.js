@@ -839,11 +839,72 @@ function clearStagingBotTargetIfSelected(botId) {
   const selectedMatches = selectedTarget?.type === "stagingBot" && selectedTarget.id === botId;
   const engagedMatches = engagedTarget?.type === "stagingBot" && engagedTarget.id === botId;
   if (!selectedMatches && !engagedMatches) return;
-  disengageTarget(false);
+
+  if (engagedMatches && engageTimer) {
+    clearInterval(engageTimer);
+    engageTimer = null;
+  }
+  if (engagedMatches) engagedTarget = null;
+  if (selectedMatches) selectedTarget = null;
+  window.LupenMultiplayerClient?.clearStagingTarget?.();
   updateAsteroidUI();
   updateTargetPanel();
   updateObjectActionPanel(false);
+  window.LupenMultiplayerOverlay?.render?.();
 }
+
+function handleStagingBotLifecycleEvent(event = {}) {
+  const botId = String(event.botId || event.id || event.targetBotId || "").trim();
+  if (!botId) return { handled: false, reason: "missing_bot_id" };
+
+  const eventType = String(event.type || "").toLowerCase();
+  const disabled = event.disabled === true || eventType.includes("disabled");
+  const respawned = eventType.includes("respawned") || event.disabled === false;
+  const target = getStagingBotTargetById(botId);
+
+  if (disabled) {
+    if (!window.lupenStagingBotDestructionVisualKeys) {
+      window.lupenStagingBotDestructionVisualKeys = new Set();
+    }
+
+    const destructionKey = String(
+      event.destructionInstanceId ||
+      event.rewardPreviewId ||
+      event.botXpSourceEventId ||
+      event.disabledUntil ||
+      botId
+    );
+    const alreadyVisualized = window.lupenStagingBotDestructionVisualKeys.has(destructionKey);
+    window.lupenStagingBotDestructionVisualKeys.add(destructionKey);
+
+    if (target && !alreadyVisualized) {
+      showExplosionAtTarget(target);
+      if (typeof playEnemyShipDestroyedSound === "function") {
+        setTimeout(playEnemyShipDestroyedSound, 140);
+      }
+    }
+
+    clearStagingBotTargetIfSelected(botId);
+    updateAsteroidUI();
+    updateTargetPanel();
+    updateObjectActionPanel(false);
+    window.LupenMultiplayerOverlay?.render?.();
+
+    return { handled: true, reason: "bot_disabled", botId };
+  }
+
+  if (respawned) {
+    updateAsteroidUI();
+    updateTargetPanel();
+    window.LupenMultiplayerOverlay?.render?.();
+    return { handled: true, reason: "bot_respawned", botId };
+  }
+
+  return { handled: false, reason: "ignored_bot_event", botId };
+}
+
+window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
+window.handleStagingBotLifecycleEvent = handleStagingBotLifecycleEvent;
 
 function updateTargetPanel() {
   const lootSummary = document.getElementById("lootSummary");

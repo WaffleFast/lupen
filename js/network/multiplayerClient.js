@@ -2357,7 +2357,9 @@
         }
       }
       logDev("server bot disabled", message);
-      if (typeof global.clearStagingBotTargetIfSelected === "function") {
+      if (typeof global.handleStagingBotLifecycleEvent === "function") {
+        global.handleStagingBotLifecycleEvent(connection.lastBotEvent);
+      } else if (typeof global.clearStagingBotTargetIfSelected === "function") {
         global.clearStagingBotTargetIfSelected(connection.lastBotEvent.botId);
       }
       scheduleStagingCombatProgressRefresh("botDisabled", connection.lastBotEvent);
@@ -2378,6 +2380,9 @@
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
       logDev("server bot respawned", message);
+      if (typeof global.handleStagingBotLifecycleEvent === "function") {
+        global.handleStagingBotLifecycleEvent(connection.lastBotEvent);
+      }
     });
 
     activeRoom.onMessage("staging:shot", (message) => {

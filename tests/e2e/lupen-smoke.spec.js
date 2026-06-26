@@ -2876,6 +2876,68 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
 
+    const stagingBotDisabledState = await page.evaluate(() => window.eval(`
+      (() => {
+        const bot = window.__stagingVisualBot;
+        selectStagingBotTarget(bot.id);
+        engageTarget();
+        const engagedBefore = engagedTarget ? { ...engagedTarget } : null;
+        bot.disabled = true;
+        bot.alive = false;
+        bot.hull = 0;
+        bot.shield = 0;
+        const disabledUntil = Date.now() + 30000;
+        const first = handleStagingBotLifecycleEvent({
+          type: "bot:disabled",
+          botId: bot.id,
+          botName: bot.name,
+          currentNode,
+          disabled: true,
+          disabledUntil,
+          destructionInstanceId: "e2e-staging-bot-disabled-1",
+          rewardPreviewId: "e2e-staging-bot-preview-1"
+        });
+        const explosionCountAfterFirst = document.querySelectorAll("#explosionLayer .space-explosion").length;
+        const duplicate = handleStagingBotLifecycleEvent({
+          type: "bot:disabled",
+          botId: bot.id,
+          botName: bot.name,
+          currentNode,
+          disabled: true,
+          disabledUntil,
+          destructionInstanceId: "e2e-staging-bot-disabled-1",
+          rewardPreviewId: "e2e-staging-bot-preview-1"
+        });
+        return {
+          engagedBefore,
+          first,
+          duplicate,
+          selectedAfter: selectedTarget ? { ...selectedTarget } : null,
+          engagedAfter: engagedTarget ? { ...engagedTarget } : null,
+          selectedClientBotId: window.__selectedStagingBotId || "",
+          overlayBotCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot").length,
+          disabledBotMarkerCount: document.querySelectorAll('#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot[data-bot-id="staging-bot-1"]').length,
+          targetCardCount: document.querySelectorAll(".lupen-target-card.hostile").length,
+          explosionCountAfterFirst,
+          explosionCountAfterDuplicate: document.querySelectorAll("#explosionLayer .space-explosion").length,
+          disengageLogCount: (document.getElementById("activityLogFeed")?.textContent || "").match(/Disengaged Erebus Watcher/g)?.length || 0
+        };
+      })()
+    `));
+
+    expect(stagingBotDisabledState.engagedBefore).toMatchObject({ type: "stagingBot", id: "staging-bot-1" });
+    expect(stagingBotDisabledState.first).toMatchObject({ handled: true, reason: "bot_disabled", botId: "staging-bot-1" });
+    expect(stagingBotDisabledState.duplicate).toMatchObject({ handled: true, reason: "bot_disabled", botId: "staging-bot-1" });
+    expect(stagingBotDisabledState.selectedAfter).toBe(null);
+    expect(stagingBotDisabledState.engagedAfter).toBe(null);
+    expect(stagingBotDisabledState.selectedClientBotId).toBe("");
+    expect(stagingBotDisabledState.overlayBotCount).toBe(9);
+    expect(stagingBotDisabledState.disabledBotMarkerCount).toBe(0);
+    expect(stagingBotDisabledState.targetCardCount).toBe(0);
+    expect(stagingBotDisabledState.explosionCountAfterFirst).toBeGreaterThan(0);
+    expect(stagingBotDisabledState.explosionCountAfterDuplicate).toBe(stagingBotDisabledState.explosionCountAfterFirst);
+    expect(stagingBotDisabledState.disengageLogCount).toBe(0);
+
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
