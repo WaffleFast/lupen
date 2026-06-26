@@ -87,6 +87,7 @@
   const playersById = new Map();
   const botsById = new Map();
   const resourcesById = new Map();
+  const missingPlayerSnapshotGraceMs = 9000;
   const stagingActivityLogKeys = new Set();
   const chatMessageKeys = new Set();
 
@@ -692,6 +693,9 @@
     if (typeof global.reconcileStagingBotTargetState === "function") {
       global.reconcileStagingBotTargetState("server_state_refresh");
     }
+    if (typeof global.reconcileServerOwnedSectorObjectMode === "function") {
+      global.reconcileServerOwnedSectorObjectMode("server_state_refresh");
+    }
     stateListeners.forEach((handler) => {
       try {
         handler(serverState, getStatus());
@@ -981,6 +985,7 @@
 
   function setPlayerSnapshot(snapshot) {
     if (!snapshot) return;
+    const seenAt = Number.isFinite(Number(snapshot.snapshotSeenAt)) ? Number(snapshot.snapshotSeenAt) : Date.now();
     const identityKey = getPlayerIdentityKey(snapshot);
     if (identityKey) {
       let keepCandidate = true;
@@ -997,8 +1002,21 @@
     }
 
     const current = playersById.get(snapshot.id);
+    if (current) {
+      playersById.set(snapshot.id, {
+        ...current,
+        ...snapshot,
+        snapshotSeenAt: seenAt,
+        snapshotMissingSince: 0
+      });
+      return;
+    }
     if (!current || shouldReplacePlayerSnapshot(current, snapshot)) {
-      playersById.set(snapshot.id, snapshot);
+      playersById.set(snapshot.id, {
+        ...snapshot,
+        snapshotSeenAt: seenAt,
+        snapshotMissingSince: 0
+      });
     }
   }
 
@@ -1044,6 +1062,8 @@
       presenceStatus: String(player.presenceStatus || player.status || "space") === "docked" ? "docked" : "space",
       joinedAt: Number.isFinite(Number(player.joinedAt)) ? Number(player.joinedAt) : 0,
       lastSeenAt: Number.isFinite(Number(player.lastSeenAt)) ? Number(player.lastSeenAt) : 0,
+      snapshotSeenAt: Number.isFinite(Number(player.snapshotSeenAt)) ? Number(player.snapshotSeenAt) : Date.now(),
+      snapshotMissingSince: Number.isFinite(Number(player.snapshotMissingSince)) ? Number(player.snapshotMissingSince) : 0,
       lastFireAt: Number.isFinite(Number(player.lastFireAt)) ? Number(player.lastFireAt) : 0,
       nextFireAt: Number.isFinite(Number(player.nextFireAt)) ? Number(player.nextFireAt) : 0,
       pvpShield: Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : null,
@@ -1072,24 +1092,50 @@
     return true;
   }
 
-  function updatePlayersFromServerState(serverState) {
-    playersById.clear();
+  function pruneMissingPlayerSnapshots(seenIds, now = Date.now()) {
+    playersById.forEach((player, id) => {
+      if (seenIds.has(id)) return;
+      if (id === connection.sessionId || player.isSelf) return;
+      const missingSince = Number(player.snapshotMissingSince || 0) || now;
+      if (now - missingSince > missingPlayerSnapshotGraceMs) {
+        playersById.delete(id);
+        return;
+      }
+      playersById.set(id, {
+        ...player,
+        snapshotMissingSince: missingSince
+      });
+    });
+  }
 
+  function removePlayerSnapshot(id) {
+    const playerId = String(id || "");
+    if (!playerId) return false;
+    return playersById.delete(playerId);
+  }
+
+  function updatePlayersFromServerState(serverState) {
     const players = serverState?.players;
     if (!players) return;
 
+    const seenIds = new Set();
+    const applyPlayerSnapshot = (player, key) => {
+      const snapshot = normalizePlayer(player, key);
+      if (!snapshot) return;
+      seenIds.add(snapshot.id);
+      setPlayerSnapshot(snapshot);
+    };
+
     if (typeof players.forEach === "function") {
-      players.forEach((player, key) => {
-        const snapshot = normalizePlayer(player, key);
-        setPlayerSnapshot(snapshot);
-      });
+      players.forEach(applyPlayerSnapshot);
+      pruneMissingPlayerSnapshots(seenIds);
       return;
     }
 
     Object.entries(players).forEach(([key, player]) => {
-      const snapshot = normalizePlayer(player, key);
-      setPlayerSnapshot(snapshot);
+      applyPlayerSnapshot(player, key);
     });
+    pruneMissingPlayerSnapshots(seenIds);
   }
 
   function normalizeBot(bot, fallbackId = "") {
@@ -2235,6 +2281,9 @@
 
     ["playerJoined", "playerLeft", "playerMoved"].forEach((type) => {
       activeRoom.onMessage(type, (message) => {
+        if ((message?.type || type) === "playerLeft") {
+          removePlayerSnapshot(message?.sessionId || message?.id || message?.playerId);
+        }
         pushPresenceEvent({ ...message, type: message?.type || type });
         logDev(`server ${type}`, message);
         notifyServerState(activeRoom?.state || null);

@@ -1616,7 +1616,12 @@
     const src = getSafeShipImageSrc(player);
     if (!src) return "";
     trackShipImageLoad(src);
-    return shipImageLoadStatus.get(src) === "failed" ? "" : src;
+    if (shipImageLoadStatus.get(src) !== "failed") return src;
+
+    const fallback = getSafeShipImageSrc({ shipImage: getKnownShipImageSrc(player) });
+    if (!fallback || fallback === src) return "";
+    trackShipImageLoad(fallback);
+    return shipImageLoadStatus.get(fallback) === "failed" ? "" : fallback;
   }
 
   function getShipImageLoadLabel(player) {
@@ -1651,9 +1656,10 @@
     if (!playerSessionId || playerSessionId === String(status?.sessionId || "")) return false;
     if (!String(player.currentNode || "").trim()) return false;
     if (!isStagingMode(status)) return true;
+    if (isSameCurrentNode(player)) return true;
     const lastSeenAt = Number(player.lastSeenAt || player.joinedAt || 0);
     if (!lastSeenAt) return false;
-    return Date.now() - lastSeenAt < 30000;
+    return Date.now() - lastSeenAt < 120000;
   }
 
   function isPilotInSpace(player) {

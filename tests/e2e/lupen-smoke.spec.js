@@ -1015,6 +1015,17 @@ test.describe("Lupen browser smoke", () => {
           },
           {
             isSelf: false,
+            sessionId: "idle-remote-session",
+            displayName: "Idle Pilot",
+            currentNode: "Asteron Prime",
+            presenceStatus: "space",
+            currentShipId: "zeusExplorer",
+            shipName: "Nightshade Hawk",
+            shipImage: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
+            lastSeenAt: Date.now() - 60000
+          },
+          {
+            isSelf: false,
             sessionId: "docked-remote-session",
             displayName: "Docked Pilot",
             currentNode: "Asteron Prime",
@@ -1185,7 +1196,7 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(connectedHudState.selectedTargetAfterDepletion).toBe(null);
     expect(connectedHudState.engagedTargetAfterDepletion).toBe(null);
-    expect(connectedHudState.ghostCount).toBe(1);
+    expect(connectedHudState.ghostCount).toBe(2);
     expect(connectedHudState.resourceCount).toBe(0);
     expect(connectedHudState.selectedResourceCount).toBe(0);
     expect(connectedHudState.resourceTitle).toBe("");
@@ -1220,7 +1231,7 @@ test.describe("Lupen browser smoke", () => {
       targetPlayerId: "remote-session"
     }]);
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
-    expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot, Docked Pilot");
+    expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot, Idle Pilot, Docked Pilot");
     expect(connectedHudState.onlineText).not.toContain("here");
     expect(connectedHudState.visiblePlayerMessageCount).toBe(1);
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
@@ -1518,8 +1529,13 @@ test.describe("Lupen browser smoke", () => {
             hp: 30,
             maxHp: 30
           }];
+          selectedTarget = { type: "asteroid", id: "local-only-test-asteroid" };
+          engagedTarget = { type: "asteroid", id: "local-only-test-asteroid" };
           window.LupenMultiplayerClient.getResources = () => [];
           updateAsteroidUI();
+          const connectedEmptyReconcile = typeof reconcileServerOwnedSectorObjectMode === "function"
+            ? reconcileServerOwnedSectorObjectMode("e2e_connected_empty")
+            : null;
           maybeMoveAsteroid();
           scheduleAsteroidRespawn();
           const connectedEmptySnapshot = typeof getStagingNodeConsistencySnapshot === "function"
@@ -1527,6 +1543,8 @@ test.describe("Lupen browser smoke", () => {
             : null;
           const connectedEmptyLocalAsteroidButtonCount = document.querySelectorAll("#asteroidField .resource-asteroid-target:not(.server-resource-asteroid)").length;
           const connectedEmptyAsteroidNode = asteroids[0]?.node || "";
+          const connectedEmptySelectedType = selectedTarget?.type || "";
+          const connectedEmptyEngagedType = engagedTarget?.type || "";
 
           window.LupenMultiplayerClient.getResources = () => [{
             id: "server-owned-test-asteroid",
@@ -1544,6 +1562,10 @@ test.describe("Lupen browser smoke", () => {
             : null;
           const localAsteroidButtonCount = document.querySelectorAll("#asteroidField .resource-asteroid-target:not(.server-resource-asteroid)").length;
           const serverAsteroidButtonCount = document.querySelectorAll("#asteroidField .server-resource-asteroid").length;
+
+          remotePlayer.currentNode = "Lower Gate Core";
+          selectRemotePlayerTarget("remote-pvp-test");
+          window.LupenMultiplayerOverlay?.render?.();
 
           const before = { hull, shield, combatXp: playerProgress.combatXp };
           const hudBefore = {
@@ -1610,9 +1632,12 @@ test.describe("Lupen browser smoke", () => {
             contestedTargetCardText,
             contestedShieldBarWidth,
             contestedHullBarWidth,
+            connectedEmptyReconcile,
             connectedEmptySnapshot,
             connectedEmptyLocalAsteroidButtonCount,
             connectedEmptyAsteroidNode,
+            connectedEmptySelectedType,
+            connectedEmptyEngagedType,
             sharedNodeSnapshot,
             localAsteroidButtonCount,
             serverAsteroidButtonCount,
@@ -1662,14 +1687,22 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedTargetCardText).toContain("No defeat or loot");
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
+    expect(eligibility.connectedEmptyReconcile).toMatchObject({
+      reconciled: true,
+      serverOwnedActive: true
+    });
     expect(eligibility.connectedEmptySnapshot).toMatchObject({
       serverOwnedActive: true,
       localAsteroidsSuppressed: true,
       visibleServerResources: 0,
       visibleLocalAsteroids: 0
     });
+    expect(eligibility.connectedEmptySnapshot.visibleTargetTypes).not.toContain("asteroid");
+    expect(eligibility.connectedEmptySnapshot.localAsteroidIds).toEqual([]);
     expect(eligibility.connectedEmptyLocalAsteroidButtonCount).toBe(0);
     expect(eligibility.connectedEmptyAsteroidNode).toBe("Lower Gate Core");
+    expect(eligibility.connectedEmptySelectedType).toBe("");
+    expect(eligibility.connectedEmptyEngagedType).toBe("");
     expect(eligibility.sharedNodeSnapshot).toMatchObject({
       serverOwnedActive: true,
       localAsteroidsSuppressed: true,

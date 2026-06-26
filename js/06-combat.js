@@ -271,6 +271,12 @@ function selectRemotePlayerTarget(playerId) {
 }
 
 function engageTarget() {
+  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects() &&
+    (selectedTarget?.type === "asteroid" || engagedTarget?.type === "asteroid")) {
+    reconcileServerOwnedSectorObjectMode("engage_server_owned_sector_objects");
+    return;
+  }
+
   const staleStagingBotCleared = reconcileStagingBotTargetState();
   if (staleStagingBotCleared) return;
 
@@ -1041,6 +1047,19 @@ function reconcileStagingBotTargetState(reason = "reconcile_staging_bot_target")
   return clearStaleStagingBotTarget(reason);
 }
 
+function reconcileServerOwnedSectorObjectMode(reason = "reconcile_server_owned_sector_objects") {
+  const serverOwnedActive = typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects();
+  if (!serverOwnedActive) return { reconciled: false, reason, serverOwnedActive };
+
+  clearLocalHostileBotSelectionForStaging();
+  clearLocalAsteroidSelectionForStaging();
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(false);
+  window.LupenMultiplayerOverlay?.render?.();
+  return { reconciled: true, reason, serverOwnedActive };
+}
+
 function handleStagingBotLifecycleEvent(event = {}) {
   const botId = String(event.botId || event.id || event.targetBotId || "").trim();
   if (!botId) return { handled: false, reason: "missing_bot_id" };
@@ -1094,6 +1113,7 @@ function handleStagingBotLifecycleEvent(event = {}) {
 window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
 window.handleStagingBotLifecycleEvent = handleStagingBotLifecycleEvent;
 window.reconcileStagingBotTargetState = reconcileStagingBotTargetState;
+window.reconcileServerOwnedSectorObjectMode = reconcileServerOwnedSectorObjectMode;
 
 function updateTargetPanel() {
   const lootSummary = document.getElementById("lootSummary");
@@ -1688,6 +1708,7 @@ function getStagingNodeConsistencySnapshot() {
   const serverResources = typeof getVisibleStagingResourceTargets === "function" ? getVisibleStagingResourceTargets() : [];
   const localBots = typeof getVisibleHostileBotsForLocalTargetUi === "function" ? getVisibleHostileBotsForLocalTargetUi() : getVisibleHostileBots();
   const localAsteroids = typeof getVisibleAsteroidsForLocalTargetUi === "function" ? getVisibleAsteroidsForLocalTargetUi() : getVisibleAsteroids();
+  const visibleTargets = typeof getVisibleTargets === "function" ? getVisibleTargets() : [];
   const remotePlayers = typeof window !== "undefined"
     ? (window.LupenMultiplayerClient?.getPlayers?.({ includeSelf: false }) || [])
       .filter(player => String(player?.currentNode || player?.currentNodeId || player?.node || "") === String(currentNode || "") &&
@@ -1701,7 +1722,10 @@ function getStagingNodeConsistencySnapshot() {
     visibleServerResources: serverResources.length,
     visibleLocalBots: localBots.length,
     visibleLocalAsteroids: localAsteroids.length,
-    visibleRemotePlayers: remotePlayers.length
+    visibleRemotePlayers: remotePlayers.length,
+    visibleTargetTypes: visibleTargets.map(target => getTargetTypeFromEntity(target)),
+    visibleTargetIds: visibleTargets.map(target => String(target?.id || "")),
+    localAsteroidIds: localAsteroids.map(asteroid => String(asteroid?.id || ""))
   };
 }
 
