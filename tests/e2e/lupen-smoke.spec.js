@@ -2950,6 +2950,12 @@ test.describe("Lupen browser smoke", () => {
     const state = await page.evaluate(() => window.eval(`
       (() => {
         localStorage.clear();
+        const activityMessages = [];
+        const originalAddActivityLog = addActivityLog;
+        addActivityLog = (message) => {
+          activityMessages.push(String(message || ""));
+          originalAddActivityLog(message);
+        };
         playerProgress = normalizePlayerProgress({ combatXp: 0, totals: { botsDestroyed: 0, erebusBotsDestroyed: 0 } });
         const active = {
           id: "staging_erebus_patrol_2",
@@ -2998,6 +3004,26 @@ test.describe("Lupen browser smoke", () => {
           destructionInstanceId: "staging-bot-2:kill-1",
           receivedAt: 1002
         });
+        const serverAppliedMark = typeof markStagingBotKillXpAwarded === "function"
+          ? markStagingBotKillXpAwarded({
+            ok: true,
+            applied: true,
+            botId: "staging-bot-3",
+            botName: "Erebus Scout",
+            destructionInstanceId: "staging-bot-3:kill-1",
+            botXpSourceEventId: "staging_bot_xp:staging-bot-3:kill-1",
+            receivedAt: 1003
+          })
+          : null;
+        const duplicateAfterServerApplied = awardLocalStagingBotKillXpFromServer({
+          ok: true,
+          applied: false,
+          botId: "staging-bot-3",
+          botName: "Erebus Scout",
+          destructionInstanceId: "staging-bot-3:kill-1",
+          botXpSourceEventId: "staging_bot_xp:staging-bot-3:kill-1",
+          receivedAt: 1004
+        });
 
         const hudText = document.getElementById("hudProgressStrip")?.textContent || "";
         showScreen("pilotProfileScreen");
@@ -3011,6 +3037,8 @@ test.describe("Lupen browser smoke", () => {
           first,
           duplicate,
           secondWithBounty,
+          serverAppliedMark,
+          duplicateAfterServerApplied,
           restoredXp: playerProgress.combatXp,
           restoredZoneXp: playerProgress.zoneCombatXp[XP_CONFIG.combatZoneKey],
           savedXp: saved.playerProgress?.combatXp,
@@ -3019,6 +3047,8 @@ test.describe("Lupen browser smoke", () => {
           erebusBotsDestroyed: saved.playerProgress?.totals?.erebusBotsDestroyed,
           hudText,
           pilotText,
+          fallbackKillActivityCount: activityMessages.filter(message => message === "Erebus Watcher destroyed. +100 XP.").length,
+          serverMarkedDuplicateActivityCount: activityMessages.filter(message => message.includes("Erebus Scout destroyed")).length,
           activeBountyProgress: window.LupenMultiplayerClient.getStatus().lastStagingBountyStatus.active.progress
         };
       })()
@@ -3029,6 +3059,9 @@ test.describe("Lupen browser smoke", () => {
     expect(state.duplicate.applied).toBe(false);
     expect(state.duplicate.reason).toBe("duplicate_staging_bot_kill_xp");
     expect(state.secondWithBounty.applied).toBe(true);
+    expect(state.serverAppliedMark).toMatchObject({ marked: true, key: "staging-bot-3:kill-1" });
+    expect(state.duplicateAfterServerApplied.applied).toBe(false);
+    expect(state.duplicateAfterServerApplied.reason).toBe("duplicate_staging_bot_kill_xp");
     expect(state.savedXp).toBe(200);
     expect(state.savedZoneXp).toBe(200);
     expect(state.restoredXp).toBe(200);
@@ -3037,6 +3070,8 @@ test.describe("Lupen browser smoke", () => {
     expect(state.erebusBotsDestroyed).toBe(2);
     expect(state.hudText).toContain("200");
     expect(state.pilotText).toContain("200");
+    expect(state.fallbackKillActivityCount).toBe(1);
+    expect(state.serverMarkedDuplicateActivityCount).toBe(0);
     expect(state.activeBountyProgress).toBe(1);
 
     await expectNoUnexpectedBrowserErrors(failures);

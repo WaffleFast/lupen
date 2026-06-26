@@ -536,6 +536,20 @@ function getStagingBotKillXpKey(result = {}) {
   return botId && receivedAt ? `${botId}:${receivedAt}` : "";
 }
 
+function ensureStagingBotKillXpAwardedKeys() {
+  if (!window.lupenStagingBotKillXpAwardedKeys) {
+    window.lupenStagingBotKillXpAwardedKeys = new Set();
+  }
+  return window.lupenStagingBotKillXpAwardedKeys;
+}
+
+function markStagingBotKillXpAwarded(result = {}) {
+  const key = getStagingBotKillXpKey(result);
+  if (!key) return { marked: false, reason: "staging_bot_kill_key_missing" };
+  ensureStagingBotKillXpAwardedKeys().add(key);
+  return { marked: true, key };
+}
+
 function getLocalStagingBotKillXpAmount(result = {}) {
   const configured = typeof getCombatXpPerBot === "function" ? Number(getCombatXpPerBot()) : 0;
   const preview = Number(result.previewXp ?? result.claimStatus?.xpDelta ?? 0);
@@ -555,10 +569,8 @@ function awardLocalStagingBotKillXpFromServer(result = {}) {
   const key = getStagingBotKillXpKey(result);
   if (!key) return { applied: false, reason: "staging_bot_kill_key_missing" };
 
-  if (!window.lupenStagingBotKillXpAwardedKeys) {
-    window.lupenStagingBotKillXpAwardedKeys = new Set();
-  }
-  if (window.lupenStagingBotKillXpAwardedKeys.has(key)) {
+  const awardedKeys = ensureStagingBotKillXpAwardedKeys();
+  if (awardedKeys.has(key)) {
     return { applied: false, reason: "duplicate_staging_bot_kill_xp" };
   }
 
@@ -566,7 +578,7 @@ function awardLocalStagingBotKillXpFromServer(result = {}) {
   if (xp <= 0) return { applied: false, reason: "staging_bot_kill_xp_zero" };
 
   const botName = String(result.botName || "Erebus Bot").trim() || "Erebus Bot";
-  window.lupenStagingBotKillXpAwardedKeys.add(key);
+  awardedKeys.add(key);
   if (typeof recordBotDestroyedProgress === "function") {
     recordBotDestroyedProgress({
       id: result.botId || "",
@@ -581,8 +593,9 @@ function awardLocalStagingBotKillXpFromServer(result = {}) {
   }
 
   const xpResult = addCombatXp(xp, "stagingBotKill");
-  if (typeof addHudToast === "function") addHudToast(`${botName} destroyed. +${formatNumber(xpResult.gained)} XP.`);
-  if (typeof addActivityLog === "function") addActivityLog(`${botName} destroyed. +${formatNumber(xpResult.gained)} XP.`);
+  const message = `${botName} destroyed. +${formatNumber(xpResult.gained)} XP.`;
+  if (typeof addHudToast === "function") addHudToast(message);
+  else if (typeof addActivityLog === "function") addActivityLog(message);
   saveGame();
   redrawProgressAfterStagingXp();
 
@@ -607,6 +620,8 @@ function awardLocalStagingBotKillXpFromServer(result = {}) {
   };
 }
 
+window.getStagingBotKillXpKey = getStagingBotKillXpKey;
+window.markStagingBotKillXpAwarded = markStagingBotKillXpAwarded;
 window.awardLocalStagingBotKillXpFromServer = awardLocalStagingBotKillXpFromServer;
 window.getLupenCombatXpSnapshot = function getLupenCombatXpSnapshot() {
   return {

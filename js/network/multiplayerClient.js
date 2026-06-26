@@ -1606,6 +1606,7 @@
       rewardLedgerResult: normalizeRewardLedgerResult(message.rewardLedgerResult),
       rewardApplicationPlan: normalizeRewardApplicationPlan(message.rewardApplicationPlan),
       rewardApplicationResult: normalizeRewardApplicationResult(message.rewardApplicationResult),
+      receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now(),
       progressionPreview: normalizeProgressionPreview(message.progressionPreview),
       progressionShadowResult: normalizeProgressionShadowResult(message.progressionShadowResult),
       playerSavePatchPlan: normalizePlayerSavePatchPlan(message.playerSavePatchPlan),
@@ -1637,6 +1638,7 @@
       botName: String(message.botName || "Staging Bot"),
       rewardPreviewId: String(message.rewardPreviewId || ""),
       destructionInstanceId: String(message.destructionInstanceId || ""),
+      botXpSourceEventId: String(message.botXpSourceEventId || ""),
       xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
       xpBefore: xp.xpBefore,
       xpAfter: xp.xpAfter,
@@ -2621,6 +2623,9 @@
       connection.lastStagingBotXpResult = normalizeStagingXpResult(message);
       if (connection.lastStagingBotXpResult?.applied) {
         const result = connection.lastStagingBotXpResult;
+        if (typeof global.markStagingBotKillXpAwarded === "function") {
+          global.markStagingBotKillXpAwarded(result);
+        }
         if (typeof global.applyStagingXpClaimToLoadedState === "function") {
           global.applyStagingXpClaimToLoadedState({
             ...result,
@@ -2629,8 +2634,11 @@
           });
         }
         const xpDelta = Math.max(0, Math.round(Number(result.xpDelta || 0)));
+        const botXpActivityKey = typeof global.getStagingBotKillXpKey === "function"
+          ? global.getStagingBotKillXpKey(result)
+          : "";
         addStagingActivityLogOnce(
-          `bot-xp:${result.destructionInstanceId || result.idempotencyKey || result.botId}:${result.xpAfter}`,
+          `bot-xp:${botXpActivityKey || result.destructionInstanceId || result.botXpSourceEventId || result.idempotencyKey || result.rewardPreviewId || result.botId}`,
           `Destroyed ${result.botName || "Staging Bot"}.${xpDelta > 0 ? ` +${xpDelta} XP.` : ""}`
         );
       } else if (typeof global.awardLocalStagingBotKillXpFromServer === "function") {
