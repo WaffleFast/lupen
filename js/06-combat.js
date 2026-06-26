@@ -910,6 +910,9 @@ function updateAsteroidUI() {
   if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) {
     clearLocalHostileBotSelectionForStaging();
   }
+  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) {
+    clearLocalAsteroidSelectionForStaging();
+  }
 
   const field = document.getElementById("asteroidField");
   if (!field) return;
@@ -919,7 +922,9 @@ function updateAsteroidUI() {
   const visibleBots = typeof getVisibleHostileBotsForLocalTargetUi === "function"
     ? getVisibleHostileBotsForLocalTargetUi()
     : hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
-  const visibleAsteroids = asteroids.filter(asteroid => asteroid.alive && asteroid.node === currentNode);
+  const visibleAsteroids = typeof getVisibleAsteroidsForLocalTargetUi === "function"
+    ? getVisibleAsteroidsForLocalTargetUi()
+    : asteroids.filter(asteroid => asteroid.alive && asteroid.node === currentNode);
   const visibleStagingResources = typeof getVisibleStagingResourceTargets === "function"
     ? getVisibleStagingResourceTargets()
     : [];
@@ -954,6 +959,17 @@ function updateAsteroidUI() {
       onClick: () => selectStagingResourceTarget(resource.id)
     });
   });
+}
+
+function clearLocalAsteroidSelectionForStaging() {
+  if (selectedTarget?.type === "asteroid") selectedTarget = null;
+  if (engagedTarget?.type !== "asteroid") return;
+
+  engagedTarget = null;
+  if (engageTimer) {
+    clearInterval(engageTimer);
+    engageTimer = null;
+  }
 }
 
 function clearLocalHostileBotSelectionForStaging() {
@@ -1631,6 +1647,8 @@ function startHostileBotAttacks() {
 }
 
 function maybeMoveAsteroid() {
+  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) return;
+
   asteroids.forEach(asteroid => {
     if (!asteroid.alive) return;
     if (Math.random() > 0.5) return;
@@ -1646,6 +1664,28 @@ function maybeMoveAsteroid() {
     asteroid.x = Math.floor(Math.random() * 72) + 12;
     asteroid.y = Math.floor(Math.random() * 45) + 12;
   });
+}
+
+function getStagingNodeConsistencySnapshot() {
+  const serverBots = typeof getVisibleStagingBotTargets === "function" ? getVisibleStagingBotTargets() : [];
+  const serverResources = typeof getVisibleStagingResourceTargets === "function" ? getVisibleStagingResourceTargets() : [];
+  const localBots = typeof getVisibleHostileBotsForLocalTargetUi === "function" ? getVisibleHostileBotsForLocalTargetUi() : getVisibleHostileBots();
+  const localAsteroids = typeof getVisibleAsteroidsForLocalTargetUi === "function" ? getVisibleAsteroidsForLocalTargetUi() : getVisibleAsteroids();
+  const remotePlayers = typeof window !== "undefined"
+    ? (window.LupenMultiplayerClient?.getPlayers?.({ includeSelf: false }) || [])
+      .filter(player => String(player?.currentNode || player?.currentNodeId || player?.node || "") === String(currentNode || "") &&
+        String(player?.presenceStatus || player?.status || "space").toLowerCase() !== "docked")
+    : [];
+  return {
+    currentNode,
+    serverOwnedActive: typeof shouldUseServerOwnedSectorObjects === "function" ? shouldUseServerOwnedSectorObjects() : false,
+    localAsteroidsSuppressed: typeof shouldUseServerOwnedSectorObjects === "function" ? shouldUseServerOwnedSectorObjects() : false,
+    visibleServerBots: serverBots.length,
+    visibleServerResources: serverResources.length,
+    visibleLocalBots: localBots.length,
+    visibleLocalAsteroids: localAsteroids.length,
+    visibleRemotePlayers: remotePlayers.length
+  };
 }
 
 function clearStationVaultForShipyardIfNeeded(saved = null) {

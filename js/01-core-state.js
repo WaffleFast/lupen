@@ -2030,6 +2030,22 @@ function getVisibleHostileBots() {
   return hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
 }
 
+function hasServerOwnedSectorObjects() {
+  if (typeof window === "undefined") return false;
+  const client = window.LupenMultiplayerClient;
+  const resources = Array.isArray(client?.getResources?.()) ? client.getResources() : [];
+  const bots = Array.isArray(client?.getBots?.()) ? client.getBots() : [];
+  return resources.some(resource => resource && resource.depleted !== true) ||
+    bots.some(bot => bot && bot.disabled !== true);
+}
+
+function shouldUseServerOwnedSectorObjects() {
+  if (typeof shouldUseLocalTutorialBountyFallback === "function" && shouldUseLocalTutorialBountyFallback()) {
+    return false;
+  }
+  return hasServerOwnedSectorObjects();
+}
+
 function isStagingLocalCombatBotVisualGuardActive() {
   if (typeof shouldUseLocalTutorialBountyFallback === "function" && shouldUseLocalTutorialBountyFallback()) {
     return false;
@@ -2053,6 +2069,10 @@ function isStagingLocalCombatBotVisualGuardActive() {
 
 function getVisibleHostileBotsForLocalTargetUi() {
   return isStagingLocalCombatBotVisualGuardActive() ? [] : getVisibleHostileBots();
+}
+
+function getVisibleAsteroidsForLocalTargetUi() {
+  return shouldUseServerOwnedSectorObjects() ? [] : getVisibleAsteroids();
 }
 
 function getVisibleStagingBotTargets() {
@@ -2116,7 +2136,7 @@ function triggerWarningBanner(text = "WARNING") {
 }
 
 function getVisibleTargets() {
-  return [...getVisibleStagingBotTargets(), ...getVisibleStagingResourceTargets(), ...getVisibleHostileBotsForLocalTargetUi(), ...getVisibleAsteroids()];
+  return [...getVisibleStagingBotTargets(), ...getVisibleStagingResourceTargets(), ...getVisibleHostileBotsForLocalTargetUi(), ...getVisibleAsteroidsForLocalTargetUi()];
 }
 
 function showScreen(screenId) {

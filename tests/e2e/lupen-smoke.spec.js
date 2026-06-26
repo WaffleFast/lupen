@@ -1433,6 +1433,7 @@ test.describe("Lupen browser smoke", () => {
         const originalHull = hull;
         const originalShield = shield;
         const originalCombatXp = playerProgress.combatXp;
+        const originalAsteroids = Array.isArray(asteroids) ? asteroids.map(item => ({ ...item })) : [];
         const sentPvpIntents = [];
         const remotePlayer = {
           sessionId: "remote-pvp-test",
@@ -1506,6 +1507,33 @@ test.describe("Lupen browser smoke", () => {
           const contestedTargetCardText = document.querySelector(".lupen-target-card.player")?.textContent || "";
           const contestedShieldBarWidth = document.querySelector(".lupen-target-card.player .lupen-target-bar-fill.shield")?.style.width || "";
           const contestedHullBarWidth = document.querySelector(".lupen-target-card.player .lupen-target-bar-fill.hull")?.style.width || "";
+          asteroids = [{
+            id: "local-only-test-asteroid",
+            name: "Local Only Test Asteroid",
+            resource: "Iron",
+            alive: true,
+            node: "Lower Gate Core",
+            x: 18,
+            y: 30,
+            hp: 30,
+            maxHp: 30
+          }];
+          window.LupenMultiplayerClient.getResources = () => [{
+            id: "server-owned-test-asteroid",
+            resourceName: "Iron",
+            currentNode: "Lower Gate Core",
+            x: 58,
+            y: 34,
+            hp: 30,
+            hpMax: 30,
+            depleted: false
+          }];
+          updateAsteroidUI();
+          const sharedNodeSnapshot = typeof getStagingNodeConsistencySnapshot === "function"
+            ? getStagingNodeConsistencySnapshot()
+            : null;
+          const localAsteroidButtonCount = document.querySelectorAll("#asteroidField .resource-asteroid-target:not(.server-resource-asteroid)").length;
+          const serverAsteroidButtonCount = document.querySelectorAll("#asteroidField .server-resource-asteroid").length;
 
           const before = { hull, shield, combatXp: playerProgress.combatXp };
           const hudBefore = {
@@ -1572,6 +1600,9 @@ test.describe("Lupen browser smoke", () => {
             contestedTargetCardText,
             contestedShieldBarWidth,
             contestedHullBarWidth,
+            sharedNodeSnapshot,
+            localAsteroidButtonCount,
+            serverAsteroidButtonCount,
             before,
             hudBefore,
             hudAfterPvpDisplay,
@@ -1593,6 +1624,7 @@ test.describe("Lupen browser smoke", () => {
           currentNode = originalNode;
           hull = originalHull;
           shield = originalShield;
+          asteroids = originalAsteroids;
           playerProgress.combatXp = originalCombatXp;
           window.LupenMultiplayerClient = originalClient;
           updateCurrentNodeUI();
@@ -1617,6 +1649,14 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedTargetCardText).toContain("No defeat or loot");
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
+    expect(eligibility.sharedNodeSnapshot).toMatchObject({
+      serverOwnedActive: true,
+      localAsteroidsSuppressed: true,
+      visibleServerResources: 1,
+      visibleLocalAsteroids: 0
+    });
+    expect(eligibility.localAsteroidButtonCount).toBe(0);
+    expect(eligibility.serverAsteroidButtonCount).toBe(1);
     expect(eligibility.hudAfterPvpDisplay.applied).toBe(true);
     expect(eligibility.hudAfterPvpDisplay.hullValue).toBe("120");
     expect(eligibility.hudAfterPvpDisplay.shieldValue).toBe("18");
