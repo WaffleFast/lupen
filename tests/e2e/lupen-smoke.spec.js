@@ -1481,22 +1481,29 @@ test.describe("Lupen browser smoke", () => {
           remotePlayer.currentNode = "Lower Gate Core";
           updateCurrentNodeUI();
           selectRemotePlayerTarget("remote-pvp-test");
+          window.LupenMultiplayerOverlay?.render?.();
           const contestedTarget = getSelectedRemotePlayerTarget();
           const contestedSelected = Boolean(contestedTarget);
           const contestedBlockReason = getRemotePlayerTargetBlockReason(contestedTarget);
           const contestedEngageMessage = getRemotePlayerEngageBlockMessage(contestedTarget);
           const contestedActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
           const contestedActionText = document.getElementById("objectEngageBtn")?.textContent || "";
+          const contestedTargetCardText = document.querySelector(".lupen-target-card.player")?.textContent || "";
 
           const before = { hull, shield, combatXp: playerProgress.combatXp };
+          const activityBeforeEngage = document.getElementById("activityLogFeed")?.textContent || "";
           engageTarget();
+          engageTarget();
+          const activityAfterEngage = document.getElementById("activityLogFeed")?.textContent || "";
           const after = {
             hull,
             shield,
             combatXp: playerProgress.combatXp,
             selectedType: selectedTarget?.type || "",
             engagedType: engagedTarget?.type || "",
-            engageTimerActive: Boolean(engageTimer)
+            engageTimerActive: Boolean(engageTimer),
+            notYetOnlineMessages: (activityAfterEngage.match(/PvP combat not yet online\\./g) || []).length
+              - (activityBeforeEngage.match(/PvP combat not yet online\\./g) || []).length
           };
 
           currentNode = "Asteron Prime";
@@ -1518,6 +1525,7 @@ test.describe("Lupen browser smoke", () => {
             contestedEngageMessage,
             contestedActionDisabled,
             contestedActionText,
+            contestedTargetCardText,
             before,
             after,
             clearedOnProtectedReturn,
@@ -1545,13 +1553,17 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedBlockReason).toBe("");
     expect(eligibility.contestedEngageMessage).toBe("PvP combat not yet online.");
     expect(eligibility.contestedActionDisabled).toBe(false);
-    expect(eligibility.contestedActionText).toBe("ENGAGE");
+    expect(eligibility.contestedActionText).toBe("PVP ARMING");
+    expect(eligibility.contestedTargetCardText).toContain("PVP ARMING");
+    expect(eligibility.contestedTargetCardText).toContain("Targeting systems ready");
+    expect(eligibility.contestedTargetCardText).toContain("PvP combat not yet online");
     expect(eligibility.after.hull).toBe(eligibility.before.hull);
     expect(eligibility.after.shield).toBe(eligibility.before.shield);
     expect(eligibility.after.combatXp).toBe(eligibility.before.combatXp);
     expect(eligibility.after.selectedType).toBe("remotePlayer");
     expect(eligibility.after.engagedType).toBe("");
     expect(eligibility.after.engageTimerActive).toBe(false);
+    expect(eligibility.after.notYetOnlineMessages).toBe(1);
     expect(eligibility.clearedOnProtectedReturn).toBe(true);
     expect(eligibility.unknownSelected).toBe(false);
     expect(eligibility.unknownMessage).toBe("PvP disabled in protected zones.");

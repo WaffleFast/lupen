@@ -2,6 +2,9 @@
 
 /* Asteroid / combat */
 
+let lastRemotePlayerEngageNoticeKey = "";
+let lastRemotePlayerEngageNoticeAt = 0;
+
 function isSameTargetRef(left, right) {
   return Boolean(left && right && left.type === right.type && left.id === right.id);
 }
@@ -134,6 +137,21 @@ function getRemotePlayerEngageBlockMessage(player = {}) {
   return getRemotePlayerTargetBlockReason(player) || "PvP combat not yet online.";
 }
 
+function showRemotePlayerEngageBlockMessage(player = {}) {
+  const message = getRemotePlayerEngageBlockMessage(player);
+  const key = `${String(player.id || player.sessionId || "")}|${currentNode}|${message}`;
+  const now = Date.now();
+  if (key === lastRemotePlayerEngageNoticeKey && now - lastRemotePlayerEngageNoticeAt < 1800) {
+    return false;
+  }
+  lastRemotePlayerEngageNoticeKey = key;
+  lastRemotePlayerEngageNoticeAt = now;
+
+  if (typeof addHudToast === "function") addHudToast(message);
+  else if (typeof addActivityLog === "function") addActivityLog(message);
+  return true;
+}
+
 function clearRemotePlayerTarget(reason = "remote_player_target_cleared") {
   const selectedMatches = selectedTarget?.type === "remotePlayer";
   const engagedMatches = engagedTarget?.type === "remotePlayer";
@@ -191,9 +209,7 @@ function engageTarget() {
   let target = getSelectedTargetEntity();
 
   if (target?.remotePlayer) {
-    const message = getRemotePlayerEngageBlockMessage(target);
-    if (typeof addHudToast === "function") addHudToast(message);
-    else if (typeof addActivityLog === "function") addActivityLog(message);
+    showRemotePlayerEngageBlockMessage(target);
     updateObjectActionPanel(false);
     return;
   }

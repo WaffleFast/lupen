@@ -1029,8 +1029,10 @@
       }
 
       .lupen-target-card.player {
-        --target-accent: #18d7ff;
-        --target-glow: rgba(42, 218, 255, 0.76);
+        --target-accent: #ffc76b;
+        --target-glow: rgba(255, 190, 92, 0.72);
+        border-color: rgba(255, 197, 96, 0.64);
+        box-shadow: 0 0 18px rgba(255, 168, 58, 0.18);
       }
 
       .lupen-target-card.resource {
@@ -1086,6 +1088,16 @@
         border-color: rgba(245, 210, 112, 0.52);
         color: #ffe996;
         background: rgba(72, 50, 6, 0.5);
+      }
+
+      .lupen-target-card .lupen-target-status.pvp-arming {
+        border-color: rgba(255, 210, 112, 0.58);
+        color: #ffe29b;
+        background: rgba(70, 44, 4, 0.58);
+      }
+
+      .lupen-target-card .lupen-target-readiness {
+        color: rgba(255, 231, 177, 0.88);
       }
 
       .lupen-target-bars {
@@ -2129,7 +2141,7 @@
     const position = getSpacePercentPosition(target);
     const hitConfirmed = selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id && getShotEventAge(status) < 900;
     const card = global.document.createElement("div");
-    card.className = `lupen-target-card ${selectedBot ? "hostile" : selectedPlayer ? "player" : "resource"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
+    card.className = `lupen-target-card ${selectedBot ? "hostile" : selectedPlayer ? "player pvp-arming" : "resource"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
     card.style.left = `${position.x}%`;
     card.style.top = `${getCardTopForPosition(position)}%`;
 
@@ -2153,9 +2165,18 @@
       card.appendChild(ship);
 
       const statusTag = global.document.createElement("span");
-      statusTag.className = "lupen-target-status";
+      statusTag.className = "lupen-target-status pvp-arming";
       statusTag.textContent = getRemotePlayerPvpLabel(selectedPlayer, status);
       card.appendChild(statusTag);
+
+      const readiness = global.document.createElement("small");
+      readiness.className = "lupen-target-readiness";
+      readiness.textContent = "Targeting systems ready";
+      card.appendChild(readiness);
+
+      const offline = global.document.createElement("small");
+      offline.textContent = "PvP combat not yet online";
+      card.appendChild(offline);
     } else if (selectedResource) {
       const bars = global.document.createElement("div");
       bars.className = "lupen-target-bars";
