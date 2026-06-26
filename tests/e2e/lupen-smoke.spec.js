@@ -1379,6 +1379,46 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("orbit HUD displays current Protected or Contested zone status", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.showScreen("spaceScreen");
+      currentNode = "Asteron Prime";
+      updateCurrentNodeUI();
+    });
+
+    const chip = page.locator("#nodeZoneStatusChip");
+    await expect(chip).toHaveAttribute("data-zone-status", "protected");
+    await expect(chip).toContainText("PROTECTED ZONE");
+    await expect(chip).toContainText("PvP disabled");
+
+    await page.evaluate(() => {
+      currentNode = "Lower Gate Core";
+      updateCurrentNodeUI();
+    });
+    await expect(chip).toHaveAttribute("data-zone-status", "contested");
+    await expect(chip).toContainText("CONTESTED ZONE");
+    await expect(chip).toContainText("PvP zone");
+
+    const pvpBlock = await page.evaluate(() => getRemotePlayerEngageBlockMessage({
+      currentNodeId: "Lower Gate Core",
+      presenceStatus: "space"
+    }));
+    expect(pvpBlock).toBe("PvP is unavailable in staging.");
+
+    await page.evaluate(() => {
+      currentNode = "Missing Node";
+      updateCurrentNodeUI();
+    });
+    await expect(chip).toHaveAttribute("data-zone-status", "protected");
+    await expect(chip).toContainText("PROTECTED ZONE");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging trade builder shows server-backed routes when offers are available", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

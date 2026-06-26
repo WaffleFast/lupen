@@ -2069,15 +2069,35 @@ function syncPlanetLandingTarget() {
   landBtn.style.setProperty("height", `${size}px`, "important");
 }
 
+function updateNodeZoneStatusChip() {
+  const chip = document.getElementById("nodeZoneStatusChip");
+  if (!chip) return;
+
+  const zoneType = typeof getCurrentNodeZoneType === "function"
+    ? getCurrentNodeZoneType()
+    : "protected";
+  const isContested = zoneType === "contested";
+
+  chip.dataset.zoneStatus = isContested ? "contested" : "protected";
+  chip.classList.toggle("zone-status-contested", isContested);
+  chip.classList.toggle("zone-status-protected", !isContested);
+
+  const label = chip.querySelector(".zone-status-label");
+  const note = chip.querySelector(".zone-status-note");
+  if (label) label.textContent = isContested ? "CONTESTED ZONE" : "PROTECTED ZONE";
+  if (note) note.textContent = isContested ? "PvP zone" : "PvP disabled";
+}
+
 function updateCurrentNodeUI() {
-  const node = sectorNodes[currentNode];
+  const node = sectorNodes[currentNode] || {};
   const nodeNameTag = document.getElementById("nodeNameTag");
   const landBtn = document.getElementById("planetLandBtn");
   const spaceScreen = document.getElementById("spaceScreen");
   const mineralsBox = document.getElementById("sectorMinerals");
 
   if (nodeNameTag) {
-    nodeNameTag.textContent = node.type === "planet" ? `${currentNode.toUpperCase()} ORBIT` : currentNode.toUpperCase();
+    const nodeName = String(currentNode || "Unknown Node");
+    nodeNameTag.textContent = node.type === "planet" ? `${nodeName.toUpperCase()} ORBIT` : nodeName.toUpperCase();
   }
 
   if (landBtn) {
@@ -2100,6 +2120,7 @@ function updateCurrentNodeUI() {
     mineralsBox.innerHTML = minerals.length ? minerals.join(", ") : "No mineral traces.";
   }
 
+  updateNodeZoneStatusChip();
   updateHudDock();
 }
 

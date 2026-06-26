@@ -42520,6 +42520,73 @@ input::placeholder {
   border-color: rgba(84, 238, 255, 0.34);
 }
 
+/* ===== Map zone status chip ===== */
+.player-orbit-screen .zone-status-chip {
+  position: absolute;
+  left: 0;
+  top: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 260px;
+  min-height: 24px;
+  padding: 3px 9px 4px;
+  border: 1px solid rgba(105, 205, 255, 0.58);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(4, 18, 31, 0.88), rgba(2, 8, 18, 0.86));
+  box-shadow: 0 0 12px rgba(0, 174, 255, 0.16), inset 0 0 12px rgba(28, 119, 190, 0.12);
+  color: #dff8ff;
+  font-family: "Arial Black", Arial, sans-serif;
+  text-transform: uppercase;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.player-orbit-screen .zone-status-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6df7ff;
+  box-shadow: 0 0 8px rgba(109, 247, 255, 0.9);
+}
+
+.player-orbit-screen .zone-status-label {
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.12em;
+}
+
+.player-orbit-screen .zone-status-note {
+  padding-left: 8px;
+  border-left: 1px solid rgba(138, 220, 255, 0.28);
+  color: rgba(190, 226, 241, 0.78);
+  font: 800 9px Arial, sans-serif;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.player-orbit-screen .zone-status-protected {
+  border-color: rgba(98, 232, 211, 0.56);
+  box-shadow: 0 0 12px rgba(32, 202, 178, 0.18), inset 0 0 12px rgba(42, 181, 166, 0.12);
+}
+
+.player-orbit-screen .zone-status-protected::before {
+  background: #65f0d9;
+  box-shadow: 0 0 8px rgba(101, 240, 217, 0.92);
+}
+
+.player-orbit-screen .zone-status-contested {
+  border-color: rgba(255, 191, 92, 0.66);
+  box-shadow: 0 0 13px rgba(255, 150, 45, 0.2), inset 0 0 12px rgba(188, 105, 38, 0.14);
+}
+
+.player-orbit-screen .zone-status-contested::before {
+  background: #ffcf72;
+  box-shadow: 0 0 9px rgba(255, 194, 92, 0.95);
+}
+
 #hangarShipyardSection #shipyardDetailPanel .exchange-requirement-row.missing strong {
   color: rgba(232, 238, 246, 0.9);
 }
