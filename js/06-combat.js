@@ -1052,6 +1052,56 @@ function applyStagingResourceMineResult(result = {}) {
 
 window.applyStagingResourceMineResult = applyStagingResourceMineResult;
 
+function handleStagingResourceLifecycleEvent(event = {}) {
+  const resourceId = String(event.resourceId || event.id || "").trim();
+  if (!resourceId) return { handled: false, reason: "missing_resource_id" };
+
+  const target = getStagingResourceTargetById(resourceId);
+  const eventType = String(event.type || "").toLowerCase();
+  const depleted = event.depleted === true || eventType.includes("depleted");
+  const respawned = eventType.includes("respawned") || event.depleted === false;
+
+  if (depleted) {
+    if (!window.lupenStagingResourceDepletionVisualKeys) {
+      window.lupenStagingResourceDepletionVisualKeys = new Set();
+    }
+    const depletionKey = String(event.resourceRewardId || event.depletionInstanceId || event.depletedUntil || resourceId);
+    const alreadyVisualized = window.lupenStagingResourceDepletionVisualKeys.has(depletionKey);
+    window.lupenStagingResourceDepletionVisualKeys.add(depletionKey);
+
+    if (target && !alreadyVisualized) {
+      showExplosionAtTarget(target);
+      if (typeof playEnemyShipDestroyedSound === "function") {
+        setTimeout(playEnemyShipDestroyedSound, 140);
+      }
+    }
+
+    const selectedMatches = selectedTarget?.type === "stagingResource" && selectedTarget.id === resourceId;
+    const engagedMatches = engagedTarget?.type === "stagingResource" && engagedTarget.id === resourceId;
+
+    if (engagedMatches) {
+      disengageTarget(false);
+    } else if (selectedMatches) {
+      selectedTarget = null;
+    }
+
+    updateAsteroidUI();
+    updateTargetPanel();
+    updateObjectActionPanel(false);
+    return { handled: true, reason: "resource_depleted", resourceId };
+  }
+
+  if (respawned) {
+    updateAsteroidUI();
+    updateTargetPanel();
+    return { handled: true, reason: "resource_respawned", resourceId };
+  }
+
+  return { handled: false, reason: "ignored_resource_event", resourceId };
+}
+
+window.handleStagingResourceLifecycleEvent = handleStagingResourceLifecycleEvent;
+
 function collectLoot(mineralToCollect = null) {
   const loot = lootByNode[currentNode];
   if (!loot) return;

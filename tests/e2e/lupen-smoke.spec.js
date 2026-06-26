@@ -951,6 +951,19 @@ test.describe("Lupen browser smoke", () => {
       currentNode = "Asteron Prime";
       const sentMessages = [];
       const sentResourceMines = [];
+      const stagingResources = [{
+        id: "staging-resource-test-iron",
+        resourceName: "Iron",
+        currentNode: "Asteron Prime",
+        x: 42,
+        y: 35,
+        hp: 20,
+        hpMax: 30,
+        yieldAmount: 12,
+        depleted: false,
+        depletedUntil: 0,
+        lastUpdatedAt: Date.now()
+      }];
       const duplicatePlayerMessage = {
         id: "msg-1",
         type: "chat",
@@ -1012,19 +1025,7 @@ test.describe("Lupen browser smoke", () => {
           }
         ],
         getBots: () => [],
-        getResources: () => [{
-          id: "staging-resource-test-iron",
-          resourceName: "Iron",
-          currentNode: "Asteron Prime",
-          x: 42,
-          y: 35,
-          hp: 20,
-          hpMax: 30,
-          yieldAmount: 12,
-          depleted: false,
-          depletedUntil: 0,
-          lastUpdatedAt: Date.now()
-        }],
+        getResources: () => stagingResources,
         getSelectedStagingBot: () => null,
         getPresenceEvents: () => [{
           type: "playerMoved",
@@ -1107,6 +1108,19 @@ test.describe("Lupen browser smoke", () => {
       const resourceActionText = engageButton?.textContent || "";
       const resourceActionDisabled = engageButton?.disabled ?? true;
       engageButton?.click();
+      stagingResources[0].hp = 0;
+      stagingResources[0].depleted = true;
+      stagingResources[0].depletedUntil = Date.now() + 30000;
+      const lifecycleResult = typeof handleStagingResourceLifecycleEvent === "function"
+        ? handleStagingResourceLifecycleEvent({
+          type: "stagingResource:depleted",
+          resourceId: "staging-resource-test-iron",
+          resourceName: "Iron",
+          depleted: true,
+          depletedUntil: stagingResources[0].depletedUntil,
+          resourceRewardId: "e2e-server-resource-depleted"
+        })
+        : null;
       const image = document.querySelector("#lupenMultiplayerSpaceGhostLayer img");
       const resourceImage = document.querySelector("#lupenMultiplayerSpaceResourceLayer .lupen-mp-resource-rock img");
       const serverResourceImage = document.querySelector("#asteroidField .server-resource-asteroid img");
@@ -1122,6 +1136,10 @@ test.describe("Lupen browser smoke", () => {
         selectedServerResourceCount: document.querySelectorAll("#asteroidField .server-resource-asteroid.is-selected").length,
         engagedServerResourceCount: document.querySelectorAll("#asteroidField .server-resource-asteroid.engaged").length,
         playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
+        explosionCount: document.querySelectorAll("#explosionLayer .space-explosion").length,
+        lifecycleResult,
+        selectedTargetAfterDepletion: window.eval("selectedTarget ? { ...selectedTarget } : null"),
+        engagedTargetAfterDepletion: window.eval("engagedTarget ? { ...engagedTarget } : null"),
         ghostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost").length,
         resourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource").length,
         selectedResourceCount: document.querySelectorAll("#lupenMultiplayerSpaceResourceLayer .lupen-mp-space-resource.is-selected").length,
@@ -1159,12 +1177,20 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(connectedHudState.src).toContain("assets/ships/nightshade-hawk/nightshade-hawk-medium.webp");
     expect(connectedHudState.resourceImageSrc).toBe("");
-    expect(connectedHudState.serverResourceImageSrc).toContain("assets/asteroids/asteroid-iron.png");
+    expect(connectedHudState.serverResourceImageSrc).toBe("");
     expect(connectedHudState.note).toContain("Nightshade Hawk");
-    expect(connectedHudState.serverResourceCount).toBe(1);
-    expect(connectedHudState.selectedServerResourceCount).toBe(1);
-    expect(connectedHudState.engagedServerResourceCount).toBe(1);
+    expect(connectedHudState.serverResourceCount).toBe(0);
+    expect(connectedHudState.selectedServerResourceCount).toBe(0);
+    expect(connectedHudState.engagedServerResourceCount).toBe(0);
     expect(connectedHudState.playerShotCount).toBeGreaterThan(0);
+    expect(connectedHudState.explosionCount).toBeGreaterThan(0);
+    expect(connectedHudState.lifecycleResult).toMatchObject({
+      handled: true,
+      reason: "resource_depleted",
+      resourceId: "staging-resource-test-iron"
+    });
+    expect(connectedHudState.selectedTargetAfterDepletion).toBe(null);
+    expect(connectedHudState.engagedTargetAfterDepletion).toBe(null);
     expect(connectedHudState.ghostCount).toBe(1);
     expect(connectedHudState.resourceCount).toBe(0);
     expect(connectedHudState.selectedResourceCount).toBe(0);

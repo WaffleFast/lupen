@@ -2445,6 +2445,9 @@
       if (normalized.ok && normalized.cargoDelta > 0 && typeof global.applyStagingResourceMineResult === "function") {
         localApplyResult = global.applyStagingResourceMineResult(normalized);
       }
+      if (normalized.depleted && typeof global.handleStagingResourceLifecycleEvent === "function") {
+        global.handleStagingResourceLifecycleEvent({ ...normalized, type: "stagingResource:depleted" });
+      }
       connection.lastStagingResourceMineResult = {
         ...normalized,
         localApplyResult: localApplyResult && typeof localApplyResult === "object" ? { ...localApplyResult } : null,
@@ -2473,10 +2476,15 @@
 
     ["stagingResource:shot", "stagingResource:depleted", "stagingResource:respawned"].forEach((type) => {
       activeRoom.onMessage(type, (message) => {
+        const normalized = normalizeStagingResourceEvent(message);
         connection.lastStagingResourceEvent = {
-          ...normalizeStagingResourceEvent(message),
+          ...normalized,
           type
         };
+        if ((type === "stagingResource:depleted" || type === "stagingResource:respawned") &&
+          typeof global.handleStagingResourceLifecycleEvent === "function") {
+          global.handleStagingResourceLifecycleEvent({ ...normalized, type });
+        }
         logDev(`server ${type}`, message);
         notifyServerState(activeRoom.state || null);
       });
