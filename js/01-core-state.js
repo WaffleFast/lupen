@@ -2039,11 +2039,24 @@ function hasServerOwnedSectorObjects() {
     bots.some(bot => bot && bot.disabled !== true);
 }
 
+function isConnectedStagingMultiplayerSession() {
+  if (typeof window === "undefined") return false;
+  const status = window.LupenMultiplayerClient?.getStatus?.();
+  const isStagingUrl = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get("mp") === "staging";
+    } catch (_err) {
+      return false;
+    }
+  })();
+  return Boolean(status?.isConnected && (isStagingUrl || status?.enabledReason === "staging_enabled"));
+}
+
 function shouldUseServerOwnedSectorObjects() {
   if (typeof shouldUseLocalTutorialBountyFallback === "function" && shouldUseLocalTutorialBountyFallback()) {
     return false;
   }
-  return hasServerOwnedSectorObjects();
+  return isConnectedStagingMultiplayerSession() || hasServerOwnedSectorObjects();
 }
 
 function isStagingLocalCombatBotVisualGuardActive() {

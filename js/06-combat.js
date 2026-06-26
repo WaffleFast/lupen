@@ -65,6 +65,8 @@ function retargetEngagementToSelectedTarget() {
 }
 
 function selectAsteroid(asteroidId) {
+  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) return;
+
   const asteroid = getAsteroidById(asteroidId);
 
   if (!asteroid || !asteroid.alive || asteroid.node !== currentNode) return;
@@ -769,6 +771,8 @@ function asteroidVisibleInCurrentNode(asteroid) {
 }
 
 function ensureActiveAsteroids() {
+  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) return;
+
   if (!Array.isArray(asteroids)) {
     asteroids = createInitialAsteroids();
     return;
@@ -904,13 +908,16 @@ function renderTargetButton(target, options = {}) {
 }
 
 function updateAsteroidUI() {
-  ensureActiveAsteroids();
-  ensureActiveHostileBots();
+  const serverOwnedSectorObjectsActive = typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects();
+  const localBotVisualGuardActive = typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive();
 
-  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) {
+  if (!serverOwnedSectorObjectsActive) ensureActiveAsteroids();
+  if (!localBotVisualGuardActive) ensureActiveHostileBots();
+
+  if (localBotVisualGuardActive) {
     clearLocalHostileBotSelectionForStaging();
   }
-  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) {
+  if (serverOwnedSectorObjectsActive) {
     clearLocalAsteroidSelectionForStaging();
   }
 
@@ -1408,20 +1415,28 @@ function updateCargoSummary() {
 }
 
 function scheduleAsteroidRespawn() {
+  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) return;
+
   setTimeout(() => {
+    if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) return;
     respawnAsteroid();
     saveGame();
   }, ASTEROID_RESPAWN_MS);
 }
 
 function scheduleHostileBotRespawn(botId) {
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
+
   setTimeout(() => {
+    if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
     respawnHostileBot(botId);
     saveGame();
   }, HOSTILE_BOT_RESPAWN_MS);
 }
 
 function respawnAsteroid() {
+  if (typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects()) return;
+
   const deadAsteroids = asteroids.filter(asteroid => !asteroid.alive);
   const asteroid = deadAsteroids[0];
 
@@ -1493,6 +1508,8 @@ function performStagingResourceAttackCycle() {
 }
 
 function respawnHostileBot(botId) {
+  if (typeof isStagingLocalCombatBotVisualGuardActive === "function" && isStagingLocalCombatBotVisualGuardActive()) return;
+
   ensureActiveHostileBots();
 
   const bot = hostileBots.find(item => item.id === botId) || hostileBots.find(item => !item.alive);

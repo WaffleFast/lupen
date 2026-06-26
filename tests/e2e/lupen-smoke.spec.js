@@ -1518,6 +1518,16 @@ test.describe("Lupen browser smoke", () => {
             hp: 30,
             maxHp: 30
           }];
+          window.LupenMultiplayerClient.getResources = () => [];
+          updateAsteroidUI();
+          maybeMoveAsteroid();
+          scheduleAsteroidRespawn();
+          const connectedEmptySnapshot = typeof getStagingNodeConsistencySnapshot === "function"
+            ? getStagingNodeConsistencySnapshot()
+            : null;
+          const connectedEmptyLocalAsteroidButtonCount = document.querySelectorAll("#asteroidField .resource-asteroid-target:not(.server-resource-asteroid)").length;
+          const connectedEmptyAsteroidNode = asteroids[0]?.node || "";
+
           window.LupenMultiplayerClient.getResources = () => [{
             id: "server-owned-test-asteroid",
             resourceName: "Iron",
@@ -1600,6 +1610,9 @@ test.describe("Lupen browser smoke", () => {
             contestedTargetCardText,
             contestedShieldBarWidth,
             contestedHullBarWidth,
+            connectedEmptySnapshot,
+            connectedEmptyLocalAsteroidButtonCount,
+            connectedEmptyAsteroidNode,
             sharedNodeSnapshot,
             localAsteroidButtonCount,
             serverAsteroidButtonCount,
@@ -1649,6 +1662,14 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedTargetCardText).toContain("No defeat or loot");
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
+    expect(eligibility.connectedEmptySnapshot).toMatchObject({
+      serverOwnedActive: true,
+      localAsteroidsSuppressed: true,
+      visibleServerResources: 0,
+      visibleLocalAsteroids: 0
+    });
+    expect(eligibility.connectedEmptyLocalAsteroidButtonCount).toBe(0);
+    expect(eligibility.connectedEmptyAsteroidNode).toBe("Lower Gate Core");
     expect(eligibility.sharedNodeSnapshot).toMatchObject({
       serverOwnedActive: true,
       localAsteroidsSuppressed: true,
