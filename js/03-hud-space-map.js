@@ -968,9 +968,12 @@ function updateObjectActionPanel(forceVisible = false) {
 
   const targetType = target ? getTargetTypeFromEntity(target) : "";
   if (targetType === "remotePlayer") {
+    const blockReason = typeof getRemotePlayerTargetBlockReason === "function"
+      ? getRemotePlayerTargetBlockReason(target)
+      : "PvP disabled in protected zones.";
     panel.classList.add("visible");
-    actionBtn.disabled = true;
-    actionBtn.textContent = "PVP UNAVAILABLE";
+    actionBtn.disabled = !!blockReason;
+    actionBtn.textContent = blockReason ? "PVP LOCKED" : "ENGAGE";
     actionBtn.classList.remove("disengage-action");
     return;
   }
@@ -2120,6 +2123,9 @@ function updateCurrentNodeUI() {
     mineralsBox.innerHTML = minerals.length ? minerals.join(", ") : "No mineral traces.";
   }
 
+  if (typeof reconcileRemotePlayerTargetEligibility === "function") {
+    reconcileRemotePlayerTargetEligibility("node_ui_refresh");
+  }
   updateNodeZoneStatusChip();
   updateHudDock();
 }

@@ -103,30 +103,19 @@ function selectStagingResourceTarget(resourceId) {
   updateObjectActionPanel(retargeted);
 }
 
-function selectRemotePlayerTarget(playerId) {
-  const player = getRemotePlayerTargetById(playerId);
-  if (!player || (player.currentNodeId || player.node) !== currentNode) return;
-
-  selectedTarget = { type: "remotePlayer", id: player.id };
-  showTargetPanel();
-  updateAsteroidUI();
-  updateTargetPanel();
-  updateObjectActionPanel(false);
+function isCurrentNodeProtectedForPvp() {
+  const node = typeof sectorNodes !== "undefined" ? sectorNodes[currentNode] : null;
+  return typeof isProtectedNode === "function"
+    ? isProtectedNode(currentNode)
+    : (node?.type === "planet" || ["Asteron Prime", "Virella", "Nyxara"].includes(String(currentNode || "")));
 }
 
-function getRemotePlayerEngageBlockMessage(player = {}) {
+function getRemotePlayerTargetBlockReason(player = {}) {
   const targetNode = player.currentNodeId || player.node || "";
   const status = String(player.presenceStatus || player.status || "space").toLowerCase();
   if (status === "docked") return "Target is docked.";
   if (targetNode && targetNode !== currentNode) return "Target is no longer in this node.";
-
-  const node = typeof sectorNodes !== "undefined" ? sectorNodes[currentNode] : null;
-  const protectedNode = typeof isProtectedNode === "function"
-    ? isProtectedNode(currentNode)
-    : (node?.type === "planet" || ["Asteron Prime", "Virella", "Nyxara"].includes(String(currentNode || "")));
-  if (protectedNode) {
-    return "PvP disabled in protected zones.";
-  }
+  if (isCurrentNodeProtectedForPvp()) return "PvP disabled in protected zones.";
 
   const localGuildId = String(window.LupenMultiplayerClient?.getStatus?.()?.guildId || "").trim();
   const targetGuildId = String(player.guildId || "").trim();
@@ -134,7 +123,65 @@ function getRemotePlayerEngageBlockMessage(player = {}) {
     return "Cannot engage guild allies.";
   }
 
-  return "PvP is unavailable in staging.";
+  return "";
+}
+
+function canTargetRemotePlayerInCurrentZone(player = {}) {
+  return !getRemotePlayerTargetBlockReason(player);
+}
+
+function getRemotePlayerEngageBlockMessage(player = {}) {
+  return getRemotePlayerTargetBlockReason(player) || "PvP combat not yet online.";
+}
+
+function clearRemotePlayerTarget(reason = "remote_player_target_cleared") {
+  const selectedMatches = selectedTarget?.type === "remotePlayer";
+  const engagedMatches = engagedTarget?.type === "remotePlayer";
+  if (!selectedMatches && !engagedMatches) return false;
+
+  if (engagedMatches) {
+    if (engageTimer) {
+      clearInterval(engageTimer);
+      engageTimer = null;
+    }
+    engagedTarget = null;
+  }
+  if (selectedMatches) selectedTarget = null;
+
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(false);
+  return true;
+}
+
+function reconcileRemotePlayerTargetEligibility(reason = "remote_player_target_reconcile") {
+  const remoteTarget = selectedTarget?.type === "remotePlayer"
+    ? getRemotePlayerTargetById(selectedTarget.id)
+    : engagedTarget?.type === "remotePlayer"
+      ? getRemotePlayerTargetById(engagedTarget.id)
+      : null;
+  if (!remoteTarget) return clearRemotePlayerTarget(reason);
+  if (!canTargetRemotePlayerInCurrentZone(remoteTarget)) return clearRemotePlayerTarget(reason);
+  return false;
+}
+
+function selectRemotePlayerTarget(playerId) {
+  const player = getRemotePlayerTargetById(playerId);
+  if (!player || (player.currentNodeId || player.node) !== currentNode) return;
+
+  const blockReason = getRemotePlayerTargetBlockReason(player);
+  if (blockReason) {
+    clearRemotePlayerTarget("remote_player_target_blocked");
+    if (typeof addHudToast === "function") addHudToast(blockReason);
+    else if (typeof addActivityLog === "function") addActivityLog(blockReason);
+    return;
+  }
+
+  selectedTarget = { type: "remotePlayer", id: player.id };
+  showTargetPanel();
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(false);
 }
 
 function engageTarget() {

@@ -1211,13 +1211,11 @@ test.describe("Lupen browser smoke", () => {
     expect(typeof connectedHudState.sentResourceMines[0].timestamp).toBe("number");
     expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
-    expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
-    expect(connectedHudState.playerTargetText).toContain("Nightshade Hawk");
-    expect(connectedHudState.playerTargetText).toContain("SAFE AREA");
-    expect(connectedHudState.playerTargetSelected).toBe("remote-session");
-    expect(connectedHudState.engageVisibleForPlayer).toBe(true);
+    expect(connectedHudState.playerTargetText).toBe("");
+    expect(connectedHudState.playerTargetSelected).toBe("");
+    expect(connectedHudState.engageVisibleForPlayer).toBe(false);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
-    expect(connectedHudState.engageTextForPlayer).toContain("PVP UNAVAILABLE");
+    expect(connectedHudState.engageTextForPlayer).toContain("ENGAGE");
     expect(connectedHudState.pvpGuardReason).toBe("pvp_unavailable_in_staging");
     expect(connectedHudState.pvpGuardPreview).toBe("client_pvp_disabled");
     expect(connectedHudState.pvpGuardDamageApplied).toBe(false);
@@ -1374,7 +1372,7 @@ test.describe("Lupen browser smoke", () => {
     expect(zones.metadata.upperGateCore).toBe("protected");
     expect(zones.metadata.lowerGateCore).toBe("contested");
     expect(zones.messages.protectedBlockMessage).toBe("PvP disabled in protected zones.");
-    expect(zones.messages.contestedBlockMessage).toBe("PvP is unavailable in staging.");
+    expect(zones.messages.contestedBlockMessage).toBe("PvP combat not yet online.");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -1407,7 +1405,7 @@ test.describe("Lupen browser smoke", () => {
       currentNodeId: "Lower Gate Core",
       presenceStatus: "space"
     }));
-    expect(pvpBlock).toBe("PvP is unavailable in staging.");
+    expect(pvpBlock).toBe("PvP combat not yet online.");
 
     await page.evaluate(() => {
       currentNode = "Missing Node";
@@ -1415,6 +1413,148 @@ test.describe("Lupen browser smoke", () => {
     });
     await expect(chip).toHaveAttribute("data-zone-status", "protected");
     await expect(chip).toContainText("PROTECTED ZONE");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("remote player targeting follows protected and contested zone eligibility", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const eligibility = await page.evaluate(() => window.eval(`
+      (() => {
+        const originalClient = window.LupenMultiplayerClient;
+        const originalNode = currentNode;
+        const originalSelected = selectedTarget;
+        const originalEngaged = engagedTarget;
+        const originalTimer = engageTimer;
+        const originalHull = hull;
+        const originalShield = shield;
+        const originalCombatXp = playerProgress.combatXp;
+        const remotePlayer = {
+          sessionId: "remote-pvp-test",
+          id: "remote-pvp-test",
+          displayName: "Remote Pilot",
+          currentNode: "Asteron Prime",
+          presenceStatus: "space",
+          shipName: "Azure Striker",
+          guildId: ""
+        };
+
+        if (engageTimer) {
+          clearInterval(engageTimer);
+          engageTimer = null;
+        }
+        selectedTarget = null;
+        engagedTarget = null;
+
+        window.LupenMultiplayerClient = {
+          ...(originalClient || {}),
+          getPlayers: ({ includeSelf = true } = {}) => [
+            ...(includeSelf ? [{
+              sessionId: "local-session",
+              isSelf: true,
+              displayName: "Local Pilot",
+              currentNode,
+              presenceStatus: "space"
+            }] : []),
+            { ...remotePlayer }
+          ],
+          getStatus: () => ({
+            enabled: true,
+            isConnected: true,
+            sessionId: "local-session",
+            guildId: ""
+          })
+        };
+
+        try {
+          currentNode = "Asteron Prime";
+          remotePlayer.currentNode = "Asteron Prime";
+          selectRemotePlayerTarget("remote-pvp-test");
+          const protectedSelected = Boolean(getSelectedRemotePlayerTarget());
+          const protectedMessage = getRemotePlayerEngageBlockMessage({ ...remotePlayer });
+
+          currentNode = "Lower Gate Core";
+          remotePlayer.currentNode = "Lower Gate Core";
+          updateCurrentNodeUI();
+          selectRemotePlayerTarget("remote-pvp-test");
+          const contestedTarget = getSelectedRemotePlayerTarget();
+          const contestedSelected = Boolean(contestedTarget);
+          const contestedBlockReason = getRemotePlayerTargetBlockReason(contestedTarget);
+          const contestedEngageMessage = getRemotePlayerEngageBlockMessage(contestedTarget);
+          const contestedActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
+          const contestedActionText = document.getElementById("objectEngageBtn")?.textContent || "";
+
+          const before = { hull, shield, combatXp: playerProgress.combatXp };
+          engageTarget();
+          const after = {
+            hull,
+            shield,
+            combatXp: playerProgress.combatXp,
+            selectedType: selectedTarget?.type || "",
+            engagedType: engagedTarget?.type || "",
+            engageTimerActive: Boolean(engageTimer)
+          };
+
+          currentNode = "Asteron Prime";
+          remotePlayer.currentNode = "Asteron Prime";
+          updateCurrentNodeUI();
+          const clearedOnProtectedReturn = !selectedTarget && !engagedTarget && !engageTimer;
+
+          currentNode = "Missing Node";
+          remotePlayer.currentNode = "Missing Node";
+          selectRemotePlayerTarget("remote-pvp-test");
+          const unknownSelected = Boolean(getSelectedRemotePlayerTarget());
+          const unknownMessage = getRemotePlayerEngageBlockMessage({ ...remotePlayer });
+
+          return {
+            protectedSelected,
+            protectedMessage,
+            contestedSelected,
+            contestedBlockReason,
+            contestedEngageMessage,
+            contestedActionDisabled,
+            contestedActionText,
+            before,
+            after,
+            clearedOnProtectedReturn,
+            unknownSelected,
+            unknownMessage
+          };
+        } finally {
+          if (engageTimer) clearInterval(engageTimer);
+          engageTimer = originalTimer;
+          selectedTarget = originalSelected;
+          engagedTarget = originalEngaged;
+          currentNode = originalNode;
+          hull = originalHull;
+          shield = originalShield;
+          playerProgress.combatXp = originalCombatXp;
+          window.LupenMultiplayerClient = originalClient;
+          updateCurrentNodeUI();
+        }
+      })()
+    `));
+
+    expect(eligibility.protectedSelected).toBe(false);
+    expect(eligibility.protectedMessage).toBe("PvP disabled in protected zones.");
+    expect(eligibility.contestedSelected).toBe(true);
+    expect(eligibility.contestedBlockReason).toBe("");
+    expect(eligibility.contestedEngageMessage).toBe("PvP combat not yet online.");
+    expect(eligibility.contestedActionDisabled).toBe(false);
+    expect(eligibility.contestedActionText).toBe("ENGAGE");
+    expect(eligibility.after.hull).toBe(eligibility.before.hull);
+    expect(eligibility.after.shield).toBe(eligibility.before.shield);
+    expect(eligibility.after.combatXp).toBe(eligibility.before.combatXp);
+    expect(eligibility.after.selectedType).toBe("remotePlayer");
+    expect(eligibility.after.engagedType).toBe("");
+    expect(eligibility.after.engageTimerActive).toBe(false);
+    expect(eligibility.clearedOnProtectedReturn).toBe(true);
+    expect(eligibility.unknownSelected).toBe(false);
+    expect(eligibility.unknownMessage).toBe("PvP disabled in protected zones.");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

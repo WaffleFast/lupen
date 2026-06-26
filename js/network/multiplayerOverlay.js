@@ -1648,7 +1648,8 @@
     return String(player?.presenceStatus || player?.status || "space").toLowerCase() !== "docked";
   }
 
-  function isPvpSafeNode(nodeName = getCurrentNodeName()) {
+  function isPvpProtectedNode(nodeName = getCurrentNodeName()) {
+    if (typeof global.isProtectedNode === "function") return global.isProtectedNode(nodeName);
     const node = typeof sectorNodes !== "undefined" ? sectorNodes[nodeName] : null;
     return node?.type === "planet" || ["Asteron Prime", "Virella", "Nyxara"].includes(String(nodeName || ""));
   }
@@ -1657,11 +1658,11 @@
     if (!player) return "PVP LOCKED";
     if (!isPilotInSpace(player)) return "DOCKED";
     if (!isSameCurrentNode(player)) return "OUT OF RANGE";
-    if (isPvpSafeNode()) return "SAFE AREA";
+    if (isPvpProtectedNode()) return "PROTECTED";
     const localGuild = String(status?.guildId || "").trim();
     const targetGuild = String(player.guildId || "").trim();
     if (localGuild && targetGuild && localGuild === targetGuild) return "ALLY";
-    return "PVP LOCKED";
+    return "PVP ARMING";
   }
 
   function getRemotePilotKey(player = {}) {
@@ -2047,6 +2048,18 @@
     const playerId = String(player?.sessionId || player?.id || "");
     if (!playerId || !isSameCurrentNode(player)) return;
     selectedResourceId = "";
+    const blockReason = typeof global.getRemotePlayerTargetBlockReason === "function"
+      ? global.getRemotePlayerTargetBlockReason(player)
+      : (isPvpProtectedNode() ? "PvP disabled in protected zones." : "");
+    if (blockReason) {
+      if (typeof global.selectRemotePlayerTarget === "function") {
+        global.selectRemotePlayerTarget(playerId);
+      } else if (typeof global.addHudToast === "function") {
+        global.addHudToast(blockReason);
+      }
+      scheduleRender();
+      return;
+    }
     if (typeof global.selectRemotePlayerTarget === "function") {
       global.selectRemotePlayerTarget(playerId);
       scheduleRender();
