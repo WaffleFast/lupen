@@ -1677,6 +1677,21 @@
     return "PVP TEST";
   }
 
+  function getRemotePlayerPvpVitals(player = {}) {
+    const shieldMax = Number.isFinite(Number(player.pvpShieldMax)) && Number(player.pvpShieldMax) > 0
+      ? Number(player.pvpShieldMax)
+      : 0;
+    const hullMax = Number.isFinite(Number(player.pvpHullMax)) && Number(player.pvpHullMax) > 0
+      ? Number(player.pvpHullMax)
+      : 0;
+    return {
+      shield: Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : shieldMax,
+      shieldMax,
+      hull: Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : hullMax,
+      hullMax
+    };
+  }
+
   function getRemotePilotKey(player = {}) {
     return String(player.sessionId || player.id || "");
   }
@@ -2164,6 +2179,15 @@
       ship.textContent = getShipLabel(selectedPlayer);
       card.appendChild(ship);
 
+      const vitals = getRemotePlayerPvpVitals(selectedPlayer);
+      if (vitals.shieldMax > 0 || vitals.hullMax > 0) {
+        const bars = global.document.createElement("div");
+        bars.className = "lupen-target-bars";
+        appendTargetBar(bars, vitals.hull, vitals.hullMax, "hull");
+        appendTargetBar(bars, vitals.shield, vitals.shieldMax, "shield");
+        card.appendChild(bars);
+      }
+
       const statusTag = global.document.createElement("span");
       statusTag.className = "lupen-target-status pvp-arming";
       statusTag.textContent = getRemotePlayerPvpLabel(selectedPlayer, status);
@@ -2171,11 +2195,11 @@
 
       const readiness = global.document.createElement("small");
       readiness.className = "lupen-target-readiness";
-      readiness.textContent = "Server hit test ready";
+      readiness.textContent = isPvpProtectedNode() ? "Inspection only" : "Server hit test ready";
       card.appendChild(readiness);
 
       const offline = global.document.createElement("small");
-      offline.textContent = "No defeat or loot";
+      offline.textContent = isPvpProtectedNode() ? "PvP disabled in protected zones" : "No defeat or loot";
       card.appendChild(offline);
     } else if (selectedResource) {
       const bars = global.document.createElement("div");

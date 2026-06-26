@@ -973,7 +973,11 @@ function updateObjectActionPanel(forceVisible = false) {
       : "PvP disabled in protected zones.";
     panel.classList.add("visible");
     actionBtn.disabled = !!blockReason;
-    actionBtn.textContent = blockReason ? "PVP LOCKED" : "PVP ENGAGE";
+    actionBtn.textContent = blockReason === "PvP disabled in protected zones."
+      ? "PVP DISABLED"
+      : blockReason
+        ? "PVP LOCKED"
+        : "PVP ENGAGE";
     actionBtn.classList.remove("disengage-action");
     return;
   }
@@ -1098,21 +1102,36 @@ function updateSpaceHUD() {
   if (!jumpFill) return;
 
   const safeJumpMax = Number.isFinite(jumpMax) && jumpMax > 0 ? jumpMax : 100;
-  const safeHullMax = Number.isFinite(hullMax) && hullMax > 0 ? hullMax : 1;
-  const safeShieldMax = Number.isFinite(shieldMax) && shieldMax > 0 ? shieldMax : 0;
+  const pvpDisplayState = typeof serverPvpDamageDisplayState === "object" && serverPvpDamageDisplayState
+    ? serverPvpDamageDisplayState
+    : null;
+  const displayHullMax = Number.isFinite(Number(pvpDisplayState?.hullMax)) && Number(pvpDisplayState.hullMax) > 0
+    ? Number(pvpDisplayState.hullMax)
+    : hullMax;
+  const displayShieldMax = Number.isFinite(Number(pvpDisplayState?.shieldMax)) && Number(pvpDisplayState.shieldMax) > 0
+    ? Number(pvpDisplayState.shieldMax)
+    : shieldMax;
+  const displayHull = Number.isFinite(Number(pvpDisplayState?.hull))
+    ? Number(pvpDisplayState.hull)
+    : hull;
+  const displayShield = Number.isFinite(Number(pvpDisplayState?.shield))
+    ? Number(pvpDisplayState.shield)
+    : shield;
+  const safeHullMax = Number.isFinite(displayHullMax) && displayHullMax > 0 ? displayHullMax : 1;
+  const safeShieldMax = Number.isFinite(displayShieldMax) && displayShieldMax > 0 ? displayShieldMax : 0;
 
   document.getElementById("jumpFill").style.height = `${Math.max(0, Math.min(100, (jumpCharge / safeJumpMax) * 100))}%`;
   document.getElementById("jumpValue").textContent = formatNumber(Math.floor(jumpCharge));
   document.getElementById("jumpBtn").disabled = jumpCharge < safeJumpMax || hull <= 0;
 
-  document.getElementById("hullFill").style.height = `${Math.max(0, Math.min(100, (hull / safeHullMax) * 100))}%`;
-  document.getElementById("hullValue").textContent = formatNumber(Math.floor(hull));
+  document.getElementById("hullFill").style.height = `${Math.max(0, Math.min(100, (displayHull / safeHullMax) * 100))}%`;
+  document.getElementById("hullValue").textContent = formatNumber(Math.floor(displayHull));
 
-  document.getElementById("shieldFill").style.height = `${safeShieldMax > 0 ? Math.max(0, Math.min(100, (shield / safeShieldMax) * 100)) : 0}%`;
-  document.getElementById("shieldValue").textContent = formatNumber(Math.floor(shield));
+  document.getElementById("shieldFill").style.height = `${safeShieldMax > 0 ? Math.max(0, Math.min(100, (displayShield / safeShieldMax) * 100)) : 0}%`;
+  document.getElementById("shieldValue").textContent = formatNumber(Math.floor(displayShield));
 
-  const isHullCritical = hull > 0 && (hull / safeHullMax) <= 0.25;
-  const isShieldDepleted = safeShieldMax > 0 && shield <= 0 && hull > 0;
+  const isHullCritical = displayHull > 0 && (displayHull / safeHullMax) <= 0.25;
+  const isShieldDepleted = safeShieldMax > 0 && displayShield <= 0 && displayHull > 0;
   const spaceScreen = document.getElementById("spaceScreen");
   const statPanel = document.querySelector(".vertical-stats");
   [spaceScreen, statPanel].forEach(panel => {

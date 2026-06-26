@@ -1046,8 +1046,30 @@
       lastSeenAt: Number.isFinite(Number(player.lastSeenAt)) ? Number(player.lastSeenAt) : 0,
       lastFireAt: Number.isFinite(Number(player.lastFireAt)) ? Number(player.lastFireAt) : 0,
       nextFireAt: Number.isFinite(Number(player.nextFireAt)) ? Number(player.nextFireAt) : 0,
+      pvpShield: Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : null,
+      pvpShieldMax: Number.isFinite(Number(player.pvpShieldMax)) ? Number(player.pvpShieldMax) : null,
+      pvpHull: Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : null,
+      pvpHullMax: Number.isFinite(Number(player.pvpHullMax)) ? Number(player.pvpHullMax) : null,
+      lastPvpHitAt: Number.isFinite(Number(player.lastPvpHitAt)) ? Number(player.lastPvpHitAt) : 0,
+      nextPvpFireAt: Number.isFinite(Number(player.nextPvpFireAt)) ? Number(player.nextPvpFireAt) : 0,
       isSelf: sessionId === connection.sessionId
     };
+  }
+
+  function applyPvpHitToPlayerSnapshot(hit = {}) {
+    const targetId = String(hit.targetSessionId || hit.targetPlayerId || "");
+    if (!targetId) return false;
+    const existing = playersById.get(targetId);
+    if (!existing) return false;
+    playersById.set(targetId, {
+      ...existing,
+      pvpShield: Number.isFinite(Number(hit.shield)) ? Number(hit.shield) : existing.pvpShield,
+      pvpShieldMax: Number.isFinite(Number(hit.shieldMax)) ? Number(hit.shieldMax) : existing.pvpShieldMax,
+      pvpHull: Number.isFinite(Number(hit.hull)) ? Number(hit.hull) : existing.pvpHull,
+      pvpHullMax: Number.isFinite(Number(hit.hullMax)) ? Number(hit.hullMax) : existing.pvpHullMax,
+      lastPvpHitAt: Number.isFinite(Number(hit.receivedAt)) ? Number(hit.receivedAt) : Date.now()
+    });
+    return true;
   }
 
   function updatePlayersFromServerState(serverState) {
@@ -2384,12 +2406,16 @@
         serverAuthoritative: message?.serverAuthoritative === true,
         receivedAt
       };
+      applyPvpHitToPlayerSnapshot(connection.lastPvpHitEvent);
 
       if (targetSessionId === connection.sessionId) {
         addStagingActivityLogOnce(
           `pvp-hit-target:${attackerSessionId}:${targetSessionId}:${receivedAt}`,
           `PvP hit received from ${connection.lastPvpHitEvent.attackerDisplayName}: ${totalDamage} damage.`
         );
+        if (typeof global.applyServerPvpDamageState === "function") {
+          global.applyServerPvpDamageState(connection.lastPvpHitEvent);
+        }
         if (typeof global.playHostilePlayerHitFeedback === "function") {
           global.playHostilePlayerHitFeedback({ shieldDamage, hullDamage });
         }

@@ -4,6 +4,25 @@
 
 let lastRemotePlayerEngageNoticeKey = "";
 let lastRemotePlayerEngageNoticeAt = 0;
+let serverPvpDamageDisplayState = null;
+
+function applyServerPvpDamageState(hit = {}) {
+  const shieldMaxValue = Number(hit.shieldMax);
+  const hullMaxValue = Number(hit.hullMax);
+  const shieldValue = Number(hit.shield);
+  const hullValue = Number(hit.hull);
+  if (!Number.isFinite(shieldValue) && !Number.isFinite(hullValue)) return false;
+
+  serverPvpDamageDisplayState = {
+    shield: Number.isFinite(shieldValue) ? Math.max(0, shieldValue) : null,
+    shieldMax: Number.isFinite(shieldMaxValue) && shieldMaxValue > 0 ? shieldMaxValue : null,
+    hull: Number.isFinite(hullValue) ? Math.max(1, hullValue) : null,
+    hullMax: Number.isFinite(hullMaxValue) && hullMaxValue > 0 ? hullMaxValue : null,
+    updatedAt: Date.now()
+  };
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  return true;
+}
 
 function isSameTargetRef(left, right) {
   return Boolean(left && right && left.type === right.type && left.id === right.id);
@@ -133,6 +152,14 @@ function canTargetRemotePlayerInCurrentZone(player = {}) {
   return !getRemotePlayerTargetBlockReason(player);
 }
 
+function shouldKeepRemotePlayerSelection(player = {}) {
+  const targetNode = player.currentNodeId || player.node || "";
+  const status = String(player.presenceStatus || player.status || "space").toLowerCase();
+  if (status === "docked") return false;
+  if (targetNode && targetNode !== currentNode) return false;
+  return true;
+}
+
 function getRemotePlayerEngageBlockMessage(player = {}) {
   return getRemotePlayerTargetBlockReason(player) || "PvP server hit test ready.";
 }
@@ -226,21 +253,13 @@ function reconcileRemotePlayerTargetEligibility(reason = "remote_player_target_r
       ? getRemotePlayerTargetById(engagedTarget.id)
       : null;
   if (!remoteTarget) return clearRemotePlayerTarget(reason);
-  if (!canTargetRemotePlayerInCurrentZone(remoteTarget)) return clearRemotePlayerTarget(reason);
+  if (!shouldKeepRemotePlayerSelection(remoteTarget)) return clearRemotePlayerTarget(reason);
   return false;
 }
 
 function selectRemotePlayerTarget(playerId) {
   const player = getRemotePlayerTargetById(playerId);
   if (!player || (player.currentNodeId || player.node) !== currentNode) return;
-
-  const blockReason = getRemotePlayerTargetBlockReason(player);
-  if (blockReason) {
-    clearRemotePlayerTarget("remote_player_target_blocked");
-    if (typeof addHudToast === "function") addHudToast(blockReason);
-    else if (typeof addActivityLog === "function") addActivityLog(blockReason);
-    return;
-  }
 
   selectedTarget = { type: "remotePlayer", id: player.id };
   showTargetPanel();

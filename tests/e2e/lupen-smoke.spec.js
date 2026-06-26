@@ -1205,11 +1205,13 @@ test.describe("Lupen browser smoke", () => {
     expect(typeof connectedHudState.sentResourceMines[0].timestamp).toBe("number");
     expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
-    expect(connectedHudState.playerTargetText).toBe("");
-    expect(connectedHudState.playerTargetSelected).toBe("");
-    expect(connectedHudState.engageVisibleForPlayer).toBe(false);
+    expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
+    expect(connectedHudState.playerTargetText).toContain("PROTECTED");
+    expect(connectedHudState.playerTargetText).toContain("Inspection only");
+    expect(connectedHudState.playerTargetSelected).toBe("remote-session");
+    expect(connectedHudState.engageVisibleForPlayer).toBe(true);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
-    expect(connectedHudState.engageTextForPlayer).toContain("ENGAGE");
+    expect(connectedHudState.engageTextForPlayer).toContain("PVP DISABLED");
     expect(connectedHudState.pvpGuardReason).toBe("");
     expect(connectedHudState.pvpGuardPreview).toBe("");
     expect(connectedHudState.pvpGuardDamageApplied).toBe(false);
@@ -1439,7 +1441,11 @@ test.describe("Lupen browser smoke", () => {
           currentNode: "Asteron Prime",
           presenceStatus: "space",
           shipName: "Azure Striker",
-          guildId: ""
+          guildId: "",
+          pvpShield: 30,
+          pvpShieldMax: 30,
+          pvpHull: 120,
+          pvpHullMax: 120
         };
 
         if (engageTimer) {
@@ -1477,11 +1483,17 @@ test.describe("Lupen browser smoke", () => {
           currentNode = "Asteron Prime";
           remotePlayer.currentNode = "Asteron Prime";
           selectRemotePlayerTarget("remote-pvp-test");
+          window.LupenMultiplayerOverlay?.render?.();
           const protectedSelected = Boolean(getSelectedRemotePlayerTarget());
           const protectedMessage = getRemotePlayerEngageBlockMessage({ ...remotePlayer });
+          const protectedActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
+          const protectedActionText = document.getElementById("objectEngageBtn")?.textContent || "";
+          const protectedTargetCardText = document.querySelector(".lupen-target-card.player")?.textContent || "";
 
           currentNode = "Lower Gate Core";
           remotePlayer.currentNode = "Lower Gate Core";
+          remotePlayer.pvpShield = 24;
+          remotePlayer.pvpHull = 120;
           updateCurrentNodeUI();
           selectRemotePlayerTarget("remote-pvp-test");
           window.LupenMultiplayerOverlay?.render?.();
@@ -1492,8 +1504,30 @@ test.describe("Lupen browser smoke", () => {
           const contestedActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
           const contestedActionText = document.getElementById("objectEngageBtn")?.textContent || "";
           const contestedTargetCardText = document.querySelector(".lupen-target-card.player")?.textContent || "";
+          const contestedShieldBarWidth = document.querySelector(".lupen-target-card.player .lupen-target-bar-fill.shield")?.style.width || "";
+          const contestedHullBarWidth = document.querySelector(".lupen-target-card.player .lupen-target-bar-fill.hull")?.style.width || "";
 
           const before = { hull, shield, combatXp: playerProgress.combatXp };
+          const hudBefore = {
+            hullValue: document.getElementById("hullValue")?.textContent || "",
+            shieldValue: document.getElementById("shieldValue")?.textContent || ""
+          };
+          const pvpHudApplied = typeof applyServerPvpDamageState === "function"
+            ? applyServerPvpDamageState({
+              targetSessionId: "local-session",
+              shield: 18,
+              shieldMax: 30,
+              hull: 120,
+              hullMax: 120
+            })
+            : false;
+          const hudAfterPvpDisplay = {
+            hullValue: document.getElementById("hullValue")?.textContent || "",
+            shieldValue: document.getElementById("shieldValue")?.textContent || "",
+            storedHull: hull,
+            storedShield: shield,
+            applied: pvpHudApplied
+          };
           const activityBeforeEngage = document.getElementById("activityLogFeed")?.textContent || "";
           engageTarget();
           engageTarget();
@@ -1512,29 +1546,44 @@ test.describe("Lupen browser smoke", () => {
           currentNode = "Asteron Prime";
           remotePlayer.currentNode = "Asteron Prime";
           updateCurrentNodeUI();
-          const clearedOnProtectedReturn = !selectedTarget && !engagedTarget && !engageTimer;
+          const protectedReturnSelected = selectedTarget?.type === "remotePlayer";
+          const protectedReturnActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
+          const protectedReturnActionText = document.getElementById("objectEngageBtn")?.textContent || "";
 
           currentNode = "Missing Node";
           remotePlayer.currentNode = "Missing Node";
           selectRemotePlayerTarget("remote-pvp-test");
           const unknownSelected = Boolean(getSelectedRemotePlayerTarget());
           const unknownMessage = getRemotePlayerEngageBlockMessage({ ...remotePlayer });
+          const unknownActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
+          const unknownActionText = document.getElementById("objectEngageBtn")?.textContent || "";
 
           return {
             protectedSelected,
             protectedMessage,
+            protectedActionDisabled,
+            protectedActionText,
+            protectedTargetCardText,
             contestedSelected,
             contestedBlockReason,
             contestedEngageMessage,
             contestedActionDisabled,
             contestedActionText,
             contestedTargetCardText,
+            contestedShieldBarWidth,
+            contestedHullBarWidth,
             before,
+            hudBefore,
+            hudAfterPvpDisplay,
             after,
             sentPvpIntents,
-            clearedOnProtectedReturn,
+            protectedReturnSelected,
+            protectedReturnActionDisabled,
+            protectedReturnActionText,
             unknownSelected,
-            unknownMessage
+            unknownMessage,
+            unknownActionDisabled,
+            unknownActionText
           };
         } finally {
           if (engageTimer) clearInterval(engageTimer);
@@ -1551,8 +1600,13 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(eligibility.protectedSelected).toBe(false);
+    expect(eligibility.protectedSelected).toBe(true);
     expect(eligibility.protectedMessage).toBe("PvP disabled in protected zones.");
+    expect(eligibility.protectedActionDisabled).toBe(true);
+    expect(eligibility.protectedActionText).toBe("PVP DISABLED");
+    expect(eligibility.protectedTargetCardText).toContain("PROTECTED");
+    expect(eligibility.protectedTargetCardText).toContain("Inspection only");
+    expect(eligibility.protectedTargetCardText).toContain("PvP disabled in protected zones");
     expect(eligibility.contestedSelected).toBe(true);
     expect(eligibility.contestedBlockReason).toBe("");
     expect(eligibility.contestedEngageMessage).toBe("PvP server hit test ready.");
@@ -1561,6 +1615,13 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedTargetCardText).toContain("PVP TEST");
     expect(eligibility.contestedTargetCardText).toContain("Server hit test ready");
     expect(eligibility.contestedTargetCardText).toContain("No defeat or loot");
+    expect(eligibility.contestedShieldBarWidth).toBe("80%");
+    expect(eligibility.contestedHullBarWidth).toBe("100%");
+    expect(eligibility.hudAfterPvpDisplay.applied).toBe(true);
+    expect(eligibility.hudAfterPvpDisplay.hullValue).toBe("120");
+    expect(eligibility.hudAfterPvpDisplay.shieldValue).toBe("18");
+    expect(eligibility.hudAfterPvpDisplay.storedHull).toBe(eligibility.before.hull);
+    expect(eligibility.hudAfterPvpDisplay.storedShield).toBe(eligibility.before.shield);
     expect(eligibility.after.hull).toBe(eligibility.before.hull);
     expect(eligibility.after.shield).toBe(eligibility.before.shield);
     expect(eligibility.after.combatXp).toBe(eligibility.before.combatXp);
@@ -1575,9 +1636,13 @@ test.describe("Lupen browser smoke", () => {
       targetSessionId: "remote-pvp-test",
       currentNode: "Lower Gate Core"
     });
-    expect(eligibility.clearedOnProtectedReturn).toBe(true);
-    expect(eligibility.unknownSelected).toBe(false);
+    expect(eligibility.protectedReturnSelected).toBe(true);
+    expect(eligibility.protectedReturnActionDisabled).toBe(true);
+    expect(eligibility.protectedReturnActionText).toBe("PVP DISABLED");
+    expect(eligibility.unknownSelected).toBe(true);
     expect(eligibility.unknownMessage).toBe("PvP disabled in protected zones.");
+    expect(eligibility.unknownActionDisabled).toBe(true);
+    expect(eligibility.unknownActionText).toBe("PVP DISABLED");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
