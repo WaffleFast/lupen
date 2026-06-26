@@ -111,7 +111,26 @@ const KNOWN_SECTOR_NODES = new Set([
   "Lower Gate Core",
   "Lower Gate East"
 ]);
-const PVP_SAFE_NODE_IDS = new Set(["Asteron Prime", "Virella", "Nyxara"]);
+const PVP_CONTESTED_NODE_IDS = new Set([
+  "Lower Apex",
+  "Lower Arc West",
+  "Lower Arc East",
+  "Lower Mid West A",
+  "Lower Mid West B",
+  "Lower Mid East B",
+  "Lower Mid East A",
+  "Lower Lane West A",
+  "Lower Lane West B",
+  "Lower Lane Core West",
+  "Lower Lane Core East",
+  "Lower Lane East B",
+  "Lower Lane East A",
+  "Lower Gate West",
+  "Lower Gate Core",
+  "Lower Gate East"
+]);
+const KNOWN_SECTOR_NODE_KEYS = new Set(Array.from(KNOWN_SECTOR_NODES, (nodeId) => normalizePresenceNode(nodeId)));
+const PVP_CONTESTED_NODE_KEYS = new Set(Array.from(PVP_CONTESTED_NODE_IDS, (nodeId) => normalizePresenceNode(nodeId)));
 const STAGING_STORE_WRITE_ITEM_IDS = new Set(getStagingStoreItemIds());
 const STAGING_LOADOUT_WRITE_ITEM_IDS = new Set(STAGING_LOADOUT_ITEM_IDS);
 
@@ -182,6 +201,11 @@ const BOT_NODE_LINKS = new Map(
 const BOT_MOVE_TICK_MS = 4000;
 const BOT_NODE_MOVE_MS = 16000;
 const STAGING_TEST_DAMAGE = 5;
+const STAGING_PVP_TEST_DAMAGE = 6;
+const STAGING_PVP_SHIELD_MAX = 30;
+const STAGING_PVP_HULL_MAX = 120;
+const STAGING_PVP_MIN_HULL = 1;
+const STAGING_PVP_COOLDOWN_MS = 950;
 const STAGING_DAMAGE_MIN = 1;
 const STAGING_DAMAGE_MAX = 50;
 const STAGING_FIRE_COOLDOWN_MS = 900;
@@ -322,6 +346,12 @@ type("number")(LupenSectorPlayer.prototype, "joinedAt");
 type("number")(LupenSectorPlayer.prototype, "lastSeenAt");
 type("number")(LupenSectorPlayer.prototype, "lastFireAt");
 type("number")(LupenSectorPlayer.prototype, "nextFireAt");
+type("number")(LupenSectorPlayer.prototype, "pvpShield");
+type("number")(LupenSectorPlayer.prototype, "pvpShieldMax");
+type("number")(LupenSectorPlayer.prototype, "pvpHull");
+type("number")(LupenSectorPlayer.prototype, "pvpHullMax");
+type("number")(LupenSectorPlayer.prototype, "lastPvpHitAt");
+type("number")(LupenSectorPlayer.prototype, "nextPvpFireAt");
 
 export class LupenSectorBot extends Schema {
   constructor(values = {}) {
@@ -485,6 +515,34 @@ function getSafePresenceStatus(value = "") {
   return status === "docked" ? "docked" : "space";
 }
 
+function getMapOnePvpZoneType(nodeId = "") {
+  const node = normalizePresenceNode(nodeId);
+  if (!node || !KNOWN_SECTOR_NODE_KEYS.has(node)) return "protected";
+  if (PVP_CONTESTED_NODE_KEYS.has(node)) return "contested";
+  return "protected";
+}
+
+function isMapOnePvpContestedNode(nodeId = "") {
+  return getMapOnePvpZoneType(nodeId) === "contested";
+}
+
+function ensurePlayerPvpState(player) {
+  if (!player) return null;
+  player.pvpShieldMax = Math.max(1, Math.round(Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX)));
+  player.pvpHullMax = Math.max(STAGING_PVP_MIN_HULL, Math.round(Number(player.pvpHullMax || STAGING_PVP_HULL_MAX)));
+  player.pvpShield = clampNumber(
+    Math.round(Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : player.pvpShieldMax),
+    0,
+    player.pvpShieldMax
+  );
+  player.pvpHull = clampNumber(
+    Math.round(Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : player.pvpHullMax),
+    STAGING_PVP_MIN_HULL,
+    player.pvpHullMax
+  );
+  return player;
+}
+
 function getPvpEligibilityPreview(attacker = null, target = null, currentNode = "") {
   const node = getStringValue(currentNode || attacker?.currentNode || target?.currentNode);
   const targetId = getStringValue(target?.sessionId || target?.id);
@@ -492,13 +550,18 @@ function getPvpEligibilityPreview(attacker = null, target = null, currentNode = 
   if (!attacker) return { allowed: false, reason: "attacker_not_found", pvpEnabled: false };
   if (!target) return { allowed: false, reason: "target_not_found", pvpEnabled: false };
   if (attackerId && targetId && attackerId === targetId) return { allowed: false, reason: "self_target", pvpEnabled: false };
+  if (getSafePresenceStatus(attacker?.presenceStatus) === "docked") return { allowed: false, reason: "attacker_docked", pvpEnabled: false };
   if (getSafePresenceStatus(target?.presenceStatus) === "docked") return { allowed: false, reason: "target_docked", pvpEnabled: false };
-  if (normalizePresenceNode(attacker?.currentNode) !== normalizePresenceNode(target?.currentNode)) return { allowed: false, reason: "not_same_node", pvpEnabled: false };
-  if (PVP_SAFE_NODE_IDS.has(node)) return { allowed: false, reason: "safe_area", pvpEnabled: false };
+  const attackerNode = normalizePresenceNode(attacker?.currentNode);
+  const targetNode = normalizePresenceNode(target?.currentNode);
+  const intentNode = normalizePresenceNode(node);
+  if (!attackerNode || !targetNode || attackerNode !== targetNode) return { allowed: false, reason: "not_same_node", pvpEnabled: false };
+  if (intentNode && intentNode !== attackerNode) return { allowed: false, reason: "intent_node_mismatch", pvpEnabled: false };
+  if (!isMapOnePvpContestedNode(attackerNode)) return { allowed: false, reason: "protected_zone", pvpEnabled: false };
   const attackerGuild = getSafeIdentityValue(attacker?.guildId);
   const targetGuild = getSafeIdentityValue(target?.guildId);
   if (attackerGuild && targetGuild && attackerGuild === targetGuild) return { allowed: false, reason: "guild_ally", pvpEnabled: false };
-  return { allowed: false, reason: "pvp_disabled", pvpEnabled: false };
+  return { allowed: true, reason: "contested_zone", pvpEnabled: true };
 }
 
 function getSafeWeaponList(value) {
@@ -1527,7 +1590,10 @@ export class LupenSectorRoom extends Room {
 
   touchPlayer(sessionId) {
     const player = this.state.players.get(sessionId);
-    if (player) player.lastSeenAt = Date.now();
+    if (player) {
+      player.lastSeenAt = Date.now();
+      ensurePlayerPvpState(player);
+    }
     return player;
   }
 
@@ -3386,28 +3452,146 @@ export class LupenSectorRoom extends Room {
     this.reconcilePlayerSelections();
   }
 
+  getPvpTargetPlayer(targetPlayerId = "") {
+    const targetId = getStringValue(targetPlayerId);
+    if (!targetId) return null;
+    const directTarget = this.state.players.get(targetId);
+    if (directTarget) return directTarget;
+    for (const player of this.state.players.values()) {
+      if (player?.sessionId === targetId || player?.id === targetId || player?.trustedPlayerId === targetId || player?.playerId === targetId) {
+        return player;
+      }
+    }
+    return null;
+  }
+
+  applyStagingPvpDamage(targetPlayer, damage = STAGING_PVP_TEST_DAMAGE) {
+    ensurePlayerPvpState(targetPlayer);
+    const requestedDamage = clampNumber(Math.round(Number(damage || STAGING_PVP_TEST_DAMAGE)), 1, STAGING_DAMAGE_MAX);
+    const shieldBefore = Number(targetPlayer.pvpShield || 0);
+    const hullBefore = Number(targetPlayer.pvpHull || STAGING_PVP_HULL_MAX);
+    const shieldDamage = Math.min(shieldBefore, requestedDamage);
+    const remainingDamage = Math.max(0, requestedDamage - shieldDamage);
+    const hullDamage = Math.min(Math.max(0, hullBefore - STAGING_PVP_MIN_HULL), remainingDamage);
+
+    targetPlayer.pvpShield = Math.max(0, shieldBefore - shieldDamage);
+    targetPlayer.pvpHull = Math.max(STAGING_PVP_MIN_HULL, hullBefore - hullDamage);
+    targetPlayer.lastPvpHitAt = Date.now();
+
+    return {
+      damage: shieldDamage + hullDamage,
+      requestedDamage,
+      shieldDamage,
+      hullDamage,
+      shieldBefore,
+      shield: targetPlayer.pvpShield,
+      shieldMax: targetPlayer.pvpShieldMax,
+      hullBefore,
+      hull: targetPlayer.pvpHull,
+      hullMax: targetPlayer.pvpHullMax,
+      defeated: false
+    };
+  }
+
+  resolvePvpCombatIntent(client, message = {}, messageType = "combat:intent") {
+    const attacker = this.touchPlayer(client.sessionId);
+    const now = Date.now();
+    const targetPlayerId = getStringValue(message.targetPlayerId || message.targetSessionId || message.playerTargetId);
+    const targetPlayer = this.getPvpTargetPlayer(targetPlayerId);
+    const pvpEligibility = getPvpEligibilityPreview(attacker, targetPlayer, message.currentNode);
+    const pvpDiagnostics = getPvpCombatIntentDiagnostics({
+      attacker,
+      target: targetPlayer,
+      message,
+      targetPlayerId,
+      pvpEligibility,
+      now
+    });
+
+    if (!pvpEligibility.allowed) {
+      if (attacker) {
+        attacker.lastCombatIntentReason = pvpEligibility.reason || "pvp_intent_rejected";
+        attacker.lastCombatNodeValidationReason = ["not_same_node", "intent_node_mismatch", "protected_zone"].includes(pvpEligibility.reason)
+          ? pvpEligibility.reason
+          : "";
+      }
+      this.sendCombatRejected(client, "pvp_intent_rejected", message, messageType, pvpEligibility.reason || "pvp_intent_rejected", {
+        ...pvpDiagnostics
+      });
+      return;
+    }
+
+    if (Number(attacker.nextPvpFireAt || 0) > now) {
+      this.sendCombatRejected(client, "pvp_fire_cooldown", message, messageType, "pvp_fire_cooldown", {
+        ...pvpDiagnostics,
+        cooldownRemainingMs: Math.max(0, Math.ceil(Number(attacker.nextPvpFireAt || 0) - now))
+      });
+      return;
+    }
+
+    ensurePlayerPvpState(attacker);
+    ensurePlayerPvpState(targetPlayer);
+    const result = this.applyStagingPvpDamage(targetPlayer, STAGING_PVP_TEST_DAMAGE);
+    attacker.lastFireAt = now;
+    attacker.nextPvpFireAt = now + STAGING_PVP_COOLDOWN_MS;
+    attacker.lastCombatIntentReason = "pvp_damage_applied";
+    attacker.lastCombatNodeValidationReason = "pvp_node_valid";
+
+    const hitPayload = {
+      ok: true,
+      reason: "pvp_damage_applied",
+      messageType,
+      pvpIntent: true,
+      targetType: "remotePlayer",
+      attackerSessionId: attacker.sessionId,
+      attackerDisplayName: getSafeIdentityValue(attacker.displayName, "Pilot") || "Pilot",
+      targetPlayerId: targetPlayer.sessionId || targetPlayerId,
+      targetSessionId: targetPlayer.sessionId || targetPlayerId,
+      targetDisplayName: getSafeIdentityValue(targetPlayer.displayName, "Pilot") || "Pilot",
+      currentNode: attacker.currentNode,
+      targetNode: targetPlayer.currentNode,
+      weaponId: getSafeIdentityValue(message.weaponId),
+      weaponKey: getSafeIdentityValue(message.weaponKey),
+      weaponName: getStringValue(message.weaponName || message.weaponLabel).slice(0, 80),
+      weaponFamily: getSafeIdentityValue(message.weaponFamily),
+      damage: result.damage,
+      requestedDamage: result.requestedDamage,
+      serverDamageUsed: STAGING_PVP_TEST_DAMAGE,
+      pvpDamageApplied: true,
+      playerDamageApplied: true,
+      mutatedPlayerState: true,
+      shieldDamage: result.shieldDamage,
+      hullDamage: result.hullDamage,
+      shieldBefore: result.shieldBefore,
+      shield: result.shield,
+      shieldMax: result.shieldMax,
+      hullBefore: result.hullBefore,
+      hull: result.hull,
+      hullMax: result.hullMax,
+      defeated: false,
+      deathApplied: false,
+      cargoLost: false,
+      xpAwarded: false,
+      bountyProgressChanged: false,
+      rewardsGranted: false,
+      serverAuthoritative: true,
+      pvpRulePreview: pvpEligibility.reason,
+      pvpEligibility,
+      cooldownMs: STAGING_PVP_COOLDOWN_MS,
+      nextPvpFireAt: attacker.nextPvpFireAt,
+      receivedAt: Date.now()
+    };
+
+    client.send("combat:resolved", hitPayload);
+    this.broadcast("pvp:hit", hitPayload);
+  }
+
   async resolveCombatIntent(client, message = {}, messageType = "combat:intent") {
     const player = this.touchPlayer(client.sessionId);
     const now = Date.now();
     const targetPlayerId = getStringValue(message.targetPlayerId || message.targetSessionId || message.playerTargetId);
     if (targetPlayerId || getStringValue(message.targetType) === "remotePlayer") {
-      const targetPlayer = targetPlayerId ? this.state.players.get(targetPlayerId) : null;
-      const pvpEligibility = getPvpEligibilityPreview(player, targetPlayer, message.currentNode);
-      const pvpDiagnostics = getPvpCombatIntentDiagnostics({
-        attacker: player,
-        target: targetPlayer,
-        message,
-        targetPlayerId,
-        pvpEligibility,
-        now
-      });
-      if (player) {
-        player.lastCombatIntentReason = "pvp_unavailable_in_staging";
-        player.lastCombatNodeValidationReason = "";
-      }
-      this.sendCombatRejected(client, "pvp_unavailable_in_staging", message, messageType, "pvp_unavailable_in_staging", {
-        ...pvpDiagnostics
-      });
+      this.resolvePvpCombatIntent(client, message, messageType);
       return;
     }
     const payloadWarning = validateCombatIntentPayload(message);

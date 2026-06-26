@@ -973,7 +973,7 @@ function updateObjectActionPanel(forceVisible = false) {
       : "PvP disabled in protected zones.";
     panel.classList.add("visible");
     actionBtn.disabled = !!blockReason;
-    actionBtn.textContent = blockReason ? "PVP LOCKED" : "PVP ARMING";
+    actionBtn.textContent = blockReason ? "PVP LOCKED" : "PVP ENGAGE";
     actionBtn.classList.remove("disengage-action");
     return;
   }

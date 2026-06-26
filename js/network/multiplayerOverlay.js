@@ -1674,7 +1674,7 @@
     const localGuild = String(status?.guildId || "").trim();
     const targetGuild = String(player.guildId || "").trim();
     if (localGuild && targetGuild && localGuild === targetGuild) return "ALLY";
-    return "PVP ARMING";
+    return "PVP TEST";
   }
 
   function getRemotePilotKey(player = {}) {
@@ -2171,11 +2171,11 @@
 
       const readiness = global.document.createElement("small");
       readiness.className = "lupen-target-readiness";
-      readiness.textContent = "Targeting systems ready";
+      readiness.textContent = "Server hit test ready";
       card.appendChild(readiness);
 
       const offline = global.document.createElement("small");
-      offline.textContent = "PvP combat not yet online";
+      offline.textContent = "No defeat or loot";
       card.appendChild(offline);
     } else if (selectedResource) {
       const bars = global.document.createElement("div");

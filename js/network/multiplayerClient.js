@@ -39,6 +39,7 @@
     lastBotEvent: null,
     lastBotRewardReceipt: null,
     lastShotEvent: null,
+    lastPvpHitEvent: null,
     lastStagingReturnFire: null,
     lastRewardPreview: null,
     lastRewardClaimResult: null,
@@ -301,6 +302,7 @@
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastPvpHitEvent: connection.lastPvpHitEvent ? { ...connection.lastPvpHitEvent } : null,
       lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
@@ -2277,6 +2279,24 @@
       connection.lastCombatResponse = {
         ok: message?.ok === true,
         reason: String(message?.reason || "staging_damage_applied"),
+        pvpIntent: message?.pvpIntent === true,
+        targetType: String(message?.targetType || ""),
+        targetPlayerId: String(message?.targetPlayerId || ""),
+        targetSessionId: String(message?.targetSessionId || ""),
+        attackerSessionId: String(message?.attackerSessionId || ""),
+        attackerDisplayName: String(message?.attackerDisplayName || ""),
+        targetDisplayName: String(message?.targetDisplayName || ""),
+        pvpRulePreview: String(message?.pvpRulePreview || ""),
+        pvpEligibility: message?.pvpEligibility && typeof message.pvpEligibility === "object"
+          ? {
+            allowed: message.pvpEligibility.allowed === true,
+            reason: String(message.pvpEligibility.reason || ""),
+            pvpEnabled: message.pvpEligibility.pvpEnabled === true
+          }
+          : null,
+        pvpDamageApplied: message?.pvpDamageApplied === true,
+        playerDamageApplied: message?.playerDamageApplied === true,
+        mutatedPlayerState: message?.mutatedPlayerState === true,
         targetBotId: String(message?.targetBotId || ""),
         targetNode: String(message?.targetNode || ""),
         weaponName: String(message?.weaponName || ""),
@@ -2308,10 +2328,20 @@
         damage: Number.isFinite(Number(message?.damage)) ? Number(message.damage) : 0,
         stagingDamage: Number.isFinite(Number(message?.stagingDamage)) ? Number(message.stagingDamage) : 0,
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        shieldDamage: Number.isFinite(Number(message?.shieldDamage)) ? Number(message.shieldDamage) : 0,
+        shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        hullDamage: Number.isFinite(Number(message?.hullDamage)) ? Number(message.hullDamage) : 0,
+        hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
         disabled: message?.disabled === true,
+        defeated: message?.defeated === true,
+        deathApplied: message?.deathApplied === true,
+        cargoLost: message?.cargoLost === true,
+        xpAwarded: message?.xpAwarded === true,
+        bountyProgressChanged: message?.bountyProgressChanged === true,
         cooldownMs: Number.isFinite(Number(message?.cooldownMs)) ? Number(message.cooldownMs) : 0,
         nextFireAt: Number.isFinite(Number(message?.nextFireAt)) ? Number(message.nextFireAt) : 0,
+        nextPvpFireAt: Number.isFinite(Number(message?.nextPvpFireAt)) ? Number(message.nextPvpFireAt) : 0,
         rewardsGranted: message?.rewardsGranted === true,
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
@@ -2319,6 +2349,59 @@
       if (connection.lastCombatResponse.disabled) {
         scheduleStagingCombatProgressRefresh("combatResolvedDisabled", connection.lastCombatResponse);
       }
+    });
+
+    activeRoom.onMessage("pvp:hit", (message) => {
+      const attackerSessionId = String(message?.attackerSessionId || "");
+      const targetSessionId = String(message?.targetSessionId || message?.targetPlayerId || "");
+      const shieldDamage = Number.isFinite(Number(message?.shieldDamage)) ? Number(message.shieldDamage) : 0;
+      const hullDamage = Number.isFinite(Number(message?.hullDamage)) ? Number(message.hullDamage) : 0;
+      const totalDamage = Number.isFinite(Number(message?.damage)) ? Number(message.damage) : shieldDamage + hullDamage;
+      const receivedAt = Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now();
+      connection.lastPvpHitEvent = {
+        ok: message?.ok === true,
+        reason: String(message?.reason || "pvp_damage_applied"),
+        attackerSessionId,
+        attackerDisplayName: String(message?.attackerDisplayName || "Pilot"),
+        targetSessionId,
+        targetPlayerId: String(message?.targetPlayerId || targetSessionId),
+        targetDisplayName: String(message?.targetDisplayName || "Pilot"),
+        currentNode: String(message?.currentNode || ""),
+        targetNode: String(message?.targetNode || ""),
+        damage: totalDamage,
+        shieldDamage,
+        hullDamage,
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
+        defeated: message?.defeated === true,
+        deathApplied: message?.deathApplied === true,
+        cargoLost: message?.cargoLost === true,
+        xpAwarded: message?.xpAwarded === true,
+        bountyProgressChanged: message?.bountyProgressChanged === true,
+        rewardsGranted: message?.rewardsGranted === true,
+        serverAuthoritative: message?.serverAuthoritative === true,
+        receivedAt
+      };
+
+      if (targetSessionId === connection.sessionId) {
+        addStagingActivityLogOnce(
+          `pvp-hit-target:${attackerSessionId}:${targetSessionId}:${receivedAt}`,
+          `PvP hit received from ${connection.lastPvpHitEvent.attackerDisplayName}: ${totalDamage} damage.`
+        );
+        if (typeof global.playHostilePlayerHitFeedback === "function") {
+          global.playHostilePlayerHitFeedback({ shieldDamage, hullDamage });
+        }
+      } else if (attackerSessionId === connection.sessionId) {
+        addStagingActivityLogOnce(
+          `pvp-hit-attacker:${attackerSessionId}:${targetSessionId}:${receivedAt}`,
+          `PvP hit confirmed on ${connection.lastPvpHitEvent.targetDisplayName}: ${totalDamage} damage.`
+        );
+      }
+
+      logDev("server pvp hit", message);
+      notifyServerState(activeRoom.state || null);
     });
 
     activeRoom.onMessage("bot:disabled", (message) => {
@@ -2924,6 +3007,7 @@
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastPvpHitEvent: connection.lastPvpHitEvent ? { ...connection.lastPvpHitEvent } : null,
       lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
@@ -3184,20 +3268,13 @@
 
     sendCombatIntent(intent = {}) {
       if (intent?.targetPlayerId || intent?.targetSessionId || intent?.targetType === "remotePlayer") {
-        return statusResult("sendCombatIntent", false, {
-          reason: "pvp_unavailable_in_staging",
-          pvpIntent: true,
-          targetType: String(intent?.targetType || "remotePlayer"),
+        const localPresence = getLocalPresenceOptions();
+        return sendRoomMessage("sendCombatIntent", "combat:intent", {
+          ...getStagingWeaponIntent(),
+          ...intent,
+          targetType: "remotePlayer",
           targetPlayerId: String(intent?.targetPlayerId || intent?.targetSessionId || ""),
-          pvpRulePreview: "client_pvp_disabled",
-          pvpEligibility: {
-            allowed: false,
-            reason: "client_pvp_disabled",
-            pvpEnabled: false
-          },
-          pvpDamageApplied: false,
-          playerDamageApplied: false,
-          mutatedPlayerState: false
+          currentNode: intent.currentNode || localPresence.currentNode || ""
         });
       }
       return sendRoomMessage("sendCombatIntent", "combat:intent", intent);

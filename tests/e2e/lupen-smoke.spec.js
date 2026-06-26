@@ -951,6 +951,7 @@ test.describe("Lupen browser smoke", () => {
       currentNode = "Asteron Prime";
       const sentMessages = [];
       const sentResourceMines = [];
+      const sentPvpIntents = [];
       const stagingResources = [{
         id: "staging-resource-test-iron",
         resourceName: "Iron",
@@ -1058,16 +1059,8 @@ test.describe("Lupen browser smoke", () => {
         },
         sendCombatIntent: (intent) => {
           if (intent?.targetPlayerId || intent?.targetSessionId || intent?.targetType === "remotePlayer") {
-            return {
-              ok: false,
-              reason: "pvp_unavailable_in_staging",
-              pvpIntent: true,
-              pvpRulePreview: "client_pvp_disabled",
-              pvpEligibility: { allowed: false, reason: "client_pvp_disabled", pvpEnabled: false },
-              pvpDamageApplied: false,
-              playerDamageApplied: false,
-              mutatedPlayerState: false
-            };
+            sentPvpIntents.push({ ...intent });
+            return { ok: true, type: "combat:intent", payload: { ...intent } };
           }
           return { ok: true };
         },
@@ -1169,7 +1162,8 @@ test.describe("Lupen browser smoke", () => {
         placeholder: input.placeholder,
         inputDisabled: input.disabled,
         sentMessages,
-        sentResourceMines
+        sentResourceMines,
+        sentPvpIntents
       };
       window.LupenMultiplayerClient = originalClient;
       window.LupenMultiplayerOverlay.render();
@@ -1216,9 +1210,13 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.engageVisibleForPlayer).toBe(false);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
     expect(connectedHudState.engageTextForPlayer).toContain("ENGAGE");
-    expect(connectedHudState.pvpGuardReason).toBe("pvp_unavailable_in_staging");
-    expect(connectedHudState.pvpGuardPreview).toBe("client_pvp_disabled");
+    expect(connectedHudState.pvpGuardReason).toBe("");
+    expect(connectedHudState.pvpGuardPreview).toBe("");
     expect(connectedHudState.pvpGuardDamageApplied).toBe(false);
+    expect(connectedHudState.sentPvpIntents).toEqual([{
+      targetType: "remotePlayer",
+      targetPlayerId: "remote-session"
+    }]);
     expect(connectedHudState.onlineText.match(/Remote Pilot/g)).toHaveLength(1);
     expect(connectedHudState.onlineText).toContain("Online Pilots: Local Pilot, Remote Pilot, Docked Pilot");
     expect(connectedHudState.onlineText).not.toContain("here");
@@ -1372,7 +1370,7 @@ test.describe("Lupen browser smoke", () => {
     expect(zones.metadata.upperGateCore).toBe("protected");
     expect(zones.metadata.lowerGateCore).toBe("contested");
     expect(zones.messages.protectedBlockMessage).toBe("PvP disabled in protected zones.");
-    expect(zones.messages.contestedBlockMessage).toBe("PvP combat not yet online.");
+    expect(zones.messages.contestedBlockMessage).toBe("PvP server hit test ready.");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -1405,7 +1403,7 @@ test.describe("Lupen browser smoke", () => {
       currentNodeId: "Lower Gate Core",
       presenceStatus: "space"
     }));
-    expect(pvpBlock).toBe("PvP combat not yet online.");
+    expect(pvpBlock).toBe("PvP server hit test ready.");
 
     await page.evaluate(() => {
       currentNode = "Missing Node";
@@ -1433,6 +1431,7 @@ test.describe("Lupen browser smoke", () => {
         const originalHull = hull;
         const originalShield = shield;
         const originalCombatXp = playerProgress.combatXp;
+        const sentPvpIntents = [];
         const remotePlayer = {
           sessionId: "remote-pvp-test",
           id: "remote-pvp-test",
@@ -1467,7 +1466,11 @@ test.describe("Lupen browser smoke", () => {
             isConnected: true,
             sessionId: "local-session",
             guildId: ""
-          })
+          }),
+          sendCombatIntent: (intent) => {
+            sentPvpIntents.push({ ...intent });
+            return { ok: true, type: "combat:intent", payload: { ...intent } };
+          }
         };
 
         try {
@@ -1502,8 +1505,8 @@ test.describe("Lupen browser smoke", () => {
             selectedType: selectedTarget?.type || "",
             engagedType: engagedTarget?.type || "",
             engageTimerActive: Boolean(engageTimer),
-            notYetOnlineMessages: (activityAfterEngage.match(/PvP combat not yet online\\./g) || []).length
-              - (activityBeforeEngage.match(/PvP combat not yet online\\./g) || []).length
+            pvpRequestMessages: (activityAfterEngage.match(/PvP hit request sent\\./g) || []).length
+              - (activityBeforeEngage.match(/PvP hit request sent\\./g) || []).length
           };
 
           currentNode = "Asteron Prime";
@@ -1528,6 +1531,7 @@ test.describe("Lupen browser smoke", () => {
             contestedTargetCardText,
             before,
             after,
+            sentPvpIntents,
             clearedOnProtectedReturn,
             unknownSelected,
             unknownMessage
@@ -1551,19 +1555,26 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.protectedMessage).toBe("PvP disabled in protected zones.");
     expect(eligibility.contestedSelected).toBe(true);
     expect(eligibility.contestedBlockReason).toBe("");
-    expect(eligibility.contestedEngageMessage).toBe("PvP combat not yet online.");
+    expect(eligibility.contestedEngageMessage).toBe("PvP server hit test ready.");
     expect(eligibility.contestedActionDisabled).toBe(false);
-    expect(eligibility.contestedActionText).toBe("PVP ARMING");
-    expect(eligibility.contestedTargetCardText).toContain("PVP ARMING");
-    expect(eligibility.contestedTargetCardText).toContain("Targeting systems ready");
-    expect(eligibility.contestedTargetCardText).toContain("PvP combat not yet online");
+    expect(eligibility.contestedActionText).toBe("PVP ENGAGE");
+    expect(eligibility.contestedTargetCardText).toContain("PVP TEST");
+    expect(eligibility.contestedTargetCardText).toContain("Server hit test ready");
+    expect(eligibility.contestedTargetCardText).toContain("No defeat or loot");
     expect(eligibility.after.hull).toBe(eligibility.before.hull);
     expect(eligibility.after.shield).toBe(eligibility.before.shield);
     expect(eligibility.after.combatXp).toBe(eligibility.before.combatXp);
     expect(eligibility.after.selectedType).toBe("remotePlayer");
     expect(eligibility.after.engagedType).toBe("");
     expect(eligibility.after.engageTimerActive).toBe(false);
-    expect(eligibility.after.notYetOnlineMessages).toBe(1);
+    expect(eligibility.after.pvpRequestMessages).toBe(1);
+    expect(eligibility.sentPvpIntents).toHaveLength(2);
+    expect(eligibility.sentPvpIntents[0]).toMatchObject({
+      targetType: "remotePlayer",
+      targetPlayerId: "remote-pvp-test",
+      targetSessionId: "remote-pvp-test",
+      currentNode: "Lower Gate Core"
+    });
     expect(eligibility.clearedOnProtectedReturn).toBe(true);
     expect(eligibility.unknownSelected).toBe(false);
     expect(eligibility.unknownMessage).toBe("PvP disabled in protected zones.");

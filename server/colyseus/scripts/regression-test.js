@@ -4357,6 +4357,8 @@ try {
   const botRespawnedEvents = [];
   const roomAShotEvents = [];
   const roomBShotEvents = [];
+  const roomAPvpHitEvents = [];
+  const roomBPvpHitEvents = [];
   const roomAReturnFireEvents = [];
   const resourceShotEventsA = [];
   const resourceShotEventsB = [];
@@ -4369,6 +4371,8 @@ try {
   roomB.onMessage("bot:respawned", () => {});
   roomA.onMessage("staging:shot", (message) => roomAShotEvents.push(message));
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
+  roomA.onMessage("pvp:hit", (message) => roomAPvpHitEvents.push(message));
+  roomB.onMessage("pvp:hit", (message) => roomBPvpHitEvents.push(message));
   roomA.onMessage("staging:return_fire", (message) => roomAReturnFireEvents.push(message));
   roomB.onMessage("staging:return_fire", () => {});
   roomA.onMessage("stagingResource:shot", (message) => resourceShotEventsA.push(message));
@@ -4410,9 +4414,9 @@ try {
       currentNode: "Asteron Prime"
     });
   });
-  assert(pvpRejected?.reason === "pvp_unavailable_in_staging", `Unexpected PvP rejection reason: ${pvpRejected?.reason}`);
-  assert(pvpRejected?.validation === "pvp_unavailable_in_staging", `Unexpected PvP validation: ${pvpRejected?.validation}`);
-  assert(pvpRejected?.pvpRulePreview === "safe_area", `Unexpected PvP rule preview: ${pvpRejected?.pvpRulePreview}`);
+  assert(pvpRejected?.reason === "pvp_intent_rejected", `Unexpected PvP rejection reason: ${pvpRejected?.reason}`);
+  assert(pvpRejected?.validation === "protected_zone", `Unexpected PvP validation: ${pvpRejected?.validation}`);
+  assert(pvpRejected?.pvpRulePreview === "protected_zone", `Unexpected PvP rule preview: ${pvpRejected?.pvpRulePreview}`);
   assert(pvpRejected?.pvpIntent === true, "PvP rejection did not mark the intent as a player combat intent.");
   assert(pvpRejected?.attackerSessionId === roomA.sessionId, "PvP rejection did not include attacker session diagnostics.");
   assert(pvpRejected?.targetPlayerId === roomB.sessionId, "PvP rejection did not include target player diagnostics.");
@@ -4422,8 +4426,6 @@ try {
   assert(pvpRejected?.playerDamageApplied === false, "Rejected PvP intent unexpectedly applied player damage.");
   assert(pvpRejected?.mutatedPlayerState === false, "Rejected PvP intent unexpectedly mutated player state.");
   assert(pvpRejected?.rewardsGranted === false, "Rejected PvP intent unexpectedly granted rewards.");
-  assert(playerFrom(roomA, roomB.sessionId)?.hull === undefined, "Rejected PvP intent created target hull state.");
-  assert(playerFrom(roomA, roomB.sessionId)?.shield === undefined, "Rejected PvP intent created target shield state.");
 
   const selfPvpRejected = await expectCombatRejected(roomA, () => {
     roomA.send("combat:intent", {
@@ -4463,10 +4465,12 @@ try {
   });
   assert(differentNodePvpRejected?.pvpRulePreview === "not_same_node", `Unexpected different-node PvP preview: ${differentNodePvpRejected?.pvpRulePreview}`);
 
-  roomA.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "space", guildId: "guild-one", x: 50, y: 43 });
-  roomB.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "space", guildId: "guild-one", x: 50, y: 43 });
+  roomA.send("movement:update", { currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "guild-one", x: 50, y: 57 });
+  roomB.send("movement:update", { currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "guild-one", x: 50, y: 57 });
   await waitFor("PvP guild ally setup", () => {
-    return playerFrom(roomA, roomA.sessionId)?.guildId === "guild-one" &&
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === "Lower Gate Core" &&
+      playerFrom(roomA, roomB.sessionId)?.currentNode === "Lower Gate Core" &&
+      playerFrom(roomA, roomA.sessionId)?.guildId === "guild-one" &&
       playerFrom(roomA, roomB.sessionId)?.guildId === "guild-one" &&
       playerFrom(roomA, roomB.sessionId)?.presenceStatus === "space";
   });
@@ -4474,18 +4478,25 @@ try {
     roomA.send("combat:intent", {
       targetType: "remotePlayer",
       targetPlayerId: roomB.sessionId,
-      currentNode: "Upper Gate Core"
+      currentNode: "Lower Gate Core"
     });
   });
   assert(guildPvpRejected?.pvpRulePreview === "guild_ally", `Unexpected guild PvP preview: ${guildPvpRejected?.pvpRulePreview}`);
 
-  roomB.send("movement:update", { currentNode: "Upper Gate Core", presenceStatus: "space", guildId: "guild-two", x: 50, y: 43 });
-  await waitFor("PvP global disabled setup", () => playerFrom(roomA, roomB.sessionId)?.guildId === "guild-two");
-  const combatSpacePvpRejected = await expectCombatRejected(roomA, () => {
+  roomA.send("movement:update", { currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "", x: 50, y: 57 });
+  roomB.send("movement:update", { currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "guild-two", x: 50, y: 57 });
+  await waitFor("PvP contested setup", () => {
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === "Lower Gate Core" &&
+      playerFrom(roomA, roomB.sessionId)?.currentNode === "Lower Gate Core" &&
+      playerFrom(roomA, roomB.sessionId)?.guildId === "guild-two";
+  });
+  const targetPvpShieldBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0);
+  const targetPvpHullBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpHull || 0);
+  const combatSpacePvpResolved = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetType: "remotePlayer",
       targetPlayerId: roomB.sessionId,
-      currentNode: "Upper Gate Core",
+      currentNode: "Lower Gate Core",
       weaponId: "pulse-laser",
       weaponKey: "pulse-laser-mk1",
       weaponFamily: "pulse",
@@ -4493,16 +4504,27 @@ try {
       equippedWeaponKeys: ["pulse-laser-mk1"]
     });
   });
-  assert(combatSpacePvpRejected?.pvpRulePreview === "pvp_disabled", `Unexpected combat-space PvP preview: ${combatSpacePvpRejected?.pvpRulePreview}`);
-  assert(combatSpacePvpRejected?.pvpEligibility?.pvpEnabled === false, "PvP eligibility unexpectedly enabled combat.");
-  assert(combatSpacePvpRejected?.weaponId === "pulse-laser", "PvP rejection did not include weapon id diagnostics.");
-  assert(combatSpacePvpRejected?.weaponKey === "pulse-laser-mk1", "PvP rejection did not include weapon key diagnostics.");
-  assert(combatSpacePvpRejected?.weaponFamily === "pulse", "PvP rejection did not include weapon family diagnostics.");
-  assert(combatSpacePvpRejected?.equippedWeaponKeys?.[0] === "pulse-laser-mk1", "PvP rejection did not include equipped weapon diagnostics.");
-  assert(combatSpacePvpRejected?.pvpDamageApplied === false, "Combat-space PvP rejection unexpectedly applied PvP damage.");
-  assert(combatSpacePvpRejected?.playerDamageApplied === false, "Combat-space PvP rejection unexpectedly applied player damage.");
-  assert(combatSpacePvpRejected?.mutatedPlayerState === false, "Combat-space PvP rejection unexpectedly mutated player state.");
-  console.log("player-vs-player combat intents rejected with future rule previews");
+  assert(combatSpacePvpResolved?.reason === "pvp_damage_applied", `Unexpected contested PvP result: ${combatSpacePvpResolved?.reason}`);
+  assert(combatSpacePvpResolved?.pvpRulePreview === "contested_zone", `Unexpected contested PvP preview: ${combatSpacePvpResolved?.pvpRulePreview}`);
+  assert(combatSpacePvpResolved?.pvpEligibility?.pvpEnabled === true, "PvP eligibility did not enable contested combat.");
+  assert(combatSpacePvpResolved?.weaponId === "pulse-laser", "PvP result did not include weapon id diagnostics.");
+  assert(combatSpacePvpResolved?.weaponKey === "pulse-laser-mk1", "PvP result did not include weapon key diagnostics.");
+  assert(combatSpacePvpResolved?.weaponFamily === "pulse", "PvP result did not include weapon family diagnostics.");
+  assert(combatSpacePvpResolved?.pvpDamageApplied === true, "Contested PvP did not apply PvP damage.");
+  assert(combatSpacePvpResolved?.playerDamageApplied === true, "Contested PvP did not apply player damage.");
+  assert(combatSpacePvpResolved?.mutatedPlayerState === true, "Contested PvP did not mutate server player state.");
+  assert(combatSpacePvpResolved?.rewardsGranted === false, "Contested PvP unexpectedly granted rewards.");
+  assert(combatSpacePvpResolved?.xpAwarded === false, "Contested PvP unexpectedly awarded XP.");
+  assert(combatSpacePvpResolved?.bountyProgressChanged === false, "Contested PvP unexpectedly changed bounty progress.");
+  assert(combatSpacePvpResolved?.cargoLost === false, "Contested PvP unexpectedly caused cargo loss.");
+  assert(combatSpacePvpResolved?.deathApplied === false, "Contested PvP unexpectedly applied death.");
+  assert(Number(combatSpacePvpResolved?.shieldDamage || 0) > 0, "Contested PvP did not apply shield-first damage.");
+  await waitFor("PvP hit broadcast delivered to both clients", () => roomAPvpHitEvents.length >= 1 && roomBPvpHitEvents.length >= 1);
+  const targetAfterPvp = playerFrom(roomA, roomB.sessionId);
+  assert(Number(targetAfterPvp?.pvpShield || 0) < targetPvpShieldBefore, "Target PvP shield did not decrease.");
+  assert(Number(targetAfterPvp?.pvpHull || 0) === targetPvpHullBefore, "Target PvP hull changed before shield was depleted.");
+  assert(Number(targetAfterPvp?.pvpHull || 0) >= 1, "Target PvP hull dropped below prototype clamp.");
+  console.log("player-vs-player combat intents reject safely and resolve in contested space");
 
   roomA.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });
   roomB.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });

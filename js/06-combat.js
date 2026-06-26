@@ -134,7 +134,7 @@ function canTargetRemotePlayerInCurrentZone(player = {}) {
 }
 
 function getRemotePlayerEngageBlockMessage(player = {}) {
-  return getRemotePlayerTargetBlockReason(player) || "PvP combat not yet online.";
+  return getRemotePlayerTargetBlockReason(player) || "PvP server hit test ready.";
 }
 
 function showRemotePlayerEngageBlockMessage(player = {}) {
@@ -149,6 +149,53 @@ function showRemotePlayerEngageBlockMessage(player = {}) {
 
   if (typeof addHudToast === "function") addHudToast(message);
   else if (typeof addActivityLog === "function") addActivityLog(message);
+  return true;
+}
+
+function sendRemotePlayerPvpIntent(player = {}) {
+  const blockReason = getRemotePlayerTargetBlockReason(player);
+  if (blockReason) {
+    showRemotePlayerEngageBlockMessage(player);
+    return false;
+  }
+
+  const targetPlayerId = String(player.sessionId || player.id || "").trim();
+  if (!targetPlayerId) {
+    showRemotePlayerEngageBlockMessage({ ...player, id: "missing-pvp-target" });
+    return false;
+  }
+
+  const result = window.LupenMultiplayerClient?.sendCombatIntent?.({
+    targetType: "remotePlayer",
+    targetPlayerId,
+    targetSessionId: targetPlayerId,
+    currentNode
+  });
+
+  if (!result?.ok) {
+    const reason = String(result?.reason || "PvP server unavailable.");
+    const message = reason === "not_connected"
+      ? "PvP server unavailable."
+      : reason.replace(/_/g, " ");
+    const key = `${targetPlayerId}|${currentNode}|${message}`;
+    const now = Date.now();
+    if (key !== lastRemotePlayerEngageNoticeKey || now - lastRemotePlayerEngageNoticeAt >= 1800) {
+      lastRemotePlayerEngageNoticeKey = key;
+      lastRemotePlayerEngageNoticeAt = now;
+      if (typeof addHudToast === "function") addHudToast(message);
+      else if (typeof addActivityLog === "function") addActivityLog(message);
+    }
+    return false;
+  }
+
+  const message = "PvP hit request sent.";
+  const key = `${targetPlayerId}|${currentNode}|${message}`;
+  const now = Date.now();
+  if (key !== lastRemotePlayerEngageNoticeKey || now - lastRemotePlayerEngageNoticeAt >= 1800) {
+    lastRemotePlayerEngageNoticeKey = key;
+    lastRemotePlayerEngageNoticeAt = now;
+    if (typeof addActivityLog === "function") addActivityLog(message);
+  }
   return true;
 }
 
@@ -209,7 +256,7 @@ function engageTarget() {
   let target = getSelectedTargetEntity();
 
   if (target?.remotePlayer) {
-    showRemotePlayerEngageBlockMessage(target);
+    sendRemotePlayerPvpIntent(target);
     updateObjectActionPanel(false);
     return;
   }
