@@ -16,6 +16,7 @@ function getTargetRefFromEntity(target) {
 
 function retargetEngagementToSelectedTarget() {
   if (!engageTimer) return false;
+  reconcileStagingBotTargetState();
 
   const target = getSelectedTargetEntity();
   if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) return false;
@@ -134,6 +135,9 @@ function getRemotePlayerEngageBlockMessage(player = {}) {
 }
 
 function engageTarget() {
+  const staleStagingBotCleared = reconcileStagingBotTargetState();
+  if (staleStagingBotCleared) return;
+
   let target = getSelectedTargetEntity();
 
   if (target?.remotePlayer) {
@@ -853,6 +857,35 @@ function clearStagingBotTargetIfSelected(botId) {
   window.LupenMultiplayerOverlay?.render?.();
 }
 
+function isStagingBotTargetStillValid(botId) {
+  const bot = getStagingBotTargetById(botId);
+  return Boolean(bot && bot.alive && (bot.currentNodeId || bot.node) === currentNode);
+}
+
+function clearStaleStagingBotTarget(reason = "stale_staging_bot_target") {
+  const selectedStale = selectedTarget?.type === "stagingBot" && !isStagingBotTargetStillValid(selectedTarget.id);
+  const engagedStale = engagedTarget?.type === "stagingBot" && !isStagingBotTargetStillValid(engagedTarget.id);
+
+  if (!selectedStale && !engagedStale) return false;
+
+  if (engagedStale && engageTimer) {
+    clearInterval(engageTimer);
+    engageTimer = null;
+  }
+  if (engagedStale) engagedTarget = null;
+  if (selectedStale) selectedTarget = null;
+  window.LupenMultiplayerClient?.clearStagingTarget?.();
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(false);
+  window.LupenMultiplayerOverlay?.render?.();
+  return { cleared: true, reason };
+}
+
+function reconcileStagingBotTargetState(reason = "reconcile_staging_bot_target") {
+  return clearStaleStagingBotTarget(reason);
+}
+
 function handleStagingBotLifecycleEvent(event = {}) {
   const botId = String(event.botId || event.id || event.targetBotId || "").trim();
   if (!botId) return { handled: false, reason: "missing_bot_id" };
@@ -905,6 +938,7 @@ function handleStagingBotLifecycleEvent(event = {}) {
 
 window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
 window.handleStagingBotLifecycleEvent = handleStagingBotLifecycleEvent;
+window.reconcileStagingBotTargetState = reconcileStagingBotTargetState;
 
 function updateTargetPanel() {
   const lootSummary = document.getElementById("lootSummary");
@@ -1258,8 +1292,7 @@ function respawnAsteroid() {
 function performStagingBotAttackCycle() {
   const target = getEngagedTargetEntity();
   if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
-    disengageTarget(true);
-    updateObjectActionPanel(true);
+    reconcileStagingBotTargetState("staging_bot_attack_target_invalid");
     return;
   }
 

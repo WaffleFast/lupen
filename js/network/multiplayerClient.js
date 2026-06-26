@@ -687,6 +687,9 @@
   }
 
   function notifyServerState(serverState) {
+    if (typeof global.reconcileStagingBotTargetState === "function") {
+      global.reconcileStagingBotTargetState("server_state_refresh");
+    }
     stateListeners.forEach((handler) => {
       try {
         handler(serverState, getStatus());

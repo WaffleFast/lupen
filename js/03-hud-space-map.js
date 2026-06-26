@@ -2019,6 +2019,9 @@ function jumpToNode(destination) {
   playJumpSound();
   jumpCharge = 0;
   closeSectorMap();
+  if (typeof reconcileStagingBotTargetState === "function") {
+    reconcileStagingBotTargetState("node_changed");
+  }
   disengageTarget(true);
   // Keep the currently selected HUD tab when jumping between nodes.
   maybeMoveAsteroid();

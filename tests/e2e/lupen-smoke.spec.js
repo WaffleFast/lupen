@@ -2690,6 +2690,7 @@ test.describe("Lupen browser smoke", () => {
         window.__remoteSelectedStagingBotId = "";
         window.__lastShotEvent = null;
         window.__stagingVisualBot = bot;
+        window.__stagingVisualBots = bots;
         window.LupenMultiplayerClient = {
           ...(window.LupenMultiplayerClient || {}),
           getStatus: () => ({
@@ -2875,6 +2876,70 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
+
+    const staleMissingBotState = await page.evaluate(() => window.eval(`
+      (() => {
+        const bot = window.__stagingVisualBot;
+        const activityBefore = document.getElementById("activityLogFeed")?.textContent || "";
+        selectStagingBotTarget(bot.id);
+        engageTarget();
+        const engagedBefore = engagedTarget ? { ...engagedTarget } : null;
+        const botList = window.__stagingVisualBots || [];
+        const botIndex = botList.findIndex(candidate => candidate.id === bot.id);
+        const removed = botIndex >= 0 ? botList.splice(botIndex, 1)[0] : null;
+        const cleanup = reconcileStagingBotTargetState("e2e_missing_bot");
+        const activityAfter = document.getElementById("activityLogFeed")?.textContent || "";
+        if (removed) botList.splice(botIndex, 0, removed);
+        window.__selectedStagingBotId = "";
+        window.LupenMultiplayerOverlay?.render?.();
+        return {
+          engagedBefore,
+          cleanup,
+          selectedAfter: selectedTarget ? { ...selectedTarget } : null,
+          engagedAfter: engagedTarget ? { ...engagedTarget } : null,
+          selectedClientBotId: window.__selectedStagingBotId || "",
+          disengageLogAdded: ((activityAfter.match(/Disengaged Erebus Watcher/g) || []).length - (activityBefore.match(/Disengaged Erebus Watcher/g) || []).length)
+        };
+      })()
+    `));
+
+    expect(staleMissingBotState.engagedBefore).toMatchObject({ type: "stagingBot", id: "staging-bot-1" });
+    expect(staleMissingBotState.cleanup).toMatchObject({ cleared: true, reason: "e2e_missing_bot" });
+    expect(staleMissingBotState.selectedAfter).toBe(null);
+    expect(staleMissingBotState.engagedAfter).toBe(null);
+    expect(staleMissingBotState.selectedClientBotId).toBe("");
+    expect(staleMissingBotState.disengageLogAdded).toBe(0);
+
+    const staleNodeBotState = await page.evaluate(() => window.eval(`
+      (() => {
+        const bot = window.__stagingVisualBot;
+        currentNode = bot.currentNode;
+        selectStagingBotTarget(bot.id);
+        engageTarget();
+        const engagedBefore = engagedTarget ? { ...engagedTarget } : null;
+        currentNode = "Asteron Prime";
+        const cleanup = reconcileStagingBotTargetState("e2e_node_changed");
+        const selectedAfter = selectedTarget ? { ...selectedTarget } : null;
+        const engagedAfter = engagedTarget ? { ...engagedTarget } : null;
+        currentNode = bot.currentNode;
+        updateCurrentNodeUI();
+        updateAsteroidUI();
+        window.LupenMultiplayerOverlay?.render?.();
+        return {
+          engagedBefore,
+          cleanup,
+          selectedAfter,
+          engagedAfter,
+          selectedClientBotId: window.__selectedStagingBotId || ""
+        };
+      })()
+    `));
+
+    expect(staleNodeBotState.engagedBefore).toMatchObject({ type: "stagingBot", id: "staging-bot-1" });
+    expect(staleNodeBotState.cleanup).toMatchObject({ cleared: true, reason: "e2e_node_changed" });
+    expect(staleNodeBotState.selectedAfter).toBe(null);
+    expect(staleNodeBotState.engagedAfter).toBe(null);
+    expect(staleNodeBotState.selectedClientBotId).toBe("");
 
     const stagingBotDisabledState = await page.evaluate(() => window.eval(`
       (() => {
