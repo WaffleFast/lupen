@@ -4359,6 +4359,8 @@ try {
   const roomBShotEvents = [];
   const roomAPvpHitEvents = [];
   const roomBPvpHitEvents = [];
+  const roomAPvpRegenEvents = [];
+  const roomBPvpRegenEvents = [];
   const roomAReturnFireEvents = [];
   const resourceShotEventsA = [];
   const resourceShotEventsB = [];
@@ -4373,6 +4375,8 @@ try {
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
   roomA.onMessage("pvp:hit", (message) => roomAPvpHitEvents.push(message));
   roomB.onMessage("pvp:hit", (message) => roomBPvpHitEvents.push(message));
+  roomA.onMessage("pvp:shield_regen", (message) => roomAPvpRegenEvents.push(message));
+  roomB.onMessage("pvp:shield_regen", (message) => roomBPvpRegenEvents.push(message));
   roomA.onMessage("staging:return_fire", (message) => roomAReturnFireEvents.push(message));
   roomB.onMessage("staging:return_fire", () => {});
   roomA.onMessage("stagingResource:shot", (message) => resourceShotEventsA.push(message));
@@ -4524,6 +4528,55 @@ try {
   assert(Number(targetAfterPvp?.pvpShield || 0) < targetPvpShieldBefore, "Target PvP shield did not decrease.");
   assert(Number(targetAfterPvp?.pvpHull || 0) === targetPvpHullBefore, "Target PvP hull changed before shield was depleted.");
   assert(Number(targetAfterPvp?.pvpHull || 0) >= 1, "Target PvP hull dropped below prototype clamp.");
+
+  const shieldAfterFirstHit = Number(targetAfterPvp?.pvpShield || 0);
+  await sleep(1500);
+  assert(roomAPvpRegenEvents.length === 0 && roomBPvpRegenEvents.length === 0, "PvP shield regenerated before the attack delay elapsed.");
+  assert(Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) === shieldAfterFirstHit, "PvP shield changed during regen delay.");
+
+  await waitFor("PvP fire cooldown before repeated hit", () => {
+    return Number(playerFrom(roomA, roomA.sessionId)?.nextPvpFireAt || 0) <= Date.now();
+  }, 4000);
+  const secondPvpResolved = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Lower Gate Core",
+      weaponId: "pulse-laser",
+      weaponKey: "pulse-laser-mk1",
+      weaponFamily: "pulse",
+      weaponName: "Pulse Laser",
+      equippedWeaponKeys: ["pulse-laser-mk1"]
+    });
+  });
+  assert(secondPvpResolved?.reason === "pvp_damage_applied", `Unexpected repeated PvP result: ${secondPvpResolved?.reason}`);
+  const shieldAfterSecondHit = Number(secondPvpResolved?.shield || 0);
+  const hullAfterSecondHit = Number(secondPvpResolved?.hull || 0);
+  assert(shieldAfterSecondHit < shieldAfterFirstHit, "Repeated PvP hit did not reduce shield before regen.");
+  assert(hullAfterSecondHit === targetPvpHullBefore, "Repeated shield-only PvP hit changed hull.");
+  await waitFor("repeated PvP hit replicated to room state", () => {
+    return Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) === shieldAfterSecondHit;
+  }, 3000);
+
+  await sleep(2500);
+  assert(roomAPvpRegenEvents.length === 0 && roomBPvpRegenEvents.length === 0, "Repeated PvP hit did not reset shield regen delay.");
+  await waitFor("PvP shield regen after delay", () => {
+    return roomAPvpRegenEvents.length >= 1 &&
+      roomBPvpRegenEvents.length >= 1 &&
+      Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) > shieldAfterSecondHit;
+  }, 7000);
+  const regenEvent = roomAPvpRegenEvents[roomAPvpRegenEvents.length - 1];
+  const targetAfterRegen = playerFrom(roomA, roomB.sessionId);
+  assert(regenEvent?.reason === "pvp_shield_regenerated", `Unexpected PvP regen reason: ${regenEvent?.reason}`);
+  assert(regenEvent?.serverAuthoritative === true, "PvP shield regen was not marked server-authoritative.");
+  assert(regenEvent?.hullRegenerated === false, "PvP shield regen unexpectedly regenerated hull.");
+  assert(regenEvent?.deathApplied === false, "PvP shield regen unexpectedly applied death.");
+  assert(regenEvent?.cargoLost === false, "PvP shield regen unexpectedly caused cargo loss.");
+  assert(regenEvent?.xpAwarded === false, "PvP shield regen unexpectedly awarded XP.");
+  assert(regenEvent?.bountyProgressChanged === false, "PvP shield regen unexpectedly changed bounty progress.");
+  assert(regenEvent?.rewardsGranted === false, "PvP shield regen unexpectedly granted rewards.");
+  assert(Number(targetAfterRegen?.pvpShield || 0) <= Number(targetAfterRegen?.pvpShieldMax || 0), "PvP shield regen exceeded max shield.");
+  assert(Number(targetAfterRegen?.pvpHull || 0) === hullAfterSecondHit, "PvP hull auto-regenerated.");
   console.log("player-vs-player combat intents reject safely and resolve in contested space");
 
   roomA.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });

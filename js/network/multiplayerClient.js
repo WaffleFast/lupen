@@ -40,6 +40,7 @@
     lastBotRewardReceipt: null,
     lastShotEvent: null,
     lastPvpHitEvent: null,
+    lastPvpRegenEvent: null,
     lastStagingReturnFire: null,
     lastRewardPreview: null,
     lastRewardClaimResult: null,
@@ -304,6 +305,7 @@
       lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastPvpHitEvent: connection.lastPvpHitEvent ? { ...connection.lastPvpHitEvent } : null,
+      lastPvpRegenEvent: connection.lastPvpRegenEvent ? { ...connection.lastPvpRegenEvent } : null,
       lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
@@ -1071,25 +1073,38 @@
       pvpHull: Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : null,
       pvpHullMax: Number.isFinite(Number(player.pvpHullMax)) ? Number(player.pvpHullMax) : null,
       lastPvpHitAt: Number.isFinite(Number(player.lastPvpHitAt)) ? Number(player.lastPvpHitAt) : 0,
+      lastPvpShieldRegenAt: Number.isFinite(Number(player.lastPvpShieldRegenAt)) ? Number(player.lastPvpShieldRegenAt) : 0,
       nextPvpFireAt: Number.isFinite(Number(player.nextPvpFireAt)) ? Number(player.nextPvpFireAt) : 0,
       isSelf: sessionId === connection.sessionId
     };
   }
 
-  function applyPvpHitToPlayerSnapshot(hit = {}) {
-    const targetId = String(hit.targetSessionId || hit.targetPlayerId || "");
+  function applyPvpStateToPlayerSnapshot(state = {}) {
+    const targetId = String(state.targetSessionId || state.targetPlayerId || "");
     if (!targetId) return false;
     const existing = playersById.get(targetId);
     if (!existing) return false;
     playersById.set(targetId, {
       ...existing,
-      pvpShield: Number.isFinite(Number(hit.shield)) ? Number(hit.shield) : existing.pvpShield,
-      pvpShieldMax: Number.isFinite(Number(hit.shieldMax)) ? Number(hit.shieldMax) : existing.pvpShieldMax,
-      pvpHull: Number.isFinite(Number(hit.hull)) ? Number(hit.hull) : existing.pvpHull,
-      pvpHullMax: Number.isFinite(Number(hit.hullMax)) ? Number(hit.hullMax) : existing.pvpHullMax,
-      lastPvpHitAt: Number.isFinite(Number(hit.receivedAt)) ? Number(hit.receivedAt) : Date.now()
+      pvpShield: Number.isFinite(Number(state.shield)) ? Number(state.shield) : existing.pvpShield,
+      pvpShieldMax: Number.isFinite(Number(state.shieldMax)) ? Number(state.shieldMax) : existing.pvpShieldMax,
+      pvpHull: Number.isFinite(Number(state.hull)) ? Number(state.hull) : existing.pvpHull,
+      pvpHullMax: Number.isFinite(Number(state.hullMax)) ? Number(state.hullMax) : existing.pvpHullMax,
+      lastPvpHitAt: Number.isFinite(Number(state.lastPvpHitAt)) ? Number(state.lastPvpHitAt) : existing.lastPvpHitAt,
+      lastPvpShieldRegenAt: Number.isFinite(Number(state.lastPvpShieldRegenAt))
+        ? Number(state.lastPvpShieldRegenAt)
+        : state.reason === "pvp_shield_regenerated" && Number.isFinite(Number(state.receivedAt))
+          ? Number(state.receivedAt)
+          : existing.lastPvpShieldRegenAt
     });
     return true;
+  }
+
+  function applyPvpHitToPlayerSnapshot(hit = {}) {
+    return applyPvpStateToPlayerSnapshot({
+      ...hit,
+      lastPvpHitAt: Number.isFinite(Number(hit.receivedAt)) ? Number(hit.receivedAt) : Date.now()
+    });
   }
 
   function pruneMissingPlayerSnapshots(seenIds, now = Date.now()) {
@@ -2476,6 +2491,41 @@
       }
 
       logDev("server pvp hit", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("pvp:shield_regen", (message) => {
+      const targetSessionId = String(message?.targetSessionId || message?.targetPlayerId || "");
+      const receivedAt = Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now();
+      connection.lastPvpRegenEvent = {
+        ok: message?.ok === true,
+        reason: String(message?.reason || "pvp_shield_regenerated"),
+        targetSessionId,
+        targetPlayerId: String(message?.targetPlayerId || targetSessionId),
+        targetDisplayName: String(message?.targetDisplayName || "Pilot"),
+        currentNode: String(message?.currentNode || ""),
+        shieldBefore: Number.isFinite(Number(message?.shieldBefore)) ? Number(message.shieldBefore) : null,
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
+        regenAmount: Number.isFinite(Number(message?.regenAmount)) ? Number(message.regenAmount) : 0,
+        hullRegenerated: message?.hullRegenerated === true,
+        deathApplied: message?.deathApplied === true,
+        cargoLost: message?.cargoLost === true,
+        xpAwarded: message?.xpAwarded === true,
+        bountyProgressChanged: message?.bountyProgressChanged === true,
+        rewardsGranted: message?.rewardsGranted === true,
+        serverAuthoritative: message?.serverAuthoritative === true,
+        receivedAt
+      };
+      applyPvpStateToPlayerSnapshot(connection.lastPvpRegenEvent);
+
+      if (targetSessionId === connection.sessionId && typeof global.applyServerPvpDamageState === "function") {
+        global.applyServerPvpDamageState(connection.lastPvpRegenEvent);
+      }
+
+      logDev("server pvp shield regen", message);
       notifyServerState(activeRoom.state || null);
     });
 

@@ -206,6 +206,9 @@ const STAGING_PVP_SHIELD_MAX = 30;
 const STAGING_PVP_HULL_MAX = 120;
 const STAGING_PVP_MIN_HULL = 1;
 const STAGING_PVP_COOLDOWN_MS = 950;
+const STAGING_PVP_SHIELD_REGEN_DELAY_MS = 5000;
+const STAGING_PVP_SHIELD_REGEN_TICK_MS = 1000;
+const STAGING_PVP_SHIELD_REGEN_AMOUNT = 10;
 const STAGING_DAMAGE_MIN = 1;
 const STAGING_DAMAGE_MAX = 50;
 const STAGING_FIRE_COOLDOWN_MS = 900;
@@ -351,6 +354,7 @@ type("number")(LupenSectorPlayer.prototype, "pvpShieldMax");
 type("number")(LupenSectorPlayer.prototype, "pvpHull");
 type("number")(LupenSectorPlayer.prototype, "pvpHullMax");
 type("number")(LupenSectorPlayer.prototype, "lastPvpHitAt");
+type("number")(LupenSectorPlayer.prototype, "lastPvpShieldRegenAt");
 type("number")(LupenSectorPlayer.prototype, "nextPvpFireAt");
 
 export class LupenSectorBot extends Schema {
@@ -540,6 +544,8 @@ function ensurePlayerPvpState(player) {
     STAGING_PVP_MIN_HULL,
     player.pvpHullMax
   );
+  player.lastPvpHitAt = Math.max(0, Math.round(Number(player.lastPvpHitAt || 0)));
+  player.lastPvpShieldRegenAt = Math.max(0, Math.round(Number(player.lastPvpShieldRegenAt || 0)));
   return player;
 }
 
@@ -1198,6 +1204,9 @@ export class LupenSectorRoom extends Room {
       this.updateStagingBots();
       this.updateStagingResources();
     }, BOT_MOVE_TICK_MS);
+    this.pvpShieldRegenInterval = this.clock.setInterval(() => {
+      this.updatePvpShieldRegeneration();
+    }, STAGING_PVP_SHIELD_REGEN_TICK_MS);
 
     this.onMessage("ping", (client, message = {}) => {
       this.touchPlayer(client.sessionId);
@@ -1406,10 +1415,21 @@ export class LupenSectorRoom extends Room {
       playerId: trustedPlayerId,
       supabaseUserId: verifiedIdentity.supabaseUserId || trustedPlayerId
     });
+    let recoveredPvpState = null;
     if (replacementIdentityKey) {
       this.state.players.forEach((player, sessionId) => {
         if (sessionId === client.sessionId) return;
         if (getPresenceIdentityKey(player) !== replacementIdentityKey) return;
+        ensurePlayerPvpState(player);
+        recoveredPvpState = {
+          pvpShield: player.pvpShield,
+          pvpShieldMax: player.pvpShieldMax,
+          pvpHull: player.pvpHull,
+          pvpHullMax: player.pvpHullMax,
+          lastPvpHitAt: player.lastPvpHitAt,
+          lastPvpShieldRegenAt: player.lastPvpShieldRegenAt,
+          nextPvpFireAt: player.nextPvpFireAt
+        };
         this.broadcast("playerLeft", this.buildPresenceEvent("left", player, {
           reason: "replaced_by_reconnect"
         }));
@@ -1459,7 +1479,10 @@ export class LupenSectorRoom extends Room {
       joinedAt: now,
       lastSeenAt: now,
       lastFireAt: 0,
-      nextFireAt: 0
+      nextFireAt: 0,
+      // PvP prototype damage is room/session state. Verified reconnects can
+      // recover it inside this room, but it is never written to player saves.
+      ...(recoveredPvpState || {})
     });
 
     this.state.players.set(client.sessionId, joinedPlayer);
@@ -1479,6 +1502,7 @@ export class LupenSectorRoom extends Room {
 
   onDispose() {
     this.botInterval?.clear?.();
+    this.pvpShieldRegenInterval?.clear?.();
   }
 
   spawnDummyBots() {
@@ -1577,6 +1601,52 @@ export class LupenSectorRoom extends Room {
         hp: resource.hp,
         hpMax: resource.hpMax,
         depleted: false,
+        receivedAt: now
+      });
+    });
+  }
+
+  updatePvpShieldRegeneration(now = Date.now()) {
+    this.state.players.forEach((player) => {
+      ensurePlayerPvpState(player);
+      const shieldBefore = Number(player.pvpShield || 0);
+      const shieldMax = Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX);
+      if (shieldBefore >= shieldMax) return;
+
+      const lastHitAt = Number(player.lastPvpHitAt || 0);
+      if (!lastHitAt || now - lastHitAt < STAGING_PVP_SHIELD_REGEN_DELAY_MS) return;
+      if (now - Number(player.lastPvpShieldRegenAt || 0) < STAGING_PVP_SHIELD_REGEN_TICK_MS) return;
+
+      const shieldAfter = Math.min(shieldMax, shieldBefore + STAGING_PVP_SHIELD_REGEN_AMOUNT);
+      if (shieldAfter <= shieldBefore) return;
+
+      player.pvpShield = shieldAfter;
+      player.lastPvpShieldRegenAt = now;
+      player.lastSeenAt = now;
+
+      this.broadcast("pvp:shield_regen", {
+        ok: true,
+        reason: "pvp_shield_regenerated",
+        targetPlayerId: player.sessionId,
+        targetSessionId: player.sessionId,
+        targetDisplayName: getSafeIdentityValue(player.displayName, "Pilot") || "Pilot",
+        currentNode: player.currentNode,
+        shieldBefore,
+        shield: player.pvpShield,
+        shieldMax: player.pvpShieldMax,
+        hull: player.pvpHull,
+        hullMax: player.pvpHullMax,
+        regenAmount: shieldAfter - shieldBefore,
+        regenDelayMs: STAGING_PVP_SHIELD_REGEN_DELAY_MS,
+        regenTickMs: STAGING_PVP_SHIELD_REGEN_TICK_MS,
+        lastPvpShieldRegenAt: player.lastPvpShieldRegenAt,
+        hullRegenerated: false,
+        deathApplied: false,
+        cargoLost: false,
+        xpAwarded: false,
+        bountyProgressChanged: false,
+        rewardsGranted: false,
+        serverAuthoritative: true,
         receivedAt: now
       });
     });
@@ -3477,6 +3547,7 @@ export class LupenSectorRoom extends Room {
     targetPlayer.pvpShield = Math.max(0, shieldBefore - shieldDamage);
     targetPlayer.pvpHull = Math.max(STAGING_PVP_MIN_HULL, hullBefore - hullDamage);
     targetPlayer.lastPvpHitAt = Date.now();
+    targetPlayer.lastPvpShieldRegenAt = 0;
 
     return {
       damage: shieldDamage + hullDamage,
