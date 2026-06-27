@@ -41,6 +41,7 @@
     lastShotEvent: null,
     lastPvpHitEvent: null,
     lastPvpRegenEvent: null,
+    lastPvpRepairEvent: null,
     lastStagingReturnFire: null,
     lastRewardPreview: null,
     lastRewardClaimResult: null,
@@ -306,6 +307,7 @@
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastPvpHitEvent: connection.lastPvpHitEvent ? { ...connection.lastPvpHitEvent } : null,
       lastPvpRegenEvent: connection.lastPvpRegenEvent ? { ...connection.lastPvpRegenEvent } : null,
+      lastPvpRepairEvent: connection.lastPvpRepairEvent ? { ...connection.lastPvpRepairEvent } : null,
       lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
@@ -2529,6 +2531,43 @@
       notifyServerState(activeRoom.state || null);
     });
 
+    activeRoom.onMessage("pvp:repair_synced", (message) => {
+      const targetSessionId = String(message?.targetSessionId || message?.targetPlayerId || "");
+      const receivedAt = Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now();
+      const repairState = {
+        ok: message?.ok === true,
+        reason: String(message?.reason || "pvp_repair_synced"),
+        targetSessionId,
+        targetPlayerId: String(message?.targetPlayerId || targetSessionId),
+        targetDisplayName: String(message?.targetDisplayName || "Pilot"),
+        currentNode: String(message?.currentNode || ""),
+        shieldBefore: Number.isFinite(Number(message?.shieldBefore)) ? Number(message.shieldBefore) : null,
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        hullBefore: Number.isFinite(Number(message?.hullBefore)) ? Number(message.hullBefore) : null,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
+        hullRepaired: message?.hullRepaired === true,
+        shieldRestored: message?.shieldRestored === true,
+        deathApplied: message?.deathApplied === true,
+        cargoLost: message?.cargoLost === true,
+        xpAwarded: message?.xpAwarded === true,
+        bountyProgressChanged: message?.bountyProgressChanged === true,
+        rewardsGranted: message?.rewardsGranted === true,
+        serverAuthoritative: message?.serverAuthoritative === true,
+        receivedAt
+      };
+      connection.lastPvpRepairEvent = repairState;
+      applyPvpStateToPlayerSnapshot(repairState);
+
+      if (targetSessionId === connection.sessionId && typeof global.applyServerPvpDamageState === "function") {
+        global.applyServerPvpDamageState(repairState);
+      }
+
+      logDev("server pvp repair sync", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
     activeRoom.onMessage("bot:disabled", (message) => {
       const contributors = Array.isArray(message?.contributors)
         ? message.contributors.map(normalizeRewardContributor).filter(Boolean)
@@ -3133,6 +3172,8 @@
       lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
       lastPvpHitEvent: connection.lastPvpHitEvent ? { ...connection.lastPvpHitEvent } : null,
+      lastPvpRegenEvent: connection.lastPvpRegenEvent ? { ...connection.lastPvpRegenEvent } : null,
+      lastPvpRepairEvent: connection.lastPvpRepairEvent ? { ...connection.lastPvpRepairEvent } : null,
       lastStagingReturnFire: connection.lastStagingReturnFire ? { ...connection.lastStagingReturnFire } : null,
       lastRewardPreview: connection.lastRewardPreview ? { ...connection.lastRewardPreview } : null,
       lastRewardClaimResult: connection.lastRewardClaimResult ? { ...connection.lastRewardClaimResult } : null,
@@ -3365,6 +3406,17 @@
 
     sendMovementIntent(intent = {}) {
       return sendRoomMessage("sendMovementIntent", "movement:update", intent);
+    },
+
+    syncPvpRepairState(options = {}) {
+      return sendRoomMessage("syncPvpRepairState", "pvp:repair", {
+        currentShipId: String(options.currentShipId || ""),
+        hull: Number.isFinite(Number(options.hull)) ? Math.round(Number(options.hull)) : null,
+        hullMax: Number.isFinite(Number(options.hullMax)) ? Math.round(Number(options.hullMax)) : null,
+        shield: Number.isFinite(Number(options.shield)) ? Math.round(Number(options.shield)) : null,
+        shieldMax: Number.isFinite(Number(options.shieldMax)) ? Math.round(Number(options.shieldMax)) : null,
+        reason: String(options.reason || "hangar_repair")
+      });
     },
 
     sendChatMessage(options = {}) {

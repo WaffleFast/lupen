@@ -573,6 +573,35 @@ function updatePlayerPvpCapacityFromPresence(player, message = {}) {
   return player;
 }
 
+function syncPlayerPvpRepairState(player, message = {}, now = Date.now()) {
+  if (!player) return null;
+  updatePlayerPvpCapacityFromPresence(player, message);
+  ensurePlayerPvpState(player);
+
+  const shieldBefore = Number(player.pvpShield || 0);
+  const hullBefore = Number(player.pvpHull || STAGING_PVP_MIN_HULL);
+
+  // PvP shields auto-regen in flight, but Hangar repair clears the shared
+  // session damage snapshot so stale server values do not override repaired HUDs.
+  player.pvpShield = Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX);
+  // PvP hull never auto-regens; only the explicit repair flow restores it.
+  player.pvpHull = Number(player.pvpHullMax || STAGING_PVP_HULL_MAX);
+  player.lastPvpHitAt = 0;
+  player.lastPvpShieldRegenAt = now;
+  player.lastSeenAt = now;
+
+  return {
+    shieldBefore,
+    hullBefore,
+    shield: player.pvpShield,
+    shieldMax: player.pvpShieldMax,
+    hull: player.pvpHull,
+    hullMax: player.pvpHullMax,
+    hullRepaired: player.pvpHull > hullBefore,
+    shieldRestored: player.pvpShield > shieldBefore
+  };
+}
+
 function getPvpEligibilityPreview(attacker = null, target = null, currentNode = "") {
   const node = getStringValue(currentNode || attacker?.currentNode || target?.currentNode);
   const targetId = getStringValue(target?.sessionId || target?.id);
@@ -1249,6 +1278,10 @@ export class LupenSectorRoom extends Room {
       this.applyPresenceUpdate(client, message, "movement:update");
     });
 
+    this.onMessage("pvp:repair", (client, message = {}) => {
+      this.syncPvpRepairState(client, message, "pvp:repair");
+    });
+
     this.onMessage("chat:send", (client, message = {}) => {
       this.routeChatMessage(client, message);
     });
@@ -1674,6 +1707,34 @@ export class LupenSectorRoom extends Room {
         serverAuthoritative: true,
         receivedAt: now
       });
+    });
+  }
+
+  syncPvpRepairState(client, message = {}, messageType = "pvp:repair") {
+    const player = this.touchPlayer(client.sessionId);
+    if (!player) return;
+
+    const now = Date.now();
+    const repairState = syncPlayerPvpRepairState(player, message, now);
+    if (!repairState) return;
+
+    this.broadcast("pvp:repair_synced", {
+      ok: true,
+      reason: "pvp_repair_synced",
+      messageType,
+      targetPlayerId: player.sessionId,
+      targetSessionId: player.sessionId,
+      targetDisplayName: getSafeIdentityValue(player.displayName, "Pilot") || "Pilot",
+      currentNode: player.currentNode,
+      currentShipId: getSafeIdentityValue(player.currentShipId),
+      ...repairState,
+      deathApplied: false,
+      cargoLost: false,
+      xpAwarded: false,
+      bountyProgressChanged: false,
+      rewardsGranted: false,
+      serverAuthoritative: true,
+      receivedAt: now
     });
   }
 

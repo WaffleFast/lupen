@@ -3841,16 +3841,26 @@ test.describe("Lupen browser smoke", () => {
       const monolith = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
       window.eval(`equipShip("bison");`);
       const bisonBeforeRepair = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
+      const originalClient = window.LupenMultiplayerClient;
+      let repairSyncPayload = null;
+      window.LupenMultiplayerClient = {
+        syncPvpRepairState(payload) {
+          repairSyncPayload = { ...payload };
+          return { ok: true };
+        }
+      };
       window.eval(`repairCurrentShip();`);
+      window.LupenMultiplayerClient = originalClient;
       const bisonAfterRepair = { ship: currentShipId, hull, hullMax, shield, shieldMax, savedHull: shipConditions.bison.hull };
       window.eval(`equipShip("falcon");`);
       const falcon = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
-      return { monolith, bisonBeforeRepair, bisonAfterRepair, falcon };
+      return { monolith, bisonBeforeRepair, bisonAfterRepair, repairSyncPayload, falcon };
     });
 
     expect(state.monolith).toMatchObject({ ship: "monolith", hull: 1800, hullMax: 1800, shield: 360, shieldMax: 360 });
     expect(state.bisonBeforeRepair).toMatchObject({ ship: "bison", hull: 930, hullMax: 1300, shield: 77, shieldMax: 135 });
     expect(state.bisonAfterRepair).toMatchObject({ ship: "bison", hull: 1300, hullMax: 1300, savedHull: 1300 });
+    expect(state.repairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, reason: "hangar_repair" });
     expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 720, shield: 111, shieldMax: 180 });
     expect(state.monolith.armor).toBe(28);
     expect(state.bisonBeforeRepair.cargo).toBe(260);

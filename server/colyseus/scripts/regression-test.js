@@ -4365,6 +4365,8 @@ try {
   const roomBPvpHitEvents = [];
   const roomAPvpRegenEvents = [];
   const roomBPvpRegenEvents = [];
+  const roomAPvpRepairEvents = [];
+  const roomBPvpRepairEvents = [];
   const roomAReturnFireEvents = [];
   const resourceShotEventsA = [];
   const resourceShotEventsB = [];
@@ -4381,6 +4383,8 @@ try {
   roomB.onMessage("pvp:hit", (message) => roomBPvpHitEvents.push(message));
   roomA.onMessage("pvp:shield_regen", (message) => roomAPvpRegenEvents.push(message));
   roomB.onMessage("pvp:shield_regen", (message) => roomBPvpRegenEvents.push(message));
+  roomA.onMessage("pvp:repair_synced", (message) => roomAPvpRepairEvents.push(message));
+  roomB.onMessage("pvp:repair_synced", (message) => roomBPvpRepairEvents.push(message));
   roomA.onMessage("staging:return_fire", (message) => roomAReturnFireEvents.push(message));
   roomB.onMessage("staging:return_fire", () => {});
   roomA.onMessage("stagingResource:shot", (message) => resourceShotEventsA.push(message));
@@ -4587,6 +4591,78 @@ try {
     return Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) === targetPvpShieldMax;
   }, 5000);
   assert(Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0) === targetPvpShieldMax, "PvP shield max changed during regen.");
+
+  roomB.send("movement:update", {
+    currentNode: "Lower Gate Core",
+    presenceStatus: "space",
+    guildId: "guild-two",
+    shieldMax: 1,
+    hullMax: 120,
+    x: 50,
+    y: 57
+  });
+  await waitFor("PvP target shield capacity reduced for hull damage regression", () => {
+    const target = playerFrom(roomA, roomB.sessionId);
+    return Number(target?.pvpShieldMax || 0) === 1 && Number(target?.pvpShield || 0) === 1;
+  }, 3000);
+  await waitFor("PvP fire cooldown before hull hit", () => {
+    return Number(playerFrom(roomA, roomA.sessionId)?.nextPvpFireAt || 0) <= Date.now();
+  }, 4000);
+  const hullDamagePvpResolved = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Lower Gate Core",
+      weaponId: "pulse-laser",
+      weaponKey: "pulse-laser-mk1",
+      weaponFamily: "pulse",
+      weaponName: "Pulse Laser",
+      equippedWeaponKeys: ["pulse-laser-mk1"]
+    });
+  });
+  assert(Number(hullDamagePvpResolved?.hullDamage || 0) > 0, "PvP hull damage regression did not reach hull.");
+  const hullAfterPvpDamage = Number(hullDamagePvpResolved?.hull || 0);
+  assert(hullAfterPvpDamage < targetPvpHullBefore, "PvP hull did not decrease after shield depletion.");
+  assert(hullAfterPvpDamage >= 1, "PvP hull damage bypassed prototype no-death clamp.");
+
+  roomB.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "guild-two", x: 50, y: 50 });
+  await waitFor("damaged PvP target travelled to protected node", () => {
+    return playerFrom(roomA, roomB.sessionId)?.currentNode === "Asteron Prime";
+  }, 3000);
+  assert(Number(playerFrom(roomA, roomB.sessionId)?.pvpHull || 0) === hullAfterPvpDamage, "Travelling to a protected node unexpectedly repaired PvP hull.");
+
+  roomB.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "docked", guildId: "guild-two", x: 50, y: 50 });
+  await waitFor("damaged PvP target docked at protected node", () => {
+    return playerFrom(roomA, roomB.sessionId)?.presenceStatus === "docked";
+  }, 3000);
+  assert(Number(playerFrom(roomA, roomB.sessionId)?.pvpHull || 0) === hullAfterPvpDamage, "Docking alone unexpectedly repaired PvP hull.");
+
+  roomB.send("pvp:repair", {
+    currentShipId: "lupenOrigin",
+    hull: 120,
+    hullMax: 120,
+    shield: 180,
+    shieldMax: 180,
+    reason: "hangar_repair"
+  });
+  await waitFor("PvP repair sync broadcast delivered to both clients", () => {
+    return roomAPvpRepairEvents.length >= 1 && roomBPvpRepairEvents.length >= 1;
+  }, 3000);
+  const repairEvent = roomAPvpRepairEvents[roomAPvpRepairEvents.length - 1];
+  const targetAfterRepair = playerFrom(roomA, roomB.sessionId);
+  assert(repairEvent?.reason === "pvp_repair_synced", `Unexpected PvP repair reason: ${repairEvent?.reason}`);
+  assert(repairEvent?.serverAuthoritative === true, "PvP repair sync was not marked server-authoritative.");
+  assert(repairEvent?.hullRepaired === true, "PvP repair sync did not report repaired hull.");
+  assert(repairEvent?.shieldRestored === true, "PvP repair sync did not refresh shield.");
+  assert(repairEvent?.deathApplied === false, "PvP repair unexpectedly applied death.");
+  assert(repairEvent?.cargoLost === false, "PvP repair unexpectedly caused cargo loss.");
+  assert(repairEvent?.xpAwarded === false, "PvP repair unexpectedly awarded XP.");
+  assert(repairEvent?.bountyProgressChanged === false, "PvP repair unexpectedly changed bounty progress.");
+  assert(repairEvent?.rewardsGranted === false, "PvP repair unexpectedly granted rewards.");
+  assert(Number(targetAfterRepair?.pvpHull || 0) === 120, "PvP repair did not restore hull in room state.");
+  assert(Number(targetAfterRepair?.pvpShield || 0) === 180, "PvP repair did not refresh shield in room state.");
+  assert(Number(targetAfterRepair?.pvpShieldMax || 0) === 180, "PvP repair did not restore true shield max.");
+  assert(Number(targetAfterRepair?.pvpHullMax || 0) === 120, "PvP repair did not preserve true hull max.");
   console.log("player-vs-player combat intents reject safely and resolve in contested space");
 
   roomA.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });

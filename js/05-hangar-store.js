@@ -1909,6 +1909,17 @@ function repairCurrentShip() {
   hull = hullMax;
   saveActiveShipCondition(currentShipId);
 
+  if (window.LupenMultiplayerClient?.syncPvpRepairState) {
+    window.LupenMultiplayerClient.syncPvpRepairState({
+      currentShipId,
+      hull,
+      hullMax,
+      shield,
+      shieldMax,
+      reason: "hangar_repair"
+    });
+  }
+
   addHudToast(`Hull repaired in Hangar for CR ${formatNumber(repairCost)}.`);
   updateSpaceHUD();
   renderHangar();
