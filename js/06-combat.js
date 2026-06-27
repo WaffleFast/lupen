@@ -73,10 +73,9 @@ function selectAsteroid(asteroidId) {
 
   selectedTarget = { type: "asteroid", id: asteroid.id };
   showTargetPanel();
-  const retargeted = retargetEngagementToSelectedTarget();
   updateAsteroidUI();
   updateTargetPanel();
-  updateObjectActionPanel(retargeted);
+  updateObjectActionPanel(false);
 }
 
 function selectHostileBot(botId) {
@@ -88,10 +87,9 @@ function selectHostileBot(botId) {
 
   selectedTarget = { type: "hostileBot", id: bot.id };
   showTargetPanel();
-  const retargeted = retargetEngagementToSelectedTarget();
   updateAsteroidUI();
   updateTargetPanel();
-  updateObjectActionPanel(retargeted);
+  updateObjectActionPanel(false);
 
   if (tutorialState?.active && getCurrentTutorialStep()?.id === "destroy-bot") {
     setTimeout(renderStarterTutorial, 40);
@@ -105,10 +103,9 @@ function selectStagingBotTarget(botId) {
   selectedTarget = { type: "stagingBot", id: bot.id };
   window.LupenMultiplayerClient?.selectStagingBot?.(bot.id, { currentNode });
   showTargetPanel();
-  const retargeted = retargetEngagementToSelectedTarget();
   updateAsteroidUI();
   updateTargetPanel();
-  updateObjectActionPanel(retargeted);
+  updateObjectActionPanel(false);
 
   if (tutorialState?.active && ["jump-to-bounty-zone", "destroy-bot"].includes(getCurrentTutorialStep()?.id)) {
     setTimeout(renderStarterTutorial, 40);
@@ -121,10 +118,9 @@ function selectStagingResourceTarget(resourceId) {
 
   selectedTarget = { type: "stagingResource", id: resource.id };
   showTargetPanel();
-  const retargeted = retargetEngagementToSelectedTarget();
   updateAsteroidUI();
   updateTargetPanel();
-  updateObjectActionPanel(retargeted);
+  updateObjectActionPanel(false);
 }
 
 function isCurrentNodeProtectedForPvp() {
@@ -299,7 +295,10 @@ function engageTarget() {
   }
 
   if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) return;
-  if (engageTimer) return;
+  if (engageTimer) {
+    retargetEngagementToSelectedTarget();
+    return;
+  }
 
   engagedTarget = getTargetRefFromEntity(target);
 

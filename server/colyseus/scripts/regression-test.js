@@ -4333,6 +4333,8 @@ try {
     shipName: "LF-1 Origin",
     shipImage: "assets/ships/lupen-origin.png",
     shipClass: "Balanced Starter Hull",
+    shieldMax: 180,
+    hullMax: 120,
     currentNode: "Asteron Prime",
     x: 50,
     y: 50
@@ -4348,6 +4350,8 @@ try {
     shipName: "LF-1 Origin",
     shipImage: "assets/ships/lupen-origin.png",
     shipClass: "Balanced Starter Hull",
+    shieldMax: 180,
+    hullMax: 120,
     currentNode: "Asteron Prime",
     x: 51,
     y: 50
@@ -4496,6 +4500,8 @@ try {
   });
   const targetPvpShieldBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0);
   const targetPvpHullBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpHull || 0);
+  const targetPvpShieldMax = Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0);
+  assert(targetPvpShieldMax === 180, `PvP target shield max did not use true presence shield capacity: ${targetPvpShieldMax}`);
   const combatSpacePvpResolved = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetType: "remotePlayer",
@@ -4577,6 +4583,10 @@ try {
   assert(regenEvent?.rewardsGranted === false, "PvP shield regen unexpectedly granted rewards.");
   assert(Number(targetAfterRegen?.pvpShield || 0) <= Number(targetAfterRegen?.pvpShieldMax || 0), "PvP shield regen exceeded max shield.");
   assert(Number(targetAfterRegen?.pvpHull || 0) === hullAfterSecondHit, "PvP hull auto-regenerated.");
+  await waitFor("PvP shield regen restored true max shield", () => {
+    return Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) === targetPvpShieldMax;
+  }, 5000);
+  assert(Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0) === targetPvpShieldMax, "PvP shield max changed during regen.");
   console.log("player-vs-player combat intents reject safely and resolve in contested space");
 
   roomA.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });

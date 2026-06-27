@@ -1606,6 +1606,22 @@ test.describe("Lupen browser smoke", () => {
           const localAsteroidButtonCount = document.querySelectorAll("#asteroidField .resource-asteroid-target:not(.server-resource-asteroid)").length;
           const serverAsteroidButtonCount = document.querySelectorAll("#asteroidField .server-resource-asteroid").length;
 
+          selectedTarget = { type: "stagingResource", id: "server-owned-test-asteroid" };
+          engagedTarget = { type: "stagingResource", id: "server-owned-test-asteroid" };
+          engageTimer = setInterval(() => {}, 99999);
+          selectRemotePlayerTarget("remote-pvp-test");
+          const clickWhileEngagedState = {
+            selectedType: selectedTarget?.type || "",
+            selectedId: selectedTarget?.id || "",
+            engagedType: engagedTarget?.type || "",
+            engagedId: engagedTarget?.id || "",
+            timerActive: Boolean(engageTimer),
+            actionText: document.getElementById("objectEngageBtn")?.textContent || ""
+          };
+          clearInterval(engageTimer);
+          engageTimer = null;
+          engagedTarget = null;
+
           remotePlayer.currentNode = "Lower Gate Core";
           selectRemotePlayerTarget("remote-pvp-test");
           window.LupenMultiplayerOverlay?.render?.();
@@ -1687,6 +1703,7 @@ test.describe("Lupen browser smoke", () => {
             sharedNodeSnapshot,
             localAsteroidButtonCount,
             serverAsteroidButtonCount,
+            clickWhileEngagedState,
             before,
             hudBefore,
             hudAfterPvpDisplay,
@@ -1765,6 +1782,14 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(eligibility.localAsteroidButtonCount).toBe(0);
     expect(eligibility.serverAsteroidButtonCount).toBe(1);
+    expect(eligibility.clickWhileEngagedState).toMatchObject({
+      selectedType: "remotePlayer",
+      selectedId: "remote-pvp-test",
+      engagedType: "stagingResource",
+      engagedId: "server-owned-test-asteroid",
+      timerActive: true
+    });
+    expect(eligibility.clickWhileEngagedState.actionText).toBe("PVP ENGAGE");
     expect(eligibility.hudAfterPvpDisplay.applied).toBe(true);
     expect(eligibility.hudAfterPvpDisplay.hullValue).toBe("120");
     expect(eligibility.hudAfterPvpDisplay.shieldValue).toBe("18");

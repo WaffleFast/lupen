@@ -532,7 +532,7 @@ function isMapOnePvpContestedNode(nodeId = "") {
 
 function ensurePlayerPvpState(player) {
   if (!player) return null;
-  player.pvpShieldMax = Math.max(1, Math.round(Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX)));
+  player.pvpShieldMax = Math.max(1, Math.round(Number(player.pvpShieldMax || player.shieldMax || STAGING_PVP_SHIELD_MAX)));
   player.pvpHullMax = Math.max(STAGING_PVP_MIN_HULL, Math.round(Number(player.pvpHullMax || STAGING_PVP_HULL_MAX)));
   player.pvpShield = clampNumber(
     Math.round(Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : player.pvpShieldMax),
@@ -546,6 +546,30 @@ function ensurePlayerPvpState(player) {
   );
   player.lastPvpHitAt = Math.max(0, Math.round(Number(player.lastPvpHitAt || 0)));
   player.lastPvpShieldRegenAt = Math.max(0, Math.round(Number(player.lastPvpShieldRegenAt || 0)));
+  return player;
+}
+
+function updatePlayerPvpCapacityFromPresence(player, message = {}) {
+  if (!player) return null;
+  ensurePlayerPvpState(player);
+
+  const requestedShieldMax = Number(message.pvpShieldMax ?? message.shieldMax ?? message.maxShield);
+  if (Number.isFinite(requestedShieldMax) && requestedShieldMax > 0) {
+    const nextShieldMax = clampNumber(Math.round(requestedShieldMax), 1, 10000);
+    const previousShieldMax = Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX);
+    player.pvpShieldMax = nextShieldMax;
+    player.pvpShield = previousShieldMax <= STAGING_PVP_SHIELD_MAX && Number(player.lastPvpHitAt || 0) <= 0
+      ? nextShieldMax
+      : clampNumber(Number(player.pvpShield || 0), 0, nextShieldMax);
+  }
+
+  const requestedHullMax = Number(message.pvpHullMax ?? message.hullMax ?? message.maxHull);
+  if (Number.isFinite(requestedHullMax) && requestedHullMax > 0) {
+    const nextHullMax = clampNumber(Math.round(requestedHullMax), STAGING_PVP_MIN_HULL, 10000);
+    player.pvpHullMax = nextHullMax;
+    player.pvpHull = clampNumber(Number(player.pvpHull || nextHullMax), STAGING_PVP_MIN_HULL, nextHullMax);
+  }
+
   return player;
 }
 
@@ -1484,6 +1508,7 @@ export class LupenSectorRoom extends Room {
       // recover it inside this room, but it is never written to player saves.
       ...(recoveredPvpState || {})
     });
+    updatePlayerPvpCapacityFromPresence(joinedPlayer, options);
 
     this.state.players.set(client.sessionId, joinedPlayer);
     this.broadcast("playerJoined", this.buildPresenceEvent("joined", joinedPlayer));
@@ -3921,6 +3946,8 @@ export class LupenSectorRoom extends Room {
     if (typeof message.shipClass === "string" || typeof message.shipType === "string" || typeof message.shipRole === "string") {
       player.shipClass = getSafeShipClass(message);
     }
+
+    updatePlayerPvpCapacityFromPresence(player, message);
 
     const weaponKey = getSafeWeaponKey(message.equippedWeaponKey || message.weaponKey);
     if (weaponKey) player.equippedWeaponKey = weaponKey;

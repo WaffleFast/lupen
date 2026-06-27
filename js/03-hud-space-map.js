@@ -727,6 +727,13 @@ function getMultiplayerPresencePayload(overrides = {}) {
     : [];
   const shipName = ship.name || "";
   const shipImage = typeof getShipAsset === "function" ? getShipAsset(currentShipId, "medium") : (ship.image || "");
+  const shipStats = typeof getShipStats === "function" ? getShipStats(currentShipId) : {};
+  const activeShieldMax = Number.isFinite(Number(shieldMax)) && Number(shieldMax) > 0
+    ? Number(shieldMax)
+    : Number(shipStats.shieldMax || shipStats.shield || 0);
+  const activeHullMax = Number.isFinite(Number(hullMax)) && Number(hullMax) > 0
+    ? Number(hullMax)
+    : Number(shipStats.hullMax || shipStats.hull || 0);
   const spaceScreen = document.getElementById("spaceScreen");
   const inferredPresenceStatus = spaceScreen?.classList.contains("active") ? "space" : "docked";
   return {
@@ -742,6 +749,8 @@ function getMultiplayerPresencePayload(overrides = {}) {
     shipClass: ship.roleSubtitle || "",
     shipName,
     ship: shipName,
+    shieldMax: Math.max(0, Math.round(activeShieldMax)),
+    hullMax: Math.max(1, Math.round(activeHullMax || 1)),
     equippedWeaponKey: equippedWeaponKeys[0] || "",
     equippedWeaponKeys,
     ...overrides
@@ -996,10 +1005,11 @@ function updateObjectActionPanel(forceVisible = false) {
   }
 
   const selectedIsEngaged = selected && selectedTarget && engagedTarget && selectedTarget.type === engagedTarget.type && selectedTarget.id === engagedTarget.id;
+  const selectedWouldSwitchEngagement = Boolean(engageTimer && selected && !selectedIsEngaged);
 
   panel.classList.add("visible");
   actionBtn.disabled = false;
-  actionBtn.textContent = engageTimer && selectedIsEngaged ? "DISENGAGE" : "ENGAGE";
+  actionBtn.textContent = engageTimer && selectedIsEngaged ? "DISENGAGE" : selectedWouldSwitchEngagement ? "SWITCH TARGET" : "ENGAGE";
   actionBtn.classList.toggle("disengage-action", !!engageTimer && selectedIsEngaged);
 }
 
