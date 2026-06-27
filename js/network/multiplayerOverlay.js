@@ -1722,14 +1722,14 @@
   }
 
   function getRemotePlayerPvpLabel(player, status = getClient()?.getStatus?.()) {
-    if (!player) return "PVP LOCKED";
-    if (!isPilotInSpace(player)) return "DOCKED";
-    if (!isSameCurrentNode(player)) return "OUT OF RANGE";
-    if (isPvpProtectedNode()) return "PROTECTED";
+    if (!player) return "DISABLED";
+    if (!isPilotInSpace(player)) return "DISABLED";
+    if (!isSameCurrentNode(player)) return "DISABLED";
+    if (isPvpProtectedNode()) return "DISABLED";
     const localGuild = String(status?.guildId || "").trim();
     const targetGuild = String(player.guildId || "").trim();
-    if (localGuild && targetGuild && localGuild === targetGuild) return "ALLY";
-    return "PVP TEST";
+    if (localGuild && targetGuild && localGuild === targetGuild) return "DISABLED";
+    return "READY";
   }
 
   function getRemotePlayerPvpVitals(player = {}) {
@@ -1764,9 +1764,13 @@
   }
 
   function getRemotePlayerPvpHullStatusLabel(status = "") {
-    if (status === "disabled-threshold") return "DISABLED THRESHOLD";
-    if (status === "critical") return "HULL CRITICAL";
+    if (status === "disabled-threshold") return "REPAIR";
+    if (status === "critical") return "CRITICAL";
     return "";
+  }
+
+  function getRemotePlayerCompactStatus(player, vitals, status = getClient()?.getStatus?.()) {
+    return getRemotePlayerPvpHullStatusLabel(getRemotePlayerPvpHullStatus(vitals)) || getRemotePlayerPvpLabel(player, status);
   }
 
   function getRemotePilotKey(player = {}) {
@@ -2299,23 +2303,10 @@
         card.appendChild(bars);
       }
 
-      const metaRow = global.document.createElement("div");
-      metaRow.className = "lupen-target-meta-row";
-
       const statusTag = global.document.createElement("span");
       statusTag.className = "lupen-target-status pvp-arming";
-      statusTag.textContent = getRemotePlayerPvpLabel(selectedPlayer, status);
-      metaRow.appendChild(statusTag);
-
-      const readiness = global.document.createElement("small");
-      readiness.className = "lupen-target-readiness";
-      readiness.textContent = getRemotePlayerPvpHullStatusLabel(playerHullStatus) || (isPvpProtectedNode() ? "Inspection only" : "Server hit test ready");
-      metaRow.appendChild(readiness);
-      card.appendChild(metaRow);
-
-      const offline = global.document.createElement("small");
-      offline.textContent = playerHullStatus ? "Repair required" : isPvpProtectedNode() ? "PvP disabled in protected zones" : "No defeat or loot";
-      card.appendChild(offline);
+      statusTag.textContent = getRemotePlayerCompactStatus(selectedPlayer, vitals, status);
+      card.appendChild(statusTag);
     } else if (selectedResource) {
       const bars = global.document.createElement("div");
       bars.className = "lupen-target-bars";

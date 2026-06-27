@@ -219,6 +219,7 @@ const STAGING_BOT_RETURN_FIRE_INTERVAL_MS = 2600;
 const STAGING_BOT_RETURN_FIRE_VARIANCE_MS = 650;
 const STAGING_RESOURCE_RESPAWN_MS = 12000;
 const STAGING_RESOURCE_MINE_COOLDOWN_MS = 950;
+const SERVER_OBJECT_SPAWN_JITTER = 3.2;
 const STAGING_WEAPON_STATS = Object.freeze({
   heavyLance: Object.freeze({
     key: "heavyLance",
@@ -532,6 +533,26 @@ function isMapOnePvpContestedNode(nodeId = "") {
   return getMapOnePvpZoneType(nodeId) === "contested";
 }
 
+function getStableNumberSeed(input = "") {
+  let hash = 2166136261;
+  const text = String(input || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function getServerObjectSpawnPosition(base = {}, key = "", radius = SERVER_OBJECT_SPAWN_JITTER) {
+  const seed = getStableNumberSeed(key);
+  const angle = ((seed % 360) * Math.PI) / 180;
+  const distance = radius * (0.45 + ((Math.floor(seed / 360) % 100) / 180));
+  return {
+    x: clampNumber(Number(base.x || 50) + Math.cos(angle) * distance, 4, 96),
+    y: clampNumber(Number(base.y || 50) + Math.sin(angle) * distance, 8, 88)
+  };
+}
+
 function ensurePlayerPvpState(player) {
   if (!player) return null;
   player.pvpShieldMax = Math.max(1, Math.round(Number(player.pvpShieldMax || player.shieldMax || STAGING_PVP_SHIELD_MAX)));
@@ -584,8 +605,11 @@ function updatePlayerPvpCapacityFromPresence(player, message = {}) {
   const requestedHullMax = Number(message.pvpHullMax ?? message.hullMax ?? message.maxHull);
   if (Number.isFinite(requestedHullMax) && requestedHullMax > 0) {
     const nextHullMax = clampNumber(Math.round(requestedHullMax), STAGING_PVP_MIN_HULL, 10000);
+    const previousHullMax = Number(player.pvpHullMax || STAGING_PVP_HULL_MAX);
     player.pvpHullMax = nextHullMax;
-    player.pvpHull = clampNumber(Number(player.pvpHull || nextHullMax), STAGING_PVP_MIN_HULL, nextHullMax);
+    player.pvpHull = previousHullMax <= STAGING_PVP_HULL_MAX && Number(player.lastPvpHitAt || 0) <= 0
+      ? nextHullMax
+      : clampNumber(Number(player.pvpHull || nextHullMax), STAGING_PVP_MIN_HULL, nextHullMax);
   }
 
   return player;
@@ -1657,14 +1681,15 @@ export class LupenSectorRoom extends Room {
 
     DUMMY_BOT_DEFINITIONS.forEach((definition, index) => {
       const patrolNode = BOT_NODE_POSITIONS.get(definition.startNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length];
+      const position = getServerObjectSpawnPosition(patrolNode, `${definition.id}:${patrolNode.node}:initial`, SERVER_OBJECT_SPAWN_JITTER);
       this.state.bots.set(definition.id, new LupenSectorBot({
         id: definition.id,
         type: definition.type,
         name: definition.name,
         faction: "Erebus",
         currentNode: patrolNode.node,
-        x: patrolNode.x,
-        y: patrolNode.y,
+        x: position.x,
+        y: position.y,
         level: Number(definition.level || 1),
         shield: Number(definition.shield || 0),
         shieldMax: Number(definition.shield || 0),
@@ -1688,13 +1713,14 @@ export class LupenSectorRoom extends Room {
         x: definition.x,
         y: definition.y
       };
+      const objectPosition = getServerObjectSpawnPosition(position, `${definition.id}:${position.node || definition.startNode}:initial`, SERVER_OBJECT_SPAWN_JITTER);
       const hp = Math.max(1, Math.round(Number(definition.hp || 30)));
       this.state.resources.set(definition.id, new LupenSectorResource({
         id: definition.id,
         resourceName: definition.resourceName || "Iron",
         currentNode: position.node || definition.startNode,
-        x: clampNumber(Number(definition.x ?? position.x ?? 50), 4, 96),
-        y: clampNumber(Number(definition.y ?? position.y ?? 50), 4, 96),
+        x: objectPosition.x,
+        y: objectPosition.y,
         hp,
         hpMax: hp,
         yieldAmount: Math.max(1, Math.round(Number(definition.yield || 10))),
@@ -1721,8 +1747,9 @@ export class LupenSectorRoom extends Room {
       if (bot.disabled) return;
 
       const nodePosition = BOT_NODE_POSITIONS.get(bot.currentNode) || STAGING_BOT_NODES[0];
-      bot.x = clampNumber(nodePosition.x, 4, 96);
-      bot.y = clampNumber(nodePosition.y, 4, 96);
+      const position = getServerObjectSpawnPosition(nodePosition, `${bot.id}:${bot.currentNode}:patrol:${Math.floor(this.botStep / 4)}`, 1.8);
+      bot.x = position.x;
+      bot.y = position.y;
       bot.lastUpdatedAt = now;
     });
 
@@ -1736,7 +1763,11 @@ export class LupenSectorRoom extends Room {
       if (!resource.depleted) return;
       if (now < Number(resource.depletedUntil || 0)) return;
 
+      const nodePosition = BOT_NODE_POSITIONS.get(resource.currentNode) || { x: resource.x, y: resource.y };
+      const position = getServerObjectSpawnPosition(nodePosition, `${resource.id}:${resource.currentNode}:respawn:${Math.floor(now / 1000)}`, SERVER_OBJECT_SPAWN_JITTER);
       resource.hp = Number(resource.hpMax || 1);
+      resource.x = position.x;
+      resource.y = position.y;
       resource.depleted = false;
       resource.depletedUntil = 0;
       resource.lastUpdatedAt = now;
@@ -3671,10 +3702,11 @@ export class LupenSectorRoom extends Room {
   respawnStagingBot(bot, index = 0, now = Date.now()) {
     const respawnNode = this.getNextBotNode(bot.currentNode, index + this.botStep + 1);
     const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
+    const position = getServerObjectSpawnPosition(nodePosition, `${bot.id}:${respawnNode}:respawn:${Math.floor(now / 1000)}`, SERVER_OBJECT_SPAWN_JITTER);
 
     bot.currentNode = nodePosition.node;
-    bot.x = clampNumber(nodePosition.x, 4, 96);
-    bot.y = clampNumber(nodePosition.y, 4, 96);
+    bot.x = position.x;
+    bot.y = position.y;
     bot.shield = Number(bot.shieldMax || 0);
     bot.hull = Number(bot.hullMax || 1);
     bot.disabled = false;

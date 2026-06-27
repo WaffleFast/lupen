@@ -1235,8 +1235,8 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.arrivingGhostCount).toBe(1);
     expect(connectedHudState.dockedGhostCount).toBe(0);
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
-    expect(connectedHudState.playerTargetText).toContain("PROTECTED");
-    expect(connectedHudState.playerTargetText).toContain("Inspection only");
+    expect(connectedHudState.playerTargetText).toContain("DISABLED");
+    expect(connectedHudState.playerTargetText).not.toContain("Inspection only");
     expect(connectedHudState.playerTargetCardClass).toContain("compact-player-target");
     expect(connectedHudState.playerTargetCardLayout).toBe("compact");
     expect(connectedHudState.playerCardLayout).toMatchObject({
@@ -1812,17 +1812,17 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.protectedMessage).toBe("PvP disabled in protected zones.");
     expect(eligibility.protectedActionDisabled).toBe(true);
     expect(eligibility.protectedActionText).toBe("PVP DISABLED");
-    expect(eligibility.protectedTargetCardText).toContain("PROTECTED");
-    expect(eligibility.protectedTargetCardText).toContain("Inspection only");
-    expect(eligibility.protectedTargetCardText).toContain("PvP disabled in protected zones");
+    expect(eligibility.protectedTargetCardText).toContain("DISABLED");
+    expect(eligibility.protectedTargetCardText).not.toContain("Inspection only");
+    expect(eligibility.protectedTargetCardText).not.toContain("PvP disabled in protected zones");
     expect(eligibility.contestedSelected).toBe(true);
     expect(eligibility.contestedBlockReason).toBe("");
     expect(eligibility.contestedEngageMessage).toBe("PvP server hit test ready.");
     expect(eligibility.contestedActionDisabled).toBe(false);
     expect(eligibility.contestedActionText).toBe("PVP ENGAGE");
-    expect(eligibility.contestedTargetCardText).toContain("PVP TEST");
-    expect(eligibility.contestedTargetCardText).toContain("Server hit test ready");
-    expect(eligibility.contestedTargetCardText).toContain("No defeat or loot");
+    expect(eligibility.contestedTargetCardText).toContain("READY");
+    expect(eligibility.contestedTargetCardText).not.toContain("Server hit test ready");
+    expect(eligibility.contestedTargetCardText).not.toContain("No defeat or loot");
     expect(eligibility.contestedTargetCardClass).toContain("compact-player-target");
     expect(eligibility.contestedTargetCardLayout).toBe("compact");
     expect(eligibility.contestedPlayerCardLayout).toMatchObject({
@@ -1834,11 +1834,11 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedArmorBarWidth).toBe("100%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
-    expect(eligibility.criticalTargetCardText).toContain("HULL CRITICAL");
-    expect(eligibility.criticalTargetCardText).toContain("Repair required");
+    expect(eligibility.criticalTargetCardText).toContain("CRITICAL");
+    expect(eligibility.criticalTargetCardText).not.toContain("Repair required");
     expect(eligibility.criticalTargetCardClass).toContain("pvp-hull-critical");
-    expect(eligibility.disabledTargetCardText).toContain("DISABLED THRESHOLD");
-    expect(eligibility.disabledTargetCardText).toContain("Repair required");
+    expect(eligibility.disabledTargetCardText).toContain("REPAIR");
+    expect(eligibility.disabledTargetCardText).not.toContain("Repair required");
     expect(eligibility.disabledTargetCardClass).toContain("pvp-disabled-threshold");
     expect(eligibility.connectedEmptyReconcile).toMatchObject({
       reconciled: true,

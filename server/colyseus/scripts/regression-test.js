@@ -4392,7 +4392,7 @@ try {
     shieldMax: 180,
     armor: 12,
     armorMax: 12,
-    hullMax: 120,
+    hullMax: 700,
     currentNode: "Asteron Prime",
     x: 50,
     y: 50
@@ -4411,7 +4411,7 @@ try {
     shieldMax: 180,
     armor: 12,
     armorMax: 12,
-    hullMax: 120,
+    hullMax: 700,
     currentNode: "Asteron Prime",
     x: 51,
     y: 50
@@ -4568,6 +4568,7 @@ try {
   const targetPvpShieldMax = Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0);
   assert(targetPvpShieldMax === 180, `PvP target shield max did not use true presence shield capacity: ${targetPvpShieldMax}`);
   assert(targetPvpArmorBefore === 12, `PvP target armor did not use true presence armor capacity: ${targetPvpArmorBefore}`);
+  assert(targetPvpHullBefore === 700, `PvP target hull did not initialize to true presence hull capacity: ${targetPvpHullBefore}`);
   const combatSpacePvpResolved = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetType: "remotePlayer",
@@ -4664,7 +4665,7 @@ try {
     shieldMax: 1,
     armor: 0,
     armorMax: 0,
-    hullMax: 120,
+    hullMax: 700,
     x: 50,
     y: 57
   });
@@ -4709,8 +4710,8 @@ try {
 
   roomB.send("pvp:repair", {
     currentShipId: "lupenOrigin",
-    hull: 120,
-    hullMax: 120,
+    hull: 700,
+    hullMax: 700,
     shield: 180,
     shieldMax: 180,
     armor: 12,
@@ -4731,12 +4732,12 @@ try {
   assert(repairEvent?.xpAwarded === false, "PvP repair unexpectedly awarded XP.");
   assert(repairEvent?.bountyProgressChanged === false, "PvP repair unexpectedly changed bounty progress.");
   assert(repairEvent?.rewardsGranted === false, "PvP repair unexpectedly granted rewards.");
-  assert(Number(targetAfterRepair?.pvpHull || 0) === 120, "PvP repair did not restore hull in room state.");
+  assert(Number(targetAfterRepair?.pvpHull || 0) === 700, "PvP repair did not restore hull in room state.");
   assert(Number(targetAfterRepair?.pvpShield || 0) === 180, "PvP repair did not refresh shield in room state.");
   assert(Number(targetAfterRepair?.pvpArmor || 0) === 12, "PvP repair did not restore armor in room state.");
   assert(Number(targetAfterRepair?.pvpShieldMax || 0) === 180, "PvP repair did not restore true shield max.");
   assert(Number(targetAfterRepair?.pvpArmorMax || 0) === 12, "PvP repair did not preserve true armor max.");
-  assert(Number(targetAfterRepair?.pvpHullMax || 0) === 120, "PvP repair did not preserve true hull max.");
+  assert(Number(targetAfterRepair?.pvpHullMax || 0) === 700, "PvP repair did not preserve true hull max.");
   console.log("player-vs-player combat intents reject safely and resolve in contested space");
 
   roomA.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });
