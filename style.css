@@ -4537,8 +4537,16 @@ input::placeholder {
   animation: playerHullCriticalPulse 1.15s ease-in-out infinite;
 }
 
+.vertical-stats.player-hull-disabled-threshold {
+  animation: playerHullCriticalPulse 0.9s ease-in-out infinite;
+}
+
 .player-hull-critical .hull-fill {
   filter: saturate(1.25) brightness(1.1) drop-shadow(0 0 6px rgba(255, 62, 58, 0.72));
+}
+
+.player-hull-disabled-threshold .hull-fill {
+  filter: saturate(1.45) brightness(1.18) drop-shadow(0 0 8px rgba(255, 62, 58, 0.86));
 }
 
 .player-shield-depleted .shield-fill {

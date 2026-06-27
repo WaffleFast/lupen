@@ -1125,6 +1125,17 @@
         max-width: 76px;
       }
 
+      .lupen-target-card.player.pvp-hull-critical,
+      .lupen-target-card.player.pvp-disabled-threshold {
+        border-color: rgba(255, 126, 92, 0.72);
+        box-shadow: 0 0 20px rgba(255, 92, 67, 0.24);
+      }
+
+      .lupen-target-card.player.pvp-hull-critical .lupen-target-readiness,
+      .lupen-target-card.player.pvp-disabled-threshold .lupen-target-readiness {
+        color: #ffcfb8;
+      }
+
       .lupen-target-card.player .lupen-target-bars {
         width: 76px;
         gap: 1px;
@@ -1732,6 +1743,21 @@
     };
   }
 
+  function getRemotePlayerPvpHullStatus(vitals = {}) {
+    const hull = Number(vitals.hull);
+    const hullMax = Number(vitals.hullMax);
+    if (!Number.isFinite(hull) || !Number.isFinite(hullMax) || hullMax <= 0) return "";
+    if (hull <= 1) return "disabled-threshold";
+    if (hull > 0 && hull <= Math.max(1, Math.round(hullMax * 0.25))) return "critical";
+    return "";
+  }
+
+  function getRemotePlayerPvpHullStatusLabel(status = "") {
+    if (status === "disabled-threshold") return "DISABLED THRESHOLD";
+    if (status === "critical") return "HULL CRITICAL";
+    return "";
+  }
+
   function getRemotePilotKey(player = {}) {
     return String(player.sessionId || player.id || "");
   }
@@ -2223,7 +2249,9 @@
     const position = selectedPlayer ? getSelectedPlayerCardPosition(selectedPlayer) : getSpacePercentPosition(target);
     const hitConfirmed = selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id && getShotEventAge(status) < 900;
     const card = global.document.createElement("div");
-    card.className = `lupen-target-card ${selectedBot ? "hostile" : selectedPlayer ? "player pvp-arming compact-player-target" : "resource"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
+    const playerVitals = selectedPlayer ? getRemotePlayerPvpVitals(selectedPlayer) : null;
+    const playerHullStatus = selectedPlayer ? getRemotePlayerPvpHullStatus(playerVitals) : "";
+    card.className = `lupen-target-card ${selectedBot ? "hostile" : selectedPlayer ? `player pvp-arming compact-player-target ${playerHullStatus === "disabled-threshold" ? "pvp-disabled-threshold" : playerHullStatus === "critical" ? "pvp-hull-critical" : ""}` : "resource"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
     card.style.left = `${position.x}%`;
     card.style.top = `${selectedPlayer ? position.y : getCardTopForPosition(position)}%`;
     if (selectedPlayer) {
@@ -2250,7 +2278,7 @@
       ship.textContent = getShipLabel(selectedPlayer);
       card.appendChild(ship);
 
-      const vitals = getRemotePlayerPvpVitals(selectedPlayer);
+      const vitals = playerVitals || getRemotePlayerPvpVitals(selectedPlayer);
       if (vitals.shieldMax > 0 || vitals.hullMax > 0) {
         const bars = global.document.createElement("div");
         bars.className = "lupen-target-bars";
@@ -2269,12 +2297,12 @@
 
       const readiness = global.document.createElement("small");
       readiness.className = "lupen-target-readiness";
-      readiness.textContent = isPvpProtectedNode() ? "Inspection only" : "Server hit test ready";
+      readiness.textContent = getRemotePlayerPvpHullStatusLabel(playerHullStatus) || (isPvpProtectedNode() ? "Inspection only" : "Server hit test ready");
       metaRow.appendChild(readiness);
       card.appendChild(metaRow);
 
       const offline = global.document.createElement("small");
-      offline.textContent = isPvpProtectedNode() ? "PvP disabled in protected zones" : "No defeat or loot";
+      offline.textContent = playerHullStatus ? "Repair required" : isPvpProtectedNode() ? "PvP disabled in protected zones" : "No defeat or loot";
       card.appendChild(offline);
     } else if (selectedResource) {
       const bars = global.document.createElement("div");

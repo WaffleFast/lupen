@@ -5,6 +5,35 @@
 let lastRemotePlayerEngageNoticeKey = "";
 let lastRemotePlayerEngageNoticeAt = 0;
 let serverPvpDamageDisplayState = null;
+let lastPvpHullFeedbackState = "";
+
+function getPvpHullStatus(hullValue, hullMaxValue) {
+  const hullNumber = Number(hullValue);
+  const hullMaxNumber = Number(hullMaxValue);
+  if (!Number.isFinite(hullNumber) || !Number.isFinite(hullMaxNumber) || hullMaxNumber <= 0) return "";
+  if (hullNumber <= 1) return "disabled-threshold";
+  if (hullNumber > 0 && hullNumber <= Math.max(1, Math.round(hullMaxNumber * 0.25))) return "critical";
+  return "";
+}
+
+function getPvpHullStatusMessage(status) {
+  if (status === "disabled-threshold") return "Emergency hull limit reached. Repair required.";
+  if (status === "critical") return "Hull integrity critical.";
+  return "";
+}
+
+function reportPvpHullStatusFeedback(state = {}) {
+  const status = getPvpHullStatus(state.hull, state.hullMax);
+  if (!status) {
+    lastPvpHullFeedbackState = "";
+    return false;
+  }
+  if (status === lastPvpHullFeedbackState) return false;
+  lastPvpHullFeedbackState = status;
+  const message = getPvpHullStatusMessage(status);
+  if (message && typeof addActivityLog === "function") addActivityLog(message);
+  return true;
+}
 
 function applyServerPvpDamageState(hit = {}) {
   const shieldMaxValue = Number(hit.shieldMax);
@@ -20,6 +49,7 @@ function applyServerPvpDamageState(hit = {}) {
     hullMax: Number.isFinite(hullMaxValue) && hullMaxValue > 0 ? hullMaxValue : null,
     updatedAt: Date.now()
   };
+  reportPvpHullStatusFeedback(serverPvpDamageDisplayState);
   if (typeof updateSpaceHUD === "function") updateSpaceHUD();
   return true;
 }

@@ -1141,12 +1141,14 @@ function updateSpaceHUD() {
   document.getElementById("shieldValue").textContent = formatNumber(Math.floor(displayShield));
 
   const isHullCritical = displayHull > 0 && (displayHull / safeHullMax) <= 0.25;
+  const isHullDisabledThreshold = displayHull > 0 && displayHull <= 1;
   const isShieldDepleted = safeShieldMax > 0 && displayShield <= 0 && displayHull > 0;
   const spaceScreen = document.getElementById("spaceScreen");
   const statPanel = document.querySelector(".vertical-stats");
   [spaceScreen, statPanel].forEach(panel => {
     if (!panel) return;
     panel.classList.toggle("player-hull-critical", isHullCritical);
+    panel.classList.toggle("player-hull-disabled-threshold", isHullDisabledThreshold);
     panel.classList.toggle("player-shield-depleted", isShieldDepleted);
   });
 

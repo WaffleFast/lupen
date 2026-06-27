@@ -1561,6 +1561,20 @@ test.describe("Lupen browser smoke", () => {
             underGhost: contestedCardRect.top >= contestedGhostRect.bottom - 6,
             clearOfButton: contestedCardRect.bottom <= contestedButtonRect.top - 8
           } : null;
+
+          remotePlayer.pvpHull = 20;
+          window.LupenMultiplayerOverlay?.render?.();
+          const criticalTargetCard = document.querySelector(".lupen-target-card.player");
+          const criticalTargetCardText = criticalTargetCard?.textContent || "";
+          const criticalTargetCardClass = criticalTargetCard?.className || "";
+
+          remotePlayer.pvpHull = 1;
+          window.LupenMultiplayerOverlay?.render?.();
+          const disabledTargetCard = document.querySelector(".lupen-target-card.player");
+          const disabledTargetCardText = disabledTargetCard?.textContent || "";
+          const disabledTargetCardClass = disabledTargetCard?.className || "";
+          remotePlayer.pvpHull = 120;
+
           asteroids = [{
             id: "local-only-test-asteroid",
             name: "Local Only Test Asteroid",
@@ -1647,6 +1661,58 @@ test.describe("Lupen browser smoke", () => {
             storedShield: shield,
             applied: pvpHudApplied
           };
+          const activityBeforeCritical = document.getElementById("activityLogFeed")?.textContent || "";
+          applyServerPvpDamageState({
+            targetSessionId: "local-session",
+            shield: 0,
+            shieldMax: 30,
+            hull: 20,
+            hullMax: 120
+          });
+          applyServerPvpDamageState({
+            targetSessionId: "local-session",
+            shield: 0,
+            shieldMax: 30,
+            hull: 20,
+            hullMax: 120
+          });
+          const activityAfterCritical = document.getElementById("activityLogFeed")?.textContent || "";
+          applyServerPvpDamageState({
+            targetSessionId: "local-session",
+            shield: 0,
+            shieldMax: 30,
+            hull: 1,
+            hullMax: 120
+          });
+          const activityAfterDisabled = document.getElementById("activityLogFeed")?.textContent || "";
+          const disabledHudClasses = {
+            screenCritical: document.getElementById("spaceScreen")?.classList.contains("player-hull-critical") || false,
+            screenDisabled: document.getElementById("spaceScreen")?.classList.contains("player-hull-disabled-threshold") || false,
+            statCritical: document.querySelector(".vertical-stats")?.classList.contains("player-hull-critical") || false,
+            statDisabled: document.querySelector(".vertical-stats")?.classList.contains("player-hull-disabled-threshold") || false
+          };
+          applyServerPvpDamageState({
+            targetSessionId: "local-session",
+            shield: 30,
+            shieldMax: 30,
+            hull: 120,
+            hullMax: 120,
+            reason: "pvp_repair_synced"
+          });
+          const repairedHudClasses = {
+            screenCritical: document.getElementById("spaceScreen")?.classList.contains("player-hull-critical") || false,
+            screenDisabled: document.getElementById("spaceScreen")?.classList.contains("player-hull-disabled-threshold") || false,
+            statCritical: document.querySelector(".vertical-stats")?.classList.contains("player-hull-critical") || false,
+            statDisabled: document.querySelector(".vertical-stats")?.classList.contains("player-hull-disabled-threshold") || false
+          };
+          const criticalFeedback = {
+            criticalMessages: (activityAfterCritical.match(/Hull integrity critical\\./g) || []).length
+              - (activityBeforeCritical.match(/Hull integrity critical\\./g) || []).length,
+            disabledMessages: (activityAfterDisabled.match(/Emergency hull limit reached\\. Repair required\\./g) || []).length
+              - (activityAfterCritical.match(/Emergency hull limit reached\\. Repair required\\./g) || []).length,
+            disabledHudClasses,
+            repairedHudClasses
+          };
           const activityBeforeEngage = document.getElementById("activityLogFeed")?.textContent || "";
           engageTarget();
           engageTarget();
@@ -1694,6 +1760,10 @@ test.describe("Lupen browser smoke", () => {
             contestedPlayerCardLayout,
             contestedShieldBarWidth,
             contestedHullBarWidth,
+            criticalTargetCardText,
+            criticalTargetCardClass,
+            disabledTargetCardText,
+            disabledTargetCardClass,
             connectedEmptyReconcile,
             connectedEmptySnapshot,
             connectedEmptyLocalAsteroidButtonCount,
@@ -1707,6 +1777,7 @@ test.describe("Lupen browser smoke", () => {
             before,
             hudBefore,
             hudAfterPvpDisplay,
+            criticalFeedback,
             after,
             sentPvpIntents,
             protectedReturnSelected,
@@ -1758,6 +1829,12 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedPlayerCardLayout.cardWidth).toBeLessThanOrEqual(150);
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
+    expect(eligibility.criticalTargetCardText).toContain("HULL CRITICAL");
+    expect(eligibility.criticalTargetCardText).toContain("Repair required");
+    expect(eligibility.criticalTargetCardClass).toContain("pvp-hull-critical");
+    expect(eligibility.disabledTargetCardText).toContain("DISABLED THRESHOLD");
+    expect(eligibility.disabledTargetCardText).toContain("Repair required");
+    expect(eligibility.disabledTargetCardClass).toContain("pvp-disabled-threshold");
     expect(eligibility.connectedEmptyReconcile).toMatchObject({
       reconciled: true,
       serverOwnedActive: true
@@ -1795,6 +1872,20 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.hudAfterPvpDisplay.shieldValue).toBe("18");
     expect(eligibility.hudAfterPvpDisplay.storedHull).toBe(eligibility.before.hull);
     expect(eligibility.hudAfterPvpDisplay.storedShield).toBe(eligibility.before.shield);
+    expect(eligibility.criticalFeedback.criticalMessages).toBe(1);
+    expect(eligibility.criticalFeedback.disabledMessages).toBe(1);
+    expect(eligibility.criticalFeedback.disabledHudClasses).toMatchObject({
+      screenCritical: true,
+      screenDisabled: true,
+      statCritical: true,
+      statDisabled: true
+    });
+    expect(eligibility.criticalFeedback.repairedHudClasses).toMatchObject({
+      screenCritical: false,
+      screenDisabled: false,
+      statCritical: false,
+      statDisabled: false
+    });
     expect(eligibility.after.hull).toBe(eligibility.before.hull);
     expect(eligibility.after.shield).toBe(eligibility.before.shield);
     expect(eligibility.after.combatXp).toBe(eligibility.before.combatXp);
