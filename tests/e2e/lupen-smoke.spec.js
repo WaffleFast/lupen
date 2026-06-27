@@ -1549,6 +1549,7 @@ test.describe("Lupen browser smoke", () => {
           const contestedTargetCardClass = contestedTargetCard?.className || "";
           const contestedTargetCardLayout = contestedTargetCard?.getAttribute("data-layout") || "";
           const contestedShieldBarWidth = contestedTargetCard?.querySelector(".lupen-target-bar-fill.shield")?.style.width || "";
+          const contestedArmorBarWidth = contestedTargetCard?.querySelector(".lupen-target-bar-fill.armor")?.style.width || "";
           const contestedHullBarWidth = contestedTargetCard?.querySelector(".lupen-target-bar-fill.hull")?.style.width || "";
           const contestedCardRect = contestedTargetCard?.getBoundingClientRect();
           const contestedGhostRect = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.getBoundingClientRect();
@@ -1761,6 +1762,7 @@ test.describe("Lupen browser smoke", () => {
             contestedTargetCardLayout,
             contestedPlayerCardLayout,
             contestedShieldBarWidth,
+            contestedArmorBarWidth,
             contestedHullBarWidth,
             criticalTargetCardText,
             criticalTargetCardClass,
@@ -1830,6 +1832,7 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedPlayerCardLayout.cardHeight).toBeLessThanOrEqual(82);
     expect(eligibility.contestedPlayerCardLayout.cardWidth).toBeLessThanOrEqual(150);
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
+    expect(eligibility.contestedArmorBarWidth).toBe("100%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
     expect(eligibility.criticalTargetCardText).toContain("HULL CRITICAL");
     expect(eligibility.criticalTargetCardText).toContain("Repair required");

@@ -124,6 +124,14 @@ function assertLayeredPvpDamageHelper() {
 
   target.pvpArmor = 15;
   target.pvpArmorMax = 15;
+  const armorDepletedNoOverflow = applyLayeredPvpDamage(target, 15);
+  assert(armorDepletedNoOverflow.shieldDamage === 0, "Shield damage occurred after shield was depleted.");
+  assert(armorDepletedNoOverflow.armorDamage === 15, `Expected exact armor depletion to absorb 15, got ${armorDepletedNoOverflow.armorDamage}.`);
+  assert(armorDepletedNoOverflow.hullDamage === 0, `Hull changed when damage exactly depleted armor: ${armorDepletedNoOverflow.hullDamage}.`);
+  assert(target.pvpArmor === 0, `Expected armor 0 after exact depletion, got ${target.pvpArmor}.`);
+  assert(target.pvpHull === 700, `Hull changed on exact armor depletion: ${target.pvpHull}.`);
+
+  target.pvpArmor = 15;
   const armorOverflow = applyLayeredPvpDamage(target, 20);
   assert(armorOverflow.shieldDamage === 0, "Shield damage occurred after shield was depleted.");
   assert(armorOverflow.armorDamage === 15, `Expected armor to absorb 15, got ${armorOverflow.armorDamage}.`);
@@ -4382,6 +4390,8 @@ try {
     shipImage: "assets/ships/lupen-origin.png",
     shipClass: "Balanced Starter Hull",
     shieldMax: 180,
+    armor: 12,
+    armorMax: 12,
     hullMax: 120,
     currentNode: "Asteron Prime",
     x: 50,
@@ -4399,6 +4409,8 @@ try {
     shipImage: "assets/ships/lupen-origin.png",
     shipClass: "Balanced Starter Hull",
     shieldMax: 180,
+    armor: 12,
+    armorMax: 12,
     hullMax: 120,
     currentNode: "Asteron Prime",
     x: 51,
@@ -4551,9 +4563,11 @@ try {
       playerFrom(roomA, roomB.sessionId)?.guildId === "guild-two";
   });
   const targetPvpShieldBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0);
+  const targetPvpArmorBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpArmor || 0);
   const targetPvpHullBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpHull || 0);
   const targetPvpShieldMax = Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0);
   assert(targetPvpShieldMax === 180, `PvP target shield max did not use true presence shield capacity: ${targetPvpShieldMax}`);
+  assert(targetPvpArmorBefore === 12, `PvP target armor did not use true presence armor capacity: ${targetPvpArmorBefore}`);
   const combatSpacePvpResolved = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetType: "remotePlayer",
@@ -4609,8 +4623,10 @@ try {
   });
   assert(secondPvpResolved?.reason === "pvp_damage_applied", `Unexpected repeated PvP result: ${secondPvpResolved?.reason}`);
   const shieldAfterSecondHit = Number(secondPvpResolved?.shield || 0);
+  const armorAfterSecondHit = Number(secondPvpResolved?.armor || 0);
   const hullAfterSecondHit = Number(secondPvpResolved?.hull || 0);
   assert(shieldAfterSecondHit < shieldAfterFirstHit, "Repeated PvP hit did not reduce shield before regen.");
+  assert(armorAfterSecondHit === targetPvpArmorBefore, "Repeated shield-only PvP hit changed armor.");
   assert(hullAfterSecondHit === targetPvpHullBefore, "Repeated shield-only PvP hit changed hull.");
   await waitFor("repeated PvP hit replicated to room state", () => {
     return Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) === shieldAfterSecondHit;
@@ -4634,6 +4650,7 @@ try {
   assert(regenEvent?.bountyProgressChanged === false, "PvP shield regen unexpectedly changed bounty progress.");
   assert(regenEvent?.rewardsGranted === false, "PvP shield regen unexpectedly granted rewards.");
   assert(Number(targetAfterRegen?.pvpShield || 0) <= Number(targetAfterRegen?.pvpShieldMax || 0), "PvP shield regen exceeded max shield.");
+  assert(Number(targetAfterRegen?.pvpArmor || 0) === armorAfterSecondHit, "PvP shield regen restored armor.");
   assert(Number(targetAfterRegen?.pvpHull || 0) === hullAfterSecondHit, "PvP hull auto-regenerated.");
   await waitFor("PvP shield regen restored true max shield", () => {
     return Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) === targetPvpShieldMax;
@@ -4645,13 +4662,18 @@ try {
     presenceStatus: "space",
     guildId: "guild-two",
     shieldMax: 1,
+    armor: 0,
+    armorMax: 0,
     hullMax: 120,
     x: 50,
     y: 57
   });
   await waitFor("PvP target shield capacity reduced for hull damage regression", () => {
     const target = playerFrom(roomA, roomB.sessionId);
-    return Number(target?.pvpShieldMax || 0) === 1 && Number(target?.pvpShield || 0) === 1;
+    return Number(target?.pvpShieldMax || 0) === 1 &&
+      Number(target?.pvpShield || 0) === 1 &&
+      Number(target?.pvpArmorMax || 0) === 0 &&
+      Number(target?.pvpArmor || 0) === 0;
   }, 3000);
   await waitFor("PvP fire cooldown before hull hit", () => {
     return Number(playerFrom(roomA, roomA.sessionId)?.nextPvpFireAt || 0) <= Date.now();
@@ -4691,6 +4713,8 @@ try {
     hullMax: 120,
     shield: 180,
     shieldMax: 180,
+    armor: 12,
+    armorMax: 12,
     reason: "hangar_repair"
   });
   await waitFor("PvP repair sync broadcast delivered to both clients", () => {
@@ -4709,7 +4733,9 @@ try {
   assert(repairEvent?.rewardsGranted === false, "PvP repair unexpectedly granted rewards.");
   assert(Number(targetAfterRepair?.pvpHull || 0) === 120, "PvP repair did not restore hull in room state.");
   assert(Number(targetAfterRepair?.pvpShield || 0) === 180, "PvP repair did not refresh shield in room state.");
+  assert(Number(targetAfterRepair?.pvpArmor || 0) === 12, "PvP repair did not restore armor in room state.");
   assert(Number(targetAfterRepair?.pvpShieldMax || 0) === 180, "PvP repair did not restore true shield max.");
+  assert(Number(targetAfterRepair?.pvpArmorMax || 0) === 12, "PvP repair did not preserve true armor max.");
   assert(Number(targetAfterRepair?.pvpHullMax || 0) === 120, "PvP repair did not preserve true hull max.");
   console.log("player-vs-player combat intents reject safely and resolve in contested space");
 
