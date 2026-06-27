@@ -1031,8 +1031,16 @@
       .lupen-target-card.player {
         --target-accent: #ffc76b;
         --target-glow: rgba(255, 190, 92, 0.72);
+        min-width: 118px;
+        max-width: 136px;
+        gap: 2px;
+        padding: 4px 6px 5px;
         border-color: rgba(255, 197, 96, 0.64);
         box-shadow: 0 0 18px rgba(255, 168, 58, 0.18);
+      }
+
+      .lupen-target-card.player.compact-player-target {
+        transform: translate(-50%, 0);
       }
 
       .lupen-target-card.resource {
@@ -1098,6 +1106,32 @@
 
       .lupen-target-card .lupen-target-readiness {
         color: rgba(255, 231, 177, 0.88);
+      }
+
+      .lupen-target-meta-row {
+        max-width: 126px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+
+      .lupen-target-card.player .lupen-target-status {
+        padding: 2px 4px;
+      }
+
+      .lupen-target-card.player .lupen-target-readiness {
+        max-width: 76px;
+      }
+
+      .lupen-target-card.player .lupen-target-bars {
+        width: 76px;
+        gap: 1px;
+      }
+
+      .lupen-target-card.player .lupen-target-bar-track {
+        height: 3px;
       }
 
       .lupen-target-bars {
@@ -2137,6 +2171,33 @@
     return Math.max(10, Math.min(76, position.y + 8));
   }
 
+  function getSelectedPlayerCardPosition(player) {
+    const key = getRemotePilotKey(player);
+    const snapshot = key ? remoteGhostSnapshots.get(key) : null;
+    const base = {
+      x: clampMapCoordinate(snapshot?.spaceLeft ?? player?.spaceLeft ?? player?.x ?? 50),
+      y: clampMapCoordinate(snapshot?.spaceTop ?? player?.spaceTop ?? player?.y ?? 24)
+    };
+    return {
+      x: Math.max(12, Math.min(88, base.x)),
+      y: Math.max(16, Math.min(62, base.y + 14))
+    };
+  }
+
+  function adjustPlayerCardAwayFromActionButton(card) {
+    const actionButton = global.document?.getElementById("objectEngageBtn");
+    const layer = global.document?.getElementById(spaceSelectionLayerId);
+    if (!card || !actionButton || !layer) return;
+
+    const cardRect = card.getBoundingClientRect();
+    const buttonRect = actionButton.getBoundingClientRect();
+    const layerRect = layer.getBoundingClientRect();
+    if (!cardRect.height || !layerRect.height || cardRect.bottom <= buttonRect.top - 10) return;
+
+    const nextTopPx = Math.max(8, buttonRect.top - layerRect.top - cardRect.height - 10);
+    card.style.top = `${Math.max(10, Math.min(62, (nextTopPx / layerRect.height) * 100))}%`;
+  }
+
   function renderSelectedTargetCard(players, bots, resources, status) {
     global.document?.getElementById(spaceSelectionLayerId)?.remove();
     if (!isEnabled()) return;
@@ -2159,12 +2220,16 @@
     layer.id = spaceSelectionLayerId;
 
     const target = selectedBot || selectedPlayer || selectedResource;
-    const position = getSpacePercentPosition(target);
+    const position = selectedPlayer ? getSelectedPlayerCardPosition(selectedPlayer) : getSpacePercentPosition(target);
     const hitConfirmed = selectedBot && status?.lastShotEvent?.targetBotId === selectedBot.id && getShotEventAge(status) < 900;
     const card = global.document.createElement("div");
-    card.className = `lupen-target-card ${selectedBot ? "hostile" : selectedPlayer ? "player pvp-arming" : "resource"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
+    card.className = `lupen-target-card ${selectedBot ? "hostile" : selectedPlayer ? "player pvp-arming compact-player-target" : "resource"}${hitConfirmed ? " locked hit-confirmed" : ""}`;
     card.style.left = `${position.x}%`;
-    card.style.top = `${getCardTopForPosition(position)}%`;
+    card.style.top = `${selectedPlayer ? position.y : getCardTopForPosition(position)}%`;
+    if (selectedPlayer) {
+      card.dataset.anchor = "remote-player";
+      card.dataset.layout = "compact";
+    }
 
     const title = global.document.createElement("strong");
     title.textContent = selectedBot
@@ -2194,15 +2259,19 @@
         card.appendChild(bars);
       }
 
+      const metaRow = global.document.createElement("div");
+      metaRow.className = "lupen-target-meta-row";
+
       const statusTag = global.document.createElement("span");
       statusTag.className = "lupen-target-status pvp-arming";
       statusTag.textContent = getRemotePlayerPvpLabel(selectedPlayer, status);
-      card.appendChild(statusTag);
+      metaRow.appendChild(statusTag);
 
       const readiness = global.document.createElement("small");
       readiness.className = "lupen-target-readiness";
       readiness.textContent = isPvpProtectedNode() ? "Inspection only" : "Server hit test ready";
-      card.appendChild(readiness);
+      metaRow.appendChild(readiness);
+      card.appendChild(metaRow);
 
       const offline = global.document.createElement("small");
       offline.textContent = isPvpProtectedNode() ? "PvP disabled in protected zones" : "No defeat or loot";
@@ -2231,8 +2300,9 @@
       card.appendChild(actionHint);
     }
 
-    layer.appendChild(card);
     spaceScreen.appendChild(layer);
+    layer.appendChild(card);
+    if (selectedPlayer) adjustPlayerCardAwayFromActionButton(card);
   }
 
   function getLabelOffset(position) {

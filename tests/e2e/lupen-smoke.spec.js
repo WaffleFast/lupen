@@ -1082,12 +1082,27 @@ test.describe("Lupen browser smoke", () => {
       window.LupenMultiplayerOverlay.render();
       const playerTargetCard = document.querySelector(".lupen-target-card.player");
       const playerTargetText = playerTargetCard?.textContent || "";
+      const playerTargetCardClass = playerTargetCard?.className || "";
+      const playerTargetCardLayout = playerTargetCard?.getAttribute("data-layout") || "";
       const playerTargetSelected = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.dataset.sessionId || "";
       const engagePanel = document.getElementById("objectActionPanel");
       const engageButton = document.getElementById("objectEngageBtn");
       const engageVisibleForPlayer = engagePanel?.classList.contains("visible") || false;
       const engageDisabledForPlayer = engageButton?.disabled ?? false;
       const engageTextForPlayer = engageButton?.textContent || "";
+      const selectedGhostRect = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.getBoundingClientRect();
+      const playerCardRect = playerTargetCard?.getBoundingClientRect();
+      const engageButtonRect = engageButton?.getBoundingClientRect();
+      const playerCardLayout = selectedGhostRect && playerCardRect && engageButtonRect ? {
+        cardHeight: Math.round(playerCardRect.height),
+        cardWidth: Math.round(playerCardRect.width),
+        cardTop: Math.round(playerCardRect.top),
+        cardBottom: Math.round(playerCardRect.bottom),
+        ghostBottom: Math.round(selectedGhostRect.bottom),
+        buttonTop: Math.round(engageButtonRect.top),
+        underGhost: playerCardRect.top >= selectedGhostRect.bottom - 6,
+        clearOfButton: playerCardRect.bottom <= engageButtonRect.top - 8
+      } : null;
       const pvpGuard = window.LupenMultiplayerClient.sendCombatIntent({
         targetType: "remotePlayer",
         targetPlayerId: "remote-session"
@@ -1159,6 +1174,9 @@ test.describe("Lupen browser smoke", () => {
         arrivingGhostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-arriving").length,
         dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
         playerTargetText,
+        playerTargetCardClass,
+        playerTargetCardLayout,
+        playerCardLayout,
         playerTargetSelected,
         engageVisibleForPlayer,
         engageDisabledForPlayer,
@@ -1219,6 +1237,14 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.playerTargetText).toContain("Remote Pilot");
     expect(connectedHudState.playerTargetText).toContain("PROTECTED");
     expect(connectedHudState.playerTargetText).toContain("Inspection only");
+    expect(connectedHudState.playerTargetCardClass).toContain("compact-player-target");
+    expect(connectedHudState.playerTargetCardLayout).toBe("compact");
+    expect(connectedHudState.playerCardLayout).toMatchObject({
+      underGhost: true,
+      clearOfButton: true
+    });
+    expect(connectedHudState.playerCardLayout.cardHeight).toBeLessThanOrEqual(76);
+    expect(connectedHudState.playerCardLayout.cardWidth).toBeLessThanOrEqual(150);
     expect(connectedHudState.playerTargetSelected).toBe("remote-session");
     expect(connectedHudState.engageVisibleForPlayer).toBe(true);
     expect(connectedHudState.engageDisabledForPlayer).toBe(true);
@@ -1466,6 +1492,7 @@ test.describe("Lupen browser smoke", () => {
         }
         selectedTarget = null;
         engagedTarget = null;
+        showScreen("spaceScreen");
 
         window.LupenMultiplayerClient = {
           ...(originalClient || {}),
@@ -1515,9 +1542,25 @@ test.describe("Lupen browser smoke", () => {
           const contestedEngageMessage = getRemotePlayerEngageBlockMessage(contestedTarget);
           const contestedActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
           const contestedActionText = document.getElementById("objectEngageBtn")?.textContent || "";
-          const contestedTargetCardText = document.querySelector(".lupen-target-card.player")?.textContent || "";
-          const contestedShieldBarWidth = document.querySelector(".lupen-target-card.player .lupen-target-bar-fill.shield")?.style.width || "";
-          const contestedHullBarWidth = document.querySelector(".lupen-target-card.player .lupen-target-bar-fill.hull")?.style.width || "";
+          const contestedTargetCard = document.querySelector(".lupen-target-card.player");
+          const contestedTargetCardText = contestedTargetCard?.textContent || "";
+          const contestedTargetCardClass = contestedTargetCard?.className || "";
+          const contestedTargetCardLayout = contestedTargetCard?.getAttribute("data-layout") || "";
+          const contestedShieldBarWidth = contestedTargetCard?.querySelector(".lupen-target-bar-fill.shield")?.style.width || "";
+          const contestedHullBarWidth = contestedTargetCard?.querySelector(".lupen-target-bar-fill.hull")?.style.width || "";
+          const contestedCardRect = contestedTargetCard?.getBoundingClientRect();
+          const contestedGhostRect = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.getBoundingClientRect();
+          const contestedButtonRect = document.getElementById("objectEngageBtn")?.getBoundingClientRect();
+          const contestedPlayerCardLayout = contestedCardRect && contestedGhostRect && contestedButtonRect ? {
+            cardHeight: Math.round(contestedCardRect.height),
+            cardWidth: Math.round(contestedCardRect.width),
+            cardTop: Math.round(contestedCardRect.top),
+            cardBottom: Math.round(contestedCardRect.bottom),
+            ghostBottom: Math.round(contestedGhostRect.bottom),
+            buttonTop: Math.round(contestedButtonRect.top),
+            underGhost: contestedCardRect.top >= contestedGhostRect.bottom - 6,
+            clearOfButton: contestedCardRect.bottom <= contestedButtonRect.top - 8
+          } : null;
           asteroids = [{
             id: "local-only-test-asteroid",
             name: "Local Only Test Asteroid",
@@ -1630,6 +1673,9 @@ test.describe("Lupen browser smoke", () => {
             contestedActionDisabled,
             contestedActionText,
             contestedTargetCardText,
+            contestedTargetCardClass,
+            contestedTargetCardLayout,
+            contestedPlayerCardLayout,
             contestedShieldBarWidth,
             contestedHullBarWidth,
             connectedEmptyReconcile,
@@ -1685,6 +1731,14 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedTargetCardText).toContain("PVP TEST");
     expect(eligibility.contestedTargetCardText).toContain("Server hit test ready");
     expect(eligibility.contestedTargetCardText).toContain("No defeat or loot");
+    expect(eligibility.contestedTargetCardClass).toContain("compact-player-target");
+    expect(eligibility.contestedTargetCardLayout).toBe("compact");
+    expect(eligibility.contestedPlayerCardLayout).toMatchObject({
+      underGhost: true,
+      clearOfButton: true
+    });
+    expect(eligibility.contestedPlayerCardLayout.cardHeight).toBeLessThanOrEqual(76);
+    expect(eligibility.contestedPlayerCardLayout.cardWidth).toBeLessThanOrEqual(150);
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
     expect(eligibility.connectedEmptyReconcile).toMatchObject({
