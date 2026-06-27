@@ -3934,24 +3934,64 @@ test.describe("Lupen browser smoke", () => {
       const bisonBeforeRepair = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
       const originalClient = window.LupenMultiplayerClient;
       let repairSyncPayload = null;
+      let pvpRepairSyncPayload = null;
       window.LupenMultiplayerClient = {
         syncPvpRepairState(payload) {
-          repairSyncPayload = { ...payload };
+          if (repairSyncPayload) pvpRepairSyncPayload = { ...payload };
+          else repairSyncPayload = { ...payload };
           return { ok: true };
         }
       };
       window.eval(`repairCurrentShip();`);
-      window.LupenMultiplayerClient = originalClient;
       const bisonAfterRepair = { ship: currentShipId, hull, hullMax, shield, shieldMax, savedHull: shipConditions.bison.hull };
+      applyServerPvpDamageState({
+        targetSessionId: "local-session",
+        shield: 135,
+        shieldMax: 135,
+        hull: 400,
+        hullMax: 1300,
+        reason: "pvp_damage_applied"
+      });
+      const pvpRepairBefore = {
+        localHull: hull,
+        localHullMax: hullMax,
+        effective: getEffectiveRepairHullState(),
+        cost: getRepairCost()
+      };
+      window.eval(`repairCurrentShip();`);
+      const pvpRepairAfter = {
+        localHull: hull,
+        localHullMax: hullMax,
+        effective: getEffectiveRepairHullState(),
+        displayHull: serverPvpDamageDisplayState?.hull,
+        displayHullMax: serverPvpDamageDisplayState?.hullMax,
+        savedHull: shipConditions.bison.hull
+      };
+      window.LupenMultiplayerClient = originalClient;
       window.eval(`equipShip("falcon");`);
       const falcon = { ship: currentShipId, hull, hullMax, shield, shieldMax, armor, cargo: getShipStats().cargo, jumpRecharge: getShipStats().jumpRecharge, evasion };
-      return { monolith, bisonBeforeRepair, bisonAfterRepair, repairSyncPayload, falcon };
+      return { monolith, bisonBeforeRepair, bisonAfterRepair, repairSyncPayload, pvpRepairBefore, pvpRepairAfter, pvpRepairSyncPayload, falcon };
     });
 
     expect(state.monolith).toMatchObject({ ship: "monolith", hull: 1800, hullMax: 1800, shield: 360, shieldMax: 360 });
     expect(state.bisonBeforeRepair).toMatchObject({ ship: "bison", hull: 930, hullMax: 1300, shield: 77, shieldMax: 135 });
     expect(state.bisonAfterRepair).toMatchObject({ ship: "bison", hull: 1300, hullMax: 1300, savedHull: 1300 });
     expect(state.repairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, reason: "hangar_repair" });
+    expect(state.pvpRepairBefore).toMatchObject({
+      localHull: 1300,
+      localHullMax: 1300,
+      effective: { hull: 400, hullMax: 1300, missingHull: 900, source: "pvp" }
+    });
+    expect(state.pvpRepairBefore.cost).toBeGreaterThan(0);
+    expect(state.pvpRepairAfter).toMatchObject({
+      localHull: 1300,
+      localHullMax: 1300,
+      effective: { hull: 1300, hullMax: 1300, missingHull: 0, source: "local" },
+      displayHull: 1300,
+      displayHullMax: 1300,
+      savedHull: 1300
+    });
+    expect(state.pvpRepairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, reason: "hangar_repair" });
     expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 720, shield: 111, shieldMax: 180 });
     expect(state.monolith.armor).toBe(28);
     expect(state.bisonBeforeRepair.cargo).toBe(260);

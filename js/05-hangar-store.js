@@ -1639,7 +1639,8 @@ function renderHangarOverview() {
 
   const ship = getCurrentShip();
   const stats = getShipStats(currentShipId);
-  const missingHull = Math.max(0, hullMax - hull);
+  const repairState = getEffectiveRepairHullState();
+  const missingHull = repairState.missingHull;
   const repairCost = getRepairCost();
   const repairDisabled = missingHull <= 0 || credits < repairCost;
 
@@ -1662,9 +1663,9 @@ function renderHangarOverview() {
   if (overviewNameplate) overviewNameplate.textContent = ship.name;
 
   if (overviewStats) {
-    const hullPercent = hullMax > 0 ? Math.max(0, Math.min(100, (hull / hullMax) * 100)) : 0;
+    const hullPercent = repairState.hullMax > 0 ? Math.max(0, Math.min(100, (repairState.hull / repairState.hullMax) * 100)) : 0;
     overviewStats.innerHTML = `
-      <div class="hangar-stat-card hull-stat featured-stat"><span>Hull</span><strong>${formatNumber(Math.floor(hull))} / ${formatNumber(hullMax)}</strong><i style="--hull-fill:${hullPercent}%"></i></div>
+      <div class="hangar-stat-card hull-stat featured-stat"><span>Hull</span><strong>${formatNumber(Math.floor(repairState.hull))} / ${formatNumber(repairState.hullMax)}</strong><i style="--hull-fill:${hullPercent}%"></i></div>
       <div class="hangar-stat-card shield-stat"><span>Shield</span><strong>${formatNumber(stats.shield)}</strong></div>
       <div class="hangar-stat-card hull-stat"><span>Armor</span><strong>${formatNumber(stats.armor)}</strong></div>
       <div class="hangar-stat-card cargo-stat"><span>Cargo</span><strong>${formatNumber(stats.cargo)}</strong></div>
@@ -1679,7 +1680,7 @@ function renderHangarOverview() {
         <div>
           <span>Hull Service</span>
           <strong>${missingHull > 0 ? `CR ${formatNumber(repairCost)}` : "Ready"}</strong>
-          <small>${formatNumber(Math.floor(hull))} / ${formatNumber(hullMax)} hull</small>
+          <small>${formatNumber(Math.floor(repairState.hull))} / ${formatNumber(repairState.hullMax)} hull${repairState.source === "pvp" ? " - PvP session" : ""}</small>
         </div>
         <button onclick="repairCurrentShip()" ${repairDisabled ? "disabled" : ""}>${missingHull > 0 ? "Repair" : "Repaired"}</button>
       </div>
@@ -1862,8 +1863,45 @@ function renderFleetDetail() {
   `;
 }
 
+function getCurrentPvpSessionHullState() {
+  const state = typeof serverPvpDamageDisplayState === "object" && serverPvpDamageDisplayState
+    ? serverPvpDamageDisplayState
+    : null;
+  const pvpHull = Number(state?.hull);
+  if (!Number.isFinite(pvpHull)) return null;
+  const pvpHullMax = Number(state?.hullMax);
+  const maxHull = Number.isFinite(pvpHullMax) && pvpHullMax > 0 ? pvpHullMax : hullMax;
+  if (!Number.isFinite(maxHull) || maxHull <= 0) return null;
+  return {
+    hull: Math.max(1, Math.min(maxHull, pvpHull)),
+    hullMax: maxHull,
+    damaged: pvpHull < maxHull
+  };
+}
+
+function getEffectiveRepairHullState() {
+  const localHull = Number.isFinite(Number(hull)) ? Number(hull) : hullMax;
+  const localHullMax = Number.isFinite(Number(hullMax)) && Number(hullMax) > 0 ? Number(hullMax) : 1;
+  const pvpState = getCurrentPvpSessionHullState();
+  if (pvpState?.damaged && pvpState.hull < localHull) {
+    return {
+      hull: pvpState.hull,
+      hullMax: localHullMax,
+      missingHull: Math.max(0, localHullMax - pvpState.hull),
+      source: "pvp"
+    };
+  }
+  return {
+    hull: localHull,
+    hullMax: localHullMax,
+    missingHull: Math.max(0, localHullMax - localHull),
+    source: "local"
+  };
+}
+
 function getRepairCost() {
-  return Math.max(0, Math.ceil((hullMax - hull) * HULL_REPAIR_COST_PER_POINT));
+  const repairState = getEffectiveRepairHullState();
+  return Math.max(0, Math.ceil(repairState.missingHull * HULL_REPAIR_COST_PER_POINT));
 }
 
 function renderRepairSummary(shipId = selectedHangarShipId) {
@@ -1876,14 +1914,15 @@ function renderRepairSummary(shipId = selectedHangarShipId) {
     `;
   }
 
-  const missingHull = Math.max(0, hullMax - hull);
+  const repairState = getEffectiveRepairHullState();
+  const missingHull = repairState.missingHull;
   const repairCost = getRepairCost();
   const disabled = missingHull <= 0 || credits < repairCost;
 
   return `
     <div class="repair-panel">
       <strong>Ship Condition</strong>
-      <span>Hull: ${formatNumber(Math.floor(hull))} / ${formatNumber(hullMax)}</span>
+      <span>Hull: ${formatNumber(Math.floor(repairState.hull))} / ${formatNumber(repairState.hullMax)}${repairState.source === "pvp" ? " (PvP session)" : ""}</span>
       <span>Repair Cost: CR ${formatNumber(repairCost)}</span>
       <button onclick="repairCurrentShip()" ${disabled ? "disabled" : ""}>
         ${missingHull <= 0 ? "Hull Fully Repaired" : "Repair Hull"}
@@ -1908,6 +1947,17 @@ function repairCurrentShip() {
   credits -= repairCost;
   hull = hullMax;
   saveActiveShipCondition(currentShipId);
+
+  if (typeof applyServerPvpDamageState === "function") {
+    applyServerPvpDamageState({
+      targetSessionId: window.LupenMultiplayerClient?.sessionId || "",
+      shield,
+      shieldMax,
+      hull,
+      hullMax,
+      reason: "hangar_repair_local"
+    });
+  }
 
   if (window.LupenMultiplayerClient?.syncPvpRepairState) {
     window.LupenMultiplayerClient.syncPvpRepairState({
