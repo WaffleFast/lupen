@@ -1953,6 +1953,8 @@ function repairCurrentShip() {
       targetSessionId: window.LupenMultiplayerClient?.sessionId || "",
       shield,
       shieldMax,
+      armor,
+      armorMax: armor,
       hull,
       hullMax,
       reason: "hangar_repair_local"
@@ -1966,6 +1968,8 @@ function repairCurrentShip() {
       hullMax,
       shield,
       shieldMax,
+      armor,
+      armorMax: armor,
       reason: "hangar_repair"
     });
   }

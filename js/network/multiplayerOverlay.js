@@ -1170,6 +1170,10 @@
         background: linear-gradient(90deg, #ff533f, #ffbc3d);
       }
 
+      .lupen-target-bar-fill.armor {
+        background: linear-gradient(90deg, #d7dcea, #ffe6a6);
+      }
+
       .lupen-target-bar-fill.shield {
         background: linear-gradient(90deg, #19aaff, #7df5ff);
       }
@@ -1735,9 +1739,16 @@
     const hullMax = Number.isFinite(Number(player.pvpHullMax)) && Number(player.pvpHullMax) > 0
       ? Number(player.pvpHullMax)
       : 0;
+    const armorMax = Number.isFinite(Number(player.pvpArmorMax)) && Number(player.pvpArmorMax) >= 0
+      ? Number(player.pvpArmorMax)
+      : Number.isFinite(Number(player.pvpArmor)) && Number(player.pvpArmor) > 0
+        ? Number(player.pvpArmor)
+        : 0;
     return {
       shield: Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : shieldMax,
       shieldMax,
+      armor: Number.isFinite(Number(player.pvpArmor)) ? Number(player.pvpArmor) : armorMax,
+      armorMax,
       hull: Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : hullMax,
       hullMax
     };
@@ -2279,10 +2290,11 @@
       card.appendChild(ship);
 
       const vitals = playerVitals || getRemotePlayerPvpVitals(selectedPlayer);
-      if (vitals.shieldMax > 0 || vitals.hullMax > 0) {
+      if (vitals.shieldMax > 0 || vitals.armorMax > 0 || vitals.hullMax > 0) {
         const bars = global.document.createElement("div");
         bars.className = "lupen-target-bars";
         appendTargetBar(bars, vitals.hull, vitals.hullMax, "hull");
+        appendTargetBar(bars, vitals.armor, vitals.armorMax, "armor");
         appendTargetBar(bars, vitals.shield, vitals.shieldMax, "shield");
         card.appendChild(bars);
       }

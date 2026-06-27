@@ -734,6 +734,9 @@ function getMultiplayerPresencePayload(overrides = {}) {
   const activeHullMax = Number.isFinite(Number(hullMax)) && Number(hullMax) > 0
     ? Number(hullMax)
     : Number(shipStats.hullMax || shipStats.hull || 0);
+  const activeArmorMax = Number.isFinite(Number(armor)) && Number(armor) > 0
+    ? Number(armor)
+    : Number(shipStats.armor || 0);
   const spaceScreen = document.getElementById("spaceScreen");
   const inferredPresenceStatus = spaceScreen?.classList.contains("active") ? "space" : "docked";
   return {
@@ -750,6 +753,8 @@ function getMultiplayerPresencePayload(overrides = {}) {
     shipName,
     ship: shipName,
     shieldMax: Math.max(0, Math.round(activeShieldMax)),
+    armor: Math.max(0, Math.round(activeArmorMax)),
+    armorMax: Math.max(0, Math.round(activeArmorMax)),
     hullMax: Math.max(1, Math.round(activeHullMax || 1)),
     equippedWeaponKey: equippedWeaponKeys[0] || "",
     equippedWeaponKeys,

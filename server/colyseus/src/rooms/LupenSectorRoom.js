@@ -351,6 +351,8 @@ type("number")(LupenSectorPlayer.prototype, "lastFireAt");
 type("number")(LupenSectorPlayer.prototype, "nextFireAt");
 type("number")(LupenSectorPlayer.prototype, "pvpShield");
 type("number")(LupenSectorPlayer.prototype, "pvpShieldMax");
+type("number")(LupenSectorPlayer.prototype, "pvpArmor");
+type("number")(LupenSectorPlayer.prototype, "pvpArmorMax");
 type("number")(LupenSectorPlayer.prototype, "pvpHull");
 type("number")(LupenSectorPlayer.prototype, "pvpHullMax");
 type("number")(LupenSectorPlayer.prototype, "lastPvpHitAt");
@@ -533,11 +535,17 @@ function isMapOnePvpContestedNode(nodeId = "") {
 function ensurePlayerPvpState(player) {
   if (!player) return null;
   player.pvpShieldMax = Math.max(1, Math.round(Number(player.pvpShieldMax || player.shieldMax || STAGING_PVP_SHIELD_MAX)));
+  player.pvpArmorMax = Math.max(0, Math.round(Number(player.pvpArmorMax || player.armorMax || player.armor || 0)));
   player.pvpHullMax = Math.max(STAGING_PVP_MIN_HULL, Math.round(Number(player.pvpHullMax || STAGING_PVP_HULL_MAX)));
   player.pvpShield = clampNumber(
     Math.round(Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : player.pvpShieldMax),
     0,
     player.pvpShieldMax
+  );
+  player.pvpArmor = clampNumber(
+    Math.round(Number.isFinite(Number(player.pvpArmor)) ? Number(player.pvpArmor) : player.pvpArmorMax),
+    0,
+    player.pvpArmorMax
   );
   player.pvpHull = clampNumber(
     Math.round(Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : player.pvpHullMax),
@@ -563,6 +571,16 @@ function updatePlayerPvpCapacityFromPresence(player, message = {}) {
       : clampNumber(Number(player.pvpShield || 0), 0, nextShieldMax);
   }
 
+  const requestedArmorMax = Number(message.pvpArmorMax ?? message.armorMax ?? message.armor);
+  if (Number.isFinite(requestedArmorMax) && requestedArmorMax >= 0) {
+    const nextArmorMax = clampNumber(Math.round(requestedArmorMax), 0, 10000);
+    const previousArmorMax = Number(player.pvpArmorMax || 0);
+    player.pvpArmorMax = nextArmorMax;
+    player.pvpArmor = previousArmorMax <= 0 && Number(player.lastPvpHitAt || 0) <= 0
+      ? nextArmorMax
+      : clampNumber(Number(player.pvpArmor || 0), 0, nextArmorMax);
+  }
+
   const requestedHullMax = Number(message.pvpHullMax ?? message.hullMax ?? message.maxHull);
   if (Number.isFinite(requestedHullMax) && requestedHullMax > 0) {
     const nextHullMax = clampNumber(Math.round(requestedHullMax), STAGING_PVP_MIN_HULL, 10000);
@@ -579,11 +597,13 @@ function syncPlayerPvpRepairState(player, message = {}, now = Date.now()) {
   ensurePlayerPvpState(player);
 
   const shieldBefore = Number(player.pvpShield || 0);
+  const armorBefore = Number(player.pvpArmor || 0);
   const hullBefore = Number(player.pvpHull || STAGING_PVP_MIN_HULL);
 
   // PvP shields auto-regen in flight, but Hangar repair clears the shared
   // session damage snapshot so stale server values do not override repaired HUDs.
   player.pvpShield = Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX);
+  player.pvpArmor = Number(player.pvpArmorMax || 0);
   // PvP hull never auto-regens; only the explicit repair flow restores it.
   player.pvpHull = Number(player.pvpHullMax || STAGING_PVP_HULL_MAX);
   player.lastPvpHitAt = 0;
@@ -595,10 +615,77 @@ function syncPlayerPvpRepairState(player, message = {}, now = Date.now()) {
     hullBefore,
     shield: player.pvpShield,
     shieldMax: player.pvpShieldMax,
+    armorBefore,
+    armor: player.pvpArmor,
+    armorMax: player.pvpArmorMax,
     hull: player.pvpHull,
     hullMax: player.pvpHullMax,
     hullRepaired: player.pvpHull > hullBefore,
-    shieldRestored: player.pvpShield > shieldBefore
+    shieldRestored: player.pvpShield > shieldBefore,
+    armorRestored: player.pvpArmor > armorBefore
+  };
+}
+
+export function applyLayeredPvpDamage(target, damage) {
+  if (!target) {
+    return {
+      damage: 0,
+      requestedDamage: 0,
+      shieldDamage: 0,
+      armorDamage: 0,
+      hullDamage: 0,
+      shieldBefore: 0,
+      shield: 0,
+      shieldMax: 0,
+      armorBefore: 0,
+      armor: 0,
+      armorMax: 0,
+      hullBefore: STAGING_PVP_MIN_HULL,
+      hull: STAGING_PVP_MIN_HULL,
+      hullMax: STAGING_PVP_MIN_HULL,
+      defeated: false
+    };
+  }
+
+  const requestedDamage = Math.max(0, Math.round(Number(damage || 0)));
+  let remaining = requestedDamage;
+  const shieldMax = Math.max(0, Math.round(Number(target.pvpShieldMax || target.shieldMax || 0)));
+  const armorMax = Math.max(0, Math.round(Number(target.pvpArmorMax || target.armorMax || target.armor || 0)));
+  const hullMax = Math.max(STAGING_PVP_MIN_HULL, Math.round(Number(target.pvpHullMax || target.hullMax || STAGING_PVP_HULL_MAX)));
+  const shieldBefore = clampNumber(Math.round(Number(target.pvpShield || 0)), 0, shieldMax);
+  const armorBefore = clampNumber(Math.round(Number(target.pvpArmor || 0)), 0, armorMax);
+  const hullBefore = clampNumber(Math.round(Number(target.pvpHull || hullMax)), STAGING_PVP_MIN_HULL, hullMax);
+
+  const shieldDamage = Math.min(shieldBefore, remaining);
+  target.pvpShield = Math.max(0, shieldBefore - shieldDamage);
+  remaining = Math.max(0, remaining - shieldDamage);
+
+  const armorDamage = Math.min(armorBefore, remaining);
+  target.pvpArmor = Math.max(0, armorBefore - armorDamage);
+  remaining = Math.max(0, remaining - armorDamage);
+
+  const hullDamage = Math.min(Math.max(0, hullBefore - STAGING_PVP_MIN_HULL), remaining);
+  target.pvpHull = Math.max(STAGING_PVP_MIN_HULL, hullBefore - hullDamage);
+  target.pvpShieldMax = shieldMax;
+  target.pvpArmorMax = armorMax;
+  target.pvpHullMax = hullMax;
+
+  return {
+    damage: shieldDamage + armorDamage + hullDamage,
+    requestedDamage,
+    shieldDamage,
+    armorDamage,
+    hullDamage,
+    shieldBefore,
+    shield: target.pvpShield,
+    shieldMax: target.pvpShieldMax,
+    armorBefore,
+    armor: target.pvpArmor,
+    armorMax: target.pvpArmorMax,
+    hullBefore,
+    hull: target.pvpHull,
+    hullMax: target.pvpHullMax,
+    defeated: false
   };
 }
 
@@ -1481,6 +1568,8 @@ export class LupenSectorRoom extends Room {
         recoveredPvpState = {
           pvpShield: player.pvpShield,
           pvpShieldMax: player.pvpShieldMax,
+          pvpArmor: player.pvpArmor,
+          pvpArmorMax: player.pvpArmorMax,
           pvpHull: player.pvpHull,
           pvpHullMax: player.pvpHullMax,
           lastPvpHitAt: player.lastPvpHitAt,
@@ -1692,6 +1781,8 @@ export class LupenSectorRoom extends Room {
         shieldBefore,
         shield: player.pvpShield,
         shieldMax: player.pvpShieldMax,
+        armor: player.pvpArmor,
+        armorMax: player.pvpArmorMax,
         hull: player.pvpHull,
         hullMax: player.pvpHullMax,
         regenAmount: shieldAfter - shieldBefore,
@@ -3624,30 +3715,10 @@ export class LupenSectorRoom extends Room {
   applyStagingPvpDamage(targetPlayer, damage = STAGING_PVP_TEST_DAMAGE) {
     ensurePlayerPvpState(targetPlayer);
     const requestedDamage = clampNumber(Math.round(Number(damage || STAGING_PVP_TEST_DAMAGE)), 1, STAGING_DAMAGE_MAX);
-    const shieldBefore = Number(targetPlayer.pvpShield || 0);
-    const hullBefore = Number(targetPlayer.pvpHull || STAGING_PVP_HULL_MAX);
-    const shieldDamage = Math.min(shieldBefore, requestedDamage);
-    const remainingDamage = Math.max(0, requestedDamage - shieldDamage);
-    const hullDamage = Math.min(Math.max(0, hullBefore - STAGING_PVP_MIN_HULL), remainingDamage);
-
-    targetPlayer.pvpShield = Math.max(0, shieldBefore - shieldDamage);
-    targetPlayer.pvpHull = Math.max(STAGING_PVP_MIN_HULL, hullBefore - hullDamage);
+    const result = applyLayeredPvpDamage(targetPlayer, requestedDamage);
     targetPlayer.lastPvpHitAt = Date.now();
     targetPlayer.lastPvpShieldRegenAt = 0;
-
-    return {
-      damage: shieldDamage + hullDamage,
-      requestedDamage,
-      shieldDamage,
-      hullDamage,
-      shieldBefore,
-      shield: targetPlayer.pvpShield,
-      shieldMax: targetPlayer.pvpShieldMax,
-      hullBefore,
-      hull: targetPlayer.pvpHull,
-      hullMax: targetPlayer.pvpHullMax,
-      defeated: false
-    };
+    return result;
   }
 
   resolvePvpCombatIntent(client, message = {}, messageType = "combat:intent") {
@@ -3718,10 +3789,14 @@ export class LupenSectorRoom extends Room {
       playerDamageApplied: true,
       mutatedPlayerState: true,
       shieldDamage: result.shieldDamage,
+      armorDamage: result.armorDamage,
       hullDamage: result.hullDamage,
       shieldBefore: result.shieldBefore,
       shield: result.shield,
       shieldMax: result.shieldMax,
+      armorBefore: result.armorBefore,
+      armor: result.armor,
+      armorMax: result.armorMax,
       hullBefore: result.hullBefore,
       hull: result.hull,
       hullMax: result.hullMax,

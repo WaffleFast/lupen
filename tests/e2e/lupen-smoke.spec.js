@@ -1482,6 +1482,8 @@ test.describe("Lupen browser smoke", () => {
           guildId: "",
           pvpShield: 30,
           pvpShieldMax: 30,
+          pvpArmor: 12,
+          pvpArmorMax: 12,
           pvpHull: 120,
           pvpHullMax: 120
         };
@@ -1825,7 +1827,7 @@ test.describe("Lupen browser smoke", () => {
       underGhost: true,
       clearOfButton: true
     });
-    expect(eligibility.contestedPlayerCardLayout.cardHeight).toBeLessThanOrEqual(76);
+    expect(eligibility.contestedPlayerCardLayout.cardHeight).toBeLessThanOrEqual(82);
     expect(eligibility.contestedPlayerCardLayout.cardWidth).toBeLessThanOrEqual(150);
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");
@@ -3976,7 +3978,7 @@ test.describe("Lupen browser smoke", () => {
     expect(state.monolith).toMatchObject({ ship: "monolith", hull: 1800, hullMax: 1800, shield: 360, shieldMax: 360 });
     expect(state.bisonBeforeRepair).toMatchObject({ ship: "bison", hull: 930, hullMax: 1300, shield: 77, shieldMax: 135 });
     expect(state.bisonAfterRepair).toMatchObject({ ship: "bison", hull: 1300, hullMax: 1300, savedHull: 1300 });
-    expect(state.repairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, reason: "hangar_repair" });
+    expect(state.repairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, armor: 18, armorMax: 18, reason: "hangar_repair" });
     expect(state.pvpRepairBefore).toMatchObject({
       localHull: 1300,
       localHullMax: 1300,
@@ -3991,7 +3993,7 @@ test.describe("Lupen browser smoke", () => {
       displayHullMax: 1300,
       savedHull: 1300
     });
-    expect(state.pvpRepairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, reason: "hangar_repair" });
+    expect(state.pvpRepairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, armor: 18, armorMax: 18, reason: "hangar_repair" });
     expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 720, shield: 111, shieldMax: 180 });
     expect(state.monolith.armor).toBe(28);
     expect(state.bisonBeforeRepair.cargo).toBe(260);

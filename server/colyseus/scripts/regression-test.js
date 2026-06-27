@@ -2,6 +2,7 @@ import { Client } from "colyseus.js";
 import { ROOM_NAME } from "../src/app.config.js";
 import {
   STAGING_BOT_ALLOWED_NODE_IDS,
+  applyLayeredPvpDamage,
   buildRewardClaimStatus,
   buildRewardWritePlan,
   getPresenceIdentityKey,
@@ -96,6 +97,52 @@ let roomC = null;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function assertLayeredPvpDamageHelper() {
+  const target = {
+    pvpShield: 120,
+    pvpShieldMax: 120,
+    pvpArmor: 0,
+    pvpArmorMax: 0,
+    pvpHull: 700,
+    pvpHullMax: 700
+  };
+
+  const shieldOnly = applyLayeredPvpDamage(target, 36);
+  assert(shieldOnly.shieldDamage === 36, `Expected 36 shield damage, got ${shieldOnly.shieldDamage}.`);
+  assert(shieldOnly.armorDamage === 0, `Expected 0 armor damage while shield is active, got ${shieldOnly.armorDamage}.`);
+  assert(shieldOnly.hullDamage === 0, `Expected 0 hull damage while shield is active, got ${shieldOnly.hullDamage}.`);
+  assert(target.pvpShield === 84, `Expected shield 84 after first layered hit, got ${target.pvpShield}.`);
+  assert(target.pvpHull === 700, `Hull changed while shield was active: ${target.pvpHull}.`);
+
+  const shieldDepletedNoOverflow = applyLayeredPvpDamage(target, 84);
+  assert(shieldDepletedNoOverflow.shieldDamage === 84, `Expected remaining shield to absorb 84, got ${shieldDepletedNoOverflow.shieldDamage}.`);
+  assert(shieldDepletedNoOverflow.hullDamage === 0, `Hull changed when damage exactly depleted shield: ${shieldDepletedNoOverflow.hullDamage}.`);
+  assert(target.pvpShield === 0, `Expected shield 0 after exact depletion, got ${target.pvpShield}.`);
+  assert(target.pvpHull === 700, `Hull changed on exact shield depletion: ${target.pvpHull}.`);
+
+  target.pvpArmor = 15;
+  target.pvpArmorMax = 15;
+  const armorOverflow = applyLayeredPvpDamage(target, 20);
+  assert(armorOverflow.shieldDamage === 0, "Shield damage occurred after shield was depleted.");
+  assert(armorOverflow.armorDamage === 15, `Expected armor to absorb 15, got ${armorOverflow.armorDamage}.`);
+  assert(armorOverflow.hullDamage === 5, `Expected hull to take only 5 overflow, got ${armorOverflow.hullDamage}.`);
+  assert(target.pvpArmor === 0, `Expected armor 0 after overflow, got ${target.pvpArmor}.`);
+  assert(target.pvpHull === 695, `Expected hull 695 after overflow, got ${target.pvpHull}.`);
+
+  const clampTarget = {
+    pvpShield: 0,
+    pvpShieldMax: 120,
+    pvpArmor: 0,
+    pvpArmorMax: 0,
+    pvpHull: 3,
+    pvpHullMax: 700
+  };
+  const clamped = applyLayeredPvpDamage(clampTarget, 50);
+  assert(clamped.hullDamage === 2, `Expected hull damage to clamp at 1 hull, got ${clamped.hullDamage}.`);
+  assert(clampTarget.pvpHull === 1, `PvP hull dropped below prototype clamp: ${clampTarget.pvpHull}.`);
+  console.log("layered PvP damage helper preserves shield/armor/hull order");
 }
 
 function waitFor(description, predicate, timeoutMs = 4000) {
@@ -4322,6 +4369,7 @@ try {
   await assertStagingBountyHelpers();
   await assertIdentityVerificationAndRewardPlanHelpers();
   assertPresenceIdentityHelpers();
+  assertLayeredPvpDamageHelper();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot A",

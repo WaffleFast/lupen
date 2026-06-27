@@ -1072,6 +1072,8 @@
       nextFireAt: Number.isFinite(Number(player.nextFireAt)) ? Number(player.nextFireAt) : 0,
       pvpShield: Number.isFinite(Number(player.pvpShield)) ? Number(player.pvpShield) : null,
       pvpShieldMax: Number.isFinite(Number(player.pvpShieldMax)) ? Number(player.pvpShieldMax) : null,
+      pvpArmor: Number.isFinite(Number(player.pvpArmor)) ? Number(player.pvpArmor) : null,
+      pvpArmorMax: Number.isFinite(Number(player.pvpArmorMax)) ? Number(player.pvpArmorMax) : null,
       pvpHull: Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : null,
       pvpHullMax: Number.isFinite(Number(player.pvpHullMax)) ? Number(player.pvpHullMax) : null,
       lastPvpHitAt: Number.isFinite(Number(player.lastPvpHitAt)) ? Number(player.lastPvpHitAt) : 0,
@@ -1090,6 +1092,8 @@
       ...existing,
       pvpShield: Number.isFinite(Number(state.shield)) ? Number(state.shield) : existing.pvpShield,
       pvpShieldMax: Number.isFinite(Number(state.shieldMax)) ? Number(state.shieldMax) : existing.pvpShieldMax,
+      pvpArmor: Number.isFinite(Number(state.armor)) ? Number(state.armor) : existing.pvpArmor,
+      pvpArmorMax: Number.isFinite(Number(state.armorMax)) ? Number(state.armorMax) : existing.pvpArmorMax,
       pvpHull: Number.isFinite(Number(state.hull)) ? Number(state.hull) : existing.pvpHull,
       pvpHullMax: Number.isFinite(Number(state.hullMax)) ? Number(state.hullMax) : existing.pvpHullMax,
       lastPvpHitAt: Number.isFinite(Number(state.lastPvpHitAt)) ? Number(state.lastPvpHitAt) : existing.lastPvpHitAt,
@@ -2418,6 +2422,9 @@
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         shieldDamage: Number.isFinite(Number(message?.shieldDamage)) ? Number(message.shieldDamage) : 0,
         shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        armor: Number.isFinite(Number(message?.armor)) ? Number(message.armor) : 0,
+        armorDamage: Number.isFinite(Number(message?.armorDamage)) ? Number(message.armorDamage) : 0,
+        armorMax: Number.isFinite(Number(message?.armorMax)) ? Number(message.armorMax) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         hullDamage: Number.isFinite(Number(message?.hullDamage)) ? Number(message.hullDamage) : 0,
         hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
@@ -2443,8 +2450,9 @@
       const attackerSessionId = String(message?.attackerSessionId || "");
       const targetSessionId = String(message?.targetSessionId || message?.targetPlayerId || "");
       const shieldDamage = Number.isFinite(Number(message?.shieldDamage)) ? Number(message.shieldDamage) : 0;
+      const armorDamage = Number.isFinite(Number(message?.armorDamage)) ? Number(message.armorDamage) : 0;
       const hullDamage = Number.isFinite(Number(message?.hullDamage)) ? Number(message.hullDamage) : 0;
-      const totalDamage = Number.isFinite(Number(message?.damage)) ? Number(message.damage) : shieldDamage + hullDamage;
+      const totalDamage = Number.isFinite(Number(message?.damage)) ? Number(message.damage) : shieldDamage + armorDamage + hullDamage;
       const receivedAt = Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now();
       connection.lastPvpHitEvent = {
         ok: message?.ok === true,
@@ -2458,9 +2466,12 @@
         targetNode: String(message?.targetNode || ""),
         damage: totalDamage,
         shieldDamage,
+        armorDamage,
         hullDamage,
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        armor: Number.isFinite(Number(message?.armor)) ? Number(message.armor) : 0,
+        armorMax: Number.isFinite(Number(message?.armorMax)) ? Number(message.armorMax) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
         defeated: message?.defeated === true,
@@ -2509,6 +2520,8 @@
         shieldBefore: Number.isFinite(Number(message?.shieldBefore)) ? Number(message.shieldBefore) : null,
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        armor: Number.isFinite(Number(message?.armor)) ? Number(message.armor) : 0,
+        armorMax: Number.isFinite(Number(message?.armorMax)) ? Number(message.armorMax) : 0,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
         regenAmount: Number.isFinite(Number(message?.regenAmount)) ? Number(message.regenAmount) : 0,
@@ -2544,6 +2557,9 @@
         shieldBefore: Number.isFinite(Number(message?.shieldBefore)) ? Number(message.shieldBefore) : null,
         shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
         shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        armorBefore: Number.isFinite(Number(message?.armorBefore)) ? Number(message.armorBefore) : null,
+        armor: Number.isFinite(Number(message?.armor)) ? Number(message.armor) : 0,
+        armorMax: Number.isFinite(Number(message?.armorMax)) ? Number(message.armorMax) : 0,
         hullBefore: Number.isFinite(Number(message?.hullBefore)) ? Number(message.hullBefore) : null,
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
@@ -3415,6 +3431,8 @@
         hullMax: Number.isFinite(Number(options.hullMax)) ? Math.round(Number(options.hullMax)) : null,
         shield: Number.isFinite(Number(options.shield)) ? Math.round(Number(options.shield)) : null,
         shieldMax: Number.isFinite(Number(options.shieldMax)) ? Math.round(Number(options.shieldMax)) : null,
+        armor: Number.isFinite(Number(options.armor)) ? Math.round(Number(options.armor)) : null,
+        armorMax: Number.isFinite(Number(options.armorMax)) ? Math.round(Number(options.armorMax)) : null,
         reason: String(options.reason || "hangar_repair")
       });
     },

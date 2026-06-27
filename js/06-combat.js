@@ -38,13 +38,17 @@ function reportPvpHullStatusFeedback(state = {}) {
 function applyServerPvpDamageState(hit = {}) {
   const shieldMaxValue = Number(hit.shieldMax);
   const hullMaxValue = Number(hit.hullMax);
+  const armorMaxValue = Number(hit.armorMax);
   const shieldValue = Number(hit.shield);
+  const armorValue = Number(hit.armor);
   const hullValue = Number(hit.hull);
   if (!Number.isFinite(shieldValue) && !Number.isFinite(hullValue)) return false;
 
   serverPvpDamageDisplayState = {
     shield: Number.isFinite(shieldValue) ? Math.max(0, shieldValue) : null,
     shieldMax: Number.isFinite(shieldMaxValue) && shieldMaxValue > 0 ? shieldMaxValue : null,
+    armor: Number.isFinite(armorValue) ? Math.max(0, armorValue) : null,
+    armorMax: Number.isFinite(armorMaxValue) && armorMaxValue >= 0 ? armorMaxValue : null,
     hull: Number.isFinite(hullValue) ? Math.max(1, hullValue) : null,
     hullMax: Number.isFinite(hullMaxValue) && hullMaxValue > 0 ? hullMaxValue : null,
     updatedAt: Date.now()
