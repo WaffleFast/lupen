@@ -1479,6 +1479,7 @@ test.describe("Lupen browser smoke", () => {
           currentNode: "Asteron Prime",
           presenceStatus: "space",
           shipName: "Azure Striker",
+          shipImage: "assets/ships/azure-striker/azure-striker-medium.webp",
           guildId: "",
           pvpShield: 30,
           pvpShieldMax: 30,
@@ -1577,6 +1578,24 @@ test.describe("Lupen browser smoke", () => {
           const disabledTargetCardText = disabledTargetCard?.textContent || "";
           const disabledTargetCardClass = disabledTargetCard?.className || "";
           remotePlayer.pvpHull = 120;
+
+          const sustainedPvpVisibilitySnapshots = [];
+          for (let index = 0; index < 7; index += 1) {
+            remotePlayer.pvpShield = Math.max(0, 24 - index * 4);
+            remotePlayer.pvpArmor = 12;
+            remotePlayer.pvpHull = Math.max(22, 120 - index * 11);
+            remotePlayer.currentNode = "Lower Gate Core";
+            remotePlayer.presenceStatus = "space";
+            window.LupenMultiplayerOverlay?.render?.();
+            const ghost = document.querySelector('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="remote-pvp-test"]');
+            sustainedPvpVisibilitySnapshots.push({
+              ghostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="remote-pvp-test"]').length,
+              selected: ghost?.classList.contains("is-selected") || false,
+              imageSrc: ghost?.querySelector(".lupen-mp-space-ghost-ship img")?.getAttribute("src") || "",
+              label: ghost?.querySelector(".lupen-mp-space-ghost-label")?.textContent || "",
+              node: remotePlayer.currentNode
+            });
+          }
 
           asteroids = [{
             id: "local-only-test-asteroid",
@@ -1817,6 +1836,7 @@ test.describe("Lupen browser smoke", () => {
             criticalTargetCardClass,
             disabledTargetCardText,
             disabledTargetCardClass,
+            sustainedPvpVisibilitySnapshots,
             connectedEmptyReconcile,
             connectedEmptySnapshot,
             connectedEmptyLocalAsteroidButtonCount,
@@ -1890,6 +1910,16 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.disabledTargetCardText).toContain("REPAIR");
     expect(eligibility.disabledTargetCardText).not.toContain("Repair required");
     expect(eligibility.disabledTargetCardClass).toContain("pvp-disabled-threshold");
+    expect(eligibility.sustainedPvpVisibilitySnapshots).toHaveLength(7);
+    eligibility.sustainedPvpVisibilitySnapshots.forEach((snapshot) => {
+      expect(snapshot).toMatchObject({
+        ghostCount: 1,
+        selected: true,
+        label: "Remote Pilot",
+        node: "Lower Gate Core"
+      });
+      expect(snapshot.imageSrc).toContain("azure-striker");
+    });
     expect(eligibility.connectedEmptyReconcile).toMatchObject({
       reconciled: true,
       serverOwnedActive: true

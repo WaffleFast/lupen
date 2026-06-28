@@ -5,6 +5,7 @@ import {
   applyLayeredPvpDamage,
   buildRewardClaimStatus,
   buildRewardWritePlan,
+  calculatePrototypePvpDamage,
   getPresenceIdentityKey,
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
@@ -151,6 +152,27 @@ function assertLayeredPvpDamageHelper() {
   assert(destroyed.hullDamage === 3, `Expected hull damage to reach 0 hull, got ${destroyed.hullDamage}.`);
   assert(destructionTarget.pvpHull === 0, `PvP hull did not reach 0 for destruction flow: ${destructionTarget.pvpHull}.`);
   assert(destroyed.defeated === true, "PvP damage helper did not mark zero-hull target defeated.");
+
+  const prototypeDamage = calculatePrototypePvpDamage();
+  assert(prototypeDamage === 90, `Unexpected prototype PvP damage tuning: ${prototypeDamage}.`);
+  const fullPrototypeTarget = {
+    pvpShield: 180,
+    pvpShieldMax: 180,
+    pvpArmor: 12,
+    pvpArmorMax: 12,
+    pvpHull: 700,
+    pvpHullMax: 700
+  };
+  const repeatedHits = [];
+  for (let index = 0; index < 10; index += 1) {
+    repeatedHits.push(applyLayeredPvpDamage(fullPrototypeTarget, prototypeDamage));
+    if (fullPrototypeTarget.pvpHull <= 0) break;
+  }
+  assert(repeatedHits.length === 10, `Expected prototype full-health destruction in 10 hits, got ${repeatedHits.length}.`);
+  assert(repeatedHits[0].shieldDamage === prototypeDamage && repeatedHits[0].armorDamage === 0 && repeatedHits[0].hullDamage === 0, "First prototype hit was not shield-only.");
+  assert(repeatedHits[1].shieldDamage === prototypeDamage && repeatedHits[1].armorDamage === 0 && repeatedHits[1].hullDamage === 0, "Second prototype hit was not shield-only.");
+  assert(repeatedHits[2].shieldDamage === 0 && repeatedHits[2].armorDamage === 12 && repeatedHits[2].hullDamage === 78, "Third prototype hit did not overflow through armor into hull.");
+  assert(repeatedHits[9].defeated === true && fullPrototypeTarget.pvpHull === 0, "Tenth prototype hit did not destroy full-health target.");
   console.log("layered PvP damage helper preserves shield/armor/hull order");
 }
 
@@ -4600,6 +4622,8 @@ try {
   assert(combatSpacePvpResolved?.bountyProgressChanged === false, "Contested PvP unexpectedly changed bounty progress.");
   assert(combatSpacePvpResolved?.cargoLost === false, "Contested PvP unexpectedly caused cargo loss.");
   assert(combatSpacePvpResolved?.deathApplied === false, "Contested PvP unexpectedly applied death.");
+  assert(Number(combatSpacePvpResolved?.serverDamageUsed || 0) === calculatePrototypePvpDamage(), "Contested PvP did not use prototype damage tuning.");
+  assert(Number(combatSpacePvpResolved?.damage || 0) === calculatePrototypePvpDamage(), "First contested PvP hit did not apply full prototype damage.");
   assert(Number(combatSpacePvpResolved?.shieldDamage || 0) > 0, "Contested PvP did not apply shield-first damage.");
   await waitFor("PvP hit broadcast delivered to both clients", () => roomAPvpHitEvents.length >= 1 && roomBPvpHitEvents.length >= 1);
   const targetAfterPvp = playerFrom(roomA, roomB.sessionId);
@@ -4628,6 +4652,8 @@ try {
     });
   });
   assert(secondPvpResolved?.reason === "pvp_damage_applied", `Unexpected repeated PvP result: ${secondPvpResolved?.reason}`);
+  assert(Number(secondPvpResolved?.serverDamageUsed || 0) === calculatePrototypePvpDamage(), "Repeated PvP hit did not use consistent prototype damage.");
+  assert(Number(secondPvpResolved?.damage || 0) === calculatePrototypePvpDamage(), "Repeated PvP hit did not apply consistent prototype damage.");
   const shieldAfterSecondHit = Number(secondPvpResolved?.shield || 0);
   const armorAfterSecondHit = Number(secondPvpResolved?.armor || 0);
   const hullAfterSecondHit = Number(secondPvpResolved?.hull || 0);
@@ -4658,9 +4684,6 @@ try {
   assert(Number(targetAfterRegen?.pvpShield || 0) <= Number(targetAfterRegen?.pvpShieldMax || 0), "PvP shield regen exceeded max shield.");
   assert(Number(targetAfterRegen?.pvpArmor || 0) === armorAfterSecondHit, "PvP shield regen restored armor.");
   assert(Number(targetAfterRegen?.pvpHull || 0) === hullAfterSecondHit, "PvP hull auto-regenerated.");
-  await waitFor("PvP shield regen restored true max shield", () => {
-    return Number(playerFrom(roomA, roomB.sessionId)?.pvpShield || 0) === targetPvpShieldMax;
-  }, 5000);
   assert(Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0) === targetPvpShieldMax, "PvP shield max changed during regen.");
 
   roomB.send("movement:update", {

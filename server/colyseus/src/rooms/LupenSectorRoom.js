@@ -201,7 +201,7 @@ const BOT_NODE_LINKS = new Map(
 const BOT_MOVE_TICK_MS = 4000;
 const BOT_NODE_MOVE_MS = 16000;
 const STAGING_TEST_DAMAGE = 5;
-const STAGING_PVP_TEST_DAMAGE = 6;
+const STAGING_PVP_TEST_DAMAGE = 90;
 const STAGING_PVP_SHIELD_MAX = 30;
 const STAGING_PVP_HULL_MAX = 120;
 const STAGING_PVP_MIN_HULL = 1;
@@ -711,6 +711,10 @@ export function applyLayeredPvpDamage(target, damage) {
     hullMax: target.pvpHullMax,
     defeated: target.pvpHull <= 0 && hullBefore > 0
   };
+}
+
+export function calculatePrototypePvpDamage() {
+  return STAGING_PVP_TEST_DAMAGE;
 }
 
 function getPvpEligibilityPreview(attacker = null, target = null, currentNode = "") {
@@ -3744,9 +3748,9 @@ export class LupenSectorRoom extends Room {
     return null;
   }
 
-  applyStagingPvpDamage(targetPlayer, damage = STAGING_PVP_TEST_DAMAGE) {
+  applyStagingPvpDamage(targetPlayer, damage = calculatePrototypePvpDamage()) {
     ensurePlayerPvpState(targetPlayer);
-    const requestedDamage = clampNumber(Math.round(Number(damage || STAGING_PVP_TEST_DAMAGE)), 1, STAGING_DAMAGE_MAX);
+    const requestedDamage = clampNumber(Math.round(Number(damage || calculatePrototypePvpDamage())), 1, 1000);
     const result = applyLayeredPvpDamage(targetPlayer, requestedDamage);
     targetPlayer.lastPvpHitAt = Date.now();
     targetPlayer.lastPvpShieldRegenAt = 0;
@@ -3866,7 +3870,8 @@ export class LupenSectorRoom extends Room {
 
     ensurePlayerPvpState(attacker);
     ensurePlayerPvpState(targetPlayer);
-    const result = this.applyStagingPvpDamage(targetPlayer, STAGING_PVP_TEST_DAMAGE);
+    const serverDamageUsed = calculatePrototypePvpDamage(attacker, targetPlayer);
+    const result = this.applyStagingPvpDamage(targetPlayer, serverDamageUsed);
     const targetDefeated = result.defeated === true || Number(result.hull || 0) <= 0;
     attacker.lastFireAt = now;
     attacker.nextPvpFireAt = now + STAGING_PVP_COOLDOWN_MS;
@@ -3892,7 +3897,7 @@ export class LupenSectorRoom extends Room {
       weaponFamily: getSafeIdentityValue(message.weaponFamily),
       damage: result.damage,
       requestedDamage: result.requestedDamage,
-      serverDamageUsed: STAGING_PVP_TEST_DAMAGE,
+      serverDamageUsed,
       pvpDamageApplied: true,
       playerDamageApplied: true,
       mutatedPlayerState: true,

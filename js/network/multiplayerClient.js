@@ -1088,11 +1088,17 @@
     if (!targetId) return false;
     const existing = playersById.get(targetId);
     if (!existing) return false;
-      playersById.set(targetId, {
-        ...existing,
-        currentNode: String(state.currentNode || state.targetNode || existing.currentNode || "Asteron Prime"),
-        presenceStatus: String(state.presenceStatus || existing.presenceStatus || "space"),
-        pvpShield: Number.isFinite(Number(state.shield)) ? Number(state.shield) : existing.pvpShield,
+    const now = Number.isFinite(Number(state.receivedAt)) ? Number(state.receivedAt) : Date.now();
+    const nextNode = String(state.targetNode || state.currentNode || existing.currentNode || "Asteron Prime");
+    const nextPresenceStatus = String(state.presenceStatus || existing.presenceStatus || "space") === "docked" ? "docked" : "space";
+    playersById.set(targetId, {
+      ...existing,
+      currentNode: nextNode,
+      presenceStatus: nextPresenceStatus,
+      snapshotSeenAt: now,
+      snapshotMissingSince: 0,
+      lastSeenAt: Math.max(Number(existing.lastSeenAt || 0), now),
+      pvpShield: Number.isFinite(Number(state.shield)) ? Number(state.shield) : existing.pvpShield,
       pvpShieldMax: Number.isFinite(Number(state.shieldMax)) ? Number(state.shieldMax) : existing.pvpShieldMax,
       pvpArmor: Number.isFinite(Number(state.armor)) ? Number(state.armor) : existing.pvpArmor,
       pvpArmorMax: Number.isFinite(Number(state.armorMax)) ? Number(state.armorMax) : existing.pvpArmorMax,
