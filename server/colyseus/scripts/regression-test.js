@@ -288,6 +288,21 @@ function assertResourceDisplayFields(room) {
   });
 }
 
+function assertServerObjectCombatSafePosition(entity, label = "server object") {
+  const x = Number(entity?.x);
+  const y = Number(entity?.y);
+  assert(Number.isFinite(x) && Number.isFinite(y), `${label} ${entity?.id || "unknown"} is missing a finite visual position.`);
+  assert(x >= 14 && x <= 86, `${label} ${entity?.id || "unknown"} x=${x} is outside combat safe bounds.`);
+  assert(y >= 14 && y <= 56, `${label} ${entity?.id || "unknown"} y=${y} overlaps lower HUD danger zone.`);
+  const overlapsActionColumn = y >= 42 && x >= 38 && x <= 62;
+  assert(!overlapsActionColumn, `${label} ${entity?.id || "unknown"} at ${x},${y} overlaps action-button danger zone.`);
+}
+
+function assertServerObjectCombatSafePositions(room) {
+  botSnapshots(room).forEach((bot) => assertServerObjectCombatSafePosition(bot, "Bot"));
+  resourceSnapshots(room).forEach((resource) => assertServerObjectCombatSafePosition(resource, "Resource"));
+}
+
 function assertAllowedBotNodes(room) {
   const allowedNodes = new Set(STAGING_BOT_ALLOWED_NODE_IDS);
   const invalidBot = botSnapshots(room).find((bot) => !allowedNodes.has(bot.currentNode));
@@ -5342,6 +5357,8 @@ try {
   assertBotDisplayFields(roomA);
   assertBotDisplayFields(roomB);
   assert(botCount(roomA) === 10 && botCount(roomB) === 10, `Expected 10 staging bots, saw A=${botCount(roomA)} B=${botCount(roomB)}`);
+  assertServerObjectCombatSafePositions(roomA);
+  assertServerObjectCombatSafePositions(roomB);
   console.log(`dummy bot count: A=${botCount(roomA)} B=${botCount(roomB)}`);
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
   const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
@@ -5359,6 +5376,8 @@ try {
     assertAllowedBotNodes(roomB);
     assertBotDisplayFields(roomA);
     assertBotDisplayFields(roomB);
+    assertServerObjectCombatSafePositions(roomA);
+    assertServerObjectCombatSafePositions(roomB);
     const currentBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
     const currentBotPositions = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}`).join("|");
     return currentBotNodes === initialBotNodes &&
@@ -5370,6 +5389,8 @@ try {
   await waitFor("server resources to appear", () => resourceCount(roomA) >= 4 && resourceCount(roomB) >= 4);
   assertResourceDisplayFields(roomA);
   assertResourceDisplayFields(roomB);
+  assertServerObjectCombatSafePositions(roomA);
+  assertServerObjectCombatSafePositions(roomB);
   const inspectedResourceBeforeMine = resourceSnapshots(roomA)[0];
   assert(inspectedResourceBeforeMine, "No staging resource available for mining test.");
   roomA.send("movement:update", {

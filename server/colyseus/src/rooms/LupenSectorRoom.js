@@ -220,6 +220,15 @@ const STAGING_BOT_RETURN_FIRE_VARIANCE_MS = 650;
 const STAGING_RESOURCE_RESPAWN_MS = 12000;
 const STAGING_RESOURCE_MINE_COOLDOWN_MS = 950;
 const SERVER_OBJECT_SPAWN_JITTER = 3.2;
+const SERVER_OBJECT_SAFE_MIN_X = 14;
+const SERVER_OBJECT_SAFE_MAX_X = 86;
+const SERVER_OBJECT_SAFE_MIN_Y = 14;
+const SERVER_OBJECT_SAFE_MAX_Y = 56;
+const SERVER_OBJECT_ACTION_MIN_X = 38;
+const SERVER_OBJECT_ACTION_MAX_X = 62;
+const SERVER_OBJECT_ACTION_MIN_Y = 42;
+const SERVER_OBJECT_ACTION_LEFT_X = 34;
+const SERVER_OBJECT_ACTION_RIGHT_X = 66;
 const STAGING_WEAPON_STATS = Object.freeze({
   heavyLance: Object.freeze({
     key: "heavyLance",
@@ -547,9 +556,16 @@ function getServerObjectSpawnPosition(base = {}, key = "", radius = SERVER_OBJEC
   const seed = getStableNumberSeed(key);
   const angle = ((seed % 360) * Math.PI) / 180;
   const distance = radius * (0.45 + ((Math.floor(seed / 360) % 100) / 180));
+  let x = clampNumber(Number(base.x || 50) + Math.cos(angle) * distance, SERVER_OBJECT_SAFE_MIN_X, SERVER_OBJECT_SAFE_MAX_X);
+  const y = clampNumber(Number(base.y || 50) + Math.sin(angle) * distance, SERVER_OBJECT_SAFE_MIN_Y, SERVER_OBJECT_SAFE_MAX_Y);
+
+  if (y >= SERVER_OBJECT_ACTION_MIN_Y && x >= SERVER_OBJECT_ACTION_MIN_X && x <= SERVER_OBJECT_ACTION_MAX_X) {
+    x = seed % 2 === 0 ? SERVER_OBJECT_ACTION_LEFT_X : SERVER_OBJECT_ACTION_RIGHT_X;
+  }
+
   return {
-    x: clampNumber(Number(base.x || 50) + Math.cos(angle) * distance, 4, 96),
-    y: clampNumber(Number(base.y || 50) + Math.sin(angle) * distance, 8, 88)
+    x,
+    y
   };
 }
 
