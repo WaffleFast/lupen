@@ -550,13 +550,15 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
     setTimeout(() => muzzle.remove(), delay + 300);
 
     const beam = document.createElement("div");
-    beam.className = `laser-burst player-shot player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
+    beam.className = `laser-burst player-shot player-shot-polished player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
     beam.style.left = `${startX}px`;
     beam.style.top = `${startY}px`;
     beam.style.width = `${shotLength}px`;
     beam.style.height = `${profile.height}px`;
-    beam.style.background = `linear-gradient(90deg, transparent 0%, ${profile.color} 16%, #ffffff 44%, ${profile.color} 68%, transparent 100%)`;
-    beam.style.boxShadow = `0 0 ${Math.round(14 * profile.glowScale)}px ${profile.color}, 0 0 ${Math.round(30 * profile.glowScale)}px ${profile.color}, 0 0 ${Math.round(46 * profile.glowScale)}px rgba(255, 255, 255, 0.28)`;
+    beam.style.background = `linear-gradient(90deg, rgba(80, 225, 255, 0) 0%, color-mix(in srgb, ${profile.color} 74%, #79f4ff) 14%, #ffffff 43%, color-mix(in srgb, ${profile.color} 82%, #34d8ff) 70%, rgba(80, 225, 255, 0) 100%)`;
+    beam.style.boxShadow = `0 0 ${Math.round(10 * profile.glowScale)}px color-mix(in srgb, ${profile.color} 72%, #7df6ff), 0 0 ${Math.round(24 * profile.glowScale)}px color-mix(in srgb, ${profile.color} 58%, #23cfff), 0 0 ${Math.round(42 * profile.glowScale)}px rgba(87, 213, 255, 0.34)`;
+    beam.style.setProperty("--laser-core-color", profile.color);
+    beam.style.setProperty("--laser-glow-color", `color-mix(in srgb, ${profile.color} 70%, #6ff4ff)`);
     beam.style.transform = `rotate(${angle}deg)`;
     beam.style.animationDuration = `${profile.durationMs}ms`;
     beam.style.animationDelay = `${delay}ms`;

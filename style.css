@@ -903,6 +903,36 @@ input::placeholder {
   mix-blend-mode: screen;
 }
 
+.laser-burst.player-shot-polished {
+  overflow: visible;
+  filter: saturate(1.18) brightness(1.08);
+}
+
+.laser-burst.player-shot-polished::before,
+.laser-burst.player-shot-polished::after {
+  content: "";
+  position: absolute;
+  left: 3%;
+  right: 5%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.laser-burst.player-shot-polished::before {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ffffff 20%, #ffffff 58%, transparent);
+  box-shadow: 0 0 8px rgba(240, 255, 255, 0.88);
+}
+
+.laser-burst.player-shot-polished::after {
+  height: 14px;
+  background: radial-gradient(ellipse at 50% 50%, var(--laser-glow-color, rgba(112, 232, 255, 0.42)), transparent 64%);
+  opacity: 0.62;
+  filter: blur(2px);
+}
+
 .weapon-muzzle-flash {
   position: absolute;
   width: 34px;

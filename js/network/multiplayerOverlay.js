@@ -170,22 +170,47 @@
 
       #${spaceShotLayerId} .lupen-mp-shot-beam {
         position: absolute;
-        height: 5px;
+        height: 6px;
         transform-origin: 0 50%;
         border-radius: 999px;
-        background: linear-gradient(90deg, rgba(112, 252, 255, 0), rgba(129, 250, 255, 0.98) 12%, rgba(255, 255, 255, 1) 42%, rgba(255, 231, 142, 0.96) 66%, rgba(255, 126, 65, 0));
-        box-shadow: 0 0 16px rgba(110, 229, 255, 0.92), 0 0 31px rgba(45, 232, 255, 0.5), 0 0 22px rgba(255, 126, 65, 0.4);
+        background: linear-gradient(90deg, rgba(78, 224, 255, 0), rgba(103, 232, 255, 0.98) 13%, rgba(255, 255, 255, 1) 43%, rgba(88, 218, 255, 0.94) 72%, rgba(72, 214, 255, 0));
+        box-shadow: 0 0 13px rgba(109, 232, 255, 0.92), 0 0 28px rgba(52, 214, 255, 0.5), 0 0 42px rgba(46, 160, 255, 0.22);
         mix-blend-mode: screen;
         animation: lupen-mp-shot-beam 0.46s ease-out forwards;
       }
 
+      #${spaceShotLayerId} .lupen-mp-shot-beam::before,
+      #${spaceShotLayerId} .lupen-mp-shot-beam::after {
+        content: "";
+        position: absolute;
+        left: 3%;
+        right: 5%;
+        top: 50%;
+        transform: translateY(-50%);
+        border-radius: 999px;
+        pointer-events: none;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-beam::before {
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #ffffff 22%, #ffffff 58%, transparent);
+        box-shadow: 0 0 8px rgba(238, 255, 255, 0.86);
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-beam::after {
+        height: 14px;
+        background: radial-gradient(ellipse at 50% 50%, rgba(100, 226, 255, 0.42), transparent 66%);
+        filter: blur(2px);
+        opacity: 0.64;
+      }
+
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-local {
-        height: 6px;
+        height: 7px;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-remote {
-        background: linear-gradient(90deg, rgba(89, 212, 255, 0), rgba(111, 224, 255, 0.9) 14%, rgba(235, 255, 255, 0.96) 45%, rgba(98, 255, 199, 0.82) 72%, rgba(98, 255, 199, 0));
-        box-shadow: 0 0 13px rgba(80, 221, 255, 0.72), 0 0 24px rgba(68, 255, 202, 0.34);
+        background: linear-gradient(90deg, rgba(78, 224, 255, 0), rgba(103, 232, 255, 0.92) 14%, rgba(245, 255, 255, 0.98) 45%, rgba(86, 225, 255, 0.86) 72%, rgba(86, 225, 255, 0));
+        box-shadow: 0 0 12px rgba(86, 224, 255, 0.76), 0 0 25px rgba(60, 202, 255, 0.34);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-bot-return {
@@ -193,14 +218,18 @@
         box-shadow: 0 0 12px rgba(255, 119, 82, 0.7), 0 0 24px rgba(255, 74, 64, 0.28);
       }
 
-      #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing {
-        height: 3px;
-        opacity: 0.86;
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-bot-return::after {
+        background: radial-gradient(ellipse at 50% 50%, rgba(255, 121, 82, 0.38), transparent 66%);
       }
 
-      #${spaceShotLayerId} .lupen-mp-shot-beam.is-spark {
-        height: 2px;
-        opacity: 0.7;
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing {
+        height: 3px;
+        opacity: 0.72;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing::after {
+        height: 9px;
+        opacity: 0.36;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-muzzle {
@@ -2935,11 +2964,9 @@
     const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
     const shotOwnerClass = isBotReturnFire ? "is-bot-return" : isLocalShot ? "is-local" : "is-remote";
     const beamFan = [
-      { x: 0, y: 0, scale: 1, className: shotOwnerClass },
-      { x: -1.8, y: 0.9, scale: 0.95, className: `${shotOwnerClass} is-wing` },
-      { x: 1.8, y: -0.9, scale: 0.95, className: `${shotOwnerClass} is-wing` },
-      { x: -3.1, y: -1.1, scale: 0.78, className: `${shotOwnerClass} is-spark` },
-      { x: 3.1, y: 1.1, scale: 0.78, className: `${shotOwnerClass} is-spark` }
+      { x: 0, y: 0, scale: 1, className: `${shotOwnerClass} is-core` },
+      { x: -1.1, y: 0.7, scale: 0.96, className: `${shotOwnerClass} is-wing` },
+      { x: 1.1, y: -0.7, scale: 0.96, className: `${shotOwnerClass} is-wing` }
     ];
 
     const muzzle = global.document.createElement("div");
