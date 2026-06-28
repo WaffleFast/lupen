@@ -3548,6 +3548,7 @@ test.describe("Lupen browser smoke", () => {
           markerHasInlineLabel: !!botMarker?.querySelector(".lupen-mp-space-bot-label, .lupen-mp-space-bot-note, .lupen-mp-bot-bars"),
           shotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam").length || 0,
           localShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-local").length || 0,
+          trailShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-wing, .lupen-mp-shot-beam.is-spark").length || 0,
           coopEngagedMarkerCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-coop-engaged").length,
           muzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle").length || 0,
           hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0,
@@ -3572,8 +3573,9 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
     expect(stagingBotSelectedState.targetBars).toBe(2);
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
-    expect(stagingBotSelectedState.shotBeamCount).toBeGreaterThanOrEqual(3);
-    expect(stagingBotSelectedState.localShotBeamCount).toBeGreaterThanOrEqual(1);
+    expect(stagingBotSelectedState.shotBeamCount).toBe(1);
+    expect(stagingBotSelectedState.localShotBeamCount).toBe(1);
+    expect(stagingBotSelectedState.trailShotBeamCount).toBe(0);
     expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.muzzleCount).toBe(1);
     expect(stagingBotSelectedState.hitCount).toBe(1);
@@ -3605,7 +3607,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBeGreaterThanOrEqual(3);
+    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(1);
     expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
@@ -3636,7 +3638,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBeGreaterThanOrEqual(3);
+    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(1);
     expect(stagingResourceRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingResourceRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingResourceRemoteShotState.hitCount).toBe(1);
@@ -3700,14 +3702,14 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBeGreaterThanOrEqual(3);
+    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBe(1);
     expect(pvpRemoteShotState.shield.remoteMuzzleCount).toBe(1);
     expect(pvpRemoteShotState.shield.attackerLabelText).toContain("WaffleFast");
     expect(pvpRemoteShotState.shield.hitCount).toBe(1);
     expect(pvpRemoteShotState.shield.shieldHitCount).toBe(1);
     expect(pvpRemoteShotState.armor.armorHitCount).toBe(1);
     expect(pvpRemoteShotState.hull.hullHitCount).toBe(1);
-    expect(pvpRemoteShotState.botReturnBeamCount).toBeGreaterThanOrEqual(3);
+    expect(pvpRemoteShotState.botReturnBeamCount).toBe(1);
     expect(pvpRemoteShotState.botReturnMuzzleCount).toBe(1);
     expect(pvpRemoteShotState.botReturnShieldHitCount).toBe(1);
 
@@ -4023,9 +4025,9 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(visualState.playerShotCount).toBeGreaterThanOrEqual(4);
-    expect(visualState.polishedPlayerShotCount).toBeGreaterThanOrEqual(4);
-    expect(visualState.muzzleCount).toBeGreaterThanOrEqual(4);
+    expect(visualState.playerShotCount).toBe(1);
+    expect(visualState.polishedPlayerShotCount).toBe(1);
+    expect(visualState.muzzleCount).toBe(1);
     expect(visualState.incomingCount).toBeGreaterThanOrEqual(5);
     expect(visualState.heavyIncomingCount).toBeGreaterThanOrEqual(1);
     expect(visualState.armorScreenFlash).toBe(true);

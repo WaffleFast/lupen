@@ -889,7 +889,7 @@ input::placeholder {
   transform: rotate(-18deg);
   transform-origin: left center;
   opacity: 0;
-  animation: laserBurst 340ms ease-out forwards;
+  animation: laserBurst 220ms ease-out forwards;
 }
 
 .laser-burst.secondary {
@@ -927,9 +927,9 @@ input::placeholder {
 }
 
 .laser-burst.player-shot-polished::after {
-  height: 14px;
-  background: radial-gradient(ellipse at 50% 50%, var(--laser-glow-color, rgba(112, 232, 255, 0.42)), transparent 64%);
-  opacity: 0.62;
+  height: 10px;
+  background: linear-gradient(90deg, transparent, var(--laser-glow-color, rgba(112, 232, 255, 0.34)) 18%, rgba(112, 232, 255, 0.2) 70%, transparent);
+  opacity: 0.56;
   filter: blur(2px);
 }
 
@@ -1058,15 +1058,15 @@ input::placeholder {
 @keyframes laserBurst {
   0% {
     opacity: 0;
-    clip-path: inset(0 100% 0 0);
+    transform: rotate(var(--laser-angle, 0deg)) scaleX(0.98);
   }
   20% {
     opacity: 1;
-    clip-path: inset(0 0 0 0);
+    transform: rotate(var(--laser-angle, 0deg)) scaleX(1);
   }
   100% {
     opacity: 0;
-    clip-path: inset(0 0 0 100%);
+    transform: rotate(var(--laser-angle, 0deg)) scaleX(1);
   }
 }
 

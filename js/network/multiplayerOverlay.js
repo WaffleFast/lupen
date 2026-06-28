@@ -198,10 +198,10 @@
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam::after {
-        height: 14px;
-        background: radial-gradient(ellipse at 50% 50%, rgba(100, 226, 255, 0.42), transparent 66%);
+        height: 10px;
+        background: linear-gradient(90deg, transparent, rgba(100, 226, 255, 0.3) 18%, rgba(100, 226, 255, 0.22) 70%, transparent);
         filter: blur(2px);
-        opacity: 0.64;
+        opacity: 0.58;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-local {
@@ -220,16 +220,6 @@
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-bot-return::after {
         background: radial-gradient(ellipse at 50% 50%, rgba(255, 121, 82, 0.38), transparent 66%);
-      }
-
-      #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing {
-        height: 3px;
-        opacity: 0.72;
-      }
-
-      #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing::after {
-        height: 9px;
-        opacity: 0.36;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-muzzle {
@@ -1417,18 +1407,18 @@
       @keyframes lupen-mp-shot-beam {
         0% {
           opacity: 0;
-          transform: rotate(var(--shot-angle)) scaleX(0.14);
-          filter: brightness(1.45);
+          transform: rotate(var(--shot-angle)) scaleX(1);
+          filter: brightness(1.26);
         }
-        24% {
+        22% {
           opacity: 1;
-          transform: rotate(var(--shot-angle)) scaleX(1.05);
-          filter: brightness(1.35);
+          transform: rotate(var(--shot-angle)) scaleX(1);
+          filter: brightness(1.2);
         }
         100% {
           opacity: 0;
-          transform: rotate(var(--shot-angle)) scaleX(0.5);
-          filter: brightness(0.78);
+          transform: rotate(var(--shot-angle)) scaleX(1);
+          filter: brightness(0.92);
         }
       }
 
@@ -2964,9 +2954,7 @@
     const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
     const shotOwnerClass = isBotReturnFire ? "is-bot-return" : isLocalShot ? "is-local" : "is-remote";
     const beamFan = [
-      { x: 0, y: 0, scale: 1, className: `${shotOwnerClass} is-core` },
-      { x: -1.1, y: 0.7, scale: 0.96, className: `${shotOwnerClass} is-wing` },
-      { x: 1.1, y: -0.7, scale: 0.96, className: `${shotOwnerClass} is-wing` }
+      { x: 0, y: 0, scale: 1, className: `${shotOwnerClass} is-core` }
     ];
 
     const muzzle = global.document.createElement("div");

@@ -517,24 +517,16 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   const endY = (target.y / 100) * screenRect.height;
   const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
   const visualWeapons = getVisibleShotWeapons(resolvedWeapon);
-  const minimumBarrage = visualWeapons.length === 1
-    ? [visualWeapons[0], visualWeapons[0], visualWeapons[0], visualWeapons[0]]
-    : visualWeapons.flatMap((item, index) => index < 2 ? [item, item] : [item]);
-  const barrageWeapons = minimumBarrage.slice(0, 8);
+  const primaryShotWeapon = visualWeapons[0] || resolvedWeapon || {};
+  const barrageWeapons = [primaryShotWeapon];
   const visualCapApplied = Number(resolvedWeapon?.count || visualWeapons.length) > visualWeapons.length;
 
   const makeBeam = (shotWeapon, laneIndex = 0, delay = 0) => {
     const profile = getShotVisualProfile(shotWeapon);
-    const side = laneIndex % 2 === 0 ? -1 : 1;
-    const laneDepth = Math.floor(laneIndex / 2);
-    const startOffsetX = side * Math.min(34, 8 + laneDepth * 7);
-    const startOffsetY = side * (profile.offsetSpread + laneDepth * 3);
-    const targetOffsetX = side * Math.min(10, 2 + laneDepth * 2);
-    const targetOffsetY = -Math.min(8, laneDepth * 2);
-    const startX = baseStartX + startOffsetX;
-    const startY = baseStartY + startOffsetY;
-    const beamEndX = endX + targetOffsetX;
-    const beamEndY = endY + targetOffsetY;
+    const startX = baseStartX;
+    const startY = baseStartY;
+    const beamEndX = endX;
+    const beamEndY = endY;
     const dx = beamEndX - startX;
     const dy = beamEndY - startY;
     const length = Math.sqrt(dx * dx + dy * dy);
@@ -559,6 +551,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
     beam.style.boxShadow = `0 0 ${Math.round(10 * profile.glowScale)}px color-mix(in srgb, ${profile.color} 72%, #7df6ff), 0 0 ${Math.round(24 * profile.glowScale)}px color-mix(in srgb, ${profile.color} 58%, #23cfff), 0 0 ${Math.round(42 * profile.glowScale)}px rgba(87, 213, 255, 0.34)`;
     beam.style.setProperty("--laser-core-color", profile.color);
     beam.style.setProperty("--laser-glow-color", `color-mix(in srgb, ${profile.color} 70%, #6ff4ff)`);
+    beam.style.setProperty("--laser-angle", `${angle}deg`);
     beam.style.transform = `rotate(${angle}deg)`;
     beam.style.animationDuration = `${profile.durationMs}ms`;
     beam.style.animationDelay = `${delay}ms`;
@@ -571,7 +564,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   };
 
   barrageWeapons.forEach((shotWeapon, index) => {
-    makeBeam(shotWeapon, index, Math.min(index * 68, 380));
+    makeBeam(shotWeapon, index, 0);
   });
 
   debugCombatShot("shot visuals", {
