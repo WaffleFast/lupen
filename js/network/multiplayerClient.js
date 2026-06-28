@@ -2506,6 +2506,10 @@
         damage: totalDamage,
         weaponName: String(message?.weaponName || ""),
         weaponFamily: String(message?.weaponFamily || message?.weaponType || ""),
+        shieldDamage,
+        armorDamage,
+        hullDamage,
+        impactLayer: hullDamage > 0 ? "hull" : armorDamage > 0 ? "armor" : shieldDamage > 0 ? "shield" : "shield",
         serverAuthoritative: connection.lastPvpHitEvent.serverAuthoritative,
         rewardsGranted: false,
         receivedAt
@@ -2523,7 +2527,7 @@
           global.applyServerPvpDamageState(connection.lastPvpHitEvent);
         }
         if (typeof global.playHostilePlayerHitFeedback === "function") {
-          global.playHostilePlayerHitFeedback({ shieldDamage, hullDamage });
+          global.playHostilePlayerHitFeedback({ shieldDamage, armorDamage, hullDamage });
         }
       } else if (attackerSessionId === connection.sessionId) {
         addStagingActivityLogOnce(
@@ -2820,6 +2824,27 @@
             botAttackReason: String(damageResult.botAttackReason || connection.lastStagingReturnFire.botAttackReason || "return_fire_applied")
           };
         }
+      }
+      if (connection.lastStagingReturnFire?.ok) {
+        connection.lastCombatVisualEvent = {
+          type: "botReturnFire",
+          ok: true,
+          attackerType: "bot",
+          attackerId: connection.lastStagingReturnFire.attackerBotId,
+          attackerBotId: connection.lastStagingReturnFire.attackerBotId,
+          attackerDisplayName: connection.lastStagingReturnFire.attackerName,
+          targetType: "player",
+          targetId: connection.sessionId || connection.lastStagingReturnFire.sessionId,
+          targetPlayerId: connection.sessionId || connection.lastStagingReturnFire.sessionId,
+          currentNode: connection.lastStagingReturnFire.currentNode,
+          damage: connection.lastStagingReturnFire.botDamage || connection.lastStagingReturnFire.damage,
+          shieldDamage: connection.lastStagingReturnFire.shieldDamage,
+          hullDamage: connection.lastStagingReturnFire.hullDamage,
+          impactLayer: connection.lastStagingReturnFire.hullDamage > 0 ? "hull" : "shield",
+          serverAuthoritative: true,
+          rewardsGranted: false,
+          receivedAt: connection.lastStagingReturnFire.receivedAt || Date.now()
+        };
       }
       notifyServerState(activeRoom.state || null);
     });

@@ -188,6 +188,11 @@
         box-shadow: 0 0 13px rgba(80, 221, 255, 0.72), 0 0 24px rgba(68, 255, 202, 0.34);
       }
 
+      #${spaceShotLayerId} .lupen-mp-shot-beam.is-bot-return {
+        background: linear-gradient(90deg, rgba(255, 97, 86, 0), rgba(255, 137, 90, 0.88) 18%, rgba(255, 238, 190, 0.96) 48%, rgba(255, 92, 72, 0.72) 76%, rgba(255, 92, 72, 0));
+        box-shadow: 0 0 12px rgba(255, 119, 82, 0.7), 0 0 24px rgba(255, 74, 64, 0.28);
+      }
+
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-wing {
         height: 3px;
         opacity: 0.86;
@@ -213,6 +218,11 @@
       #${spaceShotLayerId} .lupen-mp-shot-muzzle.is-remote {
         background: radial-gradient(circle, rgba(255, 255, 255, 0.88), rgba(95, 255, 205, 0.55) 28%, transparent 68%);
         box-shadow: 0 0 15px rgba(86, 228, 255, 0.56), 0 0 27px rgba(86, 255, 201, 0.32);
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-muzzle.is-bot-return {
+        background: radial-gradient(circle, rgba(255, 245, 214, 0.9), rgba(255, 127, 82, 0.58) 30%, transparent 70%);
+        box-shadow: 0 0 14px rgba(255, 146, 90, 0.62), 0 0 26px rgba(255, 78, 64, 0.28);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-attacker-label {
@@ -247,6 +257,34 @@
         box-shadow: 0 0 18px rgba(255, 159, 73, 0.86), 0 0 34px rgba(255, 76, 54, 0.35);
         mix-blend-mode: screen;
         animation: lupen-mp-shot-hit 0.7s ease-out forwards;
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-hit.is-shield {
+        border-color: rgba(124, 234, 255, 0.9);
+        background: radial-gradient(circle, rgba(147, 240, 255, 0.78), rgba(73, 204, 255, 0.22) 42%, transparent 72%);
+        box-shadow: 0 0 18px rgba(97, 223, 255, 0.86), 0 0 36px rgba(65, 203, 255, 0.35);
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-hit.is-armor {
+        border-color: rgba(222, 226, 216, 0.86);
+        background:
+          radial-gradient(circle, rgba(255, 255, 238, 0.7), rgba(205, 210, 198, 0.2) 42%, transparent 72%),
+          repeating-conic-gradient(from 18deg, rgba(255, 232, 157, 0.42) 0 8deg, transparent 8deg 24deg);
+        box-shadow: 0 0 14px rgba(220, 228, 210, 0.7), 0 0 27px rgba(255, 196, 96, 0.24);
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-hit.is-hull {
+        border-color: rgba(255, 116, 82, 0.9);
+        background: radial-gradient(circle, rgba(255, 227, 181, 0.82), rgba(255, 88, 64, 0.34) 46%, transparent 74%);
+        box-shadow: 0 0 18px rgba(255, 118, 78, 0.9), 0 0 38px rgba(255, 50, 48, 0.42);
+      }
+
+      #${spaceShotLayerId} .lupen-mp-shot-hit.is-resource {
+        border-color: rgba(245, 230, 140, 0.88);
+        background:
+          radial-gradient(circle, rgba(255, 242, 176, 0.74), rgba(145, 224, 255, 0.18) 44%, transparent 72%),
+          repeating-conic-gradient(from 0deg, rgba(255, 238, 150, 0.34) 0 7deg, transparent 7deg 22deg);
+        box-shadow: 0 0 16px rgba(245, 219, 118, 0.7), 0 0 30px rgba(78, 209, 255, 0.22);
       }
 
       #${stagingCombatPanelId} {
@@ -2833,6 +2871,35 @@
     return null;
   }
 
+  function resolveCombatVisualAttacker(event, players, bots) {
+    const attackerType = String(event?.attackerType || "").toLowerCase();
+    const attackerId = String(event?.attackerId || event?.attackerBotId || event?.attackerSessionId || "");
+    if (!attackerId) return null;
+    if (attackerType === "bot") {
+      const bot = bots.find((candidate) => String(candidate?.id || "") === attackerId);
+      return bot && isSameCurrentNode(bot) ? bot : null;
+    }
+    const player = players.find((candidate) => String(candidate?.sessionId || candidate?.id || "") === attackerId);
+    return player && isSameCurrentNode(player) ? player : null;
+  }
+
+  function getCombatVisualImpactLayer(event, target) {
+    const explicit = String(event?.impactLayer || "").toLowerCase();
+    if (["shield", "armor", "hull", "resource", "bot"].includes(explicit)) return explicit;
+    const targetType = String(event?.targetType || event?.type || "").toLowerCase();
+    if (targetType === "resource") return "resource";
+    if (targetType === "player" || targetType === "pvp") {
+      if (Number(event?.hullDamage || 0) > 0) return "hull";
+      if (Number(event?.armorDamage || 0) > 0) return "armor";
+      if (Number(event?.shieldDamage || 0) > 0) return "shield";
+      return "shield";
+    }
+    if (targetType === "bot") {
+      return Number(target?.shield || 0) > 0 ? "shield" : "hull";
+    }
+    return "bot";
+  }
+
   function renderSpaceShot(players, bots, resources, status) {
     global.document?.getElementById(spaceShotLayerId)?.remove();
     const event = getCombatVisualEvent(status);
@@ -2850,7 +2917,7 @@
       playLocalStagingShotFeedback(status, target);
     }
 
-    const attacker = players.find((player) => player.sessionId === event.attackerSessionId || player.id === event.attackerSessionId);
+    const attacker = resolveCombatVisualAttacker(event, players, bots);
     const targetPosition = getSpacePercentPosition(target);
     const attackerPosition = attacker && isSameCurrentNode(attacker)
       ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
@@ -2865,7 +2932,8 @@
     const distance = Math.max(8, Math.sqrt(dx * dx + dy * dy));
     const angle = Math.atan2(dy, dx);
     const isLocalShot = event.attackerSessionId === status.sessionId;
-    const shotOwnerClass = isLocalShot ? "is-local" : "is-remote";
+    const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
+    const shotOwnerClass = isBotReturnFire ? "is-bot-return" : isLocalShot ? "is-local" : "is-remote";
     const beamFan = [
       { x: 0, y: 0, scale: 1, className: shotOwnerClass },
       { x: -1.8, y: 0.9, scale: 0.95, className: `${shotOwnerClass} is-wing` },
@@ -2880,7 +2948,7 @@
     muzzle.style.top = `${attackerPosition.y}%`;
     layer.appendChild(muzzle);
 
-    if (!isLocalShot && (attacker || event.attackerDisplayName)) {
+    if (!isLocalShot && !isBotReturnFire && (attacker || event.attackerDisplayName)) {
       const label = global.document.createElement("div");
       label.className = "lupen-mp-shot-attacker-label";
       label.textContent = String(attacker?.displayName || attacker?.name || event.attackerDisplayName || "Pilot").slice(0, 18);
@@ -2901,7 +2969,8 @@
     });
 
     const hit = global.document.createElement("div");
-    hit.className = "lupen-mp-shot-hit";
+    const impactLayer = getCombatVisualImpactLayer(event, target);
+    hit.className = `lupen-mp-shot-hit is-${impactLayer}`;
     hit.style.left = `${targetPosition.x}%`;
     hit.style.top = `${targetPosition.y}%`;
     layer.appendChild(hit);

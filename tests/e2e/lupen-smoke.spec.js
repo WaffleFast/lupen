@@ -3628,7 +3628,8 @@ test.describe("Lupen browser smoke", () => {
           remoteShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-remote").length || 0,
           remoteMuzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle.is-remote").length || 0,
           attackerLabelText: shotLayer?.querySelector(".lupen-mp-shot-attacker-label")?.textContent || "",
-          hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0
+          hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0,
+          resourceHitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit.is-resource").length || 0
         };
       })()
     `));
@@ -3637,36 +3638,76 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingResourceRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingResourceRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingResourceRemoteShotState.hitCount).toBe(1);
+    expect(stagingResourceRemoteShotState.resourceHitCount).toBe(1);
 
     const pvpRemoteShotState = await page.evaluate(() => window.eval(`
       (() => {
+        const renderPvpHit = damageParts => {
+          window.__lastCombatVisualEvent = {
+            type: "pvp",
+            ok: true,
+            attackerSessionId: "remote-session",
+            attackerDisplayName: "WaffleFast",
+            targetType: "player",
+            targetId: "local-session",
+            targetPlayerId: "local-session",
+            currentNode,
+            damage: 36,
+            receivedAt: Date.now(),
+            ...damageParts
+          };
+          window.LupenMultiplayerOverlay?.render?.();
+          const layer = document.getElementById("lupenMultiplayerSpaceShotLayer");
+          return {
+            remoteShotBeamCount: layer?.querySelectorAll(".lupen-mp-shot-beam.is-remote").length || 0,
+            remoteMuzzleCount: layer?.querySelectorAll(".lupen-mp-shot-muzzle.is-remote").length || 0,
+            attackerLabelText: layer?.querySelector(".lupen-mp-shot-attacker-label")?.textContent || "",
+            hitCount: layer?.querySelectorAll(".lupen-mp-shot-hit").length || 0,
+            shieldHitCount: layer?.querySelectorAll(".lupen-mp-shot-hit.is-shield").length || 0,
+            armorHitCount: layer?.querySelectorAll(".lupen-mp-shot-hit.is-armor").length || 0,
+            hullHitCount: layer?.querySelectorAll(".lupen-mp-shot-hit.is-hull").length || 0
+          };
+        };
+        const shield = renderPvpHit({ shieldDamage: 36, armorDamage: 0, hullDamage: 0 });
+        const armor = renderPvpHit({ shieldDamage: 0, armorDamage: 24, hullDamage: 0 });
+        const hull = renderPvpHit({ shieldDamage: 0, armorDamage: 0, hullDamage: 18 });
         window.__lastCombatVisualEvent = {
-          type: "pvp",
+          type: "botReturnFire",
           ok: true,
-          attackerSessionId: "remote-session",
-          attackerDisplayName: "WaffleFast",
+          attackerType: "bot",
+          attackerId: window.__stagingVisualBot.id,
+          attackerBotId: window.__stagingVisualBot.id,
           targetType: "player",
           targetId: "local-session",
           targetPlayerId: "local-session",
           currentNode,
-          damage: 36,
+          damage: 12,
+          shieldDamage: 12,
           receivedAt: Date.now()
         };
         window.LupenMultiplayerOverlay?.render?.();
         const shotLayer = document.getElementById("lupenMultiplayerSpaceShotLayer");
         return {
-          remoteShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-remote").length || 0,
-          remoteMuzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle.is-remote").length || 0,
-          attackerLabelText: shotLayer?.querySelector(".lupen-mp-shot-attacker-label")?.textContent || "",
-          hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0
+          shield,
+          armor,
+          hull,
+          botReturnBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-bot-return").length || 0,
+          botReturnMuzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle.is-bot-return").length || 0,
+          botReturnShieldHitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit.is-shield").length || 0
         };
       })()
     `));
 
-    expect(pvpRemoteShotState.remoteShotBeamCount).toBeGreaterThanOrEqual(5);
-    expect(pvpRemoteShotState.remoteMuzzleCount).toBe(1);
-    expect(pvpRemoteShotState.attackerLabelText).toContain("WaffleFast");
-    expect(pvpRemoteShotState.hitCount).toBe(1);
+    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBeGreaterThanOrEqual(5);
+    expect(pvpRemoteShotState.shield.remoteMuzzleCount).toBe(1);
+    expect(pvpRemoteShotState.shield.attackerLabelText).toContain("WaffleFast");
+    expect(pvpRemoteShotState.shield.hitCount).toBe(1);
+    expect(pvpRemoteShotState.shield.shieldHitCount).toBe(1);
+    expect(pvpRemoteShotState.armor.armorHitCount).toBe(1);
+    expect(pvpRemoteShotState.hull.hullHitCount).toBe(1);
+    expect(pvpRemoteShotState.botReturnBeamCount).toBeGreaterThanOrEqual(5);
+    expect(pvpRemoteShotState.botReturnMuzzleCount).toBe(1);
+    expect(pvpRemoteShotState.botReturnShieldHitCount).toBe(1);
 
     const staleMissingBotState = await page.evaluate(() => window.eval(`
       (() => {
@@ -3963,11 +4004,14 @@ test.describe("Lupen browser smoke", () => {
         hull = 120;
         shield = 0;
         updateSpaceHUD();
+        showIncomingHitFlash({ armorHit: true });
         return {
           playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
           muzzleCount: document.querySelectorAll("#laserLayer .weapon-muzzle-flash").length,
           incomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser").length,
           heavyIncomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser-heavy").length,
+          armorScreenFlash: document.getElementById("spaceScreen")?.classList.contains("armor-impact") || false,
+          armorHudFlash: document.querySelector(".vertical-stats")?.classList.contains("armor-impact") || false,
           statPanelCritical: document.querySelector(".vertical-stats")?.classList.contains("player-hull-critical") || false,
           statPanelShieldDepleted: document.querySelector(".vertical-stats")?.classList.contains("player-shield-depleted") || false,
           screenCritical: document.getElementById("spaceScreen")?.classList.contains("player-hull-critical") || false,
@@ -3980,6 +4024,8 @@ test.describe("Lupen browser smoke", () => {
     expect(visualState.muzzleCount).toBeGreaterThanOrEqual(4);
     expect(visualState.incomingCount).toBeGreaterThanOrEqual(5);
     expect(visualState.heavyIncomingCount).toBeGreaterThanOrEqual(1);
+    expect(visualState.armorScreenFlash).toBe(true);
+    expect(visualState.armorHudFlash).toBe(true);
     expect(visualState.statPanelCritical).toBe(true);
     expect(visualState.statPanelShieldDepleted).toBe(true);
     expect(visualState.screenCritical).toBe(true);

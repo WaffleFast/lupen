@@ -628,10 +628,11 @@ function showIncomingHitFlash(options = {}) {
   const shipPanel = document.querySelector(".ship-display-panel");
   const statPanel = document.querySelector(".vertical-stats");
   const isHullHit = options.hullHit === true;
-  const impactClass = isHullHit ? "hull-impact" : "shield-impact";
+  const isArmorHit = options.armorHit === true;
+  const impactClass = isHullHit ? "hull-impact" : isArmorHit ? "armor-impact" : "shield-impact";
 
   if (spaceScreen) {
-    spaceScreen.classList.remove("shield-impact", "hull-impact", "incoming-impact-shake");
+    spaceScreen.classList.remove("shield-impact", "armor-impact", "hull-impact", "incoming-impact-shake");
     spaceScreen.classList.add("incoming-hit-flash", impactClass, "incoming-impact-shake");
     setTimeout(() => {
       spaceScreen.classList.remove("incoming-hit-flash", impactClass, "incoming-impact-shake");
@@ -640,7 +641,7 @@ function showIncomingHitFlash(options = {}) {
 
   [shipPanel, statPanel].forEach(panel => {
     if (!panel) return;
-    panel.classList.remove("shield-impact", "hull-impact");
+    panel.classList.remove("shield-impact", "armor-impact", "hull-impact");
     panel.classList.add("hud-hit-flash", impactClass);
     setTimeout(() => panel.classList.remove("hud-hit-flash", impactClass), 320);
   });
@@ -653,6 +654,7 @@ function playHostilePlayerHitFeedback(options = {}) {
 
   const attackerBot = options.attackerBot || null;
   const shieldDamage = Math.max(0, Number(options.shieldDamage || 0));
+  const armorDamage = Math.max(0, Number(options.armorDamage || 0));
   const hullDamage = Math.max(0, Number(options.hullDamage || 0));
   const hitDelay = 150;
   const streakCount = hullDamage > 0 ? 4 : 3;
@@ -669,11 +671,14 @@ function playHostilePlayerHitFeedback(options = {}) {
   setTimeout(() => {
     if (hullDamage > 0 && typeof playHullHitSound === "function") {
       playHullHitSound();
+    } else if (armorDamage > 0 && typeof playShieldHitSound === "function") {
+      playShieldHitSound();
     } else if (shieldDamage > 0 && typeof playShieldHitSound === "function") {
       playShieldHitSound();
     }
     showIncomingHitFlash({
       shieldHit: shieldDamage > 0,
+      armorHit: armorDamage > 0,
       hullHit: hullDamage > 0
     });
   }, hitDelay);

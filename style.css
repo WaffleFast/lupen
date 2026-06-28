@@ -4501,6 +4501,14 @@ input::placeholder {
     linear-gradient(180deg, rgba(86, 211, 255, 0.12), transparent 20%, transparent 76%, rgba(86, 211, 255, 0.17));
 }
 
+.incoming-hit-flash.armor-impact::after {
+  background:
+    radial-gradient(ellipse at 50% 90%, rgba(232, 229, 205, 0.18), transparent 30%),
+    radial-gradient(ellipse at 50% 100%, transparent 46%, rgba(224, 219, 190, 0.24) 74%, transparent 100%),
+    repeating-linear-gradient(105deg, rgba(255, 221, 132, 0.18) 0 2px, transparent 2px 18px),
+    linear-gradient(90deg, rgba(218, 222, 205, 0.16), transparent 17%, transparent 83%, rgba(218, 222, 205, 0.16));
+}
+
 .incoming-hit-flash.hull-impact::after {
   background:
     radial-gradient(ellipse at 50% 90%, rgba(255, 126, 72, 0.24), transparent 31%),
@@ -4521,6 +4529,10 @@ input::placeholder {
 
 .hud-hit-flash.shield-impact {
   --hud-hit-rgb: 93, 216, 255;
+}
+
+.hud-hit-flash.armor-impact {
+  --hud-hit-rgb: 225, 219, 190;
 }
 
 .hud-hit-flash.hull-impact {
