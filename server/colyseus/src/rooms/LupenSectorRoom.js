@@ -3767,7 +3767,7 @@ export class LupenSectorRoom extends Room {
     const hullBeforeRepair = Number(targetPlayer.pvpHull || 0);
 
     targetPlayer.currentNode = "Asteron Prime";
-    targetPlayer.presenceStatus = "space";
+    targetPlayer.presenceStatus = "docked";
     targetPlayer.x = 50;
     targetPlayer.y = 50;
     targetPlayer.selectedTargetBotId = "";

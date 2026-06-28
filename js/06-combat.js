@@ -83,7 +83,7 @@ function applyServerPvpDestructionState(event = {}) {
     if (typeof updateCurrentNodeUI === "function") updateCurrentNodeUI();
     if (typeof updateHubLocation === "function") updateHubLocation();
     if (typeof updateSpaceHUD === "function") updateSpaceHUD();
-    if (typeof showScreen === "function") showScreen("spaceScreen");
+    if (typeof showScreen === "function") showScreen("gameScreen");
   } else {
     clearRemotePlayerTarget("pvp_destroyed_remote");
   }

@@ -4824,6 +4824,7 @@ try {
   assert(destructionEvent?.reason === "pvp_player_destroyed", `Unexpected PvP destruction reason: ${destructionEvent?.reason}`);
   assert(destructionEvent?.previousNode === "Lower Gate Core", `Unexpected PvP destruction previous node: ${destructionEvent?.previousNode}`);
   assert(destructionEvent?.currentNode === "Asteron Prime", `Unexpected PvP destruction recovery node: ${destructionEvent?.currentNode}`);
+  assert(destructionEvent?.presenceStatus === "docked", `Unexpected PvP destruction recovery presence: ${destructionEvent?.presenceStatus}`);
   assert(destructionEvent?.deathApplied === true, "PvP destruction event did not mark death applied.");
   assert(destructionEvent?.restoredToFull === true, "PvP destruction event did not report full recovery.");
   assert(destructionEvent?.targetCleared === true, "PvP destruction event did not request target cleanup.");
@@ -4834,7 +4835,7 @@ try {
   assert(destructionEvent?.bountyProgressChanged === false, "PvP destruction event changed bounty progress.");
   assert(destructionEvent?.rewardsGranted === false, "PvP destruction event granted rewards.");
   assert(targetAfterDestruction?.currentNode === "Asteron Prime", "Destroyed PvP target did not return to Asteron Prime.");
-  assert(targetAfterDestruction?.presenceStatus === "space", "Destroyed PvP target was not restored to usable space presence.");
+  assert(targetAfterDestruction?.presenceStatus === "docked", "Destroyed PvP target was not restored to docked planet presence.");
   assert(Number(targetAfterDestruction?.pvpHull || 0) === 5, "Destroyed PvP target hull was not restored to max.");
   assert(Number(targetAfterDestruction?.pvpShield || 0) === 1, "Destroyed PvP target shield was not restored to max.");
   assert(Number(targetAfterDestruction?.pvpArmor || 0) === 0, "Destroyed PvP target armor state was not clean after recovery.");

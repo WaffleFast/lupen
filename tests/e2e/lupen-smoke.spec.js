@@ -1781,6 +1781,7 @@ test.describe("Lupen browser smoke", () => {
               targetSessionId: "local-session",
               attackerSessionId: "remote-pvp-test",
               currentNode: "Asteron Prime",
+              presenceStatus: "docked",
               shield: 30,
               shieldMax: 30,
               armor: 0,
@@ -1802,6 +1803,12 @@ test.describe("Lupen browser smoke", () => {
           const destructionRecovery = {
             applied: pvpDestructionApplied,
             currentNode,
+            lastPlanetNode,
+            activeScreen: document.getElementById("gameScreen")?.classList.contains("active")
+              ? "gameScreen"
+              : document.getElementById("spaceScreen")?.classList.contains("active")
+                ? "spaceScreen"
+                : "",
             selectedType: selectedTarget?.type || "",
             engagedType: engagedTarget?.type || "",
             hullValue: document.getElementById("hullValue")?.textContent || "",
@@ -1995,6 +2002,8 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.destructionRecovery).toMatchObject({
       applied: true,
       currentNode: "Asteron Prime",
+      lastPlanetNode: "Asteron Prime",
+      activeScreen: "gameScreen",
       selectedType: "",
       engagedType: "",
       hullValue: "120",
