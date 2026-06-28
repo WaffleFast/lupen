@@ -39,6 +39,7 @@
     lastBotEvent: null,
     lastBotRewardReceipt: null,
     lastShotEvent: null,
+    lastCombatVisualEvent: null,
     lastPvpHitEvent: null,
     lastPvpRegenEvent: null,
     lastPvpRepairEvent: null,
@@ -305,6 +306,7 @@
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastCombatVisualEvent: connection.lastCombatVisualEvent ? { ...connection.lastCombatVisualEvent } : null,
       lastPvpHitEvent: connection.lastPvpHitEvent ? { ...connection.lastPvpHitEvent } : null,
       lastPvpRegenEvent: connection.lastPvpRegenEvent ? { ...connection.lastPvpRegenEvent } : null,
       lastPvpRepairEvent: connection.lastPvpRepairEvent ? { ...connection.lastPvpRepairEvent } : null,
@@ -2491,6 +2493,23 @@
         serverAuthoritative: message?.serverAuthoritative === true,
         receivedAt
       };
+      connection.lastCombatVisualEvent = {
+        type: "pvp",
+        ok: connection.lastPvpHitEvent.ok,
+        attackerSessionId,
+        attackerDisplayName: connection.lastPvpHitEvent.attackerDisplayName,
+        targetType: "player",
+        targetId: targetSessionId,
+        targetPlayerId: targetSessionId,
+        targetDisplayName: connection.lastPvpHitEvent.targetDisplayName,
+        currentNode: connection.lastPvpHitEvent.currentNode || connection.lastPvpHitEvent.targetNode,
+        damage: totalDamage,
+        weaponName: String(message?.weaponName || ""),
+        weaponFamily: String(message?.weaponFamily || message?.weaponType || ""),
+        serverAuthoritative: connection.lastPvpHitEvent.serverAuthoritative,
+        rewardsGranted: false,
+        receivedAt
+      };
       applyPvpHitToPlayerSnapshot(connection.lastPvpHitEvent);
 
       if (targetSessionId === connection.sessionId) {
@@ -2751,6 +2770,24 @@
         timestamp: Number.isFinite(Number(message?.timestamp)) ? Number(message.timestamp) : Date.now(),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
+      connection.lastCombatVisualEvent = {
+        type: "bot",
+        ok: connection.lastShotEvent.ok,
+        attackerSessionId,
+        attackerDisplayName: connection.lastShotEvent.attackerDisplayName,
+        targetType: "bot",
+        targetId: targetBotId,
+        targetBotId,
+        currentNode: connection.lastShotEvent.currentNode,
+        damage: connection.lastShotEvent.damage,
+        weaponName: connection.lastShotEvent.weaponName,
+        weaponFamily: connection.lastShotEvent.weaponFamily,
+        damageSource: connection.lastShotEvent.damageSource,
+        serverAuthoritative: connection.lastShotEvent.serverAuthoritative,
+        rewardsGranted: connection.lastShotEvent.rewardsGranted,
+        timestamp: connection.lastShotEvent.timestamp,
+        receivedAt: connection.lastShotEvent.receivedAt
+      };
       const selectedTargetBotId = playersById.get(connection.sessionId)?.selectedTargetBotId || "";
       if (attackerSessionId && attackerSessionId !== connection.sessionId && targetBotId && selectedTargetBotId === targetBotId) {
         const bot = botsById.get(targetBotId);
@@ -2829,6 +2866,27 @@
           ...normalized,
           type
         };
+        if (type === "stagingResource:shot") {
+          connection.lastCombatVisualEvent = {
+            type: "resource",
+            ok: normalized.ok,
+            attackerSessionId: normalized.minerSessionId,
+            attackerDisplayName: normalized.minerDisplayName,
+            targetType: "resource",
+            targetId: normalized.resourceId,
+            resourceId: normalized.resourceId,
+            resourceName: normalized.resourceName,
+            currentNode: normalized.currentNode || normalized.resourceNode,
+            damage: normalized.damage,
+            weaponName: normalized.weaponName,
+            weaponFamily: normalized.weaponFamily,
+            damageSource: normalized.damageSource,
+            serverAuthoritative: normalized.serverAuthoritative,
+            rewardsGranted: normalized.rewardsGranted,
+            timestamp: normalized.timestamp,
+            receivedAt: normalized.receivedAt
+          };
+        }
         if ((type === "stagingResource:depleted" || type === "stagingResource:respawned") &&
           typeof global.handleStagingResourceLifecycleEvent === "function") {
           global.handleStagingResourceLifecycleEvent({ ...normalized, type });
@@ -3262,6 +3320,7 @@
       lastBotEvent: connection.lastBotEvent ? { ...connection.lastBotEvent } : null,
       lastBotRewardReceipt: connection.lastBotRewardReceipt ? { ...connection.lastBotRewardReceipt } : null,
       lastShotEvent: connection.lastShotEvent ? { ...connection.lastShotEvent } : null,
+      lastCombatVisualEvent: connection.lastCombatVisualEvent ? { ...connection.lastCombatVisualEvent } : null,
       lastPvpHitEvent: connection.lastPvpHitEvent ? { ...connection.lastPvpHitEvent } : null,
       lastPvpRegenEvent: connection.lastPvpRegenEvent ? { ...connection.lastPvpRegenEvent } : null,
       lastPvpRepairEvent: connection.lastPvpRepairEvent ? { ...connection.lastPvpRepairEvent } : null,

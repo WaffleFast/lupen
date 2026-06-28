@@ -3402,11 +3402,24 @@ test.describe("Lupen browser smoke", () => {
             y: 38 + (index % 3) * 4
           }))
         ];
+        const resource = {
+          id: "staging-resource-copper-1",
+          resourceId: "staging-resource-copper-1",
+          resourceName: "Copper",
+          currentNode: "Lower Lane West B",
+          x: 66,
+          y: 34,
+          hp: 84,
+          hpMax: 120,
+          depleted: false
+        };
         window.__selectedStagingBotId = "";
         window.__remoteSelectedStagingBotId = "";
         window.__lastShotEvent = null;
+        window.__lastCombatVisualEvent = null;
         window.__stagingVisualBot = bot;
         window.__stagingVisualBots = bots;
+        window.__stagingVisualResource = resource;
         window.LupenMultiplayerClient = {
           ...(window.LupenMultiplayerClient || {}),
           getStatus: () => ({
@@ -3417,7 +3430,8 @@ test.describe("Lupen browser smoke", () => {
             lastStagingBountyStatus: { active },
             lastStagingBountyList: { active, bounties: [active] },
             selectedTargetBotId: window.__selectedStagingBotId,
-            lastShotEvent: window.__lastShotEvent
+            lastShotEvent: window.__lastShotEvent,
+            lastCombatVisualEvent: window.__lastCombatVisualEvent
           }),
           getPlayers: options => {
             const local = {
@@ -3443,6 +3457,7 @@ test.describe("Lupen browser smoke", () => {
             return options?.includeSelf === false ? [remote] : [local, remote];
           },
           getBots: () => bots,
+          getResources: () => [resource],
           getBotsInCurrentNode: () => currentNode === bot.currentNode ? bots : [],
           getBotById: id => bots.find(candidate => String(id) === candidate.id) || null,
           selectStagingBot: id => {
@@ -3593,8 +3608,69 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
 
+    const stagingResourceRemoteShotState = await page.evaluate(() => window.eval(`
+      (() => {
+        window.__lastCombatVisualEvent = {
+          type: "resource",
+          ok: true,
+          attackerSessionId: "remote-session",
+          attackerDisplayName: "WaffleFast",
+          targetType: "resource",
+          targetId: window.__stagingVisualResource.id,
+          resourceId: window.__stagingVisualResource.id,
+          currentNode,
+          damage: 18,
+          receivedAt: Date.now()
+        };
+        window.LupenMultiplayerOverlay?.render?.();
+        const shotLayer = document.getElementById("lupenMultiplayerSpaceShotLayer");
+        return {
+          remoteShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-remote").length || 0,
+          remoteMuzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle.is-remote").length || 0,
+          attackerLabelText: shotLayer?.querySelector(".lupen-mp-shot-attacker-label")?.textContent || "",
+          hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0
+        };
+      })()
+    `));
+
+    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBeGreaterThanOrEqual(5);
+    expect(stagingResourceRemoteShotState.remoteMuzzleCount).toBe(1);
+    expect(stagingResourceRemoteShotState.attackerLabelText).toContain("WaffleFast");
+    expect(stagingResourceRemoteShotState.hitCount).toBe(1);
+
+    const pvpRemoteShotState = await page.evaluate(() => window.eval(`
+      (() => {
+        window.__lastCombatVisualEvent = {
+          type: "pvp",
+          ok: true,
+          attackerSessionId: "remote-session",
+          attackerDisplayName: "WaffleFast",
+          targetType: "player",
+          targetId: "local-session",
+          targetPlayerId: "local-session",
+          currentNode,
+          damage: 36,
+          receivedAt: Date.now()
+        };
+        window.LupenMultiplayerOverlay?.render?.();
+        const shotLayer = document.getElementById("lupenMultiplayerSpaceShotLayer");
+        return {
+          remoteShotBeamCount: shotLayer?.querySelectorAll(".lupen-mp-shot-beam.is-remote").length || 0,
+          remoteMuzzleCount: shotLayer?.querySelectorAll(".lupen-mp-shot-muzzle.is-remote").length || 0,
+          attackerLabelText: shotLayer?.querySelector(".lupen-mp-shot-attacker-label")?.textContent || "",
+          hitCount: shotLayer?.querySelectorAll(".lupen-mp-shot-hit").length || 0
+        };
+      })()
+    `));
+
+    expect(pvpRemoteShotState.remoteShotBeamCount).toBeGreaterThanOrEqual(5);
+    expect(pvpRemoteShotState.remoteMuzzleCount).toBe(1);
+    expect(pvpRemoteShotState.attackerLabelText).toContain("WaffleFast");
+    expect(pvpRemoteShotState.hitCount).toBe(1);
+
     const staleMissingBotState = await page.evaluate(() => window.eval(`
       (() => {
+        window.__lastCombatVisualEvent = null;
         const bot = window.__stagingVisualBot;
         const activityBefore = document.getElementById("activityLogFeed")?.textContent || "";
         selectStagingBotTarget(bot.id);

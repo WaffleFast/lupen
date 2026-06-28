@@ -2096,6 +2096,24 @@
     return Date.now() - Number(status?.lastShotEvent?.receivedAt || status?.lastShotEvent?.timestamp || 0);
   }
 
+  function getCombatVisualEvent(status = getClient()?.getStatus?.()) {
+    const event = status?.lastCombatVisualEvent || null;
+    if (event?.targetType || event?.targetId) return event;
+    const shot = status?.lastShotEvent || null;
+    if (!shot?.targetBotId) return null;
+    return {
+      ...shot,
+      type: "bot",
+      targetType: "bot",
+      targetId: shot.targetBotId
+    };
+  }
+
+  function getCombatVisualEventAge(status = getClient()?.getStatus?.()) {
+    const event = getCombatVisualEvent(status);
+    return Date.now() - Number(event?.receivedAt || event?.timestamp || 0);
+  }
+
   const localShotFeedbackKeys = new Set();
 
   function getShotFeedbackKey(event = {}) {
@@ -2795,22 +2813,45 @@
     // and target handling stay consistent.
   }
 
-  function renderSpaceShot(players, bots, status) {
+  function resolveCombatVisualTarget(event, players, bots, resources) {
+    const targetType = String(event?.targetType || event?.type || "").toLowerCase();
+    const targetId = String(event?.targetId || event?.targetBotId || event?.resourceId || event?.targetPlayerId || "");
+    if (!targetId) return null;
+
+    if (targetType === "bot") {
+      const bot = bots.find((candidate) => String(candidate?.id || "") === targetId);
+      return bot && isSameCurrentNode(bot) ? bot : null;
+    }
+    if (targetType === "resource") {
+      const resource = resources.find((candidate) => String(candidate?.id || candidate?.resourceId || "") === targetId);
+      return resource && isSameCurrentNode(resource) ? resource : null;
+    }
+    if (targetType === "player" || targetType === "pvp") {
+      const player = players.find((candidate) => String(candidate?.sessionId || candidate?.id || "") === targetId);
+      return player && isSameCurrentNode(player) ? player : null;
+    }
+    return null;
+  }
+
+  function renderSpaceShot(players, bots, resources, status) {
     global.document?.getElementById(spaceShotLayerId)?.remove();
-    if (!isStagingMode(status) || !status?.lastShotEvent || getShotEventAge(status) > 900) return;
-    if (normalizeNodeKey(status.lastShotEvent.currentNode) !== normalizeNodeKey(getCurrentNodeName())) return;
+    const event = getCombatVisualEvent(status);
+    if (!isStagingMode(status) || !event || getCombatVisualEventAge(status) > 900) return;
+    if (normalizeNodeKey(event.currentNode) !== normalizeNodeKey(getCurrentNodeName())) return;
 
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return;
 
-    const targetBot = bots.find((bot) => bot.id === status.lastShotEvent.targetBotId);
-    if (!targetBot || !isSameCurrentNode(targetBot)) return;
+    const target = resolveCombatVisualTarget(event, players, bots, resources);
+    if (!target) return;
 
     ensureStyles();
-    playLocalStagingShotFeedback(status, targetBot);
+    if (event.targetType === "bot" || event.targetBotId) {
+      playLocalStagingShotFeedback(status, target);
+    }
 
-    const attacker = players.find((player) => player.sessionId === status.lastShotEvent.attackerSessionId || player.id === status.lastShotEvent.attackerSessionId);
-    const targetPosition = getSpacePercentPosition(targetBot);
+    const attacker = players.find((player) => player.sessionId === event.attackerSessionId || player.id === event.attackerSessionId);
+    const targetPosition = getSpacePercentPosition(target);
     const attackerPosition = attacker && isSameCurrentNode(attacker)
       ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
       : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
@@ -2823,7 +2864,7 @@
     const dy = targetPosition.y - attackerPosition.y;
     const distance = Math.max(8, Math.sqrt(dx * dx + dy * dy));
     const angle = Math.atan2(dy, dx);
-    const isLocalShot = status.lastShotEvent.attackerSessionId === status.sessionId;
+    const isLocalShot = event.attackerSessionId === status.sessionId;
     const shotOwnerClass = isLocalShot ? "is-local" : "is-remote";
     const beamFan = [
       { x: 0, y: 0, scale: 1, className: shotOwnerClass },
@@ -2839,10 +2880,10 @@
     muzzle.style.top = `${attackerPosition.y}%`;
     layer.appendChild(muzzle);
 
-    if (!isLocalShot && (attacker || status.lastShotEvent.attackerDisplayName)) {
+    if (!isLocalShot && (attacker || event.attackerDisplayName)) {
       const label = global.document.createElement("div");
       label.className = "lupen-mp-shot-attacker-label";
-      label.textContent = String(attacker?.displayName || attacker?.name || status.lastShotEvent.attackerDisplayName || "Pilot").slice(0, 18);
+      label.textContent = String(attacker?.displayName || attacker?.name || event.attackerDisplayName || "Pilot").slice(0, 18);
       label.style.left = `${attackerPosition.x}%`;
       label.style.top = `${attackerPosition.y}%`;
       layer.appendChild(label);
@@ -4621,7 +4662,7 @@
     renderSpaceResources(resources);
     renderSpaceBots(bots, players);
     renderSelectedTargetCard(players, bots, resources, status);
-    renderSpaceShot(allPlayers, bots, status);
+    renderSpaceShot(allPlayers, bots, resources, status);
     renderStagingCombatPanel(status, selectedBot);
     global.renderMultiplayerChatHud?.(status, allPlayers);
     renderDiagnostics(players, bots, resources);
