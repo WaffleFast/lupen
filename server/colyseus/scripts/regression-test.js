@@ -139,7 +139,7 @@ function assertLayeredPvpDamageHelper() {
   assert(target.pvpArmor === 0, `Expected armor 0 after overflow, got ${target.pvpArmor}.`);
   assert(target.pvpHull === 695, `Expected hull 695 after overflow, got ${target.pvpHull}.`);
 
-  const clampTarget = {
+  const destructionTarget = {
     pvpShield: 0,
     pvpShieldMax: 120,
     pvpArmor: 0,
@@ -147,9 +147,10 @@ function assertLayeredPvpDamageHelper() {
     pvpHull: 3,
     pvpHullMax: 700
   };
-  const clamped = applyLayeredPvpDamage(clampTarget, 50);
-  assert(clamped.hullDamage === 2, `Expected hull damage to clamp at 1 hull, got ${clamped.hullDamage}.`);
-  assert(clampTarget.pvpHull === 1, `PvP hull dropped below prototype clamp: ${clampTarget.pvpHull}.`);
+  const destroyed = applyLayeredPvpDamage(destructionTarget, 50);
+  assert(destroyed.hullDamage === 3, `Expected hull damage to reach 0 hull, got ${destroyed.hullDamage}.`);
+  assert(destructionTarget.pvpHull === 0, `PvP hull did not reach 0 for destruction flow: ${destructionTarget.pvpHull}.`);
+  assert(destroyed.defeated === true, "PvP damage helper did not mark zero-hull target defeated.");
   console.log("layered PvP damage helper preserves shield/armor/hull order");
 }
 
@@ -4423,6 +4424,8 @@ try {
   const roomBShotEvents = [];
   const roomAPvpHitEvents = [];
   const roomBPvpHitEvents = [];
+  const roomAPvpDestroyedEvents = [];
+  const roomBPvpDestroyedEvents = [];
   const roomAPvpRegenEvents = [];
   const roomBPvpRegenEvents = [];
   const roomAPvpRepairEvents = [];
@@ -4441,6 +4444,8 @@ try {
   roomB.onMessage("staging:shot", (message) => roomBShotEvents.push(message));
   roomA.onMessage("pvp:hit", (message) => roomAPvpHitEvents.push(message));
   roomB.onMessage("pvp:hit", (message) => roomBPvpHitEvents.push(message));
+  roomA.onMessage("pvp:destroyed", (message) => roomAPvpDestroyedEvents.push(message));
+  roomB.onMessage("pvp:destroyed", (message) => roomBPvpDestroyedEvents.push(message));
   roomA.onMessage("pvp:shield_regen", (message) => roomAPvpRegenEvents.push(message));
   roomB.onMessage("pvp:shield_regen", (message) => roomBPvpRegenEvents.push(message));
   roomA.onMessage("pvp:repair_synced", (message) => roomAPvpRepairEvents.push(message));
@@ -4738,6 +4743,78 @@ try {
   assert(Number(targetAfterRepair?.pvpShieldMax || 0) === 180, "PvP repair did not restore true shield max.");
   assert(Number(targetAfterRepair?.pvpArmorMax || 0) === 12, "PvP repair did not preserve true armor max.");
   assert(Number(targetAfterRepair?.pvpHullMax || 0) === 700, "PvP repair did not preserve true hull max.");
+
+  roomA.send("movement:update", { currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "", x: 50, y: 57 });
+  roomB.send("movement:update", {
+    currentNode: "Lower Gate Core",
+    presenceStatus: "space",
+    guildId: "guild-two",
+    shieldMax: 1,
+    armor: 0,
+    armorMax: 0,
+    hullMax: 5,
+    x: 50,
+    y: 57
+  });
+  await waitFor("PvP destruction setup in contested node", () => {
+    const target = playerFrom(roomA, roomB.sessionId);
+    return playerFrom(roomA, roomA.sessionId)?.currentNode === "Lower Gate Core" &&
+      target?.currentNode === "Lower Gate Core" &&
+      Number(target?.pvpShield || 0) === 1 &&
+      Number(target?.pvpArmor || 0) === 0 &&
+      Number(target?.pvpHull || 0) === 5;
+  }, 3000);
+  await waitFor("PvP fire cooldown before destruction hit", () => {
+    return Number(playerFrom(roomA, roomA.sessionId)?.nextPvpFireAt || 0) <= Date.now();
+  }, 4000);
+  const pvpHitEventsBeforeDestruction = roomAPvpHitEvents.length;
+  const pvpDestroyedEventsBefore = roomAPvpDestroyedEvents.length;
+  const destructionPvpResolved = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetType: "remotePlayer",
+      targetPlayerId: roomB.sessionId,
+      currentNode: "Lower Gate Core",
+      weaponId: "pulse-laser",
+      weaponKey: "pulse-laser-mk1",
+      weaponFamily: "pulse",
+      weaponName: "Pulse Laser",
+      equippedWeaponKeys: ["pulse-laser-mk1"]
+    });
+  });
+  assert(destructionPvpResolved?.deathApplied === true, "PvP destruction hit did not apply death.");
+  assert(destructionPvpResolved?.defeated === true, "PvP destruction hit did not mark target defeated.");
+  assert(Number(destructionPvpResolved?.shieldDamage || 0) === 1, "PvP destruction did not deplete shield before hull.");
+  assert(Number(destructionPvpResolved?.armorDamage || 0) === 0, "PvP destruction unexpectedly damaged armor.");
+  assert(Number(destructionPvpResolved?.hullDamage || 0) === 5, "PvP destruction did not apply exact hull overflow.");
+  assert(Number(destructionPvpResolved?.hull ?? -1) === 0, "PvP destruction hit did not report zero hull.");
+  assert(destructionPvpResolved?.cargoLost === false, "PvP destruction unexpectedly caused cargo loss.");
+  assert(destructionPvpResolved?.xpAwarded === false, "PvP destruction unexpectedly awarded XP.");
+  assert(destructionPvpResolved?.bountyProgressChanged === false, "PvP destruction unexpectedly changed bounty progress.");
+  assert(destructionPvpResolved?.rewardsGranted === false, "PvP destruction unexpectedly granted rewards.");
+  await waitFor("PvP destruction broadcast delivered to both clients", () => {
+    return roomAPvpHitEvents.length > pvpHitEventsBeforeDestruction &&
+      roomAPvpDestroyedEvents.length > pvpDestroyedEventsBefore &&
+      roomBPvpDestroyedEvents.length > pvpDestroyedEventsBefore;
+  }, 3000);
+  const destructionEvent = roomAPvpDestroyedEvents[roomAPvpDestroyedEvents.length - 1];
+  const targetAfterDestruction = playerFrom(roomA, roomB.sessionId);
+  assert(destructionEvent?.reason === "pvp_player_destroyed", `Unexpected PvP destruction reason: ${destructionEvent?.reason}`);
+  assert(destructionEvent?.previousNode === "Lower Gate Core", `Unexpected PvP destruction previous node: ${destructionEvent?.previousNode}`);
+  assert(destructionEvent?.currentNode === "Asteron Prime", `Unexpected PvP destruction recovery node: ${destructionEvent?.currentNode}`);
+  assert(destructionEvent?.deathApplied === true, "PvP destruction event did not mark death applied.");
+  assert(destructionEvent?.restoredToFull === true, "PvP destruction event did not report full recovery.");
+  assert(destructionEvent?.targetCleared === true, "PvP destruction event did not request target cleanup.");
+  assert(destructionEvent?.cargoLost === false, "PvP destruction event caused cargo loss.");
+  assert(destructionEvent?.creditsLost === false, "PvP destruction event caused credit loss.");
+  assert(destructionEvent?.itemsLost === false, "PvP destruction event caused item loss.");
+  assert(destructionEvent?.xpAwarded === false, "PvP destruction event awarded XP.");
+  assert(destructionEvent?.bountyProgressChanged === false, "PvP destruction event changed bounty progress.");
+  assert(destructionEvent?.rewardsGranted === false, "PvP destruction event granted rewards.");
+  assert(targetAfterDestruction?.currentNode === "Asteron Prime", "Destroyed PvP target did not return to Asteron Prime.");
+  assert(targetAfterDestruction?.presenceStatus === "space", "Destroyed PvP target was not restored to usable space presence.");
+  assert(Number(targetAfterDestruction?.pvpHull || 0) === 5, "Destroyed PvP target hull was not restored to max.");
+  assert(Number(targetAfterDestruction?.pvpShield || 0) === 1, "Destroyed PvP target shield was not restored to max.");
+  assert(Number(targetAfterDestruction?.pvpArmor || 0) === 0, "Destroyed PvP target armor state was not clean after recovery.");
   console.log("player-vs-player combat intents reject safely and resolve in contested space");
 
   roomA.send("movement:update", { currentNode: "Asteron Prime", presenceStatus: "space", guildId: "", x: 50, y: 50 });

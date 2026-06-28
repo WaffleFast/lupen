@@ -11,13 +11,13 @@ function getPvpHullStatus(hullValue, hullMaxValue) {
   const hullNumber = Number(hullValue);
   const hullMaxNumber = Number(hullMaxValue);
   if (!Number.isFinite(hullNumber) || !Number.isFinite(hullMaxNumber) || hullMaxNumber <= 0) return "";
-  if (hullNumber <= 1) return "disabled-threshold";
-  if (hullNumber > 0 && hullNumber <= Math.max(1, Math.round(hullMaxNumber * 0.25))) return "critical";
+  if (hullNumber <= 0) return "disabled-threshold";
+  if (hullNumber > 0 && hullNumber <= Math.max(1, Math.round(hullMaxNumber * 0.2))) return "critical";
   return "";
 }
 
 function getPvpHullStatusMessage(status) {
-  if (status === "disabled-threshold") return "Emergency hull limit reached. Repair required.";
+  if (status === "disabled-threshold") return "Ship destroyed. Emergency return to Asteron Prime.";
   if (status === "critical") return "Hull integrity critical.";
   return "";
 }
@@ -49,12 +49,49 @@ function applyServerPvpDamageState(hit = {}) {
     shieldMax: Number.isFinite(shieldMaxValue) && shieldMaxValue > 0 ? shieldMaxValue : null,
     armor: Number.isFinite(armorValue) ? Math.max(0, armorValue) : null,
     armorMax: Number.isFinite(armorMaxValue) && armorMaxValue >= 0 ? armorMaxValue : null,
-    hull: Number.isFinite(hullValue) ? Math.max(1, hullValue) : null,
+    hull: Number.isFinite(hullValue) ? Math.max(0, hullValue) : null,
     hullMax: Number.isFinite(hullMaxValue) && hullMaxValue > 0 ? hullMaxValue : null,
+    deathApplied: hit.deathApplied === true,
     updatedAt: Date.now()
   };
-  reportPvpHullStatusFeedback(serverPvpDamageDisplayState);
+  if (hit.deathApplied !== true) {
+    reportPvpHullStatusFeedback(serverPvpDamageDisplayState);
+  }
   if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  return true;
+}
+
+function applyServerPvpDestructionState(event = {}) {
+  const targetSessionId = String(event.targetSessionId || event.targetPlayerId || "");
+  const localSessionId = String(window.LupenMultiplayerClient?.getStatus?.()?.sessionId || "");
+  const isLocalTarget = targetSessionId && targetSessionId === localSessionId;
+  const recoveryNode = String(event.currentNode || "Asteron Prime") || "Asteron Prime";
+
+  applyServerPvpDamageState({
+    ...event,
+    reason: "pvp_player_destroyed",
+    deathApplied: false
+  });
+
+  if (isLocalTarget) {
+    currentNode = recoveryNode;
+    if (typeof sectorNodes !== "undefined" && sectorNodes?.[recoveryNode]?.type === "planet") lastPlanetNode = recoveryNode;
+    jumpCharge = 0;
+    stopShieldRegen();
+    clearRemotePlayerTarget("pvp_destroyed_self");
+    closeSectorMap();
+    if (typeof updateCurrentNodeUI === "function") updateCurrentNodeUI();
+    if (typeof updateHubLocation === "function") updateHubLocation();
+    if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+    if (typeof showScreen === "function") showScreen("spaceScreen");
+  } else {
+    clearRemotePlayerTarget("pvp_destroyed_remote");
+  }
+
+  updateAsteroidUI();
+  updateTargetPanel();
+  updateObjectActionPanel(false);
+  window.LupenMultiplayerOverlay?.render?.();
   return true;
 }
 
@@ -1144,6 +1181,9 @@ function handleStagingBotLifecycleEvent(event = {}) {
 }
 
 window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
+window.clearRemotePlayerTarget = clearRemotePlayerTarget;
+window.applyServerPvpDamageState = applyServerPvpDamageState;
+window.applyServerPvpDestructionState = applyServerPvpDestructionState;
 window.handleStagingBotLifecycleEvent = handleStagingBotLifecycleEvent;
 window.reconcileStagingBotTargetState = reconcileStagingBotTargetState;
 window.reconcileServerOwnedSectorObjectMode = reconcileServerOwnedSectorObjectMode;

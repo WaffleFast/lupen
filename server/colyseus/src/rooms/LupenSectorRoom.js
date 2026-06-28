@@ -570,7 +570,7 @@ function ensurePlayerPvpState(player) {
   );
   player.pvpHull = clampNumber(
     Math.round(Number.isFinite(Number(player.pvpHull)) ? Number(player.pvpHull) : player.pvpHullMax),
-    STAGING_PVP_MIN_HULL,
+    0,
     player.pvpHullMax
   );
   player.lastPvpHitAt = Math.max(0, Math.round(Number(player.lastPvpHitAt || 0)));
@@ -609,7 +609,7 @@ function updatePlayerPvpCapacityFromPresence(player, message = {}) {
     player.pvpHullMax = nextHullMax;
     player.pvpHull = previousHullMax <= STAGING_PVP_HULL_MAX && Number(player.lastPvpHitAt || 0) <= 0
       ? nextHullMax
-      : clampNumber(Number(player.pvpHull || nextHullMax), STAGING_PVP_MIN_HULL, nextHullMax);
+      : clampNumber(Number(player.pvpHull || nextHullMax), 0, nextHullMax);
   }
 
   return player;
@@ -664,8 +664,8 @@ export function applyLayeredPvpDamage(target, damage) {
       armorBefore: 0,
       armor: 0,
       armorMax: 0,
-      hullBefore: STAGING_PVP_MIN_HULL,
-      hull: STAGING_PVP_MIN_HULL,
+      hullBefore: 0,
+      hull: 0,
       hullMax: STAGING_PVP_MIN_HULL,
       defeated: false
     };
@@ -678,7 +678,7 @@ export function applyLayeredPvpDamage(target, damage) {
   const hullMax = Math.max(STAGING_PVP_MIN_HULL, Math.round(Number(target.pvpHullMax || target.hullMax || STAGING_PVP_HULL_MAX)));
   const shieldBefore = clampNumber(Math.round(Number(target.pvpShield || 0)), 0, shieldMax);
   const armorBefore = clampNumber(Math.round(Number(target.pvpArmor || 0)), 0, armorMax);
-  const hullBefore = clampNumber(Math.round(Number(target.pvpHull || hullMax)), STAGING_PVP_MIN_HULL, hullMax);
+  const hullBefore = clampNumber(Math.round(Number.isFinite(Number(target.pvpHull)) ? Number(target.pvpHull) : hullMax), 0, hullMax);
 
   const shieldDamage = Math.min(shieldBefore, remaining);
   target.pvpShield = Math.max(0, shieldBefore - shieldDamage);
@@ -688,8 +688,8 @@ export function applyLayeredPvpDamage(target, damage) {
   target.pvpArmor = Math.max(0, armorBefore - armorDamage);
   remaining = Math.max(0, remaining - armorDamage);
 
-  const hullDamage = Math.min(Math.max(0, hullBefore - STAGING_PVP_MIN_HULL), remaining);
-  target.pvpHull = Math.max(STAGING_PVP_MIN_HULL, hullBefore - hullDamage);
+  const hullDamage = Math.min(Math.max(0, hullBefore), remaining);
+  target.pvpHull = Math.max(0, hullBefore - hullDamage);
   target.pvpShieldMax = shieldMax;
   target.pvpArmorMax = armorMax;
   target.pvpHullMax = hullMax;
@@ -709,7 +709,7 @@ export function applyLayeredPvpDamage(target, damage) {
     hullBefore,
     hull: target.pvpHull,
     hullMax: target.pvpHullMax,
-    defeated: false
+    defeated: target.pvpHull <= 0 && hullBefore > 0
   };
 }
 
@@ -1747,7 +1747,7 @@ export class LupenSectorRoom extends Room {
       if (bot.disabled) return;
 
       const nodePosition = BOT_NODE_POSITIONS.get(bot.currentNode) || STAGING_BOT_NODES[0];
-      const position = getServerObjectSpawnPosition(nodePosition, `${bot.id}:${bot.currentNode}:patrol:${Math.floor(this.botStep / 4)}`, 1.8);
+      const position = getServerObjectSpawnPosition(nodePosition, `${bot.id}:${bot.currentNode}:patrol`, 1.8);
       bot.x = position.x;
       bot.y = position.y;
       bot.lastUpdatedAt = now;
@@ -3753,6 +3753,81 @@ export class LupenSectorRoom extends Room {
     return result;
   }
 
+  recoverDestroyedPvpPlayer(targetPlayer, attacker = null, damageResult = {}, now = Date.now()) {
+    if (!targetPlayer) return null;
+
+    const previousNode = targetPlayer.currentNode || "";
+    const previousPresenceStatus = targetPlayer.presenceStatus || "space";
+    const shieldBeforeRepair = Number(targetPlayer.pvpShield || 0);
+    const armorBeforeRepair = Number(targetPlayer.pvpArmor || 0);
+    const hullBeforeRepair = Number(targetPlayer.pvpHull || 0);
+
+    targetPlayer.currentNode = "Asteron Prime";
+    targetPlayer.presenceStatus = "space";
+    targetPlayer.x = 50;
+    targetPlayer.y = 50;
+    targetPlayer.selectedTargetBotId = "";
+    targetPlayer.lastCombatIntentReason = "pvp_destroyed_recovered";
+    targetPlayer.lastCombatNodeValidationReason = "";
+    targetPlayer.nextPvpFireAt = 0;
+
+    targetPlayer.pvpShield = Number(targetPlayer.pvpShieldMax || STAGING_PVP_SHIELD_MAX);
+    targetPlayer.pvpArmor = Number(targetPlayer.pvpArmorMax || 0);
+    targetPlayer.pvpHull = Number(targetPlayer.pvpHullMax || STAGING_PVP_HULL_MAX);
+    targetPlayer.lastPvpHitAt = 0;
+    targetPlayer.lastPvpShieldRegenAt = now;
+    targetPlayer.lastSeenAt = now;
+
+    const payload = {
+      ok: true,
+      reason: "pvp_player_destroyed",
+      targetPlayerId: targetPlayer.sessionId,
+      targetSessionId: targetPlayer.sessionId,
+      targetDisplayName: getSafeIdentityValue(targetPlayer.displayName, "Pilot") || "Pilot",
+      attackerSessionId: attacker?.sessionId || "",
+      attackerDisplayName: getSafeIdentityValue(attacker?.displayName, "Pilot") || "Pilot",
+      previousNode,
+      currentNode: targetPlayer.currentNode,
+      targetNode: targetPlayer.currentNode,
+      previousPresenceStatus,
+      presenceStatus: targetPlayer.presenceStatus,
+      shieldBefore: damageResult.shieldBefore,
+      shieldAtDestruction: shieldBeforeRepair,
+      shield: targetPlayer.pvpShield,
+      shieldMax: targetPlayer.pvpShieldMax,
+      armorBefore: damageResult.armorBefore,
+      armorAtDestruction: armorBeforeRepair,
+      armor: targetPlayer.pvpArmor,
+      armorMax: targetPlayer.pvpArmorMax,
+      hullBefore: damageResult.hullBefore,
+      hullAtDestruction: hullBeforeRepair,
+      hull: targetPlayer.pvpHull,
+      hullMax: targetPlayer.pvpHullMax,
+      defeated: true,
+      deathApplied: true,
+      restoredToFull: true,
+      targetCleared: true,
+      cargoLost: false,
+      creditsLost: false,
+      itemsLost: false,
+      xpAwarded: false,
+      bountyProgressChanged: false,
+      rewardsGranted: false,
+      serverAuthoritative: true,
+      receivedAt: now
+    };
+
+    this.broadcast("playerMoved", this.buildPresenceEvent("moved", targetPlayer, {
+      previousNode,
+      currentNode: targetPlayer.currentNode,
+      previousPresenceStatus,
+      presenceStatus: targetPlayer.presenceStatus,
+      reason: "pvp_destroyed_return"
+    }));
+    this.broadcast("pvp:destroyed", payload);
+    return payload;
+  }
+
   resolvePvpCombatIntent(client, message = {}, messageType = "combat:intent") {
     const attacker = this.touchPlayer(client.sessionId);
     const now = Date.now();
@@ -3792,9 +3867,10 @@ export class LupenSectorRoom extends Room {
     ensurePlayerPvpState(attacker);
     ensurePlayerPvpState(targetPlayer);
     const result = this.applyStagingPvpDamage(targetPlayer, STAGING_PVP_TEST_DAMAGE);
+    const targetDefeated = result.defeated === true || Number(result.hull || 0) <= 0;
     attacker.lastFireAt = now;
     attacker.nextPvpFireAt = now + STAGING_PVP_COOLDOWN_MS;
-    attacker.lastCombatIntentReason = "pvp_damage_applied";
+    attacker.lastCombatIntentReason = targetDefeated ? "pvp_target_destroyed" : "pvp_damage_applied";
     attacker.lastCombatNodeValidationReason = "pvp_node_valid";
 
     const hitPayload = {
@@ -3832,8 +3908,8 @@ export class LupenSectorRoom extends Room {
       hullBefore: result.hullBefore,
       hull: result.hull,
       hullMax: result.hullMax,
-      defeated: false,
-      deathApplied: false,
+      defeated: targetDefeated,
+      deathApplied: targetDefeated,
       cargoLost: false,
       xpAwarded: false,
       bountyProgressChanged: false,
@@ -3848,6 +3924,9 @@ export class LupenSectorRoom extends Room {
 
     client.send("combat:resolved", hitPayload);
     this.broadcast("pvp:hit", hitPayload);
+    if (targetDefeated) {
+      this.recoverDestroyedPvpPlayer(targetPlayer, attacker, result, hitPayload.receivedAt);
+    }
   }
 
   async resolveCombatIntent(client, message = {}, messageType = "combat:intent") {

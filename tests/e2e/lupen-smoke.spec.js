@@ -1571,7 +1571,7 @@ test.describe("Lupen browser smoke", () => {
           const criticalTargetCardText = criticalTargetCard?.textContent || "";
           const criticalTargetCardClass = criticalTargetCard?.className || "";
 
-          remotePlayer.pvpHull = 1;
+          remotePlayer.pvpHull = 0;
           window.LupenMultiplayerOverlay?.render?.();
           const disabledTargetCard = document.querySelector(".lupen-target-card.player");
           const disabledTargetCardText = disabledTargetCard?.textContent || "";
@@ -1684,7 +1684,7 @@ test.describe("Lupen browser smoke", () => {
             targetSessionId: "local-session",
             shield: 0,
             shieldMax: 30,
-            hull: 1,
+            hull: 0,
             hullMax: 120
           });
           const activityAfterDisabled = document.getElementById("activityLogFeed")?.textContent || "";
@@ -1711,8 +1711,8 @@ test.describe("Lupen browser smoke", () => {
           const criticalFeedback = {
             criticalMessages: (activityAfterCritical.match(/Hull integrity critical\\./g) || []).length
               - (activityBeforeCritical.match(/Hull integrity critical\\./g) || []).length,
-            disabledMessages: (activityAfterDisabled.match(/Emergency hull limit reached\\. Repair required\\./g) || []).length
-              - (activityAfterCritical.match(/Emergency hull limit reached\\. Repair required\\./g) || []).length,
+            disabledMessages: (activityAfterDisabled.match(/Ship destroyed\\. Emergency return to Asteron Prime\\./g) || []).length
+              - (activityAfterCritical.match(/Ship destroyed\\. Emergency return to Asteron Prime\\./g) || []).length,
             disabledHudClasses,
             repairedHudClasses
           };
@@ -1745,6 +1745,55 @@ test.describe("Lupen browser smoke", () => {
           const unknownMessage = getRemotePlayerEngageBlockMessage({ ...remotePlayer });
           const unknownActionDisabled = document.getElementById("objectEngageBtn")?.disabled ?? null;
           const unknownActionText = document.getElementById("objectEngageBtn")?.textContent || "";
+
+          currentNode = "Lower Gate Core";
+          remotePlayer.currentNode = "Lower Gate Core";
+          selectRemotePlayerTarget("remote-pvp-test");
+          const beforeDestructionRecovery = {
+            credits,
+            combatXp: playerProgress.combatXp,
+            cargo: { ...cargo },
+            selectedType: selectedTarget?.type || "",
+            currentNode
+          };
+          const activityBeforeDestructionRecovery = document.getElementById("activityLogFeed")?.textContent || "";
+          const pvpDestructionApplied = typeof applyServerPvpDestructionState === "function"
+            ? applyServerPvpDestructionState({
+              targetSessionId: "local-session",
+              attackerSessionId: "remote-pvp-test",
+              currentNode: "Asteron Prime",
+              shield: 30,
+              shieldMax: 30,
+              armor: 0,
+              armorMax: 0,
+              hull: 120,
+              hullMax: 120,
+              hullAtDestruction: 0,
+              deathApplied: true,
+              restoredToFull: true,
+              cargoLost: false,
+              creditsLost: false,
+              itemsLost: false,
+              xpAwarded: false,
+              bountyProgressChanged: false,
+              rewardsGranted: false
+            })
+            : false;
+          const activityAfterDestructionRecovery = document.getElementById("activityLogFeed")?.textContent || "";
+          const destructionRecovery = {
+            applied: pvpDestructionApplied,
+            currentNode,
+            selectedType: selectedTarget?.type || "",
+            engagedType: engagedTarget?.type || "",
+            hullValue: document.getElementById("hullValue")?.textContent || "",
+            shieldValue: document.getElementById("shieldValue")?.textContent || "",
+            credits,
+            combatXp: playerProgress.combatXp,
+            cargo: { ...cargo },
+            messages: (activityAfterDestructionRecovery.match(/Ship destroyed\\. Emergency return to Asteron Prime\\./g) || []).length
+              - (activityBeforeDestructionRecovery.match(/Ship destroyed\\. Emergency return to Asteron Prime\\./g) || []).length,
+            before: beforeDestructionRecovery
+          };
 
           return {
             protectedSelected,
@@ -1790,7 +1839,8 @@ test.describe("Lupen browser smoke", () => {
             unknownSelected,
             unknownMessage,
             unknownActionDisabled,
-            unknownActionText
+            unknownActionText,
+            destructionRecovery
           };
         } finally {
           if (engageTimer) clearInterval(engageTimer);
@@ -1880,9 +1930,9 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.criticalFeedback.criticalMessages).toBe(1);
     expect(eligibility.criticalFeedback.disabledMessages).toBe(1);
     expect(eligibility.criticalFeedback.disabledHudClasses).toMatchObject({
-      screenCritical: true,
+      screenCritical: false,
       screenDisabled: true,
-      statCritical: true,
+      statCritical: false,
       statDisabled: true
     });
     expect(eligibility.criticalFeedback.repairedHudClasses).toMatchObject({
@@ -1912,6 +1962,17 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.unknownMessage).toBe("PvP disabled in protected zones.");
     expect(eligibility.unknownActionDisabled).toBe(true);
     expect(eligibility.unknownActionText).toBe("PVP DISABLED");
+    expect(eligibility.destructionRecovery).toMatchObject({
+      applied: true,
+      currentNode: "Asteron Prime",
+      selectedType: "",
+      engagedType: "",
+      hullValue: "120",
+      shieldValue: "30",
+      credits: eligibility.destructionRecovery.before.credits,
+      combatXp: eligibility.destructionRecovery.before.combatXp
+    });
+    expect(eligibility.destructionRecovery.cargo).toEqual(eligibility.destructionRecovery.before.cargo);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

@@ -1145,8 +1145,8 @@ function updateSpaceHUD() {
   document.getElementById("shieldFill").style.height = `${safeShieldMax > 0 ? Math.max(0, Math.min(100, (displayShield / safeShieldMax) * 100)) : 0}%`;
   document.getElementById("shieldValue").textContent = formatNumber(Math.floor(displayShield));
 
-  const isHullCritical = displayHull > 0 && (displayHull / safeHullMax) <= 0.25;
-  const isHullDisabledThreshold = displayHull > 0 && displayHull <= 1;
+  const isHullCritical = displayHull > 0 && (displayHull / safeHullMax) <= 0.2;
+  const isHullDisabledThreshold = displayHull <= 0;
   const isShieldDepleted = safeShieldMax > 0 && displayShield <= 0 && displayHull > 0;
   const spaceScreen = document.getElementById("spaceScreen");
   const statPanel = document.querySelector(".vertical-stats");

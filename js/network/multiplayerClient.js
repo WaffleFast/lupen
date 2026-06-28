@@ -1088,9 +1088,11 @@
     if (!targetId) return false;
     const existing = playersById.get(targetId);
     if (!existing) return false;
-    playersById.set(targetId, {
-      ...existing,
-      pvpShield: Number.isFinite(Number(state.shield)) ? Number(state.shield) : existing.pvpShield,
+      playersById.set(targetId, {
+        ...existing,
+        currentNode: String(state.currentNode || state.targetNode || existing.currentNode || "Asteron Prime"),
+        presenceStatus: String(state.presenceStatus || existing.presenceStatus || "space"),
+        pvpShield: Number.isFinite(Number(state.shield)) ? Number(state.shield) : existing.pvpShield,
       pvpShieldMax: Number.isFinite(Number(state.shieldMax)) ? Number(state.shieldMax) : existing.pvpShieldMax,
       pvpArmor: Number.isFinite(Number(state.armor)) ? Number(state.armor) : existing.pvpArmor,
       pvpArmorMax: Number.isFinite(Number(state.armorMax)) ? Number(state.armorMax) : existing.pvpArmorMax,
@@ -2486,10 +2488,12 @@
       applyPvpHitToPlayerSnapshot(connection.lastPvpHitEvent);
 
       if (targetSessionId === connection.sessionId) {
-        addStagingActivityLogOnce(
-          `pvp-hit-target:${attackerSessionId}:${targetSessionId}:${receivedAt}`,
-          `PvP hit received from ${connection.lastPvpHitEvent.attackerDisplayName}: ${totalDamage} damage.`
-        );
+        if (connection.lastPvpHitEvent.deathApplied !== true) {
+          addStagingActivityLogOnce(
+            `pvp-hit-target:${attackerSessionId}:${targetSessionId}:${receivedAt}`,
+            `PvP hit received from ${connection.lastPvpHitEvent.attackerDisplayName}: ${totalDamage} damage.`
+          );
+        }
         if (typeof global.applyServerPvpDamageState === "function") {
           global.applyServerPvpDamageState(connection.lastPvpHitEvent);
         }
@@ -2504,6 +2508,71 @@
       }
 
       logDev("server pvp hit", message);
+      notifyServerState(activeRoom.state || null);
+    });
+
+    activeRoom.onMessage("pvp:destroyed", (message) => {
+      const attackerSessionId = String(message?.attackerSessionId || "");
+      const targetSessionId = String(message?.targetSessionId || message?.targetPlayerId || "");
+      const receivedAt = Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now();
+      const destroyedState = {
+        ok: message?.ok === true,
+        reason: String(message?.reason || "pvp_player_destroyed"),
+        attackerSessionId,
+        attackerDisplayName: String(message?.attackerDisplayName || "Pilot"),
+        targetSessionId,
+        targetPlayerId: String(message?.targetPlayerId || targetSessionId),
+        targetDisplayName: String(message?.targetDisplayName || "Pilot"),
+        previousNode: String(message?.previousNode || ""),
+        currentNode: String(message?.currentNode || message?.targetNode || "Asteron Prime"),
+        targetNode: String(message?.targetNode || message?.currentNode || "Asteron Prime"),
+        presenceStatus: String(message?.presenceStatus || "space"),
+        shieldAtDestruction: Number.isFinite(Number(message?.shieldAtDestruction)) ? Number(message.shieldAtDestruction) : 0,
+        shield: Number.isFinite(Number(message?.shield)) ? Number(message.shield) : 0,
+        shieldMax: Number.isFinite(Number(message?.shieldMax)) ? Number(message.shieldMax) : 0,
+        armorAtDestruction: Number.isFinite(Number(message?.armorAtDestruction)) ? Number(message.armorAtDestruction) : 0,
+        armor: Number.isFinite(Number(message?.armor)) ? Number(message.armor) : 0,
+        armorMax: Number.isFinite(Number(message?.armorMax)) ? Number(message.armorMax) : 0,
+        hullAtDestruction: Number.isFinite(Number(message?.hullAtDestruction)) ? Number(message.hullAtDestruction) : 0,
+        hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
+        hullMax: Number.isFinite(Number(message?.hullMax)) ? Number(message.hullMax) : 0,
+        defeated: message?.defeated === true,
+        deathApplied: message?.deathApplied === true,
+        restoredToFull: message?.restoredToFull === true,
+        targetCleared: message?.targetCleared === true,
+        cargoLost: message?.cargoLost === true,
+        creditsLost: message?.creditsLost === true,
+        itemsLost: message?.itemsLost === true,
+        xpAwarded: message?.xpAwarded === true,
+        bountyProgressChanged: message?.bountyProgressChanged === true,
+        rewardsGranted: message?.rewardsGranted === true,
+        serverAuthoritative: message?.serverAuthoritative === true,
+        receivedAt
+      };
+      connection.lastPvpDestroyedEvent = destroyedState;
+      applyPvpStateToPlayerSnapshot(destroyedState);
+
+      if (targetSessionId === connection.sessionId) {
+        addStagingActivityLogOnce(
+          `pvp-destroyed-target:${attackerSessionId}:${targetSessionId}:${receivedAt}`,
+          "Ship destroyed. Emergency return to Asteron Prime."
+        );
+        if (typeof global.applyServerPvpDestructionState === "function") {
+          global.applyServerPvpDestructionState(destroyedState);
+        }
+      } else if (attackerSessionId === connection.sessionId) {
+        addStagingActivityLogOnce(
+          `pvp-destroyed-attacker:${attackerSessionId}:${targetSessionId}:${receivedAt}`,
+          "Target destroyed."
+        );
+        if (typeof global.clearRemotePlayerTarget === "function") {
+          global.clearRemotePlayerTarget("pvp_target_destroyed");
+        }
+      } else if (typeof global.clearRemotePlayerTarget === "function") {
+        global.clearRemotePlayerTarget("pvp_destroyed_observed");
+      }
+
+      logDev("server pvp destroyed", message);
       notifyServerState(activeRoom.state || null);
     });
 

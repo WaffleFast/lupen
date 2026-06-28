@@ -1758,8 +1758,8 @@
     const hull = Number(vitals.hull);
     const hullMax = Number(vitals.hullMax);
     if (!Number.isFinite(hull) || !Number.isFinite(hullMax) || hullMax <= 0) return "";
-    if (hull <= 1) return "disabled-threshold";
-    if (hull > 0 && hull <= Math.max(1, Math.round(hullMax * 0.25))) return "critical";
+    if (hull <= 0) return "disabled-threshold";
+    if (hull > 0 && hull <= Math.max(1, Math.round(hullMax * 0.2))) return "critical";
     return "";
   }
 
