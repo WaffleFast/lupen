@@ -3548,6 +3548,7 @@ test.describe("Lupen browser smoke", () => {
         const botMarker = document.querySelector("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-locked");
         const fxLayer = document.getElementById("combatFxLayer");
         const fxShot = fxLayer?.querySelector(".combat-fx-shot[data-owner='local']");
+        const localCores = Array.from(fxShot?.querySelectorAll(".combat-fx-beam-core") || []);
         const targetFills = Array.from(targetCard?.querySelectorAll(".lupen-target-bar-fill") || []);
         return {
           step: getCurrentTutorialStep().id,
@@ -3563,6 +3564,9 @@ test.describe("Lupen browser smoke", () => {
           trailShotBeamCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-beam.is-wing, #lupenMultiplayerSpaceShotLayer .lupen-mp-shot-beam.is-spark").length,
           localSourceX: Number(fxShot?.dataset.sourceX || 0),
           localTargetX: Number(fxShot?.dataset.targetX || 0),
+          localSourceCount: Number(fxShot?.dataset.sourceCount || 0),
+          localUniqueSourceYCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("y1") || 0)))).size,
+          localUniqueTargetCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("x2") || 0)) + ":" + Math.round(Number(line.getAttribute("y2") || 0)))).size,
           coopEngagedMarkerCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-coop-engaged").length,
           muzzleCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-muzzle").length,
           hitCount: fxLayer?.querySelectorAll(".combat-fx-impact").length || 0,
@@ -3589,9 +3593,12 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
     expect(stagingBotSelectedState.shotBeamCount).toBe(1);
     expect(stagingBotSelectedState.localShotBeamCount).toBe(1);
-    expect(stagingBotSelectedState.beamCoreCount).toBe(1);
+    expect(stagingBotSelectedState.beamCoreCount).toBe(3);
     expect(stagingBotSelectedState.trailShotBeamCount).toBe(0);
     expect(stagingBotSelectedState.localSourceX).toBeLessThan(stagingBotSelectedState.localTargetX);
+    expect(stagingBotSelectedState.localSourceCount).toBe(3);
+    expect(stagingBotSelectedState.localUniqueSourceYCount).toBeGreaterThanOrEqual(2);
+    expect(stagingBotSelectedState.localUniqueTargetCount).toBe(1);
     expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.muzzleCount).toBe(0);
     expect(stagingBotSelectedState.hitCount).toBe(1);
@@ -4054,6 +4061,7 @@ test.describe("Lupen browser smoke", () => {
         showIncomingHitFlash({ armorHit: true });
         const fxLayer = document.getElementById("combatFxLayer");
         const localShot = fxLayer?.querySelector(".combat-fx-shot[data-owner='local']");
+        const localCores = Array.from(localShot?.querySelectorAll(".combat-fx-beam-core") || []);
         return {
           combatFxLayerExists: !!fxLayer,
           combatFxShotCount: fxLayer?.querySelectorAll(".combat-fx-shot").length || 0,
@@ -4063,6 +4071,9 @@ test.describe("Lupen browser smoke", () => {
           combatFxImpactCount: fxLayer?.querySelectorAll(".combat-fx-impact").length || 0,
           localSourceX: Number(localShot?.dataset.sourceX || 0),
           localTargetX: Number(localShot?.dataset.targetX || 0),
+          localSourceCount: Number(localShot?.dataset.sourceCount || 0),
+          localUniqueSourceYCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("y1") || 0)))).size,
+          localUniqueTargetCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("x2") || 0)) + ":" + Math.round(Number(line.getAttribute("y2") || 0)))).size,
           playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
           simplePlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.simple-combat-laser.player-shot").length,
           polishedPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-polished").length,
@@ -4084,9 +4095,12 @@ test.describe("Lupen browser smoke", () => {
     expect(visualState.combatFxShotCount).toBe(2);
     expect(visualState.localCombatFxShotCount).toBe(1);
     expect(visualState.botCombatFxShotCount).toBe(1);
-    expect(visualState.combatFxBeamCoreCount).toBe(2);
+    expect(visualState.combatFxBeamCoreCount).toBe(4);
     expect(visualState.combatFxImpactCount).toBe(1);
     expect(visualState.localSourceX).toBeLessThan(visualState.localTargetX);
+    expect(visualState.localSourceCount).toBe(3);
+    expect(visualState.localUniqueSourceYCount).toBeGreaterThanOrEqual(2);
+    expect(visualState.localUniqueTargetCount).toBe(1);
     expect(visualState.playerShotCount).toBe(0);
     expect(visualState.simplePlayerShotCount).toBe(0);
     expect(visualState.polishedPlayerShotCount).toBe(0);

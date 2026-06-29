@@ -426,6 +426,7 @@ let weaponVisualCycleOffset = 0;
 const COMBAT_FX_LAYER_ID = "combatFxLayer";
 const COMBAT_FX_SVG_NS = "http://www.w3.org/2000/svg";
 const COMBAT_FX_BEAM_DURATION_MS = 520;
+const LOCAL_COMBAT_FX_BEAM_COUNT = 3;
 const suppressedCombatVisualTargets = new Map();
 const renderedCombatFxKeys = new Set();
 
@@ -549,18 +550,39 @@ function getCombatFxPointFromTarget(target = {}) {
   return getCombatFxPointFromPercent(target.x, target.y);
 }
 
-function getLocalCombatFxOriginForTarget(targetPoint = {}) {
-  const context = ensureCombatFxLayer();
+function getCombatFxActiveBounds(context = ensureCombatFxLayer()) {
   if (!context) return null;
   const activeTop = Math.min(100, Math.max(54, context.height * 0.12));
-  const activeBottom = Math.max(activeTop + 80, context.height - 178);
-  const originY = activeTop + (activeBottom - activeTop) * 0.62;
+  const activeBottom = Math.max(activeTop + 100, context.height - 245);
   return {
-    x: Math.max(18, context.width * 0.045),
-    y: Math.max(activeTop + 16, Math.min(activeBottom - 16, originY)),
-    width: context.width,
-    height: context.height
+    top: activeTop,
+    bottom: activeBottom,
+    left: Math.max(14, context.width * 0.035),
+    lowerLeft: Math.max(34, context.width * 0.08),
+    lowerCenter: context.width * 0.38,
+    lowerRight: context.width * 0.68
   };
+}
+
+function getLocalCombatFxOriginsForTarget(targetPoint = {}, beamCount = LOCAL_COMBAT_FX_BEAM_COUNT) {
+  const context = ensureCombatFxLayer();
+  if (!context) return null;
+  const bounds = getCombatFxActiveBounds(context);
+  if (!bounds) return null;
+  const targetY = Number(targetPoint?.y || bounds.top + (bounds.bottom - bounds.top) * 0.5);
+  const leftMidY = Math.max(bounds.top + 24, Math.min(bounds.bottom - 44, targetY + (targetY < bounds.bottom - 72 ? 42 : -38)));
+  const anchors = [
+    { x: bounds.left, y: leftMidY, width: context.width, height: context.height },
+    { x: bounds.lowerLeft, y: bounds.bottom - 12, width: context.width, height: context.height },
+    { x: bounds.lowerCenter, y: bounds.bottom - 4, width: context.width, height: context.height },
+    { x: bounds.lowerRight, y: bounds.bottom - 18, width: context.width, height: context.height }
+  ];
+  return anchors.slice(0, Math.max(1, Math.min(anchors.length, Math.round(Number(beamCount || LOCAL_COMBAT_FX_BEAM_COUNT)))));
+}
+
+function getLocalCombatFxOriginForTarget(targetPoint = {}) {
+  const origins = getLocalCombatFxOriginsForTarget(targetPoint, 1);
+  return Array.isArray(origins) ? origins[0] : origins;
 }
 
 function tagCombatFxElement(element, ref, options = {}) {
@@ -604,10 +626,13 @@ function renderCombatFxBeam(sourcePoint, targetPoint, options = {}) {
   const durationMs = Math.max(260, Math.min(900, Number(options.durationMs || COMBAT_FX_BEAM_DURATION_MS)));
   const tone = options.tone === "bot" ? "bot" : "player";
   const color = options.color || (tone === "bot" ? "#ff8756" : "#55e8ff");
-  const source = {
-    x: Math.max(0, Math.min(context.width, Number(sourcePoint.x || 0))),
-    y: Math.max(0, Math.min(context.height, Number(sourcePoint.y || 0)))
-  };
+  const sourcePoints = (Array.isArray(sourcePoint) ? sourcePoint : [sourcePoint])
+    .map((point) => ({
+      x: Math.max(0, Math.min(context.width, Number(point?.x || 0))),
+      y: Math.max(0, Math.min(context.height, Number(point?.y || 0)))
+    }))
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+  if (!sourcePoints.length) return false;
   const target = {
     x: Math.max(0, Math.min(context.width, Number(targetPoint.x || 0))),
     y: Math.max(0, Math.min(context.height, Number(targetPoint.y || 0)))
@@ -616,26 +641,30 @@ function renderCombatFxBeam(sourcePoint, targetPoint, options = {}) {
   const group = document.createElementNS(COMBAT_FX_SVG_NS, "g");
   group.classList.add("combat-fx-shot", tone === "bot" ? "is-bot-return" : "is-player-fire");
   tagCombatFxElement(group, ref, { ...options, owner: options.owner || tone });
-  group.dataset.sourceX = String(Math.round(source.x));
-  group.dataset.sourceY = String(Math.round(source.y));
+  group.dataset.sourceCount = String(sourcePoints.length);
+  group.dataset.sourceX = String(Math.round(sourcePoints[0].x));
+  group.dataset.sourceY = String(Math.round(sourcePoints[0].y));
   group.dataset.targetX = String(Math.round(target.x));
   group.dataset.targetY = String(Math.round(target.y));
   group.style.setProperty("--combat-fx-color", color);
   group.style.animationDuration = `${durationMs}ms`;
 
-  const glow = document.createElementNS(COMBAT_FX_SVG_NS, "line");
-  glow.classList.add("combat-fx-beam-glow");
-  const core = document.createElementNS(COMBAT_FX_SVG_NS, "line");
-  core.classList.add("combat-fx-beam-core");
-  [glow, core].forEach((line) => {
-    line.setAttribute("x1", String(source.x));
-    line.setAttribute("y1", String(source.y));
-    line.setAttribute("x2", String(target.x));
-    line.setAttribute("y2", String(target.y));
-    line.setAttribute("stroke", color);
-    line.setAttribute("vector-effect", "non-scaling-stroke");
-    tagCombatFxElement(line, ref, { ...options, owner: options.owner || tone });
-    group.appendChild(line);
+  sourcePoints.forEach((source, index) => {
+    const glow = document.createElementNS(COMBAT_FX_SVG_NS, "line");
+    glow.classList.add("combat-fx-beam-glow");
+    const core = document.createElementNS(COMBAT_FX_SVG_NS, "line");
+    core.classList.add("combat-fx-beam-core");
+    [glow, core].forEach((line) => {
+      line.dataset.beamIndex = String(index);
+      line.setAttribute("x1", String(source.x));
+      line.setAttribute("y1", String(source.y));
+      line.setAttribute("x2", String(target.x));
+      line.setAttribute("y2", String(target.y));
+      line.setAttribute("stroke", color);
+      line.setAttribute("vector-effect", "non-scaling-stroke");
+      tagCombatFxElement(line, ref, { ...options, owner: options.owner || tone });
+      group.appendChild(line);
+    });
   });
 
   if (options.showImpact !== false) {
@@ -766,7 +795,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   if (targetRef && !isCombatVisualTargetStillValid(targetRef)) return;
   const profile = getShotVisualProfile(shotWeapon);
   const targetPoint = getCombatFxPointFromTarget(target);
-  const sourcePoint = getLocalCombatFxOriginForTarget(targetPoint);
+  const sourcePoint = getLocalCombatFxOriginsForTarget(targetPoint, LOCAL_COMBAT_FX_BEAM_COUNT);
   renderCombatFxBeam(sourcePoint, targetPoint, {
     ...options,
     targetRef,
@@ -797,11 +826,11 @@ function incomingLaserBurstFromBot(bot, delay = 0, options = {}) {
     targetType: options.targetType || (getStagingBotTargetById(bot.id) ? "stagingBot" : "hostileBot"),
     targetId: bot.id
   });
-  const activeTop = Math.min(100, Math.max(54, context.height * 0.12));
-  const activeBottom = Math.max(activeTop + 80, context.height - 178);
+  const bounds = getCombatFxActiveBounds(context);
+  if (!bounds) return;
   const targetPoint = {
     x: context.width * 0.5,
-    y: activeBottom - 18
+    y: bounds.bottom - 18
   };
 
   const drawIncoming = () => {
@@ -1399,6 +1428,7 @@ window.renderCombatFxBeam = renderCombatFxBeam;
 window.renderCombatFxImpact = renderCombatFxImpact;
 window.getCombatFxPointFromPercent = getCombatFxPointFromPercent;
 window.getLocalCombatFxOriginForTarget = getLocalCombatFxOriginForTarget;
+window.getLocalCombatFxOriginsForTarget = getLocalCombatFxOriginsForTarget;
 window.clearRemotePlayerTarget = clearRemotePlayerTarget;
 window.applyServerPvpDamageState = applyServerPvpDamageState;
 window.applyServerPvpDestructionState = applyServerPvpDestructionState;

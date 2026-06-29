@@ -2899,13 +2899,6 @@
     return player && isSameCurrentNode(player) ? player : null;
   }
 
-  function getLocalCombatBeamOrigin(targetPosition = { x: 50, y: 50 }) {
-    return {
-      x: targetPosition.x < 50 ? 72 : 28,
-      y: 78
-    };
-  }
-
   function getCombatFxPixelPointFromSpacePercent(position = { x: 50, y: 50 }) {
     const spaceScreen = global.document?.getElementById("spaceScreen");
     if (!spaceScreen) return null;
@@ -2972,16 +2965,14 @@
     const targetPosition = getSpacePercentPosition(target);
     const isLocalShot = event.attackerSessionId === status.sessionId;
     const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
-    const attackerPosition = isLocalShot
-      ? getLocalCombatBeamOrigin(targetPosition)
-      : attacker && isSameCurrentNode(attacker)
-        ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
-        : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
+    const attackerPosition = attacker && isSameCurrentNode(attacker)
+      ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
+      : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
 
     const impactLayer = getCombatVisualImpactLayer(event, target);
     const targetPoint = getCombatFxPixelPointFromSpacePercent(targetPosition);
-    const sourcePoint = isLocalShot && typeof global.getLocalCombatFxOriginForTarget === "function"
-      ? global.getLocalCombatFxOriginForTarget(targetPoint)
+    const sourcePoint = isLocalShot && typeof global.getLocalCombatFxOriginsForTarget === "function"
+      ? global.getLocalCombatFxOriginsForTarget(targetPoint)
       : getCombatFxPixelPointFromSpacePercent(attackerPosition);
     const targetId = String(event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "");
     const targetType = String(event.targetType || event.type || "target");
