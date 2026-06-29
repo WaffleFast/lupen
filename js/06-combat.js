@@ -99,6 +99,13 @@ function isSameTargetRef(left, right) {
   return Boolean(left && right && left.type === right.type && left.id === right.id);
 }
 
+function getCurrentWeaponFireIntervalMs() {
+  const weapon = typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null;
+  const speed = Number(weapon?.speed);
+  const interval = Number.isFinite(speed) && speed > 0 ? Math.round(speed) : 950;
+  return Math.max(250, Math.min(4000, interval));
+}
+
 function getTargetRefFromEntity(target) {
   if (!target) return null;
   return {
@@ -124,13 +131,13 @@ function retargetEngagementToSelectedTarget() {
   clearInterval(engageTimer);
   if (nextTargetRef.type === "stagingBot") {
     performStagingBotAttackCycle();
-    engageTimer = setInterval(performStagingBotAttackCycle, 950);
+    engageTimer = setInterval(performStagingBotAttackCycle, getCurrentWeaponFireIntervalMs());
   } else if (nextTargetRef.type === "stagingResource") {
     performStagingResourceAttackCycle();
-    engageTimer = setInterval(performStagingResourceAttackCycle, 950);
+    engageTimer = setInterval(performStagingResourceAttackCycle, getCurrentWeaponFireIntervalMs());
   } else {
     performAttackCycle();
-    engageTimer = setInterval(performAttackCycle, getEquippedWeapon().speed);
+    engageTimer = setInterval(performAttackCycle, getCurrentWeaponFireIntervalMs());
   }
   return true;
 }
@@ -379,14 +386,14 @@ function engageTarget() {
   if (engagedTarget?.type === "stagingBot") {
     if (typeof addActivityLog === "function") addActivityLog(`Engaged ${target.name || "Staging Bot"}.`);
     performStagingBotAttackCycle();
-    engageTimer = setInterval(performStagingBotAttackCycle, 950);
+    engageTimer = setInterval(performStagingBotAttackCycle, getCurrentWeaponFireIntervalMs());
   } else if (engagedTarget?.type === "stagingResource") {
     if (typeof addActivityLog === "function") addActivityLog(`Engaged ${target.name || "Resource Asteroid"}.`);
     performStagingResourceAttackCycle();
-    engageTimer = setInterval(performStagingResourceAttackCycle, 950);
+    engageTimer = setInterval(performStagingResourceAttackCycle, getCurrentWeaponFireIntervalMs());
   } else {
     performAttackCycle();
-    engageTimer = setInterval(performAttackCycle, getEquippedWeapon().speed);
+    engageTimer = setInterval(performAttackCycle, getCurrentWeaponFireIntervalMs());
   }
   updateTargetPanel();
 }
@@ -1836,16 +1843,6 @@ function performStagingResourceAttackCycle() {
     return;
   }
 
-  const weapon = getEquippedWeapon();
-  pulseLaserBurstToTarget(target, weapon, { showImpact: true, targetType: "stagingResource", targetId: target.id });
-  target.hitFlashUntil = Date.now() + 260;
-  const soundPulseCount = Math.max(1, Math.min(6, Number(weapon?.count || 1)));
-  Array.from({ length: soundPulseCount }).forEach((_shotWeapon, index) => {
-    setTimeout(() => {
-      if (typeof playPlayerLaserPulse === "function") playPlayerLaserPulse();
-    }, Math.min(index * 75, 375));
-  });
-  updateAsteroidUI();
   client.mineStagingResource?.(target.id, { currentNode, timestamp: Date.now() });
 }
 

@@ -1873,7 +1873,9 @@
       saveWritten: message.saveWritten === true,
       resourceRewardId: String(message.resourceRewardId || message.depletionInstanceId || ""),
       rewardsGranted: message.rewardsGranted === true,
+      cooldownMs: Number.isFinite(Number(message.cooldownMs)) ? Math.max(0, Number(message.cooldownMs)) : 0,
       cooldownRemainingMs: Number.isFinite(Number(message.cooldownRemainingMs)) ? Math.max(0, Number(message.cooldownRemainingMs)) : 0,
+      nextMineAt: Number.isFinite(Number(message.nextMineAt)) ? Number(message.nextMineAt) : 0,
       timestamp: Number.isFinite(Number(message.timestamp)) ? Number(message.timestamp) : 0,
       receivedAt: Number.isFinite(Number(message.receivedAt)) ? Number(message.receivedAt) : Date.now()
     };
@@ -2522,6 +2524,8 @@
         bountyProgressChanged: message?.bountyProgressChanged === true,
         rewardsGranted: message?.rewardsGranted === true,
         serverAuthoritative: message?.serverAuthoritative === true,
+        cooldownMs: Number.isFinite(Number(message?.cooldownMs)) ? Number(message.cooldownMs) : 0,
+        nextPvpFireAt: Number.isFinite(Number(message?.nextPvpFireAt)) ? Number(message.nextPvpFireAt) : 0,
         receivedAt
       };
       connection.lastCombatVisualEvent = {
@@ -2541,6 +2545,7 @@
         armorDamage,
         hullDamage,
         impactLayer: hullDamage > 0 ? "hull" : armorDamage > 0 ? "armor" : shieldDamage > 0 ? "shield" : "shield",
+        cooldownMs: connection.lastPvpHitEvent.cooldownMs,
         serverAuthoritative: connection.lastPvpHitEvent.serverAuthoritative,
         rewardsGranted: false,
         receivedAt
@@ -2940,6 +2945,7 @@
             weaponName: normalized.weaponName,
             weaponFamily: normalized.weaponFamily,
             damageSource: normalized.damageSource,
+            cooldownMs: normalized.cooldownMs,
             serverAuthoritative: normalized.serverAuthoritative,
             rewardsGranted: normalized.rewardsGranted,
             timestamp: normalized.timestamp,

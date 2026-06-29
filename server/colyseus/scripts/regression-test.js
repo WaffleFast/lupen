@@ -4812,15 +4812,16 @@ try {
       targetType: "remotePlayer",
       targetPlayerId: roomB.sessionId,
       currentNode: "Lower Gate Core",
-      weaponId: "pulse-laser",
-      weaponKey: "pulse-laser-mk1",
-      weaponFamily: "pulse",
-      weaponName: "Pulse Laser",
-      equippedWeaponKeys: ["pulse-laser-mk1"]
+      weaponId: "repeater",
+      weaponKey: "repeater",
+      weaponFamily: "rapid",
+      weaponName: "Repeater",
+      equippedWeaponKeys: ["repeater"]
     });
   });
   assert(destructionPvpResolved?.deathApplied === true, "PvP destruction hit did not apply death.");
   assert(destructionPvpResolved?.defeated === true, "PvP destruction hit did not mark target defeated.");
+  assert(Number(destructionPvpResolved?.cooldownMs || 0) === 450, `PvP destruction hit did not use resolved Repeater cooldown: ${destructionPvpResolved?.cooldownMs}`);
   assert(Number(destructionPvpResolved?.shieldDamage || 0) === 1, "PvP destruction did not deplete shield before hull.");
   assert(Number(destructionPvpResolved?.armorDamage || 0) === 0, "PvP destruction unexpectedly damaged armor.");
   assert(Number(destructionPvpResolved?.hullDamage || 0) === 5, "PvP destruction did not apply exact hull overflow.");
@@ -5418,6 +5419,7 @@ try {
   assert(firstResourceMine?.ok === true, "Valid staging resource mine did not resolve.");
   assert(firstResourceMine?.serverAuthoritative === true, "Resource mine was not marked server-authoritative.");
   assert(firstResourceMine?.damage === 10, `Unexpected Pulse Laser resource mining damage: ${firstResourceMine?.damage}`);
+  assert(firstResourceMine?.cooldownMs === 1000, `Resource mine did not use resolved Pulse Laser cooldown: ${firstResourceMine?.cooldownMs}`);
   assert(firstResourceMine?.cargoDelta === 0, "Non-depleting resource mine unexpectedly paid cargo.");
   assert(firstResourceMine?.cargoWritten === false && firstResourceMine?.saveWritten === false, "Resource mine reported server cargo/save writes.");
   await waitFor("resource mine damage to replicate to both clients", () => {
@@ -5429,8 +5431,23 @@ try {
       resourceA.depleted === false &&
       resourceB.depleted === false;
   });
-  assert(resourceShotEventsA.some((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10), "Client A did not receive staging resource shot.");
-  assert(resourceShotEventsB.some((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10), "Client B did not receive staging resource shot.");
+  const firstResourceShotA = resourceShotEventsA.find((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10);
+  const firstResourceShotB = resourceShotEventsB.find((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10);
+  assert(firstResourceShotA, "Client A did not receive staging resource shot.");
+  assert(firstResourceShotB, "Client B did not receive staging resource shot.");
+  assert(firstResourceShotA?.cooldownMs === 1000 && firstResourceShotB?.cooldownMs === 1000, "Staging resource shot did not broadcast resolved Pulse Laser cooldown.");
+
+  const resourceCooldownRejected = await expectRoomMessage(roomA, "stagingResource:mineRejected", () => {
+    roomA.send("stagingResource:mine", {
+      resourceId: inspectedResourceBeforeMine.id,
+      weaponId: "pulseLaser",
+      weaponFamily: "pulse",
+      currentNode: inspectedResourceBeforeMine.currentNode,
+      timestamp: Date.now()
+    });
+  });
+  assert(resourceCooldownRejected?.reason === "staging_resource_mine_cooldown", `Unexpected immediate resource cooldown rejection: ${resourceCooldownRejected?.reason}`);
+  assert(Number(resourceCooldownRejected?.cooldownRemainingMs || 0) > 0, "Resource cooldown rejection did not include remaining time.");
 
   let depletedMine = null;
   for (let attempt = 0; attempt < 6 && !depletedMine; attempt += 1) {

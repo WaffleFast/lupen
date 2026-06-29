@@ -2174,17 +2174,21 @@
   const localShotFeedbackKeys = new Set();
 
   function getShotFeedbackKey(event = {}) {
+    const targetId = event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "";
     return [
+      event.type || event.targetType || "",
       event.attackerSessionId || "",
-      event.targetBotId || "",
+      targetId,
       event.timestamp || event.receivedAt || "",
       event.damage || ""
     ].join(":");
   }
 
-  function playLocalStagingShotFeedback(status, targetBot) {
-    const event = status?.lastShotEvent;
-    if (!event?.targetBotId || event.targetBotId !== targetBot?.id) return;
+  function playLocalStagingShotFeedback(status, target, eventOverride = null) {
+    const event = eventOverride || status?.lastShotEvent;
+    const targetId = String(event?.targetId || event?.targetBotId || event?.resourceId || event?.targetPlayerId || "");
+    const resolvedTargetId = String(target?.id || target?.sessionId || "");
+    if (!targetId || targetId !== resolvedTargetId) return;
     if (event.attackerSessionId !== status?.sessionId) return;
     const key = getShotFeedbackKey(event);
     if (!key || localShotFeedbackKeys.has(key)) return;
@@ -2196,7 +2200,7 @@
     if (typeof global.playPlayerLaserPulse === "function") {
       global.playPlayerLaserPulse();
     }
-    if (event.disabled && typeof global.playEnemyShipDestroyedSound === "function") {
+    if ((event.disabled || event.depleted) && typeof global.playEnemyShipDestroyedSound === "function") {
       global.setTimeout(global.playEnemyShipDestroyedSound, 140);
     } else if (typeof global.playWeaponHitMarkerSound === "function") {
       global.setTimeout(global.playWeaponHitMarkerSound, 130);
@@ -2957,8 +2961,8 @@
     if (!target) return;
 
     ensureStyles();
-    if (event.targetType === "bot" || event.targetBotId) {
-      playLocalStagingShotFeedback(status, target);
+    if (event.targetType === "bot" || event.targetType === "resource" || event.targetType === "player" || event.targetBotId) {
+      playLocalStagingShotFeedback(status, target, event);
     }
 
     const attacker = resolveCombatVisualAttacker(event, players, bots);

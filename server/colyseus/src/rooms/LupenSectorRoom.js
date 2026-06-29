@@ -205,7 +205,6 @@ const STAGING_PVP_TEST_DAMAGE = 90;
 const STAGING_PVP_SHIELD_MAX = 30;
 const STAGING_PVP_HULL_MAX = 120;
 const STAGING_PVP_MIN_HULL = 1;
-const STAGING_PVP_COOLDOWN_MS = 950;
 const STAGING_PVP_SHIELD_REGEN_DELAY_MS = 5000;
 const STAGING_PVP_SHIELD_REGEN_TICK_MS = 1000;
 const STAGING_PVP_SHIELD_REGEN_AMOUNT = 10;
@@ -218,7 +217,6 @@ const STAGING_BOT_RETURN_FIRE_DAMAGE = 4;
 const STAGING_BOT_RETURN_FIRE_INTERVAL_MS = 2600;
 const STAGING_BOT_RETURN_FIRE_VARIANCE_MS = 650;
 const STAGING_RESOURCE_RESPAWN_MS = 12000;
-const STAGING_RESOURCE_MINE_COOLDOWN_MS = 950;
 const SERVER_OBJECT_SPAWN_JITTER = 3.2;
 const SERVER_OBJECT_SAFE_MIN_X = 14;
 const SERVER_OBJECT_SAFE_MAX_X = 86;
@@ -2081,10 +2079,12 @@ export class LupenSectorRoom extends Room {
 
     const resolvedWeapon = resolveStagingWeapon(message, player);
     const mineDamage = Math.max(1, Math.round(Number(resolvedWeapon.damage || STAGING_TEST_DAMAGE)));
+    const mineCooldownMs = resolvedWeapon.cooldownMs;
+    const nextMineAtValue = now + mineCooldownMs;
     const hpBefore = Math.max(0, Number(resource.hp || 0));
     resource.hp = clampNumber(hpBefore - mineDamage, 0, Number(resource.hpMax || 1));
     resource.lastUpdatedAt = now;
-    this.stagingResourceMineCooldowns.set(client.sessionId, now + STAGING_RESOURCE_MINE_COOLDOWN_MS);
+    this.stagingResourceMineCooldowns.set(client.sessionId, nextMineAtValue);
 
     const depleted = resource.hp <= 0;
     let resourceRewardId = "";
@@ -2123,6 +2123,8 @@ export class LupenSectorRoom extends Room {
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
       clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,
       serverAuthoritative: true,
+      cooldownMs: mineCooldownMs,
+      nextMineAt: nextMineAtValue,
       cargoDelta,
       cargoWritten: false,
       saveWritten: false,
@@ -3886,12 +3888,19 @@ export class LupenSectorRoom extends Room {
 
     ensurePlayerPvpState(attacker);
     ensurePlayerPvpState(targetPlayer);
+    const resolvedWeapon = resolveStagingWeapon(message, attacker);
+    const pvpCooldownMs = resolvedWeapon.cooldownMs;
     const serverDamageUsed = calculatePrototypePvpDamage(attacker, targetPlayer);
     const result = this.applyStagingPvpDamage(targetPlayer, serverDamageUsed);
     const targetDefeated = result.defeated === true || Number(result.hull || 0) <= 0;
     attacker.lastFireAt = now;
-    attacker.nextPvpFireAt = now + STAGING_PVP_COOLDOWN_MS;
+    attacker.nextPvpFireAt = now + pvpCooldownMs;
     attacker.lastCombatIntentReason = targetDefeated ? "pvp_target_destroyed" : "pvp_damage_applied";
+    attacker.lastWeaponSourceReason = resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "";
+    attacker.activeShipWeaponCount = Number(resolvedWeapon.activeShipWeaponCount || 0);
+    attacker.validCombatWeaponCount = Number(resolvedWeapon.validCombatWeaponCount || 0);
+    attacker.rejectedWeaponCount = Number(resolvedWeapon.rejectedWeaponCount || 0);
+    attacker.firstRejectedWeaponReason = resolvedWeapon.firstRejectedWeaponReason || "";
     attacker.lastCombatNodeValidationReason = "pvp_node_valid";
 
     const hitPayload = {
@@ -3911,6 +3920,14 @@ export class LupenSectorRoom extends Room {
       weaponKey: getSafeIdentityValue(message.weaponKey),
       weaponName: getStringValue(message.weaponName || message.weaponLabel).slice(0, 80),
       weaponFamily: getSafeIdentityValue(message.weaponFamily),
+      damageSource: resolvedWeapon.damageSource,
+      fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
+      clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,
+      weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
+      activeShipWeaponCount: resolvedWeapon.activeShipWeaponCount || 0,
+      validCombatWeaponCount: resolvedWeapon.validCombatWeaponCount || 0,
+      rejectedWeaponCount: resolvedWeapon.rejectedWeaponCount || 0,
+      firstRejectedWeaponReason: resolvedWeapon.firstRejectedWeaponReason || "",
       damage: result.damage,
       requestedDamage: result.requestedDamage,
       serverDamageUsed,
@@ -3938,7 +3955,7 @@ export class LupenSectorRoom extends Room {
       serverAuthoritative: true,
       pvpRulePreview: pvpEligibility.reason,
       pvpEligibility,
-      cooldownMs: STAGING_PVP_COOLDOWN_MS,
+      cooldownMs: pvpCooldownMs,
       nextPvpFireAt: attacker.nextPvpFireAt,
       receivedAt: Date.now()
     };
