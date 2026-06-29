@@ -2946,16 +2946,19 @@
     layer.id = spaceShotLayerId;
     layer.setAttribute("aria-hidden", "true");
 
-    const dx = targetPosition.x - attackerPosition.x;
-    const dy = targetPosition.y - attackerPosition.y;
-    const distance = Math.max(8, Math.sqrt(dx * dx + dy * dy));
-    const angle = Math.atan2(dy, dx);
     const isLocalShot = event.attackerSessionId === status.sessionId;
     const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
     const shotOwnerClass = isBotReturnFire ? "is-bot-return" : isLocalShot ? "is-local" : "is-remote";
-    const beamFan = [
-      { x: 0, y: 0, scale: 1, className: `${shotOwnerClass} is-core` }
-    ];
+    const beamFan = isBotReturnFire
+      ? [
+        { x: -0.7, y: 0.55, className: `${shotOwnerClass} is-core is-volley` },
+        { x: 0.7, y: -0.55, className: `${shotOwnerClass} is-core is-volley` }
+      ]
+      : [
+        { x: -1.1, y: 0.85, className: `${shotOwnerClass} is-core is-volley` },
+        { x: 0, y: 0, className: `${shotOwnerClass} is-core is-volley` },
+        { x: 1.1, y: -0.85, className: `${shotOwnerClass} is-core is-volley` }
+      ];
 
     const muzzle = global.document.createElement("div");
     muzzle.className = `lupen-mp-shot-muzzle ${shotOwnerClass}`;
@@ -2973,13 +2976,19 @@
     }
 
     beamFan.forEach((beamDef, index) => {
+      const beamStartX = attackerPosition.x + beamDef.x;
+      const beamStartY = attackerPosition.y + beamDef.y;
+      const beamDx = targetPosition.x - beamStartX;
+      const beamDy = targetPosition.y - beamStartY;
+      const beamDistance = Math.max(7, Math.sqrt(beamDx * beamDx + beamDy * beamDy));
+      const beamAngle = Math.atan2(beamDy, beamDx);
       const beam = global.document.createElement("div");
       beam.className = `lupen-mp-shot-beam ${beamDef.className}`.trim();
-      beam.style.left = `${attackerPosition.x + beamDef.x}%`;
-      beam.style.top = `${attackerPosition.y + beamDef.y}%`;
-      beam.style.width = `${Math.max(7, distance * beamDef.scale)}%`;
-      beam.style.setProperty("--shot-angle", `${angle + (index - 2) * 0.012}rad`);
-      beam.style.animationDelay = `${Math.min(index * 28, 96)}ms`;
+      beam.style.left = `${beamStartX}%`;
+      beam.style.top = `${beamStartY}%`;
+      beam.style.width = `${beamDistance}%`;
+      beam.style.setProperty("--shot-angle", `${beamAngle}rad`);
+      beam.style.animationDelay = `${Math.min(index * 26, 52)}ms`;
       layer.appendChild(beam);
     });
 

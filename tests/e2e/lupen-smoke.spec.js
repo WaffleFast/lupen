@@ -1156,6 +1156,7 @@ test.describe("Lupen browser smoke", () => {
         engagedServerResourceCount: document.querySelectorAll("#asteroidField .server-resource-asteroid.engaged").length,
         playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
         polishedPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-polished").length,
+        volleyPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-volley").length,
         explosionCount: document.querySelectorAll("#explosionLayer .space-explosion").length,
         lifecycleResult,
         selectedTargetAfterDepletion: window.eval("selectedTarget ? { ...selectedTarget } : null"),
@@ -1208,6 +1209,7 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.engagedServerResourceCount).toBe(0);
     expect(connectedHudState.playerShotCount).toBeGreaterThan(0);
     expect(connectedHudState.polishedPlayerShotCount).toBeGreaterThan(0);
+    expect(connectedHudState.volleyPlayerShotCount).toBeGreaterThan(0);
     expect(connectedHudState.explosionCount).toBeGreaterThan(0);
     expect(connectedHudState.lifecycleResult).toMatchObject({
       handled: true,
@@ -3573,8 +3575,8 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
     expect(stagingBotSelectedState.targetBars).toBe(2);
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
-    expect(stagingBotSelectedState.shotBeamCount).toBe(1);
-    expect(stagingBotSelectedState.localShotBeamCount).toBe(1);
+    expect(stagingBotSelectedState.shotBeamCount).toBe(3);
+    expect(stagingBotSelectedState.localShotBeamCount).toBe(3);
     expect(stagingBotSelectedState.trailShotBeamCount).toBe(0);
     expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.muzzleCount).toBe(1);
@@ -3607,7 +3609,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(1);
+    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(3);
     expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
@@ -3638,7 +3640,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(1);
+    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(3);
     expect(stagingResourceRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingResourceRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingResourceRemoteShotState.hitCount).toBe(1);
@@ -3702,14 +3704,14 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBe(1);
+    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBe(3);
     expect(pvpRemoteShotState.shield.remoteMuzzleCount).toBe(1);
     expect(pvpRemoteShotState.shield.attackerLabelText).toContain("WaffleFast");
     expect(pvpRemoteShotState.shield.hitCount).toBe(1);
     expect(pvpRemoteShotState.shield.shieldHitCount).toBe(1);
     expect(pvpRemoteShotState.armor.armorHitCount).toBe(1);
     expect(pvpRemoteShotState.hull.hullHitCount).toBe(1);
-    expect(pvpRemoteShotState.botReturnBeamCount).toBe(1);
+    expect(pvpRemoteShotState.botReturnBeamCount).toBe(2);
     expect(pvpRemoteShotState.botReturnMuzzleCount).toBe(1);
     expect(pvpRemoteShotState.botReturnShieldHitCount).toBe(1);
 
@@ -4012,6 +4014,7 @@ test.describe("Lupen browser smoke", () => {
         return {
           playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
           polishedPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-polished").length,
+          volleyPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-volley").length,
           muzzleCount: document.querySelectorAll("#laserLayer .weapon-muzzle-flash").length,
           incomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser").length,
           heavyIncomingCount: document.querySelectorAll("#laserLayer .enemy-incoming-laser-heavy").length,
@@ -4025,9 +4028,10 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(visualState.playerShotCount).toBe(1);
-    expect(visualState.polishedPlayerShotCount).toBe(1);
-    expect(visualState.muzzleCount).toBe(1);
+    expect(visualState.playerShotCount).toBe(3);
+    expect(visualState.polishedPlayerShotCount).toBe(3);
+    expect(visualState.volleyPlayerShotCount).toBe(3);
+    expect(visualState.muzzleCount).toBe(3);
     expect(visualState.incomingCount).toBeGreaterThanOrEqual(5);
     expect(visualState.heavyIncomingCount).toBeGreaterThanOrEqual(1);
     expect(visualState.armorScreenFlash).toBe(true);
