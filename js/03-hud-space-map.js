@@ -2058,6 +2058,9 @@ function jumpToNode(destination) {
   playJumpSound();
   jumpCharge = 0;
   closeSectorMap();
+  if (typeof clearAllCombatVisuals === "function") {
+    clearAllCombatVisuals();
+  }
   if (typeof reconcileStagingBotTargetState === "function") {
     reconcileStagingBotTargetState("node_changed");
   }

@@ -3581,8 +3581,8 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
     expect(stagingBotSelectedState.targetBars).toBe(2);
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
-    expect(stagingBotSelectedState.shotBeamCount).toBe(2);
-    expect(stagingBotSelectedState.localShotBeamCount).toBe(2);
+    expect(stagingBotSelectedState.shotBeamCount).toBe(1);
+    expect(stagingBotSelectedState.localShotBeamCount).toBe(1);
     expect(stagingBotSelectedState.trailShotBeamCount).toBe(0);
     expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.muzzleCount).toBe(1);
@@ -3615,7 +3615,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(4);
+    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(1);
     expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
@@ -3646,7 +3646,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(4);
+    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(1);
     expect(stagingResourceRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingResourceRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingResourceRemoteShotState.hitCount).toBe(1);
@@ -3710,14 +3710,14 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBe(4);
+    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBe(1);
     expect(pvpRemoteShotState.shield.remoteMuzzleCount).toBe(1);
     expect(pvpRemoteShotState.shield.attackerLabelText).toContain("WaffleFast");
     expect(pvpRemoteShotState.shield.hitCount).toBe(1);
     expect(pvpRemoteShotState.shield.shieldHitCount).toBe(1);
     expect(pvpRemoteShotState.armor.armorHitCount).toBe(1);
     expect(pvpRemoteShotState.hull.hullHitCount).toBe(1);
-    expect(pvpRemoteShotState.botReturnBeamCount).toBe(2);
+    expect(pvpRemoteShotState.botReturnBeamCount).toBe(1);
     expect(pvpRemoteShotState.botReturnMuzzleCount).toBe(1);
     expect(pvpRemoteShotState.botReturnShieldHitCount).toBe(1);
 
@@ -4003,7 +4003,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("combat laser feedback renders intense outgoing and incoming bursts", async ({ page }) => {
+  test("combat laser feedback renders simple outgoing and incoming beams", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -4040,6 +4040,7 @@ test.describe("Lupen browser smoke", () => {
         showIncomingHitFlash({ armorHit: true });
         return {
           playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
+          simplePlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.simple-combat-laser.player-shot").length,
           polishedPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-polished").length,
           volleyPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-volley").length,
           muzzleCount: document.querySelectorAll("#laserLayer .weapon-muzzle-flash").length,
@@ -4055,12 +4056,13 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(visualState.playerShotCount).toBe(6);
-    expect(visualState.polishedPlayerShotCount).toBe(6);
-    expect(visualState.volleyPlayerShotCount).toBe(6);
-    expect(visualState.muzzleCount).toBe(6);
-    expect(visualState.incomingCount).toBeGreaterThanOrEqual(5);
-    expect(visualState.heavyIncomingCount).toBeGreaterThanOrEqual(1);
+    expect(visualState.playerShotCount).toBe(1);
+    expect(visualState.simplePlayerShotCount).toBe(1);
+    expect(visualState.polishedPlayerShotCount).toBe(0);
+    expect(visualState.volleyPlayerShotCount).toBe(0);
+    expect(visualState.muzzleCount).toBe(1);
+    expect(visualState.incomingCount).toBe(1);
+    expect(visualState.heavyIncomingCount).toBe(0);
     expect(visualState.armorScreenFlash).toBe(true);
     expect(visualState.armorHudFlash).toBe(true);
     expect(visualState.statPanelCritical).toBe(true);

@@ -24,7 +24,6 @@
   const stagingBountyPanelId = "lupenMultiplayerStagingBountyPanel";
   const stagingTradePanelId = "lupenMultiplayerStagingTradePanel";
   const styleId = "lupenMultiplayerOverlayStyles";
-  const MAX_VISIBLE_COMBAT_BEAMS = 6;
   let unsubscribe = null;
   let renderQueued = false;
   let diagnosticsTimer = null;
@@ -2903,45 +2902,9 @@
     return player && isSameCurrentNode(player) ? player : null;
   }
 
-  function getCombatBeamOffsets(count, spacing = 0.62) {
-    const beamCount = Math.max(1, Math.min(MAX_VISIBLE_COMBAT_BEAMS, Math.round(Number(count || 1))));
-    const center = (beamCount - 1) / 2;
-    return Array.from({ length: beamCount }, (_, index) => ({
-      x: (index - center) * spacing,
-      y: (center - index) * spacing * 0.55
-    }));
-  }
-
-  function getWeaponKeyList(value) {
-    if (Array.isArray(value)) return value.map((entry) => String(entry || "").trim()).filter(Boolean);
-    return String(value || "").split(",").map((entry) => entry.trim()).filter(Boolean);
-  }
-
-  function clampVisibleBeamCount(value, fallback = 3) {
-    const numeric = Math.round(Number(value || 0));
-    const count = numeric > 0 ? numeric : Math.round(Number(fallback || 1));
-    return Math.max(1, Math.min(MAX_VISIBLE_COMBAT_BEAMS, count));
-  }
-
-  function getLocalCombatBeamCount(status = {}) {
-    const weaponKeys = getWeaponKeyList(status.localEquippedWeaponKeys);
-    return clampVisibleBeamCount(
-      weaponKeys.length || status.activeShipWeaponCount || status.validCombatWeaponCount,
-      1
-    );
-  }
-
-  function getRemoteCombatBeamCount(player = {}) {
-    const weaponKeys = getWeaponKeyList(player.equippedWeaponKeys);
-    return clampVisibleBeamCount(
-      weaponKeys.length || player.activeShipWeaponCount || player.validCombatWeaponCount,
-      3
-    );
-  }
-
   function getLocalCombatBeamOrigin(targetPosition = { x: 50, y: 50 }) {
     return {
-      x: targetPosition.x < 50 ? 76 : 24,
+      x: targetPosition.x < 50 ? 72 : 28,
       y: 78
     };
   }
@@ -2996,15 +2959,6 @@
       : attacker && isSameCurrentNode(attacker)
         ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
         : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
-    const beamCount = isBotReturnFire
-      ? 2
-      : isLocalShot
-        ? getLocalCombatBeamCount(status)
-        : getRemoteCombatBeamCount(attacker);
-    const beamFan = getCombatBeamOffsets(beamCount).map((offset) => ({
-      ...offset,
-      className: `${shotOwnerClass} is-core is-volley`
-    }));
 
     const muzzle = global.document.createElement("div");
     muzzle.className = `lupen-mp-shot-muzzle ${shotOwnerClass}`;
@@ -3023,24 +2977,19 @@
       layer.appendChild(label);
     }
 
-    beamFan.forEach((beamDef, index) => {
-      const beamStartX = attackerPosition.x + beamDef.x;
-      const beamStartY = attackerPosition.y + beamDef.y;
-      const beamDx = targetPosition.x - beamStartX;
-      const beamDy = targetPosition.y - beamStartY;
-      const beamDistance = Math.max(7, Math.sqrt(beamDx * beamDx + beamDy * beamDy));
-      const beamAngle = Math.atan2(beamDy, beamDx);
-      const beam = global.document.createElement("div");
-      beam.className = `lupen-mp-shot-beam ${beamDef.className}`.trim();
-      beam.dataset.targetId = layer.dataset.targetId;
-      beam.dataset.targetType = layer.dataset.targetType;
-      beam.style.left = `${beamStartX}%`;
-      beam.style.top = `${beamStartY}%`;
-      beam.style.width = `${beamDistance}%`;
-      beam.style.setProperty("--shot-angle", `${beamAngle}rad`);
-      beam.style.animationDelay = `${Math.min(index * 26, 52)}ms`;
-      layer.appendChild(beam);
-    });
+    const beamDx = targetPosition.x - attackerPosition.x;
+    const beamDy = targetPosition.y - attackerPosition.y;
+    const beamDistance = Math.max(7, Math.sqrt(beamDx * beamDx + beamDy * beamDy));
+    const beamAngle = Math.atan2(beamDy, beamDx);
+    const beam = global.document.createElement("div");
+    beam.className = `lupen-mp-shot-beam ${shotOwnerClass} is-simple`.trim();
+    beam.dataset.targetId = layer.dataset.targetId;
+    beam.dataset.targetType = layer.dataset.targetType;
+    beam.style.left = `${attackerPosition.x}%`;
+    beam.style.top = `${attackerPosition.y}%`;
+    beam.style.width = `${beamDistance}%`;
+    beam.style.setProperty("--shot-angle", `${beamAngle}rad`);
+    layer.appendChild(beam);
 
     const hit = global.document.createElement("div");
     const impactLayer = getCombatVisualImpactLayer(event, target);

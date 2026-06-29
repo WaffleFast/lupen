@@ -423,7 +423,6 @@ function disengageTarget(keepTarget = false) {
 }
 
 let weaponVisualCycleOffset = 0;
-const MAX_VISIBLE_COMBAT_BEAMS = 6;
 const suppressedCombatVisualTargets = new Map();
 
 function isCombatDebugEnabled() {
@@ -443,7 +442,7 @@ function getVisibleShotWeapons(weapon) {
   const allWeapons = Array.isArray(weapon?.weapons) && weapon.weapons.length
     ? weapon.weapons
     : [weapon].filter(Boolean);
-  const visibleLimit = MAX_VISIBLE_COMBAT_BEAMS;
+  const visibleLimit = 6;
 
   if (allWeapons.length <= visibleLimit) return allWeapons;
 
@@ -453,12 +452,6 @@ function getVisibleShotWeapons(weapon) {
   }
   weaponVisualCycleOffset = (weaponVisualCycleOffset + visibleLimit) % allWeapons.length;
   return visibleWeapons;
-}
-
-function getCombatBeamStartOffsets(count, spacing = 7) {
-  const beamCount = Math.max(1, Math.round(Number(count || 1)));
-  const center = (beamCount - 1) / 2;
-  return Array.from({ length: beamCount }, (_, index) => (index - center) * spacing);
 }
 
 function getCombatVisualTargetRef(target = {}, options = {}) {
@@ -541,6 +534,22 @@ function clearCombatVisualsForTarget(refOrType, targetId = "") {
   return removed > 0;
 }
 
+function clearAllCombatVisuals() {
+  let removed = 0;
+  [
+    "#laserLayer .laser-burst",
+    "#laserLayer .weapon-muzzle-flash",
+    "#explosionLayer .weapon-impact",
+    "#lupenMultiplayerSpaceShotLayer"
+  ].forEach((selector) => {
+    document.querySelectorAll(selector).forEach((element) => {
+      element.remove();
+      removed += 1;
+    });
+  });
+  return removed > 0;
+}
+
 function getShotVisualProfile(shotWeapon = {}) {
   const style = String(shotWeapon.fireStyle || "pulse").toLowerCase();
   const color = shotWeapon.projectileColor || "#7fd6ff";
@@ -607,70 +616,53 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   const endX = (target.x / 100) * screenRect.width;
   const endY = (target.y / 100) * screenRect.height;
   const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
-  const visualWeapons = getVisibleShotWeapons(resolvedWeapon);
-  const barrageWeapons = visualWeapons.length ? visualWeapons : [resolvedWeapon].filter(Boolean);
-  if (!barrageWeapons.length) return;
-  const visualCapApplied = Number(resolvedWeapon?.count || visualWeapons.length) > visualWeapons.length;
+  const shotWeapon = Array.isArray(resolvedWeapon?.weapons) && resolvedWeapon.weapons.length
+    ? resolvedWeapon.weapons[weaponVisualCycleOffset++ % resolvedWeapon.weapons.length]
+    : resolvedWeapon;
+  if (!shotWeapon) return;
   const targetRef = getCombatVisualTargetRef(target, options);
   if (targetRef && !isCombatVisualTargetStillValid(targetRef)) return;
-  const baseStartX = screenRect.width * (target.x < 50 ? 0.76 : 0.24);
-  const baseStartY = screenRect.height - 86;
-  const volleyOffsets = getCombatBeamStartOffsets(barrageWeapons.length, Math.max(5, Math.min(8, 34 / barrageWeapons.length)));
+  const startX = screenRect.width * (target.x < 50 ? 0.72 : 0.28);
+  const startY = screenRect.height - 92;
+  const profile = getShotVisualProfile(shotWeapon);
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  const durationMs = 210;
 
-  const makeBeam = (shotWeapon, laneIndex = 0, delay = 0) => {
-    const profile = getShotVisualProfile(shotWeapon);
-    const startX = baseStartX;
-    const startY = baseStartY + (volleyOffsets[laneIndex] || 0);
-    const beamEndX = endX;
-    const beamEndY = endY;
-    const dx = beamEndX - startX;
-    const dy = beamEndY - startY;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    const shotLength = Math.max(54, length * profile.streakScale);
-    const muzzle = document.createElement("div");
-    muzzle.className = "weapon-muzzle-flash";
-    tagCombatVisualElement(muzzle, targetRef, options);
-    muzzle.style.left = `${startX}px`;
-    muzzle.style.top = `${startY}px`;
-    muzzle.style.setProperty("--weapon-muzzle-color", profile.color);
-    muzzle.style.animationDelay = `${delay}ms`;
-    layer.appendChild(muzzle);
-    setTimeout(() => muzzle.remove(), delay + 300);
+  const muzzle = document.createElement("div");
+  muzzle.className = "weapon-muzzle-flash simple-combat-muzzle";
+  tagCombatVisualElement(muzzle, targetRef, options);
+  muzzle.style.left = `${startX}px`;
+  muzzle.style.top = `${startY}px`;
+  muzzle.style.setProperty("--weapon-muzzle-color", profile.color);
+  layer.appendChild(muzzle);
+  setTimeout(() => muzzle.remove(), durationMs + 120);
 
-    const beam = document.createElement("div");
-    beam.className = `laser-burst player-shot player-shot-polished player-shot-volley player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
-    tagCombatVisualElement(beam, targetRef, options);
-    beam.style.left = `${startX}px`;
-    beam.style.top = `${startY}px`;
-    beam.style.width = `${shotLength}px`;
-    beam.style.height = `${Math.max(2, Math.min(3, profile.height))}px`;
-    beam.style.background = `linear-gradient(90deg, rgba(80, 225, 255, 0) 0%, color-mix(in srgb, ${profile.color} 74%, #79f4ff) 14%, #ffffff 43%, color-mix(in srgb, ${profile.color} 82%, #34d8ff) 70%, rgba(80, 225, 255, 0) 100%)`;
-    beam.style.boxShadow = `0 0 ${Math.round(10 * profile.glowScale)}px color-mix(in srgb, ${profile.color} 72%, #7df6ff), 0 0 ${Math.round(24 * profile.glowScale)}px color-mix(in srgb, ${profile.color} 58%, #23cfff), 0 0 ${Math.round(42 * profile.glowScale)}px rgba(87, 213, 255, 0.34)`;
-    beam.style.setProperty("--laser-core-color", profile.color);
-    beam.style.setProperty("--laser-glow-color", `color-mix(in srgb, ${profile.color} 70%, #6ff4ff)`);
-    beam.style.setProperty("--laser-angle", `${angle}deg`);
-    beam.style.transform = `rotate(${angle}deg)`;
-    beam.style.animationDuration = `${profile.durationMs}ms`;
-    beam.style.animationDelay = `${delay}ms`;
-    layer.appendChild(beam);
+  const beam = document.createElement("div");
+  beam.className = `laser-burst simple-combat-laser player-shot player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
+  tagCombatVisualElement(beam, targetRef, options);
+  beam.style.left = `${startX}px`;
+  beam.style.top = `${startY}px`;
+  beam.style.width = `${Math.max(54, length)}px`;
+  beam.style.height = "4px";
+  beam.style.setProperty("--laser-core-color", profile.color);
+  beam.style.setProperty("--laser-angle", `${angle}deg`);
+  beam.style.transform = `rotate(${angle}deg)`;
+  beam.style.animationDuration = `${durationMs}ms`;
+  layer.appendChild(beam);
 
-    setTimeout(() => beam.remove(), delay + profile.durationMs + 80);
-    if (options.showImpact !== false) {
-      showWeaponImpactAtTarget(target, shotWeapon, delay + Math.max(70, profile.durationMs - 30), options);
-    }
-  };
-
-  barrageWeapons.forEach((shotWeapon, index) => {
-    makeBeam(shotWeapon, index, Math.min(index * 28, 56));
-  });
+  setTimeout(() => beam.remove(), durationMs + 80);
+  if (options.showImpact !== false) {
+    showWeaponImpactAtTarget(target, shotWeapon, Math.max(80, durationMs - 55), options);
+  }
 
   debugCombatShot("shot visuals", {
-    activeWeaponCount: Number(resolvedWeapon?.count || visualWeapons.length),
-    visibleWeaponCount: barrageWeapons.length,
-    maxVisibleBeamCount: MAX_VISIBLE_COMBAT_BEAMS,
-    visualCapApplied,
-    weaponNames: visualWeapons.map(item => item?.name || item?.key || "weapon").join(", "),
+    activeWeaponCount: Number(resolvedWeapon?.count || (Array.isArray(resolvedWeapon?.weapons) ? resolvedWeapon.weapons.length : 1)),
+    visibleWeaponCount: 1,
+    weaponCountVisualsEnabled: false,
+    weaponNames: [shotWeapon].map(item => item?.name || item?.key || "weapon").join(", "),
     cooldownMs: Number(resolvedWeapon?.speed || 0)
   });
 }
@@ -687,34 +679,26 @@ function incomingLaserBurstFromBot(bot, delay = 0, options = {}) {
 
   const startX = (bot.x / 100) * screenRect.width;
   const startY = (bot.y / 100) * screenRect.height;
-  const count = Math.max(2, Math.min(7, Math.round(Number(options.count || 1))));
+  const endX = screenRect.width * 0.5;
+  const endY = screenRect.height * 0.84;
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
-  for (let index = 0; index < count; index += 1) {
-    // Aim at the pilot/camera position, not the ship icon.
-    const endX = screenRect.width * (0.44 + Math.random() * 0.12);
-    const endY = screenRect.height * (0.82 + Math.random() * 0.14);
-    const beamDelay = delay + index * 38;
-    const startJitterX = (Math.random() - 0.5) * 24;
-    const startJitterY = (Math.random() - 0.5) * 18;
-    const dx = endX - (startX + startJitterX);
-    const dy = endY - (startY + startJitterY);
-    const length = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    const streakLength = Math.max(80, Math.min(230, length * 0.42));
-    const travelDistance = Math.max(72, length - streakLength * 0.72);
+  const beam = document.createElement("div");
+  beam.className = "laser-burst simple-combat-laser enemy-incoming-laser";
+  beam.style.left = `${startX}px`;
+  beam.style.top = `${startY}px`;
+  beam.style.width = `${Math.max(54, length)}px`;
+  beam.style.height = "4px";
+  beam.style.setProperty("--laser-angle", `${angle}deg`);
+  beam.style.setProperty("--incoming-angle", `${angle}deg`);
+  beam.style.transform = `rotate(${angle}deg)`;
+  beam.style.animationDelay = `${delay}ms`;
+  layer.appendChild(beam);
 
-    const beam = document.createElement("div");
-    beam.className = `laser-burst enemy-incoming-laser${index % 3 === 0 ? " enemy-incoming-laser-heavy" : ""}${count > 1 ? " enemy-incoming-laser-burst" : ""}`;
-    beam.style.left = `${startX + startJitterX}px`;
-    beam.style.top = `${startY + startJitterY}px`;
-    beam.style.width = `${streakLength}px`;
-    beam.style.setProperty("--incoming-angle", `${angle}deg`);
-    beam.style.setProperty("--incoming-travel", `${travelDistance}px`);
-    beam.style.animationDelay = `${beamDelay}ms`;
-    layer.appendChild(beam);
-
-    setTimeout(() => beam.remove(), 620 + beamDelay);
-  }
+  setTimeout(() => beam.remove(), delay + 290);
 }
 
 function showIncomingHitFlash(options = {}) {
@@ -1290,6 +1274,7 @@ function handleStagingBotLifecycleEvent(event = {}) {
 
 window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
 window.clearCombatVisualsForTarget = clearCombatVisualsForTarget;
+window.clearAllCombatVisuals = clearAllCombatVisuals;
 window.clearRemotePlayerTarget = clearRemotePlayerTarget;
 window.applyServerPvpDamageState = applyServerPvpDamageState;
 window.applyServerPvpDestructionState = applyServerPvpDestructionState;

@@ -903,6 +903,34 @@ input::placeholder {
   mix-blend-mode: screen;
 }
 
+.laser-burst.simple-combat-laser {
+  position: absolute;
+  bottom: auto;
+  border-radius: 999px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgba(86, 224, 255, 0), rgba(92, 229, 255, 0.95) 12%, rgba(255, 255, 255, 0.98) 50%, rgba(72, 210, 255, 0.85) 82%, rgba(72, 210, 255, 0));
+  box-shadow:
+    0 0 9px rgba(105, 232, 255, 0.72),
+    0 0 18px rgba(50, 205, 255, 0.32);
+  opacity: 0;
+  mix-blend-mode: screen;
+  animation: simpleCombatLaser 210ms ease-out forwards;
+}
+
+.laser-burst.simple-combat-laser.enemy-incoming-laser {
+  background: linear-gradient(90deg, rgba(255, 90, 72, 0), rgba(255, 134, 76, 0.94) 14%, rgba(255, 238, 188, 0.98) 50%, rgba(255, 86, 68, 0.82) 82%, rgba(255, 86, 68, 0));
+  box-shadow:
+    0 0 9px rgba(255, 130, 82, 0.64),
+    0 0 18px rgba(255, 68, 58, 0.28);
+}
+
+.weapon-muzzle-flash.simple-combat-muzzle {
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+}
+
 .laser-burst.player-shot-polished {
   overflow: visible;
   filter: saturate(1.08) brightness(1.02);
@@ -1015,6 +1043,23 @@ input::placeholder {
   100% {
     opacity: 0;
     transform: scale(1.12);
+  }
+}
+
+@keyframes simpleCombatLaser {
+  0% {
+    opacity: 0;
+    filter: brightness(1.18);
+  }
+
+  18% {
+    opacity: 1;
+    filter: brightness(1.2);
+  }
+
+  100% {
+    opacity: 0;
+    filter: brightness(0.96);
   }
 }
 
