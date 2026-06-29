@@ -170,13 +170,13 @@
 
       #${spaceShotLayerId} .lupen-mp-shot-beam {
         position: absolute;
-        height: 6px;
+        height: 4px;
         transform-origin: 0 50%;
         border-radius: 999px;
-        background: linear-gradient(90deg, rgba(78, 224, 255, 0), rgba(103, 232, 255, 0.98) 13%, rgba(255, 255, 255, 1) 43%, rgba(88, 218, 255, 0.94) 72%, rgba(72, 214, 255, 0));
-        box-shadow: 0 0 13px rgba(109, 232, 255, 0.92), 0 0 28px rgba(52, 214, 255, 0.5), 0 0 42px rgba(46, 160, 255, 0.22);
+        background: linear-gradient(90deg, rgba(78, 224, 255, 0), rgba(103, 232, 255, 0.86) 15%, rgba(255, 255, 255, 0.94) 44%, rgba(88, 218, 255, 0.78) 72%, rgba(72, 214, 255, 0));
+        box-shadow: 0 0 8px rgba(109, 232, 255, 0.68), 0 0 16px rgba(52, 214, 255, 0.28);
         mix-blend-mode: screen;
-        animation: lupen-mp-shot-beam 0.46s ease-out forwards;
+        animation: lupen-mp-shot-beam 0.34s ease-out forwards;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam::before,
@@ -192,30 +192,30 @@
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam::before {
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #ffffff 22%, #ffffff 58%, transparent);
-        box-shadow: 0 0 8px rgba(238, 255, 255, 0.86);
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.88) 24%, rgba(255, 255, 255, 0.86) 58%, transparent);
+        box-shadow: 0 0 5px rgba(238, 255, 255, 0.58);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam::after {
-        height: 10px;
-        background: linear-gradient(90deg, transparent, rgba(100, 226, 255, 0.3) 18%, rgba(100, 226, 255, 0.22) 70%, transparent);
-        filter: blur(2px);
-        opacity: 0.58;
+        height: 7px;
+        background: linear-gradient(90deg, transparent, rgba(100, 226, 255, 0.18) 20%, rgba(100, 226, 255, 0.14) 70%, transparent);
+        filter: blur(1px);
+        opacity: 0.46;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-local {
-        height: 7px;
+        height: 5px;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-remote {
         background: linear-gradient(90deg, rgba(78, 224, 255, 0), rgba(103, 232, 255, 0.92) 14%, rgba(245, 255, 255, 0.98) 45%, rgba(86, 225, 255, 0.86) 72%, rgba(86, 225, 255, 0));
-        box-shadow: 0 0 12px rgba(86, 224, 255, 0.76), 0 0 25px rgba(60, 202, 255, 0.34);
+        box-shadow: 0 0 8px rgba(86, 224, 255, 0.58), 0 0 15px rgba(60, 202, 255, 0.24);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-bot-return {
         background: linear-gradient(90deg, rgba(255, 97, 86, 0), rgba(255, 137, 90, 0.88) 18%, rgba(255, 238, 190, 0.96) 48%, rgba(255, 92, 72, 0.72) 76%, rgba(255, 92, 72, 0));
-        box-shadow: 0 0 12px rgba(255, 119, 82, 0.7), 0 0 24px rgba(255, 74, 64, 0.28);
+        box-shadow: 0 0 8px rgba(255, 119, 82, 0.54), 0 0 15px rgba(255, 74, 64, 0.2);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-beam.is-bot-return::after {
@@ -224,24 +224,24 @@
 
       #${spaceShotLayerId} .lupen-mp-shot-muzzle {
         position: absolute;
-        width: 34px;
-        height: 34px;
+        width: 24px;
+        height: 24px;
         transform: translate(-50%, -50%);
         border-radius: 50%;
         background: radial-gradient(circle, rgba(255, 255, 255, 0.92), rgba(96, 238, 255, 0.72) 28%, transparent 68%);
-        box-shadow: 0 0 18px rgba(100, 236, 255, 0.78), 0 0 34px rgba(255, 160, 80, 0.35);
+        box-shadow: 0 0 10px rgba(100, 236, 255, 0.54), 0 0 18px rgba(255, 160, 80, 0.2);
         mix-blend-mode: screen;
         animation: lupen-mp-shot-muzzle 0.34s ease-out forwards;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-muzzle.is-remote {
         background: radial-gradient(circle, rgba(255, 255, 255, 0.88), rgba(95, 255, 205, 0.55) 28%, transparent 68%);
-        box-shadow: 0 0 15px rgba(86, 228, 255, 0.56), 0 0 27px rgba(86, 255, 201, 0.32);
+        box-shadow: 0 0 9px rgba(86, 228, 255, 0.44), 0 0 16px rgba(86, 255, 201, 0.2);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-muzzle.is-bot-return {
         background: radial-gradient(circle, rgba(255, 245, 214, 0.9), rgba(255, 127, 82, 0.58) 30%, transparent 70%);
-        box-shadow: 0 0 14px rgba(255, 146, 90, 0.62), 0 0 26px rgba(255, 78, 64, 0.28);
+        box-shadow: 0 0 9px rgba(255, 146, 90, 0.48), 0 0 16px rgba(255, 78, 64, 0.2);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-attacker-label {
@@ -267,21 +267,21 @@
 
       #${spaceShotLayerId} .lupen-mp-shot-hit {
         position: absolute;
-        width: 44px;
-        height: 44px;
+        width: 28px;
+        height: 28px;
         transform: translate(-50%, -50%);
         border: 2px solid rgba(255, 229, 156, 0.88);
         border-radius: 50%;
         background: radial-gradient(circle, rgba(255, 233, 157, 0.8), rgba(255, 111, 54, 0.26) 48%, rgba(255, 111, 54, 0) 72%);
-        box-shadow: 0 0 18px rgba(255, 159, 73, 0.86), 0 0 34px rgba(255, 76, 54, 0.35);
+        box-shadow: 0 0 10px rgba(255, 159, 73, 0.58), 0 0 18px rgba(255, 76, 54, 0.22);
         mix-blend-mode: screen;
-        animation: lupen-mp-shot-hit 0.7s ease-out forwards;
+        animation: lupen-mp-shot-hit 0.42s ease-out forwards;
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-hit.is-shield {
         border-color: rgba(124, 234, 255, 0.9);
         background: radial-gradient(circle, rgba(147, 240, 255, 0.78), rgba(73, 204, 255, 0.22) 42%, transparent 72%);
-        box-shadow: 0 0 18px rgba(97, 223, 255, 0.86), 0 0 36px rgba(65, 203, 255, 0.35);
+        box-shadow: 0 0 10px rgba(97, 223, 255, 0.62), 0 0 18px rgba(65, 203, 255, 0.22);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-hit.is-armor {
@@ -289,13 +289,13 @@
         background:
           radial-gradient(circle, rgba(255, 255, 238, 0.7), rgba(205, 210, 198, 0.2) 42%, transparent 72%),
           repeating-conic-gradient(from 18deg, rgba(255, 232, 157, 0.42) 0 8deg, transparent 8deg 24deg);
-        box-shadow: 0 0 14px rgba(220, 228, 210, 0.7), 0 0 27px rgba(255, 196, 96, 0.24);
+        box-shadow: 0 0 9px rgba(220, 228, 210, 0.52), 0 0 15px rgba(255, 196, 96, 0.16);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-hit.is-hull {
         border-color: rgba(255, 116, 82, 0.9);
         background: radial-gradient(circle, rgba(255, 227, 181, 0.82), rgba(255, 88, 64, 0.34) 46%, transparent 74%);
-        box-shadow: 0 0 18px rgba(255, 118, 78, 0.9), 0 0 38px rgba(255, 50, 48, 0.42);
+        box-shadow: 0 0 11px rgba(255, 118, 78, 0.62), 0 0 20px rgba(255, 50, 48, 0.24);
       }
 
       #${spaceShotLayerId} .lupen-mp-shot-hit.is-resource {
@@ -303,7 +303,7 @@
         background:
           radial-gradient(circle, rgba(255, 242, 176, 0.74), rgba(145, 224, 255, 0.18) 44%, transparent 72%),
           repeating-conic-gradient(from 0deg, rgba(255, 238, 150, 0.34) 0 7deg, transparent 7deg 22deg);
-        box-shadow: 0 0 16px rgba(245, 219, 118, 0.7), 0 0 30px rgba(78, 209, 255, 0.22);
+        box-shadow: 0 0 9px rgba(245, 219, 118, 0.48), 0 0 16px rgba(78, 209, 255, 0.16);
       }
 
       #${stagingCombatPanelId} {
@@ -669,12 +669,12 @@
         opacity: 0.9;
         pointer-events: auto;
         cursor: pointer;
-        filter: drop-shadow(0 0 13px rgba(93, 232, 255, 0.62));
+        filter: drop-shadow(0 0 8px rgba(93, 232, 255, 0.42));
       }
 
       .lupen-mp-space-ghost.is-selected {
         opacity: 1;
-        filter: drop-shadow(0 0 18px rgba(89, 238, 255, 0.88));
+        filter: drop-shadow(0 0 10px rgba(89, 238, 255, 0.62));
       }
 
       .lupen-mp-space-ghost.is-arriving {
@@ -690,26 +690,26 @@
       .lupen-mp-space-bot.is-locked::before {
         content: "";
         position: absolute;
-        inset: -8px -12px 12px;
+        inset: -6px -9px 10px;
         pointer-events: none;
         background:
-          linear-gradient(currentColor, currentColor) left top / 20px 3px no-repeat,
-          linear-gradient(currentColor, currentColor) left top / 3px 20px no-repeat,
-          linear-gradient(currentColor, currentColor) right top / 20px 3px no-repeat,
-          linear-gradient(currentColor, currentColor) right top / 3px 20px no-repeat,
-          linear-gradient(currentColor, currentColor) left bottom / 20px 3px no-repeat,
-          linear-gradient(currentColor, currentColor) left bottom / 3px 20px no-repeat,
-          linear-gradient(currentColor, currentColor) right bottom / 20px 3px no-repeat,
-          linear-gradient(currentColor, currentColor) right bottom / 3px 20px no-repeat;
-        filter: drop-shadow(0 0 10px currentColor);
+          linear-gradient(currentColor, currentColor) left top / 14px 2px no-repeat,
+          linear-gradient(currentColor, currentColor) left top / 2px 14px no-repeat,
+          linear-gradient(currentColor, currentColor) right top / 14px 2px no-repeat,
+          linear-gradient(currentColor, currentColor) right top / 2px 14px no-repeat,
+          linear-gradient(currentColor, currentColor) left bottom / 14px 2px no-repeat,
+          linear-gradient(currentColor, currentColor) left bottom / 2px 14px no-repeat,
+          linear-gradient(currentColor, currentColor) right bottom / 14px 2px no-repeat,
+          linear-gradient(currentColor, currentColor) right bottom / 2px 14px no-repeat;
+        filter: drop-shadow(0 0 5px currentColor);
       }
 
       .lupen-mp-space-ghost.is-selected::after {
-        color: rgba(111, 245, 255, 0.92);
+        color: rgba(111, 245, 255, 0.78);
       }
 
       .lupen-mp-space-bot.is-locked::before {
-        color: rgba(255, 180, 78, 0.95);
+        color: rgba(255, 180, 78, 0.8);
       }
 
       .lupen-mp-space-ghost-ship {
@@ -796,12 +796,12 @@
         34% {
           opacity: 1;
           transform: translate(-50%, -50%) scale(1.06);
-          filter: drop-shadow(0 0 22px rgba(93, 232, 255, 0.92));
+          filter: drop-shadow(0 0 12px rgba(93, 232, 255, 0.58));
         }
         100% {
           opacity: 0.9;
           transform: translate(-50%, -50%) scale(1);
-          filter: drop-shadow(0 0 13px rgba(93, 232, 255, 0.62));
+          filter: drop-shadow(0 0 8px rgba(93, 232, 255, 0.42));
         }
       }
 
@@ -856,7 +856,7 @@
 
       .lupen-mp-space-bot.is-locked {
         opacity: 0.95;
-        filter: drop-shadow(0 0 16px rgba(255, 198, 102, 0.78));
+        filter: drop-shadow(0 0 10px rgba(255, 198, 102, 0.54));
       }
 
       .lupen-mp-space-bot.is-locked::after {
@@ -870,16 +870,16 @@
       }
 
       .lupen-mp-space-bot.is-hit {
-        animation: lupen-mp-staging-hit 0.62s ease-out;
+        animation: lupen-mp-staging-hit 0.38s ease-out;
       }
 
       .lupen-mp-space-bot.is-engaged .lupen-mp-space-bot-ship {
         transform: rotate(-5deg) translateY(-1px);
-        filter: drop-shadow(0 0 12px rgba(255, 185, 95, 0.52));
+        filter: drop-shadow(0 0 7px rgba(255, 185, 95, 0.38));
       }
 
       .lupen-mp-space-bot.is-coop-engaged .lupen-mp-space-bot-ship {
-        filter: drop-shadow(0 0 12px rgba(98, 236, 255, 0.56));
+        filter: drop-shadow(0 0 7px rgba(98, 236, 255, 0.38));
       }
 
       .lupen-mp-space-bot.is-coop-engaged .lupen-mp-space-bot-ship::after {
@@ -892,7 +892,7 @@
         transform: translateX(-50%);
         border-radius: 999px;
         background: linear-gradient(90deg, transparent, rgba(121, 240, 255, 0.92), transparent);
-        box-shadow: 0 0 8px rgba(89, 224, 255, 0.76);
+        box-shadow: 0 0 5px rgba(89, 224, 255, 0.52);
       }
 
       .lupen-mp-space-bot.is-bounty-target .lupen-mp-space-bot-ship::before {
@@ -904,7 +904,7 @@
         border-radius: 50%;
         opacity: 0.9;
         pointer-events: none;
-        filter: drop-shadow(0 0 7px rgba(255, 194, 68, 0.56));
+        filter: drop-shadow(0 0 4px rgba(255, 194, 68, 0.38));
       }
 
       .${botMarkerClass}.is-hit {
@@ -976,12 +976,12 @@
 
       .lupen-mp-space-resource:hover {
         opacity: 1;
-        filter: drop-shadow(0 0 13px rgba(127, 223, 255, 0.48));
+        filter: drop-shadow(0 0 8px rgba(127, 223, 255, 0.34));
       }
 
       .lupen-mp-space-resource.is-selected {
         opacity: 1;
-        filter: drop-shadow(0 0 16px rgba(245, 230, 140, 0.58));
+        filter: drop-shadow(0 0 10px rgba(245, 230, 140, 0.42));
       }
 
       .lupen-mp-space-resource.is-selected::after {
@@ -991,11 +991,11 @@
         border: 1px solid rgba(245, 230, 140, 0.72);
         border-radius: 8px;
         pointer-events: none;
-        box-shadow: 0 0 12px rgba(245, 230, 140, 0.26);
+        box-shadow: 0 0 7px rgba(245, 230, 140, 0.18);
       }
 
       .lupen-mp-space-resource.is-hit {
-        animation: lupen-mp-resource-hit 0.62s ease-out;
+        animation: lupen-mp-resource-hit 0.38s ease-out;
       }
 
       .lupen-mp-space-resource.is-depleted {
@@ -1015,7 +1015,7 @@
           radial-gradient(circle at 58% 54%, var(--resource-glow), rgba(0, 0, 0, 0) 34%),
           linear-gradient(145deg, rgba(43, 55, 66, 0.98), rgba(10, 16, 22, 0.94));
         border: 1px solid rgba(201, 240, 255, 0.3);
-        box-shadow: inset -5px -6px 8px rgba(0, 0, 0, 0.42), 0 0 10px var(--resource-glow);
+        box-shadow: inset -5px -6px 8px rgba(0, 0, 0, 0.42), 0 0 6px var(--resource-glow);
       }
 
       .lupen-mp-resource-rock img {
@@ -1038,13 +1038,13 @@
         display: block;
         height: 100%;
         background: linear-gradient(90deg, #21b4ff, #f5e68c);
-        box-shadow: 0 0 8px rgba(102, 225, 255, 0.5);
+        box-shadow: 0 0 5px rgba(102, 225, 255, 0.34);
       }
 
       @keyframes lupen-mp-resource-hit {
-        0% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 8px rgba(127, 223, 255, 0.28)); }
-        38% { transform: translate(-50%, -50%) scale(1.08); filter: drop-shadow(0 0 20px rgba(255, 231, 142, 0.74)); }
-        100% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 9px rgba(127, 223, 255, 0.26)); }
+        0% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 5px rgba(127, 223, 255, 0.2)); }
+        38% { transform: translate(-50%, -50%) scale(1.03); filter: drop-shadow(0 0 10px rgba(255, 231, 142, 0.46)); }
+        100% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 5px rgba(127, 223, 255, 0.2)); }
       }
 
       .lupen-target-card {
@@ -1059,7 +1059,7 @@
         border: 1px solid rgba(110, 230, 255, 0.64);
         border-radius: 4px;
         background: linear-gradient(180deg, rgba(4, 14, 28, 0.78), rgba(1, 6, 14, 0.62));
-        box-shadow: 0 0 16px rgba(0, 190, 255, 0.14);
+        box-shadow: 0 0 10px rgba(0, 190, 255, 0.1);
         color: #e9fdff;
         text-align: center;
         text-transform: uppercase;
@@ -1075,14 +1075,14 @@
         width: 42px;
         height: 1px;
         background: var(--target-accent);
-        box-shadow: 0 0 8px var(--target-glow);
+        box-shadow: 0 0 5px var(--target-glow);
       }
 
       .lupen-target-card.hostile {
         --target-accent: #ff9a35;
         --target-glow: rgba(255, 138, 45, 0.76);
         border-color: rgba(255, 166, 74, 0.72);
-        box-shadow: 0 0 24px rgba(255, 124, 46, 0.28);
+        box-shadow: 0 0 14px rgba(255, 124, 46, 0.18);
       }
 
       .lupen-target-card.player {
@@ -1093,7 +1093,7 @@
         gap: 2px;
         padding: 4px 6px 5px;
         border-color: rgba(255, 197, 96, 0.64);
-        box-shadow: 0 0 18px rgba(255, 168, 58, 0.18);
+        box-shadow: 0 0 10px rgba(255, 168, 58, 0.12);
       }
 
       .lupen-target-card.player.compact-player-target {
@@ -1104,7 +1104,7 @@
         --target-accent: #f5e68c;
         --target-glow: rgba(245, 230, 140, 0.58);
         border-color: rgba(245, 230, 140, 0.58);
-        box-shadow: 0 0 18px rgba(245, 206, 116, 0.18);
+        box-shadow: 0 0 10px rgba(245, 206, 116, 0.12);
       }
 
       .lupen-target-card.resource .lupen-target-bar-fill.shield {
@@ -1112,11 +1112,11 @@
       }
 
       .lupen-target-card.locked {
-        animation: lupen-target-pulse 1.3s ease-in-out infinite;
+        animation: none;
       }
 
       .lupen-target-card.hit-confirmed {
-        box-shadow: 0 0 20px var(--target-glow), 0 0 38px rgba(255, 255, 255, 0.16);
+        box-shadow: 0 0 12px var(--target-glow), 0 0 18px rgba(255, 255, 255, 0.08);
       }
 
       .lupen-target-card strong {
