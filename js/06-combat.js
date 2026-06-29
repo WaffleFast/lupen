@@ -299,6 +299,8 @@ function clearRemotePlayerTarget(reason = "remote_player_target_cleared") {
   const selectedMatches = selectedTarget?.type === "remotePlayer";
   const engagedMatches = engagedTarget?.type === "remotePlayer";
   if (!selectedMatches && !engagedMatches) return false;
+  const targetId = String(selectedMatches ? selectedTarget.id : engagedTarget?.id || "");
+  if (targetId) clearCombatVisualsForTarget({ type: "remotePlayer", id: targetId });
 
   if (engagedMatches) {
     if (engageTimer) {
@@ -392,6 +394,7 @@ function engageTarget() {
 function disengageTarget(keepTarget = false) {
   const disengagedRef = engagedTarget ? { ...engagedTarget } : null;
   const disengagedEntity = ["stagingBot", "stagingResource"].includes(disengagedRef?.type) ? getEngagedTargetEntity() : null;
+  if (disengagedRef) clearCombatVisualsForTarget(disengagedRef);
 
   if (engageTimer) {
     clearInterval(engageTimer);
@@ -420,6 +423,8 @@ function disengageTarget(keepTarget = false) {
 }
 
 let weaponVisualCycleOffset = 0;
+const MAX_VISIBLE_COMBAT_BEAMS = 6;
+const suppressedCombatVisualTargets = new Map();
 
 function isCombatDebugEnabled() {
   try {
@@ -438,7 +443,7 @@ function getVisibleShotWeapons(weapon) {
   const allWeapons = Array.isArray(weapon?.weapons) && weapon.weapons.length
     ? weapon.weapons
     : [weapon].filter(Boolean);
-  const visibleLimit = 6;
+  const visibleLimit = MAX_VISIBLE_COMBAT_BEAMS;
 
   if (allWeapons.length <= visibleLimit) return allWeapons;
 
@@ -448,6 +453,92 @@ function getVisibleShotWeapons(weapon) {
   }
   weaponVisualCycleOffset = (weaponVisualCycleOffset + visibleLimit) % allWeapons.length;
   return visibleWeapons;
+}
+
+function getCombatBeamStartOffsets(count, spacing = 7) {
+  const beamCount = Math.max(1, Math.round(Number(count || 1)));
+  const center = (beamCount - 1) / 2;
+  return Array.from({ length: beamCount }, (_, index) => (index - center) * spacing);
+}
+
+function getCombatVisualTargetRef(target = {}, options = {}) {
+  const type = String(options.targetType || target.type || selectedTarget?.type || engagedTarget?.type || "").trim();
+  const id = String(options.targetId || target.id || target.resourceId || target.botId || "").trim();
+  if (!id) return null;
+  return { type, id };
+}
+
+function getCombatVisualSuppressionKey(ref) {
+  if (!ref?.id) return "";
+  return `${String(ref.type || "target")}:${String(ref.id)}`;
+}
+
+function isCombatVisualTargetSuppressed(ref) {
+  const key = getCombatVisualSuppressionKey(ref);
+  if (!key) return false;
+  const until = Number(suppressedCombatVisualTargets.get(key) || 0);
+  if (until > Date.now()) return true;
+  suppressedCombatVisualTargets.delete(key);
+  return false;
+}
+
+function markCombatVisualTargetSuppressed(ref, durationMs = 1300) {
+  const key = getCombatVisualSuppressionKey(ref);
+  if (!key) return;
+  suppressedCombatVisualTargets.set(key, Date.now() + Math.max(200, Number(durationMs || 0)));
+}
+
+function isCombatVisualTargetStillValid(ref) {
+  if (!ref?.id || isCombatVisualTargetSuppressed(ref)) return false;
+  if (ref.type === "stagingBot") return isStagingBotTargetStillValid(ref.id);
+  if (ref.type === "stagingResource") {
+    const resource = getStagingResourceTargetById(ref.id);
+    return Boolean(resource && resource.alive && !resource.depleted && (resource.currentNodeId || resource.node) === currentNode);
+  }
+  if (ref.type === "remotePlayer") {
+    const player = getRemotePlayerTargetById(ref.id);
+    return Boolean(player && (player.currentNodeId || player.node) === currentNode);
+  }
+  return true;
+}
+
+function tagCombatVisualElement(element, ref, options = {}) {
+  if (!element || !ref?.id) return;
+  element.dataset.targetId = String(ref.id);
+  element.dataset.targetType = String(ref.type || "target");
+  if (options.attackerId) element.dataset.attackerId = String(options.attackerId);
+}
+
+function clearCombatVisualsForTarget(refOrType, targetId = "") {
+  const ref = typeof refOrType === "object"
+    ? { type: String(refOrType.type || ""), id: String(refOrType.id || refOrType.targetId || "") }
+    : { type: String(refOrType || ""), id: String(targetId || "") };
+  if (!ref.id) return false;
+  markCombatVisualTargetSuppressed(ref);
+
+  const selectors = [
+    "#laserLayer [data-target-id]",
+    "#explosionLayer [data-target-id]",
+    "#lupenMultiplayerSpaceShotLayer [data-target-id]"
+  ];
+  let removed = 0;
+  selectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((element) => {
+      const idMatches = String(element.dataset.targetId || "") === ref.id;
+      const typeMatches = !ref.type || !element.dataset.targetType || String(element.dataset.targetType || "") === ref.type;
+      if (!idMatches || !typeMatches) return;
+      element.remove();
+      removed += 1;
+    });
+  });
+
+  const shotLayer = document.getElementById("lupenMultiplayerSpaceShotLayer");
+  if (shotLayer?.dataset.targetId === ref.id && (!ref.type || shotLayer.dataset.targetType === ref.type)) {
+    shotLayer.remove();
+    removed += 1;
+  }
+
+  return removed > 0;
 }
 
 function getShotVisualProfile(shotWeapon = {}) {
@@ -479,7 +570,7 @@ function getShotVisualProfile(shotWeapon = {}) {
   return profile;
 }
 
-function showWeaponImpactAtTarget(target, shotWeapon, delay = 0) {
+function showWeaponImpactAtTarget(target, shotWeapon, delay = 0, options = {}) {
   const layer = document.getElementById("explosionLayer");
   const spaceScreen = document.getElementById("spaceScreen");
   if (!layer || !spaceScreen || !target) return false;
@@ -488,10 +579,13 @@ function showWeaponImpactAtTarget(target, shotWeapon, delay = 0) {
   const profile = getShotVisualProfile(shotWeapon);
   const x = (target.x / 100) * screenRect.width;
   const y = (target.y / 100) * screenRect.height;
+  const targetRef = getCombatVisualTargetRef(target, options);
 
   setTimeout(() => {
+    if (targetRef && !isCombatVisualTargetStillValid(targetRef)) return;
     const impact = document.createElement("div");
     impact.className = `weapon-impact weapon-impact-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
+    tagCombatVisualElement(impact, targetRef, options);
     impact.style.left = `${x}px`;
     impact.style.top = `${y}px`;
     impact.style.setProperty("--weapon-impact-color", profile.color);
@@ -510,20 +604,21 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
 
   const screenRect = spaceScreen.getBoundingClientRect();
 
-  const baseStartX = 285;
-  const baseStartY = screenRect.height - 105;
-
   const endX = (target.x / 100) * screenRect.width;
   const endY = (target.y / 100) * screenRect.height;
   const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
   const visualWeapons = getVisibleShotWeapons(resolvedWeapon);
-  const primaryShotWeapon = visualWeapons[0] || resolvedWeapon || {};
-  const barrageWeapons = [primaryShotWeapon, primaryShotWeapon, primaryShotWeapon];
+  const barrageWeapons = visualWeapons.length ? visualWeapons : [resolvedWeapon].filter(Boolean);
+  if (!barrageWeapons.length) return;
   const visualCapApplied = Number(resolvedWeapon?.count || visualWeapons.length) > visualWeapons.length;
+  const targetRef = getCombatVisualTargetRef(target, options);
+  if (targetRef && !isCombatVisualTargetStillValid(targetRef)) return;
+  const baseStartX = screenRect.width * (target.x < 50 ? 0.76 : 0.24);
+  const baseStartY = screenRect.height - 86;
+  const volleyOffsets = getCombatBeamStartOffsets(barrageWeapons.length, Math.max(5, Math.min(8, 34 / barrageWeapons.length)));
 
   const makeBeam = (shotWeapon, laneIndex = 0, delay = 0) => {
     const profile = getShotVisualProfile(shotWeapon);
-    const volleyOffsets = [-7, 0, 7];
     const startX = baseStartX;
     const startY = baseStartY + (volleyOffsets[laneIndex] || 0);
     const beamEndX = endX;
@@ -535,6 +630,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
     const shotLength = Math.max(54, length * profile.streakScale);
     const muzzle = document.createElement("div");
     muzzle.className = "weapon-muzzle-flash";
+    tagCombatVisualElement(muzzle, targetRef, options);
     muzzle.style.left = `${startX}px`;
     muzzle.style.top = `${startY}px`;
     muzzle.style.setProperty("--weapon-muzzle-color", profile.color);
@@ -544,6 +640,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
 
     const beam = document.createElement("div");
     beam.className = `laser-burst player-shot player-shot-polished player-shot-volley player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
+    tagCombatVisualElement(beam, targetRef, options);
     beam.style.left = `${startX}px`;
     beam.style.top = `${startY}px`;
     beam.style.width = `${shotLength}px`;
@@ -560,7 +657,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
 
     setTimeout(() => beam.remove(), delay + profile.durationMs + 80);
     if (options.showImpact !== false) {
-      showWeaponImpactAtTarget(target, shotWeapon, delay + Math.max(70, profile.durationMs - 30));
+      showWeaponImpactAtTarget(target, shotWeapon, delay + Math.max(70, profile.durationMs - 30), options);
     }
   };
 
@@ -571,6 +668,7 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   debugCombatShot("shot visuals", {
     activeWeaponCount: Number(resolvedWeapon?.count || visualWeapons.length),
     visibleWeaponCount: barrageWeapons.length,
+    maxVisibleBeamCount: MAX_VISIBLE_COMBAT_BEAMS,
     visualCapApplied,
     weaponNames: visualWeapons.map(item => item?.name || item?.key || "weapon").join(", "),
     cooldownMs: Number(resolvedWeapon?.speed || 0)
@@ -776,7 +874,11 @@ function performAttackCycle() {
 
   const weapon = getEquippedWeapon();
   const result = applyWeaponDamageToTarget(target, weapon);
-  pulseLaserBurstToTarget(target, weapon, { showImpact: result.hit === true });
+  pulseLaserBurstToTarget(target, weapon, {
+    showImpact: result.hit === true,
+    targetType: engagedTarget?.type || getTargetTypeFromEntity(target),
+    targetId: target.id
+  });
   const soundPulseCount = Math.max(1, Math.min(6, Number(weapon?.count || 1)));
   Array.from({ length: soundPulseCount }).forEach((_shotWeapon, index) => {
     setTimeout(() => {
@@ -1074,6 +1176,7 @@ function clearStagingBotTargetIfSelected(botId) {
   if (!botId) return;
   const selectedMatches = selectedTarget?.type === "stagingBot" && selectedTarget.id === botId;
   const engagedMatches = engagedTarget?.type === "stagingBot" && engagedTarget.id === botId;
+  clearCombatVisualsForTarget({ type: "stagingBot", id: botId });
   if (!selectedMatches && !engagedMatches) return;
 
   if (engagedMatches && engageTimer) {
@@ -1099,6 +1202,9 @@ function clearStaleStagingBotTarget(reason = "stale_staging_bot_target") {
   const engagedStale = engagedTarget?.type === "stagingBot" && !isStagingBotTargetStillValid(engagedTarget.id);
 
   if (!selectedStale && !engagedStale) return false;
+
+  if (selectedStale) clearCombatVisualsForTarget({ type: "stagingBot", id: selectedTarget.id });
+  if (engagedStale) clearCombatVisualsForTarget({ type: "stagingBot", id: engagedTarget.id });
 
   if (engagedStale && engageTimer) {
     clearInterval(engageTimer);
@@ -1141,6 +1247,7 @@ function handleStagingBotLifecycleEvent(event = {}) {
   const target = getStagingBotTargetById(botId);
 
   if (disabled) {
+    clearCombatVisualsForTarget({ type: "stagingBot", id: botId });
     if (!window.lupenStagingBotDestructionVisualKeys) {
       window.lupenStagingBotDestructionVisualKeys = new Set();
     }
@@ -1182,6 +1289,7 @@ function handleStagingBotLifecycleEvent(event = {}) {
 }
 
 window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
+window.clearCombatVisualsForTarget = clearCombatVisualsForTarget;
 window.clearRemotePlayerTarget = clearRemotePlayerTarget;
 window.applyServerPvpDamageState = applyServerPvpDamageState;
 window.applyServerPvpDestructionState = applyServerPvpDestructionState;
@@ -1406,6 +1514,7 @@ function handleStagingResourceLifecycleEvent(event = {}) {
   const respawned = eventType.includes("respawned") || event.depleted === false;
 
   if (depleted) {
+    clearCombatVisualsForTarget({ type: "stagingResource", id: resourceId });
     if (!window.lupenStagingResourceDepletionVisualKeys) {
       window.lupenStagingResourceDepletionVisualKeys = new Set();
     }
@@ -1589,7 +1698,7 @@ function performStagingResourceAttackCycle() {
   }
 
   const weapon = getEquippedWeapon();
-  pulseLaserBurstToTarget(target, weapon, { showImpact: true });
+  pulseLaserBurstToTarget(target, weapon, { showImpact: true, targetType: "stagingResource", targetId: target.id });
   target.hitFlashUntil = Date.now() + 260;
   const soundPulseCount = Math.max(1, Math.min(6, Number(weapon?.count || 1)));
   Array.from({ length: soundPulseCount }).forEach((_shotWeapon, index) => {

@@ -146,6 +146,37 @@
     global.addActivityLog?.(message);
   }
 
+  function getCombatVisualTargetId(event = {}) {
+    return String(event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "");
+  }
+
+  function clearCombatVisualEventForTarget(targetType, targetId) {
+    const id = String(targetId || "").trim();
+    if (!id) return false;
+    const event = connection.lastCombatVisualEvent;
+    const eventTargetId = getCombatVisualTargetId(event);
+    const eventTargetType = String(event?.targetType || event?.type || "").toLowerCase();
+    const normalizedType = String(targetType || "").toLowerCase();
+    const typeMatches = !normalizedType ||
+      !eventTargetType ||
+      eventTargetType === normalizedType ||
+      (normalizedType === "bot" && eventTargetType === "stagingbot") ||
+      (normalizedType === "resource" && eventTargetType === "stagingresource") ||
+      (normalizedType === "player" && eventTargetType === "pvp");
+
+    if (event && eventTargetId === id && typeMatches) {
+      connection.lastCombatVisualEvent = null;
+    }
+
+    if (typeof global.clearCombatVisualsForTarget === "function") {
+      global.clearCombatVisualsForTarget({ type: normalizedType || "target", id });
+      if (normalizedType === "bot") global.clearCombatVisualsForTarget({ type: "stagingBot", id });
+      if (normalizedType === "resource") global.clearCombatVisualsForTarget({ type: "stagingResource", id });
+      if (normalizedType === "player") global.clearCombatVisualsForTarget({ type: "remotePlayer", id });
+    }
+    return true;
+  }
+
   function getSearchParam(name) {
     try {
       return new URLSearchParams(global.location.search).get(name);
@@ -2580,6 +2611,7 @@
       };
       connection.lastPvpDestroyedEvent = destroyedState;
       applyPvpStateToPlayerSnapshot(destroyedState);
+      clearCombatVisualEventForTarget("player", targetSessionId);
 
       if (targetSessionId === connection.sessionId) {
         addStagingActivityLogOnce(
@@ -2723,6 +2755,7 @@
         }
       }
       logDev("server bot disabled", message);
+      clearCombatVisualEventForTarget("bot", connection.lastBotEvent.botId);
       if (typeof global.handleStagingBotLifecycleEvent === "function") {
         global.handleStagingBotLifecycleEvent(connection.lastBotEvent);
       } else if (typeof global.clearStagingBotTargetIfSelected === "function") {
@@ -2856,6 +2889,7 @@
         localApplyResult = global.applyStagingResourceMineResult(normalized);
       }
       if (normalized.depleted && typeof global.handleStagingResourceLifecycleEvent === "function") {
+        clearCombatVisualEventForTarget("resource", normalized.resourceId);
         global.handleStagingResourceLifecycleEvent({ ...normalized, type: "stagingResource:depleted" });
       }
       connection.lastStagingResourceMineResult = {
@@ -2911,6 +2945,9 @@
             timestamp: normalized.timestamp,
             receivedAt: normalized.receivedAt
           };
+        }
+        if (type === "stagingResource:depleted") {
+          clearCombatVisualEventForTarget("resource", normalized.resourceId);
         }
         if ((type === "stagingResource:depleted" || type === "stagingResource:respawned") &&
           typeof global.handleStagingResourceLifecycleEvent === "function") {

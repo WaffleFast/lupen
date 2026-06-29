@@ -1207,9 +1207,9 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.serverResourceCount).toBe(0);
     expect(connectedHudState.selectedServerResourceCount).toBe(0);
     expect(connectedHudState.engagedServerResourceCount).toBe(0);
-    expect(connectedHudState.playerShotCount).toBeGreaterThan(0);
-    expect(connectedHudState.polishedPlayerShotCount).toBeGreaterThan(0);
-    expect(connectedHudState.volleyPlayerShotCount).toBeGreaterThan(0);
+    expect(connectedHudState.playerShotCount).toBe(0);
+    expect(connectedHudState.polishedPlayerShotCount).toBe(0);
+    expect(connectedHudState.volleyPlayerShotCount).toBe(0);
     expect(connectedHudState.explosionCount).toBeGreaterThan(0);
     expect(connectedHudState.lifecycleResult).toMatchObject({
       handled: true,
@@ -3435,7 +3435,10 @@ test.describe("Lupen browser smoke", () => {
             lastStagingBountyList: { active, bounties: [active] },
             selectedTargetBotId: window.__selectedStagingBotId,
             lastShotEvent: window.__lastShotEvent,
-            lastCombatVisualEvent: window.__lastCombatVisualEvent
+            lastCombatVisualEvent: window.__lastCombatVisualEvent,
+            activeShipWeaponCount: 2,
+            validCombatWeaponCount: 2,
+            localEquippedWeaponKeys: ["pulseLaser", "ionBlaster"]
           }),
           getPlayers: options => {
             const local = {
@@ -3456,7 +3459,10 @@ test.describe("Lupen browser smoke", () => {
               x: 58,
               y: 42,
               isSelf: false,
-              selectedTargetBotId: window.__remoteSelectedStagingBotId
+              selectedTargetBotId: window.__remoteSelectedStagingBotId,
+              equippedWeaponKeys: ["pulseLaser", "ionBlaster", "railLance", "scatterCannon"],
+              activeShipWeaponCount: 4,
+              validCombatWeaponCount: 4
             };
             return options?.includeSelf === false ? [remote] : [local, remote];
           },
@@ -3575,8 +3581,8 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
     expect(stagingBotSelectedState.targetBars).toBe(2);
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
-    expect(stagingBotSelectedState.shotBeamCount).toBe(3);
-    expect(stagingBotSelectedState.localShotBeamCount).toBe(3);
+    expect(stagingBotSelectedState.shotBeamCount).toBe(2);
+    expect(stagingBotSelectedState.localShotBeamCount).toBe(2);
     expect(stagingBotSelectedState.trailShotBeamCount).toBe(0);
     expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.muzzleCount).toBe(1);
@@ -3609,7 +3615,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(3);
+    expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(4);
     expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingBotRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
@@ -3640,7 +3646,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(3);
+    expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(4);
     expect(stagingResourceRemoteShotState.remoteMuzzleCount).toBe(1);
     expect(stagingResourceRemoteShotState.attackerLabelText).toContain("WaffleFast");
     expect(stagingResourceRemoteShotState.hitCount).toBe(1);
@@ -3704,7 +3710,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBe(3);
+    expect(pvpRemoteShotState.shield.remoteShotBeamCount).toBe(4);
     expect(pvpRemoteShotState.shield.remoteMuzzleCount).toBe(1);
     expect(pvpRemoteShotState.shield.attackerLabelText).toContain("WaffleFast");
     expect(pvpRemoteShotState.shield.hitCount).toBe(1);
@@ -3726,14 +3732,29 @@ test.describe("Lupen browser smoke", () => {
         const botList = window.__stagingVisualBots || [];
         const botIndex = botList.findIndex(candidate => candidate.id === bot.id);
         const removed = botIndex >= 0 ? botList.splice(botIndex, 1)[0] : null;
+        window.__lastCombatVisualEvent = {
+          type: "bot",
+          ok: true,
+          attackerSessionId: "remote-session",
+          targetType: "bot",
+          targetId: bot.id,
+          targetBotId: bot.id,
+          currentNode,
+          damage: 8,
+          receivedAt: Date.now()
+        };
+        window.LupenMultiplayerOverlay?.render?.();
+        const staleShotBeamCount = document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-beam").length;
         const cleanup = reconcileStagingBotTargetState("e2e_missing_bot");
         const activityAfter = document.getElementById("activityLogFeed")?.textContent || "";
         if (removed) botList.splice(botIndex, 0, removed);
         window.__selectedStagingBotId = "";
+        window.__lastCombatVisualEvent = null;
         window.LupenMultiplayerOverlay?.render?.();
         return {
           engagedBefore,
           cleanup,
+          staleShotBeamCount,
           selectedAfter: selectedTarget ? { ...selectedTarget } : null,
           engagedAfter: engagedTarget ? { ...engagedTarget } : null,
           selectedClientBotId: window.__selectedStagingBotId || "",
@@ -3744,6 +3765,7 @@ test.describe("Lupen browser smoke", () => {
 
     expect(staleMissingBotState.engagedBefore).toMatchObject({ type: "stagingBot", id: "staging-bot-1" });
     expect(staleMissingBotState.cleanup).toMatchObject({ cleared: true, reason: "e2e_missing_bot" });
+    expect(staleMissingBotState.staleShotBeamCount).toBe(0);
     expect(staleMissingBotState.selectedAfter).toBe(null);
     expect(staleMissingBotState.engagedAfter).toBe(null);
     expect(staleMissingBotState.selectedClientBotId).toBe("");
@@ -3999,8 +4021,13 @@ test.describe("Lupen browser smoke", () => {
           alive: true
         };
         pulseLaserBurstToTarget(target, {
-          name: "Pulse Laser",
-          count: 1,
+          name: "Pulse Laser Array",
+          count: 7,
+          weapons: Array.from({ length: 7 }, (_, index) => ({
+            name: "Pulse Laser " + (index + 1),
+            fireStyle: "pulse",
+            projectileColor: "#7fd6ff"
+          })),
           fireStyle: "pulse",
           projectileColor: "#7fd6ff"
         });
@@ -4028,10 +4055,10 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(visualState.playerShotCount).toBe(3);
-    expect(visualState.polishedPlayerShotCount).toBe(3);
-    expect(visualState.volleyPlayerShotCount).toBe(3);
-    expect(visualState.muzzleCount).toBe(3);
+    expect(visualState.playerShotCount).toBe(6);
+    expect(visualState.polishedPlayerShotCount).toBe(6);
+    expect(visualState.volleyPlayerShotCount).toBe(6);
+    expect(visualState.muzzleCount).toBe(6);
     expect(visualState.incomingCount).toBeGreaterThanOrEqual(5);
     expect(visualState.heavyIncomingCount).toBeGreaterThanOrEqual(1);
     expect(visualState.armorScreenFlash).toBe(true);
