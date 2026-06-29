@@ -423,7 +423,11 @@ function disengageTarget(keepTarget = false) {
 }
 
 let weaponVisualCycleOffset = 0;
+const COMBAT_FX_LAYER_ID = "combatFxLayer";
+const COMBAT_FX_SVG_NS = "http://www.w3.org/2000/svg";
+const COMBAT_FX_BEAM_DURATION_MS = 520;
 const suppressedCombatVisualTargets = new Map();
+const renderedCombatFxKeys = new Set();
 
 function isCombatDebugEnabled() {
   try {
@@ -502,6 +506,153 @@ function tagCombatVisualElement(element, ref, options = {}) {
   if (options.attackerId) element.dataset.attackerId = String(options.attackerId);
 }
 
+function pruneRenderedCombatFxKeys() {
+  if (renderedCombatFxKeys.size <= 80) return;
+  const [oldest] = renderedCombatFxKeys;
+  renderedCombatFxKeys.delete(oldest);
+}
+
+function ensureCombatFxLayer() {
+  const spaceScreen = document.getElementById("spaceScreen");
+  if (!spaceScreen) return null;
+  const rect = spaceScreen.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  let layer = document.getElementById(COMBAT_FX_LAYER_ID);
+  if (!layer) {
+    layer = document.createElementNS(COMBAT_FX_SVG_NS, "svg");
+    layer.id = COMBAT_FX_LAYER_ID;
+    layer.classList.add("combat-fx-layer");
+    layer.setAttribute("aria-hidden", "true");
+    layer.setAttribute("focusable", "false");
+    layer.setAttribute("preserveAspectRatio", "none");
+    spaceScreen.appendChild(layer);
+  }
+  layer.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  layer.dataset.width = String(width);
+  layer.dataset.height = String(height);
+  return { layer, width, height };
+}
+
+function getCombatFxPointFromPercent(xPercent, yPercent) {
+  const context = ensureCombatFxLayer();
+  if (!context) return null;
+  return {
+    x: Math.max(0, Math.min(context.width, (Number(xPercent || 0) / 100) * context.width)),
+    y: Math.max(0, Math.min(context.height, (Number(yPercent || 0) / 100) * context.height)),
+    width: context.width,
+    height: context.height
+  };
+}
+
+function getCombatFxPointFromTarget(target = {}) {
+  return getCombatFxPointFromPercent(target.x, target.y);
+}
+
+function getLocalCombatFxOriginForTarget(targetPoint = {}) {
+  const context = ensureCombatFxLayer();
+  if (!context) return null;
+  const activeTop = Math.min(100, Math.max(54, context.height * 0.12));
+  const activeBottom = Math.max(activeTop + 80, context.height - 178);
+  const originY = activeTop + (activeBottom - activeTop) * 0.62;
+  return {
+    x: Math.max(18, context.width * 0.045),
+    y: Math.max(activeTop + 16, Math.min(activeBottom - 16, originY)),
+    width: context.width,
+    height: context.height
+  };
+}
+
+function tagCombatFxElement(element, ref, options = {}) {
+  if (!element) return;
+  tagCombatVisualElement(element, ref, options);
+  if (options.owner) element.dataset.owner = String(options.owner);
+  if (options.fxEventKey) element.dataset.fxEventKey = String(options.fxEventKey);
+}
+
+function renderCombatFxImpact(point, options = {}) {
+  const context = ensureCombatFxLayer();
+  if (!context || !point) return false;
+  const ref = options.targetRef || null;
+  if (ref && !isCombatVisualTargetStillValid(ref)) return false;
+
+  const impact = document.createElementNS(COMBAT_FX_SVG_NS, "circle");
+  impact.classList.add("combat-fx-impact", options.tone === "bot" ? "is-bot-return" : "is-player-fire");
+  tagCombatFxElement(impact, ref, options);
+  impact.setAttribute("cx", String(Math.max(0, Math.min(context.width, Number(point.x || 0)))));
+  impact.setAttribute("cy", String(Math.max(0, Math.min(context.height, Number(point.y || 0)))));
+  impact.setAttribute("r", "8");
+  impact.style.setProperty("--combat-fx-color", options.color || (options.tone === "bot" ? "#ff8756" : "#55e8ff"));
+  context.layer.appendChild(impact);
+  setTimeout(() => impact.remove(), Math.max(180, Number(options.durationMs || COMBAT_FX_BEAM_DURATION_MS)));
+  return true;
+}
+
+function renderCombatFxBeam(sourcePoint, targetPoint, options = {}) {
+  const context = ensureCombatFxLayer();
+  if (!context || !sourcePoint || !targetPoint) return false;
+  const ref = options.targetRef || null;
+  if (ref && !isCombatVisualTargetStillValid(ref)) return false;
+
+  const eventKey = String(options.fxEventKey || "").trim();
+  if (eventKey) {
+    if (renderedCombatFxKeys.has(eventKey)) return false;
+    renderedCombatFxKeys.add(eventKey);
+    pruneRenderedCombatFxKeys();
+  }
+
+  const durationMs = Math.max(260, Math.min(900, Number(options.durationMs || COMBAT_FX_BEAM_DURATION_MS)));
+  const tone = options.tone === "bot" ? "bot" : "player";
+  const color = options.color || (tone === "bot" ? "#ff8756" : "#55e8ff");
+  const source = {
+    x: Math.max(0, Math.min(context.width, Number(sourcePoint.x || 0))),
+    y: Math.max(0, Math.min(context.height, Number(sourcePoint.y || 0)))
+  };
+  const target = {
+    x: Math.max(0, Math.min(context.width, Number(targetPoint.x || 0))),
+    y: Math.max(0, Math.min(context.height, Number(targetPoint.y || 0)))
+  };
+
+  const group = document.createElementNS(COMBAT_FX_SVG_NS, "g");
+  group.classList.add("combat-fx-shot", tone === "bot" ? "is-bot-return" : "is-player-fire");
+  tagCombatFxElement(group, ref, { ...options, owner: options.owner || tone });
+  group.dataset.sourceX = String(Math.round(source.x));
+  group.dataset.sourceY = String(Math.round(source.y));
+  group.dataset.targetX = String(Math.round(target.x));
+  group.dataset.targetY = String(Math.round(target.y));
+  group.style.setProperty("--combat-fx-color", color);
+  group.style.animationDuration = `${durationMs}ms`;
+
+  const glow = document.createElementNS(COMBAT_FX_SVG_NS, "line");
+  glow.classList.add("combat-fx-beam-glow");
+  const core = document.createElementNS(COMBAT_FX_SVG_NS, "line");
+  core.classList.add("combat-fx-beam-core");
+  [glow, core].forEach((line) => {
+    line.setAttribute("x1", String(source.x));
+    line.setAttribute("y1", String(source.y));
+    line.setAttribute("x2", String(target.x));
+    line.setAttribute("y2", String(target.y));
+    line.setAttribute("stroke", color);
+    line.setAttribute("vector-effect", "non-scaling-stroke");
+    tagCombatFxElement(line, ref, { ...options, owner: options.owner || tone });
+    group.appendChild(line);
+  });
+
+  if (options.showImpact !== false) {
+    const impact = document.createElementNS(COMBAT_FX_SVG_NS, "circle");
+    impact.classList.add("combat-fx-impact", tone === "bot" ? "is-bot-return" : "is-player-fire");
+    impact.setAttribute("cx", String(target.x));
+    impact.setAttribute("cy", String(target.y));
+    impact.setAttribute("r", "8");
+    tagCombatFxElement(impact, ref, { ...options, owner: options.owner || tone });
+    group.appendChild(impact);
+  }
+
+  context.layer.appendChild(group);
+  setTimeout(() => group.remove(), durationMs + 80);
+  return true;
+}
+
 function clearCombatVisualsForTarget(refOrType, targetId = "") {
   const ref = typeof refOrType === "object"
     ? { type: String(refOrType.type || ""), id: String(refOrType.id || refOrType.targetId || "") }
@@ -512,13 +663,20 @@ function clearCombatVisualsForTarget(refOrType, targetId = "") {
   const selectors = [
     "#laserLayer [data-target-id]",
     "#explosionLayer [data-target-id]",
-    "#lupenMultiplayerSpaceShotLayer [data-target-id]"
+    "#lupenMultiplayerSpaceShotLayer [data-target-id]",
+    `#${COMBAT_FX_LAYER_ID} [data-target-id]`
   ];
   let removed = 0;
   selectors.forEach((selector) => {
     document.querySelectorAll(selector).forEach((element) => {
       const idMatches = String(element.dataset.targetId || "") === ref.id;
-      const typeMatches = !ref.type || !element.dataset.targetType || String(element.dataset.targetType || "") === ref.type;
+      const elementType = String(element.dataset.targetType || "");
+      const typeMatches = !ref.type ||
+        !elementType ||
+        elementType === ref.type ||
+        (ref.type === "stagingBot" && elementType === "bot") ||
+        (ref.type === "stagingResource" && elementType === "resource") ||
+        (ref.type === "remotePlayer" && (elementType === "player" || elementType === "pvp"));
       if (!idMatches || !typeMatches) return;
       element.remove();
       removed += 1;
@@ -535,12 +693,15 @@ function clearCombatVisualsForTarget(refOrType, targetId = "") {
 }
 
 function clearAllCombatVisuals() {
+  renderedCombatFxKeys.clear();
   let removed = 0;
   [
     "#laserLayer .laser-burst",
     "#laserLayer .weapon-muzzle-flash",
     "#explosionLayer .weapon-impact",
-    "#lupenMultiplayerSpaceShotLayer"
+    "#lupenMultiplayerSpaceShotLayer",
+    `#${COMBAT_FX_LAYER_ID} .combat-fx-shot`,
+    `#${COMBAT_FX_LAYER_ID} .combat-fx-impact`
   ].forEach((selector) => {
     document.querySelectorAll(selector).forEach((element) => {
       element.remove();
@@ -580,41 +741,22 @@ function getShotVisualProfile(shotWeapon = {}) {
 }
 
 function showWeaponImpactAtTarget(target, shotWeapon, delay = 0, options = {}) {
-  const layer = document.getElementById("explosionLayer");
-  const spaceScreen = document.getElementById("spaceScreen");
-  if (!layer || !spaceScreen || !target) return false;
-
-  const screenRect = spaceScreen.getBoundingClientRect();
   const profile = getShotVisualProfile(shotWeapon);
-  const x = (target.x / 100) * screenRect.width;
-  const y = (target.y / 100) * screenRect.height;
   const targetRef = getCombatVisualTargetRef(target, options);
+  const point = getCombatFxPointFromTarget(target);
+  if (!point) return false;
 
   setTimeout(() => {
     if (targetRef && !isCombatVisualTargetStillValid(targetRef)) return;
-    const impact = document.createElement("div");
-    impact.className = `weapon-impact weapon-impact-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
-    tagCombatVisualElement(impact, targetRef, options);
-    impact.style.left = `${x}px`;
-    impact.style.top = `${y}px`;
-    impact.style.setProperty("--weapon-impact-color", profile.color);
-    layer.appendChild(impact);
-    setTimeout(() => impact.remove(), 360);
+    renderCombatFxImpact(point, { ...options, targetRef, color: profile.color, durationMs: 360 });
   }, delay);
 
   return true;
 }
 
 function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
-  const layer = document.getElementById("laserLayer");
-  const spaceScreen = document.getElementById("spaceScreen");
+  if (!target) return;
 
-  if (!layer || !spaceScreen || !target) return;
-
-  const screenRect = spaceScreen.getBoundingClientRect();
-
-  const endX = (target.x / 100) * screenRect.width;
-  const endY = (target.y / 100) * screenRect.height;
   const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
   const shotWeapon = Array.isArray(resolvedWeapon?.weapons) && resolvedWeapon.weapons.length
     ? resolvedWeapon.weapons[weaponVisualCycleOffset++ % resolvedWeapon.weapons.length]
@@ -622,41 +764,18 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   if (!shotWeapon) return;
   const targetRef = getCombatVisualTargetRef(target, options);
   if (targetRef && !isCombatVisualTargetStillValid(targetRef)) return;
-  const startX = screenRect.width * (target.x < 50 ? 0.72 : 0.28);
-  const startY = screenRect.height - 92;
   const profile = getShotVisualProfile(shotWeapon);
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const length = Math.sqrt(dx * dx + dy * dy);
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-  const durationMs = 210;
-
-  const muzzle = document.createElement("div");
-  muzzle.className = "weapon-muzzle-flash simple-combat-muzzle";
-  tagCombatVisualElement(muzzle, targetRef, options);
-  muzzle.style.left = `${startX}px`;
-  muzzle.style.top = `${startY}px`;
-  muzzle.style.setProperty("--weapon-muzzle-color", profile.color);
-  layer.appendChild(muzzle);
-  setTimeout(() => muzzle.remove(), durationMs + 120);
-
-  const beam = document.createElement("div");
-  beam.className = `laser-burst simple-combat-laser player-shot player-shot-${String(shotWeapon?.fireStyle || "pulse").toLowerCase()}`;
-  tagCombatVisualElement(beam, targetRef, options);
-  beam.style.left = `${startX}px`;
-  beam.style.top = `${startY}px`;
-  beam.style.width = `${Math.max(54, length)}px`;
-  beam.style.height = "4px";
-  beam.style.setProperty("--laser-core-color", profile.color);
-  beam.style.setProperty("--laser-angle", `${angle}deg`);
-  beam.style.transform = `rotate(${angle}deg)`;
-  beam.style.animationDuration = `${durationMs}ms`;
-  layer.appendChild(beam);
-
-  setTimeout(() => beam.remove(), durationMs + 80);
-  if (options.showImpact !== false) {
-    showWeaponImpactAtTarget(target, shotWeapon, Math.max(80, durationMs - 55), options);
-  }
+  const targetPoint = getCombatFxPointFromTarget(target);
+  const sourcePoint = getLocalCombatFxOriginForTarget(targetPoint);
+  renderCombatFxBeam(sourcePoint, targetPoint, {
+    ...options,
+    targetRef,
+    owner: "local",
+    tone: "player",
+    color: profile.color || "#55e8ff",
+    durationMs: COMBAT_FX_BEAM_DURATION_MS,
+    showImpact: options.showImpact !== false
+  });
 
   debugCombatShot("shot visuals", {
     activeWeaponCount: Number(resolvedWeapon?.count || (Array.isArray(resolvedWeapon?.weapons) ? resolvedWeapon.weapons.length : 1)),
@@ -670,35 +789,36 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
 let lastHostilePlayerHitFeedbackAt = 0;
 
 function incomingLaserBurstFromBot(bot, delay = 0, options = {}) {
-  const layer = document.getElementById("laserLayer");
-  const spaceScreen = document.getElementById("spaceScreen");
+  if (!bot) return;
+  const sourcePoint = getCombatFxPointFromTarget(bot);
+  const context = ensureCombatFxLayer();
+  if (!sourcePoint || !context) return;
+  const targetRef = getCombatVisualTargetRef(bot, {
+    targetType: options.targetType || (getStagingBotTargetById(bot.id) ? "stagingBot" : "hostileBot"),
+    targetId: bot.id
+  });
+  const activeTop = Math.min(100, Math.max(54, context.height * 0.12));
+  const activeBottom = Math.max(activeTop + 80, context.height - 178);
+  const targetPoint = {
+    x: context.width * 0.5,
+    y: activeBottom - 18
+  };
 
-  if (!layer || !spaceScreen || !bot) return;
-
-  const screenRect = spaceScreen.getBoundingClientRect();
-
-  const startX = (bot.x / 100) * screenRect.width;
-  const startY = (bot.y / 100) * screenRect.height;
-  const endX = screenRect.width * 0.5;
-  const endY = screenRect.height * 0.84;
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const length = Math.sqrt(dx * dx + dy * dy);
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-
-  const beam = document.createElement("div");
-  beam.className = "laser-burst simple-combat-laser enemy-incoming-laser";
-  beam.style.left = `${startX}px`;
-  beam.style.top = `${startY}px`;
-  beam.style.width = `${Math.max(54, length)}px`;
-  beam.style.height = "4px";
-  beam.style.setProperty("--laser-angle", `${angle}deg`);
-  beam.style.setProperty("--incoming-angle", `${angle}deg`);
-  beam.style.transform = `rotate(${angle}deg)`;
-  beam.style.animationDelay = `${delay}ms`;
-  layer.appendChild(beam);
-
-  setTimeout(() => beam.remove(), delay + 290);
+  const drawIncoming = () => {
+    renderCombatFxBeam(sourcePoint, targetPoint, {
+      ...options,
+      targetRef,
+      attackerId: bot.id,
+      owner: "bot",
+      tone: "bot",
+      color: "#ff8756",
+      durationMs: COMBAT_FX_BEAM_DURATION_MS,
+      showImpact: false
+    });
+  };
+  const delayMs = Math.max(0, Number(delay || 0));
+  if (delayMs > 0) setTimeout(drawIncoming, delayMs);
+  else drawIncoming();
 }
 
 function showIncomingHitFlash(options = {}) {
@@ -1275,6 +1395,10 @@ function handleStagingBotLifecycleEvent(event = {}) {
 window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
 window.clearCombatVisualsForTarget = clearCombatVisualsForTarget;
 window.clearAllCombatVisuals = clearAllCombatVisuals;
+window.renderCombatFxBeam = renderCombatFxBeam;
+window.renderCombatFxImpact = renderCombatFxImpact;
+window.getCombatFxPointFromPercent = getCombatFxPointFromPercent;
+window.getLocalCombatFxOriginForTarget = getLocalCombatFxOriginForTarget;
 window.clearRemotePlayerTarget = clearRemotePlayerTarget;
 window.applyServerPvpDamageState = applyServerPvpDamageState;
 window.applyServerPvpDestructionState = applyServerPvpDestructionState;

@@ -2193,9 +2193,6 @@
       localShotFeedbackKeys.delete(localShotFeedbackKeys.values().next().value);
     }
 
-    if (typeof global.pulseLaserBurstToTarget === "function") {
-      global.pulseLaserBurstToTarget(targetBot, null, { targetType: "stagingBot", targetId: targetBot.id });
-    }
     if (typeof global.playPlayerLaserPulse === "function") {
       global.playPlayerLaserPulse();
     }
@@ -2909,6 +2906,34 @@
     };
   }
 
+  function getCombatFxPixelPointFromSpacePercent(position = { x: 50, y: 50 }) {
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return null;
+    const screenRect = spaceScreen.getBoundingClientRect();
+    const coordinateLayer =
+      global.document?.getElementById(spaceBotLayerId) ||
+      global.document?.getElementById(spaceLayerId) ||
+      global.document?.getElementById(spaceResourceLayerId) ||
+      spaceScreen;
+    const layerRect = coordinateLayer.getBoundingClientRect();
+    return {
+      x: (layerRect.left - screenRect.left) + (Number(position.x || 0) / 100) * layerRect.width,
+      y: (layerRect.top - screenRect.top) + (Number(position.y || 0) / 100) * layerRect.height
+    };
+  }
+
+  function getCombatFxEventKey(event = {}) {
+    return [
+      event.type || "",
+      event.attackerType || "",
+      event.attackerId || event.attackerBotId || event.attackerSessionId || "",
+      event.targetType || "",
+      event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "",
+      event.receivedAt || event.timestamp || "",
+      event.damage || event.shieldDamage || event.hullDamage || ""
+    ].join(":");
+  }
+
   function getCombatVisualImpactLayer(event, target) {
     const explicit = String(event?.impactLayer || "").toLowerCase();
     if (["shield", "armor", "hull", "resource", "bot"].includes(explicit)) return explicit;
@@ -2945,62 +2970,36 @@
 
     const attacker = resolveCombatVisualAttacker(event, players, bots);
     const targetPosition = getSpacePercentPosition(target);
-    const layer = global.document.createElement("div");
-    layer.id = spaceShotLayerId;
-    layer.dataset.targetId = String(event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "");
-    layer.dataset.targetType = String(event.targetType || event.type || "target");
-    layer.setAttribute("aria-hidden", "true");
-
     const isLocalShot = event.attackerSessionId === status.sessionId;
     const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
-    const shotOwnerClass = isBotReturnFire ? "is-bot-return" : isLocalShot ? "is-local" : "is-remote";
     const attackerPosition = isLocalShot
       ? getLocalCombatBeamOrigin(targetPosition)
       : attacker && isSameCurrentNode(attacker)
         ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
         : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
 
-    const muzzle = global.document.createElement("div");
-    muzzle.className = `lupen-mp-shot-muzzle ${shotOwnerClass}`;
-    muzzle.dataset.targetId = layer.dataset.targetId;
-    muzzle.dataset.targetType = layer.dataset.targetType;
-    muzzle.style.left = `${attackerPosition.x}%`;
-    muzzle.style.top = `${attackerPosition.y}%`;
-    layer.appendChild(muzzle);
-
-    if (!isLocalShot && !isBotReturnFire && (attacker || event.attackerDisplayName)) {
-      const label = global.document.createElement("div");
-      label.className = "lupen-mp-shot-attacker-label";
-      label.textContent = String(attacker?.displayName || attacker?.name || event.attackerDisplayName || "Pilot").slice(0, 18);
-      label.style.left = `${attackerPosition.x}%`;
-      label.style.top = `${attackerPosition.y}%`;
-      layer.appendChild(label);
-    }
-
-    const beamDx = targetPosition.x - attackerPosition.x;
-    const beamDy = targetPosition.y - attackerPosition.y;
-    const beamDistance = Math.max(7, Math.sqrt(beamDx * beamDx + beamDy * beamDy));
-    const beamAngle = Math.atan2(beamDy, beamDx);
-    const beam = global.document.createElement("div");
-    beam.className = `lupen-mp-shot-beam ${shotOwnerClass} is-simple`.trim();
-    beam.dataset.targetId = layer.dataset.targetId;
-    beam.dataset.targetType = layer.dataset.targetType;
-    beam.style.left = `${attackerPosition.x}%`;
-    beam.style.top = `${attackerPosition.y}%`;
-    beam.style.width = `${beamDistance}%`;
-    beam.style.setProperty("--shot-angle", `${beamAngle}rad`);
-    layer.appendChild(beam);
-
-    const hit = global.document.createElement("div");
     const impactLayer = getCombatVisualImpactLayer(event, target);
-    hit.className = `lupen-mp-shot-hit is-${impactLayer}`;
-    hit.dataset.targetId = layer.dataset.targetId;
-    hit.dataset.targetType = layer.dataset.targetType;
-    hit.style.left = `${targetPosition.x}%`;
-    hit.style.top = `${targetPosition.y}%`;
-    layer.appendChild(hit);
-
-    spaceScreen.appendChild(layer);
+    const targetPoint = getCombatFxPixelPointFromSpacePercent(targetPosition);
+    const sourcePoint = isLocalShot && typeof global.getLocalCombatFxOriginForTarget === "function"
+      ? global.getLocalCombatFxOriginForTarget(targetPoint)
+      : getCombatFxPixelPointFromSpacePercent(attackerPosition);
+    const targetId = String(event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "");
+    const targetType = String(event.targetType || event.type || "target");
+    if (typeof global.renderCombatFxBeam === "function") {
+      global.renderCombatFxBeam(sourcePoint, targetPoint, {
+        targetRef: { type: targetType, id: targetId },
+        targetId,
+        targetType,
+        attackerId: String(event.attackerId || event.attackerBotId || event.attackerSessionId || ""),
+        owner: isBotReturnFire ? "bot" : isLocalShot ? "local" : "remote",
+        tone: isBotReturnFire ? "bot" : "player",
+        color: isBotReturnFire ? "#ff8756" : "#55e8ff",
+        impactLayer,
+        fxEventKey: getCombatFxEventKey(event),
+        durationMs: 520,
+        showImpact: true
+      });
+    }
   }
 
   function getSameNodePlayers(players) {
