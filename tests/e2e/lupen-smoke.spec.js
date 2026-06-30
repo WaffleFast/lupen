@@ -1127,6 +1127,9 @@ test.describe("Lupen browser smoke", () => {
       const resourceActionText = engageButton?.textContent || "";
       const resourceActionDisabled = engageButton?.disabled ?? true;
       engageButton?.click();
+      const resourceEngagedActionText = engageButton?.textContent || "";
+      const resourceEngagedActionDisabled = engageButton?.disabled ?? true;
+      const resourceEngagedTarget = window.eval("engagedTarget ? { ...engagedTarget } : null");
       stagingResources[0].hp = 0;
       stagingResources[0].depleted = true;
       stagingResources[0].depletedUntil = Date.now() + 30000;
@@ -1174,6 +1177,9 @@ test.describe("Lupen browser smoke", () => {
         resourceCardButtonCount: resourceCard?.querySelectorAll("button").length ?? 0,
         resourceActionText,
         resourceActionDisabled,
+        resourceEngagedActionText,
+        resourceEngagedActionDisabled,
+        resourceEngagedTarget,
         arrivingGhostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-arriving").length,
         dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
         playerTargetText,
@@ -1227,11 +1233,18 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.resourceMarkerBackground).toBe("");
     expect(connectedHudState.resourceMarkerBorderTopWidth).toBe("");
     expect(connectedHudState.resourceMarkerPaddingTop).toBe("");
-    expect(connectedHudState.resourceCardPresent).toBe(false);
-    expect(connectedHudState.resourceCardText).toBe("");
+    expect(connectedHudState.resourceCardPresent).toBe(true);
+    expect(connectedHudState.resourceCardText).toContain("Iron Asteroid");
+    expect(connectedHudState.resourceCardText).toContain("Use ENGAGE to fire");
     expect(connectedHudState.resourceCardButtonCount).toBe(0);
     expect(connectedHudState.resourceActionText).toContain("ENGAGE");
     expect(connectedHudState.resourceActionDisabled).toBe(false);
+    expect(connectedHudState.resourceEngagedActionText).toBe("DISENGAGE");
+    expect(connectedHudState.resourceEngagedActionDisabled).toBe(false);
+    expect(connectedHudState.resourceEngagedTarget).toMatchObject({
+      type: "stagingResource",
+      id: "staging-resource-test-iron"
+    });
     expect(connectedHudState.sentResourceMines).toHaveLength(1);
     expect(connectedHudState.sentResourceMines[0]).toMatchObject({
       resourceId: "staging-resource-test-iron",
@@ -1478,6 +1491,7 @@ test.describe("Lupen browser smoke", () => {
         const originalCombatXp = playerProgress.combatXp;
         const originalAsteroids = Array.isArray(asteroids) ? asteroids.map(item => ({ ...item })) : [];
         const sentPvpIntents = [];
+        let lastCombatVisualEvent = null;
         const remotePlayer = {
           sessionId: "remote-pvp-test",
           id: "remote-pvp-test",
@@ -1518,8 +1532,10 @@ test.describe("Lupen browser smoke", () => {
           getStatus: () => ({
             enabled: true,
             isConnected: true,
+            enabledReason: "staging_enabled",
             sessionId: "local-session",
-            guildId: ""
+            guildId: "",
+            lastCombatVisualEvent
           }),
           sendCombatIntent: (intent) => {
             sentPvpIntents.push({ ...intent });
@@ -1571,6 +1587,67 @@ test.describe("Lupen browser smoke", () => {
             underGhost: contestedCardRect.top >= contestedGhostRect.bottom - 6,
             clearOfButton: contestedCardRect.bottom <= contestedButtonRect.top - 8
           } : null;
+          clearAllCombatVisuals();
+          lastCombatVisualEvent = {
+            type: "pvp",
+            ok: true,
+            attackerSessionId: "local-session",
+            targetType: "player",
+            targetId: "remote-pvp-test",
+            targetPlayerId: "remote-pvp-test",
+            currentNode,
+            damage: 36,
+            shieldDamage: 36,
+            armorDamage: 0,
+            hullDamage: 0,
+            receivedAt: Date.now()
+          };
+          window.LupenMultiplayerOverlay?.render?.();
+          const localPvpShot = document.querySelector("#combatFxLayer .combat-fx-shot[data-owner='local'][data-target-id='remote-pvp-test']");
+          const localPvpCore = localPvpShot?.querySelector(".combat-fx-beam-core");
+          const localPvpGhostRect = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.getBoundingClientRect();
+          const localPvpScreenRect = document.getElementById("spaceScreen")?.getBoundingClientRect();
+          const localPvpBeamAlignment = {
+            shotCount: document.querySelectorAll("#combatFxLayer .combat-fx-shot[data-owner='local'][data-target-id='remote-pvp-test']").length,
+            coreFound: Boolean(localPvpCore),
+            markerFound: Boolean(localPvpGhostRect),
+            screenFound: Boolean(localPvpScreenRect),
+            endpointX: Math.round(Number(localPvpCore?.getAttribute("x2") || 0)),
+            endpointY: Math.round(Number(localPvpCore?.getAttribute("y2") || 0)),
+            markerCenterX: localPvpGhostRect && localPvpScreenRect ? Math.round(localPvpGhostRect.left + localPvpGhostRect.width / 2 - localPvpScreenRect.left) : 0,
+            markerCenterY: localPvpGhostRect && localPvpScreenRect ? Math.round(localPvpGhostRect.top + localPvpGhostRect.height / 2 - localPvpScreenRect.top) : 0
+          };
+
+          clearAllCombatVisuals();
+          lastCombatVisualEvent = {
+            type: "pvp",
+            ok: true,
+            attackerSessionId: "remote-pvp-test",
+            targetType: "player",
+            targetId: "local-session",
+            targetPlayerId: "local-session",
+            currentNode,
+            damage: 36,
+            shieldDamage: 36,
+            armorDamage: 0,
+            hullDamage: 0,
+            receivedAt: Date.now() + 1
+          };
+          window.LupenMultiplayerOverlay?.render?.();
+          const remotePvpShot = document.querySelector("#combatFxLayer .combat-fx-shot[data-owner='remote'][data-target-id='local-session']");
+          const remotePvpCore = remotePvpShot?.querySelector(".combat-fx-beam-core");
+          const remotePvpGhostRect = document.querySelector("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-selected")?.getBoundingClientRect();
+          const remotePvpScreenRect = document.getElementById("spaceScreen")?.getBoundingClientRect();
+          const remotePvpBeamAlignment = {
+            shotCount: document.querySelectorAll("#combatFxLayer .combat-fx-shot[data-owner='remote'][data-target-id='local-session']").length,
+            coreFound: Boolean(remotePvpCore),
+            markerFound: Boolean(remotePvpGhostRect),
+            screenFound: Boolean(remotePvpScreenRect),
+            sourceX: Math.round(Number(remotePvpCore?.getAttribute("x1") || 0)),
+            sourceY: Math.round(Number(remotePvpCore?.getAttribute("y1") || 0)),
+            markerCenterX: remotePvpGhostRect && remotePvpScreenRect ? Math.round(remotePvpGhostRect.left + remotePvpGhostRect.width / 2 - remotePvpScreenRect.left) : 0,
+            markerCenterY: remotePvpGhostRect && remotePvpScreenRect ? Math.round(remotePvpGhostRect.top + remotePvpGhostRect.height / 2 - remotePvpScreenRect.top) : 0
+          };
 
           remotePlayer.pvpHull = 20;
           window.LupenMultiplayerOverlay?.render?.();
@@ -1850,6 +1927,8 @@ test.describe("Lupen browser smoke", () => {
             contestedTargetCardClass,
             contestedTargetCardLayout,
             contestedPlayerCardLayout,
+            localPvpBeamAlignment,
+            remotePvpBeamAlignment,
             contestedShieldBarWidth,
             contestedArmorBarWidth,
             contestedHullBarWidth,
@@ -1923,6 +2002,12 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(eligibility.contestedPlayerCardLayout.cardHeight).toBeLessThanOrEqual(82);
     expect(eligibility.contestedPlayerCardLayout.cardWidth).toBeLessThanOrEqual(150);
+    expect(eligibility.localPvpBeamAlignment).toMatchObject({ shotCount: 1 });
+    expect(Math.abs(eligibility.localPvpBeamAlignment.endpointX - eligibility.localPvpBeamAlignment.markerCenterX)).toBeLessThanOrEqual(1);
+    expect(Math.abs(eligibility.localPvpBeamAlignment.endpointY - eligibility.localPvpBeamAlignment.markerCenterY)).toBeLessThanOrEqual(1);
+    expect(eligibility.remotePvpBeamAlignment).toMatchObject({ shotCount: 1 });
+    expect(Math.abs(eligibility.remotePvpBeamAlignment.sourceX - eligibility.remotePvpBeamAlignment.markerCenterX)).toBeLessThanOrEqual(1);
+    expect(Math.abs(eligibility.remotePvpBeamAlignment.sourceY - eligibility.remotePvpBeamAlignment.markerCenterY)).toBeLessThanOrEqual(1);
     expect(eligibility.contestedShieldBarWidth).toBe("80%");
     expect(eligibility.contestedArmorBarWidth).toBe("100%");
     expect(eligibility.contestedHullBarWidth).toBe("100%");

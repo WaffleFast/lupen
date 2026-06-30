@@ -2028,6 +2028,11 @@
     return String(selectedResourceId || "");
   }
 
+  function setSelectedResourceId(resourceId = "") {
+    selectedResourceId = String(resourceId || "");
+    scheduleRender();
+  }
+
   function getSelectedResource(resources = []) {
     const id = getSelectedResourceId();
     if (!id) return null;
@@ -2331,7 +2336,7 @@
       ? players.find((player) => String(player.sessionId || player.id || "") === selectedPlayerId && isSameCurrentNode(player))
       : null;
 
-    if (!selectedBot && !selectedPlayer) return;
+    if (!selectedBot && !selectedPlayer && !selectedResource) return;
 
     const layer = global.document.createElement("div");
     layer.id = spaceSelectionLayerId;
@@ -2865,7 +2870,6 @@
 
   function renderSpaceResources(resources) {
     global.document?.getElementById(spaceResourceLayerId)?.remove();
-    selectedResourceId = "";
     // Staging resources remain in server state, but Map 1 asteroid gameplay is
     // presented through the local combat asteroid layer so lasers, hit effects,
     // and target handling stay consistent.
@@ -2917,6 +2921,67 @@
       x: (layerRect.left - screenRect.left) + (Number(position.x || 0) / 100) * layerRect.width,
       y: (layerRect.top - screenRect.top) + (Number(position.y || 0) / 100) * layerRect.height
     };
+  }
+
+  function toCombatFxLayerPoint(clientX, clientY) {
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    if (!spaceScreen) return null;
+    const screenRect = spaceScreen.getBoundingClientRect();
+    if (!screenRect.width || !screenRect.height) return null;
+    return {
+      x: Number(clientX) - screenRect.left,
+      y: Number(clientY) - screenRect.top
+    };
+  }
+
+  function getElementCenterCombatFxPoint(element) {
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return toCombatFxLayerPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  function findSpaceGhostMarker(playerId) {
+    const id = String(playerId || "");
+    if (!id) return null;
+    return Array.from(global.document?.querySelectorAll(`#${spaceLayerId} .lupen-mp-space-ghost`) || [])
+      .find((marker) => String(marker?.dataset?.sessionId || "") === id) || null;
+  }
+
+  function findServerResourceButton(resourceId) {
+    const id = String(resourceId || "");
+    if (!id) return null;
+    return Array.from(global.document?.querySelectorAll("#asteroidField .server-resource-asteroid") || [])
+      .find((button) => String(button?.dataset?.targetId || "") === id) || null;
+  }
+
+  function resolveCombatTargetPoint(event, targetPosition, status = getClient()?.getStatus?.()) {
+    const targetType = String(event?.targetType || event?.type || "").toLowerCase();
+    const targetId = String(event?.targetId || event?.targetBotId || event?.resourceId || event?.targetPlayerId || "");
+    if (targetType === "player" || targetType === "pvp") {
+      if (targetId && targetId === String(status?.sessionId || "")) {
+        return getCombatFxPixelPointFromSpacePercent(targetPosition);
+      }
+      return getElementCenterCombatFxPoint(findSpaceGhostMarker(targetId));
+    }
+    if (targetType === "resource") {
+      return getElementCenterCombatFxPoint(findServerResourceButton(targetId)) ||
+        getCombatFxPixelPointFromSpacePercent(targetPosition);
+    }
+    return getCombatFxPixelPointFromSpacePercent(targetPosition);
+  }
+
+  function resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot) {
+    if (isLocalShot) return null;
+    const attackerId = String(event?.attackerId || event?.attackerBotId || event?.attackerSessionId || "");
+    const attackerType = String(event?.attackerType || "").toLowerCase();
+    const eventType = String(event?.type || "").toLowerCase();
+    if (attackerType !== "bot" && eventType === "pvp") {
+      return getElementCenterCombatFxPoint(findSpaceGhostMarker(attackerId));
+    }
+    return attacker && isSameCurrentNode(attacker)
+      ? getCombatFxPixelPointFromSpacePercent(attackerPosition)
+      : null;
   }
 
   function getCombatFxEventKey(event = {}) {
@@ -2974,10 +3039,13 @@
       : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
 
     const impactLayer = getCombatVisualImpactLayer(event, target);
-    const targetPoint = getCombatFxPixelPointFromSpacePercent(targetPosition);
+    const targetPoint = resolveCombatTargetPoint(event, targetPosition, status);
+    if (!targetPoint) return;
+    const remoteSourcePoint = resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot);
     const sourcePoint = isLocalShot && typeof global.getLocalCombatFxOriginsForTarget === "function"
       ? global.getLocalCombatFxOriginsForTarget(targetPoint)
-      : getCombatFxPixelPointFromSpacePercent(attackerPosition);
+      : remoteSourcePoint;
+    if (!sourcePoint) return;
     const targetId = String(event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "");
     const targetType = String(event.targetType || event.type || "target");
     if (typeof global.renderCombatFxBeam === "function") {
@@ -4775,6 +4843,7 @@
   global.LupenMultiplayerOverlay = Object.freeze({
     render,
     scheduleRender,
+    setSelectedResourceId,
     setup
   });
 

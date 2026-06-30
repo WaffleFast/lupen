@@ -195,6 +195,7 @@ function selectStagingResourceTarget(resourceId) {
   if (!resource || !resource.alive || (resource.currentNodeId || resource.node) !== currentNode) return;
 
   selectedTarget = { type: "stagingResource", id: resource.id };
+  window.LupenMultiplayerOverlay?.setSelectedResourceId?.(resource.id);
   showTargetPanel();
   updateAsteroidUI();
   updateTargetPanel();
@@ -1183,6 +1184,8 @@ function renderTargetButton(target, options = {}) {
 
   const btn = document.createElement("button");
   btn.className = `${options.className || "asteroid-target"} visible`;
+  btn.dataset.targetType = targetType;
+  btn.dataset.targetId = String(target.id || "");
 
   if (selectedTarget?.type === targetType && selectedTarget?.id === target.id) {
     btn.classList.add("selected", "is-selected");
