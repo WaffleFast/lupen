@@ -1848,7 +1848,28 @@ function performStagingResourceAttackCycle() {
     return;
   }
 
-  client.mineStagingResource?.(target.id, { currentNode, timestamp: Date.now() });
+  const result = client.mineStagingResource?.(target.id, { currentNode, timestamp: Date.now() });
+  if (result?.ok === false) {
+    if (typeof addActivityLog === "function") {
+      addActivityLog(`Unable to engage ${target.resourceName || "resource"} asteroid: ${String(result.reason || "server unavailable").replace(/_/g, " ")}.`);
+    }
+    disengageTarget(true);
+    updateObjectActionPanel(true);
+    return;
+  }
+
+  const weapon = typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null;
+  pulseLaserBurstToTarget(target, weapon, {
+    showImpact: true,
+    targetType: "stagingResource",
+    targetId: target.id
+  });
+  const soundPulseCount = Math.max(1, Math.min(6, Number(weapon?.count || 1)));
+  Array.from({ length: soundPulseCount }).forEach((_shotWeapon, index) => {
+    setTimeout(() => {
+      if (typeof playPlayerLaserPulse === "function") playPlayerLaserPulse();
+    }, Math.min(index * 75, 375));
+  });
 }
 
 function respawnHostileBot(botId) {

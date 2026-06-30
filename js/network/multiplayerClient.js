@@ -62,6 +62,7 @@
     lastStagingBountyStatus: null,
     lastStagingBountyClaimResult: null,
     lastStagingResourceMineResult: null,
+    lastStagingResourceMineIntent: null,
     lastStagingResourceEvent: null,
     chatMessages: [],
     presenceEvents: [],
@@ -3442,6 +3443,7 @@
         }
         : null,
       lastStagingResourceMineResult: connection.lastStagingResourceMineResult ? { ...connection.lastStagingResourceMineResult } : null,
+      lastStagingResourceMineIntent: connection.lastStagingResourceMineIntent ? { ...connection.lastStagingResourceMineIntent } : null,
       lastStagingResourceEvent: connection.lastStagingResourceEvent ? { ...connection.lastStagingResourceEvent } : null,
       listenerCount: stateListeners.size,
       playerCount: playersById.size,
@@ -3702,12 +3704,30 @@
 
     mineStagingResource(resourceId, options = {}) {
       const localPresence = getLocalPresenceOptions();
-      return sendRoomMessage("mineStagingResource", "stagingResource:mine", {
+      const payload = {
         ...getStagingWeaponIntent(),
         ...options,
         resourceId: String(resourceId || options.resourceId || options.targetResourceId || ""),
         currentNode: options.currentNode || localPresence.currentNode || ""
-      });
+      };
+      const sentAt = Date.now();
+      const result = sendRoomMessage("mineStagingResource", "stagingResource:mine", payload);
+      connection.lastStagingResourceMineIntent = {
+        ok: result?.ok === true,
+        reason: result?.reason || (result?.ok === true ? "resource_mine_intent_sent" : "resource_mine_intent_not_sent"),
+        type: "mineIntent",
+        resourceId: payload.resourceId,
+        resourceName: "",
+        currentNode: payload.currentNode,
+        weaponKey: payload.weaponKey || payload.equippedWeaponKey || "",
+        weaponName: payload.weaponName || "",
+        weaponFamily: payload.weaponFamily || "",
+        receivedAt: sentAt,
+        timestamp: sentAt
+      };
+      connection.lastStagingResourceEvent = { ...connection.lastStagingResourceMineIntent };
+      notifyServerState(room?.state || null);
+      return result;
     },
 
     claimStagingRewardPreview(options = {}) {

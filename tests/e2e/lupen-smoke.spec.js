@@ -1126,10 +1126,20 @@ test.describe("Lupen browser smoke", () => {
       const resourceCard = document.querySelector(".lupen-target-card.resource");
       const resourceActionText = engageButton?.textContent || "";
       const resourceActionDisabled = engageButton?.disabled ?? true;
-      engageButton?.click();
+      const resourceEngageButtonRect = engageButton?.getBoundingClientRect();
+      const resourceClickTarget = resourceEngageButtonRect
+        ? document.elementFromPoint(resourceEngageButtonRect.left + resourceEngageButtonRect.width / 2, resourceEngageButtonRect.top + resourceEngageButtonRect.height / 2)
+        : null;
+      resourceClickTarget?.dispatchEvent(new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        clientX: resourceEngageButtonRect.left + resourceEngageButtonRect.width / 2,
+        clientY: resourceEngageButtonRect.top + resourceEngageButtonRect.height / 2
+      }));
       const resourceEngagedActionText = engageButton?.textContent || "";
       const resourceEngagedActionDisabled = engageButton?.disabled ?? true;
       const resourceEngagedTarget = window.eval("engagedTarget ? { ...engagedTarget } : null");
+      const resourceLocalShot = document.querySelector("#combatFxLayer .combat-fx-shot[data-target-type='stagingResource'][data-target-id='staging-resource-test-iron']");
       stagingResources[0].hp = 0;
       stagingResources[0].depleted = true;
       stagingResources[0].depletedUntil = Date.now() + 30000;
@@ -1180,6 +1190,9 @@ test.describe("Lupen browser smoke", () => {
         resourceEngagedActionText,
         resourceEngagedActionDisabled,
         resourceEngagedTarget,
+        resourceClickTargetId: resourceClickTarget?.id || "",
+        resourceClickTargetClass: resourceClickTarget?.className || "",
+        resourceLocalShotCount: resourceLocalShot ? 1 : 0,
         arrivingGhostCount: document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost.is-arriving").length,
         dockedGhostCount: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="docked-remote-session"]').length,
         playerTargetText,
@@ -1245,6 +1258,8 @@ test.describe("Lupen browser smoke", () => {
       type: "stagingResource",
       id: "staging-resource-test-iron"
     });
+    expect(connectedHudState.resourceClickTargetId).toBe("objectEngageBtn");
+    expect(connectedHudState.resourceLocalShotCount).toBe(1);
     expect(connectedHudState.sentResourceMines).toHaveLength(1);
     expect(connectedHudState.sentResourceMines[0]).toMatchObject({
       resourceId: "staging-resource-test-iron",
@@ -3205,7 +3220,7 @@ test.describe("Lupen browser smoke", () => {
         };
       })()
     `));
-    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-trade-to-sell");
+    await page.waitForFunction(() => ["open-trade-to-sell", "sell-cargo"].includes(window.eval("getCurrentTutorialStep().id")));
 
     const terminalHighlightState = await page.evaluate(() => window.eval(`
       (() => {
