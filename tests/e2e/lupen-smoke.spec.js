@@ -1453,9 +1453,12 @@ test.describe("Lupen browser smoke", () => {
           clearInterval(engageTimer);
           engageTimer = null;
         }
+        mineralKeys.forEach(key => { cargo[key] = 0; });
+        cargo.Iron = getShipStats().cargo;
         window.LupenMultiplayerOverlay.setSelectedResourceId(resource.id);
         updateAsteroidUI();
         updateObjectActionPanel(true);
+        updateCargoSummary();
         window.LupenMultiplayerOverlay.render();
       })()
     `));
@@ -1477,6 +1480,9 @@ test.describe("Lupen browser smoke", () => {
           mineCount: window.__resourceEngageMines.length,
           mine: window.__resourceEngageMines[0] || null,
           localShotCount: document.querySelectorAll("#combatFxLayer .combat-fx-shot[data-target-type='stagingResource'][data-target-id='staging-resource-action-copper']").length,
+          actionInShipHud: Boolean(actionBtn?.closest(".ship-display-panel-action")),
+          centralActionCount: document.querySelectorAll(".central-engage-panel").length,
+          cargoSummaryText: document.getElementById("hudCargoSummary")?.textContent || "",
           resourceIntentReason: status.lastStagingResourceMineIntent?.reason || "",
           diagnosticsText: document.getElementById("lupenMultiplayerDiagnostics")?.textContent || ""
         };
@@ -1499,8 +1505,41 @@ test.describe("Lupen browser smoke", () => {
       currentNode: "Asteron Prime"
     });
     expect(resourceEngageState.localShotCount).toBe(1);
+    expect(resourceEngageState.actionInShipHud).toBe(true);
+    expect(resourceEngageState.centralActionCount).toBe(0);
+    expect(resourceEngageState.cargoSummaryText).toContain("Cargo");
+    expect(resourceEngageState.cargoSummaryText).toContain("FULL");
     expect(resourceEngageState.resourceIntentReason).toBe("resource_mine_intent_sent");
     expect(resourceEngageState.diagnosticsText).toContain("resource sent");
+
+    const fullCargoAwardState = await page.evaluate(() => window.eval(`
+      (() => {
+        const beforeCargo = cargoUsed();
+        const applyResult = applyStagingResourceMineResult({
+          ok: true,
+          resourceId: "staging-resource-action-copper",
+          resourceName: "Copper",
+          cargoDelta: 12,
+          depletedUntil: Date.now() + 30000,
+          resourceRewardId: "full-cargo-resource-award-e2e"
+        });
+        return {
+          beforeCargo,
+          afterCargo: cargoUsed(),
+          copper: cargo.Copper || 0,
+          applyResult,
+          activityText: document.getElementById("activityLogFeed")?.textContent || ""
+        };
+      })()
+    `));
+    expect(fullCargoAwardState.afterCargo).toBe(fullCargoAwardState.beforeCargo);
+    expect(fullCargoAwardState.copper).toBe(0);
+    expect(fullCargoAwardState.applyResult).toMatchObject({
+      reason: "cargo_full_no_resource_recovered",
+      collectedAmount: 0,
+      overflowAmount: 0
+    });
+    expect(fullCargoAwardState.activityText).toContain("Cargo hold full - no resource recovered.");
 
     await page.locator("#objectEngageBtn").click();
     const disengagedState = await page.evaluate(() => window.eval(`

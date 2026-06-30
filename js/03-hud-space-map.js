@@ -1027,6 +1027,9 @@ function updateHudDock() {
   const sectorCargoSummary = document.getElementById("sectorCargoSummary");
   const cargoSummary = document.getElementById("cargoSummary");
   const cargoCapacityText = document.getElementById("cargoCapacityText");
+  const hudCargoSummary = document.getElementById("hudCargoSummary");
+  const hudCargoCapacityText = document.getElementById("hudCargoCapacityText");
+  const hudCargoFullBadge = document.getElementById("hudCargoFullBadge");
   const inventoryItemCountText = document.getElementById("inventoryItemCountText");
   const itemInventorySummary = document.getElementById("itemInventorySummary");
 
@@ -1048,6 +1051,21 @@ function updateHudDock() {
 
   if (cargoCapacityText) {
     cargoCapacityText.textContent = `${formatNumber(usedCargo)} / ${formatNumber(maxCargo)}`;
+  }
+
+  if (hudCargoCapacityText) {
+    hudCargoCapacityText.textContent = `${formatNumber(usedCargo)} / ${formatNumber(maxCargo)}`;
+  }
+
+  if (hudCargoSummary) {
+    const isFull = maxCargo > 0 && usedCargo >= maxCargo;
+    hudCargoSummary.classList.toggle("is-full", isFull);
+    hudCargoSummary.setAttribute("aria-label", `Cargo ${formatNumber(usedCargo)} of ${formatNumber(maxCargo)}${isFull ? " full" : ""}`);
+  }
+
+  if (hudCargoFullBadge) {
+    const isFull = maxCargo > 0 && usedCargo >= maxCargo;
+    hudCargoFullBadge.hidden = !isFull;
   }
 
   if (inventoryItemCountText) {

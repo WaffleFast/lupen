@@ -6,6 +6,7 @@ let lastRemotePlayerEngageNoticeKey = "";
 let lastRemotePlayerEngageNoticeAt = 0;
 let serverPvpDamageDisplayState = null;
 let lastPvpHullFeedbackState = "";
+let lastResourceCargoFullNoticeAt = 0;
 
 function getPvpHullStatus(hullValue, hullMaxValue) {
   const hullNumber = Number(hullValue);
@@ -1619,6 +1620,26 @@ function applyStagingResourceMineResult(result = {}) {
   window.lupenStagingResourceAwardedKeys.add(awardKey);
   const cargoUsedBefore = cargoUsed();
   const cargoCapacity = getShipStats().cargo;
+  if (cargoCapacity > 0 && cargoUsedBefore >= cargoCapacity) {
+    const message = "Cargo hold full - no resource recovered.";
+    if (typeof addHudToast === "function") addHudToast(message);
+    else if (typeof addActivityLog === "function") addActivityLog(message);
+    updateCargoSummary();
+    updateTargetPanel();
+    saveGame();
+    return {
+      applied: false,
+      reason: "cargo_full_no_resource_recovered",
+      resourceName,
+      cargoDelta,
+      collectedAmount: 0,
+      overflowAmount: 0,
+      cargoUsedBefore,
+      cargoUsedAfter: cargoUsedBefore,
+      cargoCapacity,
+      awardKey
+    };
+  }
   const deposit = depositLootToCargo({ [resourceName]: cargoDelta });
   const collectedAmount = Math.max(0, Number(deposit.collectedAmount || 0));
   const overflowAmount = Math.max(0, Number(deposit.overflowAmount || 0));
@@ -1855,17 +1876,6 @@ function performStagingResourceAttackCycle() {
   const status = client?.getStatus?.();
   if (!status?.enabled || !status?.isConnected) return;
 
-  const cargoCapacity = typeof getShipStats === "function" ? Number(getShipStats()?.cargo || 0) : 0;
-  const usedCargo = typeof cargoUsed === "function" ? Number(cargoUsed() || 0) : 0;
-  if (cargoCapacity > 0 && usedCargo >= cargoCapacity) {
-    if (typeof addActivityLog === "function") {
-      addActivityLog(`Cargo hold full. Sell recovered cargo before engaging ${target.resourceName || "resource"} asteroid.`);
-    }
-    disengageTarget(true);
-    updateObjectActionPanel(true);
-    return;
-  }
-
   const result = client.mineStagingResource?.(target.id, { currentNode, timestamp: Date.now() });
   if (result?.ok === false) {
     if (typeof addActivityLog === "function") {
@@ -1888,6 +1898,15 @@ function performStagingResourceAttackCycle() {
       if (typeof playPlayerLaserPulse === "function") playPlayerLaserPulse();
     }, Math.min(index * 75, 375));
   });
+
+  const cargoCapacity = typeof getShipStats === "function" ? Number(getShipStats()?.cargo || 0) : 0;
+  const usedCargo = typeof cargoUsed === "function" ? Number(cargoUsed() || 0) : 0;
+  if (cargoCapacity > 0 && usedCargo >= cargoCapacity && Date.now() - lastResourceCargoFullNoticeAt > 2400) {
+    lastResourceCargoFullNoticeAt = Date.now();
+    if (typeof addActivityLog === "function") {
+      addActivityLog("Cargo hold full - no resource recovered.");
+    }
+  }
 }
 
 function respawnHostileBot(botId) {

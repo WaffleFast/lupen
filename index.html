@@ -573,10 +573,6 @@
         <svg id="sectorSvg" class="sector-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
 
-      <div id="objectActionPanel" class="object-action-panel central-engage-panel">
-        <button id="objectEngageBtn" class="engage-action" onclick="toggleTargetEngagement()">ENGAGE</button>
-      </div>
-
       <div class="space-combat-hud compact-hud command-hud player-bottom-hud">
         <div class="vertical-stats hud-panel status-panel">
           <div class="stat-col">
@@ -612,11 +608,15 @@
             <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image active-player-ship">
           </div>
           <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
-          <div class="ship-storage-strip" aria-label="Ship storage">
-            <button id="shipInventoryBtn" class="ship-storage-button" onclick="openShipStorageDrawer('equipment', event)">
-              <span>Inventory</span>
-              <strong id="hudInventorySlots">0 items</strong>
-            </button>
+          <div class="ship-storage-strip ship-action-strip" aria-label="Ship action">
+            <div id="hudCargoSummary" class="hud-cargo-summary" aria-label="Cargo hold">
+              <span>Cargo</span>
+              <strong id="hudCargoCapacityText">0 / 100</strong>
+              <em id="hudCargoFullBadge" hidden>FULL</em>
+            </div>
+            <div id="objectActionPanel" class="object-action-panel hud-engage-panel">
+              <button id="objectEngageBtn" class="engage-action" onclick="toggleTargetEngagement()">ENGAGE</button>
+            </div>
           </div>
         </div>
 
