@@ -1369,6 +1369,151 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("server resource ENGAGE button starts mining from overlay-selected resource", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&debug=mp&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        currentNode = "Asteron Prime";
+        showScreen("spaceScreen");
+        const resource = {
+          id: "staging-resource-action-copper",
+          resourceName: "Copper",
+          name: "Copper",
+          currentNode: "Asteron Prime",
+          x: 55,
+          y: 35,
+          hp: 34,
+          hpMax: 34,
+          yieldAmount: 12,
+          depleted: false,
+          depletedUntil: 0,
+          lastUpdatedAt: Date.now()
+        };
+        const status = {
+          enabled: true,
+          isConnected: true,
+          enabledReason: "staging_enabled",
+          sessionId: "local-session",
+          lastStagingResourceMineIntent: null,
+          lastStagingResourceEvent: null
+        };
+        window.__resourceEngageMines = [];
+        window.LupenMultiplayerClient = {
+          enabled: true,
+          getStatus: () => ({ ...status }),
+          getPlayers: ({ includeSelf = true } = {}) => includeSelf ? [{
+            isSelf: true,
+            sessionId: "local-session",
+            displayName: "Local Pilot",
+            currentNode: "Asteron Prime",
+            presenceStatus: "space",
+            currentShipId: currentShipId || STARTER_SHIP_ID,
+            shipName: "Azure Striker",
+            shipImage: "assets/ships/azure-striker/azure-striker-medium.webp",
+            lastSeenAt: Date.now()
+          }] : [],
+          getBots: () => [],
+          getResources: () => [resource],
+          getResourceById: id => String(id || "") === resource.id ? { ...resource } : null,
+          getSelectedStagingBot: () => null,
+          getPresenceEvents: () => [],
+          getChatMessages: () => [],
+          getStagingWeaponIntent: () => ({
+            weaponId: "pulseLaser",
+            weaponKey: "pulseLaser",
+            equippedWeaponKey: "pulseLaser",
+            equippedWeaponKeys: ["pulseLaser"],
+            weaponName: "Pulse Laser",
+            weaponFamily: "pulse",
+            weaponType: "pulse"
+          }),
+          mineStagingResource: (resourceId, options) => {
+            const intent = {
+              ok: true,
+              type: "mineIntent",
+              reason: "resource_mine_intent_sent",
+              resourceId,
+              currentNode: options?.currentNode || "",
+              receivedAt: Date.now()
+            };
+            status.lastStagingResourceMineIntent = intent;
+            status.lastStagingResourceEvent = intent;
+            window.__resourceEngageMines.push({ resourceId, ...options });
+            return { ok: true, type: "stagingResource:mine", payload: { resourceId, ...options } };
+          },
+          onServerState: () => ({ unsubscribe() {} })
+        };
+        selectedTarget = null;
+        engagedTarget = null;
+        if (engageTimer) {
+          clearInterval(engageTimer);
+          engageTimer = null;
+        }
+        window.LupenMultiplayerOverlay.setSelectedResourceId(resource.id);
+        updateAsteroidUI();
+        updateObjectActionPanel(true);
+        window.LupenMultiplayerOverlay.render();
+      })()
+    `));
+
+    await expect(page.locator("#objectEngageBtn")).toBeVisible();
+    await expect(page.locator("#objectEngageBtn")).toHaveText("ENGAGE");
+    await page.locator("#objectEngageBtn").click();
+
+    const resourceEngageState = await page.evaluate(() => window.eval(`
+      (() => {
+        window.LupenMultiplayerOverlay.render();
+        const status = window.LupenMultiplayerClient.getStatus();
+        const actionBtn = document.getElementById("objectEngageBtn");
+        return {
+          actionText: actionBtn?.textContent || "",
+          actionDisabled: actionBtn?.disabled ?? true,
+          selectedTarget: selectedTarget ? { ...selectedTarget } : null,
+          engagedTarget: engagedTarget ? { ...engagedTarget } : null,
+          mineCount: window.__resourceEngageMines.length,
+          mine: window.__resourceEngageMines[0] || null,
+          localShotCount: document.querySelectorAll("#combatFxLayer .combat-fx-shot[data-target-type='stagingResource'][data-target-id='staging-resource-action-copper']").length,
+          resourceIntentReason: status.lastStagingResourceMineIntent?.reason || "",
+          diagnosticsText: document.getElementById("lupenMultiplayerDiagnostics")?.textContent || ""
+        };
+      })()
+    `));
+
+    expect(resourceEngageState.selectedTarget).toMatchObject({
+      type: "stagingResource",
+      id: "staging-resource-action-copper"
+    });
+    expect(resourceEngageState.engagedTarget).toMatchObject({
+      type: "stagingResource",
+      id: "staging-resource-action-copper"
+    });
+    expect(resourceEngageState.actionText).toBe("DISENGAGE");
+    expect(resourceEngageState.actionDisabled).toBe(false);
+    expect(resourceEngageState.mineCount).toBe(1);
+    expect(resourceEngageState.mine).toMatchObject({
+      resourceId: "staging-resource-action-copper",
+      currentNode: "Asteron Prime"
+    });
+    expect(resourceEngageState.localShotCount).toBe(1);
+    expect(resourceEngageState.resourceIntentReason).toBe("resource_mine_intent_sent");
+    expect(resourceEngageState.diagnosticsText).toContain("resource sent");
+
+    await page.locator("#objectEngageBtn").click();
+    const disengagedState = await page.evaluate(() => window.eval(`
+      (() => ({
+        actionText: document.getElementById("objectEngageBtn")?.textContent || "",
+        engagedTarget: engagedTarget ? { ...engagedTarget } : null
+      }))()
+    `));
+    expect(disengagedState.actionText).toBe("ENGAGE");
+    expect(disengagedState.engagedTarget).toBe(null);
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("Map 1 classifies protected and contested nodes for future PvP rules", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

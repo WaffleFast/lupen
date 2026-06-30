@@ -665,7 +665,9 @@ function autoCollapseTargetPanel(delay = 3500) {
 }
 
 function toggleTargetEngagement() {
-  const selected = getSelectedTargetEntity();
+  const selected = typeof getSelectedTargetEntityForAction === "function"
+    ? getSelectedTargetEntityForAction()
+    : getSelectedTargetEntity();
   const engaged = getEngagedTargetEntity();
   const selectedIsEngaged = selected && selectedTarget && engagedTarget && selectedTarget.type === engagedTarget.type && selectedTarget.id === engagedTarget.id;
 
@@ -972,7 +974,9 @@ function handleLocalChatKey(event) {
 function updateObjectActionPanel(forceVisible = false) {
   const panel = document.getElementById("objectActionPanel");
   const actionBtn = document.getElementById("objectEngageBtn");
-  const selected = getSelectedTargetEntity();
+  const selected = typeof getSelectedTargetEntityForAction === "function"
+    ? getSelectedTargetEntityForAction()
+    : getSelectedTargetEntity();
   const engaged = getEngagedTargetEntity();
   const target = selected || engaged;
   const localBotVisualGuardActive = typeof isStagingLocalCombatBotVisualGuardActive === "function"

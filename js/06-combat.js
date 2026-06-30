@@ -202,6 +202,24 @@ function selectStagingResourceTarget(resourceId) {
   updateObjectActionPanel(false);
 }
 
+function getOverlaySelectedStagingResourceTarget() {
+  const resourceId = window.LupenMultiplayerOverlay?.getSelectedResourceId?.();
+  const resource = resourceId ? getStagingResourceTargetById(resourceId) : null;
+  if (!resource || !resource.alive || (resource.currentNodeId || resource.node) !== currentNode) return null;
+  return resource;
+}
+
+function syncOverlaySelectedResourceToCoreTarget() {
+  const resource = getOverlaySelectedStagingResourceTarget();
+  if (!resource) return null;
+  selectedTarget = { type: "stagingResource", id: resource.id };
+  return resource;
+}
+
+function getSelectedTargetEntityForAction() {
+  return getSelectedTargetEntity() || syncOverlaySelectedResourceToCoreTarget();
+}
+
 function isCurrentNodeProtectedForPvp() {
   const node = typeof sectorNodes !== "undefined" ? sectorNodes[currentNode] : null;
   return typeof isProtectedNode === "function"
@@ -357,7 +375,7 @@ function engageTarget() {
   const staleStagingBotCleared = reconcileStagingBotTargetState();
   if (staleStagingBotCleared) return;
 
-  let target = getSelectedTargetEntity();
+  let target = getSelectedTargetEntityForAction();
 
   if (target?.remotePlayer) {
     sendRemotePlayerPvpIntent(target);
@@ -366,7 +384,7 @@ function engageTarget() {
   }
 
   if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
-    target = getVisibleTargets()[0];
+    target = getSelectedTargetEntityForAction() || getVisibleTargets()[0];
     if (target) {
       selectedTarget = {
         type: getTargetTypeFromEntity(target),

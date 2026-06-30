@@ -4854,6 +4854,7 @@
   global.LupenMultiplayerOverlay = Object.freeze({
     render,
     scheduleRender,
+    getSelectedResourceId,
     setSelectedResourceId,
     setup
   });
