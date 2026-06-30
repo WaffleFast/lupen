@@ -1660,6 +1660,14 @@ test.describe("Lupen browser smoke", () => {
             timerActive: Boolean(engageTimer),
             actionText: document.getElementById("objectEngageBtn")?.textContent || ""
           };
+
+          selectedTarget = { type: "stagingResource", id: "server-owned-test-asteroid" };
+          engagedTarget = { type: "stagingBot", id: "server-owned-other-target" };
+          updateObjectActionPanel(true);
+          const switchTargetLabelState = {
+            actionText: document.getElementById("objectEngageBtn")?.textContent || "",
+            usesSwitchCopy: (document.getElementById("objectEngageBtn")?.textContent || "").includes("SWITCH")
+          };
           clearInterval(engageTimer);
           engageTimer = null;
           engagedTarget = null;
@@ -1860,6 +1868,7 @@ test.describe("Lupen browser smoke", () => {
             localAsteroidButtonCount,
             serverAsteroidButtonCount,
             clickWhileEngagedState,
+            switchTargetLabelState,
             before,
             hudBefore,
             hudAfterPvpDisplay,
@@ -1965,6 +1974,10 @@ test.describe("Lupen browser smoke", () => {
       timerActive: true
     });
     expect(eligibility.clickWhileEngagedState.actionText).toBe("PVP ENGAGE");
+    expect(eligibility.switchTargetLabelState).toMatchObject({
+      actionText: "ENGAGE",
+      usesSwitchCopy: false
+    });
     expect(eligibility.hudAfterPvpDisplay.applied).toBe(true);
     expect(eligibility.hudAfterPvpDisplay.hullValue).toBe("120");
     expect(eligibility.hudAfterPvpDisplay.shieldValue).toBe("18");
@@ -3564,6 +3577,7 @@ test.describe("Lupen browser smoke", () => {
           trailShotBeamCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-beam.is-wing, #lupenMultiplayerSpaceShotLayer .lupen-mp-shot-beam.is-spark").length,
           localSourceX: Number(fxShot?.dataset.sourceX || 0),
           localTargetX: Number(fxShot?.dataset.targetX || 0),
+          fxLayerWidth: Number(fxLayer?.dataset.width || 0),
           localSourceCount: Number(fxShot?.dataset.sourceCount || 0),
           localUniqueSourceYCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("y1") || 0)))).size,
           localUniqueTargetCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("x2") || 0)) + ":" + Math.round(Number(line.getAttribute("y2") || 0)))).size,
@@ -3593,10 +3607,11 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
     expect(stagingBotSelectedState.shotBeamCount).toBe(1);
     expect(stagingBotSelectedState.localShotBeamCount).toBe(1);
-    expect(stagingBotSelectedState.beamCoreCount).toBe(3);
+    expect(stagingBotSelectedState.beamCoreCount).toBe(5);
     expect(stagingBotSelectedState.trailShotBeamCount).toBe(0);
-    expect(stagingBotSelectedState.localSourceX).toBeLessThan(stagingBotSelectedState.localTargetX);
-    expect(stagingBotSelectedState.localSourceCount).toBe(3);
+    expect(stagingBotSelectedState.localSourceX).toBeGreaterThan(stagingBotSelectedState.localTargetX);
+    expect(stagingBotSelectedState.localSourceX).toBe(stagingBotSelectedState.fxLayerWidth);
+    expect(stagingBotSelectedState.localSourceCount).toBe(5);
     expect(stagingBotSelectedState.localUniqueSourceYCount).toBeGreaterThanOrEqual(2);
     expect(stagingBotSelectedState.localUniqueTargetCount).toBe(1);
     expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
@@ -4095,10 +4110,11 @@ test.describe("Lupen browser smoke", () => {
     expect(visualState.combatFxShotCount).toBe(2);
     expect(visualState.localCombatFxShotCount).toBe(1);
     expect(visualState.botCombatFxShotCount).toBe(1);
-    expect(visualState.combatFxBeamCoreCount).toBe(4);
+    expect(visualState.combatFxBeamCoreCount).toBe(6);
     expect(visualState.combatFxImpactCount).toBe(1);
     expect(visualState.localSourceX).toBeLessThan(visualState.localTargetX);
-    expect(visualState.localSourceCount).toBe(3);
+    expect(visualState.localSourceX).toBe(0);
+    expect(visualState.localSourceCount).toBe(5);
     expect(visualState.localUniqueSourceYCount).toBeGreaterThanOrEqual(2);
     expect(visualState.localUniqueTargetCount).toBe(1);
     expect(visualState.playerShotCount).toBe(0);

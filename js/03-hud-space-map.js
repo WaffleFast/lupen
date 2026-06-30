@@ -1010,11 +1010,10 @@ function updateObjectActionPanel(forceVisible = false) {
   }
 
   const selectedIsEngaged = selected && selectedTarget && engagedTarget && selectedTarget.type === engagedTarget.type && selectedTarget.id === engagedTarget.id;
-  const selectedWouldSwitchEngagement = Boolean(engageTimer && selected && !selectedIsEngaged);
 
   panel.classList.add("visible");
   actionBtn.disabled = false;
-  actionBtn.textContent = engageTimer && selectedIsEngaged ? "DISENGAGE" : selectedWouldSwitchEngagement ? "SWITCH TARGET" : "ENGAGE";
+  actionBtn.textContent = engageTimer && selectedIsEngaged ? "DISENGAGE" : "ENGAGE";
   actionBtn.classList.toggle("disengage-action", !!engageTimer && selectedIsEngaged);
 }
 

@@ -433,7 +433,7 @@ let weaponVisualCycleOffset = 0;
 const COMBAT_FX_LAYER_ID = "combatFxLayer";
 const COMBAT_FX_SVG_NS = "http://www.w3.org/2000/svg";
 const COMBAT_FX_BEAM_DURATION_MS = 520;
-const LOCAL_COMBAT_FX_BEAM_COUNT = 3;
+const LOCAL_COMBAT_FX_BEAM_COUNT = 5;
 const suppressedCombatVisualTargets = new Map();
 const renderedCombatFxKeys = new Set();
 
@@ -564,10 +564,8 @@ function getCombatFxActiveBounds(context = ensureCombatFxLayer()) {
   return {
     top: activeTop,
     bottom: activeBottom,
-    left: Math.max(14, context.width * 0.035),
-    lowerLeft: Math.max(34, context.width * 0.08),
-    lowerCenter: context.width * 0.38,
-    lowerRight: context.width * 0.68
+    left: 0,
+    right: context.width
   };
 }
 
@@ -577,14 +575,19 @@ function getLocalCombatFxOriginsForTarget(targetPoint = {}, beamCount = LOCAL_CO
   const bounds = getCombatFxActiveBounds(context);
   if (!bounds) return null;
   const targetY = Number(targetPoint?.y || bounds.top + (bounds.bottom - bounds.top) * 0.5);
-  const leftMidY = Math.max(bounds.top + 24, Math.min(bounds.bottom - 44, targetY + (targetY < bounds.bottom - 72 ? 42 : -38)));
-  const anchors = [
-    { x: bounds.left, y: leftMidY, width: context.width, height: context.height },
-    { x: bounds.lowerLeft, y: bounds.bottom - 12, width: context.width, height: context.height },
-    { x: bounds.lowerCenter, y: bounds.bottom - 4, width: context.width, height: context.height },
-    { x: bounds.lowerRight, y: bounds.bottom - 18, width: context.width, height: context.height }
-  ];
-  return anchors.slice(0, Math.max(1, Math.min(anchors.length, Math.round(Number(beamCount || LOCAL_COMBAT_FX_BEAM_COUNT)))));
+  const edgeX = Number(targetPoint?.x || 0) < context.width * 0.5 ? bounds.right : bounds.left;
+  const requestedCount = Math.max(1, Math.min(7, Math.round(Number(beamCount || LOCAL_COMBAT_FX_BEAM_COUNT))));
+  const spread = Math.max(94, Math.min(190, (bounds.bottom - bounds.top) * 0.52));
+  const middle = Math.max(bounds.top + spread * 0.5, Math.min(bounds.bottom - spread * 0.5, targetY));
+  return Array.from({ length: requestedCount }, (_item, index) => {
+    const ratio = requestedCount === 1 ? 0.5 : index / (requestedCount - 1);
+    return {
+      x: edgeX,
+      y: Math.max(bounds.top, Math.min(bounds.bottom, middle - spread * 0.5 + ratio * spread)),
+      width: context.width,
+      height: context.height
+    };
+  });
 }
 
 function getLocalCombatFxOriginForTarget(targetPoint = {}) {
@@ -1810,8 +1813,7 @@ function performStagingBotAttackCycle() {
 
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.();
-  const cooldownRemainingMs = Math.max(0, Number(status?.fireCooldownRemainingMs || 0));
-  if (!status?.enabled || !status?.isConnected || cooldownRemainingMs > 0) return;
+  if (!status?.enabled || !status?.isConnected) return;
 
   client.sendSelectedStagingBotCombatIntent?.({
     targetBotId: target.id,
