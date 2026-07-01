@@ -604,16 +604,20 @@
         </div>
 
         <div class="ship-display-panel ship-display-panel-action hud-panel ship-panel">
-          <div class="ship-card-main">
-            <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image active-player-ship">
+          <div class="ship-hud-hero-row">
+            <div class="ship-card-main">
+              <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image active-player-ship">
+            </div>
+            <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
           </div>
-          <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
-          <div class="ship-storage-strip ship-action-strip" aria-label="Ship action">
+          <div class="ship-hud-cargo-row">
             <div id="hudCargoSummary" class="hud-cargo-summary" aria-label="Cargo hold">
               <span>Cargo</span>
               <strong id="hudCargoCapacityText">0 / 100</strong>
               <em id="hudCargoFullBadge" hidden>FULL</em>
             </div>
+          </div>
+          <div class="ship-storage-strip ship-action-strip ship-hud-action-row" aria-label="Ship action">
             <div id="objectActionPanel" class="object-action-panel hud-engage-panel">
               <button id="objectEngageBtn" class="engage-action" onclick="toggleTargetEngagement()">ENGAGE</button>
             </div>

@@ -1483,6 +1483,19 @@ test.describe("Lupen browser smoke", () => {
         window.LupenMultiplayerOverlay.render();
         const status = window.LupenMultiplayerClient.getStatus();
         const actionBtn = document.getElementById("objectEngageBtn");
+        const rectFor = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) return null;
+          const rect = element.getBoundingClientRect();
+          return {
+            top: Math.round(rect.top),
+            right: Math.round(rect.right),
+            bottom: Math.round(rect.bottom),
+            left: Math.round(rect.left),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          };
+        };
         return {
           actionText: actionBtn?.textContent || "",
           actionDisabled: actionBtn?.disabled ?? true,
@@ -1494,6 +1507,14 @@ test.describe("Lupen browser smoke", () => {
           localShotCount: document.querySelectorAll("#combatFxLayer .combat-fx-shot[data-target-type='stagingResource'][data-target-id='staging-resource-action-copper']").length,
           actionInShipHud: Boolean(actionBtn?.closest(".ship-display-panel-action")),
           centralActionCount: document.querySelectorAll(".central-engage-panel").length,
+          middleHudLayout: {
+            panel: rectFor(".ship-display-panel-action"),
+            ship: rectFor("#hudShipImage"),
+            xpRow: rectFor("#hudProgressStrip .xp-row"),
+            xpBar: rectFor("#hudProgressStrip .xp-bar"),
+            cargo: rectFor("#hudCargoSummary"),
+            action: rectFor("#objectEngageBtn")
+          },
           cargoSummaryText: document.getElementById("hudCargoSummary")?.textContent || "",
           resourceIntentReason: status.lastStagingResourceMineIntent?.reason || "",
           diagnosticsText: document.getElementById("lupenMultiplayerDiagnostics")?.textContent || ""
@@ -1526,6 +1547,26 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.localShotCount).toBe(1);
     expect(resourceEngageState.actionInShipHud).toBe(true);
     expect(resourceEngageState.centralActionCount).toBe(0);
+    expect(resourceEngageState.middleHudLayout.panel).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.ship).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.xpRow).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.xpBar).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.cargo).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.action).not.toBeNull();
+    const rectsOverlap = (first, second) => (
+      first.left < second.right - 2
+      && first.right > second.left + 2
+      && first.top < second.bottom - 2
+      && first.bottom > second.top + 2
+    );
+    expect(rectsOverlap(resourceEngageState.middleHudLayout.ship, resourceEngageState.middleHudLayout.xpRow)).toBe(false);
+    expect(resourceEngageState.middleHudLayout.xpBar.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpRow.bottom - 2);
+    expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(Math.max(
+      resourceEngageState.middleHudLayout.ship.bottom,
+      resourceEngageState.middleHudLayout.xpBar.bottom
+    ) - 2);
+    expect(resourceEngageState.middleHudLayout.action.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.bottom - 2);
+    expect(resourceEngageState.middleHudLayout.action.bottom).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.panel.bottom + 2);
     expect(resourceEngageState.cargoSummaryText).toContain("Cargo");
     expect(resourceEngageState.cargoSummaryText).toContain("FULL");
     expect(resourceEngageState.resourceIntentReason).toBe("resource_mine_intent_sent");
