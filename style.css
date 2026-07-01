@@ -42947,3 +42947,27 @@ input::placeholder {
 .player-orbit-screen .player-bottom-hud .info-panel.hud-command-console {
   min-width: 0 !important;
 }
+
+/* ===== D4.2 stable player HUD action area ===== */
+.player-orbit-screen .player-bottom-hud .hud-engage-panel,
+.player-orbit-screen .player-bottom-hud .hud-engage-panel:not(.visible),
+.player-orbit-screen .player-bottom-hud .hud-engage-panel.visible {
+  display: block !important;
+  min-height: 46px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action {
+  height: 46px !important;
+  min-height: 46px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action.action-inactive,
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action:disabled.action-inactive {
+  background: linear-gradient(180deg, rgba(45, 78, 102, 0.86), rgba(13, 31, 48, 0.94)) !important;
+  border-color: rgba(121, 188, 220, 0.42) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 0 10px rgba(44, 166, 226, 0.08) !important;
+  color: rgba(202, 226, 240, 0.72) !important;
+  cursor: default !important;
+}

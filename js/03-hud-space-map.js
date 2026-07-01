@@ -996,7 +996,7 @@ function updateObjectActionPanel(forceVisible = false) {
       : blockReason
         ? "PVP LOCKED"
         : "PVP ENGAGE";
-    actionBtn.classList.remove("disengage-action");
+    actionBtn.classList.remove("disengage-action", "action-inactive");
     return;
   }
 
@@ -1006,10 +1006,11 @@ function updateObjectActionPanel(forceVisible = false) {
     && !(localBotVisualGuardActive && targetType === "hostileBot");
 
   if (!isRelevant) {
-    panel.classList.remove("visible");
+    panel.classList.add("visible");
     actionBtn.disabled = true;
-    actionBtn.textContent = "ENGAGE";
+    actionBtn.textContent = "SELECT TARGET";
     actionBtn.classList.remove("disengage-action");
+    actionBtn.classList.add("action-inactive");
     return;
   }
 
@@ -1019,6 +1020,7 @@ function updateObjectActionPanel(forceVisible = false) {
   actionBtn.disabled = false;
   actionBtn.textContent = engageTimer && selectedIsEngaged ? "DISENGAGE" : "ENGAGE";
   actionBtn.classList.toggle("disengage-action", !!engageTimer && selectedIsEngaged);
+  actionBtn.classList.remove("action-inactive");
 }
 
 function updateHudDock() {

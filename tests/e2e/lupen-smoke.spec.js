@@ -1455,6 +1455,17 @@ test.describe("Lupen browser smoke", () => {
         }
         mineralKeys.forEach(key => { cargo[key] = 0; });
         cargo.Iron = getShipStats().cargo;
+        window.LupenMultiplayerOverlay.setSelectedResourceId("");
+        updateAsteroidUI();
+        updateObjectActionPanel(true);
+        updateCargoSummary();
+        window.__noTargetActionState = {
+          text: document.getElementById("objectEngageBtn")?.textContent || "",
+          disabled: document.getElementById("objectEngageBtn")?.disabled ?? null,
+          visible: document.getElementById("objectActionPanel")?.classList.contains("visible") || false,
+          actionInShipHud: Boolean(document.getElementById("objectEngageBtn")?.closest(".ship-display-panel-action")),
+          inactive: document.getElementById("objectEngageBtn")?.classList.contains("action-inactive") || false
+        };
         window.LupenMultiplayerOverlay.setSelectedResourceId(resource.id);
         updateAsteroidUI();
         updateObjectActionPanel(true);
@@ -1475,6 +1486,7 @@ test.describe("Lupen browser smoke", () => {
         return {
           actionText: actionBtn?.textContent || "",
           actionDisabled: actionBtn?.disabled ?? true,
+          noTargetAction: window.__noTargetActionState || null,
           selectedTarget: selectedTarget ? { ...selectedTarget } : null,
           engagedTarget: engagedTarget ? { ...engagedTarget } : null,
           mineCount: window.__resourceEngageMines.length,
@@ -1496,6 +1508,13 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.engagedTarget).toMatchObject({
       type: "stagingResource",
       id: "staging-resource-action-copper"
+    });
+    expect(resourceEngageState.noTargetAction).toMatchObject({
+      text: "SELECT TARGET",
+      disabled: true,
+      visible: true,
+      actionInShipHud: true,
+      inactive: true
     });
     expect(resourceEngageState.actionText).toBe("DISENGAGE");
     expect(resourceEngageState.actionDisabled).toBe(false);
