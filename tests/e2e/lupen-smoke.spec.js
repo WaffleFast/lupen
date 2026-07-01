@@ -1508,7 +1508,10 @@ test.describe("Lupen browser smoke", () => {
           actionInShipHud: Boolean(actionBtn?.closest(".ship-display-panel-action")),
           centralActionCount: document.querySelectorAll(".central-engage-panel").length,
           middleHudLayout: {
+            bottomHud: rectFor(".player-bottom-hud.command-hud.space-combat-hud"),
+            statusPanel: rectFor(".player-bottom-hud .status-panel"),
             panel: rectFor(".ship-display-panel-action"),
+            infoPanel: rectFor(".hud-command-console"),
             ship: rectFor("#hudShipImage"),
             xpRow: rectFor("#hudProgressStrip .xp-row"),
             xpBar: rectFor("#hudProgressStrip .xp-bar"),
@@ -1547,12 +1550,20 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.localShotCount).toBe(1);
     expect(resourceEngageState.actionInShipHud).toBe(true);
     expect(resourceEngageState.centralActionCount).toBe(0);
+    expect(resourceEngageState.middleHudLayout.bottomHud).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.statusPanel).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.panel).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.infoPanel).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.ship).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.xpRow).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.xpBar).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.cargo).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.action).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThan(resourceEngageState.middleHudLayout.statusPanel.width);
+    expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.29));
+    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.48));
+    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeGreaterThanOrEqual(360);
+    expect(resourceEngageState.middleHudLayout.infoPanel.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.bottomHud.right + 2);
     const rectsOverlap = (first, second) => (
       first.left < second.right - 2
       && first.right > second.left + 2
