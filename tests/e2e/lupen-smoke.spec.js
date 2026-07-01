@@ -1560,10 +1560,16 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.cargo).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.action).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThan(resourceEngageState.middleHudLayout.statusPanel.width);
-    expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.29));
-    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.48));
-    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeGreaterThanOrEqual(360);
+    expect(resourceEngageState.middleHudLayout.panel.width).toBeLessThan(resourceEngageState.middleHudLayout.infoPanel.width);
+    expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.24));
+    expect(resourceEngageState.middleHudLayout.panel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.34));
+    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.42));
+    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.56));
     expect(resourceEngageState.middleHudLayout.infoPanel.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.bottomHud.right + 2);
+    expect(resourceEngageState.middleHudLayout.ship.height).toBeGreaterThanOrEqual(58);
+    expect(resourceEngageState.middleHudLayout.cargo.height).toBeLessThanOrEqual(32);
+    expect(resourceEngageState.middleHudLayout.action.height).toBeLessThanOrEqual(40);
+    expect(resourceEngageState.middleHudLayout.action.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.panel.width * 0.82));
     const rectsOverlap = (first, second) => (
       first.left < second.right - 2
       && first.right > second.left + 2

@@ -823,3 +823,87 @@
     padding-right: 12px !important;
   }
 }
+
+/* ===== D4.5 balanced lower HUD correction ===== */
+@media (min-width: 761px) {
+  .player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+    grid-template-columns: minmax(250px, 0.8fr) minmax(300px, 0.95fr) minmax(500px, 1.65fr) !important;
+    gap: 14px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action {
+    grid-template-rows: minmax(0, 1fr) 28px 36px !important;
+    gap: 6px !important;
+    padding: 8px 12px 10px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .ship-hud-hero-row {
+    grid-template-columns: minmax(112px, 0.82fr) minmax(0, 1.18fr) !important;
+    gap: 12px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .active-player-ship,
+  .player-orbit-screen .player-bottom-hud .hud-ship-image {
+    max-width: min(124px, 100%) !important;
+    max-height: 78px !important;
+    transform: scale(0.96) !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .ship-mini-progress {
+    grid-template-columns: minmax(0, 1fr) 50px !important;
+    grid-template-rows: minmax(0, 1fr) 6px !important;
+    gap: 5px 8px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .ship-mini-progress .level-badge,
+  .player-orbit-screen .player-bottom-hud .level-badge {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .ship-mini-progress .xp-row,
+  .player-orbit-screen .player-bottom-hud .xp-row {
+    font-size: 10.5px !important;
+    gap: 7px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .hud-cargo-summary {
+    height: 28px !important;
+    min-height: 28px !important;
+    gap: 8px !important;
+    padding: 4px 9px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .hud-cargo-summary span {
+    font-size: 9px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .hud-cargo-summary strong {
+    font-size: 14px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .hud-cargo-summary em {
+    font-size: 9px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .ship-action-strip.ship-hud-action-row {
+    min-height: 36px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .hud-engage-panel,
+  .player-orbit-screen .player-bottom-hud .hud-engage-panel:not(.visible),
+  .player-orbit-screen .player-bottom-hud .hud-engage-panel.visible {
+    display: grid !important;
+    justify-items: center !important;
+    min-height: 36px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action {
+    width: clamp(170px, 72%, 230px) !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    font-size: 14px !important;
+  }
+}
