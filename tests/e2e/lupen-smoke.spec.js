@@ -1516,6 +1516,11 @@ test.describe("Lupen browser smoke", () => {
             xpRow: rectFor("#hudProgressStrip .xp-row"),
             xpBar: rectFor("#hudProgressStrip .xp-bar"),
             cargo: rectFor("#hudCargoSummary"),
+            cargoLabel: rectFor("#hudCargoSummary span"),
+            cargoAmount: rectFor("#hudCargoSummary strong"),
+            cargoFull: rectFor("#hudCargoFullBadge:not([hidden])"),
+            actionRow: rectFor(".ship-hud-action-row"),
+            actionPanel: rectFor("#objectActionPanel"),
             action: rectFor("#objectEngageBtn")
           },
           cargoSummaryText: document.getElementById("hudCargoSummary")?.textContent || "",
@@ -1534,7 +1539,7 @@ test.describe("Lupen browser smoke", () => {
       id: "staging-resource-action-copper"
     });
     expect(resourceEngageState.noTargetAction).toMatchObject({
-      text: "SELECT TARGET",
+      text: "ENGAGE",
       disabled: true,
       visible: true,
       actionInShipHud: true,
@@ -1558,6 +1563,8 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.xpRow).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.xpBar).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.cargo).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.cargoLabel).not.toBeNull();
+    expect(resourceEngageState.middleHudLayout.cargoAmount).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.action).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThan(resourceEngageState.middleHudLayout.statusPanel.width);
     expect(resourceEngageState.middleHudLayout.panel.width).toBeLessThan(resourceEngageState.middleHudLayout.infoPanel.width);
@@ -1567,9 +1574,20 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.56));
     expect(resourceEngageState.middleHudLayout.infoPanel.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.bottomHud.right + 2);
     expect(resourceEngageState.middleHudLayout.ship.height).toBeGreaterThanOrEqual(58);
+    expect(resourceEngageState.middleHudLayout.xpBar.width).toBeGreaterThanOrEqual(80);
+    expect(resourceEngageState.middleHudLayout.xpBar.height).toBeGreaterThanOrEqual(6);
     expect(resourceEngageState.middleHudLayout.cargo.height).toBeLessThanOrEqual(32);
     expect(resourceEngageState.middleHudLayout.action.height).toBeLessThanOrEqual(40);
     expect(resourceEngageState.middleHudLayout.action.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.panel.width * 0.82));
+    const centerX = rect => Math.round((rect.left + rect.right) / 2);
+    const centerY = rect => Math.round((rect.top + rect.bottom) / 2);
+    expect(Math.abs(centerX(resourceEngageState.middleHudLayout.action) - centerX(resourceEngageState.middleHudLayout.panel))).toBeLessThanOrEqual(4);
+    expect(Math.abs(centerX(resourceEngageState.middleHudLayout.cargoLabel) - centerX(resourceEngageState.middleHudLayout.cargo))).toBeLessThanOrEqual(4);
+    expect(resourceEngageState.middleHudLayout.cargoAmount.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargoLabel.bottom - 1);
+    if (resourceEngageState.middleHudLayout.cargoFull) {
+      const cargoValueGroupCenter = Math.round((resourceEngageState.middleHudLayout.cargoAmount.left + resourceEngageState.middleHudLayout.cargoFull.right) / 2);
+      expect(Math.abs(cargoValueGroupCenter - centerX(resourceEngageState.middleHudLayout.cargo))).toBeLessThanOrEqual(8);
+    }
     const rectsOverlap = (first, second) => (
       first.left < second.right - 2
       && first.right > second.left + 2

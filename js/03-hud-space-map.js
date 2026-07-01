@@ -1008,7 +1008,7 @@ function updateObjectActionPanel(forceVisible = false) {
   if (!isRelevant) {
     panel.classList.add("visible");
     actionBtn.disabled = true;
-    actionBtn.textContent = "SELECT TARGET";
+    actionBtn.textContent = "ENGAGE";
     actionBtn.classList.remove("disengage-action");
     actionBtn.classList.add("action-inactive");
     return;
