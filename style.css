@@ -42911,3 +42911,39 @@ input::placeholder {
   height: 46px !important;
   border-radius: 8px !important;
 }
+
+/* ===== D4.1 lower HUD proportions ===== */
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+  grid-template-columns: clamp(334px, 27vw, 350px) clamp(360px, 30vw, 400px) minmax(420px, 1fr) !important;
+  gap: 14px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action {
+  grid-template-columns: minmax(112px, 0.82fr) minmax(184px, 1.18fr) !important;
+  gap: 8px 12px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-action-strip {
+  gap: 8px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary {
+  min-height: 50px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary strong {
+  font-size: 16px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action {
+  min-height: 44px !important;
+  font-size: 15px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .info-panel.hud-command-console {
+  min-width: 0 !important;
+}
