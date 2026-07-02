@@ -4243,31 +4243,67 @@ test.describe("Lupen browser smoke", () => {
             targetCenter: markerCenter("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='remote-target-session']")
           };
         })();
-        clearAllCombatVisuals();
-        window.__lastCombatVisualEvent = {
-          type: "botReturnFire",
-          ok: true,
-          attackerType: "bot",
-          attackerId: window.__stagingVisualBot.id,
-          attackerBotId: window.__stagingVisualBot.id,
-          targetType: "player",
-          targetId: "local-session",
-          targetPlayerId: "local-session",
-          currentNode,
-          damage: 12,
-          shieldDamage: 12,
-          receivedAt: Date.now()
+        const markerCenter = selector => {
+          const screenRect = document.getElementById("spaceScreen")?.getBoundingClientRect();
+          const rect = document.querySelector(selector)?.getBoundingClientRect();
+          return rect && screenRect
+            ? {
+              x: Math.round(rect.left + rect.width / 2 - screenRect.left),
+              y: Math.round(rect.top + rect.height / 2 - screenRect.top)
+            }
+            : { x: 0, y: 0 };
         };
-        window.LupenMultiplayerOverlay?.render?.();
-        const fxLayer = document.getElementById("combatFxLayer");
+        const renderBotReturnHit = (targetId, receivedOffset = 0) => {
+          clearAllCombatVisuals();
+          window.__lastCombatVisualEvent = {
+            type: "botReturnFire",
+            ok: true,
+            attackerType: "bot",
+            attackerId: window.__stagingVisualBot.id,
+            attackerBotId: window.__stagingVisualBot.id,
+            targetType: "player",
+            targetId,
+            targetPlayerId: targetId,
+            currentNode,
+            damage: 12,
+            shieldDamage: 12,
+            receivedAt: Date.now() + receivedOffset
+          };
+          window.LupenMultiplayerOverlay?.render?.();
+          const fxLayer = document.getElementById("combatFxLayer");
+          const shot = fxLayer?.querySelector(".combat-fx-shot[data-owner='bot'][data-target-id='" + targetId + "']");
+          const core = shot?.querySelector(".combat-fx-beam-core");
+          const cockpitPoint = targetId === "local-session" && typeof getLocalPlayerIncomingFireEndpoint === "function"
+            ? getLocalPlayerIncomingFireEndpoint()
+            : null;
+          return {
+            beamCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='bot'][data-target-id='" + targetId + "']").length || 0,
+            hitCount: shot?.querySelectorAll(".combat-fx-impact").length || 0,
+            sourceX: Math.round(Number(core?.getAttribute("x1") || 0)),
+            sourceY: Math.round(Number(core?.getAttribute("y1") || 0)),
+            endpointX: Math.round(Number(core?.getAttribute("x2") || 0)),
+            endpointY: Math.round(Number(core?.getAttribute("y2") || 0)),
+            botCenter: markerCenter("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot[data-bot-id='" + window.__stagingVisualBot.id + "']"),
+            remoteTargetCenter: targetId === "remote-target-session"
+              ? markerCenter("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='remote-target-session']")
+              : { x: 0, y: 0 },
+            cockpitPoint: cockpitPoint
+              ? { x: Math.round(cockpitPoint.x), y: Math.round(cockpitPoint.y) }
+              : { x: 0, y: 0 }
+          };
+        };
+        const localBotReturn = renderBotReturnHit("local-session", 2);
+        const thirdPartyBotReturn = renderBotReturnHit("remote-target-session", 3);
         return {
           shield,
           armor,
           hull,
           thirdParty,
-          botReturnBeamCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='bot']").length || 0,
+          localBotReturn,
+          thirdPartyBotReturn,
+          botReturnBeamCount: localBotReturn.beamCount,
           botReturnMuzzleCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-muzzle.is-bot-return").length,
-          botReturnShieldHitCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='bot'] .combat-fx-impact").length || 0
+          botReturnShieldHitCount: localBotReturn.hitCount
         };
       })()
     `));
@@ -4287,6 +4323,16 @@ test.describe("Lupen browser smoke", () => {
     expect(pvpRemoteShotState.botReturnBeamCount).toBe(1);
     expect(pvpRemoteShotState.botReturnMuzzleCount).toBe(0);
     expect(pvpRemoteShotState.botReturnShieldHitCount).toBe(1);
+    expect(Math.abs(pvpRemoteShotState.localBotReturn.sourceX - pvpRemoteShotState.localBotReturn.botCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.localBotReturn.sourceY - pvpRemoteShotState.localBotReturn.botCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.localBotReturn.endpointX - pvpRemoteShotState.localBotReturn.cockpitPoint.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.localBotReturn.endpointY - pvpRemoteShotState.localBotReturn.cockpitPoint.y)).toBeLessThanOrEqual(1);
+    expect(pvpRemoteShotState.localBotReturn.endpointY).toBeGreaterThan(pvpRemoteShotState.localBotReturn.botCenter.y);
+    expect(pvpRemoteShotState.thirdPartyBotReturn.beamCount).toBe(1);
+    expect(Math.abs(pvpRemoteShotState.thirdPartyBotReturn.sourceX - pvpRemoteShotState.thirdPartyBotReturn.botCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.thirdPartyBotReturn.sourceY - pvpRemoteShotState.thirdPartyBotReturn.botCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.thirdPartyBotReturn.endpointX - pvpRemoteShotState.thirdPartyBotReturn.remoteTargetCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.thirdPartyBotReturn.endpointY - pvpRemoteShotState.thirdPartyBotReturn.remoteTargetCenter.y)).toBeLessThanOrEqual(1);
 
     const staleMissingBotState = await page.evaluate(() => window.eval(`
       (() => {
@@ -4608,7 +4654,12 @@ test.describe("Lupen browser smoke", () => {
         showIncomingHitFlash({ armorHit: true });
         const fxLayer = document.getElementById("combatFxLayer");
         const localShot = fxLayer?.querySelector(".combat-fx-shot[data-owner='local']");
+        const botShot = fxLayer?.querySelector(".combat-fx-shot[data-owner='bot']");
         const localCores = Array.from(localShot?.querySelectorAll(".combat-fx-beam-core") || []);
+        const botCore = botShot?.querySelector(".combat-fx-beam-core");
+        const cockpitPoint = typeof getLocalPlayerIncomingFireEndpoint === "function"
+          ? getLocalPlayerIncomingFireEndpoint()
+          : null;
         return {
           combatFxLayerExists: !!fxLayer,
           combatFxShotCount: fxLayer?.querySelectorAll(".combat-fx-shot").length || 0,
@@ -4621,6 +4672,9 @@ test.describe("Lupen browser smoke", () => {
           localSourceCount: Number(localShot?.dataset.sourceCount || 0),
           localUniqueSourceYCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("y1") || 0)))).size,
           localUniqueTargetCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("x2") || 0)) + ":" + Math.round(Number(line.getAttribute("y2") || 0)))).size,
+          botEndpointX: Math.round(Number(botCore?.getAttribute("x2") || 0)),
+          botEndpointY: Math.round(Number(botCore?.getAttribute("y2") || 0)),
+          cockpitPoint: cockpitPoint ? { x: Math.round(cockpitPoint.x), y: Math.round(cockpitPoint.y) } : { x: 0, y: 0 },
           playerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot").length,
           simplePlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.simple-combat-laser.player-shot").length,
           polishedPlayerShotCount: document.querySelectorAll("#laserLayer .laser-burst.player-shot-polished").length,
@@ -4649,6 +4703,8 @@ test.describe("Lupen browser smoke", () => {
     expect(visualState.localSourceCount).toBe(5);
     expect(visualState.localUniqueSourceYCount).toBeGreaterThanOrEqual(2);
     expect(visualState.localUniqueTargetCount).toBe(1);
+    expect(Math.abs(visualState.botEndpointX - visualState.cockpitPoint.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(visualState.botEndpointY - visualState.cockpitPoint.y)).toBeLessThanOrEqual(1);
     expect(visualState.playerShotCount).toBe(0);
     expect(visualState.simplePlayerShotCount).toBe(0);
     expect(visualState.polishedPlayerShotCount).toBe(0);

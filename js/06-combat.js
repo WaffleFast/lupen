@@ -589,6 +589,39 @@ function getCombatFxActiveBounds(context = ensureCombatFxLayer()) {
   };
 }
 
+function getCombatFxPointFromClientPoint(clientX, clientY) {
+  const context = ensureCombatFxLayer();
+  const spaceScreen = document.getElementById("spaceScreen");
+  if (!context || !spaceScreen) return null;
+  const rect = spaceScreen.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  return {
+    x: Math.max(0, Math.min(context.width, Number(clientX || 0) - rect.left)),
+    y: Math.max(0, Math.min(context.height, Number(clientY || 0) - rect.top)),
+    width: context.width,
+    height: context.height
+  };
+}
+
+function getLocalPlayerIncomingFireEndpoint() {
+  const spaceScreen = document.getElementById("spaceScreen");
+  const cockpitPanel =
+    document.querySelector(".player-bottom-hud .ship-panel") ||
+    document.querySelector(".player-bottom-hud .ship-display-panel") ||
+    document.querySelector(".player-bottom-hud");
+  if (!spaceScreen || !cockpitPanel) return null;
+
+  const screenRect = spaceScreen.getBoundingClientRect();
+  const panelRect = cockpitPanel.getBoundingClientRect();
+  if (!screenRect.width || !screenRect.height || !panelRect.width || !panelRect.height) return null;
+
+  const edgeOffset = Math.max(6, Math.min(16, screenRect.height * 0.012));
+  return getCombatFxPointFromClientPoint(
+    panelRect.left + panelRect.width / 2,
+    Math.max(screenRect.top + 12, Math.min(screenRect.bottom - 1, panelRect.top - edgeOffset))
+  );
+}
+
 function getLocalCombatFxOriginsForTarget(targetPoint = {}, beamCount = LOCAL_COMBAT_FX_BEAM_COUNT) {
   const context = ensureCombatFxLayer();
   if (!context) return null;
@@ -856,12 +889,8 @@ function incomingLaserBurstFromBot(bot, delay = 0, options = {}) {
     targetType: options.targetType || (getStagingBotTargetById(bot.id) ? "stagingBot" : "hostileBot"),
     targetId: bot.id
   });
-  const bounds = getCombatFxActiveBounds(context);
-  if (!bounds) return;
-  const targetPoint = {
-    x: context.width * 0.5,
-    y: bounds.bottom - 18
-  };
+  const targetPoint = getLocalPlayerIncomingFireEndpoint();
+  if (!targetPoint) return;
 
   const drawIncoming = () => {
     renderCombatFxBeam(sourcePoint, targetPoint, {
@@ -1459,6 +1488,7 @@ window.clearAllCombatVisuals = clearAllCombatVisuals;
 window.renderCombatFxBeam = renderCombatFxBeam;
 window.renderCombatFxImpact = renderCombatFxImpact;
 window.getCombatFxPointFromPercent = getCombatFxPointFromPercent;
+window.getLocalPlayerIncomingFireEndpoint = getLocalPlayerIncomingFireEndpoint;
 window.getLocalCombatFxOriginForTarget = getLocalCombatFxOriginForTarget;
 window.getLocalCombatFxOriginsForTarget = getLocalCombatFxOriginsForTarget;
 window.clearRemotePlayerTarget = clearRemotePlayerTarget;

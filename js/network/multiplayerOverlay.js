@@ -2949,6 +2949,34 @@
     return toCombatFxLayerPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
   }
 
+  function isValidCombatFxPoint(point) {
+    return Number.isFinite(Number(point?.x)) && Number.isFinite(Number(point?.y));
+  }
+
+  function getLocalCockpitImpactPoint() {
+    if (typeof global.getLocalPlayerIncomingFireEndpoint === "function") {
+      const sharedPoint = global.getLocalPlayerIncomingFireEndpoint();
+      if (isValidCombatFxPoint(sharedPoint)) return sharedPoint;
+    }
+
+    const spaceScreen = global.document?.getElementById("spaceScreen");
+    const cockpitPanel =
+      global.document?.querySelector(".player-bottom-hud .ship-panel") ||
+      global.document?.querySelector(".player-bottom-hud .ship-display-panel") ||
+      global.document?.querySelector(".player-bottom-hud");
+    if (!spaceScreen || !cockpitPanel) return null;
+
+    const screenRect = spaceScreen.getBoundingClientRect();
+    const panelRect = cockpitPanel.getBoundingClientRect();
+    if (!screenRect.width || !screenRect.height || !panelRect.width || !panelRect.height) return null;
+
+    const edgeOffset = Math.max(6, Math.min(16, screenRect.height * 0.012));
+    return toCombatFxLayerPoint(
+      panelRect.left + panelRect.width / 2,
+      Math.max(screenRect.top + 12, Math.min(screenRect.bottom - 1, panelRect.top - edgeOffset))
+    );
+  }
+
   function findSpaceGhostMarker(playerId) {
     const id = String(playerId || "");
     if (!id) return null;
@@ -2977,6 +3005,9 @@
     const localSessionId = String(status?.sessionId || "");
     if (targetType === "player") {
       if (targetId && targetId === localSessionId) {
+        if (options.useLocalCockpitImpactPoint === true) {
+          return getLocalCockpitImpactPoint();
+        }
         return getCombatFxPixelPointFromSpacePercent(targetPosition);
       }
       return getElementCenterCombatFxPoint(findSpaceGhostMarker(targetId));
@@ -3001,8 +3032,10 @@
       const markerPoint = getElementCenterCombatFxPoint(findSpaceGhostMarker(attackerId));
       return markerPoint || (options.requireRenderedMarker === true || eventType === "pvp" ? null : getCombatFxPixelPointFromSpacePercent(attackerPosition));
     }
+    const markerPoint = getElementCenterCombatFxPoint(findSpaceBotMarker(attackerId));
+    if (markerPoint) return markerPoint;
     return attacker && isSameCurrentNode(attacker)
-      ? getCombatFxPixelPointFromSpacePercent(attackerPosition)
+      ? (options.requireRenderedMarker === true ? null : getCombatFxPixelPointFromSpacePercent(attackerPosition))
       : null;
   }
 
@@ -3057,23 +3090,25 @@
     const isLocalShot = event.attackerSessionId === status.sessionId;
     const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
     const isRemotePlayerShot = !isLocalShot && !isBotReturnFire && Boolean(event.attackerSessionId || event.attackerId);
+    const targetId = String(event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "");
+    const isLocalIncomingBotFire = isBotReturnFire && targetId === String(status.sessionId || "");
     const attackerPosition = attacker && isSameCurrentNode(attacker)
       ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
       : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
 
     const impactLayer = getCombatVisualImpactLayer(event, target);
     const targetPoint = resolveCombatTargetPoint(event, targetPosition, status, {
-      requireRenderedMarker: isRemotePlayerShot
+      requireRenderedMarker: isRemotePlayerShot || isLocalIncomingBotFire,
+      useLocalCockpitImpactPoint: isLocalIncomingBotFire
     });
     if (!targetPoint) return;
     const remoteSourcePoint = resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot, {
-      requireRenderedMarker: isRemotePlayerShot
+      requireRenderedMarker: isRemotePlayerShot || isLocalIncomingBotFire
     });
     const sourcePoint = isLocalShot && typeof global.getLocalCombatFxOriginsForTarget === "function"
       ? global.getLocalCombatFxOriginsForTarget(targetPoint)
       : remoteSourcePoint;
     if (!sourcePoint) return;
-    const targetId = String(event.targetId || event.targetBotId || event.resourceId || event.targetPlayerId || "");
     const targetType = String(event.targetType || event.type || "target");
     if (typeof global.renderCombatFxBeam === "function") {
       global.renderCombatFxBeam(sourcePoint, targetPoint, {
