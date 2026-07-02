@@ -325,6 +325,7 @@ function resetToNoShipStarterState() {
 
   mineralKeys.forEach(mineral => { cargo[mineral] = 0; });
   cargoCostBasis = {};
+  cargoRecovered = {};
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   currentShipId = "";

@@ -494,7 +494,10 @@ function renderInventoryDrawerDetail(entry) {
 
   if (entry.type === "cargo") {
     const unitBasis = cargoCostBasis[entry.key] || 0;
-    const recoveredCargo = !unitBasis && Number(entry.quantity || 0) > 0;
+    const recoveredQuantity = typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity(entry.key) : (!unitBasis ? Number(entry.quantity || 0) : 0);
+    const heldQuantity = Number(entry.quantity || 0);
+    const recoveredCargo = recoveredQuantity > 0 && recoveredQuantity >= heldQuantity;
+    const mixedCargo = recoveredQuantity > 0 && recoveredQuantity < heldQuantity;
     detail.innerHTML = `
       <div class="inventory-detail-title">
         <img src="${entry.icon}" alt="${entry.name}">
@@ -502,8 +505,9 @@ function renderInventoryDrawerDetail(entry) {
       </div>
       <div class="inventory-detail-stats">
         <span>Held <strong>${formatNumber(entry.quantity)}</strong></span>
-        <span>Source <strong>${recoveredCargo ? "Recovered" : "Purchased"}</strong></span>
-        <span>Avg Cost <strong>${unitBasis ? `CR ${formatNumber(Math.round(unitBasis))}` : "None"}</strong></span>
+        <span>Source <strong>${recoveredCargo ? "Recovered" : mixedCargo ? "Mixed" : "Purchased"}</strong></span>
+        <span>Avg Cost <strong>${recoveredCargo || !unitBasis ? "None" : `CR ${formatNumber(Math.round(unitBasis))}`}</strong></span>
+        ${mixedCargo ? `<span>Recovered <strong>${formatNumber(recoveredQuantity)}</strong></span>` : ""}
       </div>
     `;
     return;
@@ -1373,6 +1377,9 @@ function calculateDisabledCargoLoss() {
 
     if (cargoCostBasis[mineral]) {
       delete cargoCostBasis[mineral];
+    }
+    if (cargoRecovered?.[mineral]) {
+      delete cargoRecovered[mineral];
     }
   });
 

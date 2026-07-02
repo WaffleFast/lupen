@@ -415,6 +415,21 @@ function getCargoCostBasisForResource(good = "") {
   return Number.isFinite(basis) && basis > 0 ? basis : null;
 }
 
+function getPurchasedCargoQuantity(good = "") {
+  const held = Math.max(0, Number(cargo[good] || 0));
+  const recovered = typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity(good) : 0;
+  return Math.max(0, held - recovered);
+}
+
+function updatePurchasedCargoCostBasis(good, quantity, price) {
+  const boughtQuantity = Math.max(0, Math.round(Number(quantity || 0)));
+  const unitPrice = Number(price || 0);
+  if (!good || !boughtQuantity || !Number.isFinite(unitPrice) || unitPrice <= 0) return;
+  const purchasedBefore = Math.max(0, getPurchasedCargoQuantity(good) - boughtQuantity);
+  const previousBasis = cargoCostBasis[good] || unitPrice;
+  cargoCostBasis[good] = Math.round(((purchasedBefore * previousBasis) + (boughtQuantity * unitPrice)) / Math.max(1, purchasedBefore + boughtQuantity));
+}
+
 function getMultiplayerStagingOfferQuantityLimit(_offer) {
   return MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY;
 }
@@ -1447,13 +1462,10 @@ function buyMarketCargo() {
     return;
   }
 
-  const previousHeld = cargo[good] || 0;
-  const previousBasis = cargoCostBasis[good] || price;
-
   marketBuyInProgress = true;
   credits -= totalCost;
-  cargo[good] = previousHeld + quantity;
-  cargoCostBasis[good] = Math.round(((previousHeld * previousBasis) + totalCost) / Math.max(1, previousHeld + quantity));
+  cargo[good] = (cargo[good] || 0) + quantity;
+  updatePurchasedCargoCostBasis(good, quantity, price);
   setActiveTradeObjective({
     id: stagingTradeActive ? `staging-trade-${stagingOffer.offerId || Date.now()}` : `market-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
     good,
@@ -1517,12 +1529,14 @@ function sellMarketCargo() {
     : held;
   const price = stagingTradeActive ? Number(stagingOffer.sellPrice || 0) : getEffectiveSellPrice(good, currentPlanet);
   const cargoUnitBasis = getCargoCostBasisForResource(good);
-  const recoveredCargoSale = cargoUnitBasis === null;
-  const unitCost = recoveredCargoSale
-    ? 0
-    : cargoUnitBasis || (stagingTradeActive ? Number(stagingOffer.buyPrice || 0) : getEffectiveBuyPrice(good, currentPlanet)) || price;
+  const recoveredHeld = typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity(good) : (cargoUnitBasis === null ? held : 0);
+  const recoveredSold = Math.min(quantity, recoveredHeld);
+  const purchasedSold = Math.max(0, quantity - recoveredSold);
+  const recoveredCargoSale = recoveredSold > 0 && purchasedSold === 0;
+  const unitCost = cargoUnitBasis || (stagingTradeActive ? Number(stagingOffer.buyPrice || 0) : getEffectiveBuyPrice(good, currentPlanet)) || price;
   const saleRevenue = price * quantity;
-  const tradeProfit = recoveredCargoSale ? saleRevenue : quantity * (price - unitCost);
+  const purchasedProfit = purchasedSold * (price - unitCost);
+  const tradeProfit = recoveredCargoSale ? saleRevenue : (recoveredSold * price) + purchasedProfit;
 
   if (quantity <= 0 || !price) {
     if (typeof addHudToast === "function") addHudToast(`Cannot sell ${good} at this market.`);
@@ -1530,22 +1544,23 @@ function sellMarketCargo() {
   }
 
   marketSellInProgress = true;
+  if (typeof consumeRecoveredCargoQuantity === "function") consumeRecoveredCargoQuantity(good, recoveredSold);
   cargo[good] = Math.max(0, held - quantity);
   credits += saleRevenue;
-  if (cargo[good] <= 0) delete cargoCostBasis[good];
+  if (cargo[good] <= 0 || getPurchasedCargoQuantity(good) <= 0) delete cargoCostBasis[good];
   playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + quantity;
 
   const activeTrade = getActiveTradePricing(good);
-  if (!recoveredCargoSale && activeTrade && currentPlanet === activeTrade.destination) {
+  if (purchasedSold > 0 && activeTrade && currentPlanet === activeTrade.destination) {
     updateActiveTradeProgress({
-      realizedProfit: Math.max(0, Number(activeTrade.realizedProfit || 0)) + Math.max(0, tradeProfit)
+      realizedProfit: Math.max(0, Number(activeTrade.realizedProfit || 0)) + Math.max(0, purchasedProfit)
     });
   }
 
-  if (recoveredCargoSale && typeof addActivityLog === "function") {
-    addActivityLog(`Recovered resource sale: sold ${formatNumber(quantity)} ${good} at ${currentPlanet} for CR ${formatNumber(saleRevenue)} value.`);
+  if (recoveredSold > 0 && typeof addActivityLog === "function") {
+    addActivityLog(`Recovered resource sale: sold ${formatNumber(recoveredSold)} ${good} at ${currentPlanet} for CR ${formatNumber(recoveredSold * price)} value.`);
   } else if (stagingTradeActive && typeof addActivityLog === "function") {
-    addActivityLog(`Sold ${formatNumber(quantity)} ${good} at ${currentPlanet} for ${tradeProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(tradeProfit))} profit.`);
+    addActivityLog(`Sold ${formatNumber(quantity)} ${good} at ${currentPlanet} for ${purchasedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(purchasedProfit))} profit.`);
   }
   showTradeResultBurst({
     good,
@@ -1557,7 +1572,7 @@ function sellMarketCargo() {
     detail: recoveredCargoSale ? `Sold ${formatNumber(quantity)} ${good} at ${currentPlanet}` : ""
   });
   showTradeMiniFloat({ profit: tradeProfit });
-  if (!recoveredCargoSale) completeActiveTradeIfReady(good);
+  if (purchasedSold > 0) completeActiveTradeIfReady(good);
   tutorialEvent("soldTradeCargo");
   saveGame();
   renderMarketplace();
@@ -3771,9 +3786,6 @@ function buyGood(good) {
     return;
   }
 
-  const previousHeld = cargo[good] || 0;
-  const previousBasis = cargoCostBasis[good] || price;
-
   credits -= price * maxBuy;
   cargo[good] += maxBuy;
 
@@ -3785,7 +3797,7 @@ function buyGood(good) {
     });
   }
 
-  cargoCostBasis[good] = Math.round(((previousHeld * previousBasis) + (maxBuy * price)) / Math.max(1, previousHeld + maxBuy));
+  updatePurchasedCargoCostBasis(good, maxBuy, price);
 
   tutorialEvent("boughtTradeCargo");
   saveGame();
@@ -3828,20 +3840,25 @@ function sellGood(good) {
 
   const activeTrade = getActiveTradePricing(good);
   const cargoUnitBasis = getCargoCostBasisForResource(good);
-  const recoveredCargoSale = cargoUnitBasis === null;
-  const unitCost = recoveredCargoSale ? 0 : cargoUnitBasis || activeTrade?.buyPrice || price;
-  const tradeProfit = recoveredCargoSale ? price * maxSell : maxSell * (price - unitCost);
-  const saleProfit = !recoveredCargoSale && activeTrade && currentNode === activeTrade.destination
-    ? Math.max(0, tradeProfit)
+  const recoveredHeld = typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity(good) : (cargoUnitBasis === null ? maxSell : 0);
+  const recoveredSold = Math.min(maxSell, recoveredHeld);
+  const purchasedSold = Math.max(0, maxSell - recoveredSold);
+  const recoveredCargoSale = recoveredSold > 0 && purchasedSold === 0;
+  const unitCost = cargoUnitBasis || activeTrade?.buyPrice || price;
+  const purchasedProfit = purchasedSold * (price - unitCost);
+  const tradeProfit = recoveredCargoSale ? price * maxSell : (recoveredSold * price) + purchasedProfit;
+  const saleProfit = purchasedSold > 0 && activeTrade && currentNode === activeTrade.destination
+    ? Math.max(0, purchasedProfit)
     : 0;
   const saleRevenue = price * maxSell;
 
+  if (typeof consumeRecoveredCargoQuantity === "function") consumeRecoveredCargoQuantity(good, recoveredSold);
   cargo[good] -= maxSell;
   credits += saleRevenue;
   playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + maxSell;
 
-  if (recoveredCargoSale && typeof addActivityLog === "function") {
-    addActivityLog(`Recovered resource sale: sold ${formatNumber(maxSell)} ${good} at ${currentNode} for CR ${formatNumber(saleRevenue)} value.`);
+  if (recoveredSold > 0 && typeof addActivityLog === "function") {
+    addActivityLog(`Recovered resource sale: sold ${formatNumber(recoveredSold)} ${good} at ${currentNode} for CR ${formatNumber(recoveredSold * price)} value.`);
   }
 
   showTradeResultBurst({
@@ -3861,12 +3878,12 @@ function sellGood(good) {
     });
   }
 
-  if ((cargo[good] || 0) <= 0) {
+  if ((cargo[good] || 0) <= 0 || getPurchasedCargoQuantity(good) <= 0) {
     delete cargoCostBasis[good];
     if (selectedLooseCargoSellGood === good) selectedLooseCargoSellGood = null;
   }
 
-  if (!recoveredCargoSale) completeActiveTradeIfReady(good);
+  if (purchasedSold > 0) completeActiveTradeIfReady(good);
   tutorialEvent("soldTradeCargo");
   saveGame();
   renderMarketplace();

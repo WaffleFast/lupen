@@ -1621,6 +1621,7 @@ function depositLootToCargo(drops) {
 
     if (collectedQuantity > 0) {
       cargo[mineral] += collectedQuantity;
+      if (typeof addRecoveredCargoQuantity === "function") addRecoveredCargoQuantity(mineral, collectedQuantity);
       collected[mineral] = (collected[mineral] || 0) + collectedQuantity;
       collectedAmount += collectedQuantity;
       availableSpace -= collectedQuantity;

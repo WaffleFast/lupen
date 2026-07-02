@@ -740,6 +740,50 @@ const cargo = {
 };
 
 let cargoCostBasis = {};
+let cargoRecovered = {};
+
+function getRecoveredCargoQuantity(good) {
+  if (!good || !cargoRecovered || typeof cargoRecovered !== "object") return 0;
+  return Math.max(0, Math.min(Number(cargo[good] || 0), Math.round(Number(cargoRecovered[good] || 0))));
+}
+
+function addRecoveredCargoQuantity(good, quantity) {
+  const amount = Math.max(0, Math.round(Number(quantity || 0)));
+  if (!good || !amount || !mineralKeys.includes(good)) return 0;
+  cargoRecovered[good] = getRecoveredCargoQuantity(good) + amount;
+  cargoRecovered[good] = Math.min(Number(cargo[good] || 0), cargoRecovered[good]);
+  if (cargoRecovered[good] <= 0) delete cargoRecovered[good];
+  return getRecoveredCargoQuantity(good);
+}
+
+function consumeRecoveredCargoQuantity(good, quantity) {
+  const amount = Math.max(0, Math.round(Number(quantity || 0)));
+  const recovered = getRecoveredCargoQuantity(good);
+  const consumed = Math.min(recovered, amount);
+  if (consumed > 0) {
+    cargoRecovered[good] = recovered - consumed;
+    if (cargoRecovered[good] <= 0) delete cargoRecovered[good];
+  }
+  return consumed;
+}
+
+function pruneRecoveredCargoQuantities() {
+  if (!cargoRecovered || typeof cargoRecovered !== "object") {
+    cargoRecovered = {};
+    return cargoRecovered;
+  }
+  Object.keys(cargoRecovered).forEach((good) => {
+    if (!mineralKeys.includes(good)) {
+      delete cargoRecovered[good];
+      return;
+    }
+    const amount = getRecoveredCargoQuantity(good);
+    if (amount > 0) cargoRecovered[good] = amount;
+    else delete cargoRecovered[good];
+  });
+  return cargoRecovered;
+}
+
 let activeTradeTerminalTab = "market";
 let tradeTerminalTimer = null;
 let storeDailyTimer = null;

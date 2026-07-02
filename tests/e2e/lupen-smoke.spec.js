@@ -2924,6 +2924,7 @@ test.describe("Lupen browser smoke", () => {
         cargo.Iron = 0;
         cargo["Crystal Shards"] = 0;
         cargo.Copper = 0;
+        if (typeof cargoRecovered === "object") delete cargoRecovered.Copper;
         delete cargoCostBasis.Copper;
         window.lupenStagingResourceAwardedKeys = new Set();
         applyStagingResourceMineResult({
@@ -2982,6 +2983,7 @@ test.describe("Lupen browser smoke", () => {
           creditsAfter: credits,
           cargoAfter: cargo.Copper || 0,
           cargoBasisAfter: cargoCostBasis.Copper || null,
+          recoveredAfter: typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity("Copper") : 0,
           tradeProfitBefore,
           tradeProfitAfter: playerProgress.totals.tradeProfit || 0,
           totalTradingProfitBefore,
@@ -2994,11 +2996,66 @@ test.describe("Lupen browser smoke", () => {
     expect(recoveredSell.creditsAfter).toBe(recoveredSell.creditsBefore + 1200);
     expect(recoveredSell.cargoAfter).toBe(0);
     expect(recoveredSell.cargoBasisAfter).toBe(null);
+    expect(recoveredSell.recoveredAfter).toBe(0);
     expect(recoveredSell.tradeProfitAfter).toBe(recoveredSell.tradeProfitBefore);
     expect(recoveredSell.totalTradingProfitAfter).toBe(recoveredSell.totalTradingProfitBefore);
     expect(recoveredSell.burstText).toContain("Recovered Cargo Sold");
     expect(recoveredSell.burstText).toContain("+CR 1,200 value");
     expect(recoveredSell.activityText).toContain("Recovered resource sale");
+
+    const mixedRecoveredTradeSell = await page.evaluate(() => window.eval(`
+      (() => {
+        currentNode = "Nyxara";
+        lastPlanetNode = "Nyxara";
+        credits = 10000;
+        cargo.Copper = 30;
+        cargoRecovered.Copper = 12;
+        cargoCostBasis.Copper = 38;
+        playerProgress = normalizePlayerProgress({ combatXp: 0, totals: { tradeProfit: 0, totalTradingProfit: 0 } });
+        activeTradeRoute = {
+          id: "mixed-copper-route",
+          type: "trade",
+          marketTrade: true,
+          stagingTrade: true,
+          good: "Copper",
+          origin: "Asteron Prime",
+          destination: "Nyxara",
+          buyPrice: 38,
+          sellPrice: 50,
+          profitPerUnit: 12,
+          maxUnits: 18,
+          purchasedUnits: 18,
+          realizedProfit: 0,
+          status: "active"
+        };
+        activeObjective = createTradeObjective(activeTradeRoute);
+        selectedMarketResource = "Copper";
+        selectedMarketTargetPlanet = "Nyxara";
+        selectedMarketQuantity = 30;
+        sellMarketCargo();
+        const saved = JSON.parse(localStorage.getItem(STORAGE_GAME_KEY) || "{}");
+        return {
+          credits,
+          cargoAfter: cargo.Copper || 0,
+          recoveredAfter: typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity("Copper") : 0,
+          cargoBasisAfter: cargoCostBasis.Copper || null,
+          tradeProfit: playerProgress.totals.tradeProfit || 0,
+          totalTradingProfit: playerProgress.totals.totalTradingProfit || 0,
+          savedRecoveredAfter: saved.cargoRecovered?.Copper || 0,
+          savedCargoAfter: saved.cargo?.Copper || 0,
+          savedTradeProfit: saved.playerProgress?.totals?.tradeProfit || 0
+        };
+      })()
+    `));
+    expect(mixedRecoveredTradeSell.credits).toBe(11500);
+    expect(mixedRecoveredTradeSell.cargoAfter).toBe(0);
+    expect(mixedRecoveredTradeSell.recoveredAfter).toBe(0);
+    expect(mixedRecoveredTradeSell.cargoBasisAfter).toBe(null);
+    expect(mixedRecoveredTradeSell.tradeProfit).toBe(216);
+    expect(mixedRecoveredTradeSell.totalTradingProfit).toBe(216);
+    expect(mixedRecoveredTradeSell.savedRecoveredAfter).toBe(0);
+    expect(mixedRecoveredTradeSell.savedCargoAfter).toBe(0);
+    expect(mixedRecoveredTradeSell.savedTradeProfit).toBe(216);
 
     await page.evaluate(() => {
       if (typeof window.showMultiplayerStagingTradeSellFeedback === "function") {
@@ -3044,8 +3101,8 @@ test.describe("Lupen browser smoke", () => {
       tradeProfit: playerProgress.totals.tradeProfit || 0,
       totalTradingProfit: playerProgress.totals.totalTradingProfit || 0
     })`));
-    expect(recoveredProgress.tradeProfit).toBe(72);
-    expect(recoveredProgress.totalTradingProfit).toBe(72);
+    expect(recoveredProgress.tradeProfit).toBe(216);
+    expect(recoveredProgress.totalTradingProfit).toBe(216);
     await expect(page.locator("#activityLogFeed")).toContainText("Recovered resource sale");
 
     await expectNoUnexpectedBrowserErrors(failures);

@@ -207,6 +207,7 @@ function buildSaveState(options = {}) {
     leftUnderAttack,
     credits,
     cargo,
+    cargoRecovered: typeof pruneRecoveredCargoQuantities === "function" ? pruneRecoveredCargoQuantities() : cargoRecovered,
     cargoCostBasis,
     currentNode: savedCurrentNode,
     lastPlanetNode: savedLastPlanetNode,
@@ -877,6 +878,7 @@ function applyLoadedGameState(rawSaved) {
   applyTrustedStagingXpIfNewer("loadGameFromSupabase");
   upgradeMaterials = normalizeUpgradeMaterials(saved.upgradeMaterials);
   cargoCostBasis = saved.cargoCostBasis ?? cargoCostBasis;
+  cargoRecovered = saved.cargoRecovered && typeof saved.cargoRecovered === "object" ? saved.cargoRecovered : cargoRecovered;
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   const savedOwnedShips = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : ownedShips;
@@ -1009,6 +1011,14 @@ function applyLoadedGameState(rawSaved) {
       cargo[mineral] = saved.cargo[mineral] ?? cargo[mineral];
     });
   }
+  if (!saved.cargoRecovered) {
+    mineralKeys.forEach(mineral => {
+      if (Number(cargo[mineral] || 0) > 0 && !Number(cargoCostBasis?.[mineral] || 0)) {
+        cargoRecovered[mineral] = Math.max(0, Math.round(Number(cargo[mineral] || 0)));
+      }
+    });
+  }
+  if (typeof pruneRecoveredCargoQuantities === "function") pruneRecoveredCargoQuantities();
 
   shieldEnabled = true;
   applyShipStats(false);
