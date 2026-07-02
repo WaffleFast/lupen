@@ -66,7 +66,13 @@
     lastStagingResourceEvent: null,
     chatMessages: [],
     presenceEvents: [],
-    lastError: null
+    lastError: null,
+    connectionStatus: "disabled",
+    connectionStatusReason: disabledReason,
+    lastConnectedAt: 0,
+    lastDisconnectedAt: 0,
+    reconnectAttemptCount: 0,
+    disconnectRequested: false
   };
   const identity = {
     authStatus: "guest",
@@ -88,6 +94,7 @@
   let authStateListenerRegistered = false;
   let stagingCombatRefreshTimer = null;
   let stagingCombatRefreshRetryTimer = null;
+  let reconnectTimer = null;
   const playersById = new Map();
   const botsById = new Map();
   const resourcesById = new Map();
@@ -145,6 +152,71 @@
       stagingActivityLogKeys.delete(oldest);
     }
     global.addActivityLog?.(message);
+  }
+
+  function setMultiplayerConnectionStatus(status, reason = "") {
+    const nextStatus = String(status || "disabled");
+    const nextReason = String(reason || nextStatus);
+    if (connection.connectionStatus === nextStatus && connection.connectionStatusReason === nextReason) return;
+    connection.connectionStatus = nextStatus;
+    connection.connectionStatusReason = nextReason;
+
+    if (nextStatus === "online") {
+      connection.lastConnectedAt = Date.now();
+      connection.reconnectAttemptCount = 0;
+      addStagingActivityLogOnce(`mp-status-online:${Math.floor(connection.lastConnectedAt / 10000)}`, "Multiplayer connected.");
+    } else if (["reconnecting", "disconnected", "server_unavailable"].includes(nextStatus)) {
+      connection.lastDisconnectedAt = Date.now();
+      const message = nextStatus === "reconnecting"
+        ? "Connection lost. Reconnecting..."
+        : nextStatus === "server_unavailable"
+          ? "Server unavailable. Retrying..."
+          : "Multiplayer disconnected.";
+      addStagingActivityLogOnce(`mp-status-${nextStatus}:${Math.floor(connection.lastDisconnectedAt / 10000)}`, message);
+    }
+  }
+
+  function notifyConnectionStatusChanged() {
+    notifyServerState(room?.state || null);
+  }
+
+  function clearReconnectTimer() {
+    if (!reconnectTimer) return;
+    global.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  function clearRemoteMultiplayerState(reason = "multiplayer_disconnected") {
+    playersById.clear();
+    resourcesById.clear();
+    clearChatMessages();
+    connection.presenceEvents = [];
+    if (typeof global.clearRemotePlayerTarget === "function") {
+      global.clearRemotePlayerTarget(reason);
+    }
+    if (typeof global.clearAllCombatVisuals === "function") {
+      global.clearAllCombatVisuals();
+    }
+  }
+
+  function scheduleReconnect(reason = "connection_lost") {
+    if (!connection.enabled || connection.disconnectRequested || reconnectTimer) return;
+    connection.reconnectAttemptCount = Math.max(1, Number(connection.reconnectAttemptCount || 0) + 1);
+    if (connection.connectionStatus !== "server_unavailable") {
+      setMultiplayerConnectionStatus("reconnecting", reason);
+    }
+    const delayMs = Math.min(15000, 1200 + (connection.reconnectAttemptCount - 1) * 1800);
+    reconnectTimer = global.setTimeout(() => {
+      reconnectTimer = null;
+      if (!connection.enabled || connection.disconnectRequested || connection.isConnected || connection.isConnecting) return;
+      client.connect({ sendInitialPing: false, reconnectReason: reason }).catch((err) => {
+        setError(err);
+        setMultiplayerConnectionStatus("server_unavailable", "reconnect_failed");
+        scheduleReconnect("reconnect_failed");
+        notifyConnectionStatusChanged();
+      });
+    }, delayMs);
+    notifyConnectionStatusChanged();
   }
 
   function getCombatVisualTargetId(event = {}) {
@@ -250,6 +322,7 @@
     if (!hasDevFlag() && !hasStagingFlag()) {
       connection.enabled = false;
       connection.enabledReason = disabledReason;
+      setMultiplayerConnectionStatus("disabled", disabledReason);
       return;
     }
 
@@ -257,11 +330,13 @@
       if (!isProductionHost() && !isLocalHost()) {
         connection.enabled = false;
         connection.enabledReason = notLocalReason;
+        setMultiplayerConnectionStatus("disabled", notLocalReason);
         return;
       }
     } else if (!isAllowedPageHost()) {
       connection.enabled = false;
       connection.enabledReason = notLocalReason;
+      setMultiplayerConnectionStatus("disabled", notLocalReason);
       return;
     }
 
@@ -269,6 +344,7 @@
       connection.enabled = false;
       connection.enabledReason = serverConfig.error;
       connection.lastError = serverConfig.error;
+      setMultiplayerConnectionStatus("server_unavailable", serverConfig.error);
       return;
     }
 
@@ -280,6 +356,9 @@
         : "allowed_staging_host_enabled";
     if (String(connection.lastError || "").startsWith("invalid_multiplayer_server_url:")) {
       connection.lastError = null;
+    }
+    if (!connection.isConnected && !connection.isConnecting && connection.connectionStatus === "disabled") {
+      setMultiplayerConnectionStatus("disconnected", "not_connected");
     }
   }
 
@@ -2349,7 +2428,12 @@
     ["playerJoined", "playerLeft", "playerMoved"].forEach((type) => {
       activeRoom.onMessage(type, (message) => {
         if ((message?.type || type) === "playerLeft") {
-          removePlayerSnapshot(message?.sessionId || message?.id || message?.playerId);
+          const removedId = String(message?.sessionId || message?.id || message?.playerId || "");
+          removePlayerSnapshot(removedId);
+          clearCombatVisualEventForTarget("player", removedId);
+          if (typeof global.reconcileTargetSessionState === "function") {
+            global.reconcileTargetSessionState("remote_player_left");
+          }
         }
         pushPresenceEvent({ ...message, type: message?.type || type });
         logDev(`server ${type}`, message);
@@ -3339,17 +3423,17 @@
 
     activeRoom.onLeave((code) => {
       logDev(`left ${connection.roomName}`, { code });
+      const requested = connection.disconnectRequested === true;
       connection.isConnected = false;
       connection.isConnecting = false;
       connection.sessionId = null;
       room = null;
       colyseusClient = null;
-      playersById.clear();
+      clearRemoteMultiplayerState(requested ? "manual_disconnect" : "connection_lost");
       botsById.clear();
-      resourcesById.clear();
-      clearChatMessages();
-      connection.presenceEvents = [];
+      setMultiplayerConnectionStatus(requested ? "disconnected" : "reconnecting", requested ? "manual_disconnect" : `room_left_${code || "unknown"}`);
       notifyServerState(null);
+      if (!requested) scheduleReconnect(`room_left_${code || "unknown"}`);
     });
   }
 
@@ -3382,6 +3466,11 @@
       isConnected: connection.isConnected,
       connected: connection.isConnected,
       isConnecting: connection.isConnecting,
+      connectionStatus: connection.connectionStatus,
+      connectionStatusReason: connection.connectionStatusReason,
+      lastConnectedAt: connection.lastConnectedAt,
+      lastDisconnectedAt: connection.lastDisconnectedAt,
+      reconnectAttemptCount: connection.reconnectAttemptCount,
       roomName: connection.roomName,
       sessionId: connection.sessionId,
       currentNode: localPresence.currentNode || "",
@@ -3538,6 +3627,9 @@
 
       connection.isConnecting = true;
       connection.lastError = null;
+      connection.disconnectRequested = false;
+      setMultiplayerConnectionStatus(connection.reconnectAttemptCount > 0 ? "reconnecting" : "connecting", options.reconnectReason || "connect");
+      notifyConnectionStatusChanged();
       connection.roomName = options.roomName || defaultRoomName;
       const serverUrl = options.serverUrl || connection.serverUrl || localServerUrl;
       logDev(`connecting to ${serverUrl}`, { roomName: connection.roomName, source: connection.serverUrlSource });
@@ -3561,6 +3653,8 @@
         connection.isConnected = true;
         connection.isConnecting = false;
         connection.sessionId = room.sessionId;
+        clearReconnectTimer();
+        setMultiplayerConnectionStatus("online", "connected");
         bindRoomEvents(room);
         logDev(`connected to ${connection.roomName}`, { sessionId: connection.sessionId });
 
@@ -3575,6 +3669,7 @@
               ...refreshedPresence,
               reason: "connection_presence_refresh"
             });
+            notifyConnectionStatusChanged();
           }
         }, 300);
         scheduleStagingAuthReconnect();
@@ -3587,6 +3682,9 @@
         room = null;
         colyseusClient = null;
         setError(err);
+        setMultiplayerConnectionStatus("server_unavailable", "connection_failed");
+        scheduleReconnect("connection_failed");
+        notifyConnectionStatusChanged();
         return statusResult("connect", false, { reason: "connection_failed" });
       }
     },
@@ -3599,29 +3697,30 @@
       }
 
       if (!room) {
+        clearReconnectTimer();
+        connection.disconnectRequested = true;
         connection.isConnected = false;
         connection.isConnecting = false;
         connection.sessionId = null;
-        playersById.clear();
+        clearRemoteMultiplayerState("manual_disconnect");
         botsById.clear();
-        resourcesById.clear();
-        clearChatMessages();
-        connection.presenceEvents = [];
+        setMultiplayerConnectionStatus("disconnected", "manual_disconnect");
+        notifyServerState(null);
         return statusResult("disconnect", true, { alreadyDisconnected: true });
       }
 
       logDev(`disconnecting from ${connection.roomName}`);
+      clearReconnectTimer();
+      connection.disconnectRequested = true;
       room.leave();
       connection.isConnected = false;
       connection.isConnecting = false;
       connection.sessionId = null;
       room = null;
       colyseusClient = null;
-      playersById.clear();
+      clearRemoteMultiplayerState("manual_disconnect");
       botsById.clear();
-      resourcesById.clear();
-      clearChatMessages();
-      connection.presenceEvents = [];
+      setMultiplayerConnectionStatus("disconnected", "manual_disconnect");
       notifyServerState(null);
       return statusResult("disconnect");
     },

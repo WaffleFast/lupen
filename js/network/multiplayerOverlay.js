@@ -1315,6 +1315,17 @@
         box-shadow: 0 0 8px rgba(117, 242, 255, 0.72);
       }
 
+      #${statusChipId}.is-reconnecting i {
+        background: #ffd36c;
+        box-shadow: 0 0 8px rgba(255, 211, 108, 0.72);
+      }
+
+      #${statusChipId}.is-unavailable i,
+      #${statusChipId}.is-disconnected i {
+        background: #ff7d64;
+        box-shadow: 0 0 8px rgba(255, 125, 100, 0.72);
+      }
+
       #${statusChipId} em {
         max-width: 86px;
         overflow: hidden;
@@ -4170,16 +4181,31 @@
 
     ensureStyles();
 
+    const connectionStatus = String(status.connectionStatus || (status.isConnected ? "online" : status.isConnecting ? "connecting" : "disconnected"));
+    const labelText = connectionStatus === "online"
+      ? "Online"
+      : connectionStatus === "connecting"
+        ? "Connecting"
+        : connectionStatus === "reconnecting"
+          ? "Reconnecting"
+          : connectionStatus === "server_unavailable"
+            ? "Server unavailable"
+            : "Disconnected";
+
     const chip = global.document.createElement("div");
     chip.id = statusChipId;
-    if (status.isConnected) chip.classList.add("is-connected");
+    chip.dataset.connectionStatus = connectionStatus;
+    if (connectionStatus === "online") chip.classList.add("is-connected");
+    if (connectionStatus === "connecting" || connectionStatus === "reconnecting") chip.classList.add("is-reconnecting");
+    if (connectionStatus === "server_unavailable") chip.classList.add("is-unavailable");
+    if (connectionStatus === "disconnected") chip.classList.add("is-disconnected");
     chip.setAttribute("aria-hidden", "true");
 
     const dot = global.document.createElement("i");
     chip.appendChild(dot);
 
     const label = global.document.createElement("span");
-    label.textContent = status.isConnected ? "Multiplayer Staging" : status.isConnecting ? "Staging Connecting" : "Staging Offline";
+    label.textContent = `Multiplayer Staging ${labelText}`;
     chip.appendChild(label);
 
     const room = global.document.createElement("em");
@@ -4666,7 +4692,8 @@
     title.textContent = isStagingMode(status) ? "MP Staging" : "MP Dev Diagnostics";
     panel.appendChild(title);
 
-    setDiagnosticsRow(panel, "status", status.isConnected ? "connected" : status.isConnecting ? "connecting" : "offline");
+    setDiagnosticsRow(panel, "status", `${status.connectionStatus || (status.isConnected ? "online" : status.isConnecting ? "connecting" : "disconnected")} / ${status.connectionStatusReason || "none"}`);
+    setDiagnosticsRow(panel, "reconnects", `${Math.round(Number(status.reconnectAttemptCount || 0))} / last on ${formatRelativeAge(status.lastConnectedAt)} / off ${formatRelativeAge(status.lastDisconnectedAt)}`);
     setDiagnosticsRow(panel, "room", status.roomName || "none");
     setDiagnosticsRow(panel, "local player", getShortSessionId(status.sessionId));
     setDiagnosticsRow(panel, "server", getCompactServerLabel(status));

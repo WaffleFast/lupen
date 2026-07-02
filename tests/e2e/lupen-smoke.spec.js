@@ -1485,13 +1485,129 @@ test.describe("Lupen browser smoke", () => {
     await page.goto("/?mp=staging&debug=mp&mpServer=http://127.0.0.1:1");
     await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("MP Staging", { timeout: 15000 });
-    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText(/offline|connecting|connected/i);
+    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText(/online|reconnecting|disconnected|server_unavailable|connecting|connected/i);
+    await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("reconnects");
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("presence");
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("online names");
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("chat send");
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("Connect");
     await expect(page.locator("#lupenMultiplayerDiagnostics")).toContainText("Refresh Presence");
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("multiplayer connection status chip shows states and remote targets clean up", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&debug=mp&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        currentNode = "Lower Gate Core";
+        showScreen("spaceScreen");
+        const status = {
+          enabled: true,
+          isConnected: true,
+          connected: true,
+          isConnecting: false,
+          connectionStatus: "online",
+          connectionStatusReason: "connected",
+          reconnectAttemptCount: 0,
+          lastConnectedAt: Date.now(),
+          lastDisconnectedAt: 0,
+          enabledReason: "staging_enabled",
+          roomName: "lupen_sector",
+          sessionId: "local-session"
+        };
+        let players = [{
+          id: "remote-status-test",
+          sessionId: "remote-status-test",
+          displayName: "Remote Tester",
+          currentNode,
+          presenceStatus: "space",
+          x: 50,
+          y: 40,
+          lastSeenAt: Date.now()
+        }];
+        window.LupenMultiplayerClient = {
+          enabled: true,
+          getStatus: () => ({ ...status }),
+          getPlayers: ({ includeSelf } = {}) => includeSelf ? players.concat([{ id: "local-session", sessionId: "local-session", isSelf: true, currentNode }]) : players.slice(),
+          getBots: () => [],
+          getResources: () => [],
+          getPresenceEvents: () => [],
+          getSelectedStagingBot: () => null,
+          onServerState: () => ({ unsubscribe() {} }),
+          clearStagingTarget() {}
+        };
+
+        const renderState = (nextStatus) => {
+          status.connectionStatus = nextStatus;
+          status.isConnected = nextStatus === "online";
+          status.connected = status.isConnected;
+          status.isConnecting = nextStatus === "connecting" || nextStatus === "reconnecting";
+          status.connectionStatusReason = nextStatus === "server_unavailable" ? "connection_failed" : nextStatus;
+          if (nextStatus !== "online") {
+            status.lastDisconnectedAt = Date.now();
+            status.reconnectAttemptCount += 1;
+          }
+          window.LupenMultiplayerOverlay.render();
+          const chip = document.getElementById("lupenMultiplayerStatusChip");
+          return {
+            text: chip?.textContent || "",
+            state: chip?.dataset.connectionStatus || "",
+            className: chip?.className || "",
+            diagnostics: document.getElementById("lupenMultiplayerDiagnostics")?.textContent || ""
+          };
+        };
+
+        const online = renderState("online");
+        const reconnecting = renderState("reconnecting");
+        const unavailable = renderState("server_unavailable");
+        const disconnected = renderState("disconnected");
+
+        selectedTarget = { type: "remotePlayer", id: "remote-status-test" };
+        engagedTarget = { type: "remotePlayer", id: "remote-status-test" };
+        engageTimer = setInterval(() => {}, 1000);
+        const fxLayer = document.getElementById("combatFxLayer") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "combatFxLayer" }));
+        const fx = document.createElement("div");
+        fx.className = "combat-fx-shot";
+        fx.dataset.targetId = "remote-status-test";
+        fx.dataset.targetType = "remotePlayer";
+        fxLayer.appendChild(fx);
+        players = [];
+        const cleanup = reconcileTargetSessionState("connection_unavailable");
+
+        return {
+          online,
+          reconnecting,
+          unavailable,
+          disconnected,
+          cleanup,
+          selectedTarget,
+          engagedTarget,
+          engageTimerActive: Boolean(engageTimer),
+          remoteFxRemaining: document.querySelectorAll("#combatFxLayer [data-target-id='remote-status-test']").length
+        };
+      })()
+    `));
+
+    expect(state.online.text).toContain("Multiplayer Staging Online");
+    expect(state.online.state).toBe("online");
+    expect(state.reconnecting.text).toContain("Reconnecting");
+    expect(state.reconnecting.className).toContain("is-reconnecting");
+    expect(state.unavailable.text).toContain("Server unavailable");
+    expect(state.unavailable.className).toContain("is-unavailable");
+    expect(state.disconnected.text).toContain("Disconnected");
+    expect(state.disconnected.className).toContain("is-disconnected");
+    expect(state.unavailable.diagnostics).toContain("reconnects");
+    expect(state.cleanup.cleared).toBe(true);
+    expect(state.selectedTarget).toBeNull();
+    expect(state.engagedTarget).toBeNull();
+    expect(state.engageTimerActive).toBe(false);
+    expect(state.remoteFxRemaining).toBe(0);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
