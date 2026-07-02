@@ -5503,6 +5503,137 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("store and loadout mutations stay idempotent across direct helper calls", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        const alerts = [];
+        const previousAlert = window.alert;
+        window.alert = message => alerts.push(String(message || ""));
+
+        credits = 10000;
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        selectedShipyardShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        ownedGuns = Object.fromEntries(Object.keys(GUNS).map(key => [key, 0]));
+        ownedAttachments = Object.fromEntries(Object.keys(attachments).map(key => [key, 0]));
+        inventoryItems = [];
+        shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: [] }, STARTER_SHIP_ID) };
+        shipConditions = {};
+        storeDailyPurchases = {};
+        playerProgress = normalizePlayerProgress({ combatXp: 0, totals: { botsDestroyed: 0, erebusBotsDestroyed: 0, tradeProfit: 0, totalTradingProfit: 0 } });
+        applyShipStats(true);
+
+        const pulseStoreItem = {
+          ...getStoreCatalogItem("gun", "pulseLaser"),
+          id: "daily:test:pulseLaser",
+          dailyStock: true,
+          stockLimit: 1
+        };
+        const creditsBeforeDaily = credits;
+        buyGun("pulseLaser", pulseStoreItem);
+        buyGun("pulseLaser", pulseStoreItem);
+        const dailyPurchaseState = {
+          ownedPulseLaser: ownedGuns.pulseLaser || 0,
+          creditsAfter: credits,
+          creditsExpected: creditsBeforeDaily - getStorePrice(pulseStoreItem),
+          stockRemaining: getStoreStockRemaining(pulseStoreItem),
+          savedDailyPurchases: JSON.parse(localStorage.getItem("lupenGameState")).storeDailyPurchases[getStoreDayKey()][pulseStoreItem.id]
+        };
+
+        credits = 0;
+        const cargoPodBefore = ownedAttachments.cargoPod || 0;
+        buyAttachment("cargoPod");
+        const noCreditPurchaseState = {
+          credits,
+          cargoPodOwned: ownedAttachments.cargoPod || 0,
+          cargoPodBefore
+        };
+
+        credits = 10000;
+        const shieldBefore = ownedAttachments.shieldBooster || 0;
+        buyAttachment("shieldBooster");
+        const lockedPurchaseState = {
+          shieldBefore,
+          shieldAfter: ownedAttachments.shieldBooster || 0,
+          creditsAfter: credits
+        };
+
+        ownedGuns.pulseLaser = 1;
+        selectedLoadoutSlotCategory = "guns";
+        selectedLoadoutItemContext = { source: "slot", categoryKey: "guns", index: 0, key: "", quality: "standard" };
+        equipGunFromInventory("pulseLaser");
+        equipGunFromInventory("pulseLaser");
+        const duplicateEquipState = {
+          equippedGuns: shipLoadouts[STARTER_SHIP_ID].guns.map(entry => getEquipmentKey(entry)),
+          ownedPulseLaser: ownedGuns.pulseLaser || 0
+        };
+
+        const shipBeforeBlockedEquip = currentShipId;
+        equipShip("bison");
+        const blockedShipState = {
+          before: shipBeforeBlockedEquip,
+          after: currentShipId
+        };
+
+        credits = 0;
+        hull = Math.max(1, hullMax - 100);
+        saveActiveShipCondition(currentShipId);
+        const repairHullBefore = hull;
+        repairCurrentShip();
+        const noCreditRepairState = {
+          credits,
+          hull,
+          repairHullBefore
+        };
+
+        cargo.Copper = 8;
+        cargoRecovered = {};
+        addRecoveredCargoQuantity("Copper", 8);
+        saveGame();
+        const saved = JSON.parse(localStorage.getItem("lupenGameState"));
+
+        window.alert = previousAlert;
+        return {
+          alerts,
+          dailyPurchaseState,
+          noCreditPurchaseState,
+          lockedPurchaseState,
+          duplicateEquipState,
+          blockedShipState,
+          noCreditRepairState,
+          savedRecoveredCopper: saved.cargoRecovered.Copper,
+          savedLoadoutGuns: saved.shipLoadouts[STARTER_SHIP_ID].guns.map(entry => getEquipmentKey(entry))
+        };
+      })()
+    `));
+
+    expect(state.dailyPurchaseState.ownedPulseLaser).toBe(1);
+    expect(state.dailyPurchaseState.creditsAfter).toBe(state.dailyPurchaseState.creditsExpected);
+    expect(state.dailyPurchaseState.stockRemaining).toBe(0);
+    expect(state.dailyPurchaseState.savedDailyPurchases).toBe(1);
+    expect(state.noCreditPurchaseState.credits).toBe(0);
+    expect(state.noCreditPurchaseState.cargoPodOwned).toBe(state.noCreditPurchaseState.cargoPodBefore);
+    expect(state.lockedPurchaseState.shieldAfter).toBe(state.lockedPurchaseState.shieldBefore);
+    expect(state.lockedPurchaseState.creditsAfter).toBe(10000);
+    expect(state.duplicateEquipState.equippedGuns).toEqual(["pulseLaser"]);
+    expect(state.duplicateEquipState.ownedPulseLaser).toBe(0);
+    expect(state.blockedShipState.after).toBe(state.blockedShipState.before);
+    expect(state.noCreditRepairState.credits).toBe(0);
+    expect(state.noCreditRepairState.hull).toBe(state.noCreditRepairState.repairHullBefore);
+    expect(state.savedRecoveredCopper).toBe(8);
+    expect(state.savedLoadoutGuns).toEqual(["pulseLaser"]);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("desktop bounty board keeps selected contract actions visible", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

@@ -3268,6 +3268,37 @@ function getStoreSelectedItem() {
   return getStoreCatalogItems().find(item => item.id === selectedStoreItemId) || null;
 }
 
+function getStoreCatalogItem(kind, key) {
+  return getStoreCatalogItems().find(item => item.kind === kind && item.key === key) || null;
+}
+
+function canPurchaseStoreItem(item, quality = getStoreItemDisplayQuality(item)) {
+  if (!item) return { ok: false, reason: "missing_item", message: "Store item unavailable." };
+  const stockRemaining = getStoreStockRemaining(item);
+  if (stockRemaining <= 0) return { ok: false, reason: "sold_out", message: "This daily store item has sold out." };
+
+  const unlock = item.kind === "gun" || item.kind === "attachment"
+    ? getEquipmentUnlockStatus(item.kind === "gun" ? "guns" : "attachments", item.key)
+    : item.kind === "ship"
+      ? getShipUnlockStatus(item.key)
+      : null;
+  if (unlock?.locked) return { ok: false, reason: "locked", message: unlock.message || "Reach the required level to unlock this." };
+
+  if (item.kind === "ship" && ownedShips.includes(item.key)) {
+    return { ok: false, reason: "owned", message: "Ship already owned." };
+  }
+
+  const price = getStorePrice(item, quality);
+  if (credits < price) return { ok: false, reason: "credits", message: "Not enough credits." };
+  return { ok: true, price, stockRemaining };
+}
+
+function notifyStorePurchaseBlocked(result) {
+  const message = result?.message || "Purchase unavailable.";
+  if (typeof addHudToast === "function") addHudToast(message);
+  else alert(message);
+}
+
 function ensureStoreSelection() {
   if (!["all", "guns", "attachments", "materials", "owned"].includes(storeFilter)) {
     storeFilter = "all";
@@ -3764,19 +3795,15 @@ function storeBuySelected() {
     else alert(message);
     return;
   }
-  const price = getStorePrice(item, quality);
-  if (getStoreStockRemaining(item) <= 0) {
-    alert("This daily store item has sold out.");
+  const purchaseCheck = canPurchaseStoreItem(item, quality);
+  if (!purchaseCheck.ok) {
+    notifyStorePurchaseBlocked(purchaseCheck);
     return;
   }
-
-  if (credits < price) {
-    alert("Not enough credits.");
-    return;
-  }
+  const price = purchaseCheck.price;
 
   if (item.kind === "ship") {
-    buyShip(item.key);
+    buyShip(item.key, item);
     return;
   }
 
@@ -3786,8 +3813,7 @@ function storeBuySelected() {
         alert(INVENTORY_FULL_MESSAGE);
         return;
       }
-      buyAttachment(item.key);
-      recordStorePurchase(item);
+      buyAttachment(item.key, item);
       tutorialEvent("boughtEquipment");
     } else {
       if (!canAddInventoryItems(1)) {
@@ -3810,8 +3836,7 @@ function storeBuySelected() {
         alert(INVENTORY_FULL_MESSAGE);
         return;
       }
-      buyGun(item.key);
-      recordStorePurchase(item);
+      buyGun(item.key, item);
       tutorialEvent("boughtEquipment");
     } else {
       if (!canAddInventoryItems(1)) {
@@ -3895,10 +3920,18 @@ function sellShipToStore(shipId) {
   saveGame();
 }
 
-function buyAttachment(key) {
+function buyAttachment(key, storeItemOverride = null) {
   if (blockStoreMutationInMultiplayerStaging()) return;
   const item = attachments[key];
   if (!item) return;
+  const storeItem = storeItemOverride?.kind === "attachment" && storeItemOverride.key === key
+    ? storeItemOverride
+    : getStoreCatalogItem("attachment", key);
+  const purchaseCheck = canPurchaseStoreItem(storeItem || { kind: "attachment", key, basePrice: item.price });
+  if (!purchaseCheck.ok) {
+    notifyStorePurchaseBlocked(purchaseCheck);
+    return;
+  }
   const unlock = getEquipmentUnlockStatus("attachments", key);
   if (unlock.locked) {
     if (typeof addHudToast === "function") addHudToast(unlock.message);
@@ -3911,13 +3944,9 @@ function buyAttachment(key) {
     return;
   }
 
-  if (credits < item.price) {
-    alert("Not enough credits.");
-    return;
-  }
-
-  credits -= item.price;
+  credits -= purchaseCheck.price;
   ownedAttachments[key] = (ownedAttachments[key] || 0) + 1;
+  if (storeItem) recordStorePurchase(storeItem);
 
   if (key === "evasionMatrix") tutorialEvent("boughtStoreEvasionMatrix");
   tutorialEvent("boughtStoreAttachment");
@@ -3928,10 +3957,18 @@ function buyAttachment(key) {
   saveGame();
 }
 
-function buyGun(key) {
+function buyGun(key, storeItemOverride = null) {
   if (blockStoreMutationInMultiplayerStaging()) return;
   const item = GUNS[key];
   if (!item) return;
+  const storeItem = storeItemOverride?.kind === "gun" && storeItemOverride.key === key
+    ? storeItemOverride
+    : getStoreCatalogItem("gun", key);
+  const purchaseCheck = canPurchaseStoreItem(storeItem || { kind: "gun", key, basePrice: item.price });
+  if (!purchaseCheck.ok) {
+    notifyStorePurchaseBlocked(purchaseCheck);
+    return;
+  }
   const unlock = getEquipmentUnlockStatus("guns", key);
   if (unlock.locked) {
     if (typeof addHudToast === "function") addHudToast(unlock.message);
@@ -3944,13 +3981,9 @@ function buyGun(key) {
     return;
   }
 
-  if (credits < item.price) {
-    alert("Not enough credits.");
-    return;
-  }
-
-  credits -= item.price;
+  credits -= purchaseCheck.price;
   ownedGuns[key] = (ownedGuns[key] || 0) + 1;
+  if (storeItem) recordStorePurchase(storeItem);
 
   tutorialEvent("boughtStoreGun");
   tutorialEvent("boughtEquipment");
@@ -4132,7 +4165,7 @@ function removeGun(index) {
   saveGame();
 }
 
-function buyShip(shipId) {
+function buyShip(shipId, storeItemOverride = null) {
   const ship = SHIPS[shipId];
   if (!ship) return;
 
@@ -4143,6 +4176,9 @@ function buyShip(shipId) {
   const hadNoShip = !hasActiveShip();
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   const starterClaim = hadNoShip && shipId === starterShipId;
+  const storeItem = storeItemOverride?.kind === "ship" && storeItemOverride.key === shipId
+    ? storeItemOverride
+    : getStoreCatalogItem("ship", shipId);
 
   if (isMultiplayerStagingStoreActive() && !starterClaim) {
     if (ship && !ship.hiddenFromExchange && !ownedShips.includes(shipId) && getStagingStoreItemId({ kind: "ship", key: shipId })) {
@@ -4166,6 +4202,15 @@ function buyShip(shipId) {
     return;
   }
 
+  const purchaseCheck = starterClaim
+    ? { ok: true, price: 0 }
+    : canPurchaseStoreItem(storeItem || { kind: "ship", key: shipId, basePrice: ship.price });
+  if (!purchaseCheck.ok) {
+    notifyStorePurchaseBlocked(purchaseCheck);
+    renderShipShop();
+    return;
+  }
+
   const unlock = getShipUnlockStatus(shipId);
   if (unlock.locked) {
     if (typeof addHudToast === "function") addHudToast(unlock.message);
@@ -4174,13 +4219,9 @@ function buyShip(shipId) {
     return;
   }
 
-  if (!starterClaim && credits < ship.price) {
-    alert("Not enough credits.");
-    return;
-  }
-
-  credits -= starterClaim ? 0 : ship.price;
+  credits -= purchaseCheck.price;
   ownedShips.push(shipId);
+  if (!starterClaim && storeItem) recordStorePurchase(storeItem);
   selectedHangarShipId = shipId;
   selectedFleetShipId = shipId;
   selectedShipyardShipId = shipId;
