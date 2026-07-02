@@ -77,6 +77,11 @@ function applyServerPvpDestructionState(event = {}) {
   if (isLocalTarget) {
     currentNode = recoveryNode;
     if (typeof sectorNodes !== "undefined" && sectorNodes?.[recoveryNode]?.type === "planet") lastPlanetNode = recoveryNode;
+    const recoveredHull = Number(event.hull);
+    const recoveredShield = Number(event.shield);
+    if (Number.isFinite(recoveredHull) && recoveredHull > 0) hull = recoveredHull;
+    if (Number.isFinite(recoveredShield) && recoveredShield >= 0) shield = recoveredShield;
+    if (typeof saveActiveShipCondition === "function") saveActiveShipCondition(currentShipId);
     jumpCharge = 0;
     stopShieldRegen();
     clearRemotePlayerTarget("pvp_destroyed_self");
@@ -85,6 +90,7 @@ function applyServerPvpDestructionState(event = {}) {
     if (typeof updateHubLocation === "function") updateHubLocation();
     if (typeof updateSpaceHUD === "function") updateSpaceHUD();
     if (typeof showScreen === "function") showScreen("gameScreen");
+    if (typeof saveGame === "function") saveGame();
   } else {
     clearRemotePlayerTarget("pvp_destroyed_remote");
   }

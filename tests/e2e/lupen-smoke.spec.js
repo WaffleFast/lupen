@@ -2312,6 +2312,34 @@ test.describe("Lupen browser smoke", () => {
             })
             : false;
           const activityAfterDestructionRecovery = document.getElementById("activityLogFeed")?.textContent || "";
+          const savedAfterDestructionRecovery = JSON.parse(localStorage.getItem(STORAGE_GAME_KEY) || "{}");
+          selectedTarget = { type: "remotePlayer", id: "remote-pvp-test" };
+          engagedTarget = { type: "remotePlayer", id: "remote-pvp-test" };
+          engageTimer = setInterval(() => {}, 99999);
+          applyServerPvpDamageState({
+            targetSessionId: "local-session",
+            shield: 0,
+            shieldMax: 30,
+            hull: 12,
+            hullMax: 120
+          });
+          const stalePvpBeforeLoad = {
+            selectedType: selectedTarget?.type || "",
+            engagedType: engagedTarget?.type || "",
+            timerActive: Boolean(engageTimer),
+            pvpHull: serverPvpDamageDisplayState?.hull ?? null
+          };
+          applyLoadedGameState(savedAfterDestructionRecovery);
+          const loadedRecoveryState = {
+            currentNode,
+            lastPlanetNode,
+            selectedType: selectedTarget?.type || "",
+            engagedType: engagedTarget?.type || "",
+            timerActive: Boolean(engageTimer),
+            pvpStateCleared: serverPvpDamageDisplayState === null,
+            hull,
+            shield
+          };
           const destructionRecovery = {
             applied: pvpDestructionApplied,
             currentNode,
@@ -2328,6 +2356,12 @@ test.describe("Lupen browser smoke", () => {
             credits,
             combatXp: playerProgress.combatXp,
             cargo: { ...cargo },
+            savedCurrentNode: savedAfterDestructionRecovery.currentNode || "",
+            savedLastPlanetNode: savedAfterDestructionRecovery.lastPlanetNode || "",
+            savedHull: savedAfterDestructionRecovery.hull,
+            savedShield: savedAfterDestructionRecovery.shield,
+            stalePvpBeforeLoad,
+            loadedRecoveryState,
             messages: (activityAfterDestructionRecovery.match(/Ship destroyed\\. Emergency return to Asteron Prime\\./g) || []).length
               - (activityBeforeDestructionRecovery.match(/Ship destroyed\\. Emergency return to Asteron Prime\\./g) || []).length,
             before: beforeDestructionRecovery
@@ -2534,9 +2568,29 @@ test.describe("Lupen browser smoke", () => {
       hullValue: "120",
       shieldValue: "30",
       credits: eligibility.destructionRecovery.before.credits,
-      combatXp: eligibility.destructionRecovery.before.combatXp
+      combatXp: eligibility.destructionRecovery.before.combatXp,
+      savedCurrentNode: "Asteron Prime",
+      savedLastPlanetNode: "Asteron Prime",
+      savedHull: 120,
+      savedShield: 30
     });
     expect(eligibility.destructionRecovery.cargo).toEqual(eligibility.destructionRecovery.before.cargo);
+    expect(eligibility.destructionRecovery.stalePvpBeforeLoad).toMatchObject({
+      selectedType: "remotePlayer",
+      engagedType: "remotePlayer",
+      timerActive: true,
+      pvpHull: 12
+    });
+    expect(eligibility.destructionRecovery.loadedRecoveryState).toMatchObject({
+      currentNode: "Asteron Prime",
+      lastPlanetNode: "Asteron Prime",
+      selectedType: "",
+      engagedType: "",
+      timerActive: false,
+      pvpStateCleared: true,
+      hull: 120,
+      shield: 30
+    });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

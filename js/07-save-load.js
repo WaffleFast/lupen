@@ -856,6 +856,18 @@ function saveGameBeforeLeave() {
   }
 }
 
+function clearTransientStateAfterLoadedSave() {
+  if (typeof engageTimer !== "undefined" && engageTimer) {
+    clearInterval(engageTimer);
+    engageTimer = null;
+  }
+  if (typeof selectedTarget !== "undefined") selectedTarget = null;
+  if (typeof engagedTarget !== "undefined") engagedTarget = null;
+  if (typeof serverPvpDamageDisplayState !== "undefined") serverPvpDamageDisplayState = null;
+  if (typeof lastPvpHullFeedbackState !== "undefined") lastPvpHullFeedbackState = "";
+  if (typeof clearAllCombatVisuals === "function") clearAllCombatVisuals();
+}
+
 function applyLoadedGameState(rawSaved) {
   const saved = migrateSavedGame(rawSaved);
   if (!saved) return false;
@@ -1014,6 +1026,12 @@ function applyLoadedGameState(rawSaved) {
   if (typeof renderPilotProfile === "function" && document.getElementById("pilotProfileScreen")?.classList.contains("active")) {
     renderPilotProfile();
   }
+  clearTransientStateAfterLoadedSave();
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  if (typeof updateAsteroidUI === "function") updateAsteroidUI();
+  if (typeof updateTargetPanel === "function") updateTargetPanel();
+  if (typeof updateObjectActionPanel === "function") updateObjectActionPanel(false);
+  if (typeof window.LupenMultiplayerOverlay?.render === "function") window.LupenMultiplayerOverlay.render();
 
   return true;
 }
