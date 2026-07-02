@@ -2875,8 +2875,16 @@
     // and target handling stay consistent.
   }
 
-  function resolveCombatVisualTarget(event, players, bots, resources) {
+  function getCombatVisualTargetType(event = {}) {
     const targetType = String(event?.targetType || event?.type || "").toLowerCase();
+    if (targetType === "stagingbot") return "bot";
+    if (targetType === "stagingresource") return "resource";
+    if (targetType === "remoteplayer" || targetType === "pvp") return "player";
+    return targetType;
+  }
+
+  function resolveCombatVisualTarget(event, players, bots, resources) {
+    const targetType = getCombatVisualTargetType(event);
     const targetId = String(event?.targetId || event?.targetBotId || event?.resourceId || event?.targetPlayerId || "");
     if (!targetId) return null;
 
@@ -2888,7 +2896,7 @@
       const resource = resources.find((candidate) => String(candidate?.id || candidate?.resourceId || "") === targetId);
       return resource && !resource.depleted && isSameCurrentNode(resource) ? resource : null;
     }
-    if (targetType === "player" || targetType === "pvp") {
+    if (targetType === "player") {
       const player = players.find((candidate) => String(candidate?.sessionId || candidate?.id || "") === targetId);
       return player && isSameCurrentNode(player) ? player : null;
     }
@@ -2948,6 +2956,13 @@
       .find((marker) => String(marker?.dataset?.sessionId || "") === id) || null;
   }
 
+  function findSpaceBotMarker(botId) {
+    const id = String(botId || "");
+    if (!id) return null;
+    return Array.from(global.document?.querySelectorAll(`#${spaceBotLayerId} .lupen-mp-space-bot`) || [])
+      .find((marker) => String(marker?.dataset?.botId || "") === id) || null;
+  }
+
   function findServerResourceButton(resourceId) {
     const id = String(resourceId || "");
     if (!id) return null;
@@ -2955,29 +2970,36 @@
       .find((button) => String(button?.dataset?.targetId || "") === id) || null;
   }
 
-  function resolveCombatTargetPoint(event, targetPosition, status = getClient()?.getStatus?.()) {
-    const targetType = String(event?.targetType || event?.type || "").toLowerCase();
+  function resolveCombatTargetPoint(event, targetPosition, status = getClient()?.getStatus?.(), options = {}) {
+    const targetType = getCombatVisualTargetType(event);
     const targetId = String(event?.targetId || event?.targetBotId || event?.resourceId || event?.targetPlayerId || "");
-    if (targetType === "player" || targetType === "pvp") {
-      if (targetId && targetId === String(status?.sessionId || "")) {
+    const requireRenderedMarker = options.requireRenderedMarker === true;
+    const localSessionId = String(status?.sessionId || "");
+    if (targetType === "player") {
+      if (targetId && targetId === localSessionId) {
         return getCombatFxPixelPointFromSpacePercent(targetPosition);
       }
       return getElementCenterCombatFxPoint(findSpaceGhostMarker(targetId));
     }
     if (targetType === "resource") {
-      return getElementCenterCombatFxPoint(findServerResourceButton(targetId)) ||
-        getCombatFxPixelPointFromSpacePercent(targetPosition);
+      const markerPoint = getElementCenterCombatFxPoint(findServerResourceButton(targetId));
+      return markerPoint || (requireRenderedMarker ? null : getCombatFxPixelPointFromSpacePercent(targetPosition));
     }
-    return getCombatFxPixelPointFromSpacePercent(targetPosition);
+    if (targetType === "bot") {
+      const markerPoint = getElementCenterCombatFxPoint(findSpaceBotMarker(targetId));
+      return markerPoint || (requireRenderedMarker ? null : getCombatFxPixelPointFromSpacePercent(targetPosition));
+    }
+    return requireRenderedMarker ? null : getCombatFxPixelPointFromSpacePercent(targetPosition);
   }
 
-  function resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot) {
+  function resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot, options = {}) {
     if (isLocalShot) return null;
     const attackerId = String(event?.attackerId || event?.attackerBotId || event?.attackerSessionId || "");
     const attackerType = String(event?.attackerType || "").toLowerCase();
     const eventType = String(event?.type || "").toLowerCase();
-    if (attackerType !== "bot" && eventType === "pvp") {
-      return getElementCenterCombatFxPoint(findSpaceGhostMarker(attackerId));
+    if (attackerType !== "bot") {
+      const markerPoint = getElementCenterCombatFxPoint(findSpaceGhostMarker(attackerId));
+      return markerPoint || (options.requireRenderedMarker === true || eventType === "pvp" ? null : getCombatFxPixelPointFromSpacePercent(attackerPosition));
     }
     return attacker && isSameCurrentNode(attacker)
       ? getCombatFxPixelPointFromSpacePercent(attackerPosition)
@@ -2999,9 +3021,9 @@
   function getCombatVisualImpactLayer(event, target) {
     const explicit = String(event?.impactLayer || "").toLowerCase();
     if (["shield", "armor", "hull", "resource", "bot"].includes(explicit)) return explicit;
-    const targetType = String(event?.targetType || event?.type || "").toLowerCase();
+    const targetType = getCombatVisualTargetType(event);
     if (targetType === "resource") return "resource";
-    if (targetType === "player" || targetType === "pvp") {
+    if (targetType === "player") {
       if (Number(event?.hullDamage || 0) > 0) return "hull";
       if (Number(event?.armorDamage || 0) > 0) return "armor";
       if (Number(event?.shieldDamage || 0) > 0) return "shield";
@@ -3034,14 +3056,19 @@
     const targetPosition = getSpacePercentPosition(target);
     const isLocalShot = event.attackerSessionId === status.sessionId;
     const isBotReturnFire = String(event.type || "") === "botReturnFire" || String(event.attackerType || "") === "bot";
+    const isRemotePlayerShot = !isLocalShot && !isBotReturnFire && Boolean(event.attackerSessionId || event.attackerId);
     const attackerPosition = attacker && isSameCurrentNode(attacker)
       ? getSpacePercentPosition(attacker, { x: 50, y: 66 })
       : { x: targetPosition.x - 14, y: targetPosition.y + 12 };
 
     const impactLayer = getCombatVisualImpactLayer(event, target);
-    const targetPoint = resolveCombatTargetPoint(event, targetPosition, status);
+    const targetPoint = resolveCombatTargetPoint(event, targetPosition, status, {
+      requireRenderedMarker: isRemotePlayerShot
+    });
     if (!targetPoint) return;
-    const remoteSourcePoint = resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot);
+    const remoteSourcePoint = resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot, {
+      requireRenderedMarker: isRemotePlayerShot
+    });
     const sourcePoint = isLocalShot && typeof global.getLocalCombatFxOriginsForTarget === "function"
       ? global.getLocalCombatFxOriginsForTarget(targetPoint)
       : remoteSourcePoint;

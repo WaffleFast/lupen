@@ -3858,7 +3858,22 @@ test.describe("Lupen browser smoke", () => {
               activeShipWeaponCount: 4,
               validCombatWeaponCount: 4
             };
-            return options?.includeSelf === false ? [remote] : [local, remote];
+            const remoteTarget = {
+              id: "remote-target-session",
+              sessionId: "remote-target-session",
+              displayName: "Second Pilot",
+              currentNode,
+              x: 72,
+              y: 46,
+              isSelf: false,
+              pvpShield: 60,
+              pvpShieldMax: 60,
+              pvpArmor: 20,
+              pvpArmorMax: 20,
+              pvpHull: 180,
+              pvpHullMax: 180
+            };
+            return options?.includeSelf === false ? [remote, remoteTarget] : [local, remote, remoteTarget];
           },
           getBots: () => bots,
           getResources: () => [resource],
@@ -4015,12 +4030,31 @@ test.describe("Lupen browser smoke", () => {
         };
         window.LupenMultiplayerOverlay?.render?.();
         const fxLayer = document.getElementById("combatFxLayer");
+        const core = fxLayer?.querySelector(".combat-fx-shot[data-owner='remote'] .combat-fx-beam-core");
+        const screenRect = document.getElementById("spaceScreen")?.getBoundingClientRect();
+        const markerCenter = selector => {
+          const rect = document.querySelector(selector)?.getBoundingClientRect();
+          return rect && screenRect
+            ? {
+              x: Math.round(rect.left + rect.width / 2 - screenRect.left),
+              y: Math.round(rect.top + rect.height / 2 - screenRect.top)
+            }
+            : { x: 0, y: 0 };
+        };
+        const attackerCenter = markerCenter("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='remote-session']");
+        const targetCenter = markerCenter("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot[data-bot-id='" + window.__stagingVisualBot.id + "']");
         return {
           remoteShotBeamCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='remote']").length || 0,
           remoteBeamCoreCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='remote'] .combat-fx-beam-core").length || 0,
           remoteMuzzleCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-muzzle.is-remote").length,
           attackerLabelText: document.querySelector("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-attacker-label")?.textContent || "",
-          coopEngagedMarkerCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-coop-engaged").length
+          coopEngagedMarkerCount: document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-coop-engaged").length,
+          sourceX: Math.round(Number(core?.getAttribute("x1") || 0)),
+          sourceY: Math.round(Number(core?.getAttribute("y1") || 0)),
+          endpointX: Math.round(Number(core?.getAttribute("x2") || 0)),
+          endpointY: Math.round(Number(core?.getAttribute("y2") || 0)),
+          attackerCenter,
+          targetCenter
         };
       })()
     `));
@@ -4030,6 +4064,10 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(0);
     expect(stagingBotRemoteShotState.attackerLabelText).toBe("");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
+    expect(Math.abs(stagingBotRemoteShotState.sourceX - stagingBotRemoteShotState.attackerCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingBotRemoteShotState.sourceY - stagingBotRemoteShotState.attackerCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingBotRemoteShotState.endpointX - stagingBotRemoteShotState.targetCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingBotRemoteShotState.endpointY - stagingBotRemoteShotState.targetCenter.y)).toBeLessThanOrEqual(1);
 
     const stagingResourceRemoteShotState = await page.evaluate(() => window.eval(`
       (() => {
@@ -4048,12 +4086,31 @@ test.describe("Lupen browser smoke", () => {
         window.LupenMultiplayerOverlay?.render?.();
         const fxLayer = document.getElementById("combatFxLayer");
         const targetId = window.__stagingVisualResource.id;
+        const core = fxLayer?.querySelector(".combat-fx-shot[data-owner='remote'][data-target-id='" + targetId + "'] .combat-fx-beam-core");
+        const screenRect = document.getElementById("spaceScreen")?.getBoundingClientRect();
+        const markerCenter = selector => {
+          const rect = document.querySelector(selector)?.getBoundingClientRect();
+          return rect && screenRect
+            ? {
+              x: Math.round(rect.left + rect.width / 2 - screenRect.left),
+              y: Math.round(rect.top + rect.height / 2 - screenRect.top)
+            }
+            : { x: 0, y: 0 };
+        };
+        const attackerCenter = markerCenter("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='remote-session']");
+        const targetCenter = markerCenter("#asteroidField .server-resource-asteroid[data-target-id='" + targetId + "']");
         return {
           remoteShotBeamCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='remote'][data-target-id='" + targetId + "']").length || 0,
           remoteMuzzleCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-muzzle.is-remote").length,
           attackerLabelText: document.querySelector("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-attacker-label")?.textContent || "",
           hitCount: fxLayer?.querySelectorAll(".combat-fx-impact").length || 0,
-          resourceHitCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-target-type='resource'][data-target-id='" + targetId + "'] .combat-fx-impact").length || 0
+          resourceHitCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-target-type='resource'][data-target-id='" + targetId + "'] .combat-fx-impact").length || 0,
+          sourceX: Math.round(Number(core?.getAttribute("x1") || 0)),
+          sourceY: Math.round(Number(core?.getAttribute("y1") || 0)),
+          endpointX: Math.round(Number(core?.getAttribute("x2") || 0)),
+          endpointY: Math.round(Number(core?.getAttribute("y2") || 0)),
+          attackerCenter,
+          targetCenter
         };
       })()
     `));
@@ -4063,6 +4120,57 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingResourceRemoteShotState.attackerLabelText).toBe("");
     expect(stagingResourceRemoteShotState.hitCount).toBeGreaterThanOrEqual(1);
     expect(stagingResourceRemoteShotState.resourceHitCount).toBe(1);
+    expect(Math.abs(stagingResourceRemoteShotState.sourceX - stagingResourceRemoteShotState.attackerCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingResourceRemoteShotState.sourceY - stagingResourceRemoteShotState.attackerCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingResourceRemoteShotState.endpointX - stagingResourceRemoteShotState.targetCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingResourceRemoteShotState.endpointY - stagingResourceRemoteShotState.targetCenter.y)).toBeLessThanOrEqual(1);
+
+    const missingMarkerRemoteShotState = await page.evaluate(() => window.eval(`
+      (() => {
+        const targetId = window.__stagingVisualResource.id;
+        clearAllCombatVisuals();
+        document.querySelector("#asteroidField .server-resource-asteroid[data-target-id='" + targetId + "']")?.remove();
+        window.__lastCombatVisualEvent = {
+          type: "resource",
+          ok: true,
+          attackerSessionId: "remote-session",
+          targetType: "resource",
+          targetId,
+          resourceId: targetId,
+          currentNode,
+          damage: 18,
+          receivedAt: Date.now() + 2
+        };
+        window.LupenMultiplayerOverlay?.render?.();
+        const missingTargetShotCount = document.querySelectorAll("#combatFxLayer .combat-fx-shot[data-owner='remote']").length;
+        updateAsteroidUI();
+        clearAllCombatVisuals();
+        window.__lastCombatVisualEvent = {
+          type: "resource",
+          ok: true,
+          attackerSessionId: "missing-remote-session",
+          targetType: "resource",
+          targetId,
+          resourceId: targetId,
+          currentNode,
+          damage: 18,
+          receivedAt: Date.now() + 3
+        };
+        window.LupenMultiplayerOverlay?.render?.();
+        const missingAttackerShotCount = document.querySelectorAll("#combatFxLayer .combat-fx-shot[data-owner='remote']").length;
+        window.__lastCombatVisualEvent = null;
+        clearAllCombatVisuals();
+        updateAsteroidUI();
+        window.LupenMultiplayerOverlay?.render?.();
+        return {
+          missingTargetShotCount,
+          missingAttackerShotCount
+        };
+      })()
+    `));
+
+    expect(missingMarkerRemoteShotState.missingTargetShotCount).toBe(0);
+    expect(missingMarkerRemoteShotState.missingAttackerShotCount).toBe(0);
 
     const pvpRemoteShotState = await page.evaluate(() => window.eval(`
       (() => {
@@ -4096,6 +4204,45 @@ test.describe("Lupen browser smoke", () => {
         const shield = renderPvpHit({ shieldDamage: 36, armorDamage: 0, hullDamage: 0 });
         const armor = renderPvpHit({ shieldDamage: 0, armorDamage: 24, hullDamage: 0 });
         const hull = renderPvpHit({ shieldDamage: 0, armorDamage: 0, hullDamage: 18 });
+        const thirdParty = (() => {
+          clearAllCombatVisuals();
+          window.__lastCombatVisualEvent = {
+            type: "pvp",
+            ok: true,
+            attackerSessionId: "remote-session",
+            attackerDisplayName: "WaffleFast",
+            targetType: "player",
+            targetId: "remote-target-session",
+            targetPlayerId: "remote-target-session",
+            currentNode,
+            damage: 24,
+            shieldDamage: 24,
+            receivedAt: Date.now() + 1
+          };
+          window.LupenMultiplayerOverlay?.render?.();
+          const fxLayer = document.getElementById("combatFxLayer");
+          const shot = fxLayer?.querySelector(".combat-fx-shot[data-owner='remote'][data-target-id='remote-target-session']");
+          const core = shot?.querySelector(".combat-fx-beam-core");
+          const screenRect = document.getElementById("spaceScreen")?.getBoundingClientRect();
+          const markerCenter = selector => {
+            const rect = document.querySelector(selector)?.getBoundingClientRect();
+            return rect && screenRect
+              ? {
+                x: Math.round(rect.left + rect.width / 2 - screenRect.left),
+                y: Math.round(rect.top + rect.height / 2 - screenRect.top)
+              }
+              : { x: 0, y: 0 };
+          };
+          return {
+            remoteShotBeamCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='remote'][data-target-id='remote-target-session']").length || 0,
+            sourceX: Math.round(Number(core?.getAttribute("x1") || 0)),
+            sourceY: Math.round(Number(core?.getAttribute("y1") || 0)),
+            endpointX: Math.round(Number(core?.getAttribute("x2") || 0)),
+            endpointY: Math.round(Number(core?.getAttribute("y2") || 0)),
+            attackerCenter: markerCenter("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='remote-session']"),
+            targetCenter: markerCenter("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='remote-target-session']")
+          };
+        })();
         clearAllCombatVisuals();
         window.__lastCombatVisualEvent = {
           type: "botReturnFire",
@@ -4117,6 +4264,7 @@ test.describe("Lupen browser smoke", () => {
           shield,
           armor,
           hull,
+          thirdParty,
           botReturnBeamCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='bot']").length || 0,
           botReturnMuzzleCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-muzzle.is-bot-return").length,
           botReturnShieldHitCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='bot'] .combat-fx-impact").length || 0
@@ -4131,6 +4279,11 @@ test.describe("Lupen browser smoke", () => {
     expect(pvpRemoteShotState.shield.shieldHitCount).toBe(1);
     expect(pvpRemoteShotState.armor.armorHitCount).toBe(1);
     expect(pvpRemoteShotState.hull.hullHitCount).toBe(1);
+    expect(pvpRemoteShotState.thirdParty.remoteShotBeamCount).toBe(1);
+    expect(Math.abs(pvpRemoteShotState.thirdParty.sourceX - pvpRemoteShotState.thirdParty.attackerCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.thirdParty.sourceY - pvpRemoteShotState.thirdParty.attackerCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.thirdParty.endpointX - pvpRemoteShotState.thirdParty.targetCenter.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.thirdParty.endpointY - pvpRemoteShotState.thirdParty.targetCenter.y)).toBeLessThanOrEqual(1);
     expect(pvpRemoteShotState.botReturnBeamCount).toBe(1);
     expect(pvpRemoteShotState.botReturnMuzzleCount).toBe(0);
     expect(pvpRemoteShotState.botReturnShieldHitCount).toBe(1);
