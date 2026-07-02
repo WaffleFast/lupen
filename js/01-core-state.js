@@ -2056,6 +2056,10 @@ function getEngagedTargetEntity() {
     return getAsteroidById(engagedTarget.id);
   }
 
+  if (engagedTarget.type === "remotePlayer") {
+    return getRemotePlayerTargetById(engagedTarget.id);
+  }
+
   return null;
 }
 

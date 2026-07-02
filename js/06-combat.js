@@ -235,6 +235,11 @@ function isCombatEntityInCurrentNode(entity = {}) {
   return getCombatEntityNodeName(entity) === currentNode;
 }
 
+function isCombatEntityMissingOrInCurrentNode(entity = {}) {
+  const nodeName = getCombatEntityNodeName(entity);
+  return !nodeName || nodeName === currentNode;
+}
+
 function isCurrentNodeProtectedForPvp() {
   const node = typeof sectorNodes !== "undefined" ? sectorNodes[currentNode] : null;
   return typeof isProtectedNode === "function"
@@ -539,6 +544,74 @@ function isCombatVisualTargetStillValid(ref) {
     return Boolean(player && isCombatEntityInCurrentNode(player));
   }
   return true;
+}
+
+function isTargetRefStillValid(ref) {
+  if (!ref?.id) return false;
+
+  if (ref.type === "stagingBot") return isStagingBotTargetStillValid(ref.id);
+  if (ref.type === "stagingResource") {
+    const resource = getStagingResourceTargetById(ref.id);
+    return Boolean(resource && resource.alive && !resource.depleted && isCombatEntityMissingOrInCurrentNode(resource));
+  }
+  if (ref.type === "hostileBot") {
+    const bot = getHostileBotById(ref.id);
+    const localBotVisualGuardActive = typeof isStagingLocalCombatBotVisualGuardActive === "function"
+      && isStagingLocalCombatBotVisualGuardActive();
+    return Boolean(bot && bot.alive && !localBotVisualGuardActive && isCombatEntityMissingOrInCurrentNode(bot));
+  }
+  if (ref.type === "asteroid") {
+    const asteroid = getAsteroidById(ref.id);
+    const serverOwnedActive = typeof shouldUseServerOwnedSectorObjects === "function" && shouldUseServerOwnedSectorObjects();
+    return Boolean(!serverOwnedActive && asteroid && asteroid.alive && asteroid.node === currentNode);
+  }
+  if (ref.type === "remotePlayer") {
+    const player = getRemotePlayerTargetById(ref.id);
+    return Boolean(player && shouldKeepRemotePlayerSelection(player));
+  }
+
+  const entity = ref.type === selectedTarget?.type && ref.id === selectedTarget?.id
+    ? getSelectedTargetEntity()
+    : getEngagedTargetEntity();
+  return Boolean(entity && entity.alive !== false && isCombatEntityMissingOrInCurrentNode(entity));
+}
+
+function reconcileTargetSessionState(reason = "reconcile_target_session", options = {}) {
+  const selectedRef = selectedTarget ? { ...selectedTarget } : null;
+  const engagedRef = engagedTarget ? { ...engagedTarget } : null;
+  const selectedStale = Boolean(selectedRef && !isTargetRefStillValid(selectedRef));
+  const engagedStale = Boolean(engagedRef && !isTargetRefStillValid(engagedRef));
+
+  if (!selectedStale && !engagedStale) return { cleared: false, reason };
+
+  if (selectedStale) clearCombatVisualsForTarget(selectedRef);
+  if (engagedStale) clearCombatVisualsForTarget(engagedRef);
+
+  if (engagedStale && engageTimer) {
+    clearInterval(engageTimer);
+    engageTimer = null;
+  }
+  if (engagedStale) engagedTarget = null;
+  if (selectedStale) selectedTarget = null;
+
+  if (selectedStale || engagedStale) {
+    const clearedServerTarget = [selectedRef, engagedRef].some(ref => ["stagingBot", "stagingResource", "remotePlayer"].includes(ref?.type));
+    if (clearedServerTarget) window.LupenMultiplayerClient?.clearStagingTarget?.();
+  }
+
+  if (options.update !== false) {
+    updateAsteroidUI();
+    updateTargetPanel();
+    updateObjectActionPanel(false);
+    window.LupenMultiplayerOverlay?.render?.();
+  }
+
+  return {
+    cleared: true,
+    reason,
+    selectedCleared: selectedStale ? selectedRef : null,
+    engagedCleared: engagedStale ? engagedRef : null
+  };
 }
 
 function tagCombatVisualElement(element, ref, options = {}) {
@@ -1402,7 +1475,7 @@ function clearStagingBotTargetIfSelected(botId) {
 
 function isStagingBotTargetStillValid(botId) {
   const bot = getStagingBotTargetById(botId);
-  return Boolean(bot && bot.alive && isCombatEntityInCurrentNode(bot));
+  return Boolean(bot && bot.alive && isCombatEntityMissingOrInCurrentNode(bot));
 }
 
 function clearStaleStagingBotTarget(reason = "stale_staging_bot_target") {
@@ -1429,7 +1502,9 @@ function clearStaleStagingBotTarget(reason = "stale_staging_bot_target") {
 }
 
 function reconcileStagingBotTargetState(reason = "reconcile_staging_bot_target") {
-  return clearStaleStagingBotTarget(reason);
+  const botResult = clearStaleStagingBotTarget(reason);
+  const targetResult = reconcileTargetSessionState(reason);
+  return botResult || (targetResult?.cleared ? targetResult : false);
 }
 
 function reconcileServerOwnedSectorObjectMode(reason = "reconcile_server_owned_sector_objects") {
@@ -1499,6 +1574,7 @@ function handleStagingBotLifecycleEvent(event = {}) {
 window.clearStagingBotTargetIfSelected = clearStagingBotTargetIfSelected;
 window.clearCombatVisualsForTarget = clearCombatVisualsForTarget;
 window.clearAllCombatVisuals = clearAllCombatVisuals;
+window.reconcileTargetSessionState = reconcileTargetSessionState;
 window.renderCombatFxBeam = renderCombatFxBeam;
 window.renderCombatFxImpact = renderCombatFxImpact;
 window.getCombatFxPointFromPercent = getCombatFxPointFromPercent;

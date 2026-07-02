@@ -1247,7 +1247,9 @@ function landOnPlanet() {
   if (typeof playLandingSound === "function") playLandingSound();
   lastPlanetNode = currentNode;
   closeSectorMap();
-  disengageTarget(true);
+  if (typeof clearAllCombatVisuals === "function") clearAllCombatVisuals();
+  disengageTarget(false);
+  if (typeof reconcileTargetSessionState === "function") reconcileTargetSessionState("landed_on_planet");
   updateHubLocation();
   showScreen("gameScreen");
   if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("land", { presenceStatus: "docked" });

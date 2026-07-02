@@ -696,6 +696,17 @@ function addActivityLog(message) {
   const feed = document.getElementById("activityLogFeed");
   if (!feed) return;
 
+  const normalizedMessage = String(message || "").trim();
+  if (!normalizedMessage) return;
+
+  const now = Date.now();
+  const lastMessage = String(feed.dataset.lastMessage || "");
+  const lastAt = Number(feed.dataset.lastMessageAt || 0);
+  const isNoisyRepeat = /Cargo hold full|PvP disabled in protected zones|No target selected|Target is no longer|Unable to engage/i.test(normalizedMessage);
+  if (isNoisyRepeat && lastMessage === normalizedMessage && now - lastAt < 1600) return;
+  feed.dataset.lastMessage = normalizedMessage;
+  feed.dataset.lastMessageAt = String(now);
+
   const placeholder = feed.querySelector(".activity-log-item.muted");
   if (placeholder) {
     placeholder.remove();
@@ -703,7 +714,7 @@ function addActivityLog(message) {
 
   const item = document.createElement("div");
   item.className = "activity-log-item";
-  item.textContent = message;
+  item.textContent = normalizedMessage;
   feed.prepend(item);
 
   while (feed.children.length > 14) {
@@ -976,6 +987,10 @@ function handleLocalChatKey(event) {
 }
 
 function updateObjectActionPanel(forceVisible = false) {
+  if (typeof reconcileTargetSessionState === "function") {
+    reconcileTargetSessionState("action_panel_render", { update: false });
+  }
+
   const panel = document.getElementById("objectActionPanel");
   const actionBtn = document.getElementById("objectEngageBtn");
   const selected = typeof getSelectedTargetEntityForAction === "function"
@@ -1019,12 +1034,14 @@ function updateObjectActionPanel(forceVisible = false) {
     return;
   }
 
-  const selectedIsEngaged = selected && selectedTarget && engagedTarget && selectedTarget.type === engagedTarget.type && selectedTarget.id === engagedTarget.id;
+  const targetIsEngaged = engaged && engagedTarget && target &&
+    getTargetTypeFromEntity(target) === engagedTarget.type &&
+    String(target.id || "") === String(engagedTarget.id || "");
 
   panel.classList.add("visible");
   actionBtn.disabled = false;
-  actionBtn.textContent = engageTimer && selectedIsEngaged ? "DISENGAGE" : "ENGAGE";
-  actionBtn.classList.toggle("disengage-action", !!engageTimer && selectedIsEngaged);
+  actionBtn.textContent = engageTimer && targetIsEngaged ? "DISENGAGE" : "ENGAGE";
+  actionBtn.classList.toggle("disengage-action", !!engageTimer && targetIsEngaged);
   actionBtn.classList.remove("action-inactive");
 }
 

@@ -2576,9 +2576,9 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(eligibility.destructionRecovery.cargo).toEqual(eligibility.destructionRecovery.before.cargo);
     expect(eligibility.destructionRecovery.stalePvpBeforeLoad).toMatchObject({
-      selectedType: "remotePlayer",
-      engagedType: "remotePlayer",
-      timerActive: true,
+      selectedType: "",
+      engagedType: "",
+      timerActive: false,
       pvpHull: 12
     });
     expect(eligibility.destructionRecovery.loadedRecoveryState).toMatchObject({
@@ -5630,6 +5630,152 @@ test.describe("Lupen browser smoke", () => {
     expect(state.noCreditRepairState.hull).toBe(state.noCreditRepairState.repairHullBefore);
     expect(state.savedRecoveredCopper).toBe(8);
     expect(state.savedLoadoutGuns).toEqual(["pulseLaser"]);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("Map 1 session cleanup clears stale targets, FX, and duplicate activity", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentNode = "Lower Lane West B";
+        lastPlanetNode = "Asteron Prime";
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: [] }, STARTER_SHIP_ID) };
+        applyShipStats(true);
+        showScreen("spaceScreen");
+        updateCurrentNodeUI();
+        updateAsteroidUI();
+        updateObjectActionPanel(false);
+
+        const feed = document.getElementById("activityLogFeed");
+        if (feed) {
+          feed.innerHTML = "";
+          delete feed.dataset.lastMessage;
+          delete feed.dataset.lastMessageAt;
+        }
+        addActivityLog("Cargo hold full - no resource recovered.");
+        addActivityLog("Cargo hold full - no resource recovered.");
+        const activityCountAfterDuplicate = feed ? feed.querySelectorAll(".activity-log-item").length : 0;
+
+        asteroids = [{
+          id: "cleanup-asteroid",
+          resource: "Iron",
+          node: currentNode,
+          alive: true,
+          x: 50,
+          y: 36,
+          hull: 10,
+          hullMax: 10,
+          shield: 0,
+          shieldMax: 0
+        }];
+        selectAsteroid("cleanup-asteroid");
+        const fxLayer = document.getElementById("combatFxLayer") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "combatFxLayer" }));
+        const fx = document.createElement("div");
+        fx.dataset.targetId = "cleanup-asteroid";
+        fx.dataset.targetType = "asteroid";
+        fx.className = "combat-fx-shot";
+        fxLayer.appendChild(fx);
+        asteroids[0].alive = false;
+        const asteroidCleanup = reconcileTargetSessionState("test_asteroid_destroyed");
+        const asteroidState = {
+          cleanup: asteroidCleanup,
+          selectedTarget,
+          engagedTarget,
+          fxRemaining: document.querySelectorAll("#combatFxLayer [data-target-id='cleanup-asteroid']").length,
+          buttonText: document.getElementById("objectEngageBtn")?.textContent || "",
+          buttonDisabled: document.getElementById("objectEngageBtn")?.disabled ?? false
+        };
+
+        const resource = {
+          id: "cleanup-resource",
+          resourceName: "Copper",
+          currentNode,
+          depleted: false,
+          hp: 10,
+          hpMax: 10
+        };
+        window.LupenMultiplayerClient = {
+          getResourceById(id) { return id === resource.id ? resource : null; },
+          getResources() { return [resource]; },
+          getPlayers() { return []; },
+          clearStagingTarget() { window.__cleanupClearTargetCalls = (window.__cleanupClearTargetCalls || 0) + 1; }
+        };
+        selectStagingResourceTarget("cleanup-resource");
+        resource.depleted = true;
+        const resourceCleanup = reconcileTargetSessionState("test_resource_depleted");
+        const resourceState = {
+          cleanup: resourceCleanup,
+          selectedTarget,
+          engagedTarget,
+          clearTargetCalls: window.__cleanupClearTargetCalls || 0
+        };
+
+        const remote = {
+          id: "remote-cleanup",
+          sessionId: "remote-cleanup",
+          displayName: "Remote Tester",
+          currentNode,
+          presenceStatus: "space"
+        };
+        window.LupenMultiplayerClient.getPlayers = () => [remote];
+        selectedTarget = { type: "remotePlayer", id: "remote-cleanup" };
+        engagedTarget = { type: "remotePlayer", id: "remote-cleanup" };
+        remote.currentNode = "Asteron Prime";
+        const remoteCleanup = reconcileTargetSessionState("test_remote_left_node");
+        const remoteState = {
+          cleanup: remoteCleanup,
+          selectedTarget,
+          engagedTarget
+        };
+
+        selectedTarget = { type: "asteroid", id: "cleanup-asteroid" };
+        engagedTarget = { type: "asteroid", id: "cleanup-asteroid" };
+        engageTimer = setInterval(() => {}, 1000);
+        currentNode = "Asteron Prime";
+        landOnPlanet();
+        const landedState = {
+          selectedTarget,
+          engagedTarget,
+          engageTimerActive: Boolean(engageTimer),
+          screenActive: document.getElementById("gameScreen")?.classList.contains("active") || false
+        };
+
+        return {
+          activityCountAfterDuplicate,
+          asteroidState,
+          resourceState,
+          remoteState,
+          landedState
+        };
+      })()
+    `));
+
+    expect(state.activityCountAfterDuplicate).toBe(1);
+    expect(state.asteroidState.cleanup.cleared).toBe(true);
+    expect(state.asteroidState.selectedTarget).toBeNull();
+    expect(state.asteroidState.engagedTarget).toBeNull();
+    expect(state.asteroidState.fxRemaining).toBe(0);
+    expect(state.asteroidState.buttonText).toBe("ENGAGE");
+    expect(state.asteroidState.buttonDisabled).toBe(true);
+    expect(state.resourceState.cleanup.cleared).toBe(true);
+    expect(state.resourceState.selectedTarget).toBeNull();
+    expect(state.resourceState.clearTargetCalls).toBeGreaterThan(0);
+    expect(state.remoteState.cleanup.cleared).toBe(true);
+    expect(state.remoteState.selectedTarget).toBeNull();
+    expect(state.remoteState.engagedTarget).toBeNull();
+    expect(state.landedState.selectedTarget).toBeNull();
+    expect(state.landedState.engagedTarget).toBeNull();
+    expect(state.landedState.engageTimerActive).toBe(false);
+    expect(state.landedState.screenActive).toBe(true);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
