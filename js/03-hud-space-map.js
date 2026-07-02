@@ -981,6 +981,7 @@ function updateObjectActionPanel(forceVisible = false) {
   const target = selected || engaged;
   const localBotVisualGuardActive = typeof isStagingLocalCombatBotVisualGuardActive === "function"
     && isStagingLocalCombatBotVisualGuardActive();
+  const targetNode = target?.currentNodeId || target?.currentNode || target?.node || "";
 
   if (!panel || !actionBtn) return;
 
@@ -1001,7 +1002,7 @@ function updateObjectActionPanel(forceVisible = false) {
   }
 
   const isRelevant = target
-    && (target.currentNodeId || target.node) === currentNode
+    && targetNode === currentNode
     && target.alive
     && !(localBotVisualGuardActive && targetType === "hostileBot");
 

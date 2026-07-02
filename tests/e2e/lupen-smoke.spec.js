@@ -1352,6 +1352,133 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("remote player markers stay stable across repeated roster updates", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const stability = await page.evaluate(() => window.eval(`
+      (() => {
+        const originalClient = window.LupenMultiplayerClient;
+        const originalSelected = selectedTarget;
+        const originalEngaged = engagedTarget;
+        if (engageTimer) {
+          clearInterval(engageTimer);
+          engageTimer = null;
+        }
+        selectedTarget = null;
+        engagedTarget = null;
+        currentNode = "Lower Gate Core";
+        showScreen("spaceScreen");
+        updateCurrentNodeUI();
+        window.__reverseRemoteRoster = false;
+        window.LupenMultiplayerClient = {
+          ...(originalClient || {}),
+          getStatus: () => ({
+            enabled: true,
+            isConnected: true,
+            enabledReason: "staging_enabled",
+            sessionId: "local-session"
+          }),
+          getPlayers: ({ includeSelf = true } = {}) => {
+            const now = Date.now();
+            const local = {
+              sessionId: "local-session",
+              displayName: "Local Pilot",
+              currentNode,
+              presenceStatus: "space",
+              isSelf: true,
+              lastSeenAt: now
+            };
+            const remoteA = {
+              sessionId: "stable-remote-a",
+              displayName: "Stable Alpha",
+              currentNode,
+              presenceStatus: "space",
+              currentShipId: "zeusExplorer",
+              shipName: "Nightshade Hawk",
+              shipImage: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
+              lastSeenAt: now
+            };
+            const remoteB = {
+              sessionId: "stable-remote-b",
+              displayName: "Stable Beta",
+              currentNode,
+              presenceStatus: "space",
+              currentShipId: "bison",
+              shipName: "Buu Hauler",
+              shipImage: "assets/ships/buu-hauler/buu-hauler-medium.webp",
+              lastSeenAt: now
+            };
+            const remotes = window.__reverseRemoteRoster ? [remoteB, remoteA] : [remoteA, remoteB];
+            return includeSelf ? [local, ...remotes] : remotes;
+          },
+          getBots: () => [],
+          getResources: () => [],
+          getPresenceEvents: () => []
+        };
+
+        const readMarker = (id) => {
+          const marker = document.querySelector('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="' + id + '"]');
+          return {
+            count: document.querySelectorAll('#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id="' + id + '"]').length,
+            left: marker?.style.left || "",
+            top: marker?.style.top || "",
+            label: marker?.querySelector(".lupen-mp-space-ghost-label")?.textContent || "",
+            note: marker?.querySelector(".lupen-mp-space-ghost-note")?.textContent || ""
+          };
+        };
+
+        try {
+          window.LupenMultiplayerOverlay.render();
+          const firstA = readMarker("stable-remote-a");
+          const firstB = readMarker("stable-remote-b");
+          for (let index = 0; index < 6; index += 1) {
+            window.__reverseRemoteRoster = index % 2 === 0;
+            window.LupenMultiplayerOverlay.render();
+          }
+          const finalA = readMarker("stable-remote-a");
+          const finalB = readMarker("stable-remote-b");
+          return { firstA, firstB, finalA, finalB };
+        } finally {
+          selectedTarget = originalSelected;
+          engagedTarget = originalEngaged;
+          window.__reverseRemoteRoster = false;
+          window.LupenMultiplayerClient = originalClient;
+          window.LupenMultiplayerOverlay.render();
+        }
+      })()
+    `));
+
+    expect(stability.firstA).toMatchObject({
+      count: 1,
+      label: "Stable Alpha",
+      note: "Nightshade Hawk"
+    });
+    expect(stability.firstB).toMatchObject({
+      count: 1,
+      label: "Stable Beta",
+      note: "Buu Hauler"
+    });
+    expect(stability.finalA).toMatchObject({
+      count: 1,
+      left: stability.firstA.left,
+      top: stability.firstA.top,
+      label: stability.firstA.label,
+      note: stability.firstA.note
+    });
+    expect(stability.finalB).toMatchObject({
+      count: 1,
+      left: stability.firstB.left,
+      top: stability.firstB.top,
+      label: stability.firstB.label,
+      note: stability.firstB.note
+    });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("debug staging diagnostics can be opened without a live server", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

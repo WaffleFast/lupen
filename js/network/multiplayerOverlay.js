@@ -1620,6 +1620,10 @@
       .replace(/\s+/g, " ");
   }
 
+  function getEntityNodeName(entity = {}) {
+    return entity?.currentNode || entity?.currentNodeId || entity?.node || "";
+  }
+
   function getSectorNodeByName(value) {
     if (typeof sectorNodes === "undefined") return null;
 
@@ -1632,7 +1636,7 @@
   }
 
   function getEntityPosition(entity) {
-    const node = getSectorNodeByName(entity.currentNode);
+    const node = getSectorNodeByName(getEntityNodeName(entity));
     if (node) {
       return {
         x: clampMapCoordinate(node.x + 2.4),
@@ -1895,7 +1899,7 @@
 
     players.forEach((player) => {
       const id = getRemotePilotKey(player);
-      if (id) remoteGhostSnapshots.set(id, { ...player });
+      if (id) rememberRemoteGhostSnapshot(player);
     });
   }
 
@@ -2040,7 +2044,7 @@
   }
 
   function isSameCurrentNode(entity) {
-    return normalizeNodeKey(entity?.currentNode) === normalizeNodeKey(getCurrentNodeName());
+    return normalizeNodeKey(getEntityNodeName(entity)) === normalizeNodeKey(getCurrentNodeName());
   }
 
   function getResourceHealthSummary(resource) {
@@ -2691,22 +2695,79 @@
     return typeof currentNode === "undefined" ? "" : currentNode;
   }
 
-  function getStableOffset(player, index) {
+  function getStableRemoteSeed(player, index = 0) {
     const id = String(player.sessionId || player.id || index);
-    const seed = id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    return ((seed % 9) - 4) * 5.5;
+    return id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  }
+
+  function getStableRemoteSpacePosition(player, index = 0) {
+    const key = getRemotePilotKey(player);
+    const previous = key ? remoteGhostSnapshots.get(key) : null;
+    const previousLeft = Number(previous?.spaceLeft);
+    const previousTop = Number(previous?.spaceTop);
+    const previousNode = normalizeNodeKey(getEntityNodeName(previous));
+    const nextNode = normalizeNodeKey(getEntityNodeName(player) || getCurrentNodeName());
+    if (previous && previousNode && previousNode === nextNode && Number.isFinite(previousLeft) && Number.isFinite(previousTop)) {
+      return {
+        spaceLeft: clampMapCoordinate(previousLeft),
+        spaceTop: clampMapCoordinate(previousTop)
+      };
+    }
+
+    const explicitLeft = Number(player?.spaceLeft);
+    const explicitTop = Number(player?.spaceTop);
+    if (Number.isFinite(explicitLeft) && Number.isFinite(explicitTop)) {
+      return {
+        spaceLeft: clampMapCoordinate(explicitLeft),
+        spaceTop: clampMapCoordinate(explicitTop)
+      };
+    }
+
+    const seed = getStableRemoteSeed(player, index);
+    return {
+      spaceLeft: clampMapCoordinate(50 + ((seed % 9) - 4) * 5.5),
+      spaceTop: clampMapCoordinate(24 + (Math.floor(seed / 9) % 3) * 12)
+    };
+  }
+
+  function rememberRemoteGhostSnapshot(player, position = {}) {
+    const key = getRemotePilotKey(player);
+    if (!key) return null;
+    const previous = remoteGhostSnapshots.get(key) || {};
+    const previousNode = normalizeNodeKey(getEntityNodeName(previous));
+    const nextNode = normalizeNodeKey(getEntityNodeName(player));
+    const sameNode = !previousNode || !nextNode || previousNode === nextNode;
+    const explicitLeft = Number(player?.spaceLeft);
+    const explicitTop = Number(player?.spaceTop);
+    const positionLeft = Number(position?.spaceLeft);
+    const positionTop = Number(position?.spaceTop);
+    const next = {
+      ...previous,
+      ...player
+    };
+    if (Number.isFinite(positionLeft)) next.spaceLeft = clampMapCoordinate(positionLeft);
+    else if (Number.isFinite(explicitLeft)) next.spaceLeft = clampMapCoordinate(explicitLeft);
+    else if (sameNode && Number.isFinite(Number(previous.spaceLeft))) next.spaceLeft = clampMapCoordinate(previous.spaceLeft);
+    else delete next.spaceLeft;
+    if (Number.isFinite(positionTop)) next.spaceTop = clampMapCoordinate(positionTop);
+    else if (Number.isFinite(explicitTop)) next.spaceTop = clampMapCoordinate(explicitTop);
+    else if (sameNode && Number.isFinite(Number(previous.spaceTop))) next.spaceTop = clampMapCoordinate(previous.spaceTop);
+    else delete next.spaceTop;
+    remoteGhostSnapshots.set(key, next);
+    return next;
   }
 
   function appendSpaceGhostMarker(layer, player, index, options = {}) {
     const selectedPlayerId = options.selectedPlayerId || "";
+    const position = getStableRemoteSpacePosition(player, index);
     const marker = global.document.createElement("div");
     marker.className = "lupen-mp-space-ghost";
     if (String(player.sessionId || player.id || "") === selectedPlayerId) marker.classList.add("is-selected");
     if (options.arriving) marker.classList.add("is-arriving");
     if (options.departing) marker.classList.add("is-departing");
     marker.dataset.sessionId = player.sessionId || player.id || "";
-    marker.style.left = `${Number.isFinite(Number(player.spaceLeft)) ? Number(player.spaceLeft) : 50 + getStableOffset(player, index)}%`;
-    marker.style.top = `${Number.isFinite(Number(player.spaceTop)) ? Number(player.spaceTop) : 24 + (index % 3) * 12}%`;
+    marker.style.left = `${position.spaceLeft}%`;
+    marker.style.top = `${position.spaceTop}%`;
     if (!options.departing) {
       marker.addEventListener("click", (event) => {
         event.preventDefault();
@@ -2769,10 +2830,9 @@
     const selectedPlayerId = getSelectedRemotePlayerId();
 
     localPlayers.slice(0, 6).forEach((player, index) => {
-      const spaceLeft = 50 + getStableOffset(player, index);
-      const spaceTop = 24 + (index % 3) * 12;
-      remoteGhostSnapshots.set(getRemotePilotKey(player), { ...player, spaceLeft, spaceTop });
-      appendSpaceGhostMarker(layer, { ...player, spaceLeft, spaceTop }, index, {
+      const position = getStableRemoteSpacePosition(player, index);
+      const snapshot = rememberRemoteGhostSnapshot(player, position) || { ...player, ...position };
+      appendSpaceGhostMarker(layer, snapshot, index, {
         selectedPlayerId,
         arriving: Number(remoteGhostArrivals.get(getRemotePilotKey(player)) || 0) > Date.now()
       });

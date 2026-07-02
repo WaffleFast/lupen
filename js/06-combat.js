@@ -120,7 +120,7 @@ function retargetEngagementToSelectedTarget() {
   reconcileStagingBotTargetState();
 
   const target = getSelectedTargetEntity();
-  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) return false;
+  if (!target || !target.alive || !isCombatEntityInCurrentNode(target)) return false;
 
   const nextTargetRef = getTargetRefFromEntity(target);
   if (!nextTargetRef || isSameTargetRef(nextTargetRef, engagedTarget)) return false;
@@ -162,7 +162,7 @@ function selectHostileBot(botId) {
 
   const bot = getHostileBotById(botId);
 
-  if (!bot || !bot.alive || (bot.currentNodeId || bot.node) !== currentNode) return;
+  if (!bot || !bot.alive || !isCombatEntityInCurrentNode(bot)) return;
 
   selectedTarget = { type: "hostileBot", id: bot.id };
   showTargetPanel();
@@ -177,7 +177,7 @@ function selectHostileBot(botId) {
 
 function selectStagingBotTarget(botId) {
   const bot = getStagingBotTargetById(botId);
-  if (!bot || !bot.alive || (bot.currentNodeId || bot.node) !== currentNode) return;
+  if (!bot || !bot.alive || !isCombatEntityInCurrentNode(bot)) return;
 
   selectedTarget = { type: "stagingBot", id: bot.id };
   window.LupenMultiplayerClient?.selectStagingBot?.(bot.id, { currentNode });
@@ -193,7 +193,7 @@ function selectStagingBotTarget(botId) {
 
 function selectStagingResourceTarget(resourceId) {
   const resource = getStagingResourceTargetById(resourceId);
-  if (!resource || !resource.alive || (resource.currentNodeId || resource.node) !== currentNode) return;
+  if (!resource || !resource.alive || !isCombatEntityInCurrentNode(resource)) return;
 
   selectedTarget = { type: "stagingResource", id: resource.id };
   window.LupenMultiplayerOverlay?.setSelectedResourceId?.(resource.id);
@@ -206,7 +206,7 @@ function selectStagingResourceTarget(resourceId) {
 function getOverlaySelectedStagingResourceTarget() {
   const resourceId = window.LupenMultiplayerOverlay?.getSelectedResourceId?.();
   const resource = resourceId ? getStagingResourceTargetById(resourceId) : null;
-  if (!resource || !resource.alive || (resource.currentNodeId || resource.node) !== currentNode) return null;
+  if (!resource || !resource.alive || !isCombatEntityInCurrentNode(resource)) return null;
   return resource;
 }
 
@@ -221,6 +221,14 @@ function getSelectedTargetEntityForAction() {
   return getSelectedTargetEntity() || syncOverlaySelectedResourceToCoreTarget();
 }
 
+function getCombatEntityNodeName(entity = {}) {
+  return entity?.currentNodeId || entity?.currentNode || entity?.node || "";
+}
+
+function isCombatEntityInCurrentNode(entity = {}) {
+  return getCombatEntityNodeName(entity) === currentNode;
+}
+
 function isCurrentNodeProtectedForPvp() {
   const node = typeof sectorNodes !== "undefined" ? sectorNodes[currentNode] : null;
   return typeof isProtectedNode === "function"
@@ -229,7 +237,7 @@ function isCurrentNodeProtectedForPvp() {
 }
 
 function getRemotePlayerTargetBlockReason(player = {}) {
-  const targetNode = player.currentNodeId || player.node || "";
+  const targetNode = getCombatEntityNodeName(player);
   const status = String(player.presenceStatus || player.status || "space").toLowerCase();
   if (status === "docked") return "Target is docked.";
   if (targetNode && targetNode !== currentNode) return "Target is no longer in this node.";
@@ -249,7 +257,7 @@ function canTargetRemotePlayerInCurrentZone(player = {}) {
 }
 
 function shouldKeepRemotePlayerSelection(player = {}) {
-  const targetNode = player.currentNodeId || player.node || "";
+  const targetNode = getCombatEntityNodeName(player);
   const status = String(player.presenceStatus || player.status || "space").toLowerCase();
   if (status === "docked") return false;
   if (targetNode && targetNode !== currentNode) return false;
@@ -357,7 +365,7 @@ function reconcileRemotePlayerTargetEligibility(reason = "remote_player_target_r
 
 function selectRemotePlayerTarget(playerId) {
   const player = getRemotePlayerTargetById(playerId);
-  if (!player || (player.currentNodeId || player.node) !== currentNode) return;
+  if (!player || !isCombatEntityInCurrentNode(player)) return;
 
   selectedTarget = { type: "remotePlayer", id: player.id };
   showTargetPanel();
@@ -384,7 +392,7 @@ function engageTarget() {
     return;
   }
 
-  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
+  if (!target || !target.alive || !isCombatEntityInCurrentNode(target)) {
     target = getSelectedTargetEntityForAction() || getVisibleTargets()[0];
     if (target) {
       selectedTarget = {
@@ -394,7 +402,7 @@ function engageTarget() {
     }
   }
 
-  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) return;
+  if (!target || !target.alive || !isCombatEntityInCurrentNode(target)) return;
   if (engageTimer) {
     retargetEngagementToSelectedTarget();
     return;
@@ -518,11 +526,11 @@ function isCombatVisualTargetStillValid(ref) {
   if (ref.type === "stagingBot") return isStagingBotTargetStillValid(ref.id);
   if (ref.type === "stagingResource") {
     const resource = getStagingResourceTargetById(ref.id);
-    return Boolean(resource && resource.alive && !resource.depleted && (resource.currentNodeId || resource.node) === currentNode);
+    return Boolean(resource && resource.alive && !resource.depleted && isCombatEntityInCurrentNode(resource));
   }
   if (ref.type === "remotePlayer") {
     const player = getRemotePlayerTargetById(ref.id);
-    return Boolean(player && (player.currentNodeId || player.node) === currentNode);
+    return Boolean(player && isCombatEntityInCurrentNode(player));
   }
   return true;
 }
@@ -1030,9 +1038,9 @@ function triggerErebusAggro(attackedBotId, playerId = getPilotName()) {
   if (!attackedBot || attackedBot.faction !== "erebus") return;
 
   const now = Date.now();
-  const nodeId = attackedBot.currentNodeId || attackedBot.node;
+  const nodeId = getCombatEntityNodeName(attackedBot);
   hostileBots
-    .filter(bot => bot.faction === "erebus" && bot.aggroState !== "defeated" && (bot.currentNodeId || bot.node) === nodeId)
+    .filter(bot => bot.faction === "erebus" && bot.aggroState !== "defeated" && getCombatEntityNodeName(bot) === nodeId)
     .forEach(bot => {
       bot.aggroState = "hostile";
       bot.aggroUntil = now + EREBUS_BOT_AGGRO_MS;
@@ -1059,7 +1067,7 @@ function updateErebusAggroStates() {
 function performAttackCycle() {
   const target = getEngagedTargetEntity();
 
-  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
+  if (!target || !target.alive || !isCombatEntityInCurrentNode(target)) {
     disengageTarget(true);
     return;
   }
@@ -1301,7 +1309,7 @@ function updateAsteroidUI() {
 
   const visibleBots = typeof getVisibleHostileBotsForLocalTargetUi === "function"
     ? getVisibleHostileBotsForLocalTargetUi()
-    : hostileBots.filter(bot => bot.alive && (bot.currentNodeId || bot.node) === currentNode);
+    : hostileBots.filter(bot => bot.alive && isCombatEntityInCurrentNode(bot));
   const visibleAsteroids = typeof getVisibleAsteroidsForLocalTargetUi === "function"
     ? getVisibleAsteroidsForLocalTargetUi()
     : asteroids.filter(asteroid => asteroid.alive && asteroid.node === currentNode);
@@ -1388,7 +1396,7 @@ function clearStagingBotTargetIfSelected(botId) {
 
 function isStagingBotTargetStillValid(botId) {
   const bot = getStagingBotTargetById(botId);
-  return Boolean(bot && bot.alive && (bot.currentNodeId || bot.node) === currentNode);
+  return Boolean(bot && bot.alive && isCombatEntityInCurrentNode(bot));
 }
 
 function clearStaleStagingBotTarget(reason = "stale_staging_bot_target") {
@@ -1878,7 +1886,7 @@ function respawnAsteroid() {
 
 function performStagingBotAttackCycle() {
   const target = getEngagedTargetEntity();
-  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
+  if (!target || !target.alive || !isCombatEntityInCurrentNode(target)) {
     reconcileStagingBotTargetState("staging_bot_attack_target_invalid");
     return;
   }
@@ -1896,7 +1904,7 @@ function performStagingBotAttackCycle() {
 
 function performStagingResourceAttackCycle() {
   const target = getEngagedTargetEntity();
-  if (!target || !target.alive || (target.currentNodeId || target.node) !== currentNode) {
+  if (!target || !target.alive || !isCombatEntityInCurrentNode(target)) {
     disengageTarget(true);
     updateObjectActionPanel(true);
     return;
@@ -1988,7 +1996,7 @@ function respawnHostileBot(botId) {
 }
 
 function getAllowedErebusBotMoves(bot) {
-  const currentNodeId = bot?.currentNodeId || bot?.node;
+  const currentNodeId = getCombatEntityNodeName(bot);
   const current = getNodeById(currentNodeId);
   if (!current) return [];
   const connectedNodeIds = current.connections || current.connectedNodes || current.connects || [];
@@ -2006,7 +2014,7 @@ function moveHostileBotsBetweenNodes() {
     if (!bot.alive) return;
     if (bot.faction === "erebus" && bot.aggroState === "defeated") return;
 
-    const botNode = bot.currentNodeId || bot.node;
+    const botNode = getCombatEntityNodeName(bot);
     if (bot.faction === "erebus" && bot.aggroState === "hostile" && isPlayerInNode(botNode)) return;
     if (now - Number(bot.lastMovedAt || 0) < Number(bot.moveIntervalMs || HOSTILE_BOT_MOVE_MS)) return;
 
@@ -2026,7 +2034,7 @@ function moveHostileBotsBetweenNodes() {
     bot.x = Math.floor(Math.random() * 52) + 34;
     bot.y = Math.floor(Math.random() * 34) + 18;
 
-    if (engagedTarget?.type === "hostileBot" && engagedTarget.id === bot.id && (bot.currentNodeId || bot.node) !== currentNode) {
+    if (engagedTarget?.type === "hostileBot" && engagedTarget.id === bot.id && !isCombatEntityInCurrentNode(bot)) {
       disengageTarget(true);
       autoCollapseTargetPanel(1200);
     }
