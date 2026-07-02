@@ -2410,6 +2410,8 @@ export class LupenSectorRoom extends Room {
       ok: true,
       reason: "staging_bot_return_fire",
       sessionId: client.sessionId,
+      targetSessionId: client.sessionId,
+      targetPlayerId: client.sessionId,
       attackerBotId: bot.id,
       attackerName: bot.name || bot.type || "Erebus Bot",
       currentNode: player.currentNode,
@@ -2428,7 +2430,7 @@ export class LupenSectorRoom extends Room {
       receivedAt: now
     };
 
-    client.send("staging:return_fire", payload);
+    this.broadcast("staging:return_fire", payload);
     return payload;
   }
 

@@ -1806,6 +1806,8 @@
       ok: message.ok === true,
       reason: String(message.reason || "staging_bot_return_fire"),
       sessionId: String(message.sessionId || ""),
+      targetSessionId: String(message.targetSessionId || message.targetPlayerId || message.sessionId || ""),
+      targetPlayerId: String(message.targetPlayerId || message.targetSessionId || message.sessionId || ""),
       attackerBotId: String(message.attackerBotId || ""),
       attackerName: String(message.attackerName || "Erebus Bot"),
       currentNode: String(message.currentNode || ""),
@@ -2846,7 +2848,10 @@
     activeRoom.onMessage("staging:return_fire", (message) => {
       connection.lastStagingReturnFire = normalizeStagingReturnFire(message);
       logDev("server staging return fire", message);
+      const returnFireTargetSessionId = String(connection.lastStagingReturnFire?.targetSessionId || connection.lastStagingReturnFire?.sessionId || "");
+      const isReturnFireTarget = returnFireTargetSessionId === connection.sessionId;
       if (connection.lastStagingReturnFire?.ok &&
+        isReturnFireTarget &&
         typeof global.applyStagingBotReturnFireDamage === "function") {
         const damageResult = global.applyStagingBotReturnFireDamage(connection.lastStagingReturnFire);
         if (damageResult && typeof damageResult === "object") {
@@ -2873,8 +2878,9 @@
           attackerBotId: connection.lastStagingReturnFire.attackerBotId,
           attackerDisplayName: connection.lastStagingReturnFire.attackerName,
           targetType: "player",
-          targetId: connection.sessionId || connection.lastStagingReturnFire.sessionId,
-          targetPlayerId: connection.sessionId || connection.lastStagingReturnFire.sessionId,
+          targetId: returnFireTargetSessionId || connection.lastStagingReturnFire.sessionId,
+          targetPlayerId: returnFireTargetSessionId || connection.lastStagingReturnFire.sessionId,
+          targetSessionId: returnFireTargetSessionId || connection.lastStagingReturnFire.sessionId,
           currentNode: connection.lastStagingReturnFire.currentNode,
           damage: connection.lastStagingReturnFire.botDamage || connection.lastStagingReturnFire.damage,
           shieldDamage: connection.lastStagingReturnFire.shieldDamage,

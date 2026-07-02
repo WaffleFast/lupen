@@ -3866,6 +3866,7 @@ test.describe("Lupen browser smoke", () => {
               x: 72,
               y: 46,
               isSelf: false,
+              presenceStatus: window.__remoteTargetPresenceStatus || "space",
               pvpShield: 60,
               pvpShieldMax: 60,
               pvpArmor: 20,
@@ -4294,6 +4295,20 @@ test.describe("Lupen browser smoke", () => {
         };
         const localBotReturn = renderBotReturnHit("local-session", 2);
         const thirdPartyBotReturn = renderBotReturnHit("remote-target-session", 3);
+        const missingTargetMarkerBotReturn = (() => {
+          window.__remoteTargetPresenceStatus = "docked";
+          const result = renderBotReturnHit("remote-target-session", 4);
+          window.__remoteTargetPresenceStatus = "space";
+          return result;
+        })();
+        const missingBotMarkerReturn = (() => {
+          const previousDisabled = window.__stagingVisualBot.disabled;
+          window.__stagingVisualBot.disabled = true;
+          const result = renderBotReturnHit("remote-target-session", 5);
+          window.__stagingVisualBot.disabled = previousDisabled;
+          window.LupenMultiplayerOverlay?.render?.();
+          return result;
+        })();
         return {
           shield,
           armor,
@@ -4301,6 +4316,8 @@ test.describe("Lupen browser smoke", () => {
           thirdParty,
           localBotReturn,
           thirdPartyBotReturn,
+          missingTargetMarkerBotReturn,
+          missingBotMarkerReturn,
           botReturnBeamCount: localBotReturn.beamCount,
           botReturnMuzzleCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-muzzle.is-bot-return").length,
           botReturnShieldHitCount: localBotReturn.hitCount
@@ -4333,6 +4350,8 @@ test.describe("Lupen browser smoke", () => {
     expect(Math.abs(pvpRemoteShotState.thirdPartyBotReturn.sourceY - pvpRemoteShotState.thirdPartyBotReturn.botCenter.y)).toBeLessThanOrEqual(1);
     expect(Math.abs(pvpRemoteShotState.thirdPartyBotReturn.endpointX - pvpRemoteShotState.thirdPartyBotReturn.remoteTargetCenter.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(pvpRemoteShotState.thirdPartyBotReturn.endpointY - pvpRemoteShotState.thirdPartyBotReturn.remoteTargetCenter.y)).toBeLessThanOrEqual(1);
+    expect(pvpRemoteShotState.missingTargetMarkerBotReturn.beamCount).toBe(0);
+    expect(pvpRemoteShotState.missingBotMarkerReturn.beamCount).toBe(0);
 
     const staleMissingBotState = await page.evaluate(() => window.eval(`
       (() => {

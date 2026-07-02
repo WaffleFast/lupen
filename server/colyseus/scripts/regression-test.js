@@ -4468,6 +4468,7 @@ try {
   const roomAPvpRepairEvents = [];
   const roomBPvpRepairEvents = [];
   const roomAReturnFireEvents = [];
+  const roomBReturnFireEvents = [];
   const resourceShotEventsA = [];
   const resourceShotEventsB = [];
   const resourceDepletedEventsB = [];
@@ -4488,7 +4489,7 @@ try {
   roomA.onMessage("pvp:repair_synced", (message) => roomAPvpRepairEvents.push(message));
   roomB.onMessage("pvp:repair_synced", (message) => roomBPvpRepairEvents.push(message));
   roomA.onMessage("staging:return_fire", (message) => roomAReturnFireEvents.push(message));
-  roomB.onMessage("staging:return_fire", () => {});
+  roomB.onMessage("staging:return_fire", (message) => roomBReturnFireEvents.push(message));
   roomA.onMessage("stagingResource:shot", (message) => resourceShotEventsA.push(message));
   roomB.onMessage("stagingResource:shot", (message) => resourceShotEventsB.push(message));
   roomA.onMessage("stagingResource:depleted", () => {});
@@ -5554,21 +5555,39 @@ try {
   assert(combatResponse?.weaponName === "Pulse Laser", "Combat response did not use server-known weapon name.");
   assert(combatResponse?.rewardsGranted === false, "Staging combat intent granted rewards.");
 
-  await waitFor("client A to receive light staging return fire", () => {
-    const returnFire = roomAReturnFireEvents.find((event) => event?.attackerBotId === inspectedBotBeforeCombat.id);
-    return returnFire &&
-      returnFire.damage === 4 &&
-      returnFire.sessionOnly === true &&
-      returnFire.persisted === false &&
-      returnFire.saveWritten === false &&
-      returnFire.playerDeathEnabled === true &&
-      returnFire.cargoLossEnabled === true &&
-      returnFire.botAttackStatus === "cooldown" &&
-      returnFire.botAttackReason === "return_fire_sent" &&
-      returnFire.cooldownMs >= 1600 &&
-      returnFire.cooldownMs <= 3250;
+  await waitFor("both clients to receive light staging return fire visual event", () => {
+    const returnFireA = roomAReturnFireEvents.find((event) => event?.attackerBotId === inspectedBotBeforeCombat.id);
+    const returnFireB = roomBReturnFireEvents.find((event) => event?.attackerBotId === inspectedBotBeforeCombat.id);
+    return returnFireA && returnFireB &&
+      returnFireA.damage === 4 &&
+      returnFireB.damage === 4 &&
+      returnFireA.sessionId === roomA.sessionId &&
+      returnFireB.sessionId === roomA.sessionId &&
+      returnFireA.targetSessionId === roomA.sessionId &&
+      returnFireB.targetSessionId === roomA.sessionId &&
+      returnFireA.targetPlayerId === roomA.sessionId &&
+      returnFireB.targetPlayerId === roomA.sessionId &&
+      returnFireA.currentNode === inspectedBotBeforeCombat.currentNode &&
+      returnFireB.currentNode === inspectedBotBeforeCombat.currentNode &&
+      returnFireA.sessionOnly === true &&
+      returnFireB.sessionOnly === true &&
+      returnFireA.persisted === false &&
+      returnFireB.persisted === false &&
+      returnFireA.saveWritten === false &&
+      returnFireB.saveWritten === false &&
+      returnFireA.playerDeathEnabled === true &&
+      returnFireB.playerDeathEnabled === true &&
+      returnFireA.cargoLossEnabled === true &&
+      returnFireB.cargoLossEnabled === true &&
+      returnFireA.botAttackStatus === "cooldown" &&
+      returnFireB.botAttackStatus === "cooldown" &&
+      returnFireA.botAttackReason === "return_fire_sent" &&
+      returnFireB.botAttackReason === "return_fire_sent" &&
+      returnFireA.cooldownMs >= 1600 &&
+      returnFireA.cooldownMs <= 3250 &&
+      returnFireB.cooldownMs === returnFireA.cooldownMs;
   });
-  console.log("staging bot return fire stayed light, session-only, and player-damage enabled");
+  console.log("staging bot return fire stayed light, session-only, and broadcast a visual event");
 
   await waitFor("both clients to receive staging shot event", () => {
     const shotA = roomAShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 10);
