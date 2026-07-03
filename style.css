@@ -36318,6 +36318,110 @@ input::placeholder {
   gap: 6px !important;
 }
 
+/* Seven-item station dock after Journey was promoted to main navigation. */
+.planet-home-screen .hub-actions.home-bottom-dock {
+  width: min(1160px, calc(100% - 72px)) !important;
+  height: 94px !important;
+  min-height: 94px !important;
+  max-height: 94px !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  padding: 10px 14px !important;
+  overflow: visible !important;
+}
+
+.planet-home-screen .hub-actions.home-bottom-dock .hub-action-button {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  gap: 4px !important;
+  padding: 0 4px !important;
+  font-size: clamp(0.58rem, 0.72vw, 0.72rem) !important;
+  line-height: 1.04 !important;
+  overflow: visible !important;
+}
+
+.planet-home-screen .hub-actions.home-bottom-dock .hub-action-button img,
+.planet-home-screen .hub-actions.home-bottom-dock .journey-menu-icon {
+  width: 30px !important;
+  height: 30px !important;
+  flex: 0 0 30px !important;
+}
+
+.planet-home-screen .hub-actions.home-bottom-dock .hub-action-button > span:not(.hub-action-badge):not(.journey-menu-icon) {
+  max-width: 100% !important;
+  min-height: 22px !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: visible !important;
+  overflow-wrap: anywhere !important;
+}
+
+.journey-menu-icon {
+  position: relative;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  filter:
+    drop-shadow(0 0 7px rgba(135, 231, 255, 0.9))
+    drop-shadow(0 0 16px rgba(0, 158, 255, 0.58));
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.journey-menu-icon svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.journey-route-line {
+  fill: none;
+  stroke: #77e8ff;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.journey-route-node {
+  fill: #071522;
+  stroke: #8df1ff;
+  stroke-width: 3;
+}
+
+.journey-route-star {
+  fill: rgba(122, 232, 255, 0.18);
+  stroke: #8df1ff;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.planet-home-screen .hub-actions.home-bottom-dock .hub-action-button:hover .journey-menu-icon,
+.planet-home-screen .hub-actions.home-bottom-dock .hub-action-button:focus-visible .journey-menu-icon {
+  transform: scale(1.05);
+  filter:
+    drop-shadow(0 0 9px rgba(237, 252, 255, 0.96))
+    drop-shadow(0 0 22px rgba(0, 200, 255, 0.74));
+}
+
+@media (max-width: 980px) {
+  .planet-home-screen .hub-actions.home-bottom-dock {
+    width: calc(100% - 24px) !important;
+    height: 86px !important;
+    min-height: 86px !important;
+    max-height: 86px !important;
+    padding: 8px 8px !important;
+  }
+
+  .planet-home-screen .hub-actions.home-bottom-dock .hub-action-button {
+    font-size: 0.54rem !important;
+  }
+
+  .planet-home-screen .hub-actions.home-bottom-dock .hub-action-button img,
+  .planet-home-screen .hub-actions.home-bottom-dock .journey-menu-icon {
+    width: 24px !important;
+    height: 24px !important;
+    flex-basis: 24px !important;
+  }
+}
+
 #hangarShipyardSection .exchange-hero-stage img {
   width: min(52%, 270px) !important;
   max-height: 110px !important;

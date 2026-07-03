@@ -126,6 +126,7 @@ async function lupenResetPilotProgress(options = {}) {
   }
 
   if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (typeof refreshMissionDisplays === "function") refreshMissionDisplays();
   if (typeof updateHudDock === "function") updateHudDock();
   if (typeof updateSpaceHUD === "function") updateSpaceHUD();
   if (typeof renderObjectiveHud === "function") renderObjectiveHud();
@@ -242,7 +243,8 @@ function buildSaveState(options = {}) {
     selectedBountyContractId,
     storeDailyPurchases,
     upgradeMaterials,
-    playerProgress
+    playerProgress,
+    missionProgress: typeof normalizeMissionProgress === "function" ? normalizeMissionProgress(missionProgress) : missionProgress
   };
 }
 
@@ -882,6 +884,9 @@ function applyLoadedGameState(rawSaved) {
 
   credits = saved.credits ?? credits;
   playerProgress = normalizePlayerProgress(saved.playerProgress || playerProgress);
+  if (typeof normalizeMissionProgress === "function") {
+    missionProgress = normalizeMissionProgress(saved.missionProgress || missionProgress);
+  }
   applyTrustedStagingXpIfNewer("loadGameFromSupabase");
   upgradeMaterials = normalizeUpgradeMaterials(saved.upgradeMaterials);
   cargoCostBasis = saved.cargoCostBasis ?? cargoCostBasis;

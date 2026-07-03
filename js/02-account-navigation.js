@@ -306,6 +306,8 @@ function renderPilotProfile() {
         </div>
       </div>
 
+      ${typeof renderChapterProgressCard === "function" ? renderChapterProgressCard() : ""}
+
       <div class="pilot-future-card">
         <div class="profile-tree-head"><span>Online Pilot Systems</span><strong>Later</strong></div>
         <div class="future-profile-grid">
@@ -322,6 +324,9 @@ function renderPilotProfile() {
 function resetToNoShipStarterState() {
   credits = 10000;
   playerProgress = createDefaultPlayerProgress();
+  if (typeof createDefaultMissionProgress === "function") {
+    missionProgress = createDefaultMissionProgress();
+  }
 
   mineralKeys.forEach(mineral => { cargo[mineral] = 0; });
   cargoCostBasis = {};
@@ -400,6 +405,14 @@ function openPilotProfile() {
   renderPilotProfile();
   showScreen("pilotProfileScreen");
   tutorialEvent("openedPilotProfile");
+}
+
+function openJourney() {
+  if (!sectorNodes[currentNode] || sectorNodes[currentNode].type !== "planet") {
+    currentNode = lastPlanetNode || "Asteron Prime";
+  }
+  if (typeof renderJourneyScreen === "function") renderJourneyScreen();
+  showScreen("journeyScreen");
 }
 
 
@@ -790,6 +803,9 @@ function updateHubLocation() {
   document.getElementById("hubLocationTitle").textContent = currentNode.toUpperCase();
   updateBountyHubBadge();
   updateProgressDisplays();
+  if (document.getElementById("journeyScreen")?.classList.contains("active") && typeof renderJourneyScreen === "function") {
+    renderJourneyScreen();
+  }
 }
 
 function hasClaimableBountyReward() {
@@ -1230,6 +1246,7 @@ function launchShip() {
 
   showScreen("spaceScreen");
   tutorialEvent("launched");
+  if (typeof recordMissionEvent === "function") recordMissionEvent("launch_from_station", { node: currentNode });
   updateCurrentNodeUI();
   updateSpaceHUD();
   updateProgressDisplays();

@@ -1736,6 +1736,9 @@ function depositLootToCargo(drops) {
       collected[mineral] = (collected[mineral] || 0) + collectedQuantity;
       collectedAmount += collectedQuantity;
       availableSpace -= collectedQuantity;
+      if (typeof recordMissionEvent === "function") {
+        recordMissionEvent("recover_resource", { resource: mineral, amount: collectedQuantity });
+      }
     }
 
     if (overflowQuantity > 0) {
@@ -1926,6 +1929,9 @@ function collectLoot(mineralToCollect = null) {
 
     if (collected > 0) {
       collectedLoot[mineral] = (collectedLoot[mineral] || 0) + collected;
+      if (typeof recordMissionEvent === "function") {
+        recordMissionEvent("recover_resource", { resource: mineral, amount: collected });
+      }
     }
   });
 

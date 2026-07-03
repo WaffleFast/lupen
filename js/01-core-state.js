@@ -2429,6 +2429,9 @@ function recordBotDestroyedProgress(bot) {
     playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
     reportErebusBotShipProgress(beforeNightshadeStatus);
   }
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("destroy_bot", { bot, faction: isErebus ? "erebus" : (bot?.faction || "") });
+  }
 }
 
 function getEquipmentUnlockRequirements(categoryKey, itemKey) {
@@ -2508,6 +2511,10 @@ function awardTradingXpFromProfit(profit) {
   playerProgress.totals.tradeProfit = Math.max(0, Number(playerProgress.totals.tradeProfit || 0)) + safeProfit;
   playerProgress.totals.totalTradingProfit = Math.max(0, Number(playerProgress.totals.totalTradingProfit || 0)) + safeProfit;
   addActivityLog(`Trade completed: CR ${formatNumber(safeProfit)} profit.`);
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("profitable_trade", { profit: safeProfit });
+    recordMissionEvent("credits_earned", { amount: safeProfit, credits });
+  }
   reportTradingShipProgress(beforeHaulerStatus);
   updateProgressDisplays();
   return 0;

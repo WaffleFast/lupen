@@ -5712,8 +5712,43 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     await expect(page.locator(".home-bottom-dock .home-dock-item").first()).toContainText("Journey");
+    await expect(page.locator(".home-bottom-dock .home-dock-item")).toHaveCount(7);
+    await expect(page.locator(".home-bottom-dock .home-dock-item").nth(6)).toContainText("Pilot");
+    const stationDock = await page.evaluate(() => {
+      const dock = document.querySelector(".home-bottom-dock");
+      const buttons = Array.from(document.querySelectorAll(".home-bottom-dock .home-dock-item"));
+      const dockRect = dock?.getBoundingClientRect();
+      return {
+        journeyUsesMorganImage: document.querySelector("#journeyHubBtn img")?.getAttribute("src")?.includes("morgan") || false,
+        hasJourneySvg: Boolean(document.querySelector("#journeyHubBtn svg")),
+        count: buttons.length,
+        allFit: Boolean(dockRect) && buttons.every(button => {
+          const rect = button.getBoundingClientRect();
+          return rect.width > 0 &&
+            rect.height > 0 &&
+            rect.left >= dockRect.left - 1 &&
+            rect.right <= dockRect.right + 1 &&
+            rect.top >= dockRect.top - 1 &&
+            rect.bottom <= dockRect.bottom + 1;
+        }),
+        pilotVisible: (() => {
+          const pilot = buttons[6];
+          const rect = pilot?.getBoundingClientRect();
+          return Boolean(rect && rect.width > 0 && rect.height > 0);
+        })()
+      };
+    });
+    expect(stationDock).toMatchObject({
+      count: 7,
+      allFit: true,
+      pilotVisible: true,
+      journeyUsesMorganImage: false,
+      hasJourneySvg: true
+    });
+
     await page.locator("#journeyHubBtn").click();
     await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
+    await expect(page.locator("#journeyScreen .journey-morgan-portrait")).toHaveAttribute("src", /morgan-thumbnail\.png/);
     await expect(page.locator("#journeyScreen")).toContainText("MORGAN");
     await expect(page.locator("#journeyScreen")).toContainText("STATION AI");
     await expect(page.locator("#journeyScreen")).toContainText("ACADEMY");

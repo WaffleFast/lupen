@@ -631,6 +631,9 @@ function startForgeUpgrade() {
     if (item.key === "pulseLaser" && forgeUpgradeMode === "quality") {
       tutorialEvent("upgradedTutorialWeapon", { key: item.key, quality: requirements.targetQuality });
     }
+    if (typeof recordMissionEvent === "function") {
+      recordMissionEvent("upgrade_item", { key: item.key, mode: forgeUpgradeMode, quality: requirements.targetQuality, level: requirements.targetLevel });
+    }
     renderUpgradeForge();
     updateProgressDisplays();
     updateSpaceHUD();
