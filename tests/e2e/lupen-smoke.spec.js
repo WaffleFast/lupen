@@ -2003,6 +2003,9 @@ test.describe("Lupen browser smoke", () => {
       && first.top < second.bottom - 2
       && first.bottom > second.top + 2
     );
+    expect(resourceEngageState.middleHudLayout.guild.height).toBeLessThanOrEqual(28);
+    expect(rectsOverlap(resourceEngageState.middleHudLayout.guild, resourceEngageState.middleHudLayout.action)).toBe(false);
+    expect(rectsOverlap(resourceEngageState.middleHudLayout.cargo, resourceEngageState.middleHudLayout.action)).toBe(false);
     expect(rectsOverlap(resourceEngageState.middleHudLayout.ship, resourceEngageState.middleHudLayout.xpRow)).toBe(false);
     expect(resourceEngageState.middleHudLayout.xpBar.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpRow.bottom - 2);
     expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(Math.max(
@@ -2014,7 +2017,7 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.cargoSummaryText).toContain("Cargo");
     expect(resourceEngageState.cargoSummaryText).toContain("FULL");
     expect(resourceEngageState.guildPlaceholderText).toContain("Guild");
-    expect(resourceEngageState.guildPlaceholderText).toContain("Coming Soon");
+    expect(resourceEngageState.guildPlaceholderText).toContain("Soon");
     expect(resourceEngageState.guildPlaceholderDisabled).toBe("true");
     expect(resourceEngageState.resourceIntentReason).toBe("resource_mine_intent_sent");
     expect(resourceEngageState.diagnosticsText).toContain("resource sent");
