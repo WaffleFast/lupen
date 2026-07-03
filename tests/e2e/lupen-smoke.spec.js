@@ -5686,6 +5686,64 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("mission journal accepts, progresses, claims, and resetPilot clears mission progress", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      localStorage.clear();
+      tutorialState = { active: false, completed: true, stepIndex: 0 };
+      currentNode = "Asteron Prime";
+      lastPlanetNode = "Asteron Prime";
+      homePlanet = "Asteron Prime";
+      currentShipId = STARTER_SHIP_ID;
+      ownedShips = [STARTER_SHIP_ID];
+      selectedHangarShipId = STARTER_SHIP_ID;
+      selectedFleetShipId = STARTER_SHIP_ID;
+      shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: ["pulseLaser"] }, STARTER_SHIP_ID) };
+      shipConditions = {};
+      credits = 10000;
+      playerProgress = createDefaultPlayerProgress();
+      missionProgress = createDefaultMissionProgress();
+      applyShipStats(true);
+      showScreen("gameScreen");
+      updateHubLocation();
+    `));
+
+    await expect(page.locator("#missionJournalPanel")).toBeVisible();
+    await expect(page.locator("#missionJournalPanel")).toContainText("Chapter I: Frontier");
+    await expect(page.locator("#missionJournalPanel")).toContainText("Sector Orientation");
+
+    await page.locator("#missionJournalPanel button", { hasText: "Accept Mission" }).first().click();
+    await expect(page.locator("#missionJournalPanel")).toContainText("ACTIVE");
+    await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("active");
+
+    await page.evaluate(() => window.launchShip());
+    await expect(page.locator("#spaceScreen")).toHaveClass(/active/);
+    await expect(page.locator("#activeMissionSummary")).toContainText("Sector Orientation");
+    await expect(page.locator("#activeMissionSummary")).toContainText("READY");
+    await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("completed");
+
+    await page.evaluate(() => window.landOnPlanet());
+    await page.locator("#missionJournalPanel button", { hasText: "Claim Reward" }).first().click();
+    await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("claimed");
+    await expect(page.evaluate(() => window.eval(`credits`))).resolves.toBe(10100);
+
+    const resetState = await page.evaluate(async () => {
+      await window.lupenResetPilotProgress({ reload: false });
+      return {
+        runtime: window.eval(`missionProgress.missions.sector_orientation`),
+        saved: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions?.sector_orientation
+      };
+    });
+
+    expect(resetState.runtime).toMatchObject({ state: "available", progress: 0 });
+    expect(resetState.saved).toMatchObject({ state: "available", progress: 0 });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("all new ships accept guns, equipment, combat stats, and cargo math", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
