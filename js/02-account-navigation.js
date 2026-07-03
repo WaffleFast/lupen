@@ -366,6 +366,17 @@ function resetToNoShipStarterState() {
   hullMax = 0;
   shield = 0;
   shieldMax = 0;
+
+  if (typeof clearFirstSessionTransientState === "function") {
+    clearFirstSessionTransientState("reset_to_no_ship_starter_state", { clearServerTarget: false, update: false });
+  } else {
+    if (typeof engageTimer !== "undefined" && engageTimer) {
+      clearInterval(engageTimer);
+      engageTimer = null;
+    }
+    if (typeof selectedTarget !== "undefined") selectedTarget = null;
+    if (typeof engagedTarget !== "undefined") engagedTarget = null;
+  }
 }
 
 function grantStarterShipKit() {

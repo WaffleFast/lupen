@@ -890,6 +890,40 @@ function clearAllCombatVisuals() {
   return removed > 0;
 }
 
+function clearFirstSessionTransientState(reason = "first_session_cleanup", options = {}) {
+  if (typeof engageTimer !== "undefined" && engageTimer) {
+    clearInterval(engageTimer);
+    engageTimer = null;
+  }
+  if (typeof targetCollapseTimer !== "undefined" && targetCollapseTimer) {
+    clearTimeout(targetCollapseTimer);
+    targetCollapseTimer = null;
+  }
+
+  selectedTarget = null;
+  engagedTarget = null;
+  serverPvpDamageDisplayState = null;
+  lastPvpHullFeedbackState = "";
+  lastRemotePlayerEngageNoticeKey = "";
+  lastRemotePlayerEngageNoticeAt = 0;
+  lastResourceCargoFullNoticeAt = 0;
+
+  clearAllCombatVisuals();
+  window.LupenMultiplayerOverlay?.setSelectedResourceId?.("");
+  if (options.clearServerTarget !== false) {
+    window.LupenMultiplayerClient?.clearStagingTarget?.();
+  }
+
+  if (options.update !== false) {
+    if (typeof updateAsteroidUI === "function") updateAsteroidUI();
+    if (typeof updateTargetPanel === "function") updateTargetPanel();
+    if (typeof updateObjectActionPanel === "function") updateObjectActionPanel(false);
+    window.LupenMultiplayerOverlay?.render?.();
+  }
+
+  return { ok: true, reason };
+}
+
 function getShotVisualProfile(shotWeapon = {}) {
   const style = String(shotWeapon.fireStyle || "pulse").toLowerCase();
   const color = shotWeapon.projectileColor || "#7fd6ff";
@@ -1587,6 +1621,7 @@ window.applyServerPvpDestructionState = applyServerPvpDestructionState;
 window.handleStagingBotLifecycleEvent = handleStagingBotLifecycleEvent;
 window.reconcileStagingBotTargetState = reconcileStagingBotTargetState;
 window.reconcileServerOwnedSectorObjectMode = reconcileServerOwnedSectorObjectMode;
+window.clearFirstSessionTransientState = clearFirstSessionTransientState;
 
 function updateTargetPanel() {
   const lootSummary = document.getElementById("lootSummary");

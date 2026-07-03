@@ -631,6 +631,160 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("fresh pilot first-session reset clears stale runtime state and launches cleanly", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const firstSession = await page.evaluate(() => window.eval(`
+      (async () => {
+        showScreen("spaceScreen");
+        selectedTarget = { type: "remotePlayer", id: "stale-player" };
+        engagedTarget = { type: "stagingResource", id: "stale-resource" };
+        serverPvpDamageDisplayState = { hull: 12, hullMax: 120, shield: 0, shieldMax: 60, updatedAt: Date.now() };
+        cargo.Copper = 9;
+        cargoRecovered.Copper = 9;
+        window.LupenMultiplayerOverlay?.setSelectedResourceId?.("stale-resource");
+        const fxLayer = document.getElementById("combatFxLayer") || document.body.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
+        fxLayer.id = "combatFxLayer";
+        const staleShot = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        staleShot.classList.add("combat-fx-shot");
+        staleShot.dataset.targetId = "stale-resource";
+        fxLayer.appendChild(staleShot);
+        updateObjectActionPanel(true);
+
+        const resetResult = await window.lupenResetPilotProgress({ reload: false });
+        updateObjectActionPanel(true);
+        updateCargoSummary();
+        const afterReset = {
+          resetOk: resetResult.ok === true,
+          currentShipId,
+          ownedShips: ownedShips.slice(),
+          credits,
+          currentNode,
+          lastPlanetNode,
+          cargoUsed: cargoUsed(),
+          cargoRecoveredKeys: Object.keys(cargoRecovered || {}),
+          selectedTarget,
+          engagedTarget,
+          pvpState: serverPvpDamageDisplayState,
+          selectedResourceId: window.LupenMultiplayerOverlay?.getSelectedResourceId?.() || "",
+          fxCount: document.querySelectorAll("#combatFxLayer .combat-fx-shot").length,
+          actionText: document.getElementById("objectEngageBtn")?.textContent || "",
+          actionDisabled: document.getElementById("objectEngageBtn")?.disabled ?? null,
+          actionInactive: document.getElementById("objectEngageBtn")?.classList.contains("action-inactive") || false,
+          cargoSummary: document.getElementById("hudCargoSummary")?.textContent || "",
+          cargoFullHidden: document.getElementById("hudCargoFullBadge")?.hidden ?? null,
+          cargoIsFull: document.getElementById("hudCargoSummary")?.classList.contains("is-full") || false,
+          tutorialActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false,
+          saved: JSON.parse(localStorage.getItem(STORAGE_GAME_KEY))
+        };
+
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("shipyard");
+        selectedShipyardShipId = STARTER_SHIP_ID;
+        renderShipShop();
+        renderShipyardDetail();
+        const claimButton = document.querySelector("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']");
+        const claimText = claimButton?.textContent?.trim() || "";
+        buyShip(STARTER_SHIP_ID);
+        launchShip();
+        updateObjectActionPanel(true);
+        updateCargoSummary();
+        document.getElementById("objectEngageBtn")?.click();
+
+        return {
+          afterReset,
+          claimText,
+          afterLaunch: {
+            spaceActive: document.getElementById("spaceScreen")?.classList.contains("active") || false,
+            gameActive: document.getElementById("gameScreen")?.classList.contains("active") || false,
+            currentShipId,
+            ownsStarter: ownedShips.includes(STARTER_SHIP_ID),
+            currentNode,
+            lastPlanetNode,
+            hull,
+            hullMax,
+            shield,
+            shieldMax,
+            credits,
+            cargoUsed: cargoUsed(),
+            cargoRecoveredKeys: Object.keys(cargoRecovered || {}),
+            actionText: document.getElementById("objectEngageBtn")?.textContent || "",
+            actionDisabled: document.getElementById("objectEngageBtn")?.disabled ?? null,
+            actionInactive: document.getElementById("objectEngageBtn")?.classList.contains("action-inactive") || false,
+            selectedTarget,
+            engagedTarget,
+            cargoSummary: document.getElementById("hudCargoSummary")?.textContent || "",
+            multiplayerStatus: document.getElementById("lupenMultiplayerStatusChip")?.textContent?.trim() || "",
+            saved: JSON.parse(localStorage.getItem(STORAGE_GAME_KEY))
+          }
+        };
+      })()
+    `));
+
+    expect(firstSession.afterReset).toMatchObject({
+      resetOk: true,
+      currentShipId: "",
+      ownedShips: [],
+      credits: 10000,
+      currentNode: "Asteron Prime",
+      lastPlanetNode: "Asteron Prime",
+      cargoUsed: 0,
+      cargoRecoveredKeys: [],
+      selectedTarget: null,
+      engagedTarget: null,
+      pvpState: null,
+      selectedResourceId: "",
+      fxCount: 0,
+      actionText: "ENGAGE",
+      actionDisabled: true,
+      actionInactive: true,
+      cargoFullHidden: true,
+      cargoIsFull: false,
+      tutorialActive: false
+    });
+    expect(firstSession.afterReset.cargoSummary).toContain("0 / 0");
+    expect(firstSession.afterReset.saved).toMatchObject({
+      credits: 10000,
+      currentShipId: "",
+      ownedShips: [],
+      currentNode: "Asteron Prime",
+      lastPlanetNode: "Asteron Prime"
+    });
+    expect(firstSession.afterReset.saved.cargoRecovered).toEqual({});
+
+    expect(firstSession.claimText).toBe("Claim Starter Ship");
+    expect(firstSession.afterLaunch).toMatchObject({
+      spaceActive: true,
+      gameActive: false,
+      currentShipId: "falcon",
+      ownsStarter: true,
+      currentNode: "Asteron Prime",
+      lastPlanetNode: "Asteron Prime",
+      credits: 10000,
+      cargoUsed: 0,
+      cargoRecoveredKeys: [],
+      actionText: "ENGAGE",
+      actionDisabled: true,
+      actionInactive: true,
+      selectedTarget: null,
+      engagedTarget: null
+    });
+    expect(firstSession.afterLaunch.hull).toBeGreaterThan(0);
+    expect(firstSession.afterLaunch.hull).toBe(firstSession.afterLaunch.hullMax);
+    expect(firstSession.afterLaunch.shield).toBe(firstSession.afterLaunch.shieldMax);
+    expect(firstSession.afterLaunch.cargoSummary).toContain("0 / 150");
+    expect(firstSession.afterLaunch.multiplayerStatus).toMatch(/Multiplayer|Offline|Connecting|Online|Reconnecting/i);
+    expect(firstSession.afterLaunch.saved.currentShipId).toBe("falcon");
+    expect(firstSession.afterLaunch.saved.ownedShips).toContain("falcon");
+    expect(firstSession.afterLaunch.saved.cargoRecovered).toEqual({});
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("missing cloud save starts fresh instead of silently uploading stale local progress", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

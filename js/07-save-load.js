@@ -44,6 +44,9 @@ function resetLupenRuntimeStateForLocalSaveClear() {
   if (typeof resetToNoShipStarterState === "function") {
     resetToNoShipStarterState();
   }
+  if (typeof clearFirstSessionTransientState === "function") {
+    clearFirstSessionTransientState("local_save_clear", { clearServerTarget: false, update: false });
+  }
   window.lupenLastLocalSaveMigrationAnalysis = null;
   window.lupenTrustedStagingXpAfter = null;
   window.lupenLastStagingXpRefresh = null;
@@ -858,6 +861,10 @@ function saveGameBeforeLeave() {
 }
 
 function clearTransientStateAfterLoadedSave() {
+  if (typeof clearFirstSessionTransientState === "function") {
+    clearFirstSessionTransientState("loaded_save", { clearServerTarget: false, update: false });
+    return;
+  }
   if (typeof engageTimer !== "undefined" && engageTimer) {
     clearInterval(engageTimer);
     engageTimer = null;
