@@ -1088,10 +1088,10 @@
       .lupen-target-card.player {
         --target-accent: #ffc76b;
         --target-glow: rgba(255, 190, 92, 0.72);
-        min-width: 118px;
-        max-width: 136px;
-        gap: 2px;
-        padding: 4px 6px 5px;
+        min-width: 124px;
+        max-width: 146px;
+        gap: 3px;
+        padding: 5px 7px 6px;
         border-color: rgba(255, 197, 96, 0.64);
         box-shadow: 0 0 10px rgba(255, 168, 58, 0.12);
       }
@@ -1166,7 +1166,8 @@
       }
 
       .lupen-target-meta-row {
-        max-width: 126px;
+        width: 100%;
+        max-width: 132px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1174,12 +1175,49 @@
         white-space: nowrap;
       }
 
+      .lupen-target-meta-row small {
+        min-width: 0;
+      }
+
+      .lupen-target-level-chip {
+        flex: 0 0 auto;
+        border: 1px solid rgba(122, 230, 255, 0.34);
+        border-radius: 3px;
+        padding: 1px 3px;
+        color: #dffcff;
+        background: rgba(0, 32, 55, 0.48);
+        font: 900 7px/1 Arial, sans-serif;
+      }
+
+      .lupen-target-status-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        max-width: 136px;
+        white-space: nowrap;
+      }
+
       .lupen-target-card.player .lupen-target-status {
         padding: 2px 4px;
       }
 
-      .lupen-target-card.player .lupen-target-readiness {
-        max-width: 76px;
+      .lupen-target-card.player .lupen-target-status.is-protected {
+        border-color: rgba(88, 219, 255, 0.44);
+        color: #9cecff;
+        background: rgba(0, 38, 60, 0.54);
+      }
+
+      .lupen-target-card.player .lupen-target-status.is-ready {
+        border-color: rgba(86, 255, 182, 0.5);
+        color: #98ffd2;
+        background: rgba(0, 58, 38, 0.42);
+      }
+
+      .lupen-target-card.player .lupen-target-status.is-disabled {
+        border-color: rgba(255, 210, 112, 0.52);
+        color: #ffe29b;
+        background: rgba(70, 44, 4, 0.52);
       }
 
       .lupen-target-card.player.pvp-hull-critical,
@@ -1194,7 +1232,7 @@
       }
 
       .lupen-target-card.player .lupen-target-bars {
-        width: 76px;
+        width: 88px;
         gap: 1px;
       }
 
@@ -1686,7 +1724,7 @@
     if (shipName) return shipName.slice(0, 22);
 
     const shipId = String(player.currentShipId || "").trim();
-    return shipId ? shipId.slice(0, 22) : "Unknown ship";
+    return shipId ? shipId.slice(0, 22) : "Ship unknown";
   }
 
   function normalizeShipLookupKey(value) {
@@ -1843,6 +1881,30 @@
 
   function getRemotePlayerCompactStatus(player, vitals, status = getClient()?.getStatus?.()) {
     return getRemotePlayerPvpHullStatusLabel(getRemotePlayerPvpHullStatus(vitals)) || getRemotePlayerPvpLabel(player, status);
+  }
+
+  function getRemotePlayerLevelLabel(player = {}) {
+    const level = Number(player.level ?? player.combatLevel ?? player.playerLevel);
+    if (!Number.isFinite(level) || level <= 0) return "";
+    return `L${Math.round(level)}`;
+  }
+
+  function getRemotePlayerZoneStatus(player = {}) {
+    if (!isPilotInSpace(player)) return "DOCKED";
+    if (!isSameCurrentNode(player)) return "AWAY";
+    return isPvpProtectedNode() ? "PROTECTED" : "CONTESTED";
+  }
+
+  function getRemotePlayerActionStatus(player = {}, vitals = {}, status = getClient()?.getStatus?.()) {
+    const hullStatus = getRemotePlayerPvpHullStatusLabel(getRemotePlayerPvpHullStatus(vitals));
+    if (hullStatus) return hullStatus;
+    return getRemotePlayerPvpLabel(player, status) === "READY" ? "PVP READY" : "PVP DISABLED";
+  }
+
+  function getRemotePlayerActionStatusClass(label = "") {
+    if (label === "PVP READY") return "is-ready";
+    if (label === "CRITICAL" || label === "REPAIR") return "is-warning";
+    return "is-disabled";
   }
 
   function getRemotePilotKey(player = {}) {
@@ -2385,24 +2447,43 @@
       appendTargetBar(bars, selectedBot.shield, selectedBot.shieldMax ?? selectedBot.maxShield, "shield");
       card.appendChild(bars);
     } else if (selectedPlayer) {
+      const meta = global.document.createElement("div");
+      meta.className = "lupen-target-meta-row";
       const ship = global.document.createElement("small");
       ship.textContent = getShipLabel(selectedPlayer);
-      card.appendChild(ship);
+      meta.appendChild(ship);
+      const levelLabel = getRemotePlayerLevelLabel(selectedPlayer);
+      if (levelLabel) {
+        const level = global.document.createElement("span");
+        level.className = "lupen-target-level-chip";
+        level.textContent = levelLabel;
+        meta.appendChild(level);
+      }
+      card.appendChild(meta);
 
       const vitals = playerVitals || getRemotePlayerPvpVitals(selectedPlayer);
       if (vitals.shieldMax > 0 || vitals.armorMax > 0 || vitals.hullMax > 0) {
         const bars = global.document.createElement("div");
         bars.className = "lupen-target-bars";
-        appendTargetBar(bars, vitals.hull, vitals.hullMax, "hull");
-        appendTargetBar(bars, vitals.armor, vitals.armorMax, "armor");
         appendTargetBar(bars, vitals.shield, vitals.shieldMax, "shield");
+        appendTargetBar(bars, vitals.armor, vitals.armorMax, "armor");
+        appendTargetBar(bars, vitals.hull, vitals.hullMax, "hull");
         card.appendChild(bars);
       }
 
-      const statusTag = global.document.createElement("span");
-      statusTag.className = "lupen-target-status pvp-arming";
-      statusTag.textContent = getRemotePlayerCompactStatus(selectedPlayer, vitals, status);
-      card.appendChild(statusTag);
+      const statusRow = global.document.createElement("div");
+      statusRow.className = "lupen-target-status-row";
+      const zoneTag = global.document.createElement("span");
+      const zoneStatus = getRemotePlayerZoneStatus(selectedPlayer);
+      zoneTag.className = `lupen-target-status ${zoneStatus === "PROTECTED" ? "is-protected" : "pvp-arming"}`;
+      zoneTag.textContent = zoneStatus;
+      statusRow.appendChild(zoneTag);
+      const actionStatus = getRemotePlayerActionStatus(selectedPlayer, vitals, status);
+      const actionTag = global.document.createElement("span");
+      actionTag.className = `lupen-target-status ${getRemotePlayerActionStatusClass(actionStatus)}`;
+      actionTag.textContent = actionStatus;
+      statusRow.appendChild(actionTag);
+      card.appendChild(statusRow);
     } else if (selectedResource) {
       const bars = global.document.createElement("div");
       bars.className = "lupen-target-bars";

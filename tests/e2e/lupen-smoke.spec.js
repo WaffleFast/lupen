@@ -2191,6 +2191,7 @@ test.describe("Lupen browser smoke", () => {
           presenceStatus: "space",
           shipName: "Azure Striker",
           shipImage: "assets/ships/azure-striker/azure-striker-medium.webp",
+          level: 7,
           guildId: "",
           pvpShield: 30,
           pvpShieldMax: 30,
@@ -2708,7 +2709,11 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.protectedMessage).toBe("PvP disabled in protected zones.");
     expect(eligibility.protectedActionDisabled).toBe(true);
     expect(eligibility.protectedActionText).toBe("PVP DISABLED");
-    expect(eligibility.protectedTargetCardText).toContain("DISABLED");
+    expect(eligibility.protectedTargetCardText).toContain("Remote Pilot");
+    expect(eligibility.protectedTargetCardText).toContain("Azure Striker");
+    expect(eligibility.protectedTargetCardText).toContain("L7");
+    expect(eligibility.protectedTargetCardText).toContain("PROTECTED");
+    expect(eligibility.protectedTargetCardText).toContain("PVP DISABLED");
     expect(eligibility.protectedTargetCardText).not.toContain("Inspection only");
     expect(eligibility.protectedTargetCardText).not.toContain("PvP disabled in protected zones");
     expect(eligibility.contestedSelected).toBe(true);
@@ -2716,7 +2721,11 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.contestedEngageMessage).toBe("PvP server hit test ready.");
     expect(eligibility.contestedActionDisabled).toBe(false);
     expect(eligibility.contestedActionText).toBe("PVP ENGAGE");
-    expect(eligibility.contestedTargetCardText).toContain("READY");
+    expect(eligibility.contestedTargetCardText).toContain("Remote Pilot");
+    expect(eligibility.contestedTargetCardText).toContain("Azure Striker");
+    expect(eligibility.contestedTargetCardText).toContain("L7");
+    expect(eligibility.contestedTargetCardText).toContain("CONTESTED");
+    expect(eligibility.contestedTargetCardText).toContain("PVP READY");
     expect(eligibility.contestedTargetCardText).not.toContain("Server hit test ready");
     expect(eligibility.contestedTargetCardText).not.toContain("No defeat or loot");
     expect(eligibility.contestedTargetCardClass).toContain("compact-player-target");

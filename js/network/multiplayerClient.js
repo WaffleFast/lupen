@@ -1156,6 +1156,9 @@
       authVerificationAttempted: player.authVerificationAttempted === true,
       authVerificationReason: String(player.authVerificationReason || ""),
       guildId: String(player.guildId || ""),
+      level: Number.isFinite(Number(player.level ?? player.combatLevel ?? player.playerLevel))
+        ? Number(player.level ?? player.combatLevel ?? player.playerLevel)
+        : null,
       currentShipId: String(player.currentShipId || ""),
       shipName: String(player.shipName || player.ship || ""),
       shipImage: String(player.shipImage || player.shipImageSrc || player.shipImagePath || ""),
