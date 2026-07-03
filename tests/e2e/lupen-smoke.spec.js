@@ -5718,8 +5718,10 @@ test.describe("Lupen browser smoke", () => {
       const dock = document.querySelector(".home-bottom-dock");
       const buttons = Array.from(document.querySelectorAll(".home-bottom-dock .home-dock-item"));
       const dockRect = dock?.getBoundingClientRect();
+      const journeyIconSrc = document.querySelector("#journeyHubBtn img")?.getAttribute("src") || "";
       return {
-        journeyUsesMorganImage: document.querySelector("#journeyHubBtn img")?.getAttribute("src")?.includes("morgan") || false,
+        journeyIconSrc,
+        journeyUsesMorganImage: journeyIconSrc.includes("morgan"),
         hasJourneySvg: Boolean(document.querySelector("#journeyHubBtn svg")),
         count: buttons.length,
         allFit: Boolean(dockRect) && buttons.every(button => {
@@ -5743,8 +5745,14 @@ test.describe("Lupen browser smoke", () => {
       allFit: true,
       pilotVisible: true,
       journeyUsesMorganImage: false,
-      hasJourneySvg: true
+      journeyIconSrc: "assets/journey-icon.png",
+      hasJourneySvg: false
     });
+
+    await page.locator(".home-bottom-dock .home-dock-item").nth(6).click();
+    await expect(page.locator("#pilotProfileScreen")).toHaveClass(/active/);
+    await page.locator("#pilotProfileScreen .screen-back-btn").click();
+    await expect(page.locator("#gameScreen")).toHaveClass(/active/);
 
     await page.locator("#journeyHubBtn").click();
     await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
