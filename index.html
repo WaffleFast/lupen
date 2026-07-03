@@ -64,9 +64,11 @@
           <span>Launch Ship</span>
         </button>
 
-        <aside id="missionJournalPanel" class="mission-journal-panel" aria-label="Mission Journal"></aside>
-
         <nav class="hub-actions home-bottom-dock" aria-label="Planet services">
+          <button class="hub-action-button home-dock-item" id="journeyHubBtn" onclick="openJourney()" aria-label="Journey">
+            <img src="assets/morgan-thumbnail.png" alt="" />
+            <span>Journey</span>
+          </button>
           <button class="hub-action-button home-dock-item" data-tutorial-target="planetTradeTerminal" onclick="openMarketplace()" aria-label="Trade Terminal">
             <img src="assets/hub/trade-terminal-icon.png" alt="" />
             <span>Trade<br />Terminal</span>
@@ -93,6 +95,20 @@
             <span>Pilot</span>
           </button>
         </nav>
+      </div>
+    </section>
+
+    <section id="journeyScreen" class="market-screen journey-screen">
+      <div class="market-header journey-header">
+        <div>
+          <p>JOURNEY</p>
+          <h2 id="journeyLocationTitle">ASTERON PRIME</h2>
+        </div>
+        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+      </div>
+
+      <div id="journeyBody" class="journey-body">
+        <div class="terminal-empty-state">Loading journey...</div>
       </div>
     </section>
 

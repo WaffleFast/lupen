@@ -292,36 +292,180 @@ function renderMorganCard(mission, state) {
   const text = isComplete ? mission.completeText : mission.briefing;
   return `
     <div class="morgan-card">
-      <div class="morgan-avatar" aria-hidden="true">M</div>
+      <img class="morgan-card-portrait" src="assets/morgan-thumbnail.png" alt="Morgan">
       <div><span>Morgan / Station AI</span><p>${escapeHtml(text)}</p></div>
     </div>
   `;
 }
 
-function renderMissionJournal() {
-  const journal = document.getElementById("missionJournalPanel");
-  if (!journal) return;
-  const chapter = CHAPTERS.frontier;
-  const missions = getVisibleChapterMissions("frontier");
-  const completedCount = missions.filter(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_CLAIMED).length;
-  const totalCount = missions.length;
+function getChapterProgressPercent(chapterId = "frontier") {
+  const summary = getChapterProgressSummary(chapterId);
+  return Math.min(100, Math.round((summary.completedOrClaimed / Math.max(1, summary.total)) * 100));
+}
 
-  journal.innerHTML = `
-    <div class="mission-journal-head">
-      <div>
-        <span>Mission Journal</span>
-        <strong>${chapter.title}</strong>
-        <small>${chapter.theme}</small>
+function getJourneyMissionRows() {
+  missionProgress = normalizeMissionProgress(missionProgress);
+  return CHAPTER_MISSIONS.filter(mission => {
+    const state = missionProgress.missions[mission.id]?.state;
+    return state !== MISSION_STATE_CLAIMED;
+  });
+}
+
+function getJourneyPrimaryMission() {
+  missionProgress = normalizeMissionProgress(missionProgress);
+  return getPrimaryActiveMission() ||
+    CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_AVAILABLE && isMissionAvailable(mission.id, missionProgress)) ||
+    CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state !== MISSION_STATE_CLAIMED) ||
+    null;
+}
+
+function getJourneyObjectiveLine(mission) {
+  if (!mission) return "Current Objective: Complete First Haul";
+  return `Current Objective: ${getMissionObjectiveLabel(mission)}`;
+}
+
+function getGalaxyCompletionPercent() {
+  const chapterPercent = getChapterProgressPercent("frontier");
+  return Math.min(100, Math.round(chapterPercent * 0.18));
+}
+
+function renderJourneyScreen() {
+  const body = document.getElementById("journeyBody");
+  const title = document.getElementById("journeyLocationTitle");
+  if (title) title.textContent = String(currentNode || "Asteron Prime").toUpperCase();
+  if (!body) return;
+
+  const activeMission = getJourneyPrimaryMission();
+  const chapterPercent = getChapterProgressPercent("frontier");
+  const galaxyPercent = getGalaxyCompletionPercent();
+
+  body.innerHTML = `
+    <section class="journey-morgan-panel">
+      <img class="journey-morgan-portrait" src="assets/morgan-thumbnail.png" alt="Morgan">
+      <div class="journey-morgan-copy">
+        <span>MORGAN</span>
+        <strong>STATION AI</strong>
+        <p>Welcome back, Pilot. Chapter I: Frontier is active. I've marked your next objectives.</p>
+        <div class="journey-waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       </div>
-      <em>${formatNumber(completedCount)} / ${formatNumber(totalCount)}</em>
-    </div>
-    <div class="mission-journal-list">
-      ${missions.map(mission => renderMissionCard(mission)).join("")}
-    </div>
+    </section>
+
+    <section class="journey-chapters-panel">
+      <div class="journey-panel-head"><span>CHAPTERS</span></div>
+      <div class="journey-chapter-stack">
+        ${renderJourneyChapterCard({
+          badge: "A",
+          title: "ACADEMY",
+          subtitle: "Your training begins here.",
+          status: "COMING SOON",
+          state: "soon"
+        })}
+        ${renderJourneyChapterCard({
+          badge: "I",
+          title: "CHAPTER I: FRONTIER",
+          subtitle: "Establish your foothold in the frontier.",
+          status: "ACTIVE",
+          state: "active",
+          progress: chapterPercent,
+          objective: getJourneyObjectiveLine(activeMission)
+        })}
+        ${renderJourneyChapterCard({
+          badge: "II",
+          title: "CHAPTER II: OUTER RIM",
+          subtitle: "Expand beyond the known clusters.",
+          status: "LOCKED",
+          state: "locked",
+          unlock: "Unlocks when you complete: Frontier"
+        })}
+        ${renderJourneyChapterCard({
+          badge: "III",
+          title: "CHAPTER III: BORDER WORLDS",
+          subtitle: "Navigate the frontier's most dangerous edges.",
+          status: "LOCKED",
+          state: "locked",
+          unlock: "Unlocks when you complete: Outer Rim"
+        })}
+      </div>
+    </section>
+
+    <aside class="journey-side-panel">
+      <section class="journey-objectives-panel">
+        <div class="journey-panel-head"><span>CURRENT OBJECTIVES</span></div>
+        <div class="journey-objective-list">${renderJourneyObjectiveRows()}</div>
+      </section>
+      <section class="journey-rewards-panel">
+        <div class="journey-panel-head"><span>CHAPTER REWARDS</span></div>
+        <div class="journey-reward-list">
+          ${renderJourneyRewardRow("CR", "Credits", "10,000 CR")}
+          ${renderJourneyRewardRow("XP", "Experience", "12,500 XP")}
+          ${renderJourneyRewardRow("SH", "Ship Unlock Path", "Light Hauler path")}
+        </div>
+      </section>
+    </aside>
+
+    <section class="journey-galaxy-panel">
+      <div>
+        <span>OVERALL GALAXY COMPLETION</span>
+        <strong>${formatNumber(galaxyPercent)}%</strong>
+      </div>
+      <div class="journey-galaxy-track"><i style="width:${galaxyPercent}%"></i></div>
+      <p>Complete chapters, missions, and objectives to grow your legacy across the galaxy.</p>
+    </section>
   `;
 }
 
-function renderMissionCard(mission) {
+function renderMissionJournal() {
+  renderJourneyScreen();
+}
+
+function renderJourneyChapterCard({ badge, title, subtitle, status, state, progress = null, objective = "", unlock = "" }) {
+  const hasProgress = Number.isFinite(Number(progress));
+  return `
+    <article class="journey-chapter-card journey-chapter-${escapeHtml(state)}">
+      <div class="journey-chapter-badge">${escapeHtml(badge)}</div>
+      <div class="journey-chapter-main">
+        <div class="journey-chapter-title-row">
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(subtitle)}</p>
+          </div>
+          <span class="journey-status-pill">${escapeHtml(status)}</span>
+        </div>
+        ${hasProgress ? `
+          <div class="journey-chapter-progress">
+            <div class="journey-progress-track"><i style="width:${Number(progress)}%"></i></div>
+            <em>${formatNumber(progress)}%</em>
+          </div>
+        ` : ""}
+        ${objective ? `<small>${escapeHtml(objective)}</small>` : ""}
+        ${unlock ? `<small>${escapeHtml(unlock)}</small>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function renderJourneyObjectiveRows() {
+  const rows = getJourneyMissionRows();
+  if (!rows.length) {
+    return `
+      <div class="journey-empty-objectives">
+        <strong>No active objectives.</strong>
+        <span>Morgan has no active assignments for you right now.</span>
+      </div>
+    `;
+  }
+
+  return rows.map(renderJourneyObjectiveRow).join("");
+}
+
+function getJourneyObjectiveTitle(mission) {
+  if (mission.id === "first_haul") return "Complete First Haul";
+  if (mission.id === "resource_recovery") return "Recover 3 Resources";
+  if (mission.id === "erebus_patrol") return "Destroy 3 Erebus";
+  return mission.title;
+}
+
+function renderJourneyObjectiveRow(mission) {
   const state = missionProgress.missions[mission.id];
   const progress = getMissionProgressAmount(mission, state);
   const required = getMissionRequiredAmount(mission);
@@ -337,24 +481,25 @@ function renderMissionCard(mission) {
       : "";
 
   return `
-    <article class="mission-card mission-state-${escapeHtml(locked ? "locked" : (state?.state || MISSION_STATE_AVAILABLE))}">
-      <div class="mission-card-top">
-        <span>${escapeHtml(status)}</span>
-        <strong>${escapeHtml(mission.title)}</strong>
+    <article class="journey-objective-row mission-state-${escapeHtml(locked ? "locked" : (state?.state || MISSION_STATE_AVAILABLE))}">
+      <div class="journey-objective-marker" aria-hidden="true"></div>
+      <div class="journey-objective-copy">
+        <strong>${escapeHtml(getJourneyObjectiveTitle(mission))}</strong>
+        <span>${escapeHtml(status)} / ${escapeHtml(getMissionObjectiveLabel(mission))}</span>
+        <div class="journey-progress-track"><i style="width:${progressPercent}%"></i></div>
       </div>
-      ${renderMorganCard(mission, state)}
-      <div class="mission-objective-line">${escapeHtml(getMissionObjectiveLabel(mission))}</div>
-      <div class="mission-progress-row">
-        <div class="mission-progress-track"><i style="width:${progressPercent}%"></i></div>
-        <b>${formatNumber(progress)} / ${formatNumber(required)}</b>
-      </div>
-      <div class="mission-reward-row">
-        <span>Reward</span>
-        <strong>${formatNumber(mission.reward.xp)} XP / CR ${formatNumber(mission.reward.credits)}</strong>
-      </div>
-      ${locked ? `<p class="mission-lock-note">Complete the Frontier readiness missions first.</p>` : ""}
-      ${action ? `<div class="mission-actions">${action}</div>` : ""}
+      <b>${formatNumber(progress)} / ${formatNumber(required)}</b>
+      ${action ? `<div class="journey-objective-action">${action}</div>` : ""}
     </article>
+  `;
+}
+
+function renderJourneyRewardRow(icon, title, value) {
+  return `
+    <div class="journey-reward-row">
+      <span>${escapeHtml(icon)}</span>
+      <div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(value)}</small></div>
+    </div>
   `;
 }
 

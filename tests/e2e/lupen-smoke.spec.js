@@ -5686,7 +5686,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("mission journal accepts, progresses, claims, and resetPilot clears mission progress", async ({ page }) => {
+  test("Journey screen presents chapters, missions, claim flow, and resetPilot clears progress", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -5711,12 +5711,29 @@ test.describe("Lupen browser smoke", () => {
       updateHubLocation();
     `));
 
-    await expect(page.locator("#missionJournalPanel")).toBeVisible();
-    await expect(page.locator("#missionJournalPanel")).toContainText("Chapter I: Frontier");
-    await expect(page.locator("#missionJournalPanel")).toContainText("Sector Orientation");
+    await expect(page.locator(".home-bottom-dock .home-dock-item").first()).toContainText("Journey");
+    await page.locator("#journeyHubBtn").click();
+    await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
+    await expect(page.locator("#journeyScreen")).toContainText("MORGAN");
+    await expect(page.locator("#journeyScreen")).toContainText("STATION AI");
+    await expect(page.locator("#journeyScreen")).toContainText("ACADEMY");
+    await expect(page.locator("#journeyScreen")).toContainText("CHAPTER I: FRONTIER");
+    await expect(page.locator("#journeyScreen")).toContainText("ACTIVE");
+    await expect(page.locator("#journeyScreen")).toContainText("CHAPTER II: OUTER RIM");
+    await expect(page.locator("#journeyScreen")).toContainText("CHAPTER III: BORDER WORLDS");
+    await expect(page.locator("#journeyScreen")).toContainText("LOCKED");
+    await expect(page.locator("#journeyScreen")).toContainText("CURRENT OBJECTIVES");
+    await expect(page.locator("#journeyScreen")).toContainText("Sector Orientation");
+    await expect(page.locator("#journeyScreen")).toContainText("0 / 1");
 
-    await page.locator("#missionJournalPanel button", { hasText: "Accept Mission" }).first().click();
-    await expect(page.locator("#missionJournalPanel")).toContainText("ACTIVE");
+    await page.locator("#journeyScreen .screen-back-btn").click();
+    await expect(page.locator("#gameScreen")).toHaveClass(/active/);
+
+    await page.locator("#journeyHubBtn").click();
+    await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
+
+    await page.locator("#journeyScreen button", { hasText: "Accept Mission" }).first().click();
+    await expect(page.locator("#journeyScreen")).toContainText("ACTIVE");
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("active");
 
     await page.evaluate(() => window.launchShip());
@@ -5726,7 +5743,8 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("completed");
 
     await page.evaluate(() => window.landOnPlanet());
-    await page.locator("#missionJournalPanel button", { hasText: "Claim Reward" }).first().click();
+    await page.locator("#journeyHubBtn").click();
+    await page.locator("#journeyScreen button", { hasText: "Claim Reward" }).first().click();
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("claimed");
     await expect(page.evaluate(() => window.eval(`credits`))).resolves.toBe(10100);
 
