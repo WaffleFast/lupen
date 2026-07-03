@@ -293,7 +293,7 @@ function renderMorganCard(mission, state) {
   return `
     <div class="morgan-card">
       <img class="morgan-card-portrait" src="assets/morgan-thumbnail.png" alt="Morgan">
-      <div><span>Morgan / Station AI</span><p>${escapeHtml(text)}</p></div>
+      <div><span>Morgan / Command Liaison</span><p>${escapeHtml(text)}</p></div>
     </div>
   `;
 }
@@ -305,10 +305,7 @@ function getChapterProgressPercent(chapterId = "frontier") {
 
 function getJourneyMissionRows() {
   missionProgress = normalizeMissionProgress(missionProgress);
-  return CHAPTER_MISSIONS.filter(mission => {
-    const state = missionProgress.missions[mission.id]?.state;
-    return state !== MISSION_STATE_CLAIMED;
-  });
+  return CHAPTER_MISSIONS;
 }
 
 function getJourneyPrimaryMission() {
@@ -344,57 +341,59 @@ function renderJourneyScreen() {
       <img class="journey-morgan-portrait" src="assets/morgan-thumbnail.png" alt="Morgan">
       <div class="journey-morgan-copy">
         <span>MORGAN</span>
-        <strong>STATION AI</strong>
-        <p>Welcome back, Pilot. Chapter I: Frontier is active. I've marked your next objectives.</p>
+        <strong>COMMAND LIAISON</strong>
+        <p>Welcome back, Pilot. Frontier is active. I've marked the next steps in your journey.</p>
         <div class="journey-waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       </div>
     </section>
 
     <section class="journey-chapters-panel">
-      <div class="journey-panel-head"><span>CHAPTERS</span></div>
-      <div class="journey-chapter-stack">
-        ${renderJourneyChapterCard({
+      <div class="journey-panel-head"><span>CHAPTER PATH</span></div>
+      <div class="journey-chapter-path">
+        ${renderJourneyChapterNode({
           badge: "A",
           title: "ACADEMY",
-          subtitle: "Your training begins here.",
-          status: "COMING SOON",
+          subtitle: "Training",
+          status: "PENDING",
           state: "soon"
         })}
-        ${renderJourneyChapterCard({
+        ${renderJourneyChapterNode({
           badge: "I",
-          title: "CHAPTER I: FRONTIER",
-          subtitle: "Establish your foothold in the frontier.",
+          title: "FRONTIER",
+          subtitle: "Establish your foothold",
           status: "ACTIVE",
           state: "active",
           progress: chapterPercent,
           objective: getJourneyObjectiveLine(activeMission)
         })}
-        ${renderJourneyChapterCard({
+        ${renderJourneyChapterNode({
           badge: "II",
-          title: "CHAPTER II: OUTER RIM",
-          subtitle: "Expand beyond the known clusters.",
+          title: "OUTER RIM",
+          subtitle: "Complete Frontier",
           status: "LOCKED",
-          state: "locked",
-          unlock: "Unlocks when you complete: Frontier"
+          state: "locked"
         })}
-        ${renderJourneyChapterCard({
+        ${renderJourneyChapterNode({
           badge: "III",
-          title: "CHAPTER III: BORDER WORLDS",
-          subtitle: "Navigate the frontier's most dangerous edges.",
+          title: "BORDER WORLDS",
+          subtitle: "Complete Outer Rim",
           status: "LOCKED",
-          state: "locked",
-          unlock: "Unlocks when you complete: Outer Rim"
+          state: "locked"
         })}
       </div>
     </section>
 
+    <section class="journey-objectives-panel">
+      <div class="journey-panel-head">
+        <span>CURRENT PATH</span>
+        <strong>Frontier Assignments</strong>
+      </div>
+      <div class="journey-objective-list">${renderJourneyObjectiveRows()}</div>
+    </section>
+
     <aside class="journey-side-panel">
-      <section class="journey-objectives-panel">
-        <div class="journey-panel-head"><span>CURRENT OBJECTIVES</span></div>
-        <div class="journey-objective-list">${renderJourneyObjectiveRows()}</div>
-      </section>
       <section class="journey-rewards-panel">
-        <div class="journey-panel-head"><span>CHAPTER REWARDS</span></div>
+        <div class="journey-panel-head"><span>FRONTIER REWARDS</span></div>
         <div class="journey-reward-list">
           ${renderJourneyRewardRow("CR", "Credits", "10,000 CR")}
           ${renderJourneyRewardRow("XP", "Experience", "12,500 XP")}
@@ -418,10 +417,10 @@ function renderMissionJournal() {
   renderJourneyScreen();
 }
 
-function renderJourneyChapterCard({ badge, title, subtitle, status, state, progress = null, objective = "", unlock = "" }) {
+function renderJourneyChapterNode({ badge, title, subtitle, status, state, progress = null, objective = "" }) {
   const hasProgress = Number.isFinite(Number(progress));
   return `
-    <article class="journey-chapter-card journey-chapter-${escapeHtml(state)}">
+    <article class="journey-chapter-node journey-chapter-${escapeHtml(state)}">
       <div class="journey-chapter-badge">${escapeHtml(badge)}</div>
       <div class="journey-chapter-main">
         <div class="journey-chapter-title-row">
@@ -438,7 +437,6 @@ function renderJourneyChapterCard({ badge, title, subtitle, status, state, progr
           </div>
         ` : ""}
         ${objective ? `<small>${escapeHtml(objective)}</small>` : ""}
-        ${unlock ? `<small>${escapeHtml(unlock)}</small>` : ""}
       </div>
     </article>
   `;
@@ -478,18 +476,26 @@ function renderJourneyObjectiveRow(mission) {
     ? `<button type="button" onclick="claimMissionReward('${escapeJsString(mission.id)}')">Claim Reward</button>`
     : canAccept
       ? `<button type="button" onclick="acceptMission('${escapeJsString(mission.id)}')">Accept Mission</button>`
-      : "";
+      : state?.state === MISSION_STATE_ACTIVE
+        ? `<button type="button" disabled>Tracking</button>`
+        : state?.state === MISSION_STATE_CLAIMED
+          ? `<button type="button" disabled>Completed</button>`
+          : "";
 
   return `
     <article class="journey-objective-row mission-state-${escapeHtml(locked ? "locked" : (state?.state || MISSION_STATE_AVAILABLE))}">
       <div class="journey-objective-marker" aria-hidden="true"></div>
       <div class="journey-objective-copy">
         <strong>${escapeHtml(getJourneyObjectiveTitle(mission))}</strong>
+        <p>${escapeHtml(mission.briefing)}</p>
         <span>${escapeHtml(status)} / ${escapeHtml(getMissionObjectiveLabel(mission))}</span>
         <div class="journey-progress-track"><i style="width:${progressPercent}%"></i></div>
       </div>
-      <b>${formatNumber(progress)} / ${formatNumber(required)}</b>
-      ${action ? `<div class="journey-objective-action">${action}</div>` : ""}
+      <div class="journey-objective-meta">
+        <b>${formatNumber(progress)} / ${formatNumber(required)}</b>
+        <em>${formatNumber(mission.reward.xp)} XP / CR ${formatNumber(mission.reward.credits)}</em>
+        ${action ? `<div class="journey-objective-action">${action}</div>` : ""}
+      </div>
     </article>
   `;
 }

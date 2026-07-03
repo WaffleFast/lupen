@@ -44321,3 +44321,284 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+/* H1.3 Journey polish: concise Morgan briefing, compact chapter path, objective-first layout. */
+.journey-body {
+  width: min(1180px, calc(100vw - 48px));
+  height: min(612px, calc(100vh - 126px));
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.journey-morgan-panel {
+  min-height: 86px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 13px;
+  padding: 10px 14px;
+}
+
+.journey-morgan-portrait {
+  width: 70px;
+  height: 70px;
+}
+
+.journey-morgan-copy strong {
+  font-size: 1rem;
+}
+
+.journey-morgan-copy p {
+  max-width: 840px;
+  margin: 5px 0 6px;
+  font-size: 0.86rem;
+}
+
+.journey-waveform {
+  height: 8px;
+  opacity: 0.64;
+}
+
+.journey-waveform i {
+  width: 26px;
+}
+
+.journey-chapters-panel {
+  grid-column: 1 / -1;
+  padding: 12px;
+}
+
+.journey-chapter-path {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.journey-chapter-path::before {
+  content: "";
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(86, 215, 255, 0.08), rgba(86, 215, 255, 0.42), rgba(86, 215, 255, 0.08));
+  pointer-events: none;
+}
+
+.journey-chapter-node {
+  position: relative;
+  z-index: 1;
+  min-height: 108px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(127, 214, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(6, 20, 32, 0.78);
+}
+
+.journey-chapter-node.journey-chapter-active {
+  border-color: rgba(92, 215, 255, 0.76);
+  background:
+    linear-gradient(180deg, rgba(14, 56, 82, 0.74), rgba(5, 20, 34, 0.88)),
+    radial-gradient(circle at 16% 10%, rgba(102, 218, 255, 0.22), transparent 54%);
+  box-shadow: 0 0 22px rgba(57, 199, 255, 0.12), inset 0 0 20px rgba(102, 218, 255, 0.08);
+}
+
+.journey-chapter-node.journey-chapter-locked,
+.journey-chapter-node.journey-chapter-soon {
+  opacity: 0.72;
+}
+
+.journey-chapter-node .journey-chapter-badge {
+  width: 40px;
+  height: 40px;
+}
+
+.journey-chapter-node .journey-chapter-title-row {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.journey-chapter-node .journey-chapter-title-row strong {
+  font-size: 0.82rem;
+  line-height: 1.05;
+}
+
+.journey-chapter-node .journey-chapter-title-row p,
+.journey-chapter-node .journey-chapter-main small {
+  font-size: 0.68rem;
+  line-height: 1.22;
+}
+
+.journey-chapter-node .journey-status-pill {
+  justify-self: start;
+  padding: 4px 7px;
+  font-size: 0.58rem;
+}
+
+.journey-chapter-node .journey-chapter-progress {
+  grid-template-columns: 1fr 34px;
+  gap: 7px;
+  margin: 7px 0 4px;
+}
+
+.journey-objectives-panel {
+  grid-column: 1;
+  grid-row: 3 / 5;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.journey-panel-head strong {
+  color: #ffffff;
+  font-size: 0.88rem;
+}
+
+.journey-objective-list {
+  max-height: calc(100% - 34px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.journey-objective-row {
+  min-height: 150px;
+  grid-template-columns: 12px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 9px;
+  padding: 12px;
+}
+
+.journey-objective-row.mission-state-active {
+  border-color: rgba(92, 215, 255, 0.58);
+  box-shadow: inset 0 0 18px rgba(92, 215, 255, 0.08);
+}
+
+.journey-objective-row.mission-state-completed {
+  border-color: rgba(70, 230, 164, 0.56);
+  box-shadow: inset 0 0 18px rgba(70, 230, 164, 0.08);
+}
+
+.journey-objective-row.mission-state-claimed {
+  opacity: 0.68;
+}
+
+.journey-objective-copy strong {
+  font-size: 0.94rem;
+}
+
+.journey-objective-copy p {
+  margin: 5px 0 7px;
+  color: #d3e4ec;
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
+.journey-objective-copy span {
+  font-size: 0.7rem;
+}
+
+.journey-objective-meta {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 7px;
+}
+
+.journey-objective-meta b {
+  color: #ffffff;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.journey-objective-meta em {
+  color: #9edff5;
+  font-size: 0.68rem;
+  font-style: normal;
+}
+
+.journey-objective-action {
+  grid-column: 1 / -1;
+}
+
+.journey-objective-action button:disabled {
+  border-color: rgba(127, 214, 255, 0.2);
+  background: rgba(127, 214, 255, 0.08);
+  color: rgba(210, 235, 246, 0.68);
+  cursor: default;
+}
+
+.journey-side-panel {
+  grid-column: 2;
+  grid-row: 3;
+  display: block;
+}
+
+.journey-rewards-panel {
+  height: 100%;
+  padding: 12px;
+}
+
+.journey-reward-list {
+  grid-template-columns: 1fr;
+}
+
+.journey-reward-row {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 8px;
+}
+
+.journey-reward-row > span {
+  margin-bottom: 0;
+}
+
+.journey-galaxy-panel {
+  grid-column: 2;
+  grid-row: 4;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 12px;
+}
+
+.journey-galaxy-panel strong {
+  font-size: 1rem;
+}
+
+.journey-galaxy-panel p {
+  font-size: 0.74rem;
+}
+
+@media (max-width: 980px) {
+  .journey-body {
+    width: calc(100vw - 28px);
+    height: auto;
+    max-height: calc(100vh - 116px);
+    overflow: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .journey-morgan-panel,
+  .journey-chapters-panel,
+  .journey-objectives-panel,
+  .journey-side-panel,
+  .journey-galaxy-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .journey-chapter-path,
+  .journey-objective-list {
+    grid-template-columns: 1fr;
+  }
+}
