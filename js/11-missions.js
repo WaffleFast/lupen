@@ -491,12 +491,16 @@ function renderMissionJournal() {
 function renderJourneyMorganBriefing() {
   return `
     <section class="journey-morgan-panel journey-briefing">
-      <img class="journey-morgan-portrait" src="assets/morgan-thumbnail.png" alt="Morgan">
-      <div class="journey-morgan-copy">
-        <span>MORGAN</span>
-        <strong>COMMAND LIAISON</strong>
-        <p>Frontier is active, Pilot. Complete these assignments and we'll open the next path.</p>
-        <div class="journey-waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="journey-briefing__bg" aria-hidden="true"></div>
+      <div class="journey-briefing__portrait">
+        <img class="journey-briefing__portrait-img journey-morgan-portrait" src="assets/morgan-command-liaison.png" alt="Morgan">
+      </div>
+      <div class="journey-briefing__content journey-morgan-copy">
+        <span class="journey-briefing__eyebrow"><i aria-hidden="true"></i>FRONTIER BRIEFING</span>
+        <strong class="journey-briefing__name">MORGAN</strong>
+        <em class="journey-briefing__role">COMMAND LIAISON</em>
+        <p class="journey-briefing__message">Frontier is active, Pilot. Complete these assignments and we'll open the next path.</p>
+        <div class="journey-briefing__waveform journey-waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       </div>
     </section>
   `;

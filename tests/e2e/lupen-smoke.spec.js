@@ -5756,9 +5756,23 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator("#journeyHubBtn").click();
     await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
-    await expect(page.locator("#journeyScreen .journey-morgan-portrait")).toHaveAttribute("src", /morgan-thumbnail\.png/);
+    await expect(page.locator("#journeyScreen .journey-briefing")).toBeVisible();
+    await expect(page.locator("#journeyScreen .journey-briefing__portrait-img")).toHaveAttribute("src", /morgan-command-liaison\.png/);
+    const morganBriefingBg = await page.locator("#journeyScreen .journey-briefing__bg").evaluate(element => {
+      const styles = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return {
+        backgroundImage: styles.backgroundImage,
+        width: rect.width,
+        height: rect.height
+      };
+    });
+    expect(morganBriefingBg.backgroundImage).toContain("journey-morgan-bg.png");
+    expect(morganBriefingBg.width).toBeGreaterThan(0);
+    expect(morganBriefingBg.height).toBeGreaterThan(0);
     await expect(page.locator("#journeyScreen")).toContainText("MORGAN");
     await expect(page.locator("#journeyScreen")).toContainText("COMMAND LIAISON");
+    await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
     await expect(page.locator("#journeyScreen")).not.toContainText("STATION AI");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier is active, Pilot.");
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER PATH");
