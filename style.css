@@ -44831,6 +44831,212 @@ input::placeholder {
   }
 }
 
+/* Morgan briefing layout regression fix. Keep this as the final Morgan-specific cascade. */
+.journey-briefing.journey-morgan-panel {
+  position: relative;
+  grid-column: 1 / -1;
+  display: block;
+  min-height: 174px;
+  padding: 17px 24px;
+  overflow: hidden;
+  border: 1px solid rgba(49, 207, 255, 0.72);
+  border-radius: 8px;
+  background: rgba(2, 10, 20, 0.94);
+  box-shadow: 0 0 0 1px rgba(49, 207, 255, 0.08), 0 20px 48px rgba(0, 0, 0, 0.34), inset 0 0 32px rgba(49, 207, 255, 0.07);
+}
+
+.journey-briefing.journey-morgan-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(2, 10, 20, 0.98) 0%, rgba(2, 10, 20, 0.92) 34%, rgba(2, 10, 20, 0.4) 58%, rgba(2, 10, 20, 0.16) 100%),
+    radial-gradient(circle at 18% 50%, rgba(49, 207, 255, 0.12), transparent 34%);
+  pointer-events: none;
+}
+
+.journey-briefing.journey-morgan-panel::after {
+  content: "";
+  position: absolute;
+  left: 210px;
+  top: 18px;
+  bottom: 18px;
+  z-index: 2;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(49, 207, 255, 0.5), transparent);
+}
+
+.journey-briefing__bg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 64%;
+  min-width: 520px;
+  min-height: 100%;
+  background-image: url("assets/journey-morgan-bg.png");
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: cover;
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+.journey-briefing__inner {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  width: min(830px, 64%);
+  min-width: 700px;
+}
+
+.journey-briefing__portrait {
+  flex: 0 0 154px;
+  width: 154px;
+  height: 140px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border: 1px solid rgba(49, 207, 255, 0.7);
+  border-radius: 8px;
+  background: rgba(1, 12, 22, 0.72);
+  box-shadow: 0 0 26px rgba(49, 207, 255, 0.22), inset 0 0 18px rgba(49, 207, 255, 0.1);
+}
+
+.journey-briefing__portrait-img.journey-morgan-portrait {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 6px;
+  object-fit: cover;
+  object-position: center 35%;
+  box-shadow: none;
+}
+
+.journey-briefing__content.journey-morgan-copy {
+  flex: 1 1 auto;
+  min-width: 430px;
+  max-width: 590px;
+  padding-left: 8px;
+}
+
+.journey-briefing__content .journey-briefing__name {
+  display: block;
+  margin: 0;
+  color: #45d6ff;
+  font-size: 1.62rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1.05;
+  text-shadow: 0 0 18px rgba(69, 214, 255, 0.3);
+}
+
+.journey-briefing__content .journey-briefing__role {
+  display: block;
+  margin-top: 4px;
+  color: #d9ebf4;
+  font-size: 0.94rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.journey-briefing__signal {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 13px;
+}
+
+.journey-briefing__content .journey-briefing__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+  color: #28d7ff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.journey-briefing__eyebrow i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2ad9ff;
+  box-shadow: 0 0 14px rgba(42, 217, 255, 0.88);
+}
+
+.journey-briefing__content .journey-briefing__message {
+  max-width: 620px;
+  margin: 14px 0 0;
+  color: #f0f8fc;
+  font-size: 1.16rem;
+  line-height: 1.38;
+}
+
+.journey-briefing__waveform {
+  height: 9px;
+  max-width: 300px;
+  opacity: 0.72;
+  margin: 0;
+}
+
+.journey-briefing__waveform i {
+  width: 34px;
+  height: 2px;
+  background: rgba(49, 207, 255, 0.58);
+}
+
+@media (max-width: 980px) {
+  .journey-briefing.journey-morgan-panel {
+    min-height: 128px;
+    padding: 12px 14px;
+  }
+
+  .journey-briefing.journey-morgan-panel::after {
+    display: none;
+  }
+
+  .journey-briefing__bg {
+    width: 76%;
+    min-width: 0;
+    opacity: 0.36;
+  }
+
+  .journey-briefing__inner {
+    width: 100%;
+    min-width: 0;
+    gap: 13px;
+  }
+
+  .journey-briefing__portrait {
+    flex-basis: 92px;
+    width: 92px;
+    height: 92px;
+  }
+
+  .journey-briefing__content.journey-morgan-copy {
+    min-width: 0;
+  }
+
+  .journey-briefing__content .journey-briefing__name {
+    font-size: 1.08rem;
+  }
+
+  .journey-briefing__content .journey-briefing__role {
+    font-size: 0.72rem;
+  }
+
+  .journey-briefing__content .journey-briefing__message {
+    font-size: 0.82rem;
+  }
+}
+
 /* H1.5 Journey identity: simplified chapter path and Frontier-first hierarchy. */
 .journey-body {
   height: min(632px, calc(100vh - 118px));

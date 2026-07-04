@@ -5770,6 +5770,27 @@ test.describe("Lupen browser smoke", () => {
     expect(morganBriefingBg.backgroundImage).toContain("journey-morgan-bg.png");
     expect(morganBriefingBg.width).toBeGreaterThan(0);
     expect(morganBriefingBg.height).toBeGreaterThan(0);
+    const morganBriefingLayout = await page.locator("#journeyScreen .journey-briefing").evaluate(panel => {
+      const panelRect = panel.getBoundingClientRect();
+      const portraitRect = panel.querySelector(".journey-briefing__portrait")?.getBoundingClientRect();
+      const contentRect = panel.querySelector(".journey-briefing__content")?.getBoundingClientRect();
+      const bgRect = panel.querySelector(".journey-briefing__bg")?.getBoundingClientRect();
+      return {
+        panelWidth: panelRect.width,
+        panelHeight: panelRect.height,
+        portraitLeft: portraitRect?.left || 0,
+        portraitWidth: portraitRect?.width || 0,
+        contentLeft: contentRect?.left || 0,
+        contentWidth: contentRect?.width || 0,
+        bgWidth: bgRect?.width || 0
+      };
+    });
+    expect(morganBriefingLayout.panelHeight).toBeGreaterThan(120);
+    expect(morganBriefingLayout.panelHeight).toBeLessThan(230);
+    expect(morganBriefingLayout.portraitWidth).toBeGreaterThan(90);
+    expect(morganBriefingLayout.contentLeft).toBeGreaterThan(morganBriefingLayout.portraitLeft);
+    expect(morganBriefingLayout.contentWidth).toBeGreaterThan(360);
+    expect(morganBriefingLayout.bgWidth).toBeGreaterThan(morganBriefingLayout.panelWidth * 0.45);
     await expect(page.locator("#journeyScreen")).toContainText("MORGAN");
     await expect(page.locator("#journeyScreen")).toContainText("COMMAND LIAISON");
     await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
