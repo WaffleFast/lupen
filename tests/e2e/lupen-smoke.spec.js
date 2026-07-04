@@ -5834,9 +5834,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER ROUTE");
     await expect(page.locator("#journeyScreen")).toContainText("Academy");
     await expect(page.locator("#journeyScreen")).toContainText("PENDING");
-    await expect(page.locator("#journeyScreen")).toContainText("Chapter I: Frontier");
-    await expect(page.locator("#journeyScreen")).toContainText("ACTIVE CHAPTER");
-    await expect(page.locator("#journeyScreen")).toContainText("Next Route");
+    await expect(page.locator("#journeyScreen")).toContainText("Chapter I");
+    await expect(page.locator("#journeyScreen")).toContainText("Frontier");
+    await expect(page.locator("#journeyScreen")).toContainText("ACTIVE");
+    await expect(page.locator("#journeyScreen")).toContainText("Chapter II");
+    await expect(page.locator("#journeyScreen")).toContainText("Locked Route");
     await expect(page.locator("#journeyScreen")).toContainText("LOCKED");
     await expect(page.locator("#journeyScreen .journey-chapter-path")).not.toContainText("OUTER RIM");
     await expect(page.locator("#journeyScreen .journey-chapter-path")).not.toContainText("BORDER WORLDS");
@@ -5853,14 +5855,25 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen .journey-chapter-path")).toHaveAttribute("data-journey-source", "JOURNEY_CHAPTERS");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).toHaveAttribute("data-journey-source", "JOURNEY_ASSIGNMENTS");
     await expect(page.locator("#journeyScreen .journey-chapter-route")).toBeVisible();
+    await expect(page.locator("#journeyScreen .journey-chapter-route__viewport")).toBeVisible();
     await expect(page.locator("#journeyScreen .journey-chapter-route__track")).toBeVisible();
+    await expect(page.locator("#journeyScreen .journey-chapter-route__arrow")).toHaveCount(2);
     await expect(page.locator("#journeyScreen .journey-chapter-node")).toHaveCount(3);
-    await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Chapter I: Frontier");
-    await expect(page.locator("#journeyScreen .journey-chapter-node--locked")).toContainText("Next Route");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "pending");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("data-journey-chapter-state", "active");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='next_route']")).toHaveAttribute("data-journey-chapter-state", "locked");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Chapter I");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Frontier");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--locked")).toContainText("Chapter II");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--locked")).toContainText("Locked Route");
     await expect(page.locator("#journeyScreen .journey-chapter-progress")).toHaveCount(0);
     await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(0)).toHaveAttribute("src", /chapter-academy-icon\.png/);
     await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(1)).toHaveAttribute("src", /chapter-frontier-icon\.png/);
     await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(2)).toHaveAttribute("src", /chapter-locked-icon\.png/);
+    await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(0)).toHaveAttribute("alt", "Academy");
+    await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(1)).toHaveAttribute("alt", "Chapter I: Frontier");
+    await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(2)).toHaveAttribute("alt", "Locked route");
     const chapterRouteLayout = await page.locator("#journeyScreen .journey-chapter-route").evaluate(route => {
       const routeRect = route.getBoundingClientRect();
       const track = route.querySelector(".journey-chapter-route__track");
@@ -5868,12 +5881,15 @@ test.describe("Lupen browser smoke", () => {
       return {
         height: routeRect.height,
         trackOverflowX: trackStyles?.overflowX || "",
-        trackDisplay: trackStyles?.display || ""
+        trackDisplay: trackStyles?.display || "",
+        itemCount: route.querySelectorAll(".journey-chapter-route__item").length
       };
     });
-    expect(chapterRouteLayout.height).toBeLessThan(125);
+    expect(chapterRouteLayout.height).toBeGreaterThan(85);
+    expect(chapterRouteLayout.height).toBeLessThan(115);
     expect(chapterRouteLayout.trackDisplay).toBe("flex");
     expect(["auto", "scroll"]).toContain(chapterRouteLayout.trackOverflowX);
+    expect(chapterRouteLayout.itemCount).toBe(3);
     const chapterRouteCanOverflow = await page.locator("#journeyScreen .journey-chapter-route__track").evaluate(track => {
       const previousWidth = track.style.width;
       track.style.width = "280px";
@@ -5902,6 +5918,27 @@ test.describe("Lupen browser smoke", () => {
     for (const cornerAlphas of chapterIconTransparency) {
       expect(Math.max(...cornerAlphas)).toBeLessThan(8);
     }
+    await page.locator("#journeyScreen [data-journey-chapter-id='academy']").click();
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#journeyScreen")).toContainText("Academy guidance will open here later.");
+    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
+    await page.locator("#journeyScreen [data-journey-chapter-id='next_route']").click();
+    await expect(page.locator("#journeyScreen")).toContainText("Complete Frontier");
+    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
+    await page.locator("#journeyScreen [data-journey-chapter-id='frontier']").click();
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
+    await page.evaluate(() => {
+      playerProgress.academyCompleted = true;
+      renderJourneyScreen();
+    });
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "complete");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy'] .journey-chapter-route__check")).toBeVisible();
+    await page.evaluate(() => {
+      playerProgress.academyCompleted = false;
+      renderJourneyScreen();
+    });
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "pending");
     await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(5);
     await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(5);
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");

@@ -46188,6 +46188,245 @@ input::placeholder {
   color: #b99cff;
 }
 
+/* Semi-interactive Chapter Route carousel. */
+.journey-chapter-route {
+  position: relative;
+  min-height: 104px;
+  padding: 6px 14px 8px;
+  background:
+    linear-gradient(90deg, rgba(1, 10, 20, 0.92), rgba(7, 25, 40, 0.82) 50%, rgba(1, 10, 20, 0.92)),
+    rgba(3, 13, 23, 0.9);
+}
+
+.journey-chapter-route__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 5px;
+}
+
+.journey-chapter-route__title {
+  color: #54ddff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  line-height: 1;
+}
+
+.journey-chapter-route__rule {
+  height: 1px;
+  min-width: 40px;
+  background: linear-gradient(90deg, transparent, rgba(49, 207, 255, 0.48), transparent);
+}
+
+.journey-chapter-route__viewport {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 8px;
+}
+
+.journey-chapter-route__track {
+  gap: 30px;
+  justify-content: center;
+  padding: 0 4px;
+  scrollbar-width: none;
+}
+
+.journey-chapter-route__track::-webkit-scrollbar {
+  display: none;
+}
+
+.journey-chapter-route__arrow {
+  width: 22px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(102, 211, 255, 0.62);
+  font-size: 1.7rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.journey-chapter-route__arrow:hover,
+.journey-chapter-route__arrow:focus-visible {
+  color: #7ce7ff;
+  background: rgba(49, 207, 255, 0.08);
+  outline: none;
+}
+
+.journey-chapter-route .journey-chapter-route__item {
+  flex: 0 0 232px;
+  min-height: 52px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  padding: 5px 10px;
+  appearance: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.journey-chapter-route .journey-chapter-route__item:hover,
+.journey-chapter-route .journey-chapter-route__item:focus-visible {
+  border-color: rgba(107, 215, 255, 0.52);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.journey-chapter-route .journey-chapter-route__item--active {
+  flex-basis: 276px;
+  min-height: 62px;
+}
+
+.journey-chapter-route .journey-chapter-route__item--pending {
+  border-color: rgba(107, 215, 255, 0.28);
+}
+
+.journey-chapter-route .journey-chapter-route__item--complete {
+  opacity: 0.94;
+  border-color: rgba(78, 235, 137, 0.72);
+  background:
+    radial-gradient(circle at 12% 50%, rgba(78, 235, 137, 0.2), transparent 46%),
+    linear-gradient(180deg, rgba(5, 38, 28, 0.82), rgba(2, 18, 22, 0.78));
+  box-shadow: 0 0 18px rgba(78, 235, 137, 0.1), inset 0 0 18px rgba(78, 235, 137, 0.05);
+}
+
+.journey-chapter-route .journey-chapter-route__item--locked {
+  cursor: help;
+}
+
+.journey-chapter-route .journey-chapter-route__item--selected {
+  box-shadow: 0 0 0 1px rgba(49, 207, 255, 0.18), 0 0 18px rgba(49, 207, 255, 0.14), inset 0 0 18px rgba(49, 207, 255, 0.06);
+}
+
+.journey-chapter-route .journey-chapter-route__item:not(:last-child)::after {
+  left: calc(100% + 6px);
+  width: 18px;
+  background: linear-gradient(90deg, rgba(49, 207, 255, 0.16), rgba(49, 207, 255, 0.72), rgba(49, 207, 255, 0.16));
+}
+
+.journey-chapter-route .journey-chapter-route__item--complete:not(:last-child)::after {
+  background: linear-gradient(90deg, rgba(78, 235, 137, 0.16), rgba(78, 235, 137, 0.72), rgba(49, 207, 255, 0.28));
+}
+
+.journey-chapter-route .journey-chapter-route__item:not(:last-child) .journey-chapter-route__copy::after {
+  right: -22px;
+  width: 7px;
+  height: 7px;
+}
+
+.journey-chapter-route .journey-chapter-route__icon,
+.journey-chapter-route .journey-chapter-route__item--active .journey-chapter-route__icon {
+  width: 42px;
+  height: 42px;
+  background: transparent;
+}
+
+.journey-chapter-route .journey-chapter-route__item--active .journey-chapter-route__icon {
+  width: 46px;
+  height: 46px;
+}
+
+.journey-chapter-route__check {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #5bf08c;
+  color: #022512;
+  font-size: 0.86rem;
+  font-weight: 900;
+  box-shadow: 0 0 14px rgba(91, 240, 140, 0.52);
+}
+
+.journey-chapter-route__label,
+.journey-chapter-route__detail {
+  display: block;
+  overflow: hidden;
+  color: #eaf7ff;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.journey-chapter-route__detail {
+  margin-top: 1px;
+  color: #ffffff;
+}
+
+.journey-chapter-route__item--active .journey-chapter-route__label,
+.journey-chapter-route__item--active .journey-chapter-route__detail {
+  font-size: 0.8rem;
+}
+
+.journey-chapter-route__item--complete .journey-chapter-route__subtitle,
+.journey-chapter-route__item--complete .journey-chapter-route__status {
+  color: #65f598;
+}
+
+.journey-chapter-route__subtitle {
+  font-size: 0.6rem;
+  line-height: 1.12;
+}
+
+.journey-chapter-route__status {
+  margin-top: 3px;
+  font-size: 0.48rem;
+}
+
+.journey-chapter-route__item--locked .journey-chapter-route__label,
+.journey-chapter-route__item--locked .journey-chapter-route__detail {
+  color: rgba(235, 226, 255, 0.78);
+}
+
+.journey-chapter-route__scrollbar {
+  height: 4px;
+  margin: 5px 42px 0;
+  border-radius: 999px;
+  background: rgba(82, 155, 205, 0.18);
+  overflow: hidden;
+}
+
+.journey-chapter-route__scrollbar i {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22bdeb, #62e4ff);
+  box-shadow: 0 0 12px rgba(49, 207, 255, 0.34);
+  transform: translateX(0);
+  transition: width 0.18s ease, transform 0.18s ease;
+}
+
+.journey-chapter-route__message {
+  position: absolute;
+  left: 58px;
+  right: 58px;
+  bottom: 3px;
+  min-height: 0;
+  margin: 0;
+  color: rgba(189, 215, 232, 0.72);
+  font-size: 0.54rem;
+  line-height: 1;
+  text-align: center;
+}
+
 .journey-current-path {
   grid-column: 1;
   grid-row: 3 / 5;

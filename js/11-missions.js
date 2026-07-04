@@ -76,6 +76,8 @@ const JOURNEY_CHAPTERS = Object.freeze([
     order: 0,
     label: "Academy",
     displayLabel: "Academy",
+    routeLabel: "Academy",
+    routeTitle: "",
     shortLabel: "Academy",
     subtitle: "Training begins here.",
     status: "pending",
@@ -89,8 +91,10 @@ const JOURNEY_CHAPTERS = Object.freeze([
     order: 1,
     label: "Chapter I: Frontier",
     displayLabel: "Chapter I: Frontier",
+    routeLabel: "Chapter I",
+    routeTitle: "Frontier",
     shortLabel: "Frontier",
-    subtitle: "Establish your foothold beyond Asteron Prime.",
+    subtitle: "Active",
     status: "active",
     theme: "frontier",
     icon: "frontier",
@@ -100,10 +104,12 @@ const JOURNEY_CHAPTERS = Object.freeze([
   Object.freeze({
     id: "next_route",
     order: 2,
-    label: "Next Route",
-    displayLabel: "Next Route",
+    label: "Chapter II",
+    displayLabel: "Chapter II",
+    routeLabel: "Chapter II",
+    routeTitle: "Locked Route",
     shortLabel: "Next Route",
-    subtitle: "Complete Frontier to reveal the next route.",
+    subtitle: "Complete Frontier to reveal.",
     status: "locked",
     theme: "locked",
     icon: "locked",
@@ -195,6 +201,8 @@ const MISSIONS_BY_ID = Object.freeze(Object.fromEntries(CHAPTER_MISSIONS.map(mis
 const JOURNEY_ASSIGNMENTS_BY_ID = Object.freeze(Object.fromEntries(JOURNEY_ASSIGNMENTS.map(assignment => [assignment.id, assignment])));
 
 let missionProgress = createDefaultMissionProgress();
+let selectedJourneyChapterId = "frontier";
+let journeyChapterRouteMessage = "";
 
 function createDefaultMissionProgress() {
   return {
@@ -556,10 +564,20 @@ function renderJourneyChapterPath() {
     .sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
   return `
     <section class="journey-chapters-panel journey-chapter-route">
-      <div class="journey-panel-head journey-chapter-route__head"><span>CHAPTER ROUTE</span></div>
-      <div class="journey-chapter-route__track journey-chapter-path" data-journey-source="JOURNEY_CHAPTERS" aria-label="Chapter route">
-        ${chapters.map(renderJourneyChapterNode).join("")}
+      <div class="journey-chapter-route__head">
+        <span class="journey-chapter-route__rule" aria-hidden="true"></span>
+        <span class="journey-chapter-route__title">CHAPTER ROUTE</span>
+        <span class="journey-chapter-route__rule" aria-hidden="true"></span>
       </div>
+      <div class="journey-chapter-route__viewport">
+        <button type="button" class="journey-chapter-route__arrow journey-chapter-route__arrow--left" onclick="scrollJourneyChapterRoute(-1)" aria-label="Scroll chapter route left">‹</button>
+        <div id="journeyChapterRouteTrack" class="journey-chapter-route__track journey-chapter-path" data-journey-source="JOURNEY_CHAPTERS" aria-label="Chapter route" onscroll="updateJourneyChapterRouteScroll()">
+          ${chapters.map(renderJourneyChapterNode).join("")}
+        </div>
+        <button type="button" class="journey-chapter-route__arrow journey-chapter-route__arrow--right" onclick="scrollJourneyChapterRoute(1)" aria-label="Scroll chapter route right">›</button>
+      </div>
+      <div class="journey-chapter-route__scrollbar" aria-hidden="true"><i id="journeyChapterRouteScrollThumb"></i></div>
+      <p id="journeyChapterRouteMessage" class="journey-chapter-route__message" aria-live="polite">${escapeHtml(journeyChapterRouteMessage)}</p>
     </section>
   `;
 }
@@ -576,10 +594,26 @@ function getJourneyChapterProgress(chapter) {
 }
 
 function getJourneyChapterStatusLabel(chapter) {
-  if (chapter.status === "active") return "ACTIVE CHAPTER";
-  if (chapter.status === "locked") return "LOCKED";
-  if (chapter.status === "pending") return "PENDING";
+  const state = getJourneyChapterRouteState(chapter);
+  if (state === "complete") return "COMPLETE";
+  if (state === "active") return "ACTIVE";
+  if (state === "locked") return "LOCKED";
+  if (state === "pending") return "PENDING";
   return String(chapter.status || "PENDING").toUpperCase();
+}
+
+function isJourneyAcademyComplete() {
+  // Future Academy wiring can set any of these without changing the route UI.
+  return Boolean(
+    playerProgress?.academyCompleted ||
+    playerProgress?.chapterProgress?.academy?.completed ||
+    missionProgress?.academy?.completed
+  );
+}
+
+function getJourneyChapterRouteState(chapter) {
+  if (chapter.id === "academy" && isJourneyAcademyComplete()) return "complete";
+  return chapter.status || "pending";
 }
 
 function getJourneyChapterRouteIcon(chapter) {
@@ -590,24 +624,71 @@ function getJourneyChapterRouteIcon(chapter) {
 }
 
 function getJourneyChapterRouteSubtitle(chapter) {
-  if (chapter.status === "active") return "Active Chapter";
-  if (chapter.id === "next_route") return "Complete Frontier to reveal.";
+  const state = getJourneyChapterRouteState(chapter);
+  if (state === "complete") return "Completed";
+  if (state === "active") return "Active";
+  if (state === "locked") return "Locked";
   return chapter.subtitle || "";
 }
 
 function renderJourneyChapterNode(chapter) {
+  const state = getJourneyChapterRouteState(chapter);
+  const selected = selectedJourneyChapterId === chapter.id && state !== "locked";
+  const routeLabel = chapter.routeLabel || chapter.displayLabel || chapter.label;
+  const routeTitle = chapter.routeTitle || "";
+  const altText = chapter.id === "frontier" ? "Chapter I: Frontier" : state === "locked" ? "Locked route" : routeLabel;
   return `
-    <article class="journey-chapter-route__item journey-chapter-route__item--${escapeHtml(chapter.status)} journey-chapter-node journey-chapter-${escapeHtml(chapter.status)} journey-chapter-node--${escapeHtml(chapter.status)} journey-chapter-theme-${escapeHtml(chapter.theme)}" data-journey-chapter-id="${escapeHtml(chapter.id)}">
-      <div class="journey-chapter-route__icon journey-chapter-icon journey-chapter-icon--${escapeHtml(chapter.icon)}" aria-hidden="true">
-        <img src="${escapeHtml(getJourneyChapterRouteIcon(chapter))}" alt="">
+    <button type="button" class="journey-chapter-route__item journey-chapter-route__item--${escapeHtml(state)} ${selected ? "journey-chapter-route__item--selected" : ""} journey-chapter-node journey-chapter-${escapeHtml(state)} journey-chapter-node--${escapeHtml(state)} journey-chapter-theme-${escapeHtml(chapter.theme)}" data-journey-chapter-id="${escapeHtml(chapter.id)}" data-journey-chapter-state="${escapeHtml(state)}" onclick="selectJourneyChapterRoute('${escapeJsString(chapter.id)}')" aria-pressed="${selected ? "true" : "false"}" ${state === "locked" ? `title="${escapeHtml(chapter.unlockText || "Complete Frontier to reveal this route.")}"` : ""}>
+      <div class="journey-chapter-route__icon journey-chapter-icon journey-chapter-icon--${escapeHtml(chapter.icon)}">
+        <img src="${escapeHtml(getJourneyChapterRouteIcon(chapter))}" alt="${escapeHtml(altText)}">
       </div>
-      <div class="journey-chapter-route__copy journey-chapter-main">
-        <strong class="journey-chapter-route__label">${escapeHtml(chapter.displayLabel)}</strong>
+      ${state === "complete" ? `<span class="journey-chapter-route__check" aria-label="Complete">✓</span>` : ""}
+      <span class="journey-chapter-route__copy journey-chapter-main">
+        <strong class="journey-chapter-route__label">${escapeHtml(routeLabel)}</strong>
+        ${routeTitle ? `<b class="journey-chapter-route__detail">${escapeHtml(routeTitle)}</b>` : ""}
         <span class="journey-chapter-route__subtitle">${escapeHtml(getJourneyChapterRouteSubtitle(chapter))}</span>
         <em class="journey-chapter-route__status">${escapeHtml(getJourneyChapterStatusLabel(chapter))}</em>
-      </div>
-    </article>
+      </span>
+    </button>
   `;
+}
+
+function selectJourneyChapterRoute(id) {
+  const chapter = JOURNEY_CHAPTERS.find(entry => entry.id === id);
+  if (!chapter) return;
+  const state = getJourneyChapterRouteState(chapter);
+  if (state === "locked") {
+    journeyChapterRouteMessage = chapter.unlockText || "Complete Frontier to reveal this route.";
+  } else if (id === "academy") {
+    selectedJourneyChapterId = id;
+    journeyChapterRouteMessage = "Academy guidance will open here later.";
+  } else {
+    selectedJourneyChapterId = id;
+    journeyChapterRouteMessage = "";
+  }
+  renderJourneyScreen();
+  requestAnimationFrame(() => {
+    document.querySelector(`[data-journey-chapter-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", inline: "center" });
+    updateJourneyChapterRouteScroll();
+  });
+}
+
+function scrollJourneyChapterRoute(direction = 1) {
+  const track = document.getElementById("journeyChapterRouteTrack");
+  if (!track) return;
+  track.scrollBy({ left: Number(direction || 1) * Math.max(220, track.clientWidth * 0.42), behavior: "smooth" });
+  requestAnimationFrame(updateJourneyChapterRouteScroll);
+}
+
+function updateJourneyChapterRouteScroll() {
+  const track = document.getElementById("journeyChapterRouteTrack");
+  const thumb = document.getElementById("journeyChapterRouteScrollThumb");
+  if (!track || !thumb) return;
+  const scrollable = Math.max(1, track.scrollWidth - track.clientWidth);
+  const width = Math.max(24, Math.min(100, Math.round((track.clientWidth / Math.max(track.scrollWidth, 1)) * 100)));
+  const offset = Math.round((track.scrollLeft / scrollable) * Math.max(0, 100 - width));
+  thumb.style.width = `${width}%`;
+  thumb.style.transform = `translateX(${offset}%)`;
 }
 
 function renderJourneyObjectiveRows() {
