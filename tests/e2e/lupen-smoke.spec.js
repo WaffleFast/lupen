@@ -5791,6 +5791,41 @@ test.describe("Lupen browser smoke", () => {
     expect(morganBriefingLayout.contentLeft).toBeGreaterThan(morganBriefingLayout.portraitLeft);
     expect(morganBriefingLayout.contentWidth).toBeGreaterThan(360);
     expect(morganBriefingLayout.bgWidth).toBeGreaterThan(morganBriefingLayout.panelWidth * 0.45);
+    const journeyFrameLayout = await page.locator("#journeyScreen").evaluate(screen => {
+      const headerRect = screen.querySelector(".market-header")?.getBoundingClientRect();
+      const panels = [
+        ".journey-briefing",
+        ".journey-chapters-panel",
+        ".journey-current-path",
+        ".journey-side-panel",
+        ".journey-galaxy-strip"
+      ].map(selector => {
+        const rect = screen.querySelector(selector)?.getBoundingClientRect();
+        return {
+          selector,
+          left: rect?.left || 0,
+          right: rect?.right || 0
+        };
+      });
+      return {
+        headerLeft: headerRect?.left || 0,
+        headerRight: headerRect?.right || 0,
+        panels
+      };
+    });
+    for (const panel of journeyFrameLayout.panels) {
+      expect(panel.left).toBeGreaterThanOrEqual(journeyFrameLayout.headerLeft - 1);
+      expect(panel.right).toBeLessThanOrEqual(journeyFrameLayout.headerRight + 1);
+    }
+    const fullWidthPanels = journeyFrameLayout.panels.filter(panel => (
+      panel.selector === ".journey-briefing" ||
+      panel.selector === ".journey-chapters-panel" ||
+      panel.selector === ".journey-galaxy-strip"
+    ));
+    for (const panel of fullWidthPanels) {
+      expect(Math.abs(panel.left - journeyFrameLayout.headerLeft)).toBeLessThanOrEqual(1);
+      expect(Math.abs(panel.right - journeyFrameLayout.headerRight)).toBeLessThanOrEqual(1);
+    }
     await expect(page.locator("#journeyScreen")).toContainText("MORGAN");
     await expect(page.locator("#journeyScreen")).toContainText("COMMAND LIAISON");
     await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
