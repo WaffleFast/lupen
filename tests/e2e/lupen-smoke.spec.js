@@ -5762,11 +5762,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).not.toContainText("STATION AI");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier is active, Pilot.");
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER PATH");
-    await expect(page.locator("#journeyScreen")).toContainText("ACADEMY");
+    await expect(page.locator("#journeyScreen")).toContainText("Academy");
     await expect(page.locator("#journeyScreen")).toContainText("PENDING");
-    await expect(page.locator("#journeyScreen")).toContainText("CHAPTER I: FRONTIER");
+    await expect(page.locator("#journeyScreen")).toContainText("Chapter I: Frontier");
     await expect(page.locator("#journeyScreen")).toContainText("ACTIVE CHAPTER");
-    await expect(page.locator("#journeyScreen")).toContainText("NEXT ROUTE");
+    await expect(page.locator("#journeyScreen")).toContainText("Next Route");
     await expect(page.locator("#journeyScreen")).toContainText("LOCKED");
     await expect(page.locator("#journeyScreen .journey-chapter-path")).not.toContainText("OUTER RIM");
     await expect(page.locator("#journeyScreen .journey-chapter-path")).not.toContainText("BORDER WORLDS");
@@ -5780,10 +5780,20 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("Sector Orientation");
     await expect(page.locator("#journeyScreen")).toContainText("Take the ship out and confirm your launch systems.");
     await expect(page.locator("#journeyScreen")).toContainText("0 / 1");
+    await expect(page.locator("#journeyScreen .journey-chapter-path")).toHaveAttribute("data-journey-source", "JOURNEY_CHAPTERS");
+    await expect(page.locator("#journeyScreen .journey-assignment-grid")).toHaveAttribute("data-journey-source", "JOURNEY_ASSIGNMENTS");
     await expect(page.locator("#journeyScreen .journey-chapter-node")).toHaveCount(3);
+    await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Chapter I: Frontier");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--locked")).toContainText("Next Route");
     await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(5);
+    await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(5);
+    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
+    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("AVAILABLE");
+    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Accept Mission");
     await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("25 XP");
     await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("100 CR");
+    await expect(page.locator("#journeyScreen .journey-reward-chip--xp").first()).toContainText("25 XP");
+    await expect(page.locator("#journeyScreen .journey-reward-chip--credits").first()).toContainText("100 CR");
 
     await page.locator("#journeyScreen .screen-back-btn").click();
     await expect(page.locator("#gameScreen")).toHaveClass(/active/);
