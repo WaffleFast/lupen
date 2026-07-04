@@ -555,9 +555,9 @@ function renderJourneyChapterPath() {
     .slice()
     .sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
   return `
-    <section class="journey-chapters-panel">
-      <div class="journey-panel-head"><span>CHAPTER PATH</span></div>
-      <div class="journey-chapter-path" data-journey-source="JOURNEY_CHAPTERS">
+    <section class="journey-chapters-panel journey-chapter-route">
+      <div class="journey-panel-head journey-chapter-route__head"><span>CHAPTER ROUTE</span></div>
+      <div class="journey-chapter-route__track journey-chapter-path" data-journey-source="JOURNEY_CHAPTERS" aria-label="Chapter route">
         ${chapters.map(renderJourneyChapterNode).join("")}
       </div>
     </section>
@@ -582,30 +582,29 @@ function getJourneyChapterStatusLabel(chapter) {
   return String(chapter.status || "PENDING").toUpperCase();
 }
 
+function getJourneyChapterRouteIcon(chapter) {
+  if (chapter.icon === "academy") return "assets/chapter-academy-icon.png";
+  if (chapter.icon === "frontier") return "assets/chapter-frontier-icon.png";
+  if (chapter.icon === "locked") return "assets/chapter-locked-icon.png";
+  return "assets/chapter-frontier-icon.png";
+}
+
+function getJourneyChapterRouteSubtitle(chapter) {
+  if (chapter.status === "active") return "Active Chapter";
+  if (chapter.id === "next_route") return "Complete Frontier to reveal.";
+  return chapter.subtitle || "";
+}
+
 function renderJourneyChapterNode(chapter) {
-  const progress = getJourneyChapterProgress(chapter);
-  const hasProgress = chapter.progressMode === "missions" || progress > 0;
-  const activeMission = chapter.id === "frontier" ? getJourneyPrimaryMission() : null;
-  const objective = activeMission ? getJourneyObjectiveLine(activeMission) : chapter.currentPathFallback ? `Current Path: ${chapter.currentPathFallback}` : "";
   return `
-    <article class="journey-chapter-node journey-chapter-${escapeHtml(chapter.status)} journey-chapter-node--${escapeHtml(chapter.status)} journey-chapter-theme-${escapeHtml(chapter.theme)}" data-journey-chapter-id="${escapeHtml(chapter.id)}">
-      <div class="journey-chapter-badge journey-chapter-icon journey-chapter-icon--${escapeHtml(chapter.icon)}">${escapeHtml(getJourneyChapterBadge(chapter))}</div>
-      <div class="journey-chapter-main">
-        <div class="journey-chapter-title-row">
-          <div>
-            <strong>${escapeHtml(chapter.displayLabel)}</strong>
-            <p>${escapeHtml(chapter.subtitle)}</p>
-          </div>
-          ${renderJourneyStatusPill(chapter.status, getJourneyChapterStatusLabel(chapter))}
-        </div>
-        ${hasProgress ? `
-          <div class="journey-chapter-progress">
-            ${renderJourneyProgressBar(progress, 100)}
-            <em>${formatNumber(progress)}%</em>
-          </div>
-        ` : ""}
-        ${objective ? `<small>${escapeHtml(objective)}</small>` : ""}
-        ${chapter.unlockText ? `<small>${escapeHtml(chapter.unlockText)}</small>` : ""}
+    <article class="journey-chapter-route__item journey-chapter-route__item--${escapeHtml(chapter.status)} journey-chapter-node journey-chapter-${escapeHtml(chapter.status)} journey-chapter-node--${escapeHtml(chapter.status)} journey-chapter-theme-${escapeHtml(chapter.theme)}" data-journey-chapter-id="${escapeHtml(chapter.id)}">
+      <div class="journey-chapter-route__icon journey-chapter-icon journey-chapter-icon--${escapeHtml(chapter.icon)}" aria-hidden="true">
+        <img src="${escapeHtml(getJourneyChapterRouteIcon(chapter))}" alt="">
+      </div>
+      <div class="journey-chapter-route__copy journey-chapter-main">
+        <strong class="journey-chapter-route__label">${escapeHtml(chapter.displayLabel)}</strong>
+        <span class="journey-chapter-route__subtitle">${escapeHtml(getJourneyChapterRouteSubtitle(chapter))}</span>
+        <em class="journey-chapter-route__status">${escapeHtml(getJourneyChapterStatusLabel(chapter))}</em>
       </div>
     </article>
   `;

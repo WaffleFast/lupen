@@ -5831,7 +5831,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
     await expect(page.locator("#journeyScreen")).not.toContainText("STATION AI");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier is active, Pilot.");
-    await expect(page.locator("#journeyScreen")).toContainText("CHAPTER PATH");
+    await expect(page.locator("#journeyScreen")).toContainText("CHAPTER ROUTE");
     await expect(page.locator("#journeyScreen")).toContainText("Academy");
     await expect(page.locator("#journeyScreen")).toContainText("PENDING");
     await expect(page.locator("#journeyScreen")).toContainText("Chapter I: Frontier");
@@ -5852,9 +5852,56 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("0 / 1");
     await expect(page.locator("#journeyScreen .journey-chapter-path")).toHaveAttribute("data-journey-source", "JOURNEY_CHAPTERS");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).toHaveAttribute("data-journey-source", "JOURNEY_ASSIGNMENTS");
+    await expect(page.locator("#journeyScreen .journey-chapter-route")).toBeVisible();
+    await expect(page.locator("#journeyScreen .journey-chapter-route__track")).toBeVisible();
     await expect(page.locator("#journeyScreen .journey-chapter-node")).toHaveCount(3);
     await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Chapter I: Frontier");
     await expect(page.locator("#journeyScreen .journey-chapter-node--locked")).toContainText("Next Route");
+    await expect(page.locator("#journeyScreen .journey-chapter-progress")).toHaveCount(0);
+    await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(0)).toHaveAttribute("src", /chapter-academy-icon\.png/);
+    await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(1)).toHaveAttribute("src", /chapter-frontier-icon\.png/);
+    await expect(page.locator("#journeyScreen .journey-chapter-route__icon img").nth(2)).toHaveAttribute("src", /chapter-locked-icon\.png/);
+    const chapterRouteLayout = await page.locator("#journeyScreen .journey-chapter-route").evaluate(route => {
+      const routeRect = route.getBoundingClientRect();
+      const track = route.querySelector(".journey-chapter-route__track");
+      const trackStyles = track ? getComputedStyle(track) : null;
+      return {
+        height: routeRect.height,
+        trackOverflowX: trackStyles?.overflowX || "",
+        trackDisplay: trackStyles?.display || ""
+      };
+    });
+    expect(chapterRouteLayout.height).toBeLessThan(125);
+    expect(chapterRouteLayout.trackDisplay).toBe("flex");
+    expect(["auto", "scroll"]).toContain(chapterRouteLayout.trackOverflowX);
+    const chapterRouteCanOverflow = await page.locator("#journeyScreen .journey-chapter-route__track").evaluate(track => {
+      const previousWidth = track.style.width;
+      track.style.width = "280px";
+      const canOverflow = track.scrollWidth > track.clientWidth;
+      track.style.width = previousWidth;
+      return canOverflow;
+    });
+    expect(chapterRouteCanOverflow).toBe(true);
+    const chapterIconTransparency = await page.locator("#journeyScreen .journey-chapter-route__icon img").evaluateAll(async icons => {
+      await Promise.all(icons.map(icon => icon.decode?.().catch(() => {}) || Promise.resolve()));
+      return icons.map(icon => {
+        const canvas = document.createElement("canvas");
+        canvas.width = icon.naturalWidth;
+        canvas.height = icon.naturalHeight;
+        const context = canvas.getContext("2d");
+        context.drawImage(icon, 0, 0);
+        const points = [
+          [0, 0],
+          [canvas.width - 1, 0],
+          [0, canvas.height - 1],
+          [canvas.width - 1, canvas.height - 1]
+        ];
+        return points.map(([x, y]) => context.getImageData(x, y, 1, 1).data[3]);
+      });
+    });
+    for (const cornerAlphas of chapterIconTransparency) {
+      expect(Math.max(...cornerAlphas)).toBeLessThan(8);
+    }
     await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(5);
     await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(5);
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
