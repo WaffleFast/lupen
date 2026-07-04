@@ -123,6 +123,9 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     assignmentType: "orientation",
     journeyTheme: "cyan",
     icon: "navigation",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
     rewards: Object.freeze({ xp: 25, credits: 100 }),
     order: 10
   }),
@@ -135,6 +138,9 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     assignmentType: "trade",
     journeyTheme: "gold",
     icon: "cargo",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
     rewards: Object.freeze({ xp: 50, credits: 250 }),
     order: 20
   }),
@@ -147,6 +153,9 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     assignmentType: "resource",
     journeyTheme: "teal",
     icon: "resource",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
     rewards: Object.freeze({ xp: 50, credits: 200 }),
     order: 30
   }),
@@ -159,6 +168,9 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     assignmentType: "combat",
     journeyTheme: "orange",
     icon: "combat",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
     rewards: Object.freeze({ xp: 100, credits: 300 }),
     order: 40
   }),
@@ -171,6 +183,9 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     assignmentType: "certification",
     journeyTheme: "purple",
     icon: "certification",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
     rewards: Object.freeze({ xp: 150, credits: 500 }),
     order: 50
   })
@@ -254,6 +269,18 @@ function isMissionAvailable(id, progress = missionProgress) {
   return (mission.objective.requiredMissionIds || []).every(requiredId => isMissionFinishedForPrerequisite(requiredId, progress));
 }
 
+function isJourneyChapterAssignment(missionOrId) {
+  const config = getJourneyAssignmentConfig(missionOrId);
+  return config.assignmentMode === "chapter" && config.autoActive === true && config.requiresAccept === false;
+}
+
+function canProgressMissionFromEvent(mission, state, progress = missionProgress) {
+  if (!mission || !state) return false;
+  if ([MISSION_STATE_COMPLETED, MISSION_STATE_CLAIMED].includes(state.state)) return false;
+  if (state.state === MISSION_STATE_ACTIVE) return true;
+  return state.state === MISSION_STATE_AVAILABLE && isJourneyChapterAssignment(mission) && isMissionAvailable(mission.id, progress);
+}
+
 function getMissionRequiredAmount(mission) {
   if (mission.objective.type === "complete_missions") return mission.objective.requiredMissionIds?.length || 0;
   return Math.max(1, Number(mission.objective.required || 1));
@@ -295,6 +322,10 @@ function getPrimaryActiveMission() {
   missionProgress = normalizeMissionProgress(missionProgress);
   return CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_COMPLETED) ||
     CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_ACTIVE) ||
+    CHAPTER_MISSIONS.find(mission => {
+      const state = missionProgress.missions[mission.id];
+      return state?.state === MISSION_STATE_AVAILABLE && isJourneyChapterAssignment(mission) && isMissionAvailable(mission.id, missionProgress);
+    }) ||
     null;
 }
 
@@ -367,13 +398,16 @@ function recordMissionEvent(eventType, payload = {}) {
 
   CHAPTER_MISSIONS.forEach(mission => {
     const state = missionProgress.missions[mission.id];
-    if (!state || state.state !== MISSION_STATE_ACTIVE || !missionEventMatches(mission, eventType, payload)) return;
+    if (!canProgressMissionFromEvent(mission, state, missionProgress) || !missionEventMatches(mission, eventType, payload)) return;
 
     const increment = eventType === "recover_resource"
       ? Math.max(1, Math.round(Number(payload.amount || payload.quantity || 1)))
       : 1;
     state.progress = Math.min(getMissionRequiredAmount(mission), Math.max(0, Number(state.progress || 0)) + increment);
     changed = true;
+    if (state.state === MISSION_STATE_AVAILABLE && state.progress > 0 && state.progress < getMissionRequiredAmount(mission)) {
+      state.state = MISSION_STATE_ACTIVE;
+    }
     if (state.progress >= getMissionRequiredAmount(mission)) completeMission(mission.id);
   });
 
@@ -381,8 +415,11 @@ function recordMissionEvent(eventType, payload = {}) {
     .filter(mission => mission.objective.type === "complete_missions")
     .forEach(mission => {
       const state = missionProgress.missions[mission.id];
-      if (state?.state !== MISSION_STATE_ACTIVE) return;
+      if (!canProgressMissionFromEvent(mission, state, missionProgress)) return;
       state.progress = getMissionProgressAmount(mission, state);
+      if (state.state === MISSION_STATE_AVAILABLE && state.progress > 0 && state.progress < getMissionRequiredAmount(mission)) {
+        state.state = MISSION_STATE_ACTIVE;
+      }
       if (state.progress >= getMissionRequiredAmount(mission)) completeMission(mission.id);
       changed = true;
     });
@@ -439,6 +476,9 @@ function getJourneyAssignmentConfig(missionOrId) {
     assignmentType: config.assignmentType || "orientation",
     journeyTheme: config.journeyTheme || "cyan",
     icon: config.icon || "navigation",
+    assignmentMode: config.assignmentMode || "mission",
+    requiresAccept: config.requiresAccept !== false,
+    autoActive: config.autoActive === true,
     order: Number(config.order || 0),
     rewards: config.rewards || mission?.reward || { xp: 0, credits: 0 },
     mission: mission || null
@@ -605,10 +645,17 @@ function getJourneyObjectiveLabel(mission) {
   return getJourneyAssignmentConfig(mission).journeyObjectiveLabel;
 }
 
-function getJourneyAssignmentUiState(mission, state, locked = false) {
+function getJourneyAssignmentUiState(assignment, mission, state, locked = false) {
   if (locked) return "locked";
   if (state?.state === MISSION_STATE_COMPLETED) return "claimable";
-  if (state?.state === MISSION_STATE_CLAIMED) return "completed";
+  if (state?.state === MISSION_STATE_CLAIMED) return "claimed";
+  if (assignment.autoActive && assignment.requiresAccept === false) {
+    const progress = getMissionProgressAmount(mission, state);
+    const primary = getJourneyPrimaryMission();
+    if (state?.state === MISSION_STATE_ACTIVE || progress > 0) return "in-progress";
+    if (primary?.id === mission.id) return "tracking";
+    return "not-started";
+  }
   return normalizeMissionState(state?.state);
 }
 
@@ -622,17 +669,20 @@ function renderJourneyAssignmentCard(assignment) {
   const progress = getMissionProgressAmount(mission, state);
   const required = getMissionRequiredAmount(mission);
   const locked = state?.state === MISSION_STATE_AVAILABLE && !isMissionAvailable(mission.id, missionProgress);
-  const uiState = getJourneyAssignmentUiState(mission, state, locked);
-  const canAccept = state?.state === MISSION_STATE_AVAILABLE && !locked;
+  const uiState = getJourneyAssignmentUiState(assignment, mission, state, locked);
+  const requiresAccept = assignment.requiresAccept !== false;
+  const canAccept = requiresAccept && state?.state === MISSION_STATE_AVAILABLE && !locked;
   const canClaim = state?.state === MISSION_STATE_COMPLETED;
   const progressPercent = Math.min(100, Math.round((progress / Math.max(1, required)) * 100));
   const action = canClaim
     ? `<button type="button" onclick="claimMissionReward('${escapeJsString(mission.id)}')">Claim Reward</button>`
     : canAccept
       ? `<button type="button" onclick="acceptMission('${escapeJsString(mission.id)}')">Accept Mission</button>`
-      : state?.state === MISSION_STATE_ACTIVE
+      : uiState === "tracking" || uiState === "in-progress"
         ? `<button type="button" disabled>Tracking</button>`
-        : state?.state === MISSION_STATE_CLAIMED
+        : uiState === "not-started"
+          ? `<button type="button" disabled>Not Started</button>`
+          : state?.state === MISSION_STATE_CLAIMED
           ? `<button type="button" disabled>Complete</button>`
           : "";
 
@@ -661,7 +711,11 @@ function renderJourneyStatusPill(state, label = "") {
   const normalized = String(state || MISSION_STATE_AVAILABLE).toLowerCase();
   const text = label || (
     normalized === "claimable" ? "CLAIM READY" :
-      normalized === "completed" ? "COMPLETE" :
+      normalized === "claimed" ? "CLAIMED" :
+        normalized === "completed" ? "COMPLETE" :
+          normalized === "tracking" ? "TRACKING" :
+            normalized === "in-progress" ? "IN PROGRESS" :
+              normalized === "not-started" ? "NOT STARTED" :
         normalized === MISSION_STATE_COMPLETED ? "COMPLETE" :
           normalized === MISSION_STATE_CLAIMED ? "COMPLETE" :
             normalized === MISSION_STATE_ACTIVE ? "ACTIVE" :

@@ -5785,8 +5785,8 @@ test.describe("Lupen browser smoke", () => {
         bgWidth: bgRect?.width || 0
       };
     });
-    expect(morganBriefingLayout.panelHeight).toBeGreaterThan(120);
-    expect(morganBriefingLayout.panelHeight).toBeLessThan(230);
+    expect(morganBriefingLayout.panelHeight).toBeGreaterThan(110);
+    expect(morganBriefingLayout.panelHeight).toBeLessThan(180);
     expect(morganBriefingLayout.portraitWidth).toBeGreaterThan(90);
     expect(morganBriefingLayout.contentLeft).toBeGreaterThan(morganBriefingLayout.portraitLeft);
     expect(morganBriefingLayout.contentWidth).toBeGreaterThan(360);
@@ -5823,8 +5823,9 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(5);
     await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(5);
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
-    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("AVAILABLE");
-    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Accept Mission");
+    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("TRACKING");
+    await expect(page.locator("#journeyScreen .journey-assignment-card").nth(1)).toContainText("NOT STARTED");
+    await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Accept Mission");
     await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("25 XP");
     await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("100 CR");
     await expect(page.locator("#journeyScreen .journey-reward-chip--xp").first()).toContainText("25 XP");
@@ -5835,10 +5836,6 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator("#journeyHubBtn").click();
     await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
-
-    await page.locator("#journeyScreen button", { hasText: "Accept Mission" }).first().click();
-    await expect(page.locator("#journeyScreen")).toContainText("ACTIVE");
-    await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("active");
 
     await page.evaluate(() => window.launchShip());
     await expect(page.locator("#spaceScreen")).toHaveClass(/active/);
@@ -5852,16 +5849,32 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("claimed");
     await expect(page.evaluate(() => window.eval(`credits`))).resolves.toBe(10100);
 
+    const haulProgress = await page.evaluate(() => window.eval(`
+      recordMissionEvent("profitable_trade", { profit: 250 });
+      ({
+        runtime: missionProgress.missions.first_haul,
+        saved: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions?.first_haul
+      })
+    `));
+    expect(haulProgress.runtime).toMatchObject({ state: "completed", progress: 1 });
+    expect(haulProgress.saved).toMatchObject({ state: "completed", progress: 1 });
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("CLAIM READY");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("Claim Reward");
+
     const resetState = await page.evaluate(async () => {
       await window.lupenResetPilotProgress({ reload: false });
       return {
         runtime: window.eval(`missionProgress.missions.sector_orientation`),
-        saved: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions?.sector_orientation
+        saved: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions?.sector_orientation,
+        haulRuntime: window.eval(`missionProgress.missions.first_haul`),
+        haulSaved: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions?.first_haul
       };
     });
 
     expect(resetState.runtime).toMatchObject({ state: "available", progress: 0 });
     expect(resetState.saved).toMatchObject({ state: "available", progress: 0 });
+    expect(resetState.haulRuntime).toMatchObject({ state: "available", progress: 0 });
+    expect(resetState.haulSaved).toMatchObject({ state: "available", progress: 0 });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
