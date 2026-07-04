@@ -317,8 +317,8 @@ function getJourneyPrimaryMission() {
 }
 
 function getJourneyObjectiveLine(mission) {
-  if (!mission) return "Current Objective: Complete First Haul";
-  return `Current Objective: ${getMissionObjectiveLabel(mission)}`;
+  if (!mission) return "Current Path: First Haul";
+  return `Current Path: ${getJourneyObjectiveTitle(mission)}`;
 }
 
 function getGalaxyCompletionPercent() {
@@ -353,30 +353,23 @@ function renderJourneyScreen() {
         ${renderJourneyChapterNode({
           badge: "A",
           title: "ACADEMY",
-          subtitle: "Training",
+          subtitle: "Training begins here.",
           status: "PENDING",
           state: "soon"
         })}
         ${renderJourneyChapterNode({
           badge: "I",
-          title: "FRONTIER",
-          subtitle: "Establish your foothold",
-          status: "ACTIVE",
+          title: "CHAPTER I: FRONTIER",
+          subtitle: "Establish your foothold beyond Asteron Prime.",
+          status: "ACTIVE CHAPTER",
           state: "active",
           progress: chapterPercent,
           objective: getJourneyObjectiveLine(activeMission)
         })}
         ${renderJourneyChapterNode({
-          badge: "II",
-          title: "OUTER RIM",
-          subtitle: "Complete Frontier",
-          status: "LOCKED",
-          state: "locked"
-        })}
-        ${renderJourneyChapterNode({
-          badge: "III",
-          title: "BORDER WORLDS",
-          subtitle: "Complete Outer Rim",
+          badge: "?",
+          title: "NEXT ROUTE",
+          subtitle: "Complete Frontier to reveal the next route.",
           status: "LOCKED",
           state: "locked"
         })}
@@ -393,13 +386,14 @@ function renderJourneyScreen() {
 
     <aside class="journey-side-panel">
       <section class="journey-summary-panel">
-        <div class="journey-panel-head"><span>FRONTIER SUMMARY</span></div>
+        <div class="journey-panel-head"><span>FRONTIER STATUS</span></div>
         <div class="journey-summary-list">
-          ${renderJourneySummaryRow("Chapter Progress", `${formatNumber(chapterPercent)}%`)}
-          ${renderJourneySummaryRow("Next Unlock", "Outer Rim route")}
-          ${renderJourneySummaryRow("Rewards", "Credits, XP, Ship Unlock Path")}
+          ${renderJourneySummaryRow("Frontier Progress", `${formatNumber(chapterPercent)}%`)}
+          ${renderJourneySummaryRow("Active Assignment", activeMission ? getJourneyObjectiveTitle(activeMission) : "Frontier Certification")}
+          ${renderJourneySummaryRow("Next Unlock", "Frontier Certification")}
+          ${renderJourneySummaryRow("Completion Unlocks", "Ship unlock path, future route access")}
         </div>
-        <p>Complete Frontier assignments to unlock the next path.</p>
+        <p>Morgan Note: Complete your first assignments to establish your foothold.</p>
       </section>
     </aside>
 
@@ -458,9 +452,6 @@ function renderJourneyObjectiveRows() {
 }
 
 function getJourneyObjectiveTitle(mission) {
-  if (mission.id === "first_haul") return "Complete First Haul";
-  if (mission.id === "resource_recovery") return "Recover 3 Resources";
-  if (mission.id === "erebus_patrol") return "Destroy 3 Erebus";
   return mission.title;
 }
 
