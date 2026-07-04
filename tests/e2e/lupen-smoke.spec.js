@@ -5785,9 +5785,9 @@ test.describe("Lupen browser smoke", () => {
         bgWidth: bgRect?.width || 0
       };
     });
-    expect(morganBriefingLayout.panelHeight).toBeGreaterThan(110);
-    expect(morganBriefingLayout.panelHeight).toBeLessThan(180);
-    expect(morganBriefingLayout.portraitWidth).toBeGreaterThan(90);
+    expect(morganBriefingLayout.panelHeight).toBeGreaterThan(105);
+    expect(morganBriefingLayout.panelHeight).toBeLessThan(165);
+    expect(morganBriefingLayout.portraitWidth).toBeGreaterThan(95);
     expect(morganBriefingLayout.contentLeft).toBeGreaterThan(morganBriefingLayout.portraitLeft);
     expect(morganBriefingLayout.contentWidth).toBeGreaterThan(360);
     expect(morganBriefingLayout.bgWidth).toBeGreaterThan(morganBriefingLayout.panelWidth * 0.45);
