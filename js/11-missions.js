@@ -342,7 +342,7 @@ function renderJourneyScreen() {
       <div class="journey-morgan-copy">
         <span>MORGAN</span>
         <strong>COMMAND LIAISON</strong>
-        <p>Welcome back, Pilot. Frontier is active. I've marked the next steps in your journey.</p>
+        <p>Frontier is active, Pilot. Complete these assignments and we'll open the next path.</p>
         <div class="journey-waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
       </div>
     </section>
@@ -392,13 +392,14 @@ function renderJourneyScreen() {
     </section>
 
     <aside class="journey-side-panel">
-      <section class="journey-rewards-panel">
-        <div class="journey-panel-head"><span>FRONTIER REWARDS</span></div>
-        <div class="journey-reward-list">
-          ${renderJourneyRewardRow("CR", "Credits", "10,000 CR")}
-          ${renderJourneyRewardRow("XP", "Experience", "12,500 XP")}
-          ${renderJourneyRewardRow("SH", "Ship Unlock Path", "Light Hauler path")}
+      <section class="journey-summary-panel">
+        <div class="journey-panel-head"><span>FRONTIER SUMMARY</span></div>
+        <div class="journey-summary-list">
+          ${renderJourneySummaryRow("Chapter Progress", `${formatNumber(chapterPercent)}%`)}
+          ${renderJourneySummaryRow("Next Unlock", "Outer Rim route")}
+          ${renderJourneySummaryRow("Rewards", "Credits, XP, Ship Unlock Path")}
         </div>
+        <p>Complete Frontier assignments to unlock the next path.</p>
       </section>
     </aside>
 
@@ -463,6 +464,23 @@ function getJourneyObjectiveTitle(mission) {
   return mission.title;
 }
 
+function getJourneyObjectiveDescription(mission) {
+  if (mission.id === "sector_orientation") return "Take the ship out and confirm your launch systems.";
+  if (mission.id === "first_haul") return "Complete one profitable trade and build your reputation.";
+  if (mission.id === "resource_recovery") return "Recover resources from the lower lanes.";
+  if (mission.id === "erebus_patrol") return "Destroy Erebus drones moving through Frontier space.";
+  if (mission.id === "frontier_certification") return "Complete the core Frontier assignments and certify your path.";
+  return mission.briefing;
+}
+
+function getJourneyObjectiveAccent(mission) {
+  if (mission.id === "first_haul") return "trade";
+  if (mission.id === "resource_recovery") return "resource";
+  if (mission.id === "erebus_patrol") return "combat";
+  if (mission.id === "frontier_certification") return "certification";
+  return "orientation";
+}
+
 function renderJourneyObjectiveRow(mission) {
   const state = missionProgress.missions[mission.id];
   const progress = getMissionProgressAmount(mission, state);
@@ -479,24 +497,39 @@ function renderJourneyObjectiveRow(mission) {
       : state?.state === MISSION_STATE_ACTIVE
         ? `<button type="button" disabled>Tracking</button>`
         : state?.state === MISSION_STATE_CLAIMED
-          ? `<button type="button" disabled>Completed</button>`
+          ? `<button type="button" disabled>Complete</button>`
           : "";
 
   return `
-    <article class="journey-objective-row mission-state-${escapeHtml(locked ? "locked" : (state?.state || MISSION_STATE_AVAILABLE))}">
+    <article class="journey-objective-row mission-state-${escapeHtml(locked ? "locked" : (state?.state || MISSION_STATE_AVAILABLE))} journey-accent-${escapeHtml(getJourneyObjectiveAccent(mission))}">
       <div class="journey-objective-marker" aria-hidden="true"></div>
       <div class="journey-objective-copy">
-        <strong>${escapeHtml(getJourneyObjectiveTitle(mission))}</strong>
-        <p>${escapeHtml(mission.briefing)}</p>
-        <span>${escapeHtml(status)} / ${escapeHtml(getMissionObjectiveLabel(mission))}</span>
+        <div class="journey-objective-top">
+          <strong>${escapeHtml(getJourneyObjectiveTitle(mission))}</strong>
+          <span class="journey-status-pill">${escapeHtml(status)}</span>
+        </div>
+        <p>${escapeHtml(getJourneyObjectiveDescription(mission))}</p>
+        <span>${escapeHtml(getMissionObjectiveLabel(mission))}</span>
         <div class="journey-progress-track"><i style="width:${progressPercent}%"></i></div>
       </div>
       <div class="journey-objective-meta">
         <b>${formatNumber(progress)} / ${formatNumber(required)}</b>
-        <em>${formatNumber(mission.reward.xp)} XP / CR ${formatNumber(mission.reward.credits)}</em>
+        <div class="journey-reward-chips">
+          <span>${formatNumber(mission.reward.xp)} XP</span>
+          <span>${formatNumber(mission.reward.credits)} CR</span>
+        </div>
         ${action ? `<div class="journey-objective-action">${action}</div>` : ""}
       </div>
     </article>
+  `;
+}
+
+function renderJourneySummaryRow(label, value) {
+  return `
+    <div class="journey-summary-row">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
   `;
 }
 
@@ -527,7 +560,7 @@ function renderMissionObjectiveHud() {
             <strong>${escapeHtml(mission.title)}</strong>
           </div>
           <span>${escapeHtml(getMissionObjectiveLabel(mission))}</span>
-          <em>${ready ? "Return to the Mission Journal to claim the reward." : "Morgan is tracking this objective."}</em>
+          <em>${ready ? "Return to Journey to claim the reward." : "Morgan is tracking this objective."}</em>
         </div>
         <div class="objective-orbit-meta">
           <span>${formatNumber(progress)} / ${formatNumber(required)}</span>

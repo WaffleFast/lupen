@@ -5760,7 +5760,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("MORGAN");
     await expect(page.locator("#journeyScreen")).toContainText("COMMAND LIAISON");
     await expect(page.locator("#journeyScreen")).not.toContainText("STATION AI");
-    await expect(page.locator("#journeyScreen")).toContainText("Welcome back, Pilot. Frontier is active.");
+    await expect(page.locator("#journeyScreen")).toContainText("Frontier is active, Pilot.");
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER PATH");
     await expect(page.locator("#journeyScreen")).toContainText("ACADEMY");
     await expect(page.locator("#journeyScreen")).toContainText("PENDING");
@@ -5771,10 +5771,17 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("LOCKED");
     await expect(page.locator("#journeyScreen")).toContainText("CURRENT PATH");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier Assignments");
+    await expect(page.locator("#journeyScreen")).toContainText("FRONTIER SUMMARY");
+    await expect(page.locator("#journeyScreen")).toContainText("Chapter Progress");
+    await expect(page.locator("#journeyScreen")).toContainText("Next Unlock");
+    await expect(page.locator("#journeyScreen")).toContainText("OVERALL GALAXY COMPLETION");
     await expect(page.locator("#journeyScreen")).toContainText("Sector Orientation");
+    await expect(page.locator("#journeyScreen")).toContainText("Take the ship out and confirm your launch systems.");
     await expect(page.locator("#journeyScreen")).toContainText("0 / 1");
     await expect(page.locator("#journeyScreen .journey-chapter-node")).toHaveCount(4);
     await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(5);
+    await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("25 XP");
+    await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("100 CR");
 
     await page.locator("#journeyScreen .screen-back-btn").click();
     await expect(page.locator("#gameScreen")).toHaveClass(/active/);
