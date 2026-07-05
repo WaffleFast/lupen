@@ -29,6 +29,7 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
 
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
+let multiplayerStagingStoreStatusMessage = "";
 let multiplayerStagingCargoPodEquipPending = false;
 let multiplayerStagingShieldBoosterEquipPending = false;
 let multiplayerStagingPulseLaserEquipPending = false;
@@ -200,11 +201,14 @@ function renderStagingStorePreviewNote(item) {
   if (!isMultiplayerStagingStoreActive()) return "";
   const itemId = getStagingStoreItemId(item);
   const result = itemId ? getLastMatchingStagingStorePreview(itemId) : null;
+  const statusLine = multiplayerStagingStoreStatusMessage
+    ? `<div><strong>${escapeHtml(multiplayerStagingStoreStatusMessage)}</strong></div>`
+    : "";
   if (!itemId) {
-    return `<div class="store-detail-owned-line">Server purchase unavailable for this item.</div>`;
+    return `<div class="store-detail-owned-line">${statusLine}Server purchase unavailable for this item.</div>`;
   }
   if (!result) {
-    return `<div class="store-detail-owned-line">Server-backed purchase validation is ready.</div>`;
+    return `<div class="store-detail-owned-line">${statusLine}Server-backed purchase validation is ready.</div>`;
   }
   const source = result.validationMode === "trusted_save"
     ? "trusted save"
@@ -220,6 +224,7 @@ function renderStagingStorePreviewNote(item) {
     : ` / Owned ${formatNumber(result.itemBefore)} -> ${formatNumber(result.itemAfter)}`;
   return `
     <div class="store-detail-owned-line">
+      ${statusLine}
       <strong>${escapeHtml(getStagingStorePreviewLine(result))}</strong> /
       ${escapeHtml(creditLine)} /
       ${escapeHtml(source)} /
@@ -597,7 +602,9 @@ async function requestStagingStorePurchase(item) {
   }
   if (multiplayerStagingStorePurchasePending) return true;
   multiplayerStagingStorePurchasePending = true;
+  multiplayerStagingStoreStatusMessage = "Purchase requested.";
   renderStore();
+  const requestedAt = Date.now();
   client.purchaseStagingStoreItem({
     itemId,
     quantity: 1,
@@ -608,7 +615,7 @@ async function requestStagingStorePurchase(item) {
   (async () => {
     const latest = await waitForMultiplayerStagingResult(
       () => client.getStatus?.().lastStagingStorePurchase,
-      result => result?.itemId === itemId
+      result => result?.itemId === itemId && Number(result?.receivedAt || 0) >= requestedAt
     );
     multiplayerStagingStorePurchasePending = false;
     if (latest?.itemId === itemId && latest.applied) {
@@ -617,21 +624,13 @@ async function requestStagingStorePurchase(item) {
         ? ` CR ${formatNumber(Math.max(0, Number(latest.creditsBefore) - Number(latest.creditsAfter)))} spent.`
         : "";
       const message = `${latest.name || "Store item"} purchased.${spent}`;
+      multiplayerStagingStoreStatusMessage = message;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
-      if (typeof loadGameFromSupabase === "function") {
-        try {
-          const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded) {
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_store_purchase");
-            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
-          }
-        } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast("Staging purchase applied. Reload if Store values look stale.");
-        }
-      }
+      if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_store_purchase");
     } else if (latest?.itemId === itemId) {
       const reason = latest.userReason || latest.blockReason || latest.reason || "Server purchase failed - try again.";
+      multiplayerStagingStoreStatusMessage = `Purchase failed: ${reason}`;
       if (typeof addHudToast === "function") addHudToast(`Purchase blocked: ${reason}`);
       if (typeof addActivityLog === "function") addActivityLog(`MP staging purchase blocked: ${reason}`);
       if (typeof console !== "undefined" && typeof console.warn === "function") {
@@ -648,6 +647,7 @@ async function requestStagingStorePurchase(item) {
       }
     } else {
       const reason = "Server purchase failed - try again.";
+      multiplayerStagingStoreStatusMessage = `Purchase failed: ${reason}`;
       if (typeof addHudToast === "function") addHudToast(reason);
       if (typeof addActivityLog === "function") addActivityLog(`MP staging purchase failed: ${itemId}.`);
       if (typeof console !== "undefined" && typeof console.warn === "function") {

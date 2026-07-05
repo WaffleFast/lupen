@@ -3596,6 +3596,172 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("multiplayer staging store purchase click applies confirmed gun ownership", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&debug=mp&mpServer=http://127.0.0.1:1");
+    await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        credits = 10000;
+        ownedGuns.pulseLaser = 0;
+        playerProgress = normalizePlayerProgress({ combatXp: 2500, totals: {} });
+        window.__stagingStoreTutorialEvents = [];
+        const originalTutorialEvent = tutorialEvent;
+        tutorialEvent = (eventName, detail = {}) => {
+          window.__stagingStoreTutorialEvents.push(eventName);
+          return originalTutorialEvent(eventName, detail);
+        };
+
+        const subscribers = [];
+        const status = {
+          enabled: true,
+          isConnected: true,
+          currentNode: "Asteron Prime",
+          playerServerNode: "Asteron Prime",
+          presenceStatus: "docked",
+          lastStagingStoreItems: {
+            ok: true,
+            items: [{
+              itemId: "gun:pulseLaser",
+              name: "Pulse Laser",
+              category: "weapon",
+              localKind: "gun",
+              localKey: "pulseLaser",
+              price: 748,
+              levelRequirement: 0,
+              stockType: "fixed"
+            }]
+          },
+          lastStagingStorePreview: {
+            ok: true,
+            mode: "dry_run",
+            operation: "purchase",
+            applied: false,
+            itemId: "gun:pulseLaser",
+            name: "Pulse Laser",
+            category: "weapon",
+            localKind: "gun",
+            localKey: "pulseLaser",
+            quantity: 1,
+            unitPrice: 748,
+            totalCost: 748,
+            creditsBefore: 10000,
+            creditsAfterPreview: 9252,
+            itemBefore: 0,
+            itemAfter: 1,
+            wouldPass: true,
+            validationMode: "trusted_save",
+            trustedStateAvailable: true,
+            snapshotUsed: false,
+            receivedAt: Date.now()
+          },
+          lastStagingStorePurchase: null
+        };
+
+        window.__stagingStorePurchasePayloads = [];
+        window.LupenMultiplayerClient = {
+          getStatus: () => status,
+          onServerState: (callback) => {
+            subscribers.push(callback);
+            return { unsubscribe: () => {} };
+          },
+          requestStagingStoreItems: () => true,
+          previewStagingStorePurchase: () => true,
+          sendMovementIntent: () => true,
+          purchaseStagingStoreItem: (payload) => {
+            window.__stagingStorePurchasePayloads.push({ ...payload });
+            setTimeout(() => {
+              status.lastStagingStorePurchase = {
+                ok: true,
+                mode: "store_write",
+                operation: "purchase",
+                applied: true,
+                dryRun: false,
+                itemId: "gun:pulseLaser",
+                name: "Pulse Laser",
+                category: "weapon",
+                localKind: "gun",
+                localKey: "pulseLaser",
+                quantity: 1,
+                unitPrice: 748,
+                totalCost: 748,
+                creditsBefore: 10000,
+                creditsAfter: 9252,
+                itemBefore: 0,
+                itemAfter: 1,
+                wouldPass: true,
+                validationMode: "trusted_save",
+                trustedStateAvailable: true,
+                snapshotUsed: false,
+                creditsWritten: true,
+                weaponWritten: true,
+                saveWritten: true,
+                writes: { creditsWritten: true, weaponWritten: true, saveWritten: true },
+                currentNode: "Asteron Prime",
+                requestedNode: "Asteron Prime",
+                presenceStatus: "docked",
+                receivedAt: Date.now()
+              };
+              status.lastStagingStorePreview = status.lastStagingStorePurchase;
+              subscribers.forEach(callback => callback({}));
+            }, 120);
+            return true;
+          }
+        };
+      })()
+    `));
+
+    await openStore(page);
+    await page.evaluate(() => window.eval(`selectStoreItem("gun:pulseLaser"); renderStore();`));
+    await page.evaluate(() => window.eval(`window.__stagingStoreTutorialEvents = [];`));
+
+    const before = await page.evaluate(() => window.eval(`({
+      credits,
+      ownedPulseLaser: ownedGuns.pulseLaser || 0,
+      loadoutHasPulseLaser: getInventoryEntriesForCategory("guns").some(entry => entry.key === "pulseLaser" && entry.count > 0),
+      tutorialEvents: [...(window.__stagingStoreTutorialEvents || [])]
+    })`));
+
+    await page.locator(".store-detail-buy-action[data-item-key='pulseLaser']").click();
+
+    await page.waitForFunction(() => window.eval(`
+      credits === 9252 && (ownedGuns.pulseLaser || 0) === 1
+    `));
+
+    const after = await page.evaluate(() => window.eval(`({
+      credits,
+      ownedPulseLaser: ownedGuns.pulseLaser || 0,
+      loadoutHasPulseLaser: getInventoryEntriesForCategory("guns").some(entry => entry.key === "pulseLaser" && entry.count > 0),
+      tutorialEvents: [...(window.__stagingStoreTutorialEvents || [])],
+      payload: window.__stagingStorePurchasePayloads[0] || null,
+      panelText: document.querySelector("#storeDetailPanel")?.textContent || ""
+    })`));
+
+    expect(before).toMatchObject({
+      credits: 10000,
+      ownedPulseLaser: 0,
+      loadoutHasPulseLaser: false,
+      tutorialEvents: []
+    });
+    expect(after.credits).toBe(9252);
+    expect(after.ownedPulseLaser).toBe(1);
+    expect(after.loadoutHasPulseLaser).toBe(true);
+    expect(after.tutorialEvents).toContain("boughtStoreGun");
+    expect(after.payload).toMatchObject({
+      itemId: "gun:pulseLaser",
+      quantity: 1,
+      currentNode: "Asteron Prime",
+      presenceStatus: "docked"
+    });
+    expect(after.panelText).toContain("Pulse Laser purchased");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("station store detail art stays centered and prominent", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

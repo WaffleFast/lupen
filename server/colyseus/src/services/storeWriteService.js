@@ -180,7 +180,7 @@ function getStoreUserReason(reason) {
 }
 
 export function getStoreWriteEnvGate(playerId, itemId = "", env = process.env) {
-  const scope = getString(env.STAGING_STORE_WRITE_SCOPE, "disabled").toLowerCase();
+  const scope = getString(env.STAGING_STORE_WRITE_SCOPE, "verified").toLowerCase();
   const normalizedScope = scope === "verified" || scope === "allowlist" ? scope : "disabled";
   const allowlist = getCsvSet(env.STAGING_STORE_WRITE_ALLOWLIST);
   const allowedItems = getCatalogAllowedSet(env.STAGING_STORE_WRITE_ALLOWED_ITEMS, DEFAULT_ALLOWED_STORE_ITEMS);
@@ -189,8 +189,8 @@ export function getStoreWriteEnvGate(playerId, itemId = "", env = process.env) {
     : !!playerId && allowlist.has(playerId);
 
   return {
-    writeEnabled: getBooleanEnv(env.STAGING_STORE_WRITE_ENABLED, false),
-    dryRun: getBooleanEnv(env.STAGING_STORE_WRITE_DRY_RUN, true),
+    writeEnabled: getBooleanEnv(env.STAGING_STORE_WRITE_ENABLED, true),
+    dryRun: getBooleanEnv(env.STAGING_STORE_WRITE_DRY_RUN, false),
     scope: normalizedScope,
     allowlistPresent: allowlist.size > 0,
     allowlisted: playerAllowed,

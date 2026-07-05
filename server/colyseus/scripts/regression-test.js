@@ -1910,7 +1910,8 @@ async function assertStagingStorePreviewHelpers() {
   assert(unknownPreview.applied === false && unknownPreview.saveWritten === false, "Unknown Store preview reported writes.");
 
   const writeGateDefault = getStoreWriteEnvGate("verified-player-a", "attachment:cargoPod", {});
-  assert(writeGateDefault.writeEnabled === false && writeGateDefault.dryRun === true, "Store write gate default was not safe.");
+  assert(writeGateDefault.writeEnabled === true && writeGateDefault.dryRun === false && writeGateDefault.scope === "verified", "Store write gate default should allow verified staging catalogue purchases.");
+  assert(writeGateDefault.playerAllowed === true, "Verified Store write gate default did not allow a verified player id.");
   assert(writeGateDefault.itemAllowed === true, "Catalog Store items should be allowed by the default staging item gate.");
   const writeGateCatalog = getStoreWriteEnvGate("verified-player-a", "gun:voidRail", {
     STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
@@ -2047,10 +2048,11 @@ async function assertStagingStorePreviewHelpers() {
     },
     env: {},
     fetchImpl: async () => {
-      throw new Error("Store write default should not fetch.");
+      throw new Error("Store write default without Supabase config should not fetch.");
     }
   });
-  assert(defaultWrite.applied === false && defaultWrite.blockReason === "staging_store_writes_disabled", "Default Store write did not fail closed.");
+  assert(defaultWrite.applied === false && defaultWrite.blockReason === "supabase_config_missing", `Default Store write without Supabase config did not stop at config gate: ${defaultWrite.blockReason}`);
+  assert(defaultWrite.envGate?.writeEnabled === true && defaultWrite.envGate?.dryRun === false && defaultWrite.envGate?.scope === "verified", "Default Store write did not use verified write defaults.");
   assert(defaultWrite.saveWritten === false, "Default Store write reported save write.");
 
   const dryRunWrite = await applyStagingStorePurchaseWrite({
@@ -5082,7 +5084,8 @@ try {
   assert(defaultStorePurchase?.applied === false, "Default staging Store purchase unexpectedly applied.");
   assert(defaultStorePurchase?.mode === "blocked" || defaultStorePurchase?.mode === "dry_run", `Unexpected default Store purchase mode: ${defaultStorePurchase?.mode}`);
   assert(defaultStorePurchase?.creditsWritten === false && defaultStorePurchase?.attachmentWritten === false && defaultStorePurchase?.saveWritten === false, "Default Store purchase reported writes.");
-  assert(defaultStorePurchase?.gates?.writeEnabled === false, "Default Store purchase gate should report writes disabled.");
+  assert(defaultStorePurchase?.gates?.writeEnabled === true && defaultStorePurchase?.gates?.dryRun === false, "Default Store purchase gate should be enabled for verified staging writes.");
+  assert(defaultStorePurchase?.blockReason === "verified_identity_required" || defaultStorePurchase?.blockReason === "trusted_save_required", `Default Store purchase should still require verified trusted state, got ${defaultStorePurchase?.blockReason}.`);
   assert(defaultStorePurchase?.currentNode === "Nyxara", `Store purchase did not refresh stale server node from request: ${defaultStorePurchase?.currentNode}`);
   assert(defaultStorePurchase?.presenceStatus === "docked", `Store purchase did not echo docked presence: ${defaultStorePurchase?.presenceStatus}`);
 
@@ -5096,7 +5099,7 @@ try {
     });
   });
   assert(defaultShieldBoosterPurchase?.applied === false, "Default Shield Booster Store purchase unexpectedly applied.");
-  assert(defaultShieldBoosterPurchase?.reason === "staging_store_writes_disabled" || defaultShieldBoosterPurchase?.blockReason === "staging_store_writes_disabled", "Default Shield Booster purchase did not stay gated.");
+  assert(defaultShieldBoosterPurchase?.blockReason === "verified_identity_required" || defaultShieldBoosterPurchase?.blockReason === "trusted_save_required", `Default Shield Booster purchase did not stay identity/trusted-save gated: ${defaultShieldBoosterPurchase?.blockReason}.`);
   assert(defaultShieldBoosterPurchase?.saveWritten === false, "Default Shield Booster Store purchase reported save write.");
 
   const invalidStorePurchaseQuantity = await expectStagingStorePurchase(roomA, () => {
