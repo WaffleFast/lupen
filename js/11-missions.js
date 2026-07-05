@@ -455,6 +455,21 @@ function getChapterProgressPercent(chapterId = "frontier") {
   return Math.min(100, Math.round((summary.completedOrClaimed / Math.max(1, summary.total)) * 100));
 }
 
+function getJourneyChapterRequirementSummary(chapterId = "frontier") {
+  missionProgress = normalizeMissionProgress(missionProgress);
+  const requirements = getJourneyAssignments(chapterId).filter(assignment => {
+    const mission = assignment.mission;
+    return mission && mission.objective?.type !== "complete_missions";
+  });
+  const complete = requirements.filter(assignment => {
+    const state = missionProgress.missions[assignment.id]?.state;
+    return state === MISSION_STATE_COMPLETED || state === MISSION_STATE_CLAIMED;
+  }).length;
+  const total = requirements.length;
+  const percent = Math.min(100, Math.round((complete / Math.max(1, total)) * 100));
+  return { requirements, complete, total, percent };
+}
+
 function getJourneyMissionRows() {
   missionProgress = normalizeMissionProgress(missionProgress);
   return getJourneyAssignments("frontier").map(assignment => assignment.mission).filter(Boolean);
@@ -822,18 +837,17 @@ function renderJourneyProgressBar(current, required) {
 }
 
 function renderJourneyFrontierStatus() {
-  const activeMission = getJourneyPrimaryMission();
-  const chapterPercent = getChapterProgressPercent("frontier");
+  const requirements = getJourneyChapterRequirementSummary("frontier");
   return `
     <section class="journey-summary-panel journey-frontier-status">
-      <div class="journey-panel-head"><span>FRONTIER STATUS</span></div>
+      <div class="journey-panel-head"><span>CHAPTER PROGRESS</span></div>
       <div class="journey-summary-list">
-        ${renderJourneySummaryRow("Frontier Progress", `${formatNumber(chapterPercent)}%`)}
-        ${renderJourneySummaryRow("Active Assignment", activeMission ? getJourneyObjectiveTitle(activeMission) : "Frontier Certification")}
-        ${renderJourneySummaryRow("Next Unlock", "Frontier Certification")}
+        ${renderJourneyProgressSummaryRow("Frontier Progress", `${formatNumber(requirements.percent)}%`, requirements.percent)}
+        ${renderJourneySummaryRow("Requirements Complete", `${formatNumber(requirements.complete)} / ${formatNumber(requirements.total)}`)}
+        ${renderJourneySummaryRow("Chapter Unlock", "Frontier Certification")}
+        ${renderJourneySummaryRow("Next Route", "Locked until Frontier is complete")}
         ${renderJourneySummaryRow("Completion Unlocks", "Future route access")}
       </div>
-      <p>Morgan Note: Complete your first assignments to establish your foothold.</p>
     </section>
   `;
 }
@@ -857,6 +871,16 @@ function renderJourneySummaryRow(label, value) {
     <div class="journey-summary-row">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function renderJourneyProgressSummaryRow(label, value, percent = 0) {
+  return `
+    <div class="journey-summary-row journey-summary-row--progress">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      ${renderJourneyProgressBar(percent, 100)}
     </div>
   `;
 }

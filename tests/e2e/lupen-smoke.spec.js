@@ -5844,10 +5844,15 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen .journey-chapter-path")).not.toContainText("BORDER WORLDS");
     await expect(page.locator("#journeyScreen")).toContainText("CURRENT PATH");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier Assignments");
-    await expect(page.locator("#journeyScreen")).toContainText("FRONTIER STATUS");
-    await expect(page.locator("#journeyScreen")).toContainText("Frontier Progress");
-    await expect(page.locator("#journeyScreen")).toContainText("Active Assignment");
-    await expect(page.locator("#journeyScreen")).toContainText("Next Unlock");
+    await expect(page.locator("#journeyScreen")).toContainText("CHAPTER PROGRESS");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Progress");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Requirements Complete");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 4");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Chapter Unlock");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Certification");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Next Route");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Locked until Frontier is complete");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Active Assignment");
     await expect(page.locator("#journeyScreen")).toContainText("OVERALL GALAXY COMPLETION");
     await expect(page.locator("#journeyScreen")).toContainText("Sector Orientation");
     await expect(page.locator("#journeyScreen")).toContainText("Take the ship out and confirm your launch systems.");
@@ -5964,6 +5969,7 @@ test.describe("Lupen browser smoke", () => {
 
     await page.evaluate(() => window.landOnPlanet());
     await page.locator("#journeyHubBtn").click();
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 4");
     await page.locator("#journeyScreen button", { hasText: "Claim Reward" }).first().click();
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("claimed");
     await expect(page.evaluate(() => window.eval(`credits`))).resolves.toBe(10100);
@@ -5977,6 +5983,7 @@ test.describe("Lupen browser smoke", () => {
     `));
     expect(haulProgress.runtime).toMatchObject({ state: "completed", progress: 1 });
     expect(haulProgress.saved).toMatchObject({ state: "completed", progress: 1 });
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("2 / 4");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("CLAIM READY");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("Claim Reward");
 
@@ -5994,6 +6001,12 @@ test.describe("Lupen browser smoke", () => {
     expect(resetState.saved).toMatchObject({ state: "available", progress: 0 });
     expect(resetState.haulRuntime).toMatchObject({ state: "available", progress: 0 });
     expect(resetState.haulSaved).toMatchObject({ state: "available", progress: 0 });
+    await page.evaluate(() => {
+      showScreen("gameScreen");
+      updateHubLocation();
+      openJourney();
+    });
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 4");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

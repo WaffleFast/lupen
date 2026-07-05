@@ -44787,7 +44787,7 @@ input::placeholder {
 .journey-frontier-status {
   height: 100%;
   min-height: 0;
-  padding: 13px;
+  padding: 11px;
 }
 
 .journey-galaxy-strip {
@@ -46429,7 +46429,7 @@ input::placeholder {
 
 .journey-current-path {
   grid-column: 1;
-  grid-row: 3 / 5;
+  grid-row: 3;
   padding: 16px;
   overflow: hidden;
   border-color: rgba(107, 215, 255, 0.34);
@@ -46514,6 +46514,40 @@ input::placeholder {
   height: 100%;
   min-height: 0;
   padding: 13px;
+}
+
+.journey-side-panel {
+  grid-column: 2;
+  grid-row: 3;
+  min-height: 0;
+}
+
+.journey-frontier-status .journey-panel-head span {
+  letter-spacing: 0.14em;
+}
+
+.journey-frontier-status .journey-summary-list {
+  gap: 5px;
+}
+
+.journey-frontier-status .journey-summary-row {
+  gap: 1px;
+  padding: 5px 8px;
+}
+
+.journey-frontier-status .journey-summary-row span {
+  font-size: 0.58rem;
+}
+
+.journey-frontier-status .journey-summary-row strong {
+  font-size: 0.74rem;
+  line-height: 1.16;
+}
+
+.journey-summary-row--progress .journey-progress-track {
+  width: 100%;
+  height: 6px;
+  margin-top: 1px;
 }
 
 .journey-galaxy-strip {
