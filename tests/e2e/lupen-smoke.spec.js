@@ -5833,10 +5833,10 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("Frontier is active, Pilot.");
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER ROUTE");
     await expect(page.locator("#journeyScreen")).toContainText("Academy");
-    await expect(page.locator("#journeyScreen")).toContainText("PENDING");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toContainText("ACTIVE");
     await expect(page.locator("#journeyScreen")).toContainText("Chapter I");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier");
-    await expect(page.locator("#journeyScreen")).toContainText("ACTIVE");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toContainText("PENDING");
     await expect(page.locator("#journeyScreen")).toContainText("Chapter II");
     await expect(page.locator("#journeyScreen")).toContainText("Locked Route");
     await expect(page.locator("#journeyScreen")).toContainText("LOCKED");
@@ -5845,31 +5845,31 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("CURRENT PATH");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier Assignments");
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER PROGRESS");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Progress");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Academy Progress");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Requirements Complete");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 4");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Chapter Unlock");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Certification");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Next Route");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Locked until Frontier is complete");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 1");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Chapter Unlock");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Next Route");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Completion Unlocks");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Active Assignment");
     await expect(page.locator("#journeyScreen")).toContainText("OVERALL GALAXY COMPLETION");
     await expect(page.locator("#journeyScreen")).toContainText("Sector Orientation");
-    await expect(page.locator("#journeyScreen")).toContainText("Take the ship out and confirm your launch systems.");
+    await expect(page.locator("#journeyScreen")).toContainText("Launch from a station or planet 1 time");
     await expect(page.locator("#journeyScreen")).toContainText("0 / 1");
     await expect(page.locator("#journeyScreen .journey-chapter-path")).toHaveAttribute("data-journey-source", "JOURNEY_CHAPTERS");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).toHaveAttribute("data-journey-source", "JOURNEY_ASSIGNMENTS");
     await expect(page.locator("#journeyScreen .journey-chapter-route")).toBeVisible();
     await expect(page.locator("#journeyScreen .journey-chapter-route__viewport")).toBeVisible();
     await expect(page.locator("#journeyScreen .journey-chapter-route__track")).toBeVisible();
-    await expect(page.locator("#journeyScreen .journey-chapter-route__arrow")).toHaveCount(2);
     await expect(page.locator("#journeyScreen .journey-chapter-node")).toHaveCount(3);
-    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "pending");
-    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("data-journey-chapter-state", "active");
-    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("data-journey-chapter-state", "pending");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='next_route']")).toHaveAttribute("data-journey-chapter-state", "locked");
-    await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Chapter I");
-    await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Frontier");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--active")).toContainText("Academy");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--pending")).toContainText("Chapter I");
+    await expect(page.locator("#journeyScreen .journey-chapter-node--pending")).toContainText("Frontier");
     await expect(page.locator("#journeyScreen .journey-chapter-node--locked")).toContainText("Chapter II");
     await expect(page.locator("#journeyScreen .journey-chapter-node--locked")).toContainText("Locked Route");
     await expect(page.locator("#journeyScreen .journey-chapter-progress")).toHaveCount(0);
@@ -5887,13 +5887,17 @@ test.describe("Lupen browser smoke", () => {
         height: routeRect.height,
         trackOverflowX: trackStyles?.overflowX || "",
         trackDisplay: trackStyles?.display || "",
+        visibleArrows: Array.from(route.querySelectorAll(".journey-chapter-route__arrow")).filter(arrow => getComputedStyle(arrow).display !== "none").length,
+        visibleScrollbar: getComputedStyle(route.querySelector(".journey-chapter-route__scrollbar")).display !== "none",
         itemCount: route.querySelectorAll(".journey-chapter-route__item").length
       };
     });
-    expect(chapterRouteLayout.height).toBeGreaterThan(85);
-    expect(chapterRouteLayout.height).toBeLessThan(115);
+    expect(chapterRouteLayout.height).toBeGreaterThan(65);
+    expect(chapterRouteLayout.height).toBeLessThan(96);
     expect(chapterRouteLayout.trackDisplay).toBe("flex");
     expect(["auto", "scroll"]).toContain(chapterRouteLayout.trackOverflowX);
+    expect(chapterRouteLayout.visibleArrows).toBe(0);
+    expect(chapterRouteLayout.visibleScrollbar).toBe(false);
     expect(chapterRouteLayout.itemCount).toBe(3);
     const chapterRouteCanOverflow = await page.locator("#journeyScreen .journey-chapter-route__track").evaluate(track => {
       const previousWidth = track.style.width;
@@ -5927,11 +5931,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#journeyScreen")).toContainText("Academy guidance will open here later.");
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
+    await page.locator("#journeyScreen [data-journey-chapter-id='frontier']").click();
+    await expect(page.locator("#journeyScreen")).toContainText("Complete Academy to activate Chapter I: Frontier.");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "false");
     await page.locator("#journeyScreen [data-journey-chapter-id='next_route']").click();
     await expect(page.locator("#journeyScreen")).toContainText("Complete Frontier");
-    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
-    await page.locator("#journeyScreen [data-journey-chapter-id='frontier']").click();
-    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
     await page.evaluate(() => {
       playerProgress.academyCompleted = true;
@@ -5939,17 +5943,22 @@ test.describe("Lupen browser smoke", () => {
     });
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "complete");
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy'] .journey-chapter-route__check")).toBeVisible();
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("data-journey-chapter-state", "active");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Progress");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 4");
     await page.evaluate(() => {
       playerProgress.academyCompleted = false;
       renderJourneyScreen();
     });
-    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "pending");
-    await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(5);
-    await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(5);
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
+    await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(4);
+    await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(4);
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Sector Orientation");
-    await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("TRACKING");
-    await expect(page.locator("#journeyScreen .journey-assignment-card").nth(1)).toContainText("NOT STARTED");
+    await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("TRACKING");
+    await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("NOT STARTED");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Accept Mission");
+    await expect(page.locator("#journeyScreen .journey-assignment-icon img")).toHaveCount(4);
     await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("25 XP");
     await expect(page.locator("#journeyScreen .journey-reward-chips").first()).toContainText("100 CR");
     await expect(page.locator("#journeyScreen .journey-reward-chip--xp").first()).toContainText("25 XP");
@@ -5969,7 +5978,8 @@ test.describe("Lupen browser smoke", () => {
 
     await page.evaluate(() => window.landOnPlanet());
     await page.locator("#journeyHubBtn").click();
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 4");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='sector_orientation']")).toContainText("1 / 1");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='sector_orientation']")).toContainText("CLAIM READY");
     await page.locator("#journeyScreen button", { hasText: "Claim Reward" }).first().click();
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.sector_orientation.state`))).resolves.toBe("claimed");
     await expect(page.evaluate(() => window.eval(`credits`))).resolves.toBe(10100);
@@ -5983,7 +5993,7 @@ test.describe("Lupen browser smoke", () => {
     `));
     expect(haulProgress.runtime).toMatchObject({ state: "completed", progress: 1 });
     expect(haulProgress.saved).toMatchObject({ state: "completed", progress: 1 });
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("2 / 4");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("1 / 1");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("CLAIM READY");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("Claim Reward");
 
@@ -6006,7 +6016,9 @@ test.describe("Lupen browser smoke", () => {
       updateHubLocation();
       openJourney();
     });
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 4");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 1");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='sector_orientation']")).toContainText("0 / 1");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
