@@ -5924,6 +5924,19 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator("#journeyHubBtn").click();
     await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
+    const journeyScreenBackground = await page.locator("#journeyScreen").evaluate(screen => {
+      const styles = getComputedStyle(screen);
+      return {
+        backgroundImage: styles.backgroundImage,
+        backgroundSize: styles.backgroundSize,
+        backgroundPosition: styles.backgroundPosition,
+        backgroundRepeat: styles.backgroundRepeat
+      };
+    });
+    expect(journeyScreenBackground.backgroundImage).toContain("journey-screen-bg.png");
+    expect(journeyScreenBackground.backgroundSize).toContain("cover");
+    expect(journeyScreenBackground.backgroundPosition).toContain("50% 50%");
+    expect(journeyScreenBackground.backgroundRepeat).toBe("no-repeat, no-repeat, no-repeat");
     await expect(page.locator("#journeyScreen .journey-briefing")).toBeVisible();
     await expect(page.locator("#journeyScreen .journey-briefing__portrait-img")).toHaveAttribute("src", /morgan-command-liaison\.png/);
     const morganBriefingBg = await page.locator("#journeyScreen .journey-briefing__bg").evaluate(element => {

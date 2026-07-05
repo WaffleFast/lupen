@@ -44326,6 +44326,34 @@ input::placeholder {
   color: #eaf7ff;
 }
 
+#journeyScreen.journey-screen {
+  isolation: isolate;
+  background-color: #020712;
+  background-image:
+    radial-gradient(ellipse at 72% 44%, rgba(37, 119, 201, 0.16), transparent 46%),
+    linear-gradient(180deg, rgba(1, 7, 18, 0.28), rgba(1, 7, 18, 0.7)),
+    url("assets/journey-screen-bg.png") !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+}
+
+#journeyScreen.journey-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(1, 7, 16, 0.3), rgba(1, 7, 16, 0.08) 44%, rgba(1, 7, 16, 0.36)),
+    linear-gradient(180deg, rgba(1, 7, 16, 0.22), rgba(1, 7, 16, 0.06) 42%, rgba(1, 7, 16, 0.34));
+}
+
+#journeyScreen.journey-screen > * {
+  position: relative;
+  z-index: 1;
+}
+
 .journey-header h2 {
   letter-spacing: 0.04em;
 }
