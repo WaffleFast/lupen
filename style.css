@@ -46420,7 +46420,7 @@ input::placeholder {
 .journey-assignment-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
   max-height: calc(100% - 34px);
   overflow: auto;
   padding-right: 6px;
@@ -46428,11 +46428,11 @@ input::placeholder {
 
 .journey-assignment-card {
   position: relative;
-  min-height: 100px;
-  grid-template-columns: 44px minmax(0, 1fr);
+  min-height: 88px;
+  grid-template-columns: 38px minmax(0, 1fr);
   grid-template-rows: auto;
-  gap: 9px;
-  padding: 9px 10px;
+  gap: 8px;
+  padding: 8px 9px;
   border-color: color-mix(in srgb, var(--journey-accent, #6bd7ff) 38%, rgba(127, 214, 255, 0.14));
 }
 
@@ -46443,7 +46443,7 @@ input::placeholder {
 .journey-assignment-card .journey-objective-copy {
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .journey-assignment-card .journey-objective-top {
@@ -46456,28 +46456,28 @@ input::placeholder {
 .journey-assignment-card .journey-objective-top strong {
   min-width: 0;
   color: #ffffff;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   line-height: 1.15;
 }
 
 .journey-assignment-card .journey-status-pill {
   flex: 0 0 auto;
-  padding: 3px 7px;
-  font-size: 0.56rem;
+  padding: 3px 6px;
+  font-size: 0.53rem;
 }
 
 .journey-assignment-card .journey-objective-copy p {
   margin: 0;
   color: #d3e4ec;
-  font-size: 0.7rem;
-  line-height: 1.24;
+  font-size: 0.66rem;
+  line-height: 1.2;
 }
 
 .journey-assignment-progress-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 }
 
 .journey-assignment-progress-row .journey-progress-track {
@@ -46533,8 +46533,8 @@ input::placeholder {
 }
 
 .journey-assignment-icon {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   align-self: start;
   display: grid;
   place-items: center;

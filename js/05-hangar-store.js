@@ -1975,6 +1975,7 @@ function repairCurrentShip() {
   }
 
   addHudToast(`Hull repaired in Hangar for CR ${formatNumber(repairCost)}.`);
+  if (typeof recordMissionEvent === "function") recordMissionEvent("repair_ship", { shipId: currentShipId, cost: repairCost });
   updateSpaceHUD();
   renderHangar();
   saveGame();
@@ -4034,6 +4035,14 @@ function equipAttachmentFromInventory(key, quality = "standard", source = "owned
     applyShipStats(true);
   }
 
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("equip_attachment", {
+      key,
+      shipId: selectedHangarShipId,
+      equippedCount: loadout.attachments.length
+    });
+  }
+
   renderHangar();
   showHangarSection("overview");
   if (key === "cargoPod") tutorialEvent("equippedCargoPod");
@@ -4121,6 +4130,14 @@ function equipGunFromInventory(key, quality = "standard", source = "owned") {
     engageTimer = null;
   }
 
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("equip_guns", {
+      key,
+      shipId: selectedHangarShipId,
+      equippedCount: loadout.guns.length
+    });
+  }
+
   renderHangar();
   showHangarSection("overview");
   tutorialEvent(countEquippedGuns(selectedHangarShipId) >= 2 ? "equippedSecondGun" : "equippedFirstGun");
@@ -4196,6 +4213,7 @@ function buyShip(shipId, storeItemOverride = null) {
       selectedShipyardShipId = shipId;
       ensureShipCondition(shipId);
       applyShipStats(true);
+      if (typeof recordMissionEvent === "function") recordMissionEvent("starter_ship_claimed", { shipId, mode: "activate" });
       tutorialEvent("boughtFirstShip");
       saveGame();
     }
@@ -4234,6 +4252,10 @@ function buyShip(shipId, storeItemOverride = null) {
     applyShipStats(true);
   }
 
+  if (starterClaim && typeof recordMissionEvent === "function") {
+    recordMissionEvent("starter_ship_claimed", { shipId, mode: "claim" });
+  }
+
   renderHangar();
   showHangarSection("shipyard");
   addHudToast(`${ship.name} added to your hangar.`);
@@ -4263,6 +4285,9 @@ function equipShip(shipId) {
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   if (tutorialState?.active && getCurrentTutorialStep?.()?.id === "buy-first-ship" && shipId === starterShipId) {
     tutorialEvent("boughtFirstShip");
+  }
+  if (shipId === starterShipId && typeof recordMissionEvent === "function") {
+    recordMissionEvent("starter_ship_claimed", { shipId, mode: "activate" });
   }
   saveGame();
 }

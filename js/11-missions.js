@@ -22,6 +22,76 @@ const CHAPTERS = Object.freeze({
 
 const CHAPTER_MISSIONS = Object.freeze([
   Object.freeze({
+    id: "academy_starter_ship",
+    title: "Claim Starter Ship",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Claim or activate the starter ship.",
+    completeText: "Starter ship confirmed. You have a hull assigned and ready for launch.",
+    objective: Object.freeze({ type: "starter_ship_claimed", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
+    id: "academy_launch_ship",
+    title: "Launch Ship",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Launch from Asteron Prime.",
+    completeText: "Launch confirmed. Your flight systems are responding normally.",
+    objective: Object.freeze({ type: "launch_from_station", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
+    id: "academy_first_trade",
+    title: "Complete First Trade",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Complete one profitable trade.",
+    completeText: "First profitable trade confirmed. The station economy has your route data.",
+    objective: Object.freeze({ type: "profitable_trade", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
+    id: "academy_two_guns",
+    title: "Equip Two Guns",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Equip two guns.",
+    completeText: "Weapon loadout confirmed. You have two guns mounted.",
+    objective: Object.freeze({ type: "equip_guns", required: 2 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
+    id: "academy_attachment",
+    title: "Equip Attachment",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Equip one attachment.",
+    completeText: "Attachment installed. Your ship has an auxiliary module online.",
+    objective: Object.freeze({ type: "equip_attachment", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
+    id: "academy_erebus_bots",
+    title: "Destroy 3 Erebus Bots",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Destroy 3 Erebus bots.",
+    completeText: "Erebus bot exercise complete. Your combat telemetry is stable.",
+    objective: Object.freeze({ type: "destroy_bot", target: "erebus", required: 3 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
+    id: "academy_repair_ship",
+    title: "Repair Ship",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Repair your ship once.",
+    completeText: "Repair cycle confirmed. Maintenance systems are available when needed.",
+    objective: Object.freeze({ type: "repair_ship", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
     id: "sector_orientation",
     title: "Sector Orientation",
     chapter: "frontier",
@@ -126,6 +196,111 @@ const JOURNEY_CHAPTERS = Object.freeze([
 ]);
 
 const JOURNEY_ASSIGNMENTS = Object.freeze([
+  Object.freeze({
+    id: "academy_starter_ship",
+    chapterId: "academy",
+    journeyTitle: "Claim Starter Ship",
+    journeyShortDescription: "Claim or activate the starter ship.",
+    journeyObjectiveLabel: "Claim or activate the starter ship",
+    assignmentType: "orientation",
+    journeyTheme: "cyan",
+    icon: "navigation",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 10
+  }),
+  Object.freeze({
+    id: "academy_launch_ship",
+    chapterId: "academy",
+    journeyTitle: "Launch Ship",
+    journeyShortDescription: "Launch from Asteron Prime.",
+    journeyObjectiveLabel: "Launch from Asteron Prime",
+    assignmentType: "orientation",
+    journeyTheme: "cyan",
+    icon: "navigation",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 20
+  }),
+  Object.freeze({
+    id: "academy_first_trade",
+    chapterId: "academy",
+    journeyTitle: "Complete First Trade",
+    journeyShortDescription: "Complete one profitable trade.",
+    journeyObjectiveLabel: "Complete one profitable trade",
+    assignmentType: "trade",
+    journeyTheme: "gold",
+    icon: "cargo",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 30
+  }),
+  Object.freeze({
+    id: "academy_two_guns",
+    chapterId: "academy",
+    journeyTitle: "Equip Two Guns",
+    journeyShortDescription: "Equip two guns.",
+    journeyObjectiveLabel: "Equip two guns",
+    assignmentType: "combat",
+    journeyTheme: "orange",
+    icon: "combat",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 40
+  }),
+  Object.freeze({
+    id: "academy_attachment",
+    chapterId: "academy",
+    journeyTitle: "Equip Attachment",
+    journeyShortDescription: "Equip one attachment.",
+    journeyObjectiveLabel: "Equip one attachment",
+    assignmentType: "resource",
+    journeyTheme: "teal",
+    icon: "resource",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 50
+  }),
+  Object.freeze({
+    id: "academy_erebus_bots",
+    chapterId: "academy",
+    journeyTitle: "Destroy 3 Erebus Bots",
+    journeyShortDescription: "Destroy 3 Erebus bots.",
+    journeyObjectiveLabel: "Destroy 3 Erebus bots",
+    assignmentType: "combat",
+    journeyTheme: "orange",
+    icon: "combat",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 60
+  }),
+  Object.freeze({
+    id: "academy_repair_ship",
+    chapterId: "academy",
+    journeyTitle: "Repair Ship",
+    journeyShortDescription: "Repair your ship once.",
+    journeyObjectiveLabel: "Repair your ship once",
+    assignmentType: "certification",
+    journeyTheme: "purple",
+    icon: "certification",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 70
+  }),
   Object.freeze({
     id: "sector_orientation",
     chapterId: "frontier",
@@ -292,8 +467,10 @@ function isJourneyChapterAssignment(missionOrId) {
 function canProgressMissionFromEvent(mission, state, progress = missionProgress) {
   if (!mission || !state) return false;
   if ([MISSION_STATE_COMPLETED, MISSION_STATE_CLAIMED].includes(state.state)) return false;
+  if (isJourneyChapterAssignment(mission) && mission.chapter !== getJourneyActiveChapterId()) return false;
   if (state.state === MISSION_STATE_ACTIVE) return true;
-  return state.state === MISSION_STATE_AVAILABLE && isJourneyChapterAssignment(mission) && isMissionAvailable(mission.id, progress);
+  if (!isJourneyChapterAssignment(mission)) return false;
+  return state.state === MISSION_STATE_AVAILABLE && isMissionAvailable(mission.id, progress);
 }
 
 function getMissionRequiredAmount(mission) {
@@ -314,6 +491,10 @@ function getMissionObjectiveLabel(mission) {
   if (mission.objective.type === "profitable_trade") return `Complete ${required} profitable cargo sale`;
   if (mission.objective.type === "recover_resource") return `Recover ${formatNumber(required)} cargo from mining or salvage`;
   if (mission.objective.type === "destroy_bot") return `Destroy ${formatNumber(required)} Erebus bot${required === 1 ? "" : "s"}`;
+  if (mission.objective.type === "starter_ship_claimed") return "Claim or activate the starter ship";
+  if (mission.objective.type === "equip_guns") return `Equip ${formatNumber(required)} gun${required === 1 ? "" : "s"}`;
+  if (mission.objective.type === "equip_attachment") return `Equip ${formatNumber(required)} attachment${required === 1 ? "" : "s"}`;
+  if (mission.objective.type === "repair_ship") return "Repair your ship once";
   if (mission.objective.type === "complete_missions") return `Complete ${formatNumber(required)} Frontier readiness missions`;
   if (mission.objective.type === "credits_milestone") return `Reach CR ${formatNumber(required)}`;
   if (mission.objective.type === "upgrade_item") return `Upgrade ${formatNumber(required)} weapon or item`;
@@ -417,6 +598,8 @@ function recordMissionEvent(eventType, payload = {}) {
 
     const increment = eventType === "recover_resource"
       ? Math.max(1, Math.round(Number(payload.amount || payload.quantity || 1)))
+      : eventType === "equip_guns" || eventType === "equip_attachment"
+        ? Math.max(1, Math.round(Number(payload.count || payload.equippedCount || payload.amount || 1)))
       : 1;
     state.progress = Math.min(getMissionRequiredAmount(mission), Math.max(0, Number(state.progress || 0)) + increment);
     changed = true;
@@ -464,10 +647,6 @@ function getChapterProgressPercent(chapterId = "frontier") {
 
 function getJourneyChapterRequirementSummary(chapterId = "frontier") {
   missionProgress = normalizeMissionProgress(missionProgress);
-  if (chapterId === "academy") {
-    const complete = isJourneyAcademyComplete() ? 1 : 0;
-    return { requirements: [], complete, total: 1, percent: complete ? 100 : 0 };
-  }
   const requirements = getJourneyAssignments(chapterId).filter(assignment => {
     const mission = assignment.mission;
     return mission && mission.objective?.type !== "complete_missions";
@@ -483,7 +662,7 @@ function getJourneyChapterRequirementSummary(chapterId = "frontier") {
 
 function getJourneyMissionRows() {
   missionProgress = normalizeMissionProgress(missionProgress);
-  return getJourneyAssignments("frontier").map(assignment => assignment.mission).filter(Boolean);
+  return getJourneyAssignments(getJourneyActiveChapterId()).map(assignment => assignment.mission).filter(Boolean);
 }
 
 function getJourneyAssignments(chapterId = "frontier") {
@@ -536,6 +715,10 @@ function getJourneyActiveChapter() {
   return JOURNEY_CHAPTERS.find(chapter => chapter.id === activeId) || JOURNEY_CHAPTERS[0];
 }
 
+function getJourneyChapterAssignmentTitle(chapterId = getJourneyActiveChapterId()) {
+  return chapterId === "academy" ? "Academy Assignments" : "Frontier Assignments";
+}
+
 function syncSelectedJourneyChapter() {
   const activeId = getJourneyActiveChapterId();
   const selected = JOURNEY_CHAPTERS.find(chapter => chapter.id === selectedJourneyChapterId);
@@ -561,6 +744,9 @@ function renderJourneyScreen() {
   if (title) title.textContent = String(currentNode || "Asteron Prime").toUpperCase();
   if (!body) return;
   syncSelectedJourneyChapter();
+  const activeChapterId = getJourneyActiveChapterId();
+  const activeAssignments = getJourneyAssignments(activeChapterId)
+    .filter(assignment => assignment.mission?.objective?.type !== "complete_missions");
 
   body.innerHTML = `
     ${renderJourneyMorganBriefing()}
@@ -568,9 +754,9 @@ function renderJourneyScreen() {
     <section class="journey-objectives-panel journey-current-path">
       <div class="journey-panel-head">
         <span>CURRENT PATH</span>
-        <strong>Frontier Assignments</strong>
+        <strong>${escapeHtml(getJourneyChapterAssignmentTitle(activeChapterId))}</strong>
       </div>
-      ${renderJourneyAssignments(getJourneyAssignments("frontier").filter(assignment => assignment.mission?.objective?.type !== "complete_missions"))}
+      ${renderJourneyAssignments(activeAssignments)}
     </section>
     <aside class="journey-side-panel">${renderJourneyFrontierStatus()}</aside>
     ${renderJourneyGalaxyCompletion()}
@@ -648,12 +834,20 @@ function getJourneyChapterStatusLabel(chapter) {
 }
 
 function isJourneyAcademyComplete() {
-  // Future Academy wiring can set any of these without changing the route UI.
-  return Boolean(
+  if (
     playerProgress?.academyCompleted ||
     playerProgress?.chapterProgress?.academy?.completed ||
     missionProgress?.academy?.completed
-  );
+  ) {
+    return true;
+  }
+  const academyAssignments = JOURNEY_ASSIGNMENTS.filter(assignment => assignment.chapterId === "academy");
+  if (!academyAssignments.length) return false;
+  const states = missionProgress?.missions || {};
+  return academyAssignments.every(assignment => {
+    const state = states[assignment.id]?.state;
+    return state === MISSION_STATE_COMPLETED || state === MISSION_STATE_CLAIMED;
+  });
 }
 
 function getJourneyChapterRouteState(chapter) {
@@ -713,7 +907,7 @@ function selectJourneyChapterRoute(id) {
       : "This chapter is not active yet.";
   } else if (id === "academy") {
     selectedJourneyChapterId = id;
-    journeyChapterRouteMessage = "Academy guidance will open here later.";
+    journeyChapterRouteMessage = "";
   } else {
     selectedJourneyChapterId = id;
     journeyChapterRouteMessage = "";
@@ -744,7 +938,7 @@ function updateJourneyChapterRouteScroll() {
 }
 
 function renderJourneyObjectiveRows() {
-  return renderJourneyAssignments(getJourneyAssignments("frontier"));
+  return renderJourneyAssignments(getJourneyAssignments(getJourneyActiveChapterId()));
 }
 
 function renderJourneyAssignments(assignments) {
@@ -802,7 +996,9 @@ function renderJourneyAssignmentCard(assignment) {
   const uiState = getJourneyAssignmentUiState(assignment, mission, state, locked);
   const requiresAccept = assignment.requiresAccept !== false;
   const canAccept = requiresAccept && state?.state === MISSION_STATE_AVAILABLE && !locked;
-  const canClaim = state?.state === MISSION_STATE_COMPLETED;
+  const rewards = assignment.rewards || mission.reward || {};
+  const hasReward = Math.max(0, Number(rewards.xp || 0)) > 0 || Math.max(0, Number(rewards.credits || 0)) > 0;
+  const canClaim = state?.state === MISSION_STATE_COMPLETED && hasReward;
   const action = canClaim
     ? `<button type="button" onclick="claimMissionReward('${escapeJsString(mission.id)}')">Claim Reward</button>`
     : canAccept
@@ -817,13 +1013,13 @@ function renderJourneyAssignmentCard(assignment) {
       <div class="journey-objective-copy">
         <div class="journey-objective-top">
           <strong>${escapeHtml(assignment.journeyTitle)}</strong>
-          ${renderJourneyAssignmentStatePill(uiState)}
+          ${renderJourneyAssignmentStatePill(uiState, hasReward)}
         </div>
         <p>${escapeHtml(assignment.journeyObjectiveLabel)}</p>
         <div class="journey-assignment-progress-row">
           ${renderJourneyProgressBar(progress, required)}
           <b>${formatNumber(progress)} / ${formatNumber(required)}</b>
-          ${renderJourneyRewardChips(assignment.rewards || mission.reward)}
+          ${renderJourneyRewardChips(rewards)}
         </div>
         ${action ? `<div class="journey-objective-action">${action}</div>` : ""}
       </div>
@@ -837,12 +1033,17 @@ function getJourneyAssignmentIconSrc(assignment) {
   if (icon === "cargo" || icon === "trade") return "assets/journey-assignment-cargo.png";
   if (icon === "resource") return "assets/journey-assignment-resource.png";
   if (icon === "combat") return "assets/journey-assignment-combat.png";
+  if (icon === "certification") return "assets/journey-assignment-resource.png";
   return "assets/journey-assignment-launch.png";
 }
 
-function renderJourneyAssignmentStatePill(state) {
+function renderJourneyAssignmentStatePill(state, hasReward = true) {
   const normalized = String(state || "").toLowerCase();
-  if (normalized === "claimable") return renderJourneyStatusPill("claimable");
+  if (normalized === "claimable") {
+    return hasReward
+      ? renderJourneyStatusPill("claimable")
+      : renderJourneyStatusPill("completed");
+  }
   if (normalized === "claimed") return renderJourneyStatusPill("claimed");
   if (normalized === "locked") return renderJourneyStatusPill("locked");
   return "";
@@ -874,6 +1075,7 @@ function renderJourneyRewardChips(rewards = {}) {
   const chips = [];
   if (xp > 0) chips.push(`<span class="journey-reward-chip journey-reward-chip--xp">${formatNumber(xp)} XP</span>`);
   if (credits > 0) chips.push(`<span class="journey-reward-chip journey-reward-chip--credits">${formatNumber(credits)} CR</span>`);
+  if (!chips.length) return "";
   return `<div class="journey-reward-chips">${chips.join("")}</div>`;
 }
 
