@@ -183,15 +183,17 @@ function getLastStagingShipEquipResult(itemId = "") {
 }
 
 function getStagingStorePreviewLine(result) {
-  if (!result) return "Server preview pending. No CR or inventory changed.";
+  if (!result) return "Server validation pending.";
   if (result.applied) return `${result.name || "Store item"} purchased.`;
   if (result.wouldPass) return "Would pass server Store validation.";
-  if (result.blockReason === "insufficient_credits") return "Blocked: not enough credits.";
+  if (result.blockReason === "insufficient_credits") return "Not enough credits.";
   if (result.blockReason === "unknown_store_item") return "Server preview unavailable.";
-  if (result.blockReason === "invalid_store_quantity") return "Blocked: invalid quantity.";
+  if (result.blockReason === "invalid_store_quantity") return "Invalid quantity.";
+  if (result.blockReason === "store_station_required" || result.blockReason === "store_station_mismatch") return "You must be docked at this station.";
   if (result.blockReason === "store_item_preview_only" || result.reason === "store_item_preview_only") return "This item is preview-only in staging.";
-  if (result.reason === "staging_store_dry_run_enabled") return "Dry run only - no CR or Store ownership changed.";
-  return `Blocked: ${result.blockReason || result.reason || "validation unavailable"}.`;
+  if (result.reason === "staging_store_dry_run_enabled") return "Server purchase is not enabled.";
+  if (result.reason === "staging_store_writes_disabled") return "Server purchase is not enabled.";
+  return result.userReason || `Server purchase failed - try again.`;
 }
 
 function renderStagingStorePreviewNote(item) {
@@ -199,10 +201,10 @@ function renderStagingStorePreviewNote(item) {
   const itemId = getStagingStoreItemId(item);
   const result = itemId ? getLastMatchingStagingStorePreview(itemId) : null;
   if (!itemId) {
-    return `<div class="store-detail-owned-line">Server preview unavailable. Real Store purchase is blocked in MP staging.</div>`;
+    return `<div class="store-detail-owned-line">Server purchase unavailable for this item.</div>`;
   }
   if (!result) {
-    return `<div class="store-detail-owned-line">MP staging Store: server-backed validation. Writes require live Colyseus gates.</div>`;
+    return `<div class="store-detail-owned-line">Server-backed purchase validation is ready.</div>`;
   }
   const source = result.validationMode === "trusted_save"
     ? "trusted save"
@@ -221,7 +223,7 @@ function renderStagingStorePreviewNote(item) {
       <strong>${escapeHtml(getStagingStorePreviewLine(result))}</strong> /
       ${escapeHtml(creditLine)} /
       ${escapeHtml(source)} /
-      ${escapeHtml(result.applied ? "Server save refreshed after applied purchase." : "Dry run only - no CR, inventory, ships, equipment, saves, loot, or bounties changed.")}${escapeHtml(ownedLine)}
+      ${escapeHtml(result.applied ? "Inventory updated." : "Purchase will only apply after server confirmation.")}${escapeHtml(ownedLine)}
     </div>`;
 }
 
@@ -230,13 +232,72 @@ function isStagingStoreWritableItem(item) {
   return Boolean(itemId);
 }
 
+function getMultiplayerStagingStoreNodeName() {
+  if (!isMultiplayerStagingStoreActive()) return "";
+  const status = getMultiplayerStagingStoreStatus();
+  return String(status.playerServerNode || status.currentNode || currentNode || lastPlanetNode || "Asteron Prime");
+}
+
+function getMultiplayerStagingStorePresenceStatus() {
+  if (!isMultiplayerStagingStoreActive()) return "";
+  const status = getMultiplayerStagingStoreStatus();
+  return String(status.presenceStatus || "docked") === "docked" ? "docked" : "space";
+}
+
+function applyStagingStorePurchaseResultToLocalState(result) {
+  if (!result?.applied) return false;
+  const kind = String(result.localKind || "");
+  const key = String(result.localKey || "");
+  if (!kind || !key) return false;
+
+  if (Number.isFinite(Number(result.creditsAfter))) {
+    credits = Math.max(0, Math.floor(Number(result.creditsAfter)));
+  }
+
+  const nextOwnedCount = Number.isFinite(Number(result.itemAfter))
+    ? Math.max(0, Math.floor(Number(result.itemAfter)))
+    : null;
+  const storeItem = getStoreCatalogItem(kind, key) || { kind, key, id: `${kind}:${key}`, basePrice: Number(result.unitPrice || 0) };
+
+  if (kind === "gun") {
+    ownedGuns[key] = nextOwnedCount ?? Math.max(0, Number(ownedGuns[key] || 0)) + 1;
+    recordStorePurchase(storeItem);
+    tutorialEvent("boughtStoreGun");
+    tutorialEvent("boughtEquipment");
+  } else if (kind === "attachment") {
+    ownedAttachments[key] = nextOwnedCount ?? Math.max(0, Number(ownedAttachments[key] || 0)) + 1;
+    recordStorePurchase(storeItem);
+    if (key === "evasionMatrix") tutorialEvent("boughtStoreEvasionMatrix");
+    tutorialEvent("boughtStoreAttachment");
+    tutorialEvent("boughtEquipment");
+  } else if (kind === "material") {
+    upgradeMaterials[key] = nextOwnedCount ?? Math.max(0, Number(upgradeMaterials?.[key] || 0)) + 1;
+    recordStorePurchase(storeItem);
+  } else if (kind === "core") {
+    const existingCount = getStoreItemInventoryCount({ kind: "core", key }, "core");
+    const targetCount = nextOwnedCount ?? existingCount + 1;
+    for (let index = existingCount; index < targetCount; index += 1) {
+      addInventoryItem({ id: `store-${key}-${Date.now()}-${index}`, key, quality: "core" });
+    }
+    recordStorePurchase(storeItem);
+  } else if (kind === "ship") {
+    if (!ownedShips.includes(key)) ownedShips.push(key);
+    shipLoadouts[key] = normalizeShipLoadout(shipLoadouts[key] || { attachments: [], guns: [] }, key);
+    recordStorePurchase(storeItem);
+    tutorialEvent("boughtShip");
+  }
+
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  return true;
+}
+
 function getStagingCargoPodEquipLine(result) {
   if (!result) return "Cargo Pod equip preview pending.";
   if (result.applied) return "Cargo Pod equipped.";
   if (result.mode === "dry_run" && result.ok) return "Would equip Cargo Pod.";
   if (result.blockReason === "cargo_pod_not_owned") return "Blocked: no owned Cargo Pod.";
   if (result.blockReason === "attachment_slots_full") return "Blocked: no empty equipment slot.";
-  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - loadout not changed.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Server apply is not enabled.";
   return `Blocked: ${result.blockReason || result.reason || "loadout unavailable"}.`;
 }
 
@@ -252,7 +313,7 @@ function renderStagingCargoPodEquipNote(item) {
   return `
     <div class="store-detail-owned-line">
       <strong>${escapeHtml(getStagingCargoPodEquipLine(result))}</strong>${escapeHtml(capacityLine)}${escapeHtml(ownedLine)} /
-      ${escapeHtml(result?.applied ? "Server save refreshed after applied equip." : "Dry run only - no loadout, inventory, credits, ships, weapons, loot, or bounties changed.")}
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied equip." : "Equip will only apply after server confirmation.")}
     </div>`;
 }
 
@@ -262,7 +323,7 @@ function getStagingShieldBoosterEquipLine(result) {
   if (result.mode === "dry_run" && result.ok) return "Would equip Shield Booster.";
   if (result.blockReason === "shield_booster_not_owned") return "Blocked: no owned Shield Booster.";
   if (result.blockReason === "attachment_slots_full") return "Blocked: no empty equipment slot.";
-  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - loadout not changed.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Server apply is not enabled.";
   return `Blocked: ${result.blockReason || result.reason || "loadout unavailable"}.`;
 }
 
@@ -278,7 +339,7 @@ function renderStagingShieldBoosterEquipNote(item) {
   return `
     <div class="store-detail-owned-line">
       <strong>${escapeHtml(getStagingShieldBoosterEquipLine(result))}</strong>${escapeHtml(shieldLine)}${escapeHtml(ownedLine)} /
-      ${escapeHtml(result?.applied ? "Server save refreshed after applied shield equip." : "Dry run only - no loadout, inventory, credits, ships, weapons, loot, or bounties changed.")}
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied shield equip." : "Equip will only apply after server confirmation.")}
     </div>`;
 }
 
@@ -288,7 +349,7 @@ function getStagingPulseLaserEquipLine(result) {
   if (result.mode === "dry_run" && result.ok) return "Would equip Pulse Laser.";
   if (result.blockReason === "pulse_laser_not_owned") return "Blocked: no owned Pulse Laser.";
   if (result.blockReason === "gun_slots_full") return "Blocked: no empty gun slot.";
-  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - loadout not changed.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Server apply is not enabled.";
   return `Blocked: ${result.blockReason || result.reason || "loadout unavailable"}.`;
 }
 
@@ -306,7 +367,7 @@ function renderStagingPulseLaserEquipNote(item) {
   return `
     <div class="store-detail-owned-line">
       <strong>${escapeHtml(getStagingPulseLaserEquipLine(result))}</strong>${escapeHtml(slotLine)}${escapeHtml(ownedLine)} /
-      ${escapeHtml(result?.applied ? "Server save refreshed after applied weapon equip." : "Dry run only - no loadout, inventory, credits, ships, attachments, loot, or bounties changed.")}
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied weapon equip." : "Equip will only apply after server confirmation.")}
     </div>`;
 }
 
@@ -316,7 +377,7 @@ function getStagingShipEquipLine(result, shipName = "Ship") {
   if (result.mode === "dry_run" && result.ok) return `Would fly ${shipName}.`;
   if (result.blockReason === "ship_not_owned") return `Blocked: ${shipName} is not owned.`;
   if (result.blockReason === "ship_already_equipped") return `${shipName} already active.`;
-  if (result.reason === "staging_loadout_dry_run_enabled") return "Dry run only - active ship not changed.";
+  if (result.reason === "staging_loadout_dry_run_enabled") return "Server ship selection is not enabled.";
   return `Blocked: ${result.blockReason || result.reason || "ship selection unavailable"}.`;
 }
 
@@ -334,7 +395,7 @@ function renderStagingShipEquipNote(item) {
   return `
     <div class="store-detail-owned-line">
       <strong>${escapeHtml(getStagingShipEquipLine(result, shipName))}</strong>${escapeHtml(shipLine)}${escapeHtml(capacityLine)} /
-      ${escapeHtml(result?.applied ? "Server save refreshed after applied ship selection." : "Dry run only - no loadout, cargo, weapons, equipment, loot, or bounties changed.")}
+      ${escapeHtml(result?.applied ? "Server save refreshed after applied ship selection." : "Ship selection will only apply after server confirmation.")}
     </div>`;
 }
 
@@ -537,8 +598,13 @@ async function requestStagingStorePurchase(item) {
   if (multiplayerStagingStorePurchasePending) return true;
   multiplayerStagingStorePurchasePending = true;
   renderStore();
-  client.purchaseStagingStoreItem({ itemId, quantity: 1 });
-  if (typeof addHudToast === "function") addHudToast("Requested MP staging Store purchase.");
+  client.purchaseStagingStoreItem({
+    itemId,
+    quantity: 1,
+    currentNode: getMultiplayerStagingStoreNodeName(),
+    presenceStatus: getMultiplayerStagingStorePresenceStatus()
+  });
+  if (typeof addHudToast === "function") addHudToast("Purchase requested.");
   (async () => {
     const latest = await waitForMultiplayerStagingResult(
       () => client.getStatus?.().lastStagingStorePurchase,
@@ -546,6 +612,7 @@ async function requestStagingStorePurchase(item) {
     );
     multiplayerStagingStorePurchasePending = false;
     if (latest?.itemId === itemId && latest.applied) {
+      applyStagingStorePurchaseResultToLocalState(latest);
       const spent = Number.isFinite(Number(latest.creditsBefore)) && Number.isFinite(Number(latest.creditsAfter))
         ? ` CR ${formatNumber(Math.max(0, Number(latest.creditsBefore) - Number(latest.creditsAfter)))} spent.`
         : "";
@@ -564,9 +631,28 @@ async function requestStagingStorePurchase(item) {
         }
       }
     } else if (latest?.itemId === itemId) {
-      const reason = latest.userReason || latest.blockReason || latest.reason || "Store validation unavailable";
+      const reason = latest.userReason || latest.blockReason || latest.reason || "Server purchase failed - try again.";
       if (typeof addHudToast === "function") addHudToast(`Purchase blocked: ${reason}`);
       if (typeof addActivityLog === "function") addActivityLog(`MP staging purchase blocked: ${reason}`);
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn("[Lupen multiplayer] staging Store purchase blocked", {
+          itemId,
+          reason,
+          blockReason: latest.blockReason || "",
+          serverReason: latest.reason || "",
+          currentNode: latest.currentNode || "",
+          requestedNode: latest.requestedNode || "",
+          presenceStatus: latest.presenceStatus || "",
+          gates: latest.gates || null
+        });
+      }
+    } else {
+      const reason = "Server purchase failed - try again.";
+      if (typeof addHudToast === "function") addHudToast(reason);
+      if (typeof addActivityLog === "function") addActivityLog(`MP staging purchase failed: ${itemId}.`);
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn("[Lupen multiplayer] staging Store purchase timed out", { itemId });
+      }
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
@@ -589,8 +675,13 @@ function requestStagingStorePurchasePreview(item) {
     requestMultiplayerStagingStoreItemsIfNeeded();
     return true;
   }
-  client.previewStagingStorePurchase({ itemId, quantity: 1 });
-  if (typeof addHudToast === "function") addHudToast("Requested MP staging Store server preview.");
+  client.previewStagingStorePurchase({
+    itemId,
+    quantity: 1,
+    currentNode: getMultiplayerStagingStoreNodeName(),
+    presenceStatus: getMultiplayerStagingStorePresenceStatus()
+  });
+  if (typeof addHudToast === "function") addHudToast("Requested Store server validation.");
   return true;
 }
 
@@ -3529,7 +3620,8 @@ function renderStore() {
     if (pulseItem) selectedStoreItemId = pulseItem.id;
   }
 
-  const node = sectorNodes[currentNode] || sectorNodes[lastPlanetNode] || { name: "Asteron Prime" };
+  const stagingNodeName = getMultiplayerStagingStoreNodeName();
+  const node = sectorNodes[stagingNodeName] || sectorNodes[currentNode] || sectorNodes[lastPlanetNode] || { name: "Asteron Prime" };
   const title = document.getElementById("storeLocationTitle");
   if (title) title.textContent = String(node.name || "Asteron Prime").toUpperCase();
 
@@ -3706,8 +3798,8 @@ function renderStoreDetail() {
     (item.kind === "gun" || item.kind === "attachment") &&
     totalOwned > 0;
   const stagingPreviewButton = stagingStoreItemId
-    ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Staging Purchase") : "Server Preview") : "Sold Out"}</button>`
-    : `<button class="store-detail-buy-action" disabled>Server preview unavailable</button>`;
+    ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Purchase") : "Validate") : "Sold Out"}</button>`
+    : `<button class="store-detail-buy-action" disabled>Purchase unavailable</button>`;
 
   if (item.kind === "material") {
     buyButton = stagingStoreLocked
@@ -3779,6 +3871,17 @@ function storeBuySelected() {
   const item = getStoreSelectedItem();
   if (!item) return;
   if (isMultiplayerStagingStoreActive()) {
+    const unlock = item.kind === "gun" || item.kind === "attachment"
+      ? getEquipmentUnlockStatus(item.kind === "gun" ? "guns" : "attachments", item.key)
+      : item.kind === "ship"
+        ? getShipUnlockStatus(item.key)
+        : null;
+    if (unlock?.locked) {
+      const message = unlock.message || "Item locked.";
+      if (typeof addHudToast === "function") addHudToast(message);
+      else alert(message);
+      return;
+    }
     requestStagingStorePurchase(item);
     return;
   }

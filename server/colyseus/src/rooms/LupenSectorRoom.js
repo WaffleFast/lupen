@@ -513,6 +513,60 @@ function logStagingTradeWriteBlocked({
   });
 }
 
+function getStagingStoreWriteBlockUserReason(reason = "") {
+  const labels = {
+    staging_store_writes_disabled: "Server purchase is not enabled.",
+    staging_store_dry_run_enabled: "Server purchase is not enabled.",
+    verified_identity_required: "Verified staging identity required.",
+    staging_store_write_allowlist_missing: "Store write allowlist is missing.",
+    player_not_in_staging_store_write_allowlist: "This verified player is not allowlisted for staging Store purchases.",
+    staging_mode_required_for_store_write: "The room join mode is not staging.",
+    store_item_not_allowed: "Item locked.",
+    store_item_preview_only: "Item locked.",
+    invalid_store_quantity: "Invalid quantity.",
+    unknown_store_item: "Item locked.",
+    insufficient_credits: "Not enough credits.",
+    store_station_required: "You must be docked at this station.",
+    store_station_mismatch: "You must be docked at this station.",
+    trusted_save_required: "Server purchase failed - try again.",
+    player_save_missing: "Server purchase failed - try again.",
+    player_save_read_failed: "Server purchase failed - try again.",
+    player_save_patch_failed: "Server purchase failed - try again.",
+    store_write_unavailable: "Server purchase failed - try again."
+  };
+  return labels[reason] || "Server purchase failed - try again.";
+}
+
+function logStagingStoreWriteBlocked({
+  reason = "",
+  preview = {},
+  identity = {},
+  player = null,
+  itemId = "",
+  quantity = 0,
+  requestedNode = ""
+} = {}) {
+  const gates = preview.gates || {};
+  console.warn("[lupen staging store] purchase blocked", {
+    reason,
+    itemId: getStringValue(itemId),
+    quantity: Number(quantity) || 0,
+    authStatus: identity.authStatus || "guest",
+    trustedPlayerIdPresent: !!identity.trustedPlayerId,
+    playerIdPresent: !!identity.playerId,
+    roomMode: player?.multiplayerMode || "",
+    writeEnabled: gates.writeEnabled === true,
+    dryRun: gates.dryRun === true,
+    scope: gates.scope || "",
+    allowlisted: gates.allowlisted === true,
+    trustedSaveAvailable: gates.trustedSaveAvailable === true,
+    itemAllowed: gates.itemAllowed === true,
+    currentNode: player?.currentNode || "",
+    requestedNode: getStringValue(requestedNode),
+    presenceStatus: player?.presenceStatus || ""
+  });
+}
+
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -1551,6 +1605,16 @@ export class LupenSectorRoom extends Room {
 
     this.onMessage("stagingStore:previewPurchase", async (client, message = {}) => {
       const player = this.touchPlayer(client.sessionId);
+      const requestedNode = getStringValue(message?.currentNode)
+        || getStringValue(message?.playerSnapshot?.currentNode);
+      if (requestedNode && KNOWN_SECTOR_NODES.has(requestedNode) && player?.multiplayerMode === "staging") {
+        player.currentNode = requestedNode;
+      }
+      const requestedPresenceStatus = getStringValue(message?.presenceStatus)
+        || getStringValue(message?.playerSnapshot?.presenceStatus);
+      if ((requestedPresenceStatus === "docked" || requestedPresenceStatus === "space") && player?.multiplayerMode === "staging") {
+        player.presenceStatus = requestedPresenceStatus;
+      }
       const trustedState = await fetchPlayerTradeValidationState({
         authStatus: player?.authStatus || "guest",
         trustedPlayerId: player?.trustedPlayerId || "",
@@ -1564,6 +1628,9 @@ export class LupenSectorRoom extends Room {
       });
       client.send("stagingStore:previewResult", {
         ...preview,
+        currentNode: player?.currentNode || "",
+        requestedNode,
+        presenceStatus: player?.presenceStatus || "",
         sessionId: client.sessionId,
         receivedAt: Date.now()
       });
@@ -3462,6 +3529,19 @@ export class LupenSectorRoom extends Room {
     const item = getStagingStoreItemById(itemId);
     const requestedQuantity = Number(message?.quantity);
     const storeWriteQuantityValid = Number.isFinite(requestedQuantity) && Math.floor(requestedQuantity) === 1;
+    const requestedNode = getStringValue(message?.currentNode)
+      || getStringValue(message?.playerSnapshot?.currentNode);
+    if (requestedNode && KNOWN_SECTOR_NODES.has(requestedNode) && player?.multiplayerMode === "staging") {
+      player.currentNode = requestedNode;
+    }
+    const requestedPresenceStatus = getStringValue(message?.presenceStatus)
+      || getStringValue(message?.playerSnapshot?.presenceStatus);
+    if ((requestedPresenceStatus === "docked" || requestedPresenceStatus === "space") && player?.multiplayerMode === "staging") {
+      player.presenceStatus = requestedPresenceStatus;
+    }
+    const playerNode = getStringValue(player?.currentNode);
+    const playerPresenceStatus = getStringValue(player?.presenceStatus || "space");
+    const stationValid = playerPresenceStatus === "docked" && !!playerNode;
     const trustedState = await fetchPlayerTradeValidationState({
       authStatus: identity.authStatus,
       trustedPlayerId: identity.trustedPlayerId,
@@ -3508,6 +3588,9 @@ export class LupenSectorRoom extends Room {
       saveWritten: false,
       lootWritten: false,
       bountyWritten: false,
+      currentNode: playerNode,
+      requestedNode,
+      presenceStatus: playerPresenceStatus,
       sessionId: client.sessionId,
       receivedAt: Date.now()
     };
@@ -3522,6 +3605,7 @@ export class LupenSectorRoom extends Room {
       gates.allowlisted === true &&
       gates.trustedSaveAvailable === true &&
       gates.itemAllowed === true &&
+      stationValid &&
       player?.multiplayerMode === "staging";
 
     if (canAttemptWrite) {
@@ -3531,6 +3615,17 @@ export class LupenSectorRoom extends Room {
         quantity: message?.quantity,
         trustedState
       });
+      if (writeResult?.applied !== true) {
+        logStagingStoreWriteBlocked({
+          reason: writeResult?.blockReason || writeResult?.reason || writeResult?.debugReason || "store_write_unavailable",
+          preview: { ...preview, gates },
+          identity,
+          player,
+          itemId,
+          quantity: message?.quantity,
+          requestedNode
+        });
+      }
 
       client.send("stagingStore:purchaseResult", {
         ...baseResult,
@@ -3539,31 +3634,49 @@ export class LupenSectorRoom extends Room {
         validationMode: writeResult.validationMode || preview.validationMode,
         trustedStateAvailable: true,
         snapshotUsed: false,
+        userReason: writeResult.applied === true
+          ? ""
+          : writeResult.userReason || getStagingStoreWriteBlockUserReason(writeResult.blockReason || writeResult.reason),
+        currentNode: playerNode,
+        requestedNode,
+        presenceStatus: playerPresenceStatus,
         sessionId: client.sessionId,
         receivedAt: Date.now()
       });
       return;
     }
 
-    const previewOnlyReason = !storeWriteQuantityValid
-      ? "invalid_store_quantity"
-      : item && !STAGING_STORE_WRITE_ITEM_IDS.has(item.itemId)
-      ? "store_item_preview_only"
-      : player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun
-        ? "staging_mode_required_for_store_write"
-        : !gates.writeEnabled
-          ? "staging_store_writes_disabled"
-          : gates.dryRun
-            ? "staging_store_dry_run_enabled"
-            : !gates.verified
-              ? "verified_identity_required"
-              : !gates.allowlisted
-                ? envGate.scope === "allowlist" && !envGate.allowlistPresent
-                  ? "staging_store_write_allowlist_missing"
-                  : "player_not_in_staging_store_write_allowlist"
-                : !gates.itemAllowed
-                  ? "store_item_not_allowed"
-                  : preview.blockReason || "store_write_unavailable";
+    let previewOnlyReason = preview.blockReason || "store_write_unavailable";
+    if (!storeWriteQuantityValid) {
+      previewOnlyReason = "invalid_store_quantity";
+    } else if (item && !STAGING_STORE_WRITE_ITEM_IDS.has(item.itemId)) {
+      previewOnlyReason = "store_item_preview_only";
+    } else if (player?.multiplayerMode !== "staging" && gates.writeEnabled && !gates.dryRun) {
+      previewOnlyReason = "staging_mode_required_for_store_write";
+    } else if (!gates.writeEnabled) {
+      previewOnlyReason = "staging_store_writes_disabled";
+    } else if (gates.dryRun) {
+      previewOnlyReason = "staging_store_dry_run_enabled";
+    } else if (!gates.verified) {
+      previewOnlyReason = "verified_identity_required";
+    } else if (!gates.allowlisted) {
+      previewOnlyReason = envGate.scope === "allowlist" && !envGate.allowlistPresent
+        ? "staging_store_write_allowlist_missing"
+        : "player_not_in_staging_store_write_allowlist";
+    } else if (!gates.itemAllowed) {
+      previewOnlyReason = "store_item_not_allowed";
+    } else if (!stationValid) {
+      previewOnlyReason = "store_station_required";
+    }
+    logStagingStoreWriteBlocked({
+      reason: previewOnlyReason,
+      preview: { ...preview, gates },
+      identity,
+      player,
+      itemId,
+      quantity: message?.quantity,
+      requestedNode
+    });
 
     client.send("stagingStore:purchaseResult", {
       ...baseResult,
@@ -3574,10 +3687,11 @@ export class LupenSectorRoom extends Room {
       blockReason: previewOnlyReason === "invalid_store_quantity" ? "invalid_store_quantity" : preview.blockReason || previewOnlyReason,
       reason: previewOnlyReason,
       userReason: item && !STAGING_STORE_WRITE_ITEM_IDS.has(item.itemId)
-        ? "This item is preview-only in staging."
-        : previewOnlyReason === "staging_store_dry_run_enabled"
-          ? "Dry run only - no credits or Store ownership changed."
-          : preview.userReason,
+        ? getStagingStoreWriteBlockUserReason("store_item_preview_only")
+        : getStagingStoreWriteBlockUserReason(preview.blockReason || previewOnlyReason),
+      currentNode: playerNode,
+      requestedNode,
+      presenceStatus: playerPresenceStatus,
       receivedAt: Date.now()
     });
   }

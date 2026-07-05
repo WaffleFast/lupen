@@ -3573,7 +3573,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("multiplayer staging store shows server-backed dry-run wording", async ({ page }) => {
+  test("multiplayer staging store shows server-backed purchase wording", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -3581,7 +3581,8 @@ test.describe("Lupen browser smoke", () => {
 
     await openStore(page);
 
-    await expect(page.locator("#storeScreen")).toContainText(/Staging Purchase|Server Preview|Server preview unavailable/);
+    await expect(page.locator("#storeScreen")).toContainText(/Purchase|Validate|Purchase unavailable/);
+    await expect(page.locator("#storeScreen")).not.toContainText(/Staging Purchase|Dry run only/i);
     await expect(page.locator("#storeScreen")).not.toContainText(/LF-2 Hauler/i);
     await expect(page.locator("#storeScreen")).toContainText(/Pulse Laser/i);
     await expect(page.locator("#storeScreen")).toContainText(/Shield Booster/i);
@@ -3589,7 +3590,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#storeScreen")).toContainText(/Lupen Core/i);
     await expect(page.locator("#storeScreen")).toContainText(/Materials/i);
     await expect(page.locator("#storeScreen")).toContainText(/Apply Cargo Pod|Cargo Pod equip preview|server-backed validation/i);
-    await expect(page.locator("#storeScreen")).toContainText(/server-backed validation|server preview only|Real Store purchase is blocked|No CR or inventory changed/i);
+    await expect(page.locator("#storeScreen")).toContainText(/server-backed purchase validation|Purchase unavailable|Server-backed purchase/i);
     await expect(page.locator("#storeScreen")).not.toContainText("Buy / CR");
 
     await expectNoUnexpectedBrowserErrors(failures);

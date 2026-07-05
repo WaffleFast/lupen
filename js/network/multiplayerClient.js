@@ -2225,6 +2225,9 @@
         : [],
       reason: String(preview.reason || ""),
       debugReason: String(preview.debugReason || ""),
+      currentNode: String(preview.currentNode || ""),
+      requestedNode: String(preview.requestedNode || ""),
+      presenceStatus: String(preview.presenceStatus || ""),
       receivedAt: Number.isFinite(Number(preview.receivedAt)) ? Number(preview.receivedAt) : Date.now()
     };
   }
@@ -2309,8 +2312,18 @@
     try {
       const creditsValue = typeof credits !== "undefined" ? Number(credits) : NaN;
       if (!Number.isFinite(creditsValue)) return null;
+      const localPresence = getLocalPresenceOptions();
+      const selfPlayer = playersById.get(connection.sessionId);
+      const currentNodeValue = selfPlayer?.currentNode ||
+        localPresence.currentNode ||
+        (typeof currentNode !== "undefined" ? String(currentNode || "") : "");
+      const presenceStatusValue = selfPlayer?.presenceStatus ||
+        localPresence.presenceStatus ||
+        (typeof presenceStatus !== "undefined" ? String(presenceStatus || "") : "space");
       return {
-        credits: Math.max(0, Math.floor(creditsValue))
+        credits: Math.max(0, Math.floor(creditsValue)),
+        currentNode: String(currentNodeValue || ""),
+        presenceStatus: String(presenceStatusValue || "space") === "docked" ? "docked" : "space"
       };
     } catch (err) {
       logDev("staging store player snapshot unavailable", err);
@@ -3917,18 +3930,24 @@
     },
 
     previewStagingStorePurchase(options = {}) {
+      const snapshot = options.playerSnapshot || getStagingStorePlayerSnapshot();
       return sendRoomMessage("previewStagingStorePurchase", "stagingStore:previewPurchase", {
         itemId: String(options.itemId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity || 1,
-        playerSnapshot: options.playerSnapshot || getStagingStorePlayerSnapshot()
+        currentNode: String(options.currentNode || snapshot?.currentNode || localPresence.currentNode || ""),
+        presenceStatus: String(options.presenceStatus || snapshot?.presenceStatus || localPresence.presenceStatus || "space"),
+        playerSnapshot: snapshot
       });
     },
 
     purchaseStagingStoreItem(options = {}) {
+      const snapshot = options.playerSnapshot || getStagingStorePlayerSnapshot();
       return sendRoomMessage("purchaseStagingStoreItem", "stagingStore:purchase", {
         itemId: String(options.itemId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity || 1,
-        playerSnapshot: options.playerSnapshot || getStagingStorePlayerSnapshot()
+        currentNode: String(options.currentNode || snapshot?.currentNode || localPresence.currentNode || ""),
+        presenceStatus: String(options.presenceStatus || snapshot?.presenceStatus || localPresence.presenceStatus || "space"),
+        playerSnapshot: snapshot
       });
     },
 

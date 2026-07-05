@@ -5070,8 +5070,12 @@ try {
     roomA.send("stagingStore:purchase", {
       itemId: "attachment:cargoPod",
       quantity: 1,
+      currentNode: "Nyxara",
+      presenceStatus: "docked",
       playerSnapshot: {
-        credits: 1000
+        credits: 1000,
+        currentNode: "Nyxara",
+        presenceStatus: "docked"
       }
     });
   });
@@ -5079,6 +5083,8 @@ try {
   assert(defaultStorePurchase?.mode === "blocked" || defaultStorePurchase?.mode === "dry_run", `Unexpected default Store purchase mode: ${defaultStorePurchase?.mode}`);
   assert(defaultStorePurchase?.creditsWritten === false && defaultStorePurchase?.attachmentWritten === false && defaultStorePurchase?.saveWritten === false, "Default Store purchase reported writes.");
   assert(defaultStorePurchase?.gates?.writeEnabled === false, "Default Store purchase gate should report writes disabled.");
+  assert(defaultStorePurchase?.currentNode === "Nyxara", `Store purchase did not refresh stale server node from request: ${defaultStorePurchase?.currentNode}`);
+  assert(defaultStorePurchase?.presenceStatus === "docked", `Store purchase did not echo docked presence: ${defaultStorePurchase?.presenceStatus}`);
 
   const defaultShieldBoosterPurchase = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {

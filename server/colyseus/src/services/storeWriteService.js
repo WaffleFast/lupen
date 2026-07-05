@@ -158,7 +158,9 @@ function getStoreUserReason(reason) {
     store_item_not_allowed: "This Store item is not enabled for staging writes.",
     invalid_store_quantity: "Only one staging Store item can be purchased per request.",
     trusted_save_required: "Trusted player save read required.",
-    insufficient_credits: "Blocked: not enough credits.",
+    insufficient_credits: "Not enough credits.",
+    store_station_required: "You must be docked at this station.",
+    store_station_mismatch: "You must be docked at this station.",
     credits_path_missing_or_invalid: "Saved credits path is missing or invalid.",
     owned_attachments_path_missing_or_invalid: "Saved attachment ownership path is missing or invalid.",
     attachment_count_missing_or_invalid: "Saved attachment ownership count is missing or invalid.",
@@ -174,7 +176,7 @@ function getStoreUserReason(reason) {
     player_save_read_failed: "Player save read failed.",
     player_save_patch_failed: "Player save patch failed."
   };
-  return labels[reason] || `Blocked: ${reason || "Store write unavailable"}.`;
+  return labels[reason] || "Server purchase failed - try again.";
 }
 
 export function getStoreWriteEnvGate(playerId, itemId = "", env = process.env) {
