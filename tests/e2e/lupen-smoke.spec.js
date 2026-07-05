@@ -2063,6 +2063,174 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("player space HUD presents Journey objectives, activity, and chat cleanly", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        if (typeof resetRuntimeForFreshPilot === "function") resetRuntimeForFreshPilot();
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: ["pulseLaser"] }, STARTER_SHIP_ID) };
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        hull = getShipStats().hull;
+        hullMax = getShipStats().hull;
+        shield = getShipStats().shield;
+        shieldMax = getShipStats().shield;
+        jumpCharge = jumpMax;
+        showScreen("gameScreen");
+        updateHubLocation();
+      })()
+    `));
+
+    await page.evaluate(() => window.launchShip());
+    await expect(page.locator("#spaceScreen")).toHaveClass(/active/);
+
+    const centerHud = await page.evaluate(() => window.eval(`
+      (() => {
+        const rectFor = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) return null;
+          const rect = element.getBoundingClientRect();
+          return {
+            top: Math.round(rect.top),
+            right: Math.round(rect.right),
+            bottom: Math.round(rect.bottom),
+            left: Math.round(rect.left),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          };
+        };
+        const action = document.getElementById("objectEngageBtn");
+        return {
+          ship: rectFor("#hudShipImage"),
+          level: rectFor("#hudProgressStrip .level-badge"),
+          xpRow: rectFor("#hudProgressStrip .xp-row"),
+          xpBar: rectFor("#hudProgressStrip .xp-bar"),
+          cargo: rectFor("#hudCargoSummary"),
+          guild: rectFor("#hudGuildPlaceholder"),
+          engage: rectFor("#objectEngageBtn"),
+          panel: rectFor(".ship-display-panel-action"),
+          actionText: action?.textContent || "",
+          actionDisabled: action?.disabled ?? false,
+          actionInShipHud: Boolean(action?.closest(".ship-display-panel-action")),
+          centralActionCount: document.querySelectorAll(".central-engage-panel").length,
+          xpText: document.getElementById("hudProgressStrip")?.textContent || "",
+          cargoText: document.getElementById("hudCargoSummary")?.textContent || "",
+          guildText: document.getElementById("hudGuildPlaceholder")?.textContent || ""
+        };
+      })()
+    `));
+    expect(centerHud.ship).not.toBeNull();
+    expect(centerHud.level).not.toBeNull();
+    expect(centerHud.xpRow).not.toBeNull();
+    expect(centerHud.xpBar).not.toBeNull();
+    expect(centerHud.cargo).not.toBeNull();
+    expect(centerHud.guild).not.toBeNull();
+    expect(centerHud.engage).not.toBeNull();
+    expect(centerHud.actionText).toBe("ENGAGE");
+    expect(centerHud.actionDisabled).toBe(true);
+    expect(centerHud.actionInShipHud).toBe(true);
+    expect(centerHud.centralActionCount).toBe(0);
+    expect(centerHud.ship.height).toBeGreaterThanOrEqual(70);
+    expect(centerHud.level.right).toBeLessThanOrEqual(centerHud.panel.right + 2);
+    expect(centerHud.xpBar.top).toBeGreaterThanOrEqual(centerHud.xpRow.bottom - 2);
+    expect(centerHud.cargo.top).toBeGreaterThanOrEqual(Math.min(centerHud.ship.bottom, centerHud.xpBar.bottom) - 8);
+    expect(centerHud.engage.top).toBeGreaterThanOrEqual(centerHud.cargo.bottom - 2);
+    expect(centerHud.xpText).toContain("XP");
+    expect(centerHud.cargoText).toContain("Cargo");
+    expect(centerHud.guildText).toContain("Guild");
+    expect(centerHud.guildText).toContain("Soon");
+
+    await page.locator("#objectivesDockBtn").click();
+    await expect(page.locator("#objectivesPanel")).toHaveClass(/active/);
+    await expect(page.locator("#activeObjectiveSummary")).not.toContainText("No active objective");
+    await expect(page.locator("#activeMissionSummary")).toContainText("ACADEMY");
+    await expect(page.locator("#activeMissionSummary")).toContainText("Launch Ship");
+    await expect(page.locator("#activeMissionSummary")).toContainText("Launch from Asteron Prime");
+    await expect(page.locator("#activeMissionSummary")).toContainText("1 / 1");
+    await expect(page.locator("#activeMissionSummary")).toContainText("COMPLETE");
+    await expect(page.locator("#activeMissionSummary")).toContainText("Open Journey to review your chapter assignments.");
+    const objectiveHud = await page.locator("#activeMissionSummary").evaluate(card => {
+      const rect = card.getBoundingClientRect();
+      const styles = getComputedStyle(card);
+      const panel = document.querySelector(".hud-command-console")?.getBoundingClientRect();
+      return {
+        borderColor: styles.borderColor,
+        boxShadow: styles.boxShadow,
+        top: rect.top,
+        bottom: rect.bottom,
+        panelTop: panel?.top || 0,
+        panelBottom: panel?.bottom || 0
+      };
+    });
+    expect(objectiveHud.borderColor).toMatch(/70, 230, 164|73, 214, 255/);
+    expect(objectiveHud.bottom).toBeLessThanOrEqual(objectiveHud.panelBottom + 2);
+    expect(objectiveHud.top).toBeGreaterThanOrEqual(objectiveHud.panelTop - 2);
+
+    await page.locator("#activityDockBtn").click();
+    await expect(page.locator("#activityPanel")).toHaveClass(/active/);
+    await page.evaluate(() => window.eval(`
+      addActivityLog("Morgan: Starter ship confirmed. You have a hull assigned and ready for launch.");
+      addActivityLog("Mission complete: Launch Ship.");
+      addActivityLog("Cargo hold full - no resource recovered.");
+    `));
+    await expect(page.locator("#activityLogFeed .activity-log-item--morgan").first()).toContainText("Morgan:");
+    await expect(page.locator("#activityLogFeed .activity-log-item--mission").first()).toContainText("Mission complete");
+    await expect(page.locator("#activityLogFeed .activity-log-item--warning").first()).toContainText("Cargo hold full");
+    const activityLayout = await page.locator("#activityLogFeed").evaluate(feed => {
+      const rect = feed.getBoundingClientRect();
+      const panel = document.querySelector(".hud-command-console")?.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        panelTop: panel?.top || 0,
+        panelBottom: panel?.bottom || 0,
+        rowCount: feed.querySelectorAll(".activity-log-item").length,
+        overflowY: getComputedStyle(feed).overflowY
+      };
+    });
+    expect(activityLayout.rowCount).toBeGreaterThanOrEqual(3);
+    expect(["auto", "scroll"]).toContain(activityLayout.overflowY);
+    expect(activityLayout.bottom).toBeLessThanOrEqual(activityLayout.panelBottom + 2);
+    expect(activityLayout.top).toBeGreaterThanOrEqual(activityLayout.panelTop - 2);
+
+    await page.locator("#chatDockBtn").click();
+    await expect(page.locator("#chatPanel")).toHaveClass(/active/);
+    await expect(page.locator("#localChatFeed")).toContainText("No player messages yet.");
+    await expect(page.locator("#localChatInput")).toBeVisible();
+    await expect(page.locator("#chatPanel .local-chat-input-row button")).toBeVisible();
+    const chatLayout = await page.locator("#chatPanel").evaluate(panel => {
+      const input = panel.querySelector("#localChatInput")?.getBoundingClientRect();
+      const send = panel.querySelector(".local-chat-input-row button")?.getBoundingClientRect();
+      const tabs = document.querySelector(".hud-command-tabs")?.getBoundingClientRect();
+      const activeTab = document.querySelector("#chatDockBtn")?.getBoundingClientRect();
+      return {
+        inputTop: input?.top || 0,
+        inputBottom: input?.bottom || 0,
+        sendTop: send?.top || 0,
+        sendBottom: send?.bottom || 0,
+        tabTop: tabs?.top || 0,
+        activeTabTop: activeTab?.top || 0,
+        activeTabBottom: activeTab?.bottom || 0,
+        buttonCount: document.querySelectorAll(".hud-command-tabs .info-tab").length
+      };
+    });
+    expect(chatLayout.buttonCount).toBe(3);
+    expect(Math.abs(chatLayout.inputTop - chatLayout.sendTop)).toBeLessThanOrEqual(2);
+    expect(Math.abs(chatLayout.inputBottom - chatLayout.sendBottom)).toBeLessThanOrEqual(2);
+    expect(chatLayout.activeTabTop).toBeGreaterThanOrEqual(chatLayout.tabTop - 2);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("Map 1 classifies protected and contested nodes for future PvP rules", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -6095,7 +6263,7 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.launchShip());
     await expect(page.locator("#spaceScreen")).toHaveClass(/active/);
     await expect(page.locator("#activeMissionSummary")).toContainText("Launch Ship");
-    await expect(page.locator("#activeMissionSummary")).toContainText("READY");
+    await expect(page.locator("#activeMissionSummary")).toContainText("COMPLETE");
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.academy_launch_ship.state`))).resolves.toBe("completed");
 
     await page.evaluate(() => window.landOnPlanet());

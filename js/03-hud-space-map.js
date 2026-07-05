@@ -23,6 +23,12 @@ function openHudPanel(panelName) {
   if (panel) panel.classList.add("active");
   if (dockButton) dockButton.classList.add("active");
 
+  if (panelName === "chat" && typeof renderMultiplayerChatHud === "function") {
+    renderMultiplayerChatHud();
+  } else if (panelName === "objectives" && typeof renderObjectiveHud === "function") {
+    renderObjectiveHud();
+  }
+
   const drawer = document.getElementById("inventoryDrawer");
   if (drawer && panelName !== "inventory") {
     drawer.classList.remove("active");
@@ -713,8 +719,24 @@ function addActivityLog(message) {
   }
 
   const item = document.createElement("div");
-  item.className = "activity-log-item";
-  item.textContent = normalizedMessage;
+  const isMorgan = /^Morgan:/i.test(normalizedMessage);
+  const isMission = /Mission (complete|accepted|reward claimed)|Journey|Academy|Frontier/i.test(normalizedMessage);
+  const isWarning = /blocked|unable|disabled|critical|destroyed|expired|lost|full/i.test(normalizedMessage);
+  item.className = [
+    "activity-log-item",
+    isMorgan ? "activity-log-item--morgan" : "",
+    isMission ? "activity-log-item--mission" : "",
+    isWarning ? "activity-log-item--warning" : ""
+  ].filter(Boolean).join(" ");
+  if (isMorgan) {
+    const prefix = document.createElement("strong");
+    prefix.textContent = "Morgan:";
+    const text = document.createElement("span");
+    text.textContent = ` ${normalizedMessage.replace(/^Morgan:\s*/i, "")}`;
+    item.append(prefix, text);
+  } else {
+    item.textContent = normalizedMessage;
+  }
   feed.prepend(item);
 
   while (feed.children.length > 14) {

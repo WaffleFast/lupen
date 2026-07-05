@@ -43690,6 +43690,384 @@ input::placeholder {
   font-size: 16px !important;
   justify-self: center !important;
 }
+
+/* ===== Player space HUD polish ===== */
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+  align-items: stretch !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action {
+  grid-template-rows: minmax(80px, 1fr) 34px 34px !important;
+  padding: 9px 13px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-hud-hero-row {
+  grid-template-columns: minmax(132px, 0.92fr) minmax(180px, 1.08fr) !important;
+  gap: 12px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-card-main {
+  display: grid !important;
+  place-items: center !important;
+  min-height: 86px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-card-main::before {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .active-player-ship,
+.player-orbit-screen .player-bottom-hud .hud-ship-image {
+  align-self: center !important;
+  justify-self: center !important;
+  max-width: min(152px, 100%) !important;
+  height: 104px !important;
+  max-height: 104px !important;
+  object-fit: contain !important;
+  transform: translateY(-4px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress {
+  grid-template-columns: minmax(0, 1fr) 54px !important;
+  grid-template-rows: 44px 17px 8px !important;
+  gap: 5px 10px !important;
+  align-content: center !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress .level-badge,
+.player-orbit-screen .player-bottom-hud .level-badge {
+  align-self: start !important;
+  justify-self: end !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  min-height: 52px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress .xp-row,
+.player-orbit-screen .player-bottom-hud .xp-row {
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  white-space: nowrap !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress .xp-row span:last-child,
+.player-orbit-screen .player-bottom-hud .xp-row span:last-child {
+  color: #e7f7ff !important;
+  font-size: 11px !important;
+  letter-spacing: 0.03em !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-hud-cargo-row {
+  grid-template-columns: minmax(150px, 176px) minmax(72px, 86px) !important;
+  gap: 9px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary {
+  min-height: 32px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-guild-placeholder {
+  min-height: 28px !important;
+  height: 28px !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action {
+  width: min(268px, 78%) !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  letter-spacing: 0.12em !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action.action-inactive,
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action:disabled {
+  opacity: 0.52 !important;
+  filter: saturate(0.55) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-console.info-panel {
+  display: grid !important;
+  grid-template-rows: 28px minmax(0, 1fr) !important;
+  padding: 8px 10px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-tabs.info-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 4px !important;
+  align-items: stretch !important;
+  padding: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-tabs .info-tab {
+  min-width: 0 !important;
+  height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  border-radius: 3px !important;
+  border: 1px solid rgba(74, 194, 255, 0.18) !important;
+  background: rgba(3, 14, 28, 0.46) !important;
+  color: rgba(202, 229, 244, 0.78) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.1em !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-tabs .info-tab.active {
+  border-color: rgba(55, 214, 255, 0.92) !important;
+  background: linear-gradient(180deg, rgba(24, 116, 172, 0.48), rgba(4, 18, 34, 0.8)) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 -2px 0 rgba(53, 216, 255, 0.88), 0 0 14px rgba(31, 185, 255, 0.22) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-tabs .info-tab img {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding-top: 7px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel > .hud-panel,
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel > #chatPanel.hud-panel:not(.active),
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel > #objectivesPanel.hud-panel:not(.active),
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel > #activityPanel.hud-panel:not(.active) {
+  display: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-inline-panel .hud-panel.active {
+  display: grid !important;
+  min-height: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel > #chatPanel.hud-panel.active {
+  display: grid !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objectives-panel .objective-panel-layout,
+.player-orbit-screen .player-bottom-hud .activity-objective-block,
+.player-orbit-screen .player-bottom-hud .activity-log-block {
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objectives-panel .hud-panel-header,
+.player-orbit-screen .player-bottom-hud .activity-panel .hud-panel-header {
+  min-height: 20px !important;
+  margin-bottom: 5px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objectives-panel .hud-panel-header h3,
+.player-orbit-screen .player-bottom-hud .activity-panel .hud-panel-header h3 {
+  color: #9ee9ff !important;
+  font-size: 10px !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-hud-summary {
+  min-height: 0 !important;
+  height: calc(100% - 25px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .objective-hud-card.mission-objective-card {
+  height: 100% !important;
+  min-height: 96px !important;
+  display: grid !important;
+  align-items: center !important;
+  padding: 10px !important;
+  border-color: rgba(73, 214, 255, 0.36) !important;
+  background:
+    radial-gradient(circle at 12% 22%, rgba(74, 214, 255, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(5, 22, 38, 0.88), rgba(3, 12, 24, 0.84)) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-card--complete {
+  border-color: rgba(70, 230, 164, 0.72) !important;
+  background:
+    radial-gradient(circle at 12% 22%, rgba(70, 230, 164, 0.18), transparent 36%),
+    linear-gradient(180deg, rgba(5, 26, 32, 0.9), rgba(3, 12, 24, 0.84)) !important;
+  box-shadow: inset 0 0 0 1px rgba(141, 255, 196, 0.08), 0 0 16px rgba(70, 230, 164, 0.16) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-icon {
+  width: 42px !important;
+  height: 42px !important;
+  flex: 0 0 42px !important;
+  border-radius: 999px !important;
+  color: #9cffd0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-card .objective-title-line {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-card .objective-orbit-meta strong {
+  color: #9cffd0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-card .objective-orbit-copy em {
+  color: rgba(207, 232, 244, 0.82) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-card .objective-orbit-copy {
+  gap: 2px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-card .objective-orbit-copy span,
+.player-orbit-screen .player-bottom-hud .mission-objective-card .objective-orbit-copy em {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.18 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-card .objective-orbit-copy em {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-empty--journey,
+.player-orbit-screen .player-bottom-hud .objective-empty {
+  min-height: 96px !important;
+  height: 100% !important;
+  display: grid !important;
+  align-content: center !important;
+  justify-items: center !important;
+  gap: 5px !important;
+  padding: 12px !important;
+  text-align: center !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-empty--journey strong,
+.player-orbit-screen .player-bottom-hud .objective-empty strong {
+  color: #eaf7ff !important;
+  font-size: 12px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .mission-objective-empty--journey span,
+.player-orbit-screen .player-bottom-hud .objective-empty span {
+  max-width: 240px !important;
+  color: rgba(190, 212, 226, 0.76) !important;
+  font-size: 11px !important;
+  line-height: 1.28 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-feed {
+  display: grid !important;
+  align-content: start !important;
+  gap: 5px !important;
+  min-height: 0 !important;
+  height: calc(100% - 25px) !important;
+  overflow: auto !important;
+  padding-right: 4px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-item {
+  padding: 5px 7px !important;
+  border-left: 2px solid rgba(94, 214, 255, 0.2) !important;
+  border-radius: 5px !important;
+  background: rgba(5, 18, 32, 0.42) !important;
+  color: rgba(220, 237, 247, 0.84) !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-item--morgan {
+  border-left-color: rgba(55, 215, 255, 0.76) !important;
+  color: #dff8ff !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-item--morgan strong {
+  color: #37d7ff !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-item--mission {
+  border-left-color: rgba(70, 230, 164, 0.72) !important;
+  color: #bafbd6 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-item--warning {
+  border-left-color: rgba(255, 198, 92, 0.74) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .activity-log-item.muted {
+  color: rgba(171, 196, 211, 0.66) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .comms-panel {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) 34px !important;
+  gap: 7px !important;
+  min-height: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .online-pilots-list {
+  min-height: 18px !important;
+  padding: 3px 0 6px !important;
+  border-bottom: 1px solid rgba(92, 208, 255, 0.14) !important;
+  color: rgba(198, 226, 240, 0.86) !important;
+  font-size: 11px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .local-chat-feed {
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+.player-orbit-screen .player-bottom-hud .chat-line {
+  padding: 3px 1px !important;
+  color: rgba(221, 237, 248, 0.84) !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .chat-line strong {
+  color: #37d7ff !important;
+}
+
+.player-orbit-screen .player-bottom-hud .chat-line.muted {
+  color: rgba(186, 207, 220, 0.72) !important;
+  font-style: italic !important;
+}
+
+.player-orbit-screen .player-bottom-hud .local-chat-input-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 64px !important;
+  gap: 7px !important;
+  align-items: center !important;
+}
+
+.player-orbit-screen .player-bottom-hud .local-chat-input-row input,
+.player-orbit-screen .player-bottom-hud .local-chat-input-row button {
+  height: 32px !important;
+  min-height: 32px !important;
+  margin: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .local-chat-input-row input {
+  padding: 0 10px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .local-chat-input-row button {
+  padding: 0 !important;
+}
 /* Mission Journal */
 
 .mission-journal-panel {

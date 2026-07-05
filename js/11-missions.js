@@ -1158,29 +1158,70 @@ function renderJourneyRewardRow(icon, title, value) {
   `;
 }
 
-function renderMissionObjectiveHud() {
-  const mission = getPrimaryActiveMission();
-  if (!mission) return `<div class="mission-objective-empty">No active mission.</div>`;
+function getJourneyHudObjectiveDisplay(mission = getPrimaryActiveMission()) {
+  if (!mission) return null;
+  missionProgress = normalizeMissionProgress(missionProgress);
   const state = missionProgress.missions[mission.id];
   const progress = getMissionProgressAmount(mission, state);
   const required = getMissionRequiredAmount(mission);
-  const ready = state.state === MISSION_STATE_COMPLETED;
+  const ready = state?.state === MISSION_STATE_COMPLETED;
+  const claimed = state?.state === MISSION_STATE_CLAIMED;
+  const config = getJourneyAssignmentConfig(mission);
+  const reward = config.rewards || mission.reward || {};
+  const hasReward = Math.max(0, Number(reward.xp || 0)) > 0 || Math.max(0, Number(reward.credits || 0)) > 0;
+  const chapterLabel = mission.chapter === "academy" ? "ACADEMY" : "JOURNEY";
+  return {
+    mission,
+    config,
+    state,
+    chapterLabel,
+    progress,
+    required,
+    ready,
+    claimed,
+    hasReward,
+    title: config.journeyTitle || mission.title,
+    objective: config.journeyObjectiveLabel || getMissionObjectiveLabel(mission),
+    status: ready || claimed ? "COMPLETE" : progress > 0 ? "IN PROGRESS" : "ACTIVE",
+    hint: ready && hasReward
+      ? "Return to Journey to claim the reward."
+      : ready || claimed
+        ? "Open Journey to review your chapter assignments."
+        : "Progress updates automatically as you play."
+  };
+}
+
+function renderMissionObjectiveHud() {
+  const display = getJourneyHudObjectiveDisplay();
+  if (!display) {
+    return `
+      <div class="mission-objective-empty mission-objective-empty--journey">
+        <strong>No active objective.</strong>
+        <span>Open Journey to view your current chapter assignments.</span>
+      </div>
+    `;
+  }
+  const statusClass = display.ready || display.claimed
+    ? "mission-objective-card--complete"
+    : display.progress > 0
+      ? "mission-objective-card--progress"
+      : "mission-objective-card--active";
 
   return `
-    <div class="objective-hud-card mission-objective-card orbit-objective-card">
+    <div class="objective-hud-card mission-objective-card orbit-objective-card ${statusClass}">
       <div class="objective-main-row objective-orbit-row">
-        <div class="mission-objective-icon" aria-hidden="true">M</div>
+        <div class="mission-objective-icon" aria-hidden="true">${display.ready || display.claimed ? "✓" : "◎"}</div>
         <div class="objective-copy objective-orbit-copy">
           <div class="objective-title-line">
-            <span class="objective-type-pill mission-pill">Mission</span>
-            <strong>${escapeHtml(mission.title)}</strong>
+            <span class="objective-type-pill mission-pill">${escapeHtml(display.chapterLabel)}</span>
+            <strong>${escapeHtml(display.title)}</strong>
           </div>
-          <span>${escapeHtml(getMissionObjectiveLabel(mission))}</span>
-          <em>${ready ? "Return to Journey to claim the reward." : "Morgan is tracking this objective."}</em>
+          <span>${escapeHtml(display.objective)}</span>
+          <em>${escapeHtml(display.hint)}</em>
         </div>
         <div class="objective-orbit-meta">
-          <span>${formatNumber(progress)} / ${formatNumber(required)}</span>
-          <strong>${ready ? "READY" : "ACTIVE"}</strong>
+          <span>${formatNumber(display.progress)} / ${formatNumber(display.required)}</span>
+          <strong>${escapeHtml(display.status)}</strong>
         </div>
       </div>
     </div>
@@ -1230,13 +1271,13 @@ if (originalRenderObjectiveHud) {
     originalRenderObjectiveHud();
     const panel = document.getElementById("activeObjectiveSummary");
     if (!panel) return;
-    let missionSlot = document.getElementById("activeMissionSummary");
-    if (!missionSlot) {
-      missionSlot = document.createElement("div");
-      missionSlot.id = "activeMissionSummary";
-      missionSlot.className = "active-mission-summary";
-      panel.insertAdjacentElement("afterend", missionSlot);
+    const existingMissionSlot = document.getElementById("activeMissionSummary");
+    if (existingMissionSlot) existingMissionSlot.remove();
+    const hasGameplayObjective = !panel.querySelector(".objective-empty");
+    if (!hasGameplayObjective) {
+      panel.innerHTML = renderMissionObjectiveHud();
+      const card = panel.querySelector(".mission-objective-card, .mission-objective-empty");
+      if (card) card.id = "activeMissionSummary";
     }
-    missionSlot.innerHTML = renderMissionObjectiveHud();
   };
 }
