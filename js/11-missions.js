@@ -734,8 +734,21 @@ function getJourneyObjectiveLine(mission) {
 }
 
 function getGalaxyCompletionPercent() {
-  const chapterPercent = getChapterProgressPercent("frontier");
-  return Math.min(100, Math.round(chapterPercent * 0.18));
+  missionProgress = normalizeMissionProgress(missionProgress);
+  const assignments = JOURNEY_ASSIGNMENTS.filter(assignment => {
+    const mission = assignment.mission || MISSIONS_BY_ID[assignment.id];
+    return mission && mission.objective?.type !== "complete_missions";
+  });
+  if (!assignments.length) return 0;
+  const completedUnits = assignments.reduce((total, assignment) => {
+    const mission = assignment.mission || MISSIONS_BY_ID[assignment.id];
+    const state = missionProgress.missions[mission.id];
+    const required = Math.max(1, getMissionRequiredAmount(mission));
+    const progress = getMissionProgressAmount(mission, state);
+    return total + Math.min(1, progress / required);
+  }, 0);
+  const journeyContentWeight = 35;
+  return Math.min(100, Math.round((completedUnits / assignments.length) * journeyContentWeight));
 }
 
 function renderJourneyScreen() {
@@ -1040,11 +1053,9 @@ function getJourneyAssignmentIconSrc(assignment) {
 function renderJourneyAssignmentStatePill(state, hasReward = true) {
   const normalized = String(state || "").toLowerCase();
   if (normalized === "claimable") {
-    return hasReward
-      ? renderJourneyStatusPill("claimable")
-      : renderJourneyStatusPill("completed");
+    return renderJourneyStatusPill("completed");
   }
-  if (normalized === "claimed") return renderJourneyStatusPill("claimed");
+  if (normalized === "claimed") return renderJourneyStatusPill("completed");
   if (normalized === "locked") return renderJourneyStatusPill("locked");
   return "";
 }

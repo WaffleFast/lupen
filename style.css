@@ -44716,7 +44716,45 @@ input::placeholder {
 .journey-assignment-card.mission-state-claimable,
 .journey-assignment-card.mission-state-completed {
   --journey-accent: #46e6a4;
-  border-color: rgba(70, 230, 164, 0.68);
+  border-color: rgba(70, 230, 164, 0.86);
+  background:
+    linear-gradient(135deg, rgba(70, 230, 164, 0.16), rgba(7, 23, 36, 0.76) 42%),
+    rgba(7, 23, 36, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(141, 255, 196, 0.08), 0 0 18px rgba(70, 230, 164, 0.18);
+}
+
+.journey-assignment-card.mission-state-claimed {
+  --journey-accent: #46e6a4;
+  border-color: rgba(70, 230, 164, 0.62);
+}
+
+.journey-assignment-card.mission-state-claimable .journey-objective-copy p,
+.journey-assignment-card.mission-state-completed .journey-objective-copy p,
+.journey-assignment-card.mission-state-claimed .journey-objective-copy p {
+  color: rgba(211, 228, 236, 0.68);
+}
+
+.journey-assignment-card.mission-state-claimable .journey-progress-track i,
+.journey-assignment-card.mission-state-completed .journey-progress-track i,
+.journey-assignment-card.mission-state-claimed .journey-progress-track i {
+  background: linear-gradient(90deg, #36f28f, #8dffc4);
+  box-shadow: 0 0 10px rgba(70, 230, 164, 0.58);
+}
+
+.journey-assignment-card.mission-state-claimable .journey-status-pill--completed,
+.journey-assignment-card.mission-state-completed .journey-status-pill--completed,
+.journey-assignment-card.mission-state-claimed .journey-status-pill--completed {
+  border-color: rgba(70, 230, 164, 0.74);
+  background: rgba(70, 230, 164, 0.16);
+  color: #a9ffd1;
+  box-shadow: 0 0 12px rgba(70, 230, 164, 0.2);
+}
+
+.journey-assignment-card .journey-status-pill--completed::before,
+.journey-assignment-card .journey-status-pill--claimed::before {
+  content: "\2713";
+  margin-right: 4px;
+  color: #6dffad;
 }
 
 .journey-assignment-card.mission-state-completed {
@@ -46631,17 +46669,26 @@ input::placeholder {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  min-height: 38px;
-  padding: 7px 14px;
+  gap: 10px;
+  min-height: 28px;
+  padding: 4px 12px;
+  overflow: hidden;
+  line-height: 1;
 }
 
 .journey-galaxy-strip span {
   white-space: nowrap;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+}
+
+.journey-galaxy-strip strong {
+  white-space: nowrap;
+  font-size: 0.78rem;
 }
 
 .journey-galaxy-strip .journey-progress-track {
-  height: 7px;
+  height: 5px;
 }
 
 @media (max-width: 980px) {

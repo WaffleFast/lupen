@@ -5873,6 +5873,27 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Claim Reward");
     await expect(page.locator("#journeyScreen .journey-assignment-icon img")).toHaveCount(7);
     await expect(page.locator("#journeyScreen .journey-assignment-grid .journey-reward-chips")).toHaveCount(0);
+    const initialGalaxyFooter = await page.locator("#journeyScreen .journey-galaxy-strip").evaluate(footer => {
+      const rect = footer.getBoundingClientRect();
+      const text = footer.querySelector("span")?.getBoundingClientRect();
+      const bar = footer.querySelector(".journey-progress-track")?.getBoundingClientRect();
+      const percent = footer.querySelector("strong")?.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        height: rect.height,
+        textTop: text?.top || 0,
+        barTop: bar?.top || 0,
+        percentTop: percent?.top || 0,
+        visible: rect.top >= 0 && rect.bottom <= window.innerHeight,
+        singleLine: Boolean(text && bar && percent && Math.abs(text.top - percent.top) < 8 && Math.abs(bar.top - text.top) < 14),
+        percentText: footer.querySelector("strong")?.textContent?.trim() || ""
+      };
+    });
+    expect(initialGalaxyFooter.visible).toBe(true);
+    expect(initialGalaxyFooter.singleLine).toBe(true);
+    expect(initialGalaxyFooter.height).toBeLessThan(34);
+    expect(initialGalaxyFooter.percentText).toBe("0%");
     const academyAssignmentScroll = await page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => {
       const firstCard = grid.querySelector(".journey-assignment-card")?.getBoundingClientRect();
       return {
@@ -5887,6 +5908,63 @@ test.describe("Lupen browser smoke", () => {
     expect(academyAssignmentScroll.firstCardHeight).toBeLessThan(105);
     await page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => { grid.scrollTop = grid.scrollHeight; });
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_repair_ship']")).toBeVisible();
+    await page.evaluate(() => {
+      missionProgress = normalizeMissionProgress(missionProgress);
+      ["academy_starter_ship", "academy_launch_ship"].forEach(id => {
+        const mission = MISSIONS_BY_ID[id];
+        missionProgress.missions[id] = {
+          ...missionProgress.missions[id],
+          state: "completed",
+          progress: getMissionRequiredAmount(mission)
+        };
+      });
+      renderJourneyScreen();
+    });
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Academy Progress");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("29%");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("2 / 7");
+    const completedAcademyCard = await page.locator("#journeyScreen [data-journey-assignment-id='academy_launch_ship']").evaluate(card => {
+      const styles = getComputedStyle(card);
+      const pill = card.querySelector(".journey-status-pill");
+      const progress = card.querySelector(".journey-progress-track i");
+      const progressStyles = progress ? getComputedStyle(progress) : null;
+      return {
+        className: card.className,
+        borderColor: styles.borderColor,
+        boxShadow: styles.boxShadow,
+        badgeText: pill?.textContent?.trim() || "",
+        badgeCheck: pill ? getComputedStyle(pill, "::before").content : "",
+        progressWidth: progress?.style.width || "",
+        progressBackground: progressStyles?.backgroundImage || progressStyles?.backgroundColor || ""
+      };
+    });
+    expect(completedAcademyCard.className).toContain("mission-state-claimable");
+    expect(completedAcademyCard.badgeText).toContain("COMPLETE");
+    expect(completedAcademyCard.badgeCheck).toContain("✓");
+    expect(completedAcademyCard.progressWidth).toBe("100%");
+    expect(completedAcademyCard.borderColor).toMatch(/70, 230, 164|54, 242, 143|109, 255, 173/);
+    expect(completedAcademyCard.boxShadow).toMatch(/70, 230, 164|54, 242, 143|109, 255, 173/);
+    expect(completedAcademyCard.progressBackground).toMatch(/54, 242, 143|141, 255, 196|linear-gradient/);
+    const partialGalaxyFooter = await page.locator("#journeyScreen .journey-galaxy-strip").evaluate(footer => {
+      const rect = footer.getBoundingClientRect();
+      const current = Number((footer.querySelector("strong")?.textContent || "0").replace(/[^0-9]/g, ""));
+      const assignmentGrid = document.querySelector(".journey-assignment-grid")?.getBoundingClientRect();
+      return {
+        current,
+        visible: rect.top >= 0 && rect.bottom <= window.innerHeight,
+        separatedFromAssignments: !assignmentGrid || rect.top >= assignmentGrid.bottom
+      };
+    });
+    expect(partialGalaxyFooter.current).toBeGreaterThan(0);
+    expect(partialGalaxyFooter.current).toBeLessThan(29);
+    expect(partialGalaxyFooter.visible).toBe(true);
+    expect(partialGalaxyFooter.separatedFromAssignments).toBe(true);
+    await page.evaluate(() => {
+      ["academy_starter_ship", "academy_launch_ship"].forEach(id => {
+        missionProgress.missions[id] = { state: "available", progress: 0 };
+      });
+      renderJourneyScreen();
+    });
     await expect(page.locator("#journeyScreen .journey-chapter-route")).toBeVisible();
     await expect(page.locator("#journeyScreen .journey-chapter-route__viewport")).toBeVisible();
     await expect(page.locator("#journeyScreen .journey-chapter-route__track")).toBeVisible();
@@ -6068,7 +6146,7 @@ test.describe("Lupen browser smoke", () => {
     expect(haulProgress.runtime).toMatchObject({ state: "completed", progress: 1 });
     expect(haulProgress.saved).toMatchObject({ state: "completed", progress: 1 });
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("1 / 1");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("CLAIM READY");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("COMPLETE");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("Claim Reward");
     await page.locator("#journeyScreen [data-journey-assignment-id='first_haul'] button", { hasText: "Claim Reward" }).click();
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.first_haul.state`))).resolves.toBe("claimed");
