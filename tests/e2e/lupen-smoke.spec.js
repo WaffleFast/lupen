@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const fs = require("fs");
 
 function collectUnexpectedBrowserErrors(page) {
   const failures = [];
@@ -875,8 +876,116 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#creditsText")).toBeVisible();
     await expect(page.locator("#cargoText")).toBeVisible();
-    await expect(page.locator("#marketScreen")).toContainText(/Buy Cargo|Sell Cargo|Sell Here/);
+    await expect(page.locator("#marketScreen")).toContainText(/Load Cargo|Sell Cargo|Sell Here/);
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("trade terminal route cards load profitable cargo and block loss routes", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: ["pulseLaser"] }, STARTER_SHIP_ID) };
+        credits = 10000;
+        currentNode = "Virella";
+        lastPlanetNode = "Virella";
+        activeTradeRoute = null;
+        activeObjective = null;
+        mineralKeys.forEach(key => { cargo[key] = 0; });
+        cargoCostBasis = {};
+        selectedMarketResource = "Cobalt";
+        selectedMarketTargetPlanet = "Asteron Prime";
+        selectedMarketQuantity = 2;
+        showScreen("gameScreen");
+        openMarketplace();
+      })()
+    `));
+
+    await expect(page.locator("#marketScreen")).toContainText("AVAILABLE ROUTES");
+    await expect(page.locator("#marketScreen .trade-route-card")).toHaveCount(2);
+    await expect(page.locator("#marketScreen")).not.toContainText("Confirm Target");
+    await expect(page.locator("#marketScreen .market-target-select")).toHaveCount(0);
+
+    const profitableRoute = page.locator("#marketScreen .trade-route-card[data-route-destination='Asteron Prime']");
+    const lossRoute = page.locator("#marketScreen .trade-route-card[data-route-destination='Nyxara']");
+    await expect(profitableRoute).toContainText("BEST ROUTE");
+    await expect(profitableRoute).toContainText("Sell CR 2,340");
+    await expect(profitableRoute).toContainText(/Jumps?/);
+    await expect(profitableRoute).toContainText("Estimated Profit");
+    await expect(profitableRoute).toContainText("+CR 1,312");
+    await expect(profitableRoute.locator(".trade-route-card__button")).toHaveText("Load Cargo");
+    await expect(lossRoute).toContainText("Loss");
+    await expect(lossRoute.locator(".trade-route-card__button")).toHaveText("Not Recommended");
+    await expect(lossRoute.locator(".trade-route-card__button")).toBeDisabled();
+
+    const layout = await page.locator("#marketScreen .map-one-market-terminal").evaluate((terminal) => {
+      const screen = document.getElementById("marketScreen");
+      const loadButton = terminal.querySelector(".trade-route-card__button:not(:disabled)")?.getBoundingClientRect();
+      const amount = terminal.querySelector(".market-amount-control--route")?.getBoundingClientRect();
+      const screenRect = screen.getBoundingClientRect();
+      return {
+        terminalFits: terminal.scrollWidth <= terminal.clientWidth + 1,
+        loadButtonVisible: Boolean(loadButton && loadButton.bottom <= screenRect.bottom && loadButton.right <= screenRect.right),
+        amountVisible: Boolean(amount && amount.bottom <= screenRect.bottom && amount.right <= screenRect.right)
+      };
+    });
+    expect(layout).toMatchObject({
+      terminalFits: true,
+      loadButtonVisible: true,
+      amountVisible: true
+    });
+
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.screenshot({ path: "artifacts/trade-terminal-route-cards.png", fullPage: false });
+
+    const lossNoop = await page.evaluate(() => window.eval(`
+      (() => {
+        const beforeCredits = credits;
+        const beforeCargo = cargo.Cobalt || 0;
+        document.querySelector("#marketScreen .trade-route-card[data-route-destination='Nyxara'] .trade-route-card__button")?.click();
+        return { beforeCredits, afterCredits: credits, beforeCargo, afterCargo: cargo.Cobalt || 0 };
+      })()
+    `));
+    expect(lossNoop.afterCredits).toBe(lossNoop.beforeCredits);
+    expect(lossNoop.afterCargo).toBe(lossNoop.beforeCargo);
+
+    await profitableRoute.locator(".trade-route-card__button").click();
+    const buyState = await page.evaluate(() => window.eval(`
+      (() => {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_GAME_KEY) || "{}");
+        return {
+          credits,
+          cargoCobalt: cargo.Cobalt || 0,
+          route: { ...activeTradeRoute },
+          objective: { ...activeObjective },
+          savedCredits: saved.credits,
+          savedCargoCobalt: saved.cargo?.Cobalt || 0,
+          activityText: document.getElementById("activityLogFeed")?.textContent || ""
+        };
+      })()
+    `));
+    expect(buyState.credits).toBe(6632);
+    expect(buyState.cargoCobalt).toBe(2);
+    expect(buyState.route).toMatchObject({
+      good: "Cobalt",
+      origin: "Virella",
+      destination: "Asteron Prime",
+      marketTrade: true
+    });
+    expect(buyState.objective.destination).toBe("Asteron Prime");
+    expect(buyState.savedCredits).toBe(6632);
+    expect(buyState.savedCargoCobalt).toBe(2);
+    expect(buyState.activityText).toContain("Route locked: Virella -> Asteron Prime");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -1499,7 +1608,7 @@ test.describe("Lupen browser smoke", () => {
 
     await openTradeTerminal(page);
 
-    await expect(page.locator("#marketScreen")).toContainText(/Buy Cargo|Preview Unavailable/);
+    await expect(page.locator("#marketScreen")).toContainText(/AVAILABLE ROUTES|Not Recommended|Preview Unavailable/);
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
     await expect(page.locator("#marketScreen")).toContainText(/pilot save immediately|staging/i);
 
@@ -3110,9 +3219,11 @@ test.describe("Lupen browser smoke", () => {
     });
 
     await expect(page.locator("#lupenMultiplayerStagingTradePanel")).toHaveCount(0);
-    await expect(page.locator("#marketScreen")).toContainText("Buy Cargo");
+    await expect(page.locator("#marketScreen")).toContainText("AVAILABLE ROUTES");
+    await expect(page.locator("#marketScreen")).toContainText("Load Cargo");
     await expect(page.locator("#marketScreen")).not.toContainText("Preview Unavailable");
-    await expect(page.locator("#marketScreen")).toContainText(/Crystal Shards[\s\S]*Asteron Prime > Nyxara|Iron[\s\S]*Asteron Prime > Virella/i);
+    await expect(page.locator("#marketScreen")).not.toContainText("Confirm Target");
+    await expect(page.locator("#marketScreen")).toContainText(/Crystal Shards[\s\S]*Asteron Prime -> Nyxara|Iron[\s\S]*Asteron Prime -> Virella/i);
 
     await page.evaluate(() => {
       window.eval(`
@@ -3127,7 +3238,9 @@ test.describe("Lupen browser smoke", () => {
       if (typeof window.renderMarketplace === "function") window.renderMarketplace();
     });
 
-    await expect(page.locator("#marketScreen")).toContainText(/Iron[\s\S]*Asteron Prime > Virella/);
+    await expect(page.locator("#marketScreen .trade-route-card[data-route-destination='Virella']")).toContainText(/Asteron Prime -> Virella/);
+    await expect(page.locator("#marketScreen .trade-route-card[data-route-destination='Virella']")).toContainText("BEST ROUTE");
+    await expect(page.locator("#marketScreen .trade-route-card[data-route-destination='Virella']")).toContainText(/Jumps?/);
     await expect(page.locator("#marketScreen")).toContainText("63 units");
     await expect(page.locator("#marketScreen")).toContainText("CR 1,134");
     await expect(page.locator("#marketScreen")).toContainText("CR 1,890");
@@ -3141,7 +3254,8 @@ test.describe("Lupen browser smoke", () => {
       `);
       if (typeof window.setMarketResource === "function") window.setMarketResource("Copper");
     });
-    await expect(page.locator("#marketScreen .market-builder-selected")).toContainText(/Copper[\s\S]*Asteron Prime > Virella/);
+    await expect(page.locator("#marketScreen .market-builder-selected")).toContainText(/Copper[\s\S]*Current station: Asteron Prime/);
+    await expect(page.locator("#marketScreen .trade-route-card[data-route-destination='Virella']")).toContainText(/Asteron Prime -> Virella/);
 
     await page.evaluate(() => {
       window.eval(`
@@ -3149,7 +3263,8 @@ test.describe("Lupen browser smoke", () => {
       `);
       if (typeof window.setMarketResource === "function") window.setMarketResource("Iron");
     });
-    await expect(page.locator("#marketScreen .market-builder-selected")).toContainText(/Iron[\s\S]*Asteron Prime > Virella/);
+    await expect(page.locator("#marketScreen .market-builder-selected")).toContainText(/Iron[\s\S]*Current station: Asteron Prime/);
+    await expect(page.locator("#marketScreen .trade-route-card[data-route-destination='Virella']")).toHaveClass(/is-selected/);
 
     const buyMutation = await page.evaluate(() => window.eval(`
       (() => {
@@ -3208,7 +3323,7 @@ test.describe("Lupen browser smoke", () => {
       if (typeof window.renderMarketplace === "function") window.renderMarketplace();
     });
 
-    await expect(page.locator("#marketScreen")).toContainText(/Cobalt[\s\S]*Nyxara > Asteron Prime/);
+    await expect(page.locator("#marketScreen .trade-route-card[data-route-destination='Asteron Prime']")).toContainText(/Nyxara -> Asteron Prime/);
     await expect(page.locator("#marketScreen")).toContainText("14 units");
     await expect(page.locator("#marketScreen")).toContainText("CR 868");
     await expect(page.locator("#marketScreen")).toContainText("CR 1,260");
@@ -3235,7 +3350,8 @@ test.describe("Lupen browser smoke", () => {
           if (typeof window.renderMarketplace === "function") window.renderMarketplace();
         }, resource);
         await expect(page.locator("#marketScreen")).toContainText(resource);
-        await expect(page.locator("#marketScreen")).toContainText("Buy Cargo");
+        await expect(page.locator("#marketScreen")).toContainText("AVAILABLE ROUTES");
+        await expect(page.locator("#marketScreen")).toContainText(/Load Cargo|Not Recommended/);
       }
     }
 
@@ -4299,8 +4415,8 @@ test.describe("Lupen browser smoke", () => {
         const resourceTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketResourceIron']"));
         setMarketResource("Iron");
         setTutorialStepById("select-market-target");
-        const targetTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketTargetConfirm']"));
-        confirmMarketTargetPlanet();
+        const targetTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketRouteCard']"));
+        selectMarketRouteDestination("Virella");
         setTutorialStepById("select-buy-amount");
         setMarketQuantityMax();
         const maxQuantity = selectedMarketQuantity;

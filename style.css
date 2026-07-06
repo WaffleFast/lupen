@@ -12555,7 +12555,7 @@ input::placeholder {
 
 .trade-terminal-layout {
   gap: 14px;
-  height: calc(100% - 84px);
+  height: calc(100% - 56px);
 }
 
 .trade-terminal-summary {
@@ -12959,7 +12959,7 @@ input::placeholder {
 
 .map-one-market-terminal {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(308px, 350px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 450px);
   gap: 12px;
   height: 100%;
   min-height: 0;
@@ -13099,6 +13099,11 @@ input::placeholder {
   gap: 8px;
 }
 
+.market-builder-controls--routes {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
 .market-builder-controls label {
   display: grid;
   gap: 5px;
@@ -13147,6 +13152,10 @@ input::placeholder {
   align-items: stretch;
 }
 
+.market-amount-control--route {
+  grid-template-columns: minmax(0, 1fr) 88px;
+}
+
 .market-amount-control strong,
 .market-amount-control button {
   min-height: 34px;
@@ -13180,6 +13189,215 @@ input::placeholder {
 .market-amount-control button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.trade-route-section {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  min-height: 0;
+}
+
+.trade-route-section__head {
+  color: #7fdfff;
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.trade-route-list {
+  display: grid;
+  grid-auto-rows: minmax(90px, max-content);
+  align-content: start;
+  gap: 7px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.trade-route-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 9px;
+  min-height: 90px;
+  padding: 7px 136px 7px 9px;
+  position: relative;
+  border: 1px solid rgba(90, 190, 255, 0.36);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(72, 180, 255, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(5, 18, 36, 0.94), rgba(2, 9, 20, 0.94));
+  box-shadow: inset 0 1px 0 rgba(170, 235, 255, 0.08);
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.trade-route-card:hover,
+.trade-route-card:focus-visible,
+.trade-route-card.is-selected {
+  border-color: rgba(127, 223, 255, 0.82);
+  box-shadow: inset 0 1px 0 rgba(170, 235, 255, 0.12), 0 0 18px rgba(43, 171, 255, 0.2);
+}
+
+.trade-route-card.is-best {
+  border-color: rgba(127, 223, 255, 0.92);
+  box-shadow: inset 0 1px 0 rgba(170, 235, 255, 0.16), 0 0 22px rgba(43, 171, 255, 0.28);
+}
+
+.trade-route-card.is-loss,
+.trade-route-card.is-muted {
+  opacity: 0.72;
+  border-color: rgba(115, 150, 180, 0.32);
+  background: linear-gradient(180deg, rgba(7, 14, 24, 0.88), rgba(3, 8, 16, 0.9));
+  box-shadow: none;
+}
+
+.trade-route-card__planet {
+  width: 42px;
+  height: 42px;
+  align-self: center;
+  border-radius: 50%;
+  border: 1px solid rgba(155, 220, 255, 0.44);
+  box-shadow: inset -8px -10px 14px rgba(0, 0, 0, 0.42), 0 0 18px rgba(78, 180, 255, 0.26);
+  background: radial-gradient(circle at 34% 30%, #d9f8ff 0 4%, #5cb8ff 16%, #153d91 45%, #07132c 76%);
+}
+
+.trade-route-card__planet--virella {
+  background: radial-gradient(circle at 35% 30%, #e8fbff 0 5%, #67e7ff 18%, #0a7192 48%, #051829 78%);
+}
+
+.trade-route-card__planet--asteronprime {
+  background: radial-gradient(circle at 34% 28%, #f6fbff 0 4%, #adbbc7 18%, #566a77 48%, #121922 78%);
+}
+
+.trade-route-card__planet--nyxara {
+  background: radial-gradient(circle at 34% 28%, #e5f0ff 0 4%, #74a7ff 18%, #28459c 48%, #07142c 78%);
+}
+
+.trade-route-card__main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.trade-route-card__title-row,
+.trade-route-card__bottom {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trade-route-card__title {
+  margin: 0 0 2px;
+  color: #f1f8ff;
+  font-size: 0.82rem;
+  line-height: 1.05;
+}
+
+.trade-route-card__route {
+  margin: 0;
+  color: #9ebcda;
+  font-size: 0.62rem;
+}
+
+.trade-route-badge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 215, 106, 0.52);
+  border-radius: 6px;
+  color: #ffe589;
+  background: rgba(70, 46, 10, 0.52);
+  font-size: 0.48rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trade-route-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.trade-route-chip {
+  padding: 2px 6px;
+  border: 1px solid rgba(90, 190, 255, 0.24);
+  border-radius: 5px;
+  color: #dbeeff;
+  background: rgba(3, 14, 28, 0.82);
+  font-size: 0.52rem;
+  font-weight: 850;
+}
+
+.trade-route-chip--profit {
+  border-color: rgba(101, 240, 160, 0.28);
+  color: #65f0a0;
+  background: rgba(2, 32, 22, 0.72);
+}
+
+.trade-route-chip--loss {
+  border-color: rgba(255, 106, 126, 0.32);
+  color: #ff8e9f;
+  background: rgba(45, 10, 18, 0.7);
+}
+
+.trade-route-chip--jumps {
+  color: #b9d7f4;
+}
+
+.trade-route-chip--cost,
+.trade-route-chip--revenue {
+  color: #b9d7f4;
+  border-color: rgba(90, 190, 255, 0.16);
+  background: rgba(2, 8, 18, 0.56);
+}
+
+.trade-route-card__profit {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.trade-route-card__profit span {
+  color: #9ebcda;
+  font-size: 0.5rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.trade-route-card__profit strong {
+  font-size: 0.8rem;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.trade-route-card__profit em {
+  display: none;
+}
+
+.trade-route-card__button {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 122px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 0.7rem;
+}
+
+.trade-route-card__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+  color: #b4bdc7;
+  border-color: rgba(140, 160, 180, 0.26);
+  background: linear-gradient(180deg, rgba(42, 48, 58, 0.88), rgba(22, 26, 34, 0.88));
 }
 
 @keyframes tutorialLandingPulse {

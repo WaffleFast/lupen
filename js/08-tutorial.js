@@ -68,7 +68,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "select-market-target",
     title: "Choose destination",
-    text: "Confirm Virella as the target planet. Asteron Prime sells Iron cheap; Virella pays more.",
+    text: "Select the Virella route card. Asteron Prime sells Iron cheap; Virella pays more.",
     target: "tutorial:marketTarget",
     event: "selectedMarketTarget"
   },
@@ -883,8 +883,8 @@ function getDynamicTutorialTarget(step) {
   }
 
   if (step.target === "tutorial:marketTarget") {
-    return document.querySelector("[data-tutorial-target='marketTargetConfirm']:not(:disabled)") ||
-           document.querySelector("[data-tutorial-target='marketTargetSelect']");
+    return document.querySelector("[data-tutorial-target='marketRouteCard']") ||
+           document.querySelector(".trade-route-card:not(.is-loss)");
   }
 
   if (step.target === "tutorial:planetTradeTerminal") {

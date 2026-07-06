@@ -1000,6 +1000,163 @@ function getOrderedMapOneMarketPlanets(currentPlanet = getCurrentMarketPlanet())
   return [currentPlanet, ...MAP_ONE_MARKET_PLANETS.filter(planet => planet !== currentPlanet)];
 }
 
+function getJumpCountBetweenNodes(fromNodeId, toNodeId) {
+  if (!fromNodeId || !toNodeId || !sectorNodes[fromNodeId] || !sectorNodes[toNodeId]) return null;
+  const path = typeof findSectorRoute === "function" ? findSectorRoute(fromNodeId, toNodeId) : [];
+  return path.length > 1 ? path.length - 1 : fromNodeId === toNodeId ? 0 : null;
+}
+
+function getTradeRouteMarginLabel(unitMargin, buyPrice) {
+  if (unitMargin <= 0 || buyPrice <= 0) return "Loss";
+  const marginPercent = (unitMargin / buyPrice) * 100;
+  if (marginPercent < 10) return "Weak Margin";
+  if (marginPercent < 20) return "Fair Margin";
+  return "Strong Margin";
+}
+
+function getTradeRouteHint(route) {
+  if (!route) return "";
+  if (route.unitMargin <= 0) return route.jumpCount === 1 ? "Short route, poor return" : "Longer route, poor return";
+  if (route.marginPercent >= 20 && (route.jumpCount || 0) > 1) return "Longer route, stronger return";
+  if (route.marginPercent >= 20) return "Strong return from this station";
+  if (route.marginPercent >= 10) return "Balanced route, steady return";
+  return "Small margin, watch the cargo cost";
+}
+
+function getMarketRouteCards({
+  resource = selectedMarketResource,
+  origin = getCurrentMarketPlanet(),
+  quantity = selectedMarketQuantity,
+  stagingTradeLocked = isMultiplayerStagingActive() && !isLocalTutorialTradeActive()
+} = {}) {
+  const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
+  const destinations = MAP_ONE_MARKET_PLANETS.filter(planet => planet !== origin);
+  const routes = destinations.map(destination => {
+    const stagingOffer = stagingTradeLocked
+      ? findMultiplayerStagingTradeOffer({ good: resource, origin, destination })
+      : null;
+    const stagingPricing = stagingTradeLocked
+      ? getMultiplayerStagingRoutePricing({ good: resource, origin, destination })
+      : null;
+    const buyPrice = stagingTradeLocked ? Number(stagingPricing?.buyPrice || stagingOffer?.buyPrice || 0) : getMapOneMarketPrice(resource, origin);
+    const sellPrice = stagingTradeLocked ? Number(stagingPricing?.sellPrice || stagingOffer?.sellPrice || 0) : getMapOneMarketPrice(resource, destination);
+    const routeLimit = stagingTradeLocked
+      ? getMultiplayerStagingTradeQuantityLimit({ operation: "buy", good: resource, origin, destination })
+      : getMarketMaxBuyQuantity(resource, origin);
+    const affordable = buyPrice > 0 ? Math.floor(credits / buyPrice) : 0;
+    const maxUnits = Math.max(0, Math.min(routeLimit, affordable, freeCargo));
+    const selectedUnits = maxUnits > 0 ? clampNumber(quantity || maxUnits, 1, maxUnits) : 0;
+    const unitMargin = sellPrice - buyPrice;
+    const marginPercent = buyPrice > 0 ? (unitMargin / buyPrice) * 100 : 0;
+    const estimatedProfit = unitMargin * selectedUnits;
+    const jumpCount = getJumpCountBetweenNodes(origin, destination);
+    const jumpPenalty = jumpCount === null ? 0 : jumpCount * 25;
+    const pending = stagingTradeLocked && stagingOffer && isMultiplayerStagingTradePending("buy", stagingOffer.offerId);
+    const score = estimatedProfit - jumpPenalty;
+
+    return {
+      destination,
+      origin,
+      resource,
+      buyPrice,
+      sellPrice,
+      unitMargin,
+      marginPercent,
+      marginLabel: getTradeRouteMarginLabel(unitMargin, buyPrice),
+      maxUnits,
+      selectedUnits,
+      totalCost: buyPrice * selectedUnits,
+      estimatedRevenue: sellPrice * selectedUnits,
+      estimatedProfit,
+      jumpCount,
+      score,
+      stagingOffer,
+      pending,
+      isLoss: unitMargin <= 0,
+      canLoad: unitMargin > 0 && selectedUnits > 0 && buyPrice > 0 && credits >= buyPrice * selectedUnits && freeCargo >= selectedUnits && (!stagingTradeLocked || Boolean(stagingOffer)) && !pending
+    };
+  });
+
+  routes.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    if (right.estimatedProfit !== left.estimatedProfit) return right.estimatedProfit - left.estimatedProfit;
+    if (right.unitMargin !== left.unitMargin) return right.unitMargin - left.unitMargin;
+    return left.destination.localeCompare(right.destination);
+  });
+
+  const bestRoute = routes.find(route => route.unitMargin > 0 && route.estimatedProfit > 0);
+  if (bestRoute) bestRoute.isBest = true;
+  return routes;
+}
+
+function renderTradeRouteCard(route) {
+  const destinationClass = safeId(route.destination);
+  const jumpsText = route.jumpCount === null ? "? Jumps" : `${formatNumber(route.jumpCount)} ${route.jumpCount === 1 ? "Jump" : "Jumps"}`;
+  const profitClass = route.estimatedProfit >= 0 ? "profit-good" : "profit-bad";
+  const profitSign = route.estimatedProfit >= 0 ? "+" : "-";
+  const buttonLabel = route.pending ? "Applying..." : route.isLoss ? "Not Recommended" : "Load Cargo";
+  const disabledAttr = route.canLoad ? "" : "disabled";
+  const badge = route.isBest
+    ? `<span class="trade-route-badge">BEST ROUTE</span>`
+    : "";
+  const cardClasses = [
+    "trade-route-card",
+    route.isBest ? "is-best" : "",
+    route.isLoss ? "is-loss is-muted" : "",
+    selectedMarketTargetPlanet === route.destination ? "is-selected" : ""
+  ].filter(Boolean).join(" ");
+
+  return `
+    <article
+      class="${cardClasses}"
+      data-route-destination="${escapeHtml(route.destination)}"
+      data-tutorial-target="${route.destination === selectedMarketTargetPlanet ? "marketRouteCard" : ""}"
+      onclick="selectMarketRouteDestination('${escapeJsString(route.destination)}')"
+      onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectMarketRouteDestination('${escapeJsString(route.destination)}'); }"
+      tabindex="0"
+      role="button"
+      aria-label="${escapeHtml(`${route.resource} route from ${route.origin} to ${route.destination}`)}">
+      <div class="trade-route-card__planet trade-route-card__planet--${destinationClass}" aria-hidden="true"></div>
+      <div class="trade-route-card__main">
+        <div class="trade-route-card__title-row">
+          <div>
+            <h4 class="trade-route-card__title">${escapeHtml(route.destination)}</h4>
+            <p class="trade-route-card__route">${escapeHtml(route.origin)} -> ${escapeHtml(route.destination)}</p>
+          </div>
+          ${badge}
+        </div>
+        <div class="trade-route-card__chips">
+          <span class="trade-route-chip trade-route-chip--sell">Sell CR ${formatNumber(route.sellPrice)}</span>
+          <span class="trade-route-chip trade-route-chip--jumps">${jumpsText}</span>
+          <span class="trade-route-chip ${route.isLoss ? "trade-route-chip--loss" : "trade-route-chip--profit"}">${escapeHtml(route.marginLabel)}</span>
+          <span class="trade-route-chip trade-route-chip--cost">Cost CR ${formatNumber(route.totalCost)}</span>
+          <span class="trade-route-chip trade-route-chip--revenue">Revenue CR ${formatNumber(route.estimatedRevenue)}</span>
+        </div>
+        <div class="trade-route-card__bottom">
+          <div class="trade-route-card__profit">
+            <span>Estimated Profit</span>
+            <strong class="${profitClass}">${profitSign}CR ${formatNumber(Math.abs(route.estimatedProfit))}</strong>
+            <em>${escapeHtml(getTradeRouteHint(route))}</em>
+          </div>
+          <button
+            type="button"
+            class="trade-route-card__button trade-primary-action"
+            data-tutorial-target="${route.destination === selectedMarketTargetPlanet ? "buyCargo" : ""}"
+            onclick="loadMarketRouteCargo('${escapeJsString(route.destination)}', event)"
+            ${disabledAttr}>${buttonLabel}</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderTradeRouteCards(routes) {
+  if (!routes.length) {
+    return `<div class="trade-preview-note staging-trade-status compact">No destination routes are available from this station.</div>`;
+  }
+  return `<div class="trade-route-list">${routes.map(renderTradeRouteCard).join("")}</div>`;
+}
+
 function normalizeMarketBuilderState() {
   const currentPlanet = getCurrentMarketPlanet();
   const tutorialTradeActive = isLocalTutorialTradeActive();
@@ -1213,9 +1370,14 @@ function renderMapOneMarketTerminal(goodsBox) {
     ? sellRevenue
     : Math.max(0, effectiveQuantity) * ((sellUnitPrice || 0) - (sellUnitBasis || 0));
   const buyActionQuantityLimit = stagingTradeLocked ? buyQuantityLimit : maxBuy;
+  const routeCards = sellMode ? [] : getMarketRouteCards({ resource, origin: currentPlanet, quantity: effectiveQuantity, stagingTradeLocked });
+  const selectedRouteCard = routeCards.find(route => route.destination === targetPlanet) || routeCards[0] || null;
+  const selectedResourceBuyPrice = sellMode
+    ? sellUnitBasis
+    : selectedRouteCard?.buyPrice || (stagingTradeLocked ? getMultiplayerStagingMarketPrice(resource, currentPlanet, currentPlanet) : getMapOneMarketPrice(resource, currentPlanet)) || 0;
   const builderRouteText = sellMode
     ? (localSellMode ? `${activeMarketTrade?.origin || "Route origin"} > ${currentPlanet}` : stagingRecoveredCargoSale ? "Recovered resource" : `${sellStagingOrigin} > ${currentPlanet}`)
-    : `${currentPlanet} > ${targetPlanet}`;
+    : `Current station: ${currentPlanet}`;
   const sellOrigin = localSellMode ? activeMarketTrade?.origin || "Route origin" : sellStagingOrigin;
 
   goodsBox.innerHTML = `
@@ -1272,44 +1434,37 @@ function renderMapOneMarketTerminal(goodsBox) {
           <div>
             <h3>${resource}</h3>
             <p>${builderRouteText}</p>
+            ${sellMode ? "" : `<p>Buy price: CR ${formatNumber(selectedResourceBuyPrice)}</p>`}
           </div>
         </div>
 
-        <div class="market-builder-controls">
+        <div class="market-builder-controls ${sellMode ? "" : "market-builder-controls--routes"}">
           ${sellMode ? `
           <div class="trade-preview-note staging-sell-summary route-sell-summary">
             <strong>${formatNumber(held)} ${resource} ready for sale</strong>
             <span>${sellOrigin} to ${currentPlanet} / CR ${formatNumber(sellUnitPrice)} per unit</span>
           </div>
-          ` : `<label>
-            <span>Target Planet</span>
-            <select class="market-target-select" data-tutorial-target="marketTargetSelect" onchange="setMarketTargetPlanet(this.value)">
-              ${targetPlanetOptions.map(planet => `<option value="${planet}" ${planet === targetPlanet ? "selected" : ""}>${planet}</option>`).join("")}
-            </select>
-            <button type="button" class="market-target-confirm" data-tutorial-target="marketTargetConfirm" onclick="confirmMarketTargetPlanet()">Confirm Target</button>
-          </label>`}
+          ` : `<div class="trade-route-section">
+            <div class="trade-route-section__head">AVAILABLE ROUTES</div>
+            ${renderTradeRouteCards(routeCards)}
+          </div>`}
           <label>
             <span>${sellMode ? "Sell Amount" : "Buy Amount"}</span>
-            <div class="market-amount-control">
+            <div class="market-amount-control ${sellMode ? "" : "market-amount-control--route"}">
               <strong>${sellMode ? `Sell ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} carried` : `${formatNumber(effectiveQuantity)} units`}</strong>
               ${sellMode
                 ? `<button type="button" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${sellQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
                   <button class="trade-primary-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${localSellMode || (sellStagingOffer && !sellPending) ? "" : "disabled"}>${sellPending ? "Applying..." : "Sell Cargo"}</button>`
-                : `<button type="button" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyActionQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>
-                  <button class="trade-primary-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${stagingTradeLocked ? buyStagingOffer && !buyPending ? "" : "disabled" : canBuy ? "" : "disabled"}>${stagingTradeLocked ? buyStagingOffer ? buyPending ? "Applying..." : "Buy Cargo" : "Preview Unavailable" : "Buy Cargo"}</button>`}
+                : `<button type="button" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyActionQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>`}
             </div>
           </label>
         </div>
 
-        <div class="market-builder-summary">
-          ${sellMode
-            ? `<div><span>Sell Revenue</span><strong>CR ${formatNumber(sellRevenue)}</strong></div>
+        ${sellMode ? `<div class="market-builder-summary">
+          <div><span>Sell Revenue</span><strong>CR ${formatNumber(sellRevenue)}</strong></div>
               <div><span>Source</span><strong>${sellOrigin}</strong></div>
-              <div class="profit-summary-card"><span>${stagingRecoveredCargoSale ? "Recovered Value" : "Sell Profit"}</span><strong class="${sellProfit >= 0 ? "profit-good" : "profit-bad"}">${stagingRecoveredCargoSale ? "CR " : sellProfit >= 0 ? "+" : "-"}${stagingRecoveredCargoSale ? formatNumber(sellProfit) : `CR ${formatNumber(Math.abs(sellProfit))}`}</strong></div>`
-            : `<div><span>Total Cost</span><strong>CR ${formatNumber(totalCost)}</strong></div>
-              <div><span>Estimated Revenue</span><strong>CR ${formatNumber(estimatedRevenue)}</strong></div>
-              <div class="profit-summary-card"><span>Estimated Profit</span><strong class="${estimatedProfit >= 0 ? "profit-good" : "profit-bad"}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>`}
-        </div>
+              <div class="profit-summary-card"><span>${stagingRecoveredCargoSale ? "Recovered Value" : "Sell Profit"}</span><strong class="${sellProfit >= 0 ? "profit-good" : "profit-bad"}">${stagingRecoveredCargoSale ? "CR " : sellProfit >= 0 ? "+" : "-"}${stagingRecoveredCargoSale ? formatNumber(sellProfit) : `CR ${formatNumber(Math.abs(sellProfit))}`}</strong></div>
+        </div>` : ""}
 
         ${held > 0 ? `<div class="market-builder-actions has-sell">
           <div class="trade-preview-note staging-sell-summary">
@@ -1363,6 +1518,60 @@ function setMarketTargetPlanet(planet) {
   selectedMarketTargetPlanet = planet;
   tutorialEvent("selectedMarketTarget");
   renderMarketplace();
+}
+
+function selectMarketRouteDestination(destination) {
+  setMarketTargetPlanet(destination);
+}
+
+function getMarketRouteLoadBlockReason(route) {
+  if (!route) return "Trade route unavailable.";
+  if (route.isLoss) return "Not recommended: this route would lose credits.";
+  if (!route.buyPrice || route.buyPrice <= 0) return "Buy price unavailable for this resource.";
+  if (route.pending) return "Trade request already pending.";
+  if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && !route.stagingOffer) return "Server trade route unavailable.";
+  if (route.selectedUnits <= 0) {
+    const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
+    if (freeCargo <= 0) return "Cargo hold is full.";
+    if (credits < route.buyPrice) return "Not enough credits.";
+    return "No cargo can be loaded.";
+  }
+  if (credits < route.totalCost) return "Not enough credits.";
+  if (Math.max(0, getShipStats().cargo - cargoUsed()) < route.selectedUnits) return "Cargo hold is full.";
+  return "";
+}
+
+function showMarketRouteLoadMessage(message) {
+  if (!message) return;
+  if (typeof addHudToast === "function") addHudToast(message);
+  if (typeof addActivityLog === "function") addActivityLog(message);
+}
+
+function loadMarketRouteCargo(destination, event) {
+  if (event?.stopPropagation) event.stopPropagation();
+  normalizeMarketBuilderState();
+
+  const currentPlanet = getCurrentMarketPlanet();
+  const tutorialTradeActive = isLocalTutorialTradeActive();
+  const stagingTradeLocked = isMultiplayerStagingActive() && !tutorialTradeActive;
+  const routes = getMarketRouteCards({
+    resource: selectedMarketResource,
+    origin: currentPlanet,
+    quantity: selectedMarketQuantity,
+    stagingTradeLocked
+  });
+  const route = routes.find(candidate => candidate.destination === destination);
+  selectedMarketTargetPlanet = destination;
+  tutorialEvent("selectedMarketTarget");
+
+  const blockReason = getMarketRouteLoadBlockReason(route);
+  if (blockReason) {
+    showMarketRouteLoadMessage(blockReason);
+    renderMarketplace();
+    return;
+  }
+
+  buyMarketCargo();
 }
 
 function confirmMarketTargetPlanet() {
@@ -1482,8 +1691,9 @@ function buyMarketCargo() {
     tutorialTrade: tutorialTradeActive
   });
 
-  if (stagingTradeActive && typeof addActivityLog === "function") {
-    addActivityLog(`Bought ${formatNumber(quantity)} ${good} for CR ${formatNumber(totalCost)}. Deliver to ${destination} for estimated profit CR ${formatNumber(Math.max(0, (sellPrice - price) * quantity))}.`);
+  if (typeof addActivityLog === "function") {
+    const estimatedRouteProfit = (sellPrice - price) * quantity;
+    addActivityLog(`Route locked: ${currentPlanet} -> ${destination}. Loaded ${formatNumber(quantity)} ${good}. Estimated profit: ${estimatedRouteProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedRouteProfit))}.`);
   }
   tutorialEvent("boughtTradeCargo");
   saveGame();
