@@ -151,6 +151,8 @@ function getStoreUserReason(reason) {
   const labels = {
     staging_store_writes_disabled: "Store writes are disabled in staging.",
     staging_store_dry_run_enabled: "Dry run only - no credits or Store ownership changed.",
+    staging_store_write_scope_disabled: "Store write scope is disabled.",
+    staging_store_write_scope_invalid: "Store write scope is invalid.",
     verified_identity_required: "Verified staging identity required.",
     staging_store_write_allowlist_missing: "Store write allowlist is missing.",
     player_not_in_staging_store_write_allowlist: "Player is not allowlisted for staging Store writes.",
@@ -179,19 +181,31 @@ function getStoreUserReason(reason) {
   return labels[reason] || "Server purchase failed - try again.";
 }
 
+function normalizeStagingWriteScope(value, fallback = "disabled") {
+  const requestedScope = getString(value, fallback).toLowerCase();
+  const supported = requestedScope === "all" || requestedScope === "verified" || requestedScope === "allowlist" || requestedScope === "disabled";
+  return {
+    requestedScope,
+    scope: supported ? requestedScope : "invalid",
+    scopeInvalid: !supported
+  };
+}
+
 export function getStoreWriteEnvGate(playerId, itemId = "", env = process.env) {
-  const scope = getString(env.STAGING_STORE_WRITE_SCOPE, "verified").toLowerCase();
-  const normalizedScope = scope === "verified" || scope === "allowlist" ? scope : "disabled";
+  const scopeGate = normalizeStagingWriteScope(env.STAGING_STORE_WRITE_SCOPE, "verified");
+  const normalizedScope = scopeGate.scope;
   const allowlist = getCsvSet(env.STAGING_STORE_WRITE_ALLOWLIST);
   const allowedItems = getCatalogAllowedSet(env.STAGING_STORE_WRITE_ALLOWED_ITEMS, DEFAULT_ALLOWED_STORE_ITEMS);
-  const playerAllowed = normalizedScope === "verified"
+  const playerAllowed = normalizedScope === "all" || normalizedScope === "verified"
     ? !!playerId
-    : !!playerId && allowlist.has(playerId);
+    : normalizedScope === "allowlist" && !!playerId && allowlist.has(playerId);
 
   return {
     writeEnabled: getBooleanEnv(env.STAGING_STORE_WRITE_ENABLED, true),
     dryRun: getBooleanEnv(env.STAGING_STORE_WRITE_DRY_RUN, false),
     scope: normalizedScope,
+    requestedScope: scopeGate.requestedScope,
+    scopeInvalid: scopeGate.scopeInvalid,
     allowlistPresent: allowlist.size > 0,
     allowlisted: playerAllowed,
     playerAllowed,
@@ -469,9 +483,14 @@ export async function applyStagingStorePurchaseWrite({
   if (envGate.dryRun) return getBlockedResult("staging_store_dry_run_enabled", { envGate, itemId: selectedItem.itemId, quantity: safeQuantity });
   if (!envGate.itemAllowed) return getBlockedResult("store_item_not_allowed", { envGate, itemId: selectedItem.itemId, quantity: safeQuantity });
   if (!envGate.playerAllowed) {
-    return getBlockedResult(envGate.scope === "allowlist" && !envGate.allowlistPresent
-      ? "staging_store_write_allowlist_missing"
-      : "player_not_in_staging_store_write_allowlist", { envGate, itemId: selectedItem.itemId, quantity: safeQuantity });
+    const blockReason = envGate.scopeInvalid
+      ? "staging_store_write_scope_invalid"
+      : envGate.scope === "disabled"
+        ? "staging_store_write_scope_disabled"
+        : envGate.scope === "allowlist" && !envGate.allowlistPresent
+          ? "staging_store_write_allowlist_missing"
+          : "player_not_in_staging_store_write_allowlist";
+    return getBlockedResult(blockReason, { envGate, itemId: selectedItem.itemId, quantity: safeQuantity });
   }
 
   const config = getSupabaseConfig(env);
@@ -544,6 +563,8 @@ export async function applyStagingStorePurchaseWrite({
         dryRun: envGate.dryRun,
         allowlisted: envGate.playerAllowed,
         scope: envGate.scope,
+        requestedScope: envGate.requestedScope,
+        scopeInvalid: envGate.scopeInvalid === true,
         trustedSaveAvailable: true,
         itemAllowed: envGate.itemAllowed
       },

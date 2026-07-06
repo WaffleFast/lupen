@@ -90,6 +90,16 @@ function getCatalogAllowedSet(value = "", catalogCsv = "") {
   return getCsvSet(value);
 }
 
+function normalizeStagingWriteScope(value, fallback = "disabled") {
+  const requestedScope = getString(value, fallback).toLowerCase();
+  const supported = requestedScope === "all" || requestedScope === "verified" || requestedScope === "allowlist" || requestedScope === "disabled";
+  return {
+    requestedScope,
+    scope: supported ? requestedScope : "invalid",
+    scopeInvalid: !supported
+  };
+}
+
 function getSupabaseConfig(env = process.env) {
   return {
     url: getString(env.SUPABASE_URL),
@@ -139,6 +149,8 @@ function getUserReason(reason) {
   const labels = {
     staging_loadout_writes_disabled: "Loadout writes are disabled in staging.",
     staging_loadout_dry_run_enabled: "Dry run only - loadout not changed.",
+    staging_loadout_write_scope_disabled: "Loadout write scope is disabled.",
+    staging_loadout_write_scope_invalid: "Loadout write scope is invalid.",
     verified_identity_required: "Verified staging identity required.",
     staging_loadout_write_allowlist_missing: "Loadout write allowlist is missing.",
     player_not_in_staging_loadout_write_allowlist: "Player is not allowlisted for staging loadout writes.",
@@ -271,18 +283,20 @@ function getShieldCapacity(saveData, shipId, attachments = []) {
 }
 
 export function getLoadoutWriteEnvGate(playerId, itemId = CARGO_POD_ITEM_ID, env = process.env) {
-  const scope = getString(env.STAGING_LOADOUT_WRITE_SCOPE, "disabled").toLowerCase();
-  const normalizedScope = scope === "verified" || scope === "allowlist" ? scope : "disabled";
+  const scopeGate = normalizeStagingWriteScope(env.STAGING_LOADOUT_WRITE_SCOPE, "disabled");
+  const normalizedScope = scopeGate.scope;
   const allowlist = getCsvSet(env.STAGING_LOADOUT_WRITE_ALLOWLIST);
   const allowedItems = getCatalogAllowedSet(env.STAGING_LOADOUT_WRITE_ALLOWED_ITEMS, DEFAULT_ALLOWED_LOADOUT_ITEMS);
-  const playerAllowed = normalizedScope === "verified"
+  const playerAllowed = normalizedScope === "all" || normalizedScope === "verified"
     ? !!playerId
-    : !!playerId && allowlist.has(playerId);
+    : normalizedScope === "allowlist" && !!playerId && allowlist.has(playerId);
 
   return {
     writeEnabled: getBooleanEnv(env.STAGING_LOADOUT_WRITE_ENABLED, false),
     dryRun: getBooleanEnv(env.STAGING_LOADOUT_WRITE_DRY_RUN, true),
     scope: normalizedScope,
+    requestedScope: scopeGate.requestedScope,
+    scopeInvalid: scopeGate.scopeInvalid,
     allowlistPresent: allowlist.size > 0,
     allowlisted: playerAllowed,
     playerAllowed,
@@ -806,9 +820,14 @@ export async function applyStagingLoadoutEquipWrite({
   if (envGate.dryRun) return blocked("staging_loadout_dry_run_enabled", { envGate, itemId });
   if (!envGate.itemAllowed) return blocked("loadout_item_not_allowed", { envGate, itemId });
   if (!envGate.playerAllowed) {
-    return blocked(envGate.scope === "allowlist" && !envGate.allowlistPresent
-      ? "staging_loadout_write_allowlist_missing"
-      : "player_not_in_staging_loadout_write_allowlist", { envGate, itemId });
+    const blockReason = envGate.scopeInvalid
+      ? "staging_loadout_write_scope_invalid"
+      : envGate.scope === "disabled"
+        ? "staging_loadout_write_scope_disabled"
+        : envGate.scope === "allowlist" && !envGate.allowlistPresent
+          ? "staging_loadout_write_allowlist_missing"
+          : "player_not_in_staging_loadout_write_allowlist";
+    return blocked(blockReason, { envGate, itemId });
   }
 
   const config = getSupabaseConfig(env);
@@ -869,6 +888,8 @@ export async function applyStagingLoadoutEquipWrite({
         dryRun: envGate.dryRun,
         allowlisted: envGate.playerAllowed,
         scope: envGate.scope,
+        requestedScope: envGate.requestedScope,
+        scopeInvalid: envGate.scopeInvalid === true,
         trustedSaveAvailable: true,
         itemAllowed: envGate.itemAllowed
       },

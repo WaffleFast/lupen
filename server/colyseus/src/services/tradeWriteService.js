@@ -80,18 +80,30 @@ function getCsvSet(value = "") {
   );
 }
 
+function normalizeStagingWriteScope(value, fallback = "disabled") {
+  const requestedScope = getString(value, fallback).toLowerCase();
+  const supported = requestedScope === "all" || requestedScope === "verified" || requestedScope === "allowlist" || requestedScope === "disabled";
+  return {
+    requestedScope,
+    scope: supported ? requestedScope : "invalid",
+    scopeInvalid: !supported
+  };
+}
+
 function getTradeWriteEnvGate(playerId, env = process.env) {
-  const scope = getString(env.STAGING_TRADE_WRITE_SCOPE, "disabled").toLowerCase();
+  const scopeGate = normalizeStagingWriteScope(env.STAGING_TRADE_WRITE_SCOPE, "disabled");
   const allowlist = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWLIST);
-  const normalizedScope = scope === "verified" || scope === "allowlist" ? scope : "disabled";
-  const playerAllowed = normalizedScope === "verified"
+  const normalizedScope = scopeGate.scope;
+  const playerAllowed = normalizedScope === "all" || normalizedScope === "verified"
     ? !!playerId
-    : !!playerId && allowlist.has(playerId);
+    : normalizedScope === "allowlist" && !!playerId && allowlist.has(playerId);
 
   return {
     writeEnabled: getBooleanEnv(env.STAGING_TRADE_WRITE_ENABLED, false),
     dryRun: getBooleanEnv(env.STAGING_TRADE_WRITE_DRY_RUN, true),
     scope: normalizedScope,
+    requestedScope: scopeGate.requestedScope,
+    scopeInvalid: scopeGate.scopeInvalid,
     allowlistPresent: allowlist.size > 0,
     playerAllowed
   };
@@ -164,6 +176,8 @@ function getTradeWriteUserReason(reason = "") {
     fetch_unavailable: "Server fetch is unavailable for the trade write.",
     staging_trade_writes_disabled: "Staging trade writes are disabled on the server.",
     staging_trade_dry_run_enabled: "Staging trade dry-run is enabled on the server.",
+    staging_trade_write_scope_disabled: "Staging trade write scope is disabled.",
+    staging_trade_write_scope_invalid: "Staging trade write scope is invalid.",
     staging_trade_write_allowlist_missing: "Staging trade write allowlist is missing.",
     player_not_in_staging_trade_write_allowlist: "This verified player is not allowlisted for staging trade writes.",
     supabase_config_missing: "Supabase service-role configuration is missing or invalid.",
@@ -431,9 +445,14 @@ export async function applyStagingTradeBuyWrite({
   if (!envGate.writeEnabled) return getBlockedResult("staging_trade_writes_disabled", { envGate });
   if (envGate.dryRun) return getBlockedResult("staging_trade_dry_run_enabled", { envGate });
   if (!envGate.playerAllowed) {
-    return getBlockedResult(envGate.scope === "allowlist" && !envGate.allowlistPresent
-      ? "staging_trade_write_allowlist_missing"
-      : "player_not_in_staging_trade_write_allowlist", { envGate });
+    const blockReason = envGate.scopeInvalid
+      ? "staging_trade_write_scope_invalid"
+      : envGate.scope === "disabled"
+        ? "staging_trade_write_scope_disabled"
+        : envGate.scope === "allowlist" && !envGate.allowlistPresent
+          ? "staging_trade_write_allowlist_missing"
+          : "player_not_in_staging_trade_write_allowlist";
+    return getBlockedResult(blockReason, { envGate });
   }
 
   const config = getSupabaseConfig(env);
@@ -479,6 +498,7 @@ export async function applyStagingTradeBuyWrite({
       dryRun: false,
       reason: "Staging trade buy applied",
       debugReason: "phase5b_staging_trade_buy_write_applied",
+      envGate,
       offerId: offer.offerId,
       resourceId: offer.resourceId,
       resourceName: offer.resourceName,
@@ -533,9 +553,14 @@ export async function applyStagingTradeSellWrite({
   if (!envGate.writeEnabled) return getBlockedResult("staging_trade_writes_disabled", { operation: "sell", envGate });
   if (envGate.dryRun) return getBlockedResult("staging_trade_dry_run_enabled", { operation: "sell", envGate });
   if (!envGate.playerAllowed) {
-    return getBlockedResult(envGate.scope === "allowlist" && !envGate.allowlistPresent
-      ? "staging_trade_write_allowlist_missing"
-      : "player_not_in_staging_trade_write_allowlist", { operation: "sell", envGate });
+    const blockReason = envGate.scopeInvalid
+      ? "staging_trade_write_scope_invalid"
+      : envGate.scope === "disabled"
+        ? "staging_trade_write_scope_disabled"
+        : envGate.scope === "allowlist" && !envGate.allowlistPresent
+          ? "staging_trade_write_allowlist_missing"
+          : "player_not_in_staging_trade_write_allowlist";
+    return getBlockedResult(blockReason, { operation: "sell", envGate });
   }
 
   const config = getSupabaseConfig(env);
@@ -582,6 +607,7 @@ export async function applyStagingTradeSellWrite({
       dryRun: false,
       reason: "Staging trade sell applied",
       debugReason: "phase5d_staging_trade_sell_write_applied",
+      envGate,
       offerId: offer.offerId,
       resourceId: offer.resourceId,
       resourceName: offer.resourceName,

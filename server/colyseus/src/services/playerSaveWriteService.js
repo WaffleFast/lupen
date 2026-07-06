@@ -121,7 +121,8 @@ function getStagingProgressionWriteAllowlist(env = process.env) {
 
 export function getProgressionWriteScope(env = process.env) {
   const scope = getStringValue(env.STAGING_PROGRESSION_WRITE_SCOPE, "allowlist").toLowerCase();
-  return scope === "verified" ? "verified" : "allowlist";
+  if (scope === "all" || scope === "verified" || scope === "allowlist") return scope;
+  return "invalid";
 }
 
 export function isProgressionWriteEnabled(env = process.env) {
@@ -133,14 +134,16 @@ function getAllowlistStatus(playerId, env = process.env) {
   const normalizedPlayerId = getStringValue(playerId);
   const progressionWriteScope = getProgressionWriteScope(env);
   const playerInStagingWriteAllowlist = !!normalizedPlayerId && allowlist.includes(normalizedPlayerId);
-  const verifiedScopeEnabled = progressionWriteScope === "verified";
+  const verifiedScopeEnabled = progressionWriteScope === "all" || progressionWriteScope === "verified";
+  const scopeInvalid = progressionWriteScope === "invalid";
 
   return {
     progressionWriteScope,
     verifiedScopeEnabled,
+    scopeInvalid,
     stagingWriteAllowlistPresent: allowlist.length > 0,
     playerInStagingWriteAllowlist,
-    playerAllowedForStagingWrite: verifiedScopeEnabled ? !!normalizedPlayerId : playerInStagingWriteAllowlist
+    playerAllowedForStagingWrite: verifiedScopeEnabled ? !!normalizedPlayerId : !scopeInvalid && playerInStagingWriteAllowlist
   };
 }
 
@@ -348,7 +351,22 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
     };
   }
 
-  if (allowlistStatus.progressionWriteScope !== "verified" && !allowlistStatus.stagingWriteAllowlistPresent) {
+  if (allowlistStatus.scopeInvalid) {
+    return {
+      ok: false,
+      applied: false,
+      dryRun: true,
+      progressionWritesEnabled: true,
+      idempotencyKey: getStringValue(plan.idempotencyKey),
+      idempotencyReady: true,
+      duplicateDetected: false,
+      ...allowlistStatus,
+      skippedReason: "staging_write_scope_invalid",
+      plan
+    };
+  }
+
+  if (!allowlistStatus.verifiedScopeEnabled && !allowlistStatus.stagingWriteAllowlistPresent) {
     return {
       ok: false,
       applied: false,
@@ -373,7 +391,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       idempotencyReady: true,
       duplicateDetected: false,
       ...allowlistStatus,
-      skippedReason: allowlistStatus.progressionWriteScope === "verified"
+      skippedReason: allowlistStatus.verifiedScopeEnabled
         ? "verified_player_missing"
         : "player_not_in_staging_write_allowlist",
       plan

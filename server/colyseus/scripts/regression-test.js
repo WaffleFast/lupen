@@ -1192,6 +1192,57 @@ async function assertStagingTradeValidationHelpers() {
   assert(enabledWriteGate.gates.dryRun === false, "Trade write gate did not disable dry-run.");
   assert(enabledWriteGate.gates.allowlisted === true, "Trade write gate did not allow verified allowlisted player.");
 
+  const allScopeTradeGate = buildStagingTradeWriteDryRun({
+    operation: "buy",
+    offerId,
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 0,
+        cargoCapacity: 12,
+        cargoByResource: { Iron: 0 }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-b"
+    },
+    env: {
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "all",
+      STAGING_TRADE_WRITE_ALLOWLIST: ""
+    }
+  });
+  assert(allScopeTradeGate.gates.scope === "all" && allScopeTradeGate.gates.allowlisted === true, "Trade config scope=all did not allow a non-allowlisted verified player.");
+
+  const invalidScopeTradeGate = buildStagingTradeWriteDryRun({
+    operation: "buy",
+    offerId,
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: {
+        credits: 1000,
+        cargoUsed: 0,
+        cargoCapacity: 12,
+        cargoByResource: { Iron: 0 }
+      }
+    },
+    identity: {
+      authStatus: "verified",
+      trustedPlayerId: "verified-player-b"
+    },
+    env: {
+      STAGING_TRADE_WRITE_ENABLED: "true",
+      STAGING_TRADE_WRITE_DRY_RUN: "false",
+      STAGING_TRADE_WRITE_SCOPE: "everybody"
+    }
+  });
+  assert(invalidScopeTradeGate.gates.scope === "invalid" && invalidScopeTradeGate.gates.scopeInvalid === true && invalidScopeTradeGate.gates.allowlisted === false, "Trade config invalid scope was not surfaced safely.");
+
   const notAllowlistedGate = buildStagingTradeWriteDryRun({
     operation: "buy",
     offerId,
@@ -1417,8 +1468,8 @@ async function assertStagingTradeValidationHelpers() {
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
       STAGING_TRADE_WRITE_ENABLED: "true",
       STAGING_TRADE_WRITE_DRY_RUN: "false",
-      STAGING_TRADE_WRITE_SCOPE: "allowlist",
-      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+      STAGING_TRADE_WRITE_SCOPE: "all",
+      STAGING_TRADE_WRITE_ALLOWLIST: ""
     },
     fetchImpl: async (url, options = {}) => {
       fetchCalls.push({ url, options });
@@ -1455,6 +1506,7 @@ async function assertStagingTradeValidationHelpers() {
   });
   assert(fetchCalls.length === 2, `Trade write expected read+patch, got ${fetchCalls.length} calls.`);
   assert(appliedWrite.applied === true, `Trade write did not apply in mocked enabled path: ${appliedWrite.reason}`);
+  assert(appliedWrite.envGate.scope === "all" && appliedWrite.envGate.playerAllowed === true, "Trade buy scope=all did not allow a non-allowlisted verified player.");
   assert(appliedWrite.mode === "trade_write", `Unexpected trade write mode: ${appliedWrite.mode}`);
   assert(appliedWrite.creditsWritten === true && appliedWrite.cargoWritten === true && appliedWrite.saveWritten === true, "Applied trade write did not report expected writes.");
   assert(appliedWrite.inventoryWritten === false && appliedWrite.lootWritten === false && appliedWrite.bountyWritten === false, "Applied trade write reported forbidden writes.");
@@ -1584,8 +1636,8 @@ async function assertStagingTradeValidationHelpers() {
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-role",
       STAGING_TRADE_WRITE_ENABLED: "true",
       STAGING_TRADE_WRITE_DRY_RUN: "false",
-      STAGING_TRADE_WRITE_SCOPE: "allowlist",
-      STAGING_TRADE_WRITE_ALLOWLIST: "verified-player-a"
+      STAGING_TRADE_WRITE_SCOPE: "all",
+      STAGING_TRADE_WRITE_ALLOWLIST: ""
     },
     fetchImpl: async (url, options = {}) => {
       fetchCalls.push({ url, options });
@@ -1623,6 +1675,7 @@ async function assertStagingTradeValidationHelpers() {
   });
   assert(fetchCalls.length === 2, `Trade sell write expected read+patch, got ${fetchCalls.length} calls.`);
   assert(appliedSellWrite.applied === true, `Trade sell write did not apply in mocked enabled path: ${appliedSellWrite.reason}`);
+  assert(appliedSellWrite.envGate.scope === "all" && appliedSellWrite.envGate.playerAllowed === true, "Trade sell scope=all did not allow a non-allowlisted verified player.");
   assert(appliedSellWrite.mode === "trade_write", `Unexpected trade sell write mode: ${appliedSellWrite.mode}`);
   assert(appliedSellWrite.creditsDelta === 50 && appliedSellWrite.cargoDelta === -2, "Trade sell write returned incorrect deltas.");
   assert(appliedSellWrite.inventoryWritten === false && appliedSellWrite.lootWritten === false && appliedSellWrite.bountyWritten === false, "Applied trade sell write reported forbidden writes.");
@@ -1913,6 +1966,15 @@ async function assertStagingStorePreviewHelpers() {
   assert(writeGateDefault.writeEnabled === true && writeGateDefault.dryRun === false && writeGateDefault.scope === "verified", "Store write gate default should allow verified staging catalogue purchases.");
   assert(writeGateDefault.playerAllowed === true, "Verified Store write gate default did not allow a verified player id.");
   assert(writeGateDefault.itemAllowed === true, "Catalog Store items should be allowed by the default staging item gate.");
+  const writeGateAll = getStoreWriteEnvGate("verified-player-b", "gun:pulseLaser", {
+    STAGING_STORE_WRITE_SCOPE: "all",
+    STAGING_STORE_WRITE_ALLOWLIST: ""
+  });
+  assert(writeGateAll.scope === "all" && writeGateAll.playerAllowed === true, "Store write scope=all did not allow a non-allowlisted verified player.");
+  const writeGateInvalidScope = getStoreWriteEnvGate("verified-player-b", "gun:pulseLaser", {
+    STAGING_STORE_WRITE_SCOPE: "everybody"
+  });
+  assert(writeGateInvalidScope.scope === "invalid" && writeGateInvalidScope.scopeInvalid === true && writeGateInvalidScope.playerAllowed === false, "Store write invalid scope was not surfaced safely.");
   const writeGateCatalog = getStoreWriteEnvGate("verified-player-a", "gun:voidRail", {
     STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
   });
@@ -2246,8 +2308,8 @@ async function assertStagingStorePreviewHelpers() {
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
       STAGING_STORE_WRITE_ENABLED: "true",
       STAGING_STORE_WRITE_DRY_RUN: "false",
-      STAGING_STORE_WRITE_SCOPE: "allowlist",
-      STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_STORE_WRITE_SCOPE: "all",
+      STAGING_STORE_WRITE_ALLOWLIST: "",
       STAGING_STORE_WRITE_ALLOWED_ITEMS: "gun:pulseLaser"
     },
     fetchImpl: async (_url, options = {}) => {
@@ -2258,6 +2320,7 @@ async function assertStagingStorePreviewHelpers() {
     }
   });
   assert(appliedWeaponWrite.applied === true && appliedWeaponWrite.mode === "store_write", `Gated Pulse Laser Store write did not apply: ${appliedWeaponWrite.blockReason}`);
+  assert(appliedWeaponWrite.envGate.scope === "all" && appliedWeaponWrite.envGate.playerAllowed === true, "Store gun scope=all did not allow a non-allowlisted verified player.");
   assert(appliedWeaponWrite.creditsBefore === 1000 && appliedWeaponWrite.creditsAfter === 252, "Applied Pulse Laser Store write returned incorrect credits.");
   assert(appliedWeaponWrite.itemBefore === 1 && appliedWeaponWrite.itemAfter === 2, "Applied Pulse Laser Store write returned incorrect weapon count.");
   assert(appliedWeaponWrite.creditsWritten === true && appliedWeaponWrite.weaponWritten === true && appliedWeaponWrite.saveWritten === true, "Applied Pulse Laser Store write did not report allowed writes.");
@@ -2369,6 +2432,15 @@ async function assertStagingCargoPodEquipHelpers() {
   const defaultGate = getLoadoutWriteEnvGate("verified-player-a", "attachment:cargoPod", {});
   assert(defaultGate.writeEnabled === false && defaultGate.dryRun === true, "Loadout write gate default was not safe.");
   assert(defaultGate.itemAllowed === true, "Catalog loadout items should be allowed by the default staging item gate.");
+  const allScopeGate = getLoadoutWriteEnvGate("verified-player-b", "attachment:cargoPod", {
+    STAGING_LOADOUT_WRITE_SCOPE: "all",
+    STAGING_LOADOUT_WRITE_ALLOWLIST: ""
+  });
+  assert(allScopeGate.scope === "all" && allScopeGate.playerAllowed === true, "Loadout scope=all did not allow a non-allowlisted verified player.");
+  const invalidScopeGate = getLoadoutWriteEnvGate("verified-player-b", "attachment:cargoPod", {
+    STAGING_LOADOUT_WRITE_SCOPE: "everybody"
+  });
+  assert(invalidScopeGate.scope === "invalid" && invalidScopeGate.scopeInvalid === true && invalidScopeGate.playerAllowed === false, "Loadout invalid scope was not surfaced safely.");
   const catalogGate = getLoadoutWriteEnvGate("verified-player-a", "attachment:evasionMatrix", {
     STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "catalog"
   });
@@ -2774,8 +2846,8 @@ async function assertStagingCargoPodEquipHelpers() {
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
       STAGING_LOADOUT_WRITE_ENABLED: "true",
       STAGING_LOADOUT_WRITE_DRY_RUN: "false",
-      STAGING_LOADOUT_WRITE_SCOPE: "allowlist",
-      STAGING_LOADOUT_WRITE_ALLOWLIST: "verified-player-a",
+      STAGING_LOADOUT_WRITE_SCOPE: "all",
+      STAGING_LOADOUT_WRITE_ALLOWLIST: "",
       STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:cargoPod"
     },
     fetchImpl: async (url, options = {}) => {
@@ -2793,6 +2865,7 @@ async function assertStagingCargoPodEquipHelpers() {
     }
   });
   assert(appliedWrite.applied === true && appliedWrite.mode === "loadout_write", `Gated Cargo Pod equip did not apply: ${appliedWrite.blockReason}`);
+  assert(appliedWrite.envGate.scope === "all" && appliedWrite.envGate.playerAllowed === true, "Loadout equip scope=all did not allow a non-allowlisted verified player.");
   assert(appliedWrite.ownedBefore === 2 && appliedWrite.ownedAfter === 1, "Applied Cargo Pod equip returned incorrect ownership.");
   assert(appliedWrite.equippedBefore === 0 && appliedWrite.equippedAfter === 1, "Applied Cargo Pod equip returned incorrect equipped count.");
   assert(appliedWrite.cargoCapacityBefore === 150 && appliedWrite.cargoCapacityAfter === 175, "Applied Cargo Pod equip returned incorrect capacity.");
@@ -3253,7 +3326,8 @@ async function assertStagingBountyHelpers() {
   const bountyPatchResult = await applyPlayerSavePatchPlan(bountyPatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
-      STAGING_PROGRESSION_WRITE_SCOPE: "verified",
+      STAGING_PROGRESSION_WRITE_SCOPE: "all",
+      STAGING_PROGRESSION_WRITE_ALLOWLIST: "",
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
     },
@@ -3326,7 +3400,8 @@ async function assertStagingBountyHelpers() {
   const botKillPatchResult = await applyPlayerSavePatchPlan(botKillPatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
-      STAGING_PROGRESSION_WRITE_SCOPE: "verified",
+      STAGING_PROGRESSION_WRITE_SCOPE: "all",
+      STAGING_PROGRESSION_WRITE_ALLOWLIST: "",
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
     },
@@ -3756,6 +3831,18 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(notAllowlistedPlayerSavePatchResult?.playerInStagingWriteAllowlist === false, "Non-allow-listed player_saves patch adapter allowed the player.");
   assert(notAllowlistedPlayerSavePatchResult?.skippedReason === "player_not_in_staging_write_allowlist", `Unexpected non-allow-listed player_saves patch reason: ${notAllowlistedPlayerSavePatchResult?.skippedReason}`);
 
+  const invalidScopePlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
+    env: {
+      ENABLE_STAGING_PROGRESSION_WRITES: "true",
+      STAGING_PROGRESSION_WRITE_SCOPE: "everybody"
+    }
+  });
+  assert(invalidScopePlayerSavePatchResult?.dryRun === true, "Invalid-scope player_saves patch adapter did not stay dry-run.");
+  assert(invalidScopePlayerSavePatchResult?.applied === false, "Invalid-scope player_saves patch adapter applied progression.");
+  assert(invalidScopePlayerSavePatchResult?.progressionWriteScope === "invalid", "Invalid-scope player_saves patch did not expose invalid scope.");
+  assert(invalidScopePlayerSavePatchResult?.playerAllowedForStagingWrite === false, "Invalid-scope player_saves patch allowed the player.");
+  assert(invalidScopePlayerSavePatchResult?.skippedReason === "staging_write_scope_invalid", `Unexpected invalid-scope player_saves patch reason: ${invalidScopePlayerSavePatchResult?.skippedReason}`);
+
   const allowlistedPlayerSavePatchResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
@@ -3803,7 +3890,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   const validPatchPlayerSaveResult = await applyPlayerSavePatchPlan(playerSavePatchPlan, {
     env: {
       ENABLE_STAGING_PROGRESSION_WRITES: "true",
-      STAGING_PROGRESSION_WRITE_SCOPE: "verified",
+      STAGING_PROGRESSION_WRITE_SCOPE: "all",
+      STAGING_PROGRESSION_WRITE_ALLOWLIST: "",
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "stub-service-key"
     },
@@ -3838,8 +3926,8 @@ async function assertIdentityVerificationAndRewardPlanHelpers() {
   assert(validPatchPlayerSaveResult?.ok === true, "Valid mocked player_saves patch did not succeed.");
   assert(validPatchPlayerSaveResult?.applied === true, "Valid mocked player_saves patch was not applied.");
   assert(validPatchPlayerSaveResult?.dryRun === false, "Valid mocked player_saves patch stayed dry-run.");
-  assert(validPatchPlayerSaveResult?.progressionWriteScope === "verified", "Valid mocked player_saves patch did not use verified scope.");
-  assert(validPatchPlayerSaveResult?.playerAllowedForStagingWrite === true, "Verified-scope mocked player_saves patch did not allow the verified player.");
+  assert(validPatchPlayerSaveResult?.progressionWriteScope === "all", "Valid mocked player_saves patch did not use all scope.");
+  assert(validPatchPlayerSaveResult?.playerAllowedForStagingWrite === true, "All-scope mocked player_saves patch did not allow the verified player.");
   assert(validPatchPlayerSaveResult?.xpBefore === 80 && validPatchPlayerSaveResult?.xpAfter === 84, "Valid mocked player_saves patch did not apply XP delta.");
   assert(validPatchPlayerSaveResult?.creditsBefore === 1200 && validPatchPlayerSaveResult?.creditsAfter === 1200, "Valid mocked player_saves patch changed credits.");
   assert(Array.isArray(validPatchPlayerSaveResult?.appliedFields), "Valid mocked player_saves patch did not include applied fields.");

@@ -334,12 +334,21 @@ function getCsvSet(value = "") {
   );
 }
 
+function normalizeStagingTradeWriteScope(value, fallback = "disabled") {
+  const requestedScope = String(value || fallback).trim().toLowerCase();
+  const supported = requestedScope === "all" || requestedScope === "verified" || requestedScope === "allowlist" || requestedScope === "disabled";
+  return {
+    requestedScope,
+    scope: supported ? requestedScope : "invalid",
+    scopeInvalid: !supported
+  };
+}
+
 export function getStagingTradeWriteConfig(env = process.env) {
   const maxQuantity = normalizeTradeNumber(env.STAGING_TRADE_WRITE_MAX_QUANTITY, 1000) || 1000;
   const allowlist = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWLIST);
   const allowedOffers = getCsvSet(env.STAGING_TRADE_WRITE_ALLOWED_OFFERS);
-  const requestedScope = String(env.STAGING_TRADE_WRITE_SCOPE || "disabled").trim().toLowerCase();
-  const scope = requestedScope === "verified" || requestedScope === "allowlist" ? requestedScope : "disabled";
+  const scopeGate = normalizeStagingTradeWriteScope(env.STAGING_TRADE_WRITE_SCOPE, "disabled");
 
   return {
     writeEnabled: getBooleanEnv(env.STAGING_TRADE_WRITE_ENABLED, false),
@@ -347,7 +356,9 @@ export function getStagingTradeWriteConfig(env = process.env) {
     // be explicitly false plus all other staging identity/save gates.
     dryRun: getBooleanEnv(env.STAGING_TRADE_WRITE_DRY_RUN, true),
     envDryRun: getBooleanEnv(env.STAGING_TRADE_WRITE_DRY_RUN, true),
-    scope,
+    scope: scopeGate.scope,
+    requestedScope: scopeGate.requestedScope,
+    scopeInvalid: scopeGate.scopeInvalid,
     allowlistPresent: allowlist.size > 0,
     allowlist,
     maxQuantity,
@@ -359,9 +370,9 @@ export function getStagingTradeWriteConfig(env = process.env) {
 function getTradeWriteGates({ identity = {}, trustedState = null, config = getStagingTradeWriteConfig() } = {}) {
   const playerId = String(identity.trustedPlayerId || identity.playerId || "");
   const verified = identity.authStatus === "verified" && !!playerId;
-  const allowlisted = config.scope === "verified"
+  const allowlisted = config.scope === "all" || config.scope === "verified"
     ? verified
-    : verified && config.allowlist.has(playerId);
+    : config.scope === "allowlist" && verified && config.allowlist.has(playerId);
 
   return {
     verified,
@@ -369,6 +380,8 @@ function getTradeWriteGates({ identity = {}, trustedState = null, config = getSt
     dryRun: config.dryRun !== false,
     allowlisted,
     scope: config.scope,
+    requestedScope: config.requestedScope,
+    scopeInvalid: config.scopeInvalid === true,
     trustedSaveAvailable: trustedState?.available === true,
     maxQuantity: config.maxQuantity,
     allowedOffersPresent: config.allowedOffersPresent

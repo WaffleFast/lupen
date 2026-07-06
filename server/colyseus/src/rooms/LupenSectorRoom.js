@@ -447,9 +447,11 @@ function getStagingTradeWriteBlockReason({
   if (gates.dryRun !== false) return "staging_trade_dry_run_enabled";
   if (gates.verified !== true) return "missing_verified_supabase_identity";
   if (gates.allowlisted !== true) {
+    if (gates.scopeInvalid === true || gates.scope === "invalid") return "staging_trade_write_scope_invalid";
+    if (gates.scope === "disabled") return "staging_trade_write_scope_disabled";
     return gates.scope === "allowlist"
       ? "player_not_in_staging_trade_write_allowlist"
-      : "staging_trade_write_scope_disabled";
+      : "staging_trade_write_gate_not_satisfied";
   }
   if (gates.trustedSaveAvailable !== true || trustedState?.available !== true) {
     return "trusted_player_saves_read_unavailable";
@@ -466,6 +468,7 @@ function getStagingTradeWriteBlockUserReason(reason = "") {
     missing_verified_supabase_identity: "Verified Supabase identity is missing.",
     player_not_in_staging_trade_write_allowlist: "This verified player is not allowlisted for staging trade writes.",
     staging_trade_write_scope_disabled: "Staging trade write scope is disabled.",
+    staging_trade_write_scope_invalid: "Staging trade write scope is invalid.",
     trusted_player_saves_read_unavailable: "Trusted player_saves read is unavailable.",
     staging_mode_required_for_trade_write: "The room join mode is not staging.",
     invalid_staging_trade_sell_destination: "Blocked: wrong sell node.",
@@ -503,6 +506,8 @@ function logStagingTradeWriteBlocked({
     writeEnabled: gates.writeEnabled === true,
     dryRun: gates.dryRun !== false,
     scope: gates.scope || "",
+    requestedScope: gates.requestedScope || "",
+    scopeInvalid: gates.scopeInvalid === true,
     allowlisted: gates.allowlisted === true,
     trustedSaveAvailable: gates.trustedSaveAvailable === true,
     currentNode: player?.currentNode || "",
@@ -517,6 +522,8 @@ function getStagingStoreWriteBlockUserReason(reason = "") {
   const labels = {
     staging_store_writes_disabled: "Server purchase is not enabled.",
     staging_store_dry_run_enabled: "Server purchase is not enabled.",
+    staging_store_write_scope_disabled: "Server purchase is not enabled.",
+    staging_store_write_scope_invalid: "Server purchase failed - invalid Store write scope.",
     verified_identity_required: "Verified staging identity required.",
     staging_store_write_allowlist_missing: "Store write allowlist is missing.",
     player_not_in_staging_store_write_allowlist: "This verified player is not allowlisted for staging Store purchases.",
@@ -558,6 +565,8 @@ function logStagingStoreWriteBlocked({
     writeEnabled: gates.writeEnabled === true,
     dryRun: gates.dryRun === true,
     scope: gates.scope || "",
+    requestedScope: gates.requestedScope || "",
+    scopeInvalid: gates.scopeInvalid === true,
     allowlisted: gates.allowlisted === true,
     trustedSaveAvailable: gates.trustedSaveAvailable === true,
     itemAllowed: gates.itemAllowed === true,
@@ -3560,6 +3569,8 @@ export class LupenSectorRoom extends Room {
       dryRun: envGate.dryRun,
       allowlisted: envGate.playerAllowed,
       scope: envGate.scope,
+      requestedScope: envGate.requestedScope,
+      scopeInvalid: envGate.scopeInvalid === true,
       trustedSaveAvailable: trustedState?.available === true,
       itemAllowed: envGate.itemAllowed
     };
@@ -3660,9 +3671,13 @@ export class LupenSectorRoom extends Room {
     } else if (!gates.verified) {
       previewOnlyReason = "verified_identity_required";
     } else if (!gates.allowlisted) {
-      previewOnlyReason = envGate.scope === "allowlist" && !envGate.allowlistPresent
-        ? "staging_store_write_allowlist_missing"
-        : "player_not_in_staging_store_write_allowlist";
+      previewOnlyReason = envGate.scopeInvalid
+        ? "staging_store_write_scope_invalid"
+        : envGate.scope === "disabled"
+          ? "staging_store_write_scope_disabled"
+          : envGate.scope === "allowlist" && !envGate.allowlistPresent
+            ? "staging_store_write_allowlist_missing"
+            : "player_not_in_staging_store_write_allowlist";
     } else if (!gates.itemAllowed) {
       previewOnlyReason = "store_item_not_allowed";
     } else if (!stationValid) {
@@ -3727,6 +3742,8 @@ export class LupenSectorRoom extends Room {
       dryRun: envGate.dryRun,
       allowlisted: envGate.playerAllowed,
       scope: envGate.scope,
+      requestedScope: envGate.requestedScope,
+      scopeInvalid: envGate.scopeInvalid === true,
       trustedSaveAvailable: trustedState?.available === true,
       itemAllowed: envGate.itemAllowed
     };
@@ -3801,9 +3818,13 @@ export class LupenSectorRoom extends Room {
             : !gates.verified
               ? "verified_identity_required"
               : !gates.allowlisted
-                ? envGate.scope === "allowlist" && !envGate.allowlistPresent
-                  ? "staging_loadout_write_allowlist_missing"
-                  : "player_not_in_staging_loadout_write_allowlist"
+                ? envGate.scopeInvalid
+                  ? "staging_loadout_write_scope_invalid"
+                  : envGate.scope === "disabled"
+                    ? "staging_loadout_write_scope_disabled"
+                    : envGate.scope === "allowlist" && !envGate.allowlistPresent
+                      ? "staging_loadout_write_allowlist_missing"
+                      : "player_not_in_staging_loadout_write_allowlist"
                 : !gates.itemAllowed
                   ? "loadout_item_not_allowed"
                   : "trusted_save_required";
