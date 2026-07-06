@@ -1244,6 +1244,7 @@ function performAttackCycle() {
       const overflowText = cargoResult.overflowAmount > 0 ? ` ${overflowSummary} left as salvage.` : "";
       const recoveredText = cargoResult.collectedAmount > 0 ? `Cargo recovered: ${collectedSummary}.` : "Cargo hold full.";
       addHudToast(`${getPilotName()} destroyed ${target.name}. ${recoveredText}${overflowText}`);
+      awardAsteroidShardBonus(getAsteroidShardReward(target), target.name || "Asteroid");
       scheduleAsteroidRespawn();
     }
 
@@ -1676,6 +1677,42 @@ function generateLootFromAsteroid(asteroidOrNode) {
   };
 }
 
+function getAsteroidShardReward(asteroidOrResource) {
+  const forced = window.__forceAsteroidShardReward;
+  if (forced === false) return 0;
+  if (forced === true) return 1;
+  if (Number.isFinite(Number(forced))) return Math.max(0, Math.floor(Number(forced)));
+
+  const resourceName = typeof asteroidOrResource === "string"
+    ? asteroidOrResource
+    : String(asteroidOrResource?.resource || asteroidOrResource?.resourceName || "");
+  const crystalBonus = resourceName === "Crystal Shards";
+  const chance = crystalBonus ? 0.35 : 0.18;
+  if (Math.random() >= chance) return 0;
+  return crystalBonus && Math.random() < 0.35 ? 2 : 1;
+}
+
+function awardAsteroidShardBonus(quantity = 0, sourceLabel = "Asteroid") {
+  const shardDelta = Math.max(0, Math.floor(Number(quantity || 0)));
+  if (shardDelta <= 0) return 0;
+  upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+  upgradeMaterials.lupenShards = Math.max(0, Number(upgradeMaterials.lupenShards || 0)) + shardDelta;
+  const shardLabel = shardDelta === 1 ? "Lupen Shard" : "Lupen Shards";
+  const message = `${sourceLabel} yielded +${formatNumber(shardDelta)} ${shardLabel}.`;
+  if (typeof addActivityLog === "function") addActivityLog(message);
+  if (typeof addHudToast === "function") addHudToast(message);
+  if (typeof showGameRewardBurst === "function") {
+    showGameRewardBurst({
+      type: "material",
+      kicker: "Rare Find",
+      title: `+${formatNumber(shardDelta)} ${shardLabel}`,
+      meta: sourceLabel,
+      image: "assets/items/lupen-shard.png"
+    });
+  }
+  return shardDelta;
+}
+
 function summarizeLootMap(lootMap) {
   const entries = Object.entries(lootMap || {}).filter(([, amount]) => amount > 0);
   if (!entries.length) return "salvage";
@@ -1803,6 +1840,8 @@ function applyStagingResourceMineResult(result = {}) {
   const collectedAmount = Math.max(0, Number(deposit.collectedAmount || 0));
   const overflowAmount = Math.max(0, Number(deposit.overflowAmount || 0));
   const cargoUsedAfter = cargoUsed();
+  const shardDelta = Math.max(0, Math.round(Number(result.lupenShardDelta || result.shardDelta || 0)));
+  const appliedShardDelta = awardAsteroidShardBonus(shardDelta, `${resourceName} asteroid`);
   const collectedText = collectedAmount > 0
     ? `Recovered ${formatNumber(collectedAmount)} ${resourceName}. Cargo ${formatNumber(cargoUsedAfter)}/${formatNumber(cargoCapacity)}.`
     : "cargo full";
@@ -1845,6 +1884,7 @@ function applyStagingResourceMineResult(result = {}) {
     cargoDelta,
     collectedAmount,
     overflowAmount,
+    lupenShardDelta: appliedShardDelta,
     cargoUsedBefore,
     cargoUsedAfter,
     cargoCapacity,

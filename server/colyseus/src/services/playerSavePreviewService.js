@@ -59,10 +59,14 @@ function summarizeSaveData(saveData = {}, updatedAt = "") {
     ? saveData.playerProgress
     : {};
   const inventoryItems = Array.isArray(saveData.inventoryItems) ? saveData.inventoryItems : [];
+  const upgradeMaterials = saveData.upgradeMaterials && typeof saveData.upgradeMaterials === "object"
+    ? saveData.upgradeMaterials
+    : {};
 
   return {
     xp: getIntegerOrNull(progress.combatXp, progress.xp, progress.totalXp, saveData.combatXp, saveData.xp),
     credits: getIntegerOrNull(saveData.credits),
+    lupenShards: getIntegerOrNull(upgradeMaterials.lupenShards),
     level: getIntegerOrNull(progress.level, saveData.level),
     inventoryCount: inventoryItems.length,
     updatedAt: getStringValue(updatedAt || saveData.updated_at || saveData.savedAt)
@@ -176,6 +180,10 @@ export function buildProgressionPreview(currentSaveContext = {}, rewardApplicati
   const creditsDelta = Math.max(0, Math.round(Number(rewardApplicationPlan?.creditsDelta || 0)));
   const currentXp = getIntegerOrNull(saveSummary?.xp);
   const currentCredits = getIntegerOrNull(saveSummary?.credits);
+  const currentLupenShards = getIntegerOrNull(saveSummary?.lupenShards);
+  const lupenShardDelta = getLootList(rewardApplicationPlan?.lootAdditions)
+    .filter((item) => item === "lupenShard" || item === "preview:lupenShard")
+    .length;
   const available = currentSaveContext?.available === true;
 
   return {
@@ -188,6 +196,9 @@ export function buildProgressionPreview(currentSaveContext = {}, rewardApplicati
     currentCredits,
     previewCredits: currentCredits === null ? null : currentCredits + creditsDelta,
     creditsDelta,
+    currentLupenShards,
+    previewLupenShards: currentLupenShards === null ? null : currentLupenShards + lupenShardDelta,
+    lupenShardDelta,
     currentLevel: getIntegerOrNull(saveSummary?.level),
     inventoryCount: getIntegerOrNull(saveSummary?.inventoryCount),
     intendedLootAdditions: getLootList(rewardApplicationPlan?.lootAdditions),

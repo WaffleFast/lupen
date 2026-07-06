@@ -1213,7 +1213,7 @@ test.describe("Lupen browser smoke", () => {
     expect(tutorialDefault.tutorial.active).toBe(false);
     expect(tutorialDefault.overlayActive).toBe(false);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText("Multiplayer Staging Loop", { timeout: 15000 });
-    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*Store upgrades[\s\S]*Launch[\s\S]*Engage bots[\s\S]*Claim bounty XP/i);
+    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*Store upgrades[\s\S]*Launch[\s\S]*Engage bots[\s\S]*Claim bounty rewards/i);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/No PvP[\s\S]*bots return fire locally/i);
     await expect(page.locator("#chatPanel .chat-channel-tabs")).toBeHidden();
     await expect(page.locator("#onlinePilotsList")).toContainText(/Chat unavailable while disconnected|Online Pilots/i);
@@ -4065,14 +4065,17 @@ test.describe("Lupen browser smoke", () => {
         ownedShips = ["falcon"];
         ownedAttachments.cargoPod = 1;
         ownedAttachments.jumpDrive = 1;
+        ownedAttachments.shieldBooster = 1;
         ownedGuns.pulseLaser = 0;
+        ownedGuns.ionBlaster = 1;
         inventoryItems = [];
         shipLoadouts = {
           falcon: normalizeShipLoadout({ attachments: [], guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)] }, "falcon")
         };
-        upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 25 });
-        currentNode = "Asteron Prime";
-        lastPlanetNode = "Asteron Prime";
+        upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 10 });
+        currentNode = "Nyxara";
+        lastPlanetNode = "Nyxara";
+        selectedForgeItemId = "owned:attachments:cargoPod";
         openUpgradeForge();
       })()
     `));
@@ -4082,8 +4085,10 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Owned Items");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade Preview");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Lupen Shards");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade Item");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Need 15 More Shards");
     await expect(page.locator("#upgradeForgeScreen")).not.toContainText(/Quality Upgrade|Lupen Core|Lupen Cores/);
+    await expect(page.locator("#forgeStartBtn")).toBeDisabled();
+    await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-ui-final.png" });
 
     await page.evaluate(() => window.eval(`
       shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 1);
@@ -4112,6 +4117,61 @@ test.describe("Lupen browser smoke", () => {
     `));
     await expect(page.locator("#forgeStatePreview")).toContainText("Item is already max level for Map 1.");
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("asteroid depletion keeps resource cargo and can award Lupen Shards", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentNode = "Lower Apex";
+        lastPlanetNode = "Nyxara";
+        mineralKeys.forEach(key => { cargo[key] = 0; });
+        upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 0 });
+        window.__forceAsteroidShardReward = 2;
+        const drops = generateLootFromAsteroid({ resource: "Iron", dropMin: 3, dropMax: 3 });
+        const cargoResult = depositLootToCargo(drops);
+        const localShardDelta = awardAsteroidShardBonus(getAsteroidShardReward({ resource: "Iron" }), "Iron asteroid");
+        delete window.__forceAsteroidShardReward;
+
+        const stagingResult = applyStagingResourceMineResult({
+          ok: true,
+          resourceId: "staging-resource-test",
+          resourceName: "Copper",
+          cargoDelta: 4,
+          lupenShardDelta: 1,
+          resourceRewardId: "staging-resource-test:1",
+          depletedUntil: Date.now() + 1000,
+          receivedAt: Date.now()
+        });
+
+        return {
+          iron: cargo.Iron,
+          copper: cargo.Copper,
+          cargoCollected: cargoResult.collectedAmount,
+          localShardDelta,
+          stagingApplied: stagingResult.applied,
+          stagingShardDelta: stagingResult.lupenShardDelta,
+          shards: upgradeMaterials.lupenShards
+        };
+      })()
+    `));
+
+    expect(state).toMatchObject({
+      iron: 3,
+      copper: 4,
+      cargoCollected: 3,
+      localShardDelta: 2,
+      stagingApplied: true,
+      stagingShardDelta: 1,
+      shards: 3
+    });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -5615,6 +5675,7 @@ test.describe("Lupen browser smoke", () => {
         };
 
         showScreen("spaceScreen");
+        upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 7 });
         updateProgressDisplays();
         const first = awardLocalStagingBotKillXpFromServer({
           ok: true,
@@ -5685,7 +5746,8 @@ test.describe("Lupen browser smoke", () => {
           pilotText,
           fallbackKillActivityCount: activityMessages.filter(message => message === "Erebus Watcher destroyed. +100 XP.").length,
           serverMarkedDuplicateActivityCount: activityMessages.filter(message => message.includes("Erebus Scout destroyed")).length,
-          activeBountyProgress: window.LupenMultiplayerClient.getStatus().lastStagingBountyStatus.active.progress
+          activeBountyProgress: window.LupenMultiplayerClient.getStatus().lastStagingBountyStatus.active.progress,
+          shardCount: upgradeMaterials.lupenShards
         };
       })()
     `));
@@ -5709,6 +5771,7 @@ test.describe("Lupen browser smoke", () => {
     expect(state.fallbackKillActivityCount).toBe(1);
     expect(state.serverMarkedDuplicateActivityCount).toBe(0);
     expect(state.activeBountyProgress).toBe(1);
+    expect(state.shardCount).toBe(7);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -5840,11 +5903,12 @@ test.describe("Lupen browser smoke", () => {
         };
         shipConditions = {};
         upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 0 });
+        credits = 500;
         ensureDailyBounties();
         const contract = dailyBountyContracts[0];
         contract.status = "readyToClaim";
         contract.progress = getBountyRequiredKills(contract);
-        contract.reward = { credits: 0, xp: 125, lupenCores: 0, lupenShards: 0 };
+        contract.reward = { credits: 100, xp: 125, lupenCores: 0, lupenShards: 25 };
         selectedBountyContractId = contract.id;
         tutorialState = {
           active: true,
@@ -5857,6 +5921,8 @@ test.describe("Lupen browser smoke", () => {
         claimBountyReward(contract.id);
         const claimed = getBountyContract(contract.id);
         return {
+          combatXp: playerProgress.combatXp,
+          credits,
           shardCount: upgradeMaterials.lupenShards,
           contractShards: claimed.reward.lupenShards,
           status: claimed.status,
@@ -5866,10 +5932,13 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(rewardState).toMatchObject({
+      combatXp: 2500,
+      credits: 600,
       shardCount: 25,
       contractShards: 25,
       status: "claimed"
     });
+    expect(rewardState.overlayText).toContain("CR 100");
     expect(rewardState.overlayText).toContain("25 Lupen Shards");
 
     await page.evaluate(() => window.eval(`
@@ -7277,7 +7346,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toContainText("MP STAGING BOUNTIES");
     await expect(page.locator("#bountyScreen")).toContainText("Erebus Patrol Sweep");
     await expect(page.locator("#bountyScreen")).toContainText(/Server-tracked staging bounty|Waiting for Multiplayer Staging/);
-    await expect(page.locator("#bountyScreen")).toContainText(/40 XP|No CR or loot items/i);
+    await expect(page.locator("#bountyScreen")).toContainText(/CR \+ Lupen Shards|No XP payout/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

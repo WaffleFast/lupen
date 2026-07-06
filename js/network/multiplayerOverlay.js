@@ -3741,7 +3741,7 @@
       return {
         label: "Claimed",
         disabled: true,
-        title: "XP-only staging claim already applied. No credits or loot."
+        title: "Staging bounty claim already applied."
       };
     }
 
@@ -3755,9 +3755,9 @@
 
     if (claimStatus.gates?.xpWriteAllowed) {
       return {
-        label: "Claim XP",
+        label: "Claim Reward",
         disabled: false,
-        title: "Attempt gated XP-only staging claim. No credits or loot."
+        title: "Attempt gated staging bounty claim."
       };
     }
 
@@ -4297,7 +4297,7 @@
   }
 
   function getStagingFlowHint(status, selectedBot, players, bots) {
-    const loop = "Trade for CR -> Store upgrades -> Launch -> Engage bots -> Claim bounty XP.";
+    const loop = "Trade for CR -> Store upgrades -> Launch -> Engage bots -> Claim bounty rewards.";
 
     if (!status?.isConnected) {
       return `Connecting to Multiplayer Staging. ${loop}`;
@@ -4314,7 +4314,7 @@
 
     if (selectedBot.disabled) {
       return status?.lastRewardPreview?.botId === selectedBot.id
-        ? "Target destroyed. XP applied. Claim bounty XP from the Bounty Board when ready."
+        ? "Target destroyed. XP applied. Claim bounty rewards from the Bounty Board when ready."
         : "Target destroyed. Waiting for the server to respawn it.";
     }
 
@@ -4357,7 +4357,7 @@
 
     const note = global.document.createElement("span");
     note.className = "lupen-mp-flow-note";
-    note.textContent = "Trade, Store, loadout, combat XP, and bounty XP are live for staging. No PvP; engaged bots return fire locally.";
+    note.textContent = "Trade, Store, loadout, combat XP, and bounty rewards are live for staging. No PvP; engaged bots return fire locally.";
     hint.appendChild(note);
 
     global.document.body.appendChild(hint);
@@ -4729,7 +4729,7 @@
     inner.appendChild(progress);
 
     const reward = global.document.createElement("span");
-    reward.textContent = `XP-only reward: ${Math.round(Number(bounty.xpReward || 0))}. No CR or loot.`;
+    reward.textContent = "Reward: CR + Lupen Shards. No bounty XP.";
     inner.appendChild(reward);
 
     const claimLabel = getStagingBountyClaimLabel(status);
@@ -4903,7 +4903,7 @@
         setDiagnosticsRow(panel, "bounty", `${bounty.accepted ? "accepted" : "available"} / ${Math.round(Number(bounty.progress || 0))}/${Math.round(Number(bounty.requiredKills || 0))} / claim ${bounty.claimAvailable ? "yes" : "no"}`);
       }
       if (status.lastStagingBountyClaimResult) {
-        setDiagnosticsRow(panel, "bounty claim", `${status.lastStagingBountyClaimResult.mode || "unknown"} / XP +${Math.round(Number(status.lastStagingBountyClaimResult.xpDelta || 0))} / ${status.lastStagingBountyClaimResult.reason || "none"}`);
+        setDiagnosticsRow(panel, "bounty claim", `${status.lastStagingBountyClaimResult.mode || "unknown"} / reward claim / ${status.lastStagingBountyClaimResult.reason || "none"}`);
       }
       if (status.lastStagingBotXpResult) {
         const botXp = status.lastStagingBotXpResult;

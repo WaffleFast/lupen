@@ -1,7 +1,7 @@
 /* Staging-only bounty wrapper.
    This file defines a tiny server-owned objective for multiplayer staging.
-   It never writes normal bounty state, credits, loot, route completion,
-   inventory, PvP, player damage, or broad progression. */
+   It never writes normal bounty state, route completion, inventory, PvP,
+   player damage, or broad progression. */
 
 export const STAGING_BOUNTY_ID = "staging_erebus_patrol_2";
 
@@ -12,9 +12,10 @@ export const STAGING_BOUNTY = Object.freeze({
   targetType: "server_bot_destroy",
   targetFaction: "Erebus",
   requiredKills: 2,
-  xpReward: 40,
-  creditsReward: 0,
-  lootReward: [],
+  xpReward: 0,
+  creditsReward: 150,
+  lupenShardsReward: 1,
+  lootReward: ["lupenShard"],
   repeatable: false,
   stagingOnly: true
 });

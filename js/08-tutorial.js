@@ -176,7 +176,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "return-after-equip",
     title: "Return to station",
-    text: "Return to the station hub. Next objective: accept a bounty and turn combat into XP, credits, and upgrade rewards.",
+    text: "Return to the station hub. Next objective: accept a bounty and turn combat into credits and Lupen Shards.",
     target: "#hangarScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -191,7 +191,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "accept-bounty",
     title: "Accept bounty",
-    text: "Accept a bounty. Combat earns XP, credits, and materials that will matter more with every upgrade.",
+    text: "Accept a bounty. Bot kills still build combat XP, while completed bounties pay credits and Lupen Shards.",
     target: ".bounty-detail-panel button, .bounty-action-btn",
     event: "acceptedBounty"
   },
@@ -271,7 +271,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "claim-bounty",
     title: "Claim bounty reward",
-    text: "Claim your completed bounty. Combat payouts include credits, XP, and Lupen Shards.",
+    text: "Claim your completed bounty. Bounty payouts include credits and Lupen Shards.",
     target: "tutorial:claimBountyReward",
     event: ["openedBountyBoard", "claimedBountyReward"]
   },
@@ -325,7 +325,7 @@ const STARTER_TUTORIAL_STEPS = [
     title: "Programme Complete",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_outro_complete",
-    text: "Starter route complete. Run trades to save for the Buu Hauler, take bounties for XP and upgrade rewards, strengthen weapons through the Forge, and work toward Combat Level 2. The Nightshade Hawk waits for pilots who prove they are ready.",
+    text: "Starter route complete. Run trades to save for the Buu Hauler, take bounties for credits and Lupen Shards, strengthen weapons through the Forge, and work toward Combat Level 2. The Nightshade Hawk waits for pilots who prove they are ready.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin your journey",

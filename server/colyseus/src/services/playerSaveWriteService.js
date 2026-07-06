@@ -1,10 +1,12 @@
-/* Staging player_saves XP-only patch adapter.
+/* Staging player_saves reward patch adapter.
    This is the future real progression write path, but it is disabled by
-   default and fail-closed. It supports XP only for the current staging
-   sprint and never applies credits, loot, inventory, bounties, cargo,
-   equipment, or ship changes. */
+   default and fail-closed. It supports only combat XP, credits, and
+   upgradeMaterials.lupenShards; it never applies inventory, bounties,
+   cargo, equipment, or ship changes. */
 
 const MAX_STAGING_XP_DELTA = 500;
+const MAX_STAGING_CREDITS_DELTA = 50000;
+const MAX_STAGING_LUPEN_SHARD_DELTA = 100;
 
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -104,6 +106,20 @@ function setCombatXpOnly(source = {}, xpAfter = 0) {
     zoneCombatXp
   };
 
+  return updated;
+}
+
+function setRewardPatchValues(source = {}, plan = {}) {
+  let updated = cloneJson(source);
+  if (Number(plan.xpDelta || 0) > 0 && Number.isFinite(Number(plan.xpAfter))) {
+    updated = setCombatXpOnly(updated, plan.xpAfter);
+  }
+  if (Number(plan.creditsDelta || 0) > 0 && plan.creditsPath) {
+    updated = setValueAtPath(updated, plan.creditsPath.split("."), plan.creditsAfter);
+  }
+  if (Number(plan.lupenShardDelta || 0) > 0 && plan.lupenShardsPath) {
+    updated = setValueAtPath(updated, plan.lupenShardsPath.split("."), plan.lupenShardsAfter);
+  }
   return updated;
 }
 
@@ -236,25 +252,41 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
   const duplicateDetected = context.duplicateDetected === true || rewardApplicationPlan.duplicateDetected === true;
   const idempotencyKey = getIdempotencyKey(playerId, sourceEventId, sourceLedgerId);
   const xpDelta = clampInteger(rewardApplicationPlan.xpDelta, 0, MAX_STAGING_XP_DELTA);
-  const creditsDelta = 0;
+  const creditsDelta = clampInteger(rewardApplicationPlan.creditsDelta, 0, MAX_STAGING_CREDITS_DELTA);
+  const lupenShardDelta = Math.min(
+    MAX_STAGING_LUPEN_SHARD_DELTA,
+    Math.max(0, (Array.isArray(rewardApplicationPlan.lootAdditions) ? rewardApplicationPlan.lootAdditions : [])
+      .filter((item) => getStringValue(item) === "lupenShard" || getStringValue(item) === "preview:lupenShard")
+      .length)
+  );
   const xpMatch = resolveNumericPath(currentSaveData, [
     ["playerProgress", "combatXp"]
   ]);
   const creditsMatch = resolveNumericPath(currentSaveData, [
     ["credits"]
   ]);
+  const lupenShardsMatch = resolveNumericPath(currentSaveData, [
+    ["upgradeMaterials", "lupenShards"]
+  ]);
   const eligible = rewardApplicationPlan.eligible === true &&
     rewardApplicationPlan.authStatus === "verified" &&
     !!playerId;
+  const hasAnyDelta = xpDelta > 0 || creditsDelta > 0 || lupenShardDelta > 0;
   const blockedReason = !eligible
     ? "reward_application_not_eligible"
     : !idempotencyKey
       ? "idempotency_not_ready"
       : duplicateDetected
         ? "duplicate_reward_application"
-        : !xpMatch
+        : !hasAnyDelta
+          ? "reward_application_empty"
+          : xpDelta > 0 && !xpMatch
           ? "xp_path_missing_or_ambiguous"
-          : "";
+          : creditsDelta > 0 && !creditsMatch
+            ? "credits_path_missing_or_ambiguous"
+            : lupenShardDelta > 0 && !lupenShardsMatch
+              ? "lupen_shards_path_missing_or_invalid"
+              : "";
 
   return {
     playerId: eligible ? playerId : "",
@@ -265,12 +297,16 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
     duplicateDetected,
     xpPath: xpMatch?.path?.join(".") || "",
     creditsPath: creditsMatch?.path?.join(".") || "",
+    lupenShardsPath: lupenShardsMatch?.path?.join(".") || "",
     xpDelta,
     creditsDelta,
+    lupenShardDelta,
     xpBefore: xpMatch ? getIntegerValue(xpMatch.value, 0) : null,
     xpAfter: xpMatch ? getIntegerValue(xpMatch.value, 0) + xpDelta : null,
     creditsBefore: creditsMatch ? getIntegerValue(creditsMatch.value, 0) : null,
     creditsAfter: creditsMatch ? getIntegerValue(creditsMatch.value, 0) + creditsDelta : null,
+    lupenShardsBefore: lupenShardsMatch ? getIntegerValue(lupenShardsMatch.value, 0) : null,
+    lupenShardsAfter: lupenShardsMatch ? getIntegerValue(lupenShardsMatch.value, 0) + lupenShardDelta : null,
     lootPreviewOnly: Array.isArray(rewardApplicationPlan.lootAdditions) ? rewardApplicationPlan.lootAdditions.length : 0,
     eligible: !blockedReason,
     skippedReason: blockedReason,
@@ -509,7 +545,7 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       };
     }
 
-    const updatedSaveData = setCombatXpOnly(saveData, refreshedPlan.xpAfter);
+    const updatedSaveData = setRewardPatchValues(saveData, refreshedPlan);
     const patchResult = await patchPlayerSaveData(supabaseUrl, plan.playerId, updatedSaveData, config, fetchImpl);
 
     if (!patchResult.ok) {
@@ -538,9 +574,12 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
 
     const verifiedXp = getCombatXpFromSaveData(verifiedSaveData);
     const verifiedZoneXp = getZoneCombatXpFromSaveData(verifiedSaveData);
+    const verifiedCredits = Number(verifiedSaveData?.credits);
+    const verifiedLupenShards = Number(verifiedSaveData?.upgradeMaterials?.lupenShards);
     const persistenceVerified = !!verifiedSaveData &&
-      verifiedXp >= refreshedPlan.xpAfter &&
-      verifiedZoneXp >= refreshedPlan.xpAfter;
+      (refreshedPlan.xpDelta <= 0 || (verifiedXp >= refreshedPlan.xpAfter && verifiedZoneXp >= refreshedPlan.xpAfter)) &&
+      (refreshedPlan.creditsDelta <= 0 || verifiedCredits >= refreshedPlan.creditsAfter) &&
+      (refreshedPlan.lupenShardDelta <= 0 || verifiedLupenShards >= refreshedPlan.lupenShardsAfter);
 
     if (!persistenceVerified) {
       return {
@@ -556,12 +595,23 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
         status: verifyStatus,
         xpBefore: refreshedPlan.xpBefore,
         xpAfter: refreshedPlan.xpAfter,
+        creditsBefore: refreshedPlan.creditsBefore,
+        creditsAfter: refreshedPlan.creditsAfter,
+        lupenShardsBefore: refreshedPlan.lupenShardsBefore,
+        lupenShardsAfter: refreshedPlan.lupenShardsAfter,
         persistedXp: verifiedSaveData ? verifiedXp : null,
         persistedZoneXp: verifiedSaveData ? verifiedZoneXp : null,
+        persistedCredits: verifiedSaveData ? verifiedCredits : null,
+        persistedLupenShards: verifiedSaveData ? verifiedLupenShards : null,
         persistenceVerified: false,
         plan: refreshedPlan
       };
     }
+
+    const appliedFields = [];
+    if (refreshedPlan.xpDelta > 0) appliedFields.push("xp");
+    if (refreshedPlan.creditsDelta > 0) appliedFields.push("credits");
+    if (refreshedPlan.lupenShardDelta > 0) appliedFields.push("upgradeMaterials.lupenShards");
 
     return {
       ok: true,
@@ -581,7 +631,11 @@ export async function applyPlayerSavePatchPlan(plan = {}, options = {}) {
       persistenceVerified: true,
       creditsBefore: refreshedPlan.creditsBefore,
       creditsAfter: refreshedPlan.creditsAfter,
-      appliedFields: ["xp"],
+      persistedCredits: verifiedCredits,
+      lupenShardsBefore: refreshedPlan.lupenShardsBefore,
+      lupenShardsAfter: refreshedPlan.lupenShardsAfter,
+      persistedLupenShards: verifiedLupenShards,
+      appliedFields,
       plan: refreshedPlan
     };
   } catch (_err) {

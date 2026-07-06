@@ -1808,6 +1808,18 @@
       xpDelta: Number.isFinite(Number(message.xpDelta)) ? Number(message.xpDelta) : 0,
       xpBefore: xp.xpBefore,
       xpAfter: xp.xpAfter,
+      creditsDelta: Number.isFinite(Number(message.creditsDelta ?? message.playerSavePatchPlan?.creditsDelta ?? message.playerSavePatchResult?.plan?.creditsDelta))
+        ? Number(message.creditsDelta ?? message.playerSavePatchPlan?.creditsDelta ?? message.playerSavePatchResult?.plan?.creditsDelta)
+        : 0,
+      creditsAfter: Number.isFinite(Number(message.creditsAfter ?? message.playerSavePatchResult?.creditsAfter ?? message.playerSavePatchPlan?.creditsAfter ?? message.playerSavePatchResult?.plan?.creditsAfter))
+        ? Number(message.creditsAfter ?? message.playerSavePatchResult?.creditsAfter ?? message.playerSavePatchPlan?.creditsAfter ?? message.playerSavePatchResult?.plan?.creditsAfter)
+        : null,
+      lupenShardDelta: Number.isFinite(Number(message.lupenShardDelta ?? message.playerSavePatchPlan?.lupenShardDelta ?? message.playerSavePatchResult?.plan?.lupenShardDelta))
+        ? Number(message.lupenShardDelta ?? message.playerSavePatchPlan?.lupenShardDelta ?? message.playerSavePatchResult?.plan?.lupenShardDelta)
+        : 0,
+      lupenShardsAfter: Number.isFinite(Number(message.lupenShardsAfter ?? message.playerSavePatchResult?.lupenShardsAfter ?? message.playerSavePatchResult?.persistedLupenShards ?? message.playerSavePatchPlan?.lupenShardsAfter ?? message.playerSavePatchResult?.plan?.lupenShardsAfter))
+        ? Number(message.lupenShardsAfter ?? message.playerSavePatchResult?.lupenShardsAfter ?? message.playerSavePatchResult?.persistedLupenShards ?? message.playerSavePatchPlan?.lupenShardsAfter ?? message.playerSavePatchResult?.plan?.lupenShardsAfter)
+        : null,
       persistedXp: xp.persistedXp,
       persistedZoneXp: xp.persistedZoneXp,
       persistenceVerified: xp.persistenceVerified,
@@ -1954,6 +1966,7 @@
       serverAuthoritative: message.serverAuthoritative === true,
       localApplySuggested: message.localApplySuggested === true,
       cargoDelta: Number.isFinite(Number(message.cargoDelta)) ? Math.max(0, Math.round(Number(message.cargoDelta))) : 0,
+      lupenShardDelta: Number.isFinite(Number(message.lupenShardDelta || message.shardDelta)) ? Math.max(0, Math.round(Number(message.lupenShardDelta || message.shardDelta))) : 0,
       cargoWritten: message.cargoWritten === true,
       saveWritten: message.saveWritten === true,
       resourceRewardId: String(message.resourceRewardId || message.depletionInstanceId || ""),
@@ -3302,9 +3315,11 @@
       refreshCloudSaveAfterStagingXpClaim(connection.lastStagingBountyClaimResult);
       if (connection.lastStagingBountyClaimResult?.applied) {
         const claim = connection.lastStagingBountyClaimResult;
+        const creditsText = Math.round(Number(claim.creditsDelta || 0));
+        const shardText = Math.round(Number(claim.lupenShardDelta || 0));
         addStagingActivityLogOnce(
-          `bounty-claimed:${claim.bounty?.id || claim.id}:${claim.xpAfter || claim.receivedAt}`,
-          `Bounty XP claimed: +${Math.round(Number(claim.xpDelta || 0))} XP.`
+          `bounty-claimed:${claim.bounty?.id || claim.id}:${claim.creditsAfter || claim.lupenShardsAfter || claim.receivedAt}`,
+          `Bounty reward claimed: +${creditsText} CR${shardText > 0 ? `, +${shardText} Lupen Shard${shardText === 1 ? "" : "s"}` : ""}.`
         );
       }
       logDev("server staging bounty claim result", message);

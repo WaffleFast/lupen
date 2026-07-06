@@ -1,8 +1,6 @@
 /* Staging reward application adapter.
-   This prepares the future server-side progression application path while
-   keeping player_saves, XP, inventory, bounty progress, loot, and
-   progression writes disabled by default. The current staging path prepares
-   XP-only application; credits remain preview-only and are not applied. */
+   This prepares the server-side progression application path while keeping
+   player_saves writes gated and disabled by default. */
 
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -57,7 +55,7 @@ export function buildRewardApplicationPlan(rewardPlanOrLedgerEntry = {}, context
     botName: getStringValue(rewardPlanOrLedgerEntry.botName || rewardPlanOrLedgerEntry.bot_name, "Staging Bot") || "Staging Bot",
     node: getStringValue(rewardPlanOrLedgerEntry.node),
     xpDelta: Math.max(0, Math.round(getNumberValue(rewardPlanOrLedgerEntry.intendedXp ?? rewardPlanOrLedgerEntry.xp_amount, 0))),
-    creditsDelta: 0,
+    creditsDelta: Math.max(0, Math.round(getNumberValue(rewardPlanOrLedgerEntry.intendedCredits ?? rewardPlanOrLedgerEntry.credits_amount, 0))),
     lootAdditions: getLootList(rewardPlanOrLedgerEntry.intendedLoot || rewardPlanOrLedgerEntry.loot),
     reason: getStringValue(rewardPlanOrLedgerEntry.intendedReason || rewardPlanOrLedgerEntry.reward_reason, "staging_bot_disabled"),
     sourceLedgerId,

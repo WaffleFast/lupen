@@ -853,7 +853,7 @@ const BOUNTY_AREAS = {
 };
 
 const BOUNTY_REWARD_DEFAULT = {
-  credits: 0,
+  credits: 250,
   xp: 0,
   lupenCores: 0,
   lupenShards: 25

@@ -2601,8 +2601,8 @@ function cloneBountyReward(reward = {}) {
   const legacyShards = Number(reward.weaponParts || 0) + Number(reward.equipmentModules || 0);
   return {
     credits: Number(reward.credits || 0),
-    xp: Number(reward.xp || 0),
-    lupenCores: Number(reward.lupenCores || 0),
+    xp: 0,
+    lupenCores: 0,
     lupenShards: Number(reward.lupenShards ?? legacyShards ?? 0)
   };
 }
@@ -2614,9 +2614,7 @@ function getBountyRequiredKills(contract) {
 function formatBountyReward(reward = {}) {
   const safeReward = cloneBountyReward(reward);
   const parts = [];
-  if (safeReward.lupenCores) parts.push(`${formatNumber(safeReward.lupenCores)}x Lupen Core`);
   if (safeReward.credits) parts.push(`CR ${formatNumber(safeReward.credits)}`);
-  if (safeReward.xp) parts.push(`${formatNumber(safeReward.xp)} XP`);
   if (safeReward.lupenShards) parts.push(`${formatNumber(safeReward.lupenShards)} Lupen Shards`);
   return parts.length ? parts.join(" / ") : "No reward";
 }
@@ -2844,7 +2842,9 @@ function applyTutorialBountyFallbackContract() {
     threat: "Low",
     reward: {
       ...cloneBountyReward(existing?.reward || template.reward || BOUNTY_REWARD_DEFAULT),
-      lupenCores: Math.max(1, Number(existing?.reward?.lupenCores || template.reward?.lupenCores || 1))
+      xp: 0,
+      lupenCores: 0,
+      lupenShards: Math.max(25, Number(existing?.reward?.lupenShards || template.reward?.lupenShards || BOUNTY_REWARD_DEFAULT.lupenShards || 25))
     },
     timed: false,
     timeLimitSeconds: null,
@@ -2913,12 +2913,12 @@ function renderMultiplayerStagingBountyBoard() {
             <span class="bounty-card__chips">
               <span class="bounty-chip bounty-chip--special">STAGING</span>
               <span class="bounty-chip bounty-chip--target">PROGRESS ${formatNumber(progress)}/${formatNumber(requiredKills)}</span>
-              <span class="bounty-chip bounty-card-threat">NO CR / LOOT</span>
+              <span class="bounty-chip bounty-card-threat">CR + SHARDS</span>
             </span>
           </span>
           <span class="bounty-reward-box bounty-card-reward bounty-reward">
             <span class="bounty-reward-box__label">REWARD</span>
-            <strong class="bounty-reward-box__value">XP-ONLY ${formatNumber(bounty.xpReward || 25)}</strong>
+            <strong class="bounty-reward-box__value">CR + Lupen Shards</strong>
             <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
             <small>Progress: ${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
           </span>
@@ -2952,7 +2952,7 @@ function renderMultiplayerStagingBountyDetail() {
   const actionHtml = bounty.claimed
     ? `<button class="selected-contract-action bounty-accept-btn" disabled>Claimed</button>`
       : bounty.claimAvailable || bounty.completed
-        ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claim Pending" : "Claim XP"}</button>`
+        ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claim Pending" : "Claim Reward"}</button>`
       : bounty.accepted
         ? `<button class="selected-contract-action bounty-accept-btn" disabled>Active Bounty</button>`
         : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accept Pending" : connected ? "Accept Bounty" : "Waiting For Server"}</button>`;
@@ -2965,8 +2965,8 @@ function renderMultiplayerStagingBountyDetail() {
     ["TYPE", "Multiplayer Staging"],
     ["TARGET", "Erebus bots"],
     ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} Erebus bots`],
-    ["REWARD", `${formatNumber(bounty.xpReward || 25)} XP`],
-    ["LIMITS", "No CR or loot items"]
+    ["REWARD", "CR + Lupen Shards"],
+    ["LIMITS", "No XP payout"]
   ];
 
   panel.innerHTML = `
@@ -2980,8 +2980,8 @@ function renderMultiplayerStagingBountyDetail() {
       </div>
     </div>
 
-    ${bounty.claimAvailable || bounty.completed ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Claim the ${formatNumber(bounty.xpReward || 25)} XP bounty bonus.</span></div>` : ""}
-    ${bounty.claimed ? `<div class="bounty-complete-note claimed"><strong>Already claimed</strong><span>Bounty XP has been collected.</span></div>` : ""}
+    ${bounty.claimAvailable || bounty.completed ? `<div class="bounty-complete-note"><strong>Complete</strong><span>Claim the bounty reward.</span></div>` : ""}
+    ${bounty.claimed ? `<div class="bounty-complete-note claimed"><strong>Already claimed</strong><span>Bounty reward has been collected.</span></div>` : ""}
 
     <div class="selected-contract-progress bounty-detail-progress-block selected-bounty-progress">
       <div class="bounty-progress-heading"><span>Progress</span><strong>${formatNumber(progress)} / ${formatNumber(requiredKills)}</strong></div>
@@ -3054,7 +3054,7 @@ function renderBountyBoard() {
           </span>
           <span class="bounty-reward-box bounty-card-reward bounty-reward">
             <span class="bounty-reward-box__label">REWARD</span>
-            <strong class="bounty-reward-box__value">${formatBountyReward(contract.reward)}<img class="bounty-reward-box__icon" src="assets/items/lupen-core.png" alt=""></strong>
+            <strong class="bounty-reward-box__value">${formatBountyReward(contract.reward)}<img class="bounty-reward-box__icon" src="assets/items/lupen-shard.png" alt=""></strong>
             <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
           </span>
         </button>
@@ -3114,7 +3114,7 @@ function renderBountyDetail() {
     ["TARGET", contract.targetBotLabel],
     ["THREAT", contract.threat || "Standard"],
     ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} bots`],
-    ["REWARD", `<span class="selected-bounty-reward selected-bounty-reward--${stateKey}"><span>${formatBountyReward(contract.reward)}</span><img src="assets/items/lupen-core.png" alt=""></span>`]
+    ["REWARD", `<span class="selected-bounty-reward selected-bounty-reward--${stateKey}"><span>${formatBountyReward(contract.reward)}</span><img src="assets/items/lupen-shard.png" alt=""></span>`]
   ];
   if (contract.bonus) infoRows.push(["BONUS", contract.bonus]);
 
@@ -3283,6 +3283,7 @@ function claimBountyReward(contractId) {
   if (tutorialState?.active && ["claim-bounty", "continue-after-bounty-reward"].includes(getCurrentTutorialStep()?.id)) {
     contract.reward = {
       ...cloneBountyReward(contract.reward),
+      xp: 0,
       lupenCores: 0,
       lupenShards: Math.max(25, Number(contract.reward?.lupenShards || 0))
     };
@@ -3322,7 +3323,6 @@ function claimBountyReward(contractId) {
   if (activeBountyId === contract.id) activeBountyId = null;
 
   selectedBountyContractId = dailyBountyContracts.find(item => item.status === "readyToClaim")?.id || dailyBountyContracts.find(item => item.status === "available")?.id || contract.id;
-  awardBountyXpOnClaim(contract);
   addActivityLog(`Bounty reward claimed: ${contract.title || contract.name}. +${rewardSummary}. ${bonusText}`);
   tutorialEvent("claimedBountyReward");
   if (typeof playRewardClaimSound === "function") playRewardClaimSound();
@@ -3338,20 +3338,7 @@ function claimBountyReward(contractId) {
 
 function applyBountyReward(bounty) {
   const reward = cloneBountyReward(bounty?.reward);
-  if (reward.lupenCores > 0) {
-    const coreDrops = [];
-    for (let index = 0; index < reward.lupenCores; index += 1) {
-      coreDrops.push(createInventoryDrop("lupenCore"));
-    }
-    addInventoryItems(coreDrops);
-  }
-
   credits += reward.credits;
-  if (reward.xp > 0 && typeof addCombatXp === "function") {
-    addCombatXp(reward.xp, "bounty");
-  } else {
-    playerProgress.combatXp = Number(playerProgress.combatXp || 0) + reward.xp;
-  }
   upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
   upgradeMaterials.lupenShards = Math.max(0, Number(upgradeMaterials.lupenShards || 0)) + reward.lupenShards;
 
@@ -3612,7 +3599,7 @@ function renderObjectiveHud() {
       const routePath = targetNode && typeof findSectorRoute === "function" ? findSectorRoute(currentNode, targetNode) : [];
       const nextHop = routePath.length > 1 ? routePath[1] : targetNode;
       const actionText = stagingBounty.claimAvailable || stagingBounty.completed
-        ? "Claim XP at Bounty Board"
+        ? "Claim reward at Bounty Board"
         : targetNode
           ? currentNode === targetNode
             ? "Engage Erebus bot"
@@ -3638,7 +3625,7 @@ function renderObjectiveHud() {
             </div>
             <div class="objective-orbit-meta">
               <span>${formatNumber(progress)} / ${formatNumber(required)} destroyed</span>
-              <strong>${formatNumber(stagingBounty.xpReward || 40)} XP</strong>
+              <strong>CR + Shards</strong>
             </div>
             <div class="objective-compact-actions objective-orbit-actions">
               <button class="objective-map-btn" onclick="openSectorMap()">Jump</button>

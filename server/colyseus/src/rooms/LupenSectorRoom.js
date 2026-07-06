@@ -315,6 +315,13 @@ const STAGING_RESOURCE_DEFINITIONS = [
   { id: "staging-resource-crystal-lower-apex", resourceName: "Crystal Shards", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 5 }
 ];
 
+function rollStagingResourceShardReward(resourceName = "") {
+  const crystalBonus = String(resourceName || "") === "Crystal Shards";
+  const chance = crystalBonus ? 0.35 : 0.18;
+  if (Math.random() >= chance) return 0;
+  return crystalBonus && Math.random() < 0.35 ? 2 : 1;
+}
+
 export class LupenSectorPlayer extends Schema {
   constructor(values = {}) {
     super();
@@ -1122,7 +1129,7 @@ export function buildRewardClaimStatus({
     playerSavePatchPlan?.duplicateDetected === true ||
     rewardApplicationResult?.duplicateDetected === true ||
     rewardApplicationPlan?.duplicateDetected === true;
-  const xpWriteAllowed = verified &&
+  const rewardWriteAllowed = verified &&
     progressionWritesEnabled &&
     playerAllowedForStagingWrite &&
     idempotencyReady &&
@@ -1139,7 +1146,7 @@ export function buildRewardClaimStatus({
   const progressionShadowWritten = !!progressionShadowResult?.shadowId;
   const playerSaveWritten = playerSavePatchResult?.applied === true;
   const mode = playerSaveWritten
-    ? "xp_only"
+    ? "reward"
     : !ok || duplicateDetected || !verified || rewardWritePlan?.eligible === false || rewardApplicationPlan?.eligible === false
       ? "blocked"
       : progressionWritesEnabled
@@ -1154,11 +1161,11 @@ export function buildRewardClaimStatus({
     applied: playerSaveWritten,
     xpDelta,
     reason: playerSaveWritten
-      ? "xp_only_staging_claim_applied"
+      ? "staging_reward_claim_applied"
       : mode === "blocked"
         ? debugReason
-        : mode === "dry_run"
-          ? "staging_xp_claim_dry_run"
+      : mode === "dry_run"
+          ? "staging_reward_claim_dry_run"
           : "staging_claim_simulated",
     debugReason,
     gates: {
@@ -1169,7 +1176,8 @@ export function buildRewardClaimStatus({
         playerSavePatchPlan?.progressionWriteScope,
         "allowlist"
       ),
-      xpWriteAllowed
+      xpWriteAllowed: rewardWriteAllowed,
+      rewardWriteAllowed
     },
     ledger: {
       reachable: rewardLedgerResult?.ok === true ||
@@ -2165,6 +2173,7 @@ export class LupenSectorRoom extends Room {
     const depleted = resource.hp <= 0;
     let resourceRewardId = "";
     let cargoDelta = 0;
+    let lupenShardDelta = 0;
 
     if (depleted) {
       resource.depleted = true;
@@ -2173,6 +2182,7 @@ export class LupenSectorRoom extends Room {
       if (!this.stagingResourcePayoutKeys.has(resourceRewardId)) {
         this.stagingResourcePayoutKeys.add(resourceRewardId);
         cargoDelta = Math.max(1, Math.round(Number(resource.yieldAmount || 1)));
+        lupenShardDelta = rollStagingResourceShardReward(resource.resourceName || "");
       }
     }
 
@@ -2202,6 +2212,7 @@ export class LupenSectorRoom extends Room {
       cooldownMs: mineCooldownMs,
       nextMineAt: nextMineAtValue,
       cargoDelta,
+      lupenShardDelta,
       cargoWritten: false,
       saveWritten: false,
       localApplySuggested: cargoDelta > 0,
@@ -2214,6 +2225,7 @@ export class LupenSectorRoom extends Room {
     this.broadcast("stagingResource:shot", {
       ...basePayload,
       cargoDelta: 0,
+      lupenShardDelta: 0,
       rewardsGranted: false,
       resourceRewardId: "",
       timestamp: now
@@ -2232,6 +2244,7 @@ export class LupenSectorRoom extends Room {
         depleted: true,
         depletedUntil: resource.depletedUntil,
         cargoDelta,
+        lupenShardDelta,
         cargoWritten: false,
         saveWritten: false,
         serverAuthoritative: true,
@@ -2804,9 +2817,9 @@ export class LupenSectorRoom extends Room {
       topContributorSessionId: client.sessionId,
       contributorSessionId: client.sessionId,
       contributionPercent: 100,
-      intendedXp: STAGING_BOUNTY.xpReward,
-      intendedCredits: 0,
-      intendedLoot: [],
+      intendedXp: STAGING_BOUNTY.xpReward || 0,
+      intendedCredits: STAGING_BOUNTY.creditsReward || 0,
+      intendedLoot: Array.isArray(STAGING_BOUNTY.lootReward) ? STAGING_BOUNTY.lootReward : [],
       intendedReason: "staging_bounty_completed",
       rewardPreviewId: sourceEventId,
       eligible,
@@ -2877,6 +2890,9 @@ export class LupenSectorRoom extends Room {
     const previewSaveData = progressionPreview.available
       ? {
         credits: progressionPreview.currentCredits,
+        upgradeMaterials: {
+          lupenShards: progressionPreview.currentLupenShards
+        },
         playerProgress: {
           combatXp: progressionPreview.currentXp
         }
@@ -2924,8 +2940,10 @@ export class LupenSectorRoom extends Room {
       debugReason: claimStatus.debugReason,
       bounty: updatedPublicState,
       xpDelta: claimStatus.xpDelta,
-      creditsWritten: false,
-      lootWritten: false,
+      creditsDelta: rewardApplicationPlan.creditsDelta || 0,
+      lupenShardDelta: playerSavePatchPlan.lupenShardDelta || 0,
+      creditsWritten: playerSavePatchResult.appliedFields?.includes?.("credits") === true,
+      lootWritten: playerSavePatchResult.appliedFields?.includes?.("upgradeMaterials.lupenShards") === true,
       bountyWritten: false,
       saveWritten: playerSavePatchResult.applied === true,
       gates: claimStatus.gates,

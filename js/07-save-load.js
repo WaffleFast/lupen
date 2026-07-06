@@ -495,21 +495,45 @@ function applyStagingXpClaimToLoadedState(result = {}) {
     result.saveWritten === true ||
     result.playerSave?.written === true ||
     result.claimStatus?.playerSave?.written === true;
-  if (!applied || !Number.isFinite(xpAfter)) return false;
+  const creditsAfter = Number(
+    result.creditsAfter ??
+    result.playerSavePatchResult?.creditsAfter ??
+    result.playerSavePatchResult?.plan?.creditsAfter ??
+    result.playerSavePatchPlan?.creditsAfter
+  );
+  const lupenShardsAfter = Number(
+    result.lupenShardsAfter ??
+    result.playerSavePatchResult?.lupenShardsAfter ??
+    result.playerSavePatchResult?.persistedLupenShards ??
+    result.playerSavePatchResult?.plan?.lupenShardsAfter ??
+    result.playerSavePatchPlan?.lupenShardsAfter
+  );
+  if (!applied || (!Number.isFinite(xpAfter) && !Number.isFinite(creditsAfter) && !Number.isFinite(lupenShardsAfter))) return false;
 
   const xpSource = result.xpSource || result.source || (result.botId ? "botKill" : "bountyClaim");
-  rememberTrustedStagingXp(result, xpSource);
-  const progress = normalizePlayerProgress(playerProgress);
-  if (xpAfter < Number(progress.combatXp || 0)) return false;
-  progress.combatXp = Math.max(0, Math.round(xpAfter));
-  progress.zoneCombatXp = {
-    ...(progress.zoneCombatXp || {}),
-    [XP_CONFIG.combatZoneKey]: Math.max(
-      Number(progress.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0),
-      progress.combatXp
-    )
-  };
-  playerProgress = normalizePlayerProgress(progress);
+  let appliedXp = Number(playerProgress?.combatXp || 0);
+  if (Number.isFinite(xpAfter)) {
+    rememberTrustedStagingXp(result, xpSource);
+    const progress = normalizePlayerProgress(playerProgress);
+    if (xpAfter < Number(progress.combatXp || 0)) return false;
+    progress.combatXp = Math.max(0, Math.round(xpAfter));
+    progress.zoneCombatXp = {
+      ...(progress.zoneCombatXp || {}),
+      [XP_CONFIG.combatZoneKey]: Math.max(
+        Number(progress.zoneCombatXp?.[XP_CONFIG.combatZoneKey] || 0),
+        progress.combatXp
+      )
+    };
+    playerProgress = normalizePlayerProgress(progress);
+    appliedXp = playerProgress.combatXp;
+  }
+  if (Number.isFinite(creditsAfter)) {
+    credits = Math.max(Number(credits || 0), Math.round(creditsAfter));
+  }
+  if (Number.isFinite(lupenShardsAfter)) {
+    upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+    upgradeMaterials.lupenShards = Math.max(Number(upgradeMaterials.lupenShards || 0), Math.round(lupenShardsAfter));
+  }
   if (result.botId && typeof recordMissionEvent === "function") {
     recordMissionEvent("destroy_bot", {
       botId: result.botId,
@@ -521,12 +545,14 @@ function applyStagingXpClaimToLoadedState(result = {}) {
   window.lupenLastStagingXpRefresh = {
     source: xpSource,
     stale: false,
-    trustedXpAfter: xpAfter,
-    refreshedXp: progress.combatXp,
-    appliedXp: playerProgress.combatXp,
-    hudXpAfterPatch: playerProgress.combatXp,
+    trustedXpAfter: Number.isFinite(xpAfter) ? xpAfter : null,
+    refreshedXp: appliedXp,
+    appliedXp,
+    hudXpAfterPatch: appliedXp,
+    creditsAfterPatch: credits,
+    lupenShardsAfterPatch: Number(upgradeMaterials?.lupenShards || 0),
     redrawTriggered: true,
-    reason: "hud_xp_refreshed",
+    reason: Number.isFinite(xpAfter) ? "hud_xp_refreshed" : "hud_reward_refreshed",
     checkedAt: Date.now()
   };
   LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
