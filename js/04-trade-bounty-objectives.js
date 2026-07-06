@@ -1003,7 +1003,13 @@ function getOrderedMapOneMarketPlanets(currentPlanet = getCurrentMarketPlanet())
 function getJumpCountBetweenNodes(fromNodeId, toNodeId) {
   if (!fromNodeId || !toNodeId || !sectorNodes[fromNodeId] || !sectorNodes[toNodeId]) return null;
   const path = typeof findSectorRoute === "function" ? findSectorRoute(fromNodeId, toNodeId) : [];
-  return path.length > 1 ? path.length - 1 : fromNodeId === toNodeId ? 0 : null;
+  if (fromNodeId === toNodeId) return 0;
+  if (path.length <= 1) return null;
+  const sectorHops = path.length - 1;
+  if (MAP_ONE_MARKET_PLANETS.includes(fromNodeId) && MAP_ONE_MARKET_PLANETS.includes(toNodeId)) {
+    return Math.max(1, Math.ceil(sectorHops / 3));
+  }
+  return sectorHops;
 }
 
 function getTradeRouteMarginLabel(unitMargin, buyPrice) {
@@ -1023,10 +1029,16 @@ function getTradeRouteHint(route) {
   return "Small margin, watch the cargo cost";
 }
 
+function getMarketPlanetImage(planet) {
+  if (planet === "Virella") return "assets/planets/virella.png";
+  if (planet === "Nyxara") return "assets/planets/nyxara.png";
+  if (planet === "Asteron Prime") return "assets/planets/asteron-prime.png";
+  return "";
+}
+
 function getMarketRouteCards({
   resource = selectedMarketResource,
   origin = getCurrentMarketPlanet(),
-  quantity = selectedMarketQuantity,
   stagingTradeLocked = isMultiplayerStagingActive() && !isLocalTutorialTradeActive()
 } = {}) {
   const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
@@ -1045,7 +1057,7 @@ function getMarketRouteCards({
       : getMarketMaxBuyQuantity(resource, origin);
     const affordable = buyPrice > 0 ? Math.floor(credits / buyPrice) : 0;
     const maxUnits = Math.max(0, Math.min(routeLimit, affordable, freeCargo));
-    const selectedUnits = maxUnits > 0 ? clampNumber(quantity || maxUnits, 1, maxUnits) : 0;
+    const selectedUnits = maxUnits;
     const unitMargin = sellPrice - buyPrice;
     const marginPercent = buyPrice > 0 ? (unitMargin / buyPrice) * 100 : 0;
     const estimatedProfit = unitMargin * selectedUnits;
@@ -1073,7 +1085,7 @@ function getMarketRouteCards({
       stagingOffer,
       pending,
       isLoss: unitMargin <= 0,
-      canLoad: unitMargin > 0 && selectedUnits > 0 && buyPrice > 0 && credits >= buyPrice * selectedUnits && freeCargo >= selectedUnits && (!stagingTradeLocked || Boolean(stagingOffer)) && !pending
+      canLoad: estimatedProfit > 0 && unitMargin > 0 && selectedUnits > 0 && buyPrice > 0 && credits >= buyPrice * selectedUnits && freeCargo >= selectedUnits && (!stagingTradeLocked || Boolean(stagingOffer)) && !pending
     };
   });
 
@@ -1091,10 +1103,11 @@ function getMarketRouteCards({
 
 function renderTradeRouteCard(route) {
   const destinationClass = safeId(route.destination);
+  const planetImage = getMarketPlanetImage(route.destination);
   const jumpsText = route.jumpCount === null ? "? Jumps" : `${formatNumber(route.jumpCount)} ${route.jumpCount === 1 ? "Jump" : "Jumps"}`;
   const profitClass = route.estimatedProfit >= 0 ? "profit-good" : "profit-bad";
   const profitSign = route.estimatedProfit >= 0 ? "+" : "-";
-  const buttonLabel = route.pending ? "Applying..." : route.isLoss ? "Not Recommended" : "Load Cargo";
+  const buttonLabel = route.pending ? "Applying..." : "Accept Trade";
   const disabledAttr = route.canLoad ? "" : "disabled";
   const badge = route.isBest
     ? `<span class="trade-route-badge">BEST ROUTE</span>`
@@ -1116,7 +1129,9 @@ function renderTradeRouteCard(route) {
       tabindex="0"
       role="button"
       aria-label="${escapeHtml(`${route.resource} route from ${route.origin} to ${route.destination}`)}">
-      <div class="trade-route-card__planet trade-route-card__planet--${destinationClass}" aria-hidden="true"></div>
+      <div class="trade-route-card__planet trade-route-card__planet--${destinationClass}" aria-hidden="true">
+        ${planetImage ? `<img src="${escapeHtml(planetImage)}" alt="">` : ""}
+      </div>
       <div class="trade-route-card__main">
         <div class="trade-route-card__title-row">
           <div>
@@ -1129,14 +1144,17 @@ function renderTradeRouteCard(route) {
           <span class="trade-route-chip trade-route-chip--sell">Sell CR ${formatNumber(route.sellPrice)}</span>
           <span class="trade-route-chip trade-route-chip--jumps">${jumpsText}</span>
           <span class="trade-route-chip ${route.isLoss ? "trade-route-chip--loss" : "trade-route-chip--profit"}">${escapeHtml(route.marginLabel)}</span>
-          <span class="trade-route-chip trade-route-chip--cost">Cost CR ${formatNumber(route.totalCost)}</span>
-          <span class="trade-route-chip trade-route-chip--revenue">Revenue CR ${formatNumber(route.estimatedRevenue)}</span>
         </div>
         <div class="trade-route-card__bottom">
           <div class="trade-route-card__profit">
             <span>Estimated Profit</span>
             <strong class="${profitClass}">${profitSign}CR ${formatNumber(Math.abs(route.estimatedProfit))}</strong>
             <em>${escapeHtml(getTradeRouteHint(route))}</em>
+          </div>
+          <div class="trade-route-card__cargo">
+            <span>Cargo:</span>
+            <strong>${formatNumber(route.selectedUnits)} units</strong>
+            <em>Maximum affordable cargo will be loaded automatically.</em>
           </div>
           <button
             type="button"
@@ -1151,10 +1169,14 @@ function renderTradeRouteCard(route) {
 }
 
 function renderTradeRouteCards(routes) {
-  if (!routes.length) {
-    return `<div class="trade-preview-note staging-trade-status compact">No destination routes are available from this station.</div>`;
+  const profitableRoutes = routes.filter(route => route.estimatedProfit > 0 && route.unitMargin > 0 && route.selectedUnits > 0);
+  if (!profitableRoutes.length) {
+    return `<div class="trade-route-empty">
+      <strong>No profitable route available for this resource.</strong>
+      <span>Select another resource or wait for the next market refresh.</span>
+    </div>`;
   }
-  return `<div class="trade-route-list">${routes.map(renderTradeRouteCard).join("")}</div>`;
+  return `<div class="trade-route-list">${profitableRoutes.map(renderTradeRouteCard).join("")}</div>`;
 }
 
 function normalizeMarketBuilderState() {
@@ -1371,6 +1393,8 @@ function renderMapOneMarketTerminal(goodsBox) {
     : Math.max(0, effectiveQuantity) * ((sellUnitPrice || 0) - (sellUnitBasis || 0));
   const buyActionQuantityLimit = stagingTradeLocked ? buyQuantityLimit : maxBuy;
   const routeCards = sellMode ? [] : getMarketRouteCards({ resource, origin: currentPlanet, quantity: effectiveQuantity, stagingTradeLocked });
+  const profitableRouteCards = routeCards.filter(route => route.estimatedProfit > 0 && route.unitMargin > 0 && route.selectedUnits > 0);
+  const routeSectionLabel = profitableRouteCards.length === 1 ? "BEST ROUTE" : "AVAILABLE ROUTES";
   const selectedRouteCard = routeCards.find(route => route.destination === targetPlanet) || routeCards[0] || null;
   const selectedResourceBuyPrice = sellMode
     ? sellUnitBasis
@@ -1445,10 +1469,10 @@ function renderMapOneMarketTerminal(goodsBox) {
             <span>${sellOrigin} to ${currentPlanet} / CR ${formatNumber(sellUnitPrice)} per unit</span>
           </div>
           ` : `<div class="trade-route-section">
-            <div class="trade-route-section__head">AVAILABLE ROUTES</div>
+            <div class="trade-route-section__head">${routeSectionLabel}</div>
             ${renderTradeRouteCards(routeCards)}
           </div>`}
-          <label>
+          ${sellMode ? `<label>
             <span>${sellMode ? "Sell Amount" : "Buy Amount"}</span>
             <div class="market-amount-control ${sellMode ? "" : "market-amount-control--route"}">
               <strong>${sellMode ? `Sell ${formatNumber(effectiveQuantity)} of ${formatNumber(held)} carried` : `${formatNumber(effectiveQuantity)} units`}</strong>
@@ -1457,7 +1481,7 @@ function renderMapOneMarketTerminal(goodsBox) {
                   <button class="trade-primary-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${localSellMode || (sellStagingOffer && !sellPending) ? "" : "disabled"}>${sellPending ? "Applying..." : "Sell Cargo"}</button>`
                 : `<button type="button" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyActionQuantityLimit <= 0 ? "disabled" : ""}>MAX</button>`}
             </div>
-          </label>
+          </label>` : ""}
         </div>
 
         ${sellMode ? `<div class="market-builder-summary">
@@ -1571,6 +1595,7 @@ function loadMarketRouteCargo(destination, event) {
     return;
   }
 
+  selectedMarketQuantity = route.selectedUnits;
   buyMarketCargo();
 }
 

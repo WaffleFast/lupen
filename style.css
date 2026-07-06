@@ -12959,7 +12959,7 @@ input::placeholder {
 
 .map-one-market-terminal {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 450px);
+  grid-template-columns: minmax(520px, 0.95fr) minmax(500px, 0.9fr);
   gap: 12px;
   height: 100%;
   min-height: 0;
@@ -12986,7 +12986,7 @@ input::placeholder {
 .market-board-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 620px;
+  min-width: 520px;
   table-layout: fixed;
 }
 
@@ -13002,7 +13002,7 @@ input::placeholder {
 
 .market-board-table th,
 .market-board-table td {
-  padding: 14px 16px;
+  padding: 14px 12px;
   border-bottom: 1px solid rgba(90, 190, 255, 0.14);
   text-align: left;
   color: #dbeeff;
@@ -13011,9 +13011,9 @@ input::placeholder {
 
 .market-board-table th {
   color: #7fdfff;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 950;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   background: rgba(2, 8, 18, 0.82);
   position: sticky;
@@ -13194,7 +13194,7 @@ input::placeholder {
 .trade-route-section {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 6px;
+  gap: 10px;
   min-height: 0;
 }
 
@@ -13208,9 +13208,9 @@ input::placeholder {
 
 .trade-route-list {
   display: grid;
-  grid-auto-rows: minmax(90px, max-content);
+  grid-auto-rows: minmax(210px, max-content);
   align-content: start;
-  gap: 7px;
+  gap: 10px;
   min-height: 0;
   overflow: auto;
   padding-right: 2px;
@@ -13218,10 +13218,10 @@ input::placeholder {
 
 .trade-route-card {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 9px;
-  min-height: 90px;
-  padding: 7px 136px 7px 9px;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 18px;
+  min-height: 210px;
+  padding: 24px 24px 24px 26px;
   position: relative;
   border: 1px solid rgba(90, 190, 255, 0.36);
   border-radius: 8px;
@@ -13254,31 +13254,26 @@ input::placeholder {
 }
 
 .trade-route-card__planet {
-  width: 42px;
-  height: 42px;
+  width: 92px;
+  height: 92px;
   align-self: center;
   border-radius: 50%;
-  border: 1px solid rgba(155, 220, 255, 0.44);
-  box-shadow: inset -8px -10px 14px rgba(0, 0, 0, 0.42), 0 0 18px rgba(78, 180, 255, 0.26);
-  background: radial-gradient(circle at 34% 30%, #d9f8ff 0 4%, #5cb8ff 16%, #153d91 45%, #07132c 76%);
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 0 16px rgba(82, 190, 255, 0.36));
 }
 
-.trade-route-card__planet--virella {
-  background: radial-gradient(circle at 35% 30%, #e8fbff 0 5%, #67e7ff 18%, #0a7192 48%, #051829 78%);
-}
-
-.trade-route-card__planet--asteronprime {
-  background: radial-gradient(circle at 34% 28%, #f6fbff 0 4%, #adbbc7 18%, #566a77 48%, #121922 78%);
-}
-
-.trade-route-card__planet--nyxara {
-  background: radial-gradient(circle at 34% 28%, #e5f0ff 0 4%, #74a7ff 18%, #28459c 48%, #07142c 78%);
+.trade-route-card__planet img {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+  display: block;
 }
 
 .trade-route-card__main {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 10px;
 }
 
 .trade-route-card__title-row,
@@ -13290,27 +13285,37 @@ input::placeholder {
   min-width: 0;
 }
 
+.trade-route-card__bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 164px;
+  grid-template-areas:
+    "profit action"
+    "cargo action";
+  align-items: end;
+  gap: 8px 16px;
+}
+
 .trade-route-card__title {
   margin: 0 0 2px;
   color: #f1f8ff;
-  font-size: 0.82rem;
+  font-size: 1.16rem;
   line-height: 1.05;
 }
 
 .trade-route-card__route {
   margin: 0;
   color: #9ebcda;
-  font-size: 0.62rem;
+  font-size: 0.78rem;
 }
 
 .trade-route-badge {
   flex: 0 0 auto;
-  padding: 3px 6px;
+  padding: 6px 10px;
   border: 1px solid rgba(255, 215, 106, 0.52);
   border-radius: 6px;
   color: #ffe589;
   background: rgba(70, 46, 10, 0.52);
-  font-size: 0.48rem;
+  font-size: 0.62rem;
   font-weight: 950;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -13319,16 +13324,16 @@ input::placeholder {
 .trade-route-card__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 8px;
 }
 
 .trade-route-chip {
-  padding: 2px 6px;
+  padding: 6px 12px;
   border: 1px solid rgba(90, 190, 255, 0.24);
   border-radius: 5px;
   color: #dbeeff;
   background: rgba(3, 14, 28, 0.82);
-  font-size: 0.52rem;
+  font-size: 0.72rem;
   font-weight: 850;
 }
 
@@ -13356,22 +13361,23 @@ input::placeholder {
 }
 
 .trade-route-card__profit {
+  grid-area: profit;
   display: flex;
   align-items: baseline;
-  gap: 5px;
+  gap: 8px;
   min-width: 0;
 }
 
 .trade-route-card__profit span {
   color: #9ebcda;
-  font-size: 0.5rem;
+  font-size: 0.68rem;
   font-weight: 850;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .trade-route-card__profit strong {
-  font-size: 0.8rem;
+  font-size: 1.18rem;
   line-height: 1.05;
   white-space: nowrap;
 }
@@ -13380,16 +13386,41 @@ input::placeholder {
   display: none;
 }
 
+.trade-route-card__cargo {
+  grid-area: cargo;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(127, 223, 255, 0.22);
+  color: #b9d7f4;
+}
+
+.trade-route-card__cargo span {
+  font-size: 0.82rem;
+}
+
+.trade-route-card__cargo strong {
+  color: #f1f8ff;
+  font-size: 0.9rem;
+}
+
+.trade-route-card__cargo em {
+  display: block;
+  grid-column: 1 / -1;
+  color: #9ebcda;
+  font-size: 0.62rem;
+  font-style: normal;
+}
+
 .trade-route-card__button {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 122px;
-  min-height: 36px;
-  padding: 7px 10px;
+  grid-area: action;
+  width: 164px;
+  min-height: 50px;
+  padding: 10px 16px;
   border-radius: 7px;
-  font-size: 0.7rem;
+  font-size: 0.88rem;
 }
 
 .trade-route-card__button:disabled {
@@ -13398,6 +13429,27 @@ input::placeholder {
   color: #b4bdc7;
   border-color: rgba(140, 160, 180, 0.26);
   background: linear-gradient(180deg, rgba(42, 48, 58, 0.88), rgba(22, 26, 34, 0.88));
+}
+
+.trade-route-empty {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  min-height: 180px;
+  padding: 18px;
+  border: 1px solid rgba(90, 190, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(2, 8, 18, 0.62);
+}
+
+.trade-route-empty strong {
+  color: #f1f8ff;
+  font-size: 0.95rem;
+}
+
+.trade-route-empty span {
+  color: #9ebcda;
+  font-size: 0.76rem;
 }
 
 @keyframes tutorialLandingPulse {

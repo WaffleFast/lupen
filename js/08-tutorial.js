@@ -73,16 +73,9 @@ const STARTER_TUTORIAL_STEPS = [
     event: "selectedMarketTarget"
   },
   {
-    id: "select-buy-amount",
-    title: "Choose buy amount",
-    text: "Press MAX. We will fill the run using your credits and free cargo space.",
-    target: "tutorial:buyAmount",
-    event: "selectedBuyAmount"
-  },
-  {
     id: "buy-cargo",
-    title: "Buy cargo",
-    text: "Buy the marked cargo. I will keep the route objective active until the Iron is sold.",
+    title: "Accept trade",
+    text: "Accept the marked trade. Maximum affordable cargo will be loaded automatically.",
     target: "tutorial:buyCargo",
     event: "boughtTradeCargo"
   },
@@ -855,7 +848,9 @@ function getDynamicTutorialTarget(step) {
   }
 
   if (step.target === "tutorial:buyAmount") {
-    return document.querySelector("[data-tutorial-target='marketMaxAmount']:not(:disabled)") ||
+    return document.querySelector("[data-tutorial-target='buyCargo']:not(:disabled)") ||
+           document.querySelector(".trade-route-card__button:not(:disabled)") ||
+           document.querySelector("[data-tutorial-target='marketMaxAmount']:not(:disabled)") ||
            document.querySelector(".market-amount-control button:not(.trade-primary-action):not(:disabled)") ||
            document.querySelector(".market-amount-control button:not(:disabled)");
   }
