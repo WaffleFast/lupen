@@ -510,6 +510,14 @@ function applyStagingXpClaimToLoadedState(result = {}) {
     )
   };
   playerProgress = normalizePlayerProgress(progress);
+  if (result.botId && typeof recordMissionEvent === "function") {
+    recordMissionEvent("destroy_bot", {
+      botId: result.botId,
+      botName: result.botName,
+      faction: "erebus",
+      eventKey: result.destructionInstanceId || result.botXpSourceEventId || result.rewardPreviewId || result.idempotencyKey || ""
+    });
+  }
   window.lupenLastStagingXpRefresh = {
     source: xpSource,
     stale: false,
@@ -959,6 +967,15 @@ function applyLoadedGameState(rawSaved) {
 
   if (!shipLoadouts[currentShipId]) {
     shipLoadouts[currentShipId] = normalizeShipLoadout(undefined, currentShipId);
+  }
+  if (typeof reconcileMissionProgressFromGameplayState === "function") {
+    reconcileMissionProgressFromGameplayState({
+      source: "loaded_save",
+      shipId: currentShipId,
+      refresh: false,
+      save: false,
+      notify: false
+    });
   }
 
   hull = Number.isFinite(Number(saved.hull)) ? Number(saved.hull) : hull;

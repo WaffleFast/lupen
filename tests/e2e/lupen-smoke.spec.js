@@ -6241,7 +6241,7 @@ test.describe("Lupen browser smoke", () => {
     expect(initialGalaxyFooter.visible).toBe(true);
     expect(initialGalaxyFooter.singleLine).toBe(true);
     expect(initialGalaxyFooter.height).toBeLessThan(34);
-    expect(initialGalaxyFooter.percentText).toBe("0%");
+    expect(initialGalaxyFooter.percentText).toBe("2%");
     const academyAssignmentScroll = await page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => {
       const firstCard = grid.querySelector(".journey-assignment-card")?.getBoundingClientRect();
       return {
@@ -6524,7 +6524,7 @@ test.describe("Lupen browser smoke", () => {
       openJourney();
     });
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 7");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 7");
     await expect(page.locator("#journeyScreen")).toContainText("Academy Assignments");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_launch_ship']")).toContainText("0 / 1");
 
@@ -6772,6 +6772,86 @@ test.describe("Lupen browser smoke", () => {
     expect(state.noCreditRepairState.hull).toBe(state.noCreditRepairState.repairHullBefore);
     expect(state.savedRecoveredCopper).toBe(8);
     expect(state.savedLoadoutGuns).toEqual(["pulseLaser"]);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("Journey Academy assignments reconcile from active ship loadout state", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        tutorialState = { active: false, completed: true, stepIndex: 0 };
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        homePlanet = "Asteron Prime";
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        ownedGuns = { ...ownedGuns, pulseLaser: 0 };
+        ownedAttachments = { ...ownedAttachments, cargoPod: 0 };
+        shipLoadouts = {
+          [STARTER_SHIP_ID]: normalizeShipLoadout({
+            guns: ["pulseLaser", "pulseLaser"],
+            attachments: ["cargoPod"]
+          }, STARTER_SHIP_ID)
+        };
+        missionProgress = createDefaultMissionProgress();
+        playerProgress = createDefaultPlayerProgress();
+        applyShipStats(true);
+        saveGame();
+        showScreen("gameScreen");
+        updateHubLocation();
+      })()
+    `));
+
+    await openHangar(page);
+    await expect(page.locator("#loadoutCategoryWeapons")).toContainText("Weapons 2/2");
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(2);
+
+    await page.locator("#hangarScreen .screen-back-btn").click();
+    await page.locator("#journeyHubBtn").click();
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("2 / 2");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("COMPLETE");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("1 / 1");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("COMPLETE");
+
+    const savedAfterJourneyOpen = await page.evaluate(() => JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions);
+    expect(savedAfterJourneyOpen.academy_two_guns).toMatchObject({ state: "completed", progress: 2 });
+    expect(savedAfterJourneyOpen.academy_attachment).toMatchObject({ state: "completed", progress: 1 });
+
+    await page.reload();
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      showScreen("gameScreen");
+      updateHubLocation();
+    });
+    await page.locator("#journeyHubBtn").click();
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("2 / 2");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("COMPLETE");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("1 / 1");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("COMPLETE");
+
+    const botDedupeState = await page.evaluate(() => window.eval(`
+      (() => {
+        missionProgress = createDefaultMissionProgress();
+        recordMissionEvent("destroy_bot", { faction: "erebus", eventKey: "server-kill-1" });
+        recordMissionEvent("destroy_bot", { faction: "erebus", eventKey: "server-kill-1" });
+        return {
+          runtime: missionProgress.missions.academy_erebus_bots,
+          saved: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions?.academy_erebus_bots,
+          eventKeySaved: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.eventKeys?.["destroy_bot:server-kill-1"] === true
+        };
+      })()
+    `));
+    expect(botDedupeState.runtime).toMatchObject({ state: "active", progress: 1 });
+    expect(botDedupeState.saved).toMatchObject({ state: "active", progress: 1 });
+    expect(botDedupeState.eventKeySaved).toBe(true);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

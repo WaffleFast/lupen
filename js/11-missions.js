@@ -391,6 +391,7 @@ function createDefaultMissionProgress() {
       academy: { id: "academy", state: MISSION_STATE_ACTIVE, completed: false },
       frontier: { id: "frontier", state: MISSION_STATE_AVAILABLE }
     },
+    eventKeys: {},
     missions: Object.fromEntries(CHAPTER_MISSIONS.map(mission => [
       mission.id,
       { id: mission.id, state: MISSION_STATE_AVAILABLE, progress: 0, completedAt: null, claimedAt: null }
@@ -427,7 +428,11 @@ function normalizeMissionProgress(saved) {
     ...(safe.chapters && typeof safe.chapters === "object" ? safe.chapters : {})
   };
 
-  return reconcileMissionAvailability({ chapters, missions });
+  const eventKeys = safe.eventKeys && typeof safe.eventKeys === "object" && !Array.isArray(safe.eventKeys)
+    ? Object.fromEntries(Object.entries(safe.eventKeys).filter(([key, value]) => key && value === true))
+    : {};
+
+  return reconcileMissionAvailability({ chapters, eventKeys, missions });
 }
 
 function reconcileMissionAvailability(progress = missionProgress) {
@@ -540,17 +545,18 @@ function acceptMission(id) {
   return true;
 }
 
-function completeMission(id) {
+function completeMission(id, options = {}) {
   const mission = MISSIONS_BY_ID[id];
   const state = missionProgress?.missions?.[id];
   if (!mission || !state || ![MISSION_STATE_ACTIVE, MISSION_STATE_AVAILABLE].includes(state.state)) return false;
   state.state = MISSION_STATE_COMPLETED;
   state.progress = getMissionRequiredAmount(mission);
   state.completedAt = state.completedAt || new Date().toISOString();
-  if (typeof addHudToast === "function") addHudToast(`Mission complete: ${mission.title}.`);
-  if (typeof addActivityLog === "function") addActivityLog(`Morgan: ${mission.completeText}`);
+  const notify = options.notify !== false;
+  if (notify && typeof addHudToast === "function") addHudToast(`Mission complete: ${mission.title}.`);
+  if (notify && typeof addActivityLog === "function") addActivityLog(`Morgan: ${mission.completeText}`);
   reconcileMissionAvailability(missionProgress);
-  refreshMissionDisplays();
+  if (options.refresh !== false) refreshMissionDisplays();
   return true;
 }
 
@@ -588,8 +594,100 @@ function missionEventMatches(mission, eventType, payload = {}) {
   return true;
 }
 
+function getMissionEventDedupeKey(eventType, payload = {}) {
+  if (eventType !== "destroy_bot") return "";
+  const key = String(
+    payload.eventKey ||
+    payload.dedupeKey ||
+    payload.destructionInstanceId ||
+    payload.botXpSourceEventId ||
+    payload.rewardPreviewId ||
+    payload.idempotencyKey ||
+    ""
+  ).trim();
+  return key ? `${eventType}:${key}` : "";
+}
+
+function getLoadoutEntryKeyForMission(entry) {
+  if (!entry) return "";
+  if (typeof getEquipmentKey === "function") return String(getEquipmentKey(entry) || "").trim();
+  return String(typeof entry === "string" ? entry : entry.key || "").trim();
+}
+
+function countMissionLoadoutEntries(entries, catalog = null) {
+  if (!Array.isArray(entries)) return 0;
+  return entries.reduce((count, entry) => {
+    const key = getLoadoutEntryKeyForMission(entry);
+    if (!key) return count;
+    if (catalog && !catalog[key]) return count;
+    return count + 1;
+  }, 0);
+}
+
+function getCurrentMissionLoadoutCounts(shipId = "") {
+  const activeShipId = String(shipId || currentShipId || "").trim();
+  const loadout = activeShipId && typeof getShipLoadout === "function"
+    ? getShipLoadout(activeShipId)
+    : shipLoadouts?.[activeShipId] || { guns: [], attachments: [] };
+  return {
+    shipId: activeShipId,
+    weaponCount: countMissionLoadoutEntries(loadout?.guns, typeof GUNS !== "undefined" ? GUNS : null),
+    attachmentCount: countMissionLoadoutEntries(loadout?.attachments, typeof attachments !== "undefined" ? attachments : null)
+  };
+}
+
+function setMissionProgressAbsolute(id, amount, options = {}) {
+  const mission = MISSIONS_BY_ID[id];
+  const state = missionProgress?.missions?.[id];
+  if (!mission || !state) return false;
+  if ([MISSION_STATE_COMPLETED, MISSION_STATE_CLAIMED].includes(state.state)) return false;
+  if (!isMissionAvailable(id, missionProgress)) return false;
+
+  const required = getMissionRequiredAmount(mission);
+  const nextProgress = Math.max(0, Math.min(required, Math.floor(Number(amount || 0))));
+  const previousProgress = getMissionProgressAmount(mission, state);
+  const previousState = state.state;
+  state.progress = nextProgress;
+  if (nextProgress > 0 && nextProgress < required && state.state === MISSION_STATE_AVAILABLE) {
+    state.state = MISSION_STATE_ACTIVE;
+  }
+  if (nextProgress >= required) {
+    completeMission(id, { refresh: false, notify: options.notify });
+  }
+  return previousProgress !== getMissionProgressAmount(mission, state) || previousState !== state.state;
+}
+
+function reconcileMissionProgressFromGameplayState(options = {}) {
+  missionProgress = reconcileMissionAvailability(normalizeMissionProgress(missionProgress));
+  const currentCounts = getCurrentMissionLoadoutCounts(options.shipId);
+  const weaponCount = Number.isFinite(Number(options.weaponCount))
+    ? Number(options.weaponCount)
+    : currentCounts.weaponCount;
+  const attachmentCount = Number.isFinite(Number(options.attachmentCount))
+    ? Number(options.attachmentCount)
+    : currentCounts.attachmentCount;
+  let changed = false;
+
+  changed = setMissionProgressAbsolute("academy_two_guns", weaponCount, options) || changed;
+  changed = setMissionProgressAbsolute("academy_attachment", attachmentCount, options) || changed;
+
+  if (changed) {
+    reconcileMissionAvailability(missionProgress);
+    if (options.refresh !== false) refreshMissionDisplays();
+    if (options.save !== false && typeof saveGame === "function") saveGame();
+  }
+  return {
+    changed,
+    shipId: currentCounts.shipId,
+    weaponCount,
+    attachmentCount
+  };
+}
+
 function recordMissionEvent(eventType, payload = {}) {
   missionProgress = reconcileMissionAvailability(normalizeMissionProgress(missionProgress));
+  const dedupeKey = getMissionEventDedupeKey(eventType, payload);
+  if (dedupeKey && missionProgress.eventKeys?.[dedupeKey]) return false;
   let changed = false;
 
   CHAPTER_MISSIONS.forEach(mission => {
@@ -623,6 +721,12 @@ function recordMissionEvent(eventType, payload = {}) {
     });
 
   if (changed) {
+    if (dedupeKey) {
+      missionProgress.eventKeys = missionProgress.eventKeys && typeof missionProgress.eventKeys === "object"
+        ? missionProgress.eventKeys
+        : {};
+      missionProgress.eventKeys[dedupeKey] = true;
+    }
     refreshMissionDisplays();
     saveGame();
   }
@@ -752,6 +856,7 @@ function getGalaxyCompletionPercent() {
 }
 
 function renderJourneyScreen() {
+  reconcileMissionProgressFromGameplayState({ source: "journey_render", refresh: false, notify: false });
   const body = document.getElementById("journeyBody");
   const title = document.getElementById("journeyLocationTitle");
   if (title) title.textContent = String(currentNode || "Asteron Prime").toUpperCase();

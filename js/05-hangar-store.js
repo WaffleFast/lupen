@@ -296,6 +296,26 @@ function applyStagingStorePurchaseResultToLocalState(result) {
   return true;
 }
 
+function reconcileMissionProgressAfterStagingLoadoutResult(result) {
+  if (!result?.applied || typeof reconcileMissionProgressFromGameplayState !== "function") return null;
+  const itemId = String(result.itemId || "");
+  const shipId = String(result.currentShipId || result.targetShipId || selectedHangarShipId || currentShipId || "");
+  const options = {
+    source: "staging_loadout_confirmed",
+    shipId,
+    refresh: true,
+    save: true,
+    notify: true
+  };
+  if (itemId.startsWith("gun:") && Number.isFinite(Number(result.equippedAfter))) {
+    options.weaponCount = Math.max(0, Math.floor(Number(result.equippedAfter)));
+  }
+  if (itemId.startsWith("attachment:") && Number.isFinite(Number(result.equippedAfter))) {
+    options.attachmentCount = Math.max(0, Math.floor(Number(result.equippedAfter)));
+  }
+  return reconcileMissionProgressFromGameplayState(options);
+}
+
 function getStagingCargoPodEquipLine(result) {
   if (!result) return "Cargo Pod equip preview pending.";
   if (result.applied) return "Cargo Pod equipped.";
@@ -430,10 +450,12 @@ async function requestStagingShipEquip(item) {
       const message = `${selectedName} selected: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      reconcileMissionProgressAfterStagingLoadoutResult(latest);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
           if (loaded?.loaded) {
+            reconcileMissionProgressAfterStagingLoadoutResult(latest);
             if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("ship_selected");
             if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
           }
@@ -468,10 +490,12 @@ async function requestStagingCargoPodEquip(item) {
       const message = `Cargo Pod equipped: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      reconcileMissionProgressAfterStagingLoadoutResult(latest);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
           if (loaded?.loaded) {
+            reconcileMissionProgressAfterStagingLoadoutResult(latest);
             if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("cargo_pod_equipped");
             if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
           }
@@ -506,10 +530,12 @@ async function requestStagingShieldBoosterEquip(item) {
       const message = `Shield Booster equipped: shield ${formatNumber(latest.shieldBefore)} -> ${formatNumber(latest.shieldAfter)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      reconcileMissionProgressAfterStagingLoadoutResult(latest);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
           if (loaded?.loaded) {
+            reconcileMissionProgressAfterStagingLoadoutResult(latest);
             if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("shield_booster_equipped");
             if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
           }
@@ -565,10 +591,12 @@ async function requestStagingLoadoutEquip(item) {
       const message = `${latest.name || item.name || "Item"} equipped.${statChange}`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      reconcileMissionProgressAfterStagingLoadoutResult(latest);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
           if (loaded?.loaded) {
+            reconcileMissionProgressAfterStagingLoadoutResult(latest);
             if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_equipped");
             if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
           }
@@ -1362,10 +1390,12 @@ async function requestStagingLoadoutUnequip(entry) {
       const message = `${latest.name || entry.name} unequipped. Available ${formatNumber(latest.ownedAfter ?? 1)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      reconcileMissionProgressAfterStagingLoadoutResult(latest);
       if (typeof loadGameFromSupabase === "function") {
         try {
           const loaded = await loadGameFromSupabase();
           if (loaded?.loaded) {
+            reconcileMissionProgressAfterStagingLoadoutResult(latest);
             if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_unequipped");
             if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
           }
