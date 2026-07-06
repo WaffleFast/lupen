@@ -855,8 +855,8 @@ const BOUNTY_AREAS = {
 const BOUNTY_REWARD_DEFAULT = {
   credits: 0,
   xp: 0,
-  lupenCores: 1,
-  lupenShards: 3
+  lupenCores: 0,
+  lupenShards: 25
 };
 
 const DAILY_BOUNTY_CONTRACTS = [
@@ -1126,7 +1126,7 @@ let storeDailyPurchases = {};
 let hangarVaultFilter = "all";
 let selectedVaultGroupKey = null;
 let selectedForgeItemId = null;
-let forgeUpgradeMode = "quality";
+let forgeUpgradeMode = "level";
 let forgeMaterialAllocations = {};
 let forgeUseLupenCore = false;
 let forgeAnimating = false;

@@ -1845,24 +1845,15 @@ async function assertStagingStorePreviewHelpers() {
   const expectedStoreItemIds = [
     "gun:heavyLance",
     "gun:ionBlaster",
-    "gun:meltCannon",
     "gun:pulseLaser",
-    "gun:repeater",
-    "gun:ripperGun",
-    "gun:voidRail",
     "attachment:cargoPod",
-    "attachment:hullBooster",
     "attachment:jumpDrive",
-    "attachment:shieldBooster",
-    "attachment:evasionMatrix",
     "ship:falcon",
     "ship:bison",
     "ship:monolith",
     "ship:zeusExplorer",
     "ship:hephaestusTrader",
-    "ship:poseidonAggressor",
-    "material:lupenShard",
-    "core:lupenCore"
+    "ship:poseidonAggressor"
   ];
   assert(items.length >= expectedStoreItemIds.length, "Staging Store item list did not include deterministic Map 1 items.");
   for (const itemId of expectedStoreItemIds) {
@@ -1896,7 +1887,7 @@ async function assertStagingStorePreviewHelpers() {
   assert(validTrustedPreview.bountyWritten === false, "Store preview reported bounty write.");
 
   const insufficientCredits = buildStagingStorePurchasePreview({
-    itemId: "attachment:shieldBooster",
+    itemId: "attachment:jumpDrive",
     quantity: 1,
     trustedState: {
       available: true,
@@ -1978,7 +1969,7 @@ async function assertStagingStorePreviewHelpers() {
   const writeGateCatalog = getStoreWriteEnvGate("verified-player-a", "gun:voidRail", {
     STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
   });
-  assert(writeGateCatalog.itemAllowed === true, "Store catalog alias did not allow a server-known Store item.");
+  assert(writeGateCatalog.itemAllowed === false, "Store catalog alias allowed a removed Store item.");
   const writeGateCatalogUnknown = getStoreWriteEnvGate("verified-player-a", "gun:notReal", {
     STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
   });
@@ -2002,8 +1993,6 @@ async function assertStagingStorePreviewHelpers() {
   const ionBlasterItem = items.find((item) => item.itemId === "gun:ionBlaster");
   const jumpDriveItem = items.find((item) => item.itemId === "attachment:jumpDrive");
   const bisonItem = items.find((item) => item.itemId === "ship:bison");
-  const lupenShardItem = items.find((item) => item.itemId === "material:lupenShard");
-  const lupenCoreItem = items.find((item) => item.itemId === "core:lupenCore");
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
   assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 780, "Cargo Pod Store patch did not subtract the server price.");
@@ -2039,33 +2028,6 @@ async function assertStagingStorePreviewHelpers() {
   assert(jumpDrivePatch.itemBefore === 0 && jumpDrivePatch.itemAfter === 1, "Jump Drive Store patch did not initialise ownedAttachments.jumpDrive.");
   assert(jumpDrivePatch.patchedSaveData.ownedAttachments.cargoPod === 1, "Jump Drive Store patch changed Cargo Pod ownership.");
   assert(jumpDrivePatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Jump Drive Store patch changed shipLoadouts.");
-
-  const shieldBoosterItem = items.find((item) => item.itemId === "attachment:shieldBooster");
-  const shieldBoosterPatch = buildStagingStorePurchasePatch(validSaveData, shieldBoosterItem, 1);
-  assert(shieldBoosterPatch.ok === true, `Valid Shield Booster Store patch was blocked: ${shieldBoosterPatch.blockReason}`);
-  assert(shieldBoosterPatch.creditsBefore === 1000 && shieldBoosterPatch.creditsAfter === 690, "Shield Booster Store patch did not subtract the server price.");
-  assert(shieldBoosterPatch.itemBefore === 2 && shieldBoosterPatch.itemAfter === 3, "Shield Booster Store patch did not increment ownedAttachments.shieldBooster.");
-  assert(shieldBoosterPatch.patchedSaveData.ownedAttachments.cargoPod === 1, "Shield Booster Store patch changed Cargo Pod ownership.");
-  assert(shieldBoosterPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Shield Booster Store patch changed shipLoadouts.");
-  assert(shieldBoosterPatch.patchedSaveData.ownedGuns.pulseLaser === 1, "Shield Booster Store patch changed weapon ownership.");
-  assert(shieldBoosterPatch.patchedSaveData.cargo.Iron === 2, "Shield Booster Store patch changed trade cargo.");
-  assert(shieldBoosterPatch.patchedSaveData.playerProgress.combatXp === 33, "Shield Booster Store patch changed progression.");
-
-  const shardPatch = buildStagingStorePurchasePatch({ ...validSaveData, upgradeMaterials: { lupenShards: 4 } }, lupenShardItem, 1);
-  assert(shardPatch.ok === true, `Valid Lupen Shard Store patch was blocked: ${shardPatch.blockReason}`);
-  assert(shardPatch.creditsBefore === 1000 && shardPatch.creditsAfter === 950, "Lupen Shard Store patch did not subtract the server price.");
-  assert(shardPatch.itemBefore === 4 && shardPatch.itemAfter === 5, "Lupen Shard Store patch did not increment upgradeMaterials.lupenShards.");
-  assert(shardPatch.patchedSaveData.upgradeMaterials.lupenShards === 5, "Lupen Shard Store patch used the wrong material path.");
-  assert(shardPatch.patchedSaveData.inventoryItems[0].id === "kept-item", "Lupen Shard Store patch changed inventoryItems.");
-  assert(shardPatch.materialWritten === false && shardPatch.saveWritten === false, "Lupen Shard dry-run plan reported writes.");
-
-  const corePatch = buildStagingStorePurchasePatch(validSaveData, lupenCoreItem, 1);
-  assert(corePatch.ok === true, `Valid Lupen Core Store patch was blocked: ${corePatch.blockReason}`);
-  assert(corePatch.creditsBefore === 1000 && corePatch.creditsAfter === 850, "Lupen Core Store patch did not subtract the server price.");
-  assert(corePatch.itemBefore === 0 && corePatch.itemAfter === 1, "Lupen Core Store patch did not count inventoryItems.lupenCore.");
-  assert(corePatch.patchedSaveData.inventoryItems.length === validSaveData.inventoryItems.length + 1, "Lupen Core Store patch did not append a vault item.");
-  assert(corePatch.patchedSaveData.inventoryItems.some((entry) => entry.key === "lupenCore" && entry.quality === "core"), "Lupen Core Store patch used the wrong inventory item shape.");
-  assert(corePatch.inventoryWritten === false && corePatch.saveWritten === false, "Lupen Core dry-run plan reported writes.");
 
   const bisonSaveData = { ...validSaveData, credits: 13000 };
   const bisonPatch = buildStagingStorePurchasePatch(bisonSaveData, bisonItem, 1);
@@ -2169,9 +2131,9 @@ async function assertStagingStorePreviewHelpers() {
   });
   assert(notAllowlistedWrite.blockReason === "player_not_in_staging_store_write_allowlist", "Non-allowlisted Store write was not blocked.");
 
-  const shieldItemNotAllowedWrite = await applyStagingStorePurchaseWrite({
+  const jumpDriveItemNotAllowedWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
-    itemId: "attachment:shieldBooster",
+    itemId: "attachment:jumpDrive",
     quantity: 1,
     trustedState: {
       available: true,
@@ -2184,7 +2146,7 @@ async function assertStagingStorePreviewHelpers() {
       STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:cargoPod"
     }
   });
-  assert(shieldItemNotAllowedWrite.blockReason === "store_item_not_allowed", "Shield Booster Store write without item allowlist was not blocked.");
+  assert(jumpDriveItemNotAllowedWrite.blockReason === "store_item_not_allowed", "Jump Drive Store write without item allowlist was not blocked.");
 
   let sequentialSave = JSON.parse(JSON.stringify(validSaveData));
   const storeFetchCalls = [];
@@ -2238,61 +2200,6 @@ async function assertStagingStorePreviewHelpers() {
   assert(sequentialSave.activeBountyId === "keep-bounty", "Applied Store write changed bounty state.");
   assert(storeFetchCalls.join(",") === "GET,PATCH", `Store write expected read/write pair, got ${storeFetchCalls.join(",")}.`);
 
-  let materialSave = { ...JSON.parse(JSON.stringify(validSaveData)), upgradeMaterials: { lupenShards: 2 } };
-  const appliedMaterialWrite = await applyStagingStorePurchaseWrite({
-    playerId: "verified-player-a",
-    itemId: "material:lupenShard",
-    quantity: 1,
-    trustedState: {
-      available: true,
-      validationState: { credits: 1000 }
-    },
-    env: {
-      SUPABASE_URL: "https://example.supabase.co",
-      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
-      STAGING_STORE_WRITE_ENABLED: "true",
-      STAGING_STORE_WRITE_DRY_RUN: "false",
-      STAGING_STORE_WRITE_SCOPE: "verified",
-      STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
-    },
-    fetchImpl: async (_url, options = {}) => {
-      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: materialSave }] };
-      materialSave = JSON.parse(options.body || "{}").save_data;
-      return { ok: true, status: 204, json: async () => [] };
-    }
-  });
-  assert(appliedMaterialWrite.applied === true, `Applied Lupen Shard Store write did not apply: ${appliedMaterialWrite.blockReason}`);
-  assert(appliedMaterialWrite.creditsAfter === 950 && materialSave.upgradeMaterials.lupenShards === 3, "Applied Lupen Shard write did not patch credits/material count.");
-  assert(appliedMaterialWrite.materialWritten === true && appliedMaterialWrite.inventoryWritten === false, "Applied Lupen Shard write reported wrong write flags.");
-
-  let coreSave = JSON.parse(JSON.stringify(validSaveData));
-  const appliedCoreWrite = await applyStagingStorePurchaseWrite({
-    playerId: "verified-player-a",
-    itemId: "core:lupenCore",
-    quantity: 1,
-    trustedState: {
-      available: true,
-      validationState: { credits: 1000 }
-    },
-    env: {
-      SUPABASE_URL: "https://example.supabase.co",
-      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
-      STAGING_STORE_WRITE_ENABLED: "true",
-      STAGING_STORE_WRITE_DRY_RUN: "false",
-      STAGING_STORE_WRITE_SCOPE: "verified",
-      STAGING_STORE_WRITE_ALLOWED_ITEMS: "catalog"
-    },
-    fetchImpl: async (_url, options = {}) => {
-      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: coreSave }] };
-      coreSave = JSON.parse(options.body || "{}").save_data;
-      return { ok: true, status: 204, json: async () => [] };
-    }
-  });
-  assert(appliedCoreWrite.applied === true, `Applied Lupen Core Store write did not apply: ${appliedCoreWrite.blockReason}`);
-  assert(appliedCoreWrite.creditsAfter === 850, "Applied Lupen Core write did not patch credits.");
-  assert(coreSave.inventoryItems.some((entry) => entry.key === "lupenCore" && entry.quality === "core"), "Applied Lupen Core write did not persist a core inventory item.");
-  assert(appliedCoreWrite.inventoryWritten === true && appliedCoreWrite.materialWritten === false, "Applied Lupen Core write reported wrong write flags.");
-
   let weaponSave = JSON.parse(JSON.stringify(validSaveData));
   const weaponFetchCalls = [];
   const appliedWeaponWrite = await applyStagingStorePurchaseWrite({
@@ -2331,45 +2238,6 @@ async function assertStagingStorePreviewHelpers() {
   assert(weaponSave.inventoryItems[0].id === "kept-item", "Applied Pulse Laser Store write changed inventoryItems.");
   assert(weaponSave.playerProgress.combatXp === 33, "Applied Pulse Laser Store write changed progression.");
   assert(weaponFetchCalls.join(",") === "GET,PATCH", `Pulse Laser Store write expected read/write pair, got ${weaponFetchCalls.join(",")}.`);
-
-  let shieldSave = JSON.parse(JSON.stringify(validSaveData));
-  const shieldFetchCalls = [];
-  const appliedShieldWrite = await applyStagingStorePurchaseWrite({
-    playerId: "verified-player-a",
-    itemId: "attachment:shieldBooster",
-    quantity: 1,
-    trustedState: {
-      available: true,
-      validationState: { credits: 1000 }
-    },
-    env: {
-      SUPABASE_URL: "https://example.supabase.co",
-      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
-      STAGING_STORE_WRITE_ENABLED: "true",
-      STAGING_STORE_WRITE_DRY_RUN: "false",
-      STAGING_STORE_WRITE_SCOPE: "allowlist",
-      STAGING_STORE_WRITE_ALLOWLIST: "verified-player-a",
-      STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:shieldBooster"
-    },
-    fetchImpl: async (_url, options = {}) => {
-      shieldFetchCalls.push(options.method || "GET");
-      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: shieldSave }] };
-      shieldSave = JSON.parse(options.body || "{}").save_data;
-      return { ok: true, status: 204, json: async () => [] };
-    }
-  });
-  assert(appliedShieldWrite.applied === true && appliedShieldWrite.mode === "store_write", `Gated Shield Booster Store write did not apply: ${appliedShieldWrite.blockReason}`);
-  assert(appliedShieldWrite.creditsBefore === 1000 && appliedShieldWrite.creditsAfter === 690, "Applied Shield Booster Store write returned incorrect credits.");
-  assert(appliedShieldWrite.itemBefore === 2 && appliedShieldWrite.itemAfter === 3, "Applied Shield Booster Store write returned incorrect ownership count.");
-  assert(appliedShieldWrite.creditsWritten === true && appliedShieldWrite.attachmentWritten === true && appliedShieldWrite.saveWritten === true, "Applied Shield Booster Store write did not report allowed writes.");
-  assert(appliedShieldWrite.weaponWritten === false && appliedShieldWrite.inventoryWritten === false && appliedShieldWrite.shipWritten === false, "Applied Shield Booster Store write reported forbidden writes.");
-  assert(shieldSave.credits === 690 && shieldSave.ownedAttachments.shieldBooster === 3, "Applied Shield Booster Store write did not update mocked save state.");
-  assert(shieldSave.ownedAttachments.cargoPod === 1, "Applied Shield Booster Store write changed Cargo Pod ownership.");
-  assert(shieldSave.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Applied Shield Booster Store write changed loadout.");
-  assert(shieldSave.ownedGuns.pulseLaser === 1, "Applied Shield Booster Store write changed weapon ownership.");
-  assert(shieldSave.inventoryItems[0].id === "kept-item", "Applied Shield Booster Store write changed inventoryItems.");
-  assert(shieldSave.playerProgress.combatXp === 33, "Applied Shield Booster Store write changed progression.");
-  assert(shieldFetchCalls.join(",") === "GET,PATCH", `Shield Booster Store write expected read/write pair, got ${shieldFetchCalls.join(",")}.`);
 
   let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 13000 }));
   const haulerFetchCalls = [];
@@ -5177,18 +5045,18 @@ try {
   assert(defaultStorePurchase?.currentNode === "Nyxara", `Store purchase did not refresh stale server node from request: ${defaultStorePurchase?.currentNode}`);
   assert(defaultStorePurchase?.presenceStatus === "docked", `Store purchase did not echo docked presence: ${defaultStorePurchase?.presenceStatus}`);
 
-  const defaultShieldBoosterPurchase = await expectStagingStorePurchase(roomA, () => {
+  const defaultJumpDrivePurchase = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {
-      itemId: "attachment:shieldBooster",
+      itemId: "attachment:jumpDrive",
       quantity: 1,
       playerSnapshot: {
         credits: 1000
       }
     });
   });
-  assert(defaultShieldBoosterPurchase?.applied === false, "Default Shield Booster Store purchase unexpectedly applied.");
-  assert(defaultShieldBoosterPurchase?.blockReason === "verified_identity_required" || defaultShieldBoosterPurchase?.blockReason === "trusted_save_required", `Default Shield Booster purchase did not stay identity/trusted-save gated: ${defaultShieldBoosterPurchase?.blockReason}.`);
-  assert(defaultShieldBoosterPurchase?.saveWritten === false, "Default Shield Booster Store purchase reported save write.");
+  assert(defaultJumpDrivePurchase?.applied === false, "Default Jump Drive Store purchase unexpectedly applied.");
+  assert(defaultJumpDrivePurchase?.blockReason === "verified_identity_required" || defaultJumpDrivePurchase?.blockReason === "trusted_save_required", `Default Jump Drive purchase did not stay identity/trusted-save gated: ${defaultJumpDrivePurchase?.blockReason}.`);
+  assert(defaultJumpDrivePurchase?.saveWritten === false, "Default Jump Drive Store purchase reported save write.");
 
   const invalidStorePurchaseQuantity = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {

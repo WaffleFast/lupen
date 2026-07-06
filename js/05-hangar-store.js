@@ -27,6 +27,9 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
   "ship:monolith": "ship:monolith"
 });
 
+const MAP_ONE_STORE_GUN_KEYS = Object.freeze(["pulseLaser", "ionBlaster", "heavyLance"]);
+const MAP_ONE_STORE_ATTACHMENT_KEYS = Object.freeze(["cargoPod", "jumpDrive"]);
+
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
 let multiplayerStagingStoreStatusMessage = "";
@@ -3234,41 +3237,7 @@ function getDailyStoreItem(baseItems) {
 }
 
 function getStoreMaterialItems() {
-  const shardDefinition = upgradeMaterialDefinitions?.lupenShards || {};
-  return [
-    {
-      id: "material:lupenShard",
-      kind: "material",
-      key: "lupenShards",
-      name: "Lupen Shard",
-      category: "materials",
-      image: shardDefinition.icon || "assets/items/lupen-shard.png",
-      fixedQuality: "advanced",
-      storeTier: "Forge Material",
-      basePrice: 50,
-      description: shardDefinition.description || "Charged Forge material used to raise item levels.",
-      stats: [
-        { label: "Use", value: "Forge upgrades" },
-        { label: "Stored", value: "Materials" }
-      ]
-    },
-    {
-      id: "core:lupenCore",
-      kind: "core",
-      key: "lupenCore",
-      name: "Lupen Core",
-      category: "materials",
-      image: "assets/items/lupen-core.png",
-      fixedQuality: LUPEN_CORE_QUALITY,
-      storeTier: "Rare Forge Material",
-      basePrice: 150,
-      description: "Rare Forge catalyst used to support quality upgrades.",
-      stats: [
-        { label: "Tier", value: "Rare catalyst" },
-        { label: "Stored", value: "Vault item" }
-      ]
-    }
-  ];
+  return [];
 }
 
 
@@ -3315,6 +3284,7 @@ function getStoreCatalogItems() {
 
   Object.entries(GUNS).forEach(([key, item]) => {
     if (item.hiddenFromStore) return;
+    if (!MAP_ONE_STORE_GUN_KEYS.includes(key)) return;
     items.push({
       id: `gun:${key}`,
       kind: "gun",
@@ -3331,6 +3301,7 @@ function getStoreCatalogItems() {
   });
 
   Object.entries(attachments).forEach(([key, item]) => {
+    if (!MAP_ONE_STORE_ATTACHMENT_KEYS.includes(key)) return;
     items.push({
       id: `attachment:${key}`,
       kind: "attachment",
@@ -3422,7 +3393,7 @@ function notifyStorePurchaseBlocked(result) {
 }
 
 function ensureStoreSelection() {
-  if (!["all", "guns", "attachments", "materials", "owned"].includes(storeFilter)) {
+  if (!["all", "guns", "attachments", "owned"].includes(storeFilter)) {
     storeFilter = "all";
   }
   selectedStoreQuality = "standard";
@@ -3683,7 +3654,6 @@ function renderStoreFilters() {
     { key: "all", label: "All" },
     { key: "guns", label: "Guns" },
     { key: "attachments", label: "Attachments" },
-    { key: "materials", label: "Materials" },
     { key: "owned", label: "Owned" }
   ];
 

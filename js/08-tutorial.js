@@ -271,14 +271,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "claim-bounty",
     title: "Claim bounty reward",
-    text: "Claim your completed bounty. Combat payouts include credits, XP, Lupen Shards, and Lupen Cores.",
+    text: "Claim your completed bounty. Combat payouts include credits, XP, and Lupen Shards.",
     target: "tutorial:claimBountyReward",
     event: ["openedBountyBoard", "claimedBountyReward"]
   },
   {
     id: "continue-after-bounty-reward",
     title: "Reward claimed",
-    text: "Press Continue, then return to the station hub. The Lupen Core you claimed is your first Forge catalyst.",
+    text: "Press Continue, then return to the station hub. The Lupen Shards you claimed can upgrade your Pulse Laser.",
     target: "#bountyRewardOverlay button, .reward-overlay button",
     event: "closedBountyReward",
     place: "left"
@@ -294,14 +294,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-forge",
     title: "Open Forge",
-    text: "Open the Forge. Lupen Cores improve equipment quality; for now, we will upgrade your Pulse Laser once and keep the lesson clean.",
+    text: "Open the Forge. Lupen Shards raise item levels; for now, we will upgrade your Pulse Laser once and keep the lesson clean.",
     target: ".hub-actions button[onclick='openUpgradeForge()']",
     event: "openedForge"
   },
   {
     id: "forge-upgrade-weapon",
     title: "Upgrade Pulse Laser",
-    text: "Start the Quality Upgrade. Your Pulse Laser will advance beyond Standard and remain fitted to your loadout.",
+    text: "Upgrade the Pulse Laser. It will rise from Level I to Level II and remain fitted to your loadout.",
     target: "tutorial:forgeUpgradeButton",
     event: "upgradedTutorialWeapon"
   },
@@ -486,7 +486,7 @@ function isAtTutorialBountyCombatTarget() {
 }
 
 function isTutorialForgeComplete() {
-  return typeof hasTutorialPulseLaserQualityUpgrade === "function" && hasTutorialPulseLaserQualityUpgrade();
+  return typeof hasTutorialPulseLaserLevelUpgrade === "function" && hasTutorialPulseLaserLevelUpgrade();
 }
 
 function getTutorialStateCompletionReason(step) {
@@ -996,7 +996,6 @@ function getDynamicTutorialTarget(step) {
 
   if (step.target === "tutorial:forgeUpgradeButton") {
     return document.querySelector("#forgeStartBtn:not(:disabled)") ||
-           document.querySelector("#forgeQualityModeBtn") ||
            document.querySelector("#forgeChamber");
   }
 
@@ -1201,7 +1200,6 @@ function isTutorialClickAllowed(event) {
   if (step?.id === "forge-upgrade-weapon") {
     if (
       event.target.closest?.("#forgeStartBtn") ||
-      event.target.closest?.("#forgeQualityModeBtn") ||
       event.target.closest?.("#forgeSelectedPanel") ||
       event.target.closest?.("#forgeInventoryPicker")
     ) return true;

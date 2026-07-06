@@ -8,6 +8,11 @@ const FORGE_MODE_LABELS = {
 const FORGE_LEVEL_XP_REQUIREMENTS = [0, 0, 1000, 2500, 5000];
 const FORGE_LEVEL_ROMAN = ["", "I", "II", "III", "IV", "V"];
 const FORGE_QUALITY_ORDER = ITEM_QUALITY_ORDER;
+const FORGE_MAP_ONE_MAX_LEVEL = 3;
+const FORGE_MAP_ONE_LEVEL_COSTS = Object.freeze({
+  1: 25,
+  2: 75
+});
 
 function getForgeItemLevelRoman(level) {
   const safeLevel = Math.min(MAX_ITEM_LEVEL, Math.max(1, Math.floor(Number(level || 1))));
@@ -78,12 +83,11 @@ function getForgeItemDefinition(key) {
 function getForgeItemDisplayName(item) {
   const definition = getForgeItemDefinition(item?.key);
   if (!definition) return "Unknown Item";
-  const qualityName = item.quality === "standard" ? definition.name : `${titleCaseQuality(item.quality)} ${definition.name}`;
-  return `${qualityName} ${getForgeItemLevelRoman(getForgeItemLevel(item || {}))}`;
+  return `${definition.name} ${getForgeItemLevelRoman(getForgeItemLevel(item || {}))}`;
 }
 
 function getForgeItemLevel(item) {
-  return Math.min(MAX_ITEM_LEVEL, Math.max(1, Math.floor(Number(item?.level || 1))));
+  return Math.min(FORGE_MAP_ONE_MAX_LEVEL, Math.max(1, Math.floor(Number(item?.level || 1))));
 }
 
 function getForgeStatKey(label = "") {
@@ -106,11 +110,12 @@ function getForgeItemStatRows(item, quality = item?.quality || "standard", level
   if (!item) return [];
   if (item.categoryKey === "guns" && GUNS[item.key]) {
     const base = getGunDamageForQuality(GUNS[item.key], quality);
-    const levelMultiplier = getItemLevelMultiplier(level);
-    const damage = Math.max(1, Math.round(Math.max(base.shield || 0, base.armor || 0, base.hull || 0) * levelMultiplier));
+    const levelBonus = Math.max(0, Math.min(FORGE_MAP_ONE_MAX_LEVEL, Math.floor(Number(level || 1))) - 1);
+    const damage = Math.max(1, Math.round(Math.max(base.shield || 0, base.armor || 0, base.hull || 0))) + levelBonus;
+    const fireRate = getGunFireRateValue(GUNS[item.key]) + (level >= 3 ? 0.1 : 0);
     return [
       { label: "Damage", value: formatNumber(damage) },
-      { label: "Fire Rate", value: getGunFireRateText(GUNS[item.key]) }
+      { label: "Fire Rate", value: `${fireRate.toFixed(1)}/s` }
     ];
   }
 
@@ -235,6 +240,14 @@ function hasTutorialPulseLaserQualityUpgrade() {
   );
 }
 
+function hasTutorialPulseLaserLevelUpgrade() {
+  return getForgeUpgradeableItems().some(item =>
+    item.key === "pulseLaser" &&
+    item.categoryKey === "guns" &&
+    getForgeItemLevel(item) > 1
+  );
+}
+
 function getTutorialPulseLaserForgeItemId() {
   const items = getForgeUpgradeableItems().filter(item => item.key === "pulseLaser" && item.categoryKey === "guns");
   if (!items.length) return null;
@@ -247,14 +260,14 @@ function getTutorialPulseLaserForgeItemId() {
 
 function prepareTutorialForgeSelection() {
   if (!isTutorialForgeStepActive()) return;
-  forgeUpgradeMode = "quality";
+  forgeUpgradeMode = "level";
   const pulseLaserItemId = getTutorialPulseLaserForgeItemId();
   if (pulseLaserItemId) selectedForgeItemId = pulseLaserItemId;
 }
 
 function setForgeMode(mode) {
   if (forgeAnimating) return;
-  forgeUpgradeMode = mode === "level" ? "level" : "quality";
+  forgeUpgradeMode = "level";
   renderUpgradeForge();
 }
 
@@ -312,7 +325,8 @@ function getForgeNextQuality(quality) {
 }
 
 function getForgeLevelShardCost(level) {
-  return Math.max(50, getForgeItemLevel({ level }) * 50);
+  const safeLevel = Math.max(1, Math.min(FORGE_MAP_ONE_MAX_LEVEL - 1, Math.floor(Number(level || 1))));
+  return FORGE_MAP_ONE_LEVEL_COSTS[safeLevel] || 75;
 }
 
 function getForgeQualityCoreCost(nextQuality) {
@@ -323,31 +337,17 @@ function getForgeRequirement(item, mode = forgeUpgradeMode) {
   if (!item) return null;
   const level = getForgeItemLevel(item);
 
-  if (mode === "level") {
-    if (level >= MAX_ITEM_LEVEL) return null;
-    return {
-      materialKey: "lupenShards",
-      materialName: "Lupen Shards",
-      shortName: "Shards",
-      resourceIcon: "assets/items/lupen-shard.png",
-      required: getForgeLevelShardCost(level)
-    };
-  }
-
-  const nextQuality = getForgeNextQuality(item.quality);
-  if (!nextQuality) return null;
   return {
-    materialKey: "lupenCores",
-    materialName: "Lupen Cores",
-    shortName: "Cores",
-    resourceIcon: "assets/items/lupen-core.png",
-    required: getForgeQualityCoreCost(nextQuality)
+    materialKey: "lupenShards",
+    materialName: "Lupen Shards",
+    shortName: "Shards",
+    resourceIcon: "assets/items/lupen-shard.png",
+    required: level >= FORGE_MAP_ONE_MAX_LEVEL ? 0 : getForgeLevelShardCost(level)
   };
 }
 
 function getForgeMaterialOwned(materialKey) {
   if (materialKey === "lupenShards") return getLupenShardCount();
-  if (materialKey === "lupenCores") return getLupenCoreCount();
   return 0;
 }
 
@@ -355,8 +355,8 @@ function getForgeUpgradePreview(item, mode = forgeUpgradeMode) {
   if (!item) return null;
   const currentLevel = getForgeItemLevel(item);
   const currentQuality = item.quality || "standard";
-  const targetLevel = mode === "level" ? Math.min(MAX_ITEM_LEVEL, currentLevel + 1) : currentLevel;
-  const targetQuality = mode === "quality" ? (getForgeNextQuality(currentQuality) || currentQuality) : currentQuality;
+  const targetLevel = Math.min(FORGE_MAP_ONE_MAX_LEVEL, currentLevel + 1);
+  const targetQuality = currentQuality;
 
   return {
     mode,
@@ -380,10 +380,7 @@ function getForgePrimaryStatChange(preview) {
 
 function getForgeOutcomeLabel(preview, mode = forgeUpgradeMode) {
   if (!preview) return "--";
-  if (mode === "level") {
-    return `Level ${getForgeItemLevelRoman(preview.fromLevel)} -> Level ${getForgeItemLevelRoman(preview.toLevel)}`;
-  }
-  return `${titleCaseQuality(preview.fromQuality)} -> ${titleCaseQuality(preview.toQuality)}`;
+  return `Level ${getForgeItemLevelRoman(preview.fromLevel)} -> Level ${getForgeItemLevelRoman(preview.toLevel)}`;
 }
 
 function getForgeRequirementLabel(requirement) {
@@ -402,7 +399,7 @@ function getForgeState(item, mode = forgeUpgradeMode) {
   if (!item) {
     return {
       canUpgrade: false,
-      reason: "No item selected",
+      reason: "Select an item to upgrade.",
       buttonText: "Select Item",
       requirement,
       preview,
@@ -413,14 +410,12 @@ function getForgeState(item, mode = forgeUpgradeMode) {
   }
 
   const level = getForgeItemLevel(item);
-  const targetLevel = mode === "level" ? Math.min(MAX_ITEM_LEVEL, level + 1) : level;
-  const requiredXp = mode === "level" ? getForgeLevelXpRequirement(targetLevel) : 0;
-  if (!requirement) {
-    const isQuality = mode === "quality";
+  const targetLevel = Math.min(FORGE_MAP_ONE_MAX_LEVEL, level + 1);
+  if (level >= FORGE_MAP_ONE_MAX_LEVEL) {
     return {
       canUpgrade: false,
-      reason: isQuality ? "Item already Godlike" : "Item already at maximum level",
-      buttonText: isQuality ? "Godlike Maxed" : "Max Level",
+      reason: "Item is already max level for Map 1.",
+      buttonText: "Max Level",
       requirement,
       preview,
       targetLevel: level,
@@ -431,33 +426,17 @@ function getForgeState(item, mode = forgeUpgradeMode) {
     };
   }
 
-  if (mode === "level" && getForgeTotalPilotXp() < requiredXp) {
-    return {
-      canUpgrade: false,
-      reason: `Requires ${formatNumber(requiredXp)} XP for Level ${getForgeItemLevelRoman(targetLevel)}`,
-      buttonText: `Need ${formatNumber(requiredXp - getForgeTotalPilotXp())} XP`,
-      requirement,
-      preview,
-      targetLevel,
-      targetQuality: item.quality,
-      requiredXp,
-      owned: getForgeMaterialOwned(requirement.materialKey),
-      missing: 0,
-      successChance: 0
-    };
-  }
-
   const owned = getForgeMaterialOwned(requirement.materialKey);
   const missing = Math.max(0, Number(requirement.required || 0) - owned);
   if (missing > 0) {
     return {
       canUpgrade: false,
-      reason: `Missing ${requirement.materialName}`,
+      reason: "Not enough Lupen Shards.",
       buttonText: `Need ${formatNumber(missing)} More ${requirement.shortName}`,
       requirement,
       preview,
-      targetLevel: mode === "level" ? level + 1 : level,
-      targetQuality: mode === "quality" ? getForgeNextQuality(item.quality) : item.quality,
+      targetLevel,
+      targetQuality: item.quality,
       owned,
       missing,
       successChance: 0
@@ -466,12 +445,12 @@ function getForgeState(item, mode = forgeUpgradeMode) {
 
   return {
     canUpgrade: true,
-    reason: "Ready to forge",
-    buttonText: "Start Forge",
+    reason: "Ready to upgrade.",
+    buttonText: "Upgrade Item",
     requirement,
     preview,
-    targetLevel: mode === "level" ? level + 1 : level,
-    targetQuality: mode === "quality" ? getForgeNextQuality(item.quality) : item.quality,
+    targetLevel,
+    targetQuality: item.quality,
     owned,
     missing: 0,
     successChance: 100
@@ -528,7 +507,6 @@ function getForgeMissingRequirements(item, requirements) {
   if (!requirements.canUpgrade) return missing;
   const required = Math.max(0, Number(requirements.resourceRequired || 0));
   if (requirements.resourceKey === "lupenShards" && getLupenShardCount() < required) missing.push("Lupen Shards");
-  if (requirements.resourceKey === "lupenCores" && getLupenCoreCount() < required) missing.push("Lupen Cores");
   return missing;
 }
 
@@ -546,11 +524,16 @@ function previewForgeUpgrade() {
 }
 
 function applyForgeUpgrade(item, requirements) {
-  if (requirements.resourceKey === "lupenShards" && !spendLupenShards(requirements.resourceRequired)) return false;
-  if (requirements.resourceKey === "lupenCores" && getLupenCoreCount() < Number(requirements.resourceRequired || 0)) return false;
-  if (requirements.resourceKey === "lupenCores") removeLupenCores(requirements.resourceRequired);
+  const shardCost = Math.max(0, Math.floor(Number(requirements.resourceRequired || getForgeLevelShardCost(getForgeItemLevel(item)))));
+  upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+  const ownedShards = Math.max(0, Math.floor(Number(upgradeMaterials.lupenShards || 0)));
+  if (ownedShards < shardCost) return false;
+  upgradeMaterials = {
+    ...upgradeMaterials,
+    lupenShards: Math.max(0, ownedShards - shardCost)
+  };
 
-  const nextQuality = requirements.targetQuality || item.quality;
+  const nextQuality = item.quality || "standard";
   const nextLevel = requirements.targetLevel || item.level;
 
   if (item.source === "inventory") {
@@ -626,13 +609,14 @@ function startForgeUpgrade() {
       chamber.classList.remove("forging");
       chamber.classList.add("forge-complete");
     }
-    addActivityLog(`${getForgeItemDisplayName(item)} ${forgeUpgradeMode === "level" ? `raised to level ${getForgeItemLevelRoman(requirements.targetLevel)}` : `advanced to ${titleCaseQuality(requirements.targetQuality)}`}.`);
-    if (typeof addHudToast === "function") addHudToast(forgeUpgradeMode === "level" ? "Forge complete: Level increased." : "Forge complete: Quality advanced.");
-    if (item.key === "pulseLaser" && forgeUpgradeMode === "quality") {
-      tutorialEvent("upgradedTutorialWeapon", { key: item.key, quality: requirements.targetQuality });
+    const upgradedName = getForgeItemDefinition(item.key)?.name || getForgeItemDisplayName(item);
+    addActivityLog(`${upgradedName} upgraded to Level ${getForgeItemLevelRoman(requirements.targetLevel)}.`);
+    if (typeof addHudToast === "function") addHudToast(`${upgradedName} upgraded to Level ${getForgeItemLevelRoman(requirements.targetLevel)}.`);
+    if (item.key === "pulseLaser" && item.categoryKey === "guns") {
+      tutorialEvent("upgradedTutorialWeapon", { key: item.key, level: requirements.targetLevel });
     }
     if (typeof recordMissionEvent === "function") {
-      recordMissionEvent("upgrade_item", { key: item.key, mode: forgeUpgradeMode, quality: requirements.targetQuality, level: requirements.targetLevel });
+      recordMissionEvent("upgrade_item", { key: item.key, mode: "level", quality: item.quality, level: requirements.targetLevel });
     }
     renderUpgradeForge();
     updateProgressDisplays();
@@ -641,45 +625,27 @@ function startForgeUpgrade() {
   }, 1200);
 }
 
-function renderForgeSelectedPanel(item) {
+function renderForgeSelectedPanel(item, items = getForgeUpgradeableItems()) {
   const panel = document.getElementById("forgeSelectedPanel");
   if (!panel) return;
-  if (!item) {
-    panel.innerHTML = `
-      <button type="button" class="forge-drop-slot empty" onclick="openForgeInventoryPicker()" ondragover="event.preventDefault()" ondrop="handleForgeDrop(event, 'item')">
-        <span>Empty item slot</span>
-        <strong>Select a weapon or attachment</strong>
-      </button>
-    `;
+  if (!items.length) {
+    panel.innerHTML = `<div class="terminal-empty-state">No owned weapons or attachments.</div>`;
     return;
   }
 
-  const definition = getForgeItemDefinition(item.key);
-  const stats = getVisibleItemStats(item);
-  const statRows = stats.map(row => ({ ...row, key: getForgeStatKey(row.label) }));
-  const typeLabel = item.categoryKey === "attachments" ? "Equipment" : "Weapon";
-
-  panel.innerHTML = `
-    <div class="forge-selected-card forge-selected-card--stack forge-drop-slot quality-${item.quality}" ondragover="event.preventDefault()" ondrop="handleForgeDrop(event, 'item')">
-      <div class="forge-selected-info forge-selected-heading">
-        <h3>${escapeHtml(getForgeItemDisplayName(item))}</h3>
-        <p>${escapeHtml(typeLabel)} &middot; <strong>${escapeHtml(titleCaseQuality(item.quality))}</strong> &middot; Level ${escapeHtml(getForgeItemLevelRoman(getForgeItemLevel(item)))}</p>
-      </div>
-      <div class="forge-selected-art">${renderQualityFx(item.quality, { src: definition.image, alt: definition.name, size: "feature" })}</div>
-      <div class="forge-selected-info">
-        <div class="forge-section-label">Current Stats</div>
-        <div class="forge-core-stats">
-          ${statRows.map(row => `
-            <div class="forge-stat-row forge-stat-row-${escapeHtml(row.key)}">
-              <span class="forge-stat-label">${escapeHtml(row.label)}</span>
-              <strong>${escapeHtml(row.value)}</strong>
-            </div>
-          `).join("")}
-        </div>
-        <button type="button" class="forge-change-item-btn" onclick="openForgeInventoryPicker()">Select Another Item</button>
-      </div>
-    </div>
-  `;
+  panel.innerHTML = items.map(entry => {
+    const definition = getForgeItemDefinition(entry.key);
+    const selected = entry.id === item?.id;
+    return `
+      <button type="button" class="forge-owned-item ${selected ? "selected" : ""}" onclick="selectForgeItem('${escapeJsString(entry.id)}')">
+        <img src="${escapeHtml(definition?.image || "assets/items/lupen-shard.png")}" alt="${escapeHtml(definition?.name || entry.key)}">
+        <span>
+          <strong>${escapeHtml(definition?.name || getForgeItemDisplayName(entry))} ${escapeHtml(getForgeItemLevelRoman(getForgeItemLevel(entry)))}</strong>
+          <small>Level ${escapeHtml(getForgeItemLevelRoman(getForgeItemLevel(entry)))}</small>
+        </span>
+      </button>
+    `;
+  }).join("");
 }
 
 function renderForgeInventoryPicker(items) {
@@ -735,77 +701,23 @@ function renderForgeInventoryPicker(items) {
 function renderForgeChamber(item, requirements) {
   const image = document.getElementById("forgePreviewImage");
   const state = document.getElementById("forgeStatePreview");
-  const levelBtn = document.getElementById("forgeLevelModeBtn");
-  const qualityBtn = document.getElementById("forgeQualityModeBtn");
   const chamber = document.getElementById("forgeChamber");
   if (!image || !state || !chamber) return;
-  const modeClass = forgeUpgradeMode === "quality" ? "quality-active" : "level-active";
   if (!item) {
-    chamber.className = `forge-chamber forge-chamber-visual ${modeClass} missing-materials quality-fx-host quality-fx--standard`;
-    state.innerHTML = `<div class="forge-compare-card"><span>Current</span><strong>Select item</strong></div><div class="forge-compare-card"><span>After</span><strong>Select item</strong></div>`;
+    chamber.className = "forge-chamber forge-chamber-visual level-active missing-materials quality-fx-host quality-fx--standard";
+    state.textContent = "Select an item to upgrade.";
     return;
   }
 
   const definition = getForgeItemDefinition(item.key);
-  const targetQuality = requirements.targetQuality || item.quality;
-  const targetLevel = requirements.targetLevel || getForgeItemLevel(item);
-  const preview = requirements.preview || getForgeUpgradePreview(item);
   image.src = definition.image;
   image.alt = definition.name;
   const chamberStateClass = forgeAnimating ? "upgrading forging" : requirements.canUpgrade ? "ready" : "missing-materials";
-  chamber.className = `forge-chamber forge-chamber-visual ${modeClass} ${chamberStateClass} quality-fx-host quality-fx--${normalizeQualityFxTier(targetQuality)}`;
-  chamber.dataset.qualityTier = normalizeQualityFxTier(targetQuality);
+  chamber.className = `forge-chamber forge-chamber-visual level-active ${chamberStateClass} quality-fx-host quality-fx--standard`;
+  chamber.dataset.qualityTier = "standard";
   chamber.style.setProperty("--forge-before", getForgeQualityColor(item.quality));
-  chamber.style.setProperty("--forge-after", getForgeQualityColor(targetQuality));
-
-  const currentStats = (preview?.currentStats || []).map(row => `<div><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></div>`).join("");
-  const nextStats = (preview?.nextStats || []).map(row => `<div><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></div>`).join("");
-  const currentLabel = forgeUpgradeMode === "level"
-    ? `Level ${getForgeItemLevelRoman(getForgeItemLevel(item))} / ${getForgeItemLevelRoman(getForgePlayerLevelCap())}`
-    : `${titleCaseQuality(item.quality)} ${getForgeItemLevelRoman(getForgeItemLevel(item))}`;
-  const nextLabel = forgeUpgradeMode === "level"
-    ? `Level ${getForgeItemLevelRoman(targetLevel)} / ${getForgeItemLevelRoman(getForgePlayerLevelCap())}`
-    : `${titleCaseQuality(targetQuality)} ${getForgeItemLevelRoman(targetLevel)}`;
-
-  state.innerHTML = `
-    <div class="forge-compare-card">
-      <span>Current</span>
-      <strong>${escapeHtml(currentLabel)}</strong>
-      ${currentStats}
-    </div>
-    <div class="forge-compare-card after">
-      <span>After</span>
-      <strong class="quality-${targetQuality}">${escapeHtml(nextLabel)}</strong>
-      ${nextStats}
-    </div>
-  `;
-
-  levelBtn?.classList.toggle("active", forgeUpgradeMode === "level");
-  qualityBtn?.classList.toggle("active", forgeUpgradeMode === "quality");
-  levelBtn?.classList.toggle("disabled", getForgeItemLevel(item) >= MAX_ITEM_LEVEL);
-  qualityBtn?.classList.toggle("disabled", !getForgeNextQuality(item.quality));
-  const levelRequirements = getForgeRequirements(item, "level");
-  const qualityRequirements = getForgeRequirements(item, "quality");
-  const levelPreview = levelRequirements.preview;
-  const qualityPreview = qualityRequirements.preview;
-  if (levelBtn) {
-    levelBtn.innerHTML = `
-      <span class="forge-choice-check" aria-hidden="true"></span>
-      <strong>Level Upgrade</strong>
-      <small>Increase item power</small>
-      <div class="forge-choice-cost"><b>Cost</b><span>LS ${formatNumber(levelRequirements.resourceRequired || 0)}</span></div>
-      <div class="forge-choice-preview"><b>Preview</b><span>${escapeHtml(getForgePrimaryStatChange(levelPreview))}</span></div>
-    `;
-  }
-  if (qualityBtn) {
-    qualityBtn.innerHTML = `
-      <span class="forge-choice-check" aria-hidden="true"></span>
-      <strong>Quality Upgrade</strong>
-      <small>Increase item quality</small>
-      <div class="forge-choice-cost"><b>Cost</b><span>LC ${formatNumber(qualityRequirements.resourceRequired || 0)}</span></div>
-      <div class="forge-choice-preview"><b>Preview</b><span>${escapeHtml(getForgeOutcomeLabel(qualityPreview, "quality"))}</span><span>${escapeHtml(getForgePrimaryStatChange(qualityPreview))}</span></div>
-    `;
-  }
+  chamber.style.setProperty("--forge-after", getForgeQualityColor(item.quality));
+  state.textContent = requirements.reason || "Ready to upgrade.";
 }
 
 function renderForgeMaterials(item, requirements) {
@@ -814,46 +726,43 @@ function renderForgeMaterials(item, requirements) {
   if (!list || !corePanel) return;
 
   if (!item) {
-    list.innerHTML = `
-      <button type="button" class="forge-resource-card empty" onclick="openForgeInventoryPicker()">
-        <span>Select an item</span>
-        <strong>No upgrade resource required yet</strong>
-      </button>
-    `;
-    corePanel.innerHTML = `<button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="openForgeInventoryPicker()">Select Item</button>`;
+    list.innerHTML = `<div class="terminal-empty-state">Select an item to upgrade.</div>`;
+    corePanel.innerHTML = `<button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="previewForgeUpgrade()">Select Item</button>`;
     return;
   }
 
-  const requirement = requirements.requirement;
-  const owned = Number(requirements.owned || 0);
-  const required = Number(requirement?.required || 0);
-  const resourceName = requirement?.materialName || (forgeUpgradeMode === "level" ? "Lupen Shards" : "Lupen Cores");
-  const resourceIcon = requirement?.resourceIcon || (forgeUpgradeMode === "level" ? "assets/items/lupen-shard.png" : "assets/items/lupen-core.png");
+  const definition = getForgeItemDefinition(item.key);
+  const required = Number(requirements.requirement?.required || 0);
   const preview = requirements.preview || getForgeUpgradePreview(item);
-  const resultLabel = requirement ? getForgeOutcomeLabel(preview, forgeUpgradeMode) : (requirements.reason || "No upgrade available");
-  const outcomeLabel = getForgePrimaryStatChange(preview) || resultLabel;
-  const modeTitle = forgeUpgradeMode === "level" ? "Level Upgrade" : "Quality Upgrade";
-  const note = forgeUpgradeMode === "quality" ? "Rare resource: spend carefully" : "Upgrade resource: spend carefully";
-  const statusLabel = requirements.canUpgrade ? "Ready" : (requirements.buttonText || requirements.reason || "Unavailable");
+  const currentStats = preview?.currentStats || [];
+  const nextStats = preview?.nextStats || [];
+  const statRows = currentStats.map(row => {
+    const next = nextStats.find(nextRow => nextRow.label === row.label) || row;
+    return `
+      <div class="forge-preview-stat">
+        <span>${escapeHtml(row.label)}</span>
+        <strong>${escapeHtml(row.value)}</strong>
+        <b>&gt;&gt;</b>
+        <em>${escapeHtml(next.value)}</em>
+      </div>
+    `;
+  }).join("");
 
   list.innerHTML = `
-    <div class="forge-confirm-card forge-confirm-card--${forgeUpgradeMode} ${requirements.canUpgrade ? "ready" : "blocked"}">
-      <div class="forge-confirm-head">
-        <img src="${escapeHtml(resourceIcon)}" alt="${escapeHtml(resourceName)}">
-        <strong>${escapeHtml(modeTitle)}</strong>
+    <div class="forge-map1-preview ${requirements.canUpgrade ? "ready" : "blocked"}">
+      <h3>${escapeHtml(definition?.name || getForgeItemDisplayName(item))}</h3>
+      <div class="forge-level-flow">
+        <span>Level ${escapeHtml(getForgeItemLevelRoman(preview?.fromLevel || getForgeItemLevel(item)))}</span>
+        <b>&gt;&gt;&gt;</b>
+        <strong>Level ${escapeHtml(getForgeItemLevelRoman(preview?.toLevel || getForgeItemLevel(item)))}</strong>
       </div>
-      <div class="forge-confirm-lines">
-        <div><span>Selected Item</span><strong>${escapeHtml(getForgeItemDisplayName(item))}</strong></div>
-        <div><span>Result</span><strong>${escapeHtml(resultLabel)}</strong></div>
+      <div class="forge-preview-stats">${statRows}</div>
+      <div class="forge-preview-cost">
+        <span>Cost</span>
+        <strong><img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">${formatNumber(required)}</strong>
+        <small>Lupen Shards</small>
       </div>
-      <div class="forge-confirm-metrics">
-        <div><span>Cost</span><strong>${escapeHtml(getForgeRequirementLabel(requirement))}</strong></div>
-        <div><span>Inventory</span><strong>${formatNumber(owned)} owned</strong></div>
-        <div class="${requirements.canUpgrade ? "ready" : "blocked"}"><span>Status</span><strong>${escapeHtml(statusLabel)}</strong></div>
-        <div><span>Outcome</span><strong>${escapeHtml(outcomeLabel)}</strong></div>
-      </div>
-      <p class="forge-confirm-note">${escapeHtml(note)}</p>
-      <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Forge Upgrade</button>
+      <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Upgrade Item</button>
     </div>
   `;
 
@@ -882,9 +791,9 @@ function renderForgeSummary(item, requirements) {
   const start = document.getElementById("forgeStartBtn");
   if (start) {
     start.textContent = forgeAnimating
-      ? "Forging..."
+      ? "Upgrading..."
       : requirements.canUpgrade
-        ? "Forge Upgrade"
+        ? "Upgrade Item"
         : (requirements.buttonText || requirements.reason || "Unavailable");
     start.disabled = forgeAnimating || (!requirements.canUpgrade && Boolean(item));
   }
@@ -892,25 +801,31 @@ function renderForgeSummary(item, requirements) {
 
 function renderUpgradeForge() {
   upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+  forgeUpgradeMode = "level";
   prepareTutorialForgeSelection();
   const items = getForgeUpgradeableItems();
   const item = getForgeSelectedItem();
   const requirements = getForgeRequirements(item);
-  const totalXp = getForgeTotalPilotXp();
+  const stationText = document.getElementById("forgeStationText");
+  if (stationText) stationText.textContent = (lastPlanetNode || currentNode || "Asteron Prime").toUpperCase();
 
-  document.getElementById("forgeCreditsText").textContent = formatNumber(credits);
-  document.getElementById("forgeCoreCountText").textContent = formatNumber(getLupenCoreCount());
+  const creditText = document.getElementById("forgeCreditsText");
+  if (creditText) creditText.textContent = formatNumber(credits);
+  const coreText = document.getElementById("forgeCoreCountText");
+  if (coreText) coreText.textContent = "0";
   const shardCount = document.getElementById("forgeShardCountText");
   if (shardCount) shardCount.textContent = formatNumber(getLupenShardCount());
-  document.getElementById("forgePilotLevelText").textContent = formatNumber(totalXp);
-  document.getElementById("forgePilotXpText").textContent = `Level cap ${getForgeItemLevelRoman(getForgePlayerLevelCap())}`;
+  const pilotLevelText = document.getElementById("forgePilotLevelText");
+  if (pilotLevelText) pilotLevelText.textContent = formatNumber(getForgeTotalPilotXp());
+  const pilotXpText = document.getElementById("forgePilotXpText");
+  if (pilotXpText) pilotXpText.textContent = `Level cap ${getForgeItemLevelRoman(FORGE_MAP_ONE_MAX_LEVEL)}`;
 
-  renderForgeSelectedPanel(item, requirements);
+  renderForgeSelectedPanel(item, items);
   renderForgeInventoryPicker(items);
   renderForgeChamber(item, requirements);
   renderForgeMaterials(item, requirements);
   renderForgeSummary(item, requirements);
 
   const status = document.getElementById("forgeChamberStatus");
-  if (status && !forgeAnimating) status.textContent = requirements.canUpgrade ? `${FORGE_MODE_LABELS[forgeUpgradeMode]} ready` : (requirements.reason || "Select item");
+  if (status && !forgeAnimating) status.textContent = requirements.canUpgrade ? "Upgrade ready" : (requirements.reason || "Select item");
 }

@@ -3283,7 +3283,8 @@ function claimBountyReward(contractId) {
   if (tutorialState?.active && ["claim-bounty", "continue-after-bounty-reward"].includes(getCurrentTutorialStep()?.id)) {
     contract.reward = {
       ...cloneBountyReward(contract.reward),
-      lupenCores: Math.max(1, Number(contract.reward?.lupenCores || 0))
+      lupenCores: 0,
+      lupenShards: Math.max(25, Number(contract.reward?.lupenShards || 0))
     };
   }
 

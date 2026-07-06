@@ -1,7 +1,7 @@
 /* Static staging Store preview config.
    This catalogue is server-owned data for multiplayer Store validation.
-   It covers current Map 1 Store guns, attachments, the Vessel Exchange
-   first-map ship path, and cheap Forge test materials; it never allows unknown item ids,
+   It covers current Map 1 Store guns, attachments, and the Vessel Exchange
+   first-map ship path; it never allows unknown item ids,
    Store sell, loot writes, bounties, PvP/player damage, schema, or broad
    progression. */
 
@@ -33,18 +33,6 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     reference: "GUNS.ionBlaster"
   }),
   Object.freeze({
-    itemId: "gun:meltCannon",
-    name: "Melt Cannon",
-    category: "weapon",
-    localKind: "gun",
-    localKey: "meltCannon",
-    price: 821,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "Close-range thermal cannon for heavy bursts.",
-    reference: "GUNS.meltCannon"
-  }),
-  Object.freeze({
     itemId: "gun:pulseLaser",
     name: "Pulse Laser",
     category: "weapon",
@@ -55,42 +43,6 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     stockType: "fixed",
     description: "Reliable all-round energy weapon.",
     reference: "GUNS.pulseLaser"
-  }),
-  Object.freeze({
-    itemId: "gun:repeater",
-    name: "Repeater",
-    category: "weapon",
-    localKind: "gun",
-    localKey: "repeater",
-    price: 526,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "Fast cycling starter-class ballistic weapon.",
-    reference: "GUNS.repeater"
-  }),
-  Object.freeze({
-    itemId: "gun:ripperGun",
-    name: "Ripper Gun",
-    category: "weapon",
-    localKind: "gun",
-    localKey: "ripperGun",
-    price: 777,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "High-rate fragmentation weapon for sustained pressure.",
-    reference: "GUNS.ripperGun"
-  }),
-  Object.freeze({
-    itemId: "gun:voidRail",
-    name: "Void Rail",
-    category: "weapon",
-    localKind: "gun",
-    localKey: "voidRail",
-    price: 1024,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "Experimental rail weapon with strong single-hit damage.",
-    reference: "GUNS.voidRail"
   }),
   Object.freeze({
     itemId: "attachment:cargoPod",
@@ -105,18 +57,6 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     reference: "attachments.cargoPod"
   }),
   Object.freeze({
-    itemId: "attachment:hullBooster",
-    name: "Hull Booster",
-    category: "equipment",
-    localKind: "attachment",
-    localKey: "hullBooster",
-    price: 260,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "+40 hull integrity",
-    reference: "attachments.hullBooster"
-  }),
-  Object.freeze({
     itemId: "attachment:jumpDrive",
     name: "Jump Drive",
     category: "equipment",
@@ -127,30 +67,6 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     stockType: "fixed",
     description: "Improves jump system recovery.",
     reference: "attachments.jumpDrive"
-  }),
-  Object.freeze({
-    itemId: "attachment:shieldBooster",
-    name: "Shield Booster",
-    category: "equipment",
-    localKind: "attachment",
-    localKey: "shieldBooster",
-    price: 310,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "+50 shield",
-    reference: "attachments.shieldBooster"
-  }),
-  Object.freeze({
-    itemId: "attachment:evasionMatrix",
-    name: "Evasion Matrix",
-    category: "equipment",
-    localKind: "attachment",
-    localKey: "evasionMatrix",
-    price: 390,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "+8 evasion rating",
-    reference: "attachments.evasionMatrix"
   }),
   Object.freeze({
     itemId: "ship:falcon",
@@ -224,30 +140,6 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     description: "A premium assault hull with five weapon mounts, sharp evasion and a lighter hold than the trade-focused ships.",
     reference: "SHIPS.poseidonAggressor"
   }),
-  Object.freeze({
-    itemId: "material:lupenShard",
-    name: "Lupen Shard",
-    category: "material",
-    localKind: "material",
-    localKey: "lupenShards",
-    price: 50,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "Charged Forge material for upgrade testing.",
-    reference: "upgradeMaterials.lupenShards"
-  }),
-  Object.freeze({
-    itemId: "core:lupenCore",
-    name: "Lupen Core",
-    category: "material",
-    localKind: "core",
-    localKey: "lupenCore",
-    price: 150,
-    levelRequirement: 0,
-    stockType: "fixed",
-    description: "Rare Forge catalyst for upgrade testing.",
-    reference: "inventoryItems.lupenCore"
-  })
 ]);
 
 export const STAGING_STORE_ITEM_IDS = Object.freeze(STAGING_STORE_ITEMS.map((item) => item.itemId));

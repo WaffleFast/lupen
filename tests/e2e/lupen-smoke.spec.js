@@ -3730,10 +3730,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#storeScreen")).not.toContainText(/Staging Purchase|Dry run only/i);
     await expect(page.locator("#storeScreen")).not.toContainText(/LF-2 Hauler/i);
     await expect(page.locator("#storeScreen")).toContainText(/Pulse Laser/i);
-    await expect(page.locator("#storeScreen")).toContainText(/Shield Booster/i);
-    await expect(page.locator("#storeScreen")).toContainText(/Lupen Shard/i);
-    await expect(page.locator("#storeScreen")).toContainText(/Lupen Core/i);
-    await expect(page.locator("#storeScreen")).toContainText(/Materials/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Ion Blaster/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Heavy Lance/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Cargo Pod/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Jump Drive/i);
+    await expect(page.locator("#storeScreen")).not.toContainText(/Repeater|Ripper Gun|Melt Cannon|Void Rail|Shield Booster|Lupen Shard|Lupen Core|Materials/i);
     await expect(page.locator("#storeScreen")).toContainText(/Apply Cargo Pod|Cargo Pod equip preview|server-backed validation/i);
     await expect(page.locator("#storeScreen")).toContainText(/server-backed purchase validation|Purchase unavailable|Server-backed purchase/i);
     await expect(page.locator("#storeScreen")).not.toContainText("Buy / CR");
@@ -3916,10 +3917,9 @@ test.describe("Lupen browser smoke", () => {
     const measurements = await page.evaluate(async () => {
       const items = [
         ["cargoPod", "attachment:cargoPod"],
+        ["jumpDrive", "attachment:jumpDrive"],
         ["ionBlaster", "gun:ionBlaster"],
-        ["heavyLance", "gun:heavyLance"],
-        ["lupenCore", "core:lupenCore"],
-        ["lupenShards", "material:lupenShard"]
+        ["heavyLance", "gun:heavyLance"]
       ];
       const rows = [];
       for (const [key, id] of items) {
@@ -3945,7 +3945,7 @@ test.describe("Lupen browser smoke", () => {
 
     for (const row of measurements) {
       expect(row.frameHeight, row.key).toBeGreaterThanOrEqual(145);
-      expect(row.itemHeight, row.key).toBeGreaterThanOrEqual(row.key === "lupenShards" ? 95 : 110);
+      expect(row.itemHeight, row.key).toBeGreaterThanOrEqual(110);
       expect(row.offsetX, row.key).toBeLessThanOrEqual(1);
       expect(row.offsetY, row.key).toBeLessThanOrEqual(1);
       expect(row.actionText, row.key).not.toBe("");
@@ -4047,6 +4047,71 @@ test.describe("Lupen browser smoke", () => {
     const allCopy = tutorial.steps.map(step => `${step.title} ${step.text} ${step.target} ${step.event}`).join("\n");
     expect(allCopy).not.toMatch(/Falcon|LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix|tutorial:spareAttachment/);
     expect(allCopy).toMatch(/Azure Striker|Buu Hauler|Nightshade Hawk|credits|XP|bounties|Forge/i);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("simple Forge upgrades owned gear with Lupen Shards only", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        ownedShips = ["falcon"];
+        ownedAttachments.cargoPod = 1;
+        ownedAttachments.jumpDrive = 1;
+        ownedGuns.pulseLaser = 0;
+        inventoryItems = [];
+        shipLoadouts = {
+          falcon: normalizeShipLoadout({ attachments: [], guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)] }, "falcon")
+        };
+        upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 25 });
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        openUpgradeForge();
+      })()
+    `));
+
+    await expect(page.locator("#upgradeForgeScreen")).toHaveClass(/active/);
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("LUPEN FORGE");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Owned Items");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade Preview");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Lupen Shards");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade Item");
+    await expect(page.locator("#upgradeForgeScreen")).not.toContainText(/Quality Upgrade|Lupen Core|Lupen Cores/);
+
+    await page.evaluate(() => window.eval(`
+      shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 1);
+      upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 25 });
+      selectedForgeItemId = "equipped:falcon:guns:0";
+      renderUpgradeForge();
+    `));
+    await expect(page.locator("#forgeStartBtn")).toBeEnabled();
+    await page.locator("#forgeStartBtn").click();
+    await page.waitForFunction(() => window.eval(`getEquipmentLevel(shipLoadouts.falcon.guns[0]) === 2 && upgradeMaterials.lupenShards === 0`), null, { timeout: 5000 });
+
+    const upgraded = await page.evaluate(() => window.eval(`({
+      level: getEquipmentLevel(shipLoadouts.falcon.guns[0]),
+      shards: upgradeMaterials.lupenShards,
+      previewText: document.querySelector("#upgradeForgeScreen")?.textContent || ""
+    })`));
+    expect(upgraded.level).toBe(2);
+    expect(upgraded.shards).toBe(0);
+    expect(upgraded.previewText).toContain("Level II");
+    expect(upgraded.previewText).toContain("Not enough Lupen Shards");
+
+    await page.evaluate(() => window.eval(`
+      shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 3);
+      upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 100 });
+      renderUpgradeForge();
+    `));
+    await expect(page.locator("#forgeStatePreview")).toContainText("Item is already max level for Map 1.");
+    await expect(page.locator("#forgeStartBtn")).toBeDisabled();
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -5753,7 +5818,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("tutorial bounty grants a Core and Forge upgrade persists on Pulse Laser", async ({ page }) => {
+  test("tutorial bounty grants shards and Forge level upgrade persists on Pulse Laser", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -5792,8 +5857,8 @@ test.describe("Lupen browser smoke", () => {
         claimBountyReward(contract.id);
         const claimed = getBountyContract(contract.id);
         return {
-          coreCount: getLupenCoreCount(),
-          contractCores: claimed.reward.lupenCores,
+          shardCount: upgradeMaterials.lupenShards,
+          contractShards: claimed.reward.lupenShards,
           status: claimed.status,
           overlayText: document.getElementById("bountyRewardOverlay")?.textContent || ""
         };
@@ -5801,11 +5866,11 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(rewardState).toMatchObject({
-      coreCount: 1,
-      contractCores: 1,
+      shardCount: 25,
+      contractShards: 25,
       status: "claimed"
     });
-    expect(rewardState.overlayText).toContain("1x Lupen Core");
+    expect(rewardState.overlayText).toContain("25 Lupen Shards");
 
     await page.evaluate(() => window.eval(`
       setTutorialStepById("forge-upgrade-weapon");
@@ -5815,32 +5880,32 @@ test.describe("Lupen browser smoke", () => {
 
     await page.waitForFunction(() => {
       const entry = shipLoadouts.falcon?.guns?.[0];
-      return entry && getEquipmentKey(entry) === "pulseLaser" && getEquipmentQuality(entry) !== "standard";
+      return entry && getEquipmentKey(entry) === "pulseLaser" && getEquipmentLevel(entry) === 2;
     }, null, { timeout: 5000 });
     await page.waitForFunction(() => getCurrentTutorialStep()?.id === "return-after-forge", null, { timeout: 5000 });
 
     let forgeState = await page.evaluate(() => ({
-      quality: getEquipmentQuality(shipLoadouts.falcon.guns[0]),
-      coreCount: getLupenCoreCount(),
+      level: getEquipmentLevel(shipLoadouts.falcon.guns[0]),
+      shardCount: upgradeMaterials.lupenShards,
       selectedForgeItemId,
       tutorialStep: getCurrentTutorialStep()?.id || ""
     }));
-    expect(forgeState.quality).toBe("refined");
-    expect(forgeState.coreCount).toBe(0);
+    expect(forgeState.level).toBe(2);
+    expect(forgeState.shardCount).toBe(0);
     expect(forgeState.selectedForgeItemId).toContain("equipped:falcon:guns:0");
     expect(forgeState.tutorialStep).toBe("return-after-forge");
 
     await page.reload();
     await waitForGameGlobals(page);
     forgeState = await page.evaluate(() => ({
-      quality: getEquipmentQuality(shipLoadouts.falcon.guns[0]),
+      level: getEquipmentLevel(shipLoadouts.falcon.guns[0]),
       key: getEquipmentKey(shipLoadouts.falcon.guns[0]),
-      coreCount: getLupenCoreCount()
+      shardCount: upgradeMaterials.lupenShards
     }));
     expect(forgeState).toMatchObject({
       key: "pulseLaser",
-      quality: "refined",
-      coreCount: 0
+      level: 2,
+      shardCount: 0
     });
 
     await expectNoUnexpectedBrowserErrors(failures);

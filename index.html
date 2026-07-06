@@ -205,33 +205,27 @@
 
 
     <section id="upgradeForgeScreen" class="market-screen upgrade-forge-screen">
-      <div class="forge-topbar">
-        <div>
-          <p>STATION FORGE</p>
-          <h2>FORGE</h2>
-          <span>Enhance weapons and equipment</span>
+      <div class="forge-map1-topbar">
+        <div class="forge-map1-title">
+          <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
+          <div>
+            <h2>LUPEN FORGE</h2>
+            <span id="forgeStationText">ASTERON PRIME</span>
+          </div>
         </div>
-        <div class="forge-top-stats">
-          <div class="forge-top-chip"><span>CR</span><strong id="forgeCreditsText">0</strong><small>Credits</small></div>
-          <div class="forge-top-chip core-chip"><span>LC</span><strong id="forgeCoreCountText">0</strong><small>Lupen Cores</small></div>
-          <div class="forge-top-chip shard-chip"><span>LS</span><strong id="forgeShardCountText">0</strong><small>Lupen Shards</small></div>
-          <div class="forge-top-chip"><span>XP</span><strong id="forgePilotLevelText">0</strong><small id="forgePilotXpText">Level I</small></div>
-          <button class="screen-back-btn" onclick="returnToHub()">Back</button>
-        </div>
+        <div class="forge-map1-tagline">UPGRADE YOUR GEAR. GET STRONGER.</div>
+        <button class="screen-back-btn forge-map1-close" onclick="returnToHub()" aria-label="Back">X</button>
       </div>
 
       <div class="upgrade-forge-layout">
-        <aside class="forge-panel forge-selected-panel">
+        <aside class="forge-panel forge-selected-panel forge-owned-panel">
           <div class="modern-store-panel-header">
-            <span><b class="forge-step-badge">1</b> Selected Item</span>
+            <span>Owned Items</span>
           </div>
           <div id="forgeSelectedPanel" class="forge-selected-body"></div>
         </aside>
 
         <main class="forge-panel forge-chamber-panel">
-          <div class="forge-chamber-title">
-            <span><b class="forge-step-badge">2</b> Choose Upgrade</span>
-          </div>
           <div id="forgeChamber" class="forge-chamber forge-chamber-visual">
             <div class="forge-chamber-bg" aria-hidden="true"></div>
             <div class="forge-chamber-vignette" aria-hidden="true"></div>
@@ -242,34 +236,21 @@
             <div class="forge-particles"></div>
             <img id="forgePreviewImage" class="forge-chamber-item" src="assets/weapons/pulse-laser.png" alt="Selected item">
           </div>
-          <div id="forgeStatePreview" class="forge-state-preview"></div>
-          <div class="forge-mode-switch">
-            <button id="forgeLevelModeBtn" class="forge-mode-card" type="button" onclick="setForgeMode('level')">Level Upgrade<span>Increase item power</span></button>
-            <button id="forgeQualityModeBtn" class="forge-mode-card" type="button" onclick="setForgeMode('quality')">Quality Upgrade<span>Advance item quality</span></button>
+          <div class="forge-map1-shards">
+            <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
+            <span>Lupen Shards</span>
+            <strong id="forgeShardCountText">0</strong>
           </div>
         </main>
 
-        <aside class="forge-panel forge-materials-panel">
+        <aside class="forge-panel forge-materials-panel forge-preview-panel">
           <div class="modern-store-panel-header">
-            <span><b class="forge-step-badge">3</b> Confirm Forge</span>
+            <span>Upgrade Preview</span>
           </div>
           <div id="forgeMaterialsList" class="forge-materials-list"></div>
           <div id="forgeCorePanel" class="forge-core-panel"></div>
+          <div id="forgeStatePreview" class="forge-state-preview"></div>
         </aside>
-      </div>
-
-      <div id="forgeInventoryPicker" class="forge-inventory-picker" aria-hidden="true">
-        <div class="forge-picker-panel">
-          <div class="forge-picker-head">
-            <div>
-              <span>Forge Inventory</span>
-              <strong>Select an item to enhance</strong>
-            </div>
-            <button type="button" onclick="closeForgeInventoryPicker()">Close</button>
-          </div>
-          <div id="forgePickerFilters" class="forge-picker-filters"></div>
-          <div id="forgePickerGrid" class="forge-picker-grid"></div>
-        </div>
       </div>
     </section>
 
@@ -279,7 +260,7 @@
         <div>
           <p>STATION STORE</p>
           <h2 id="storeLocationTitle">ASTERON PRIME</h2>
-          <span class="hangar-subtitle">Standard guns and attachments, plus Lupen Core catalyst stock.</span>
+          <span class="hangar-subtitle">Map 1 guns and attachments for early pilots.</span>
         </div>
         <div class="store-header-actions">
           <div class="credits-line store-credits-inline">

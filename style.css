@@ -43985,7 +43985,7 @@ input::placeholder {
 .player-orbit-screen .player-bottom-hud .ship-card-main::before {
   left: 50% !important;
   top: 50% !important;
-  transform: translate(-50%, -50%) !important;
+  transform: translate(-50%, -50%) scale(1.45) !important;
 }
 
 .player-orbit-screen .player-bottom-hud .active-player-ship,
@@ -47398,4 +47398,477 @@ input::placeholder {
   .journey-galaxy-strip {
     grid-template-columns: 1fr;
   }
+}
+/* ===== Map 1 simple Lupen Forge ===== */
+.upgrade-forge-screen {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  padding: 16px 18px 18px;
+  background:
+    linear-gradient(90deg, rgba(1, 8, 17, 0.94), rgba(0, 10, 22, 0.72)),
+    url("assets/ui/forge/forge-chamber.png") center / cover no-repeat,
+    #020810;
+}
+
+.upgrade-forge-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 52% 38%, rgba(46, 203, 255, 0.2), transparent 32%),
+    linear-gradient(180deg, rgba(4, 22, 39, 0.18), rgba(1, 6, 12, 0.78));
+}
+
+.upgrade-forge-screen > * {
+  position: relative;
+  z-index: 1;
+}
+
+.upgrade-forge-screen .forge-map1-topbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto 44px;
+  align-items: start;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.upgrade-forge-screen .forge-map1-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.upgrade-forge-screen .forge-map1-title img {
+  width: 52px;
+  height: 52px;
+  padding: 8px;
+  border: 1px solid rgba(50, 213, 255, 0.62);
+  border-radius: 6px;
+  background: rgba(6, 42, 64, 0.58);
+  object-fit: contain;
+}
+
+.upgrade-forge-screen .forge-map1-title h2 {
+  margin: 0;
+  color: #dff8ff;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 0.92;
+  letter-spacing: 0;
+  text-shadow: 0 0 18px rgba(48, 213, 255, 0.58);
+}
+
+.upgrade-forge-screen .forge-map1-title span,
+.upgrade-forge-screen .forge-map1-tagline,
+.upgrade-forge-screen .modern-store-panel-header span {
+  color: #62e7ff;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.upgrade-forge-screen .forge-map1-title span {
+  display: block;
+  margin-top: 6px;
+  color: #bfefff;
+  font-size: 1.05rem;
+}
+
+.upgrade-forge-screen .forge-map1-tagline {
+  align-self: center;
+  padding-top: 8px;
+  color: #9eeaff;
+  font-size: 0.88rem;
+}
+
+.upgrade-forge-screen .forge-map1-close {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border-radius: 6px;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.upgrade-forge-screen .upgrade-forge-layout {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.78fr) minmax(360px, 1.35fr) minmax(260px, 0.82fr);
+  gap: 16px;
+  min-height: min(640px, calc(100vh - 112px));
+  align-items: stretch;
+}
+
+.upgrade-forge-screen .forge-panel {
+  border: 1px solid rgba(51, 205, 255, 0.38);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(3, 17, 31, 0.9), rgba(1, 8, 16, 0.82));
+  box-shadow: inset 0 0 28px rgba(37, 160, 220, 0.12), 0 0 26px rgba(0, 0, 0, 0.38);
+}
+
+.upgrade-forge-screen .forge-owned-panel,
+.upgrade-forge-screen .forge-preview-panel {
+  padding: 14px;
+}
+
+.upgrade-forge-screen .modern-store-panel-header {
+  margin: 0 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(82, 199, 244, 0.24);
+}
+
+.upgrade-forge-screen .forge-selected-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 178px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.upgrade-forge-screen .forge-owned-item {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 74px;
+  padding: 9px 10px;
+  border: 1px solid rgba(50, 169, 222, 0.24);
+  border-radius: 6px;
+  background: rgba(2, 14, 25, 0.72);
+  color: #eef9ff;
+  text-align: left;
+}
+
+.upgrade-forge-screen .forge-owned-item.selected {
+  border-color: #31cfff;
+  background: linear-gradient(90deg, rgba(0, 166, 255, 0.28), rgba(5, 27, 48, 0.78));
+  box-shadow: inset 0 0 16px rgba(41, 202, 255, 0.28), 0 0 18px rgba(34, 197, 255, 0.28);
+}
+
+.upgrade-forge-screen .forge-owned-item img {
+  width: 60px;
+  height: 54px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(54, 202, 255, 0.34));
+}
+
+.upgrade-forge-screen .forge-owned-item strong,
+.upgrade-forge-screen .forge-owned-item small {
+  display: block;
+  letter-spacing: 0;
+}
+
+.upgrade-forge-screen .forge-owned-item strong {
+  font-size: 0.98rem;
+  color: #f4fbff;
+}
+
+.upgrade-forge-screen .forge-owned-item small {
+  margin-top: 3px;
+  color: #a8c6d7;
+}
+
+.upgrade-forge-screen .forge-chamber-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.upgrade-forge-screen .forge-chamber-visual,
+.upgrade-forge-screen .forge-chamber-visual.missing-materials {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.upgrade-forge-screen .forge-chamber-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("assets/ui/forge/forge-chamber.png") !important;
+  background-size: cover !important;
+  background-position: center !important;
+  opacity: 0.98;
+  filter: saturate(1.12) contrast(1.06);
+}
+
+.upgrade-forge-screen .forge-chamber-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 30%, rgba(2, 7, 13, 0.56) 80%);
+}
+
+.upgrade-forge-screen .forge-ring,
+.upgrade-forge-screen .forge-beam,
+.upgrade-forge-screen .forge-scanline,
+.upgrade-forge-screen .forge-particles {
+  display: block;
+}
+
+.upgrade-forge-screen .forge-chamber-item,
+.upgrade-forge-screen #forgeChamber.forge-chamber-visual .forge-chamber-item {
+  position: relative;
+  z-index: 3;
+  width: min(58%, 430px);
+  max-height: 45%;
+  object-fit: contain;
+  transform: translateY(8px);
+  filter: drop-shadow(0 0 18px rgba(45, 211, 255, 0.55));
+}
+
+.upgrade-forge-screen .forge-map1-shards {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 42px auto;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 180px;
+  padding: 10px 14px;
+  border: 1px solid rgba(55, 198, 255, 0.4);
+  border-radius: 6px;
+  background: rgba(3, 20, 36, 0.88);
+  transform: translateX(-50%);
+}
+
+.upgrade-forge-screen .forge-map1-shards img {
+  grid-row: 1 / 3;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.upgrade-forge-screen .forge-map1-shards span {
+  color: #6eeaff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.upgrade-forge-screen .forge-map1-shards strong {
+  color: #63e8ff;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.upgrade-forge-screen .forge-map1-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+  padding: 14px 4px 0;
+  color: #eaf8ff;
+}
+
+.upgrade-forge-screen .forge-map1-preview h3 {
+  margin: 0;
+  text-align: center;
+  font-size: 1.28rem;
+}
+
+.upgrade-forge-screen .forge-level-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.upgrade-forge-screen .forge-level-flow span,
+.upgrade-forge-screen .forge-level-flow strong {
+  padding: 8px 9px;
+  border: 1px solid rgba(42, 185, 246, 0.28);
+  border-radius: 5px;
+  text-align: center;
+  color: #73eaff;
+  text-transform: uppercase;
+}
+
+.upgrade-forge-screen .forge-level-flow strong {
+  color: #93ff68;
+  border-color: rgba(147, 255, 104, 0.28);
+}
+
+.upgrade-forge-screen .forge-level-flow b,
+.upgrade-forge-screen .forge-preview-stat b {
+  color: #49dcff;
+}
+
+.upgrade-forge-screen .forge-preview-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 4px 14px;
+  border-bottom: 1px solid rgba(104, 204, 242, 0.24);
+}
+
+.upgrade-forge-screen .forge-preview-stat {
+  display: grid;
+  grid-template-columns: 1fr 58px 30px 58px;
+  align-items: center;
+  gap: 8px;
+}
+
+.upgrade-forge-screen .forge-preview-stat span {
+  color: #d8ecf8;
+}
+
+.upgrade-forge-screen .forge-preview-stat strong {
+  text-align: right;
+  color: #f8fbff;
+}
+
+.upgrade-forge-screen .forge-preview-stat em {
+  color: #84ff63;
+  font-style: normal;
+  font-weight: 900;
+  text-align: right;
+}
+
+.upgrade-forge-screen .forge-preview-cost {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  color: #a9cfe0;
+}
+
+.upgrade-forge-screen .forge-preview-cost span {
+  color: #5ee9ff;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.upgrade-forge-screen .forge-preview-cost strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #62e8ff;
+  font-size: 1.9rem;
+}
+
+.upgrade-forge-screen .forge-preview-cost img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.upgrade-forge-screen .forge-start-btn {
+  min-height: 56px;
+  margin-top: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(92, 216, 255, 0.65);
+  background: linear-gradient(180deg, #1b8bf2, #0a4fad);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.upgrade-forge-screen .forge-start-btn:disabled {
+  border-color: rgba(118, 151, 166, 0.32);
+  background: rgba(79, 91, 100, 0.34);
+  color: #aeb7bd;
+  opacity: 1;
+}
+
+.upgrade-forge-screen .forge-state-preview {
+  margin-top: 12px;
+  color: #a7c6d6;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 980px) {
+  .upgrade-forge-screen .forge-map1-topbar {
+    grid-template-columns: 1fr 44px;
+  }
+
+  .upgrade-forge-screen .forge-map1-tagline {
+    display: none;
+  }
+
+  .upgrade-forge-screen .upgrade-forge-layout {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .upgrade-forge-screen .forge-chamber-panel {
+    min-height: 420px;
+    order: -1;
+  }
+}
+
+/* Last-pass Forge sizing guards: keep the simple Forge inside the shell and let the chamber breathe. */
+.upgrade-forge-screen {
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 12px 16px 14px !important;
+}
+
+.upgrade-forge-screen .forge-map1-topbar {
+  margin-bottom: 12px !important;
+}
+
+.upgrade-forge-screen .upgrade-forge-layout {
+  height: calc(100% - 92px) !important;
+  min-height: 0 !important;
+}
+
+.upgrade-forge-screen .forge-selected-body {
+  max-height: 100% !important;
+}
+
+.upgrade-forge-screen .forge-owned-item {
+  height: 76px !important;
+  min-height: 76px !important;
+  padding: 8px 10px !important;
+}
+
+.upgrade-forge-screen .forge-owned-item img {
+  width: 58px !important;
+  height: 52px !important;
+}
+
+.upgrade-forge-screen .forge-chamber-panel {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.upgrade-forge-screen #forgeChamber.forge-chamber-visual,
+.upgrade-forge-screen #forgeChamber.forge-chamber-visual.missing-materials,
+.upgrade-forge-screen #forgeChamber.forge-chamber-visual.ready {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+.upgrade-forge-screen #forgeChamber .forge-chamber-bg {
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.upgrade-forge-screen #forgeChamber.forge-chamber-visual .forge-chamber-item {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(86%, 650px) !important;
+  max-height: 56% !important;
+  transform: translate(-50%, -50%) !important;
 }
