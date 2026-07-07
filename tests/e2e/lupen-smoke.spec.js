@@ -6359,6 +6359,7 @@ test.describe("Lupen browser smoke", () => {
   test("Journey screen presents chapters, missions, claim flow, and resetPilot clears progress", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
+    await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto("/");
     await waitForGameGlobals(page);
     await page.evaluate(() => window.eval(`
@@ -6381,18 +6382,42 @@ test.describe("Lupen browser smoke", () => {
       updateHubLocation();
     `));
 
-    await expect(page.locator(".home-bottom-dock .home-dock-item").first()).toContainText("Journey");
+    await expect(page.locator(".home-bottom-dock .home-dock-item").first()).toContainText("JOURNEY");
     await expect(page.locator(".home-bottom-dock .home-dock-item")).toHaveCount(7);
     await expect(page.locator(".home-bottom-dock .home-dock-item").nth(6)).toContainText("Pilot");
     const stationDock = await page.evaluate(() => {
+      const screen = document.querySelector("#gameScreen");
       const dock = document.querySelector(".home-bottom-dock");
       const buttons = Array.from(document.querySelectorAll(".home-bottom-dock .home-dock-item"));
+      const journeyButton = document.querySelector("#journeyHubBtn");
+      const journeyIcon = journeyButton?.querySelector("img");
+      const journeyLabel = journeyButton?.querySelector("span:not(.hub-action-badge)");
+      const screenStyles = screen ? getComputedStyle(screen) : null;
+      const screenBeforeStyles = screen ? getComputedStyle(screen, "::before") : null;
       const dockRect = dock?.getBoundingClientRect();
-      const journeyIconSrc = document.querySelector("#journeyHubBtn img")?.getAttribute("src") || "";
+      const journeyIconRect = journeyIcon?.getBoundingClientRect();
+      const siblingIconRects = buttons
+        .filter(button => button.id !== "journeyHubBtn")
+        .map(button => button.querySelector("img")?.getBoundingClientRect())
+        .filter(Boolean);
+      const averageSiblingIconHeight = siblingIconRects.length
+        ? siblingIconRects.reduce((total, rect) => total + rect.height, 0) / siblingIconRects.length
+        : 0;
+      const journeyIconSrc = journeyIcon?.getAttribute("src") || "";
       return {
         journeyIconSrc,
+        journeyIconComplete: Boolean(journeyIcon?.complete),
+        journeyIconNaturalWidth: journeyIcon?.naturalWidth || 0,
+        journeyIconNaturalHeight: journeyIcon?.naturalHeight || 0,
+        journeyIconHeight: journeyIconRect?.height || 0,
+        averageSiblingIconHeight,
+        journeyLabel: journeyLabel?.textContent?.trim() || "",
         journeyUsesMorganImage: journeyIconSrc.includes("morgan"),
         hasJourneySvg: Boolean(document.querySelector("#journeyHubBtn svg")),
+        homeScreenBorderWidth: parseFloat(screenStyles?.borderTopWidth || "0"),
+        homeScreenFrameContent: screenBeforeStyles?.content || "",
+        homeScreenFrameBorderWidth: parseFloat(screenBeforeStyles?.borderTopWidth || "0"),
+        homeScreenFrameBackgroundImage: screenBeforeStyles?.backgroundImage || "none",
         count: buttons.length,
         allFit: Boolean(dockRect) && buttons.every(button => {
           const rect = button.getBoundingClientRect();
@@ -6415,9 +6440,23 @@ test.describe("Lupen browser smoke", () => {
       allFit: true,
       pilotVisible: true,
       journeyUsesMorganImage: false,
-      journeyIconSrc: "assets/journey-icon.png",
+      journeyIconSrc: "assets/icons/journey-icon.png",
+      journeyLabel: "JOURNEY",
       hasJourneySvg: false
     });
+    expect(stationDock.journeyIconComplete).toBe(true);
+    expect(stationDock.journeyIconNaturalWidth).toBeGreaterThan(0);
+    expect(stationDock.journeyIconNaturalHeight).toBeGreaterThan(0);
+    expect(stationDock.journeyIconHeight).toBeGreaterThan(0);
+    expect(Math.abs(stationDock.journeyIconHeight - stationDock.averageSiblingIconHeight)).toBeLessThanOrEqual(8);
+    expect(stationDock.homeScreenBorderWidth).toBeGreaterThan(0);
+    expect(stationDock.homeScreenFrameContent).toBe("none");
+    expect(stationDock.homeScreenFrameBorderWidth).toBe(0);
+    expect(stationDock.homeScreenFrameBackgroundImage).toBe("none");
+
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.locator("#gameScreen").screenshot({ path: "artifacts/planet-home-journey-icon.png" });
+    await page.locator("#gameScreen").screenshot({ path: "artifacts/planet-home-frame-cleanup.png" });
 
     await page.locator(".home-bottom-dock .home-dock-item").nth(6).click();
     await expect(page.locator("#pilotProfileScreen")).toHaveClass(/active/);

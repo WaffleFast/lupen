@@ -36444,12 +36444,10 @@ input::placeholder {
 }
 
 .hub-screen.planet-home-screen::before {
-  inset: 12px !important;
-  z-index: 6 !important;
-  border: 1px solid rgba(95, 211, 255, 0.34) !important;
-  border-radius: 12px !important;
+  content: none !important;
+  border: 0 !important;
   background: none !important;
-  box-shadow: inset 0 0 26px rgba(0, 156, 255, 0.08) !important;
+  box-shadow: none !important;
 }
 
 .planet-home-screen .hub-overlay {
@@ -36618,6 +36616,12 @@ input::placeholder {
   object-fit: contain !important;
 }
 
+.planet-home-screen .hub-actions.home-bottom-dock .journey-dock-icon {
+  width: 34px !important;
+  height: 34px !important;
+  flex-basis: 34px !important;
+}
+
 .planet-home-screen .hub-actions.home-bottom-dock .hub-action-button > span:not(.hub-action-badge) {
   max-width: 100% !important;
   min-height: 22px !important;
@@ -36645,6 +36649,12 @@ input::placeholder {
     width: 24px !important;
     height: 24px !important;
     flex-basis: 24px !important;
+  }
+
+  .planet-home-screen .hub-actions.home-bottom-dock .journey-dock-icon {
+    width: 28px !important;
+    height: 28px !important;
+    flex-basis: 28px !important;
   }
 }
 
