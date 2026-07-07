@@ -292,6 +292,9 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
     playerId: eligible ? playerId : "",
     sourceEventId,
     sourceLedgerId,
+    lootAdditions: Array.isArray(rewardApplicationPlan.lootAdditions)
+      ? rewardApplicationPlan.lootAdditions.map((item) => getStringValue(item)).filter(Boolean)
+      : [],
     idempotencyKey: eligible ? idempotencyKey : "",
     idempotencyReady: eligible && !!idempotencyKey,
     duplicateDetected,

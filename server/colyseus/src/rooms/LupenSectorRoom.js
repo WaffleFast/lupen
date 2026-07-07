@@ -1,5 +1,5 @@
 import { Room } from "colyseus";
-import { MapSchema, Schema, type } from "@colyseus/schema";
+import { Encoder, MapSchema, Schema, type } from "@colyseus/schema";
 import {
   buildRewardLedgerEntry,
   writeRewardLedgerEntry
@@ -40,6 +40,10 @@ import {
   STAGING_SHIP_CONFIG
 } from "../config/stagingShipConfig.js";
 import {
+  EREBUS_BOT_TYPE_ORDER,
+  getErebusBotTypeConfig
+} from "../config/stagingBotConfig.js";
+import {
   STAGING_BOUNTY,
   STAGING_BOUNTY_ID,
   buildStagingBountySourceEventId,
@@ -48,9 +52,6 @@ import {
   getStagingBounties,
   recordStagingBountyBotDestruction
 } from "../config/stagingBountyConfig.js";
-import {
-  buildStagingLootPreview
-} from "../config/stagingLootConfig.js";
 import {
   fetchPlayerTradeValidationState
 } from "../services/playerSaveReadService.js";
@@ -69,6 +70,8 @@ import {
   STAGING_LOADOUT_ITEM_IDS,
   getLoadoutWriteEnvGate
 } from "../services/loadoutWriteService.js";
+
+Encoder.BUFFER_SIZE = Math.max(Encoder.BUFFER_SIZE || 0, 64 * 1024);
 
 const KNOWN_SECTOR_NODES = new Set([
   "Virella",
@@ -213,9 +216,6 @@ const STAGING_DAMAGE_MAX = 50;
 const STAGING_FIRE_COOLDOWN_MS = 900;
 const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
-const STAGING_BOT_RETURN_FIRE_DAMAGE = 4;
-const STAGING_BOT_RETURN_FIRE_INTERVAL_MS = 2600;
-const STAGING_BOT_RETURN_FIRE_VARIANCE_MS = 650;
 const STAGING_RESOURCE_RESPAWN_MS = 12000;
 const SERVER_OBJECT_SPAWN_JITTER = 3.2;
 const SERVER_OBJECT_SAFE_MIN_X = 14;
@@ -291,18 +291,66 @@ const STAGING_REWARD_DRY_RUN_XP = 100;
 const STAGING_REWARD_DRY_RUN_CREDITS = 0;
 const CHAT_MESSAGE_MAX_LENGTH = 200;
 
-const DUMMY_BOT_DEFINITIONS = [
-  { id: "dev-bot-erebus-1", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Arc West", level: 1, shield: 22, hull: 48 },
-  { id: "dev-bot-erebus-2", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Lane East B", level: 1, shield: 18, hull: 44 },
-  { id: "dev-bot-erebus-3", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Lane West B", level: 1, shield: 28, hull: 56 },
-  { id: "dev-bot-erebus-4", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Arc East", level: 1, shield: 24, hull: 52 },
-  { id: "dev-bot-erebus-5", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Gate Core", level: 1, shield: 20, hull: 48 },
-  { id: "dev-bot-erebus-6", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Gate Core", level: 1, shield: 28, hull: 56 },
-  { id: "dev-bot-erebus-7", type: "Erebus Drone", name: "Erebus Drone", startNode: "Upper Mid West B", level: 1, shield: 22, hull: 48 },
-  { id: "dev-bot-erebus-8", type: "Erebus Drone", name: "Erebus Scout", startNode: "Upper Mid East B", level: 1, shield: 18, hull: 44 },
-  { id: "dev-bot-erebus-9", type: "Erebus Drone", name: "Erebus Surveyor", startNode: "Lower Mid West B", level: 1, shield: 24, hull: 52 },
-  { id: "dev-bot-erebus-10", type: "Erebus Drone", name: "Erebus Watcher", startNode: "Lower Mid East B", level: 1, shield: 28, hull: 56 }
-];
+const STAGING_BOT_SPAWN_NODES_BY_TYPE = Object.freeze({
+  hunter: Object.freeze([
+    "Upper Arc West",
+    "Upper Arc East",
+    "Upper Mid West B",
+    "Upper Mid East B",
+    "Upper Lane West B",
+    "Upper Lane East B",
+    "Lower Lane West B",
+    "Lower Lane East B",
+    "Lower Mid West B",
+    "Lower Mid East B",
+    "Lower Arc West",
+    "Lower Arc East"
+  ]),
+  attacker: Object.freeze([
+    "Upper Mid West B",
+    "Upper Mid East B",
+    "Upper Lane Core West",
+    "Upper Lane Core East",
+    "Upper Gate West",
+    "Upper Gate East",
+    "Lower Gate West",
+    "Lower Gate East",
+    "Lower Lane Core West",
+    "Lower Lane Core East"
+  ]),
+  destroyer: Object.freeze([
+    "Upper Gate Core",
+    "Lower Gate Core",
+    "Upper Apex",
+    "Lower Apex"
+  ]),
+  behemoth: Object.freeze([
+    "Upper Apex",
+    "Lower Apex",
+    "Upper Gate Core"
+  ])
+});
+
+const DUMMY_BOT_DEFINITIONS = EREBUS_BOT_TYPE_ORDER.flatMap((botType) => {
+  const config = getErebusBotTypeConfig(botType);
+  const spawnNodes = STAGING_BOT_SPAWN_NODES_BY_TYPE[botType] || STAGING_BOT_ALLOWED_NODE_IDS;
+  return Array.from({ length: config.targetCount }, (_value, index) => ({
+    id: `staging-bot-${botType}-${String(index + 1).padStart(2, "0")}`,
+    botType,
+    type: config.displayName,
+    name: config.displayName,
+    displayName: config.displayName,
+    startNode: spawnNodes[index % spawnNodes.length],
+    level: config.level,
+    shield: config.shield,
+    hull: config.hull,
+    damagePerHit: config.damagePerHit,
+    attackCooldownMs: config.attackCooldownMs,
+    image: config.image,
+    threat: config.threat,
+    visualScale: config.visualScale
+  }));
+});
 
 const STAGING_RESOURCE_DEFINITIONS = [
   { id: "staging-resource-iron-upper-core-west", resourceName: "Iron", startNode: "Upper Lane Core West", x: 42, y: 35, hp: 30, yield: 12 },
@@ -382,13 +430,20 @@ export class LupenSectorBot extends Schema {
 }
 
 type("string")(LupenSectorBot.prototype, "id");
+type("string")(LupenSectorBot.prototype, "botType");
 type("string")(LupenSectorBot.prototype, "type");
 type("string")(LupenSectorBot.prototype, "name");
+type("string")(LupenSectorBot.prototype, "displayName");
 type("string")(LupenSectorBot.prototype, "faction");
+type("string")(LupenSectorBot.prototype, "image");
+type("string")(LupenSectorBot.prototype, "threat");
 type("string")(LupenSectorBot.prototype, "currentNode");
 type("number")(LupenSectorBot.prototype, "x");
 type("number")(LupenSectorBot.prototype, "y");
 type("number")(LupenSectorBot.prototype, "level");
+type("number")(LupenSectorBot.prototype, "damagePerHit");
+type("number")(LupenSectorBot.prototype, "attackCooldownMs");
+type("number")(LupenSectorBot.prototype, "visualScale");
 type("number")(LupenSectorBot.prototype, "shield");
 type("number")(LupenSectorBot.prototype, "shieldMax");
 type("number")(LupenSectorBot.prototype, "hull");
@@ -1786,13 +1841,20 @@ export class LupenSectorRoom extends Room {
       const position = getServerObjectSpawnPosition(patrolNode, `${definition.id}:${patrolNode.node}:initial`, SERVER_OBJECT_SPAWN_JITTER);
       this.state.bots.set(definition.id, new LupenSectorBot({
         id: definition.id,
+        botType: definition.botType,
         type: definition.type,
         name: definition.name,
+        displayName: definition.displayName || definition.name,
         faction: "Erebus",
+        image: definition.image,
+        threat: definition.threat,
         currentNode: patrolNode.node,
         x: position.x,
         y: position.y,
         level: Number(definition.level || 1),
+        damagePerHit: Number(definition.damagePerHit || getErebusBotTypeConfig(definition.botType).damagePerHit),
+        attackCooldownMs: Number(definition.attackCooldownMs || getErebusBotTypeConfig(definition.botType).attackCooldownMs),
+        visualScale: Number(definition.visualScale || getErebusBotTypeConfig(definition.botType).visualScale),
         shield: Number(definition.shield || 0),
         shieldMax: Number(definition.shield || 0),
         hull: Number(definition.hull || 1),
@@ -2480,6 +2542,20 @@ export class LupenSectorRoom extends Room {
     });
   }
 
+  getBotTypePayload(bot) {
+    const config = getErebusBotTypeConfig(bot?.botType || bot?.type || "");
+    return {
+      botType: bot?.botType || config.botType,
+      botName: bot?.displayName || bot?.name || config.displayName,
+      displayName: bot?.displayName || bot?.name || config.displayName,
+      image: bot?.image || config.image,
+      threat: bot?.threat || config.threat,
+      damagePerHit: Math.max(0, Math.round(Number(bot?.damagePerHit || config.damagePerHit))),
+      attackCooldownMs: Math.max(1, Math.round(Number(bot?.attackCooldownMs || config.attackCooldownMs))),
+      visualScale: Math.max(0.5, Math.min(1.8, Number(bot?.visualScale || config.visualScale)))
+    };
+  }
+
   maybeSendStagingBotReturnFire(client, player, bot, now = Date.now()) {
     if (!client || !player || !bot) return null;
     if (bot.disabled || bot.currentNode !== player.currentNode) return null;
@@ -2489,9 +2565,9 @@ export class LupenSectorRoom extends Room {
     const nextAllowedAt = Number(this.stagingBotReturnFireCooldowns.get(cooldownKey) || 0);
     if (nextAllowedAt > now) return null;
 
-    const rhythmSeed = String(bot.id || "").split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    const rhythmOffset = (rhythmSeed % (STAGING_BOT_RETURN_FIRE_VARIANCE_MS * 2 + 1)) - STAGING_BOT_RETURN_FIRE_VARIANCE_MS;
-    const cooldownMs = Math.max(1600, STAGING_BOT_RETURN_FIRE_INTERVAL_MS + rhythmOffset);
+    const botTypePayload = this.getBotTypePayload(bot);
+    const cooldownMs = botTypePayload.attackCooldownMs;
+    const botDamage = botTypePayload.damagePerHit;
     const nextReturnFireAt = now + cooldownMs;
     this.stagingBotReturnFireCooldowns.set(cooldownKey, nextReturnFireAt);
 
@@ -2502,10 +2578,14 @@ export class LupenSectorRoom extends Room {
       targetSessionId: client.sessionId,
       targetPlayerId: client.sessionId,
       attackerBotId: bot.id,
-      attackerName: bot.name || bot.type || "Erebus Bot",
+      attackerName: botTypePayload.displayName,
+      attackerBotType: botTypePayload.botType,
+      attackerImage: botTypePayload.image,
+      attackerThreat: botTypePayload.threat,
       currentNode: player.currentNode,
-      damage: STAGING_BOT_RETURN_FIRE_DAMAGE,
-      botDamage: STAGING_BOT_RETURN_FIRE_DAMAGE,
+      damage: botDamage,
+      botDamage,
+      damagePerHit: botDamage,
       damageType: "shield_first",
       sessionOnly: true,
       persisted: false,
@@ -2602,7 +2682,13 @@ export class LupenSectorRoom extends Room {
         reason: claimStatus.reason,
         debugReason: claimStatus.debugReason,
         botId: getStringValue(preview.botId),
+        botType: getStringValue(preview.botType),
         botName: getStringValue(preview.botName, "Staging Bot"),
+        displayName: getStringValue(preview.displayName, preview.botName || "Staging Bot"),
+        image: getStringValue(preview.image),
+        threat: getStringValue(preview.threat),
+        damagePerHit: Math.max(0, Math.round(Number(preview.damagePerHit || 0))),
+        attackCooldownMs: Math.max(0, Math.round(Number(preview.attackCooldownMs || 0))),
         rewardPreviewId: sourceEventId,
         destructionInstanceId: getStringValue(preview.destructionInstanceId),
         xpDelta: claimStatus.xpDelta,
@@ -2644,6 +2730,7 @@ export class LupenSectorRoom extends Room {
   buildRewardPreviewPayload(bot, disabledBySessionId, contributionSummary, receivedAt = Date.now(), destructionInstanceId = "") {
     const botId = getStringValue(bot?.id);
     const safeDestructionInstanceId = getStringValue(destructionInstanceId) || `${botId}:${receivedAt}`;
+    const botTypePayload = this.getBotTypePayload(bot);
     const finalHitIdentity = this.getPlayerIdentitySnapshot(disabledBySessionId);
     const topContributorIdentity = this.getPlayerIdentitySnapshot(contributionSummary.topContributorSessionId);
     const eligibleSessionIds = (Array.isArray(contributionSummary?.contributors) ? contributionSummary.contributors : [])
@@ -2652,18 +2739,33 @@ export class LupenSectorRoom extends Room {
     if (disabledBySessionId) eligibleSessionIds.push(getStringValue(disabledBySessionId));
     const rewardPreviewId = `staging_bot_reward:${safeDestructionInstanceId}`;
     const botXpSourceEventId = `staging_bot_xp:${safeDestructionInstanceId}`;
-    const lootPreview = buildStagingLootPreview({
-      botId,
-      rewardPreviewId,
-      eligibleSessionIds
-    });
+    const lootPreview = {
+      available: false,
+      mode: "bot_loot_disabled",
+      items: [],
+      eligibleSessionIds: Array.from(new Set(eligibleSessionIds)),
+      inventoryWritten: false,
+      ownedGunsWritten: false,
+      ownedAttachmentsWritten: false,
+      cargoWritten: false,
+      creditsWritten: false,
+      bountyWritten: false,
+      saveWritten: false,
+      reason: "bot_kills_do_not_drop_lupen_shards"
+    };
     return {
       ok: true,
       rewardPreviewId,
       botXpSourceEventId,
       destructionInstanceId: safeDestructionInstanceId,
       botId,
-      botName: bot?.name || bot?.type || "Staging Bot",
+      botType: botTypePayload.botType,
+      botName: botTypePayload.displayName,
+      displayName: botTypePayload.displayName,
+      image: botTypePayload.image,
+      threat: botTypePayload.threat,
+      damagePerHit: botTypePayload.damagePerHit,
+      attackCooldownMs: botTypePayload.attackCooldownMs,
       disabledBySessionId,
       finalHitBy: disabledBySessionId,
       finalHitPlayerId: finalHitIdentity.trustedPlayerId || finalHitIdentity.playerId || finalHitIdentity.supabaseUserId || "",
@@ -3877,6 +3979,7 @@ export class LupenSectorRoom extends Room {
   }
 
   respawnStagingBot(bot, index = 0, now = Date.now()) {
+    const botTypePayload = this.getBotTypePayload(bot);
     const respawnNode = this.getNextBotNode(bot.currentNode, index + this.botStep + 1);
     const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
     const position = getServerObjectSpawnPosition(nodePosition, `${bot.id}:${respawnNode}:respawn:${Math.floor(now / 1000)}`, SERVER_OBJECT_SPAWN_JITTER);
@@ -3896,6 +3999,7 @@ export class LupenSectorRoom extends Room {
     this.broadcast("bot:respawned", {
       ok: true,
       botId: bot.id,
+      ...botTypePayload,
       currentNode: bot.currentNode,
       shield: bot.shield,
       hull: bot.hull,
@@ -4204,6 +4308,7 @@ export class LupenSectorRoom extends Room {
     const stagingDamage = resolvedWeapon.damage;
     const stagingCooldownMs = resolvedWeapon.cooldownMs;
     const result = this.applyStagingTestDamage(targetBot, stagingDamage);
+    const botTypePayload = this.getBotTypePayload(targetBot);
     player.lastFireAt = now;
     player.nextFireAt = now + stagingCooldownMs;
     player.lastCombatIntentReason = "staging_damage_applied";
@@ -4225,6 +4330,7 @@ export class LupenSectorRoom extends Room {
       messageType,
       sessionId: client.sessionId,
       targetBotId,
+      ...botTypePayload,
       targetNode: targetBot.currentNode,
       currentNode: player.currentNode,
       weaponId: resolvedWeapon.weaponKey,
@@ -4269,6 +4375,7 @@ export class LupenSectorRoom extends Room {
       attackerSessionId: client.sessionId,
       attackerDisplayName: player.displayName || "Pilot",
       targetBotId,
+      ...botTypePayload,
       currentNode: player.currentNode,
       damage: result.damage,
       weaponKey: resolvedWeapon.weaponKey,
@@ -4305,6 +4412,7 @@ export class LupenSectorRoom extends Room {
       this.broadcast("bot:disabled", {
         ok: true,
         botId: targetBot.id,
+        ...botTypePayload,
         currentNode: targetBot.currentNode,
         shield: targetBot.shield,
         hull: targetBot.hull,

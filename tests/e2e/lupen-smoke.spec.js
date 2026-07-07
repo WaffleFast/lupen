@@ -1770,6 +1770,154 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("multiplayer overlay renders all server Erebus bot types with configured images", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      window.eval(`
+        tutorialState = { active: false, completed: true, stepIndex: 0 };
+        currentNode = "Upper Apex";
+        showScreen("spaceScreen");
+      `);
+      const bots = [
+        {
+          id: "staging-bot-hunter-01",
+          botType: "hunter",
+          type: "Erebus Hunter",
+          name: "Erebus Hunter",
+          displayName: "Erebus Hunter",
+          faction: "Erebus",
+          image: "assets/bots/erebus-hunter.png",
+          threat: "Light",
+          currentNode: "Upper Apex",
+          x: 34,
+          y: 25,
+          level: 1,
+          damagePerHit: 18,
+          attackCooldownMs: 2400,
+          visualScale: 0.82,
+          shield: 60,
+          shieldMax: 60,
+          hull: 60,
+          hullMax: 60
+        },
+        {
+          id: "staging-bot-attacker-01",
+          botType: "attacker",
+          type: "Erebus Attacker",
+          name: "Erebus Attacker",
+          displayName: "Erebus Attacker",
+          faction: "Erebus",
+          image: "assets/bots/erebus-attacker.png",
+          threat: "Medium",
+          currentNode: "Upper Apex",
+          x: 45,
+          y: 30,
+          level: 2,
+          damagePerHit: 24,
+          attackCooldownMs: 2800,
+          visualScale: 0.94,
+          shield: 90,
+          shieldMax: 90,
+          hull: 90,
+          hullMax: 90
+        },
+        {
+          id: "staging-bot-destroyer-01",
+          botType: "destroyer",
+          type: "Erebus Destroyer",
+          name: "Erebus Destroyer",
+          displayName: "Erebus Destroyer",
+          faction: "Erebus",
+          image: "assets/bots/erebus-destroyer.png",
+          threat: "Heavy",
+          currentNode: "Upper Apex",
+          x: 58,
+          y: 31,
+          level: 3,
+          damagePerHit: 36,
+          attackCooldownMs: 3500,
+          visualScale: 1.12,
+          shield: 160,
+          shieldMax: 160,
+          hull: 160,
+          hullMax: 160
+        },
+        {
+          id: "staging-bot-behemoth-01",
+          botType: "behemoth",
+          type: "Erebus Behemoth",
+          name: "Erebus Behemoth",
+          displayName: "Erebus Behemoth",
+          faction: "Erebus",
+          image: "assets/bots/erebus-behemoth.png",
+          threat: "Boss",
+          currentNode: "Upper Apex",
+          x: 72,
+          y: 27,
+          level: 5,
+          damagePerHit: 58,
+          attackCooldownMs: 4500,
+          visualScale: 1.32,
+          shield: 300,
+          shieldMax: 300,
+          hull: 350,
+          hullMax: 350
+        }
+      ];
+      window.LupenMultiplayerClient = {
+        enabled: true,
+        getStatus: () => ({ enabled: true, enabledReason: "staging_enabled", connected: true, sessionId: "self" }),
+        getPlayers: () => [],
+        getBots: () => bots,
+        getResources: () => [],
+        getSelectedStagingBot: () => bots[3],
+        onServerState: () => ({ unsubscribe() {} })
+      };
+      window.LupenMultiplayerOverlay?.setup?.();
+      window.LupenMultiplayerOverlay?.render?.();
+    });
+
+    await expect(page.locator("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot")).toHaveCount(4);
+    await page.waitForFunction(() => {
+      return Array.from(document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot img"))
+        .every(image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
+    });
+    const renderedBots = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot")).map((marker) => {
+        const ship = marker.querySelector(".lupen-mp-space-bot-ship");
+        const image = marker.querySelector("img");
+        return {
+          id: marker.dataset.botId || "",
+          type: marker.dataset.botType || "",
+          className: marker.className,
+          title: marker.getAttribute("title") || "",
+          src: image?.getAttribute("src") || "",
+          naturalWidth: image?.naturalWidth || 0,
+          naturalHeight: image?.naturalHeight || 0,
+          scale: ship ? getComputedStyle(ship).getPropertyValue("--bot-scale").trim() : ""
+        };
+      });
+    });
+    expect(renderedBots.map(bot => bot.type).sort()).toEqual(["attacker", "behemoth", "destroyer", "hunter"]);
+    expect(renderedBots.find(bot => bot.type === "hunter")).toMatchObject({ src: "assets/bots/erebus-hunter.png", scale: "0.82" });
+    expect(renderedBots.find(bot => bot.type === "attacker")).toMatchObject({ src: "assets/bots/erebus-attacker.png", scale: "0.94" });
+    expect(renderedBots.find(bot => bot.type === "destroyer")).toMatchObject({ src: "assets/bots/erebus-destroyer.png", scale: "1.12" });
+    expect(renderedBots.find(bot => bot.type === "behemoth")).toMatchObject({ src: "assets/bots/erebus-behemoth.png", scale: "1.32" });
+    renderedBots.forEach((bot) => {
+      expect(bot.naturalWidth).toBeGreaterThan(0);
+      expect(bot.naturalHeight).toBeGreaterThan(0);
+      expect(bot.title).toContain("Erebus");
+    });
+
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/map1-erebus-bot-types.png" });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("debug staging diagnostics can be opened without a live server", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

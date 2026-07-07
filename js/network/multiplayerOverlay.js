@@ -874,7 +874,7 @@
       }
 
       .lupen-mp-space-bot.is-engaged .lupen-mp-space-bot-ship {
-        transform: rotate(-5deg) translateY(-1px);
+        transform: scale(var(--bot-scale, 1)) rotate(-5deg) translateY(-1px);
         filter: drop-shadow(0 0 7px rgba(255, 185, 95, 0.38));
       }
 
@@ -919,6 +919,8 @@
         display: grid;
         place-items: center;
         pointer-events: none;
+        transform: scale(var(--bot-scale, 1));
+        transform-origin: 50% 50%;
       }
 
       .lupen-mp-space-bot-ship::after {
@@ -2006,7 +2008,27 @@
   }
 
   function getBotLabel(bot) {
-    return String(bot.name || bot.type || "DEV BOT").trim().slice(0, 18) || "DEV BOT";
+    return String(bot.displayName || bot.name || bot.type || "DEV BOT").trim().slice(0, 22) || "DEV BOT";
+  }
+
+  function getBotTypeKey(bot) {
+    const raw = String(bot?.botType || bot?.type || bot?.name || "").toLowerCase();
+    if (raw.includes("behemoth")) return "behemoth";
+    if (raw.includes("destroyer")) return "destroyer";
+    if (raw.includes("attacker")) return "attacker";
+    if (raw.includes("hunter")) return "hunter";
+    return "";
+  }
+
+  function getBotVisualScale(bot) {
+    const explicit = Number(bot?.visualScale);
+    if (Number.isFinite(explicit) && explicit > 0) return Math.max(0.5, Math.min(1.8, explicit));
+    const typeKey = getBotTypeKey(bot);
+    if (typeKey === "behemoth") return 1.32;
+    if (typeKey === "destroyer") return 1.12;
+    if (typeKey === "attacker") return 0.94;
+    if (typeKey === "hunter") return 0.82;
+    return 1;
   }
 
   function getStagingBotImage(bot) {
@@ -2016,8 +2038,8 @@
     }
 
     const rawType = String(
-      bot?.type ||
       bot?.botType ||
+      bot?.type ||
       bot?.kind ||
       bot?.name ||
       ""
@@ -2076,7 +2098,8 @@
     if (!bot) return "none";
     const level = Number(bot.level || 0) > 0 ? `L${bot.level}` : "L?";
     const faction = bot.faction || "Erebus";
-    return `${faction} ${level} / ${bot.currentNode || "unknown"}`;
+    const threat = bot.threat ? ` / ${bot.threat}` : "";
+    return `${faction} ${level}${threat} / ${bot.currentNode || "unknown"}`;
   }
 
   function getBotHullSummary(bot) {
@@ -2630,8 +2653,10 @@
     const labelOffset = position.x > 82 ? -2.9 : 2.9;
     const canSelectOnMap = isSameCurrentNode(bot);
     const group = global.document.createElementNS(SVG_NS, "g");
-    group.setAttribute("class", `${botMarkerClass}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}${wasRecentlyHit(bot) ? " is-hit" : ""}${isRecentlyEngagedBot(bot, status) ? " is-engaged" : ""}${isBountyTargetBot(bot, status) ? " is-bounty-target" : ""}`);
+    const botTypeKey = getBotTypeKey(bot);
+    group.setAttribute("class", `${botMarkerClass}${botTypeKey ? ` bot-${botTypeKey}` : ""}${selectedTargetBotId === bot.id ? " is-locked" : ""}${bot.disabled ? " is-disabled" : ""}${wasRecentlyHit(bot) ? " is-hit" : ""}${isRecentlyEngagedBot(bot, status) ? " is-engaged" : ""}${isBountyTargetBot(bot, status) ? " is-bounty-target" : ""}`);
     group.setAttribute("data-bot-id", bot.id || "");
+    group.setAttribute("data-bot-type", bot.botType || botTypeKey || "");
     group.setAttribute("pointer-events", canSelectOnMap ? "auto" : "none");
     group.style.cursor = canSelectOnMap ? "crosshair" : "default";
     group.setAttribute("transform", `translate(${position.x} ${position.y})`);
@@ -2964,8 +2989,11 @@
       const remoteEngagerCount = getRemoteBotEngagerCount(bot, players);
       const isBountyTarget = isBountyTargetBot(bot, status);
       const marker = global.document.createElement("div");
+      const botTypeKey = getBotTypeKey(bot);
       marker.className = "lupen-mp-space-bot";
+      if (botTypeKey) marker.classList.add(`bot-${botTypeKey}`);
       marker.dataset.botId = bot.id || "";
+      marker.dataset.botType = bot.botType || botTypeKey || "";
       if (isSelected) marker.classList.add("is-locked");
       if (isEngaged) marker.classList.add("is-engaged");
       if (remoteEngagerCount > 0) marker.classList.add("is-coop-engaged");
@@ -2989,6 +3017,7 @@
 
       const ship = global.document.createElement("div");
       ship.className = "lupen-mp-space-bot-ship";
+      ship.style.setProperty("--bot-scale", String(getBotVisualScale(bot)));
       const image = global.document.createElement("img");
       const botImage = getBotImageRenderSrc(bot);
       image.src = botImage;
