@@ -4054,6 +4054,7 @@ test.describe("Lupen browser smoke", () => {
   test("simple Forge upgrades owned gear with Lupen Shards only", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
+    await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto("/");
     await waitForGameGlobals(page);
 
@@ -4068,7 +4069,13 @@ test.describe("Lupen browser smoke", () => {
         ownedAttachments.shieldBooster = 1;
         ownedGuns.pulseLaser = 0;
         ownedGuns.ionBlaster = 1;
-        inventoryItems = [];
+        inventoryItems = [
+          ...Object.keys(attachments).map((key, index) => ({ id: \`forge-scroll-attachment-\${index}\`, key, quality: "standard", level: 1 })),
+          ...Object.keys(GUNS)
+            .filter(key => GUNS[key] && !GUNS[key].hiddenFromStore)
+            .slice(0, 9)
+            .map((key, index) => ({ id: \`forge-scroll-gun-\${index}\`, key, quality: "standard", level: 1 }))
+        ];
         shipLoadouts = {
           falcon: normalizeShipLoadout({ attachments: [], guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)] }, "falcon")
         };
@@ -4088,7 +4095,59 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Need 15 More Shards");
     await expect(page.locator("#upgradeForgeScreen")).not.toContainText(/Quality Upgrade|Lupen Core|Lupen Cores/);
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
+    await expect(page.locator("#forgeSelectedPanel")).toBeVisible();
+
+    const ownedListBefore = await page.locator("#forgeSelectedPanel").evaluate((list) => {
+      const screen = document.getElementById("upgradeForgeScreen");
+      return {
+        scrollTop: list.scrollTop,
+        clientHeight: list.clientHeight,
+        scrollHeight: list.scrollHeight,
+        overflowY: getComputedStyle(list).overflowY,
+        screenScrollTop: screen?.scrollTop || 0,
+        bottom: list.getBoundingClientRect().bottom,
+        viewportHeight: window.innerHeight
+      };
+    });
+    expect(ownedListBefore.scrollHeight).toBeGreaterThan(ownedListBefore.clientHeight + 20);
+    expect(ownedListBefore.overflowY).toMatch(/auto|scroll/);
+    expect(ownedListBefore.bottom).toBeLessThanOrEqual(ownedListBefore.viewportHeight);
+
+    await page.locator("#forgeSelectedPanel").evaluate((list) => {
+      list.scrollTop = list.scrollHeight;
+    });
+    const ownedListAfter = await page.locator("#forgeSelectedPanel").evaluate((list) => {
+      const screen = document.getElementById("upgradeForgeScreen");
+      return {
+        scrollTop: list.scrollTop,
+        screenScrollTop: screen?.scrollTop || 0,
+        documentScrollTop: document.scrollingElement?.scrollTop || 0
+      };
+    });
+    expect(ownedListAfter.scrollTop).toBeGreaterThan(0);
+    expect(ownedListAfter.screenScrollTop).toBe(ownedListBefore.screenScrollTop);
+    expect(ownedListAfter.documentScrollTop).toBe(0);
+
+    const scrolledItem = page.locator("#forgeSelectedPanel .forge-owned-item").last();
+    await scrolledItem.click();
+    await expect(scrolledItem).toHaveClass(/selected/);
+    const scrolledSelection = await page.evaluate(() => ({
+      selectedForgeItemId,
+      imageAlt: document.getElementById("forgePreviewImage")?.alt || "",
+      previewTitle: document.querySelector("#forgeMaterialsList .forge-map1-preview h3")?.textContent?.trim() || "",
+      screenScrollTop: document.getElementById("upgradeForgeScreen")?.scrollTop || 0
+    }));
+    expect(scrolledSelection.selectedForgeItemId).not.toBe("owned:attachments:cargoPod");
+    expect(scrolledSelection.previewTitle).toBeTruthy();
+    expect(scrolledSelection.imageAlt).toBe(scrolledSelection.previewTitle);
+    expect(scrolledSelection.screenScrollTop).toBe(0);
+
+    await page.locator("#forgeSelectedPanel").evaluate((list) => {
+      list.scrollTop = 0;
+    });
+    await page.locator("#forgeSelectedPanel .forge-owned-item").first().click();
     await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-ui-final.png" });
+    await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-style-aligned.png" });
 
     await page.evaluate(() => window.eval(`
       shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 1);

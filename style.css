@@ -48161,3 +48161,288 @@ input::placeholder {
     min-height: 70px !important;
   }
 }
+
+/* Forge station alignment: bring the simplified Forge back into the Lupen station UI family. */
+.upgrade-forge-screen.active {
+  padding: 14px 18px 16px !important;
+  background:
+    linear-gradient(90deg, rgba(2, 10, 20, 0.96), rgba(2, 13, 26, 0.76)),
+    url("assets/ui/forge/forge-chamber.png") center / cover no-repeat,
+    #020810 !important;
+}
+
+.upgrade-forge-screen::before {
+  background:
+    linear-gradient(180deg, rgba(0, 15, 29, 0.12), rgba(0, 7, 14, 0.7)),
+    radial-gradient(circle at 50% 36%, rgba(44, 199, 255, 0.12), transparent 34%) !important;
+}
+
+.upgrade-forge-screen .forge-map1-topbar {
+  grid-template-columns: minmax(320px, 1fr) auto 76px !important;
+  min-height: 74px !important;
+  margin-bottom: 12px !important;
+  gap: 16px !important;
+}
+
+.upgrade-forge-screen .forge-map1-title {
+  gap: 12px !important;
+}
+
+.upgrade-forge-screen .forge-map1-title img {
+  width: 54px !important;
+  height: 54px !important;
+  padding: 8px !important;
+  border-radius: 8px !important;
+  background: rgba(3, 26, 44, 0.74) !important;
+}
+
+.upgrade-forge-screen .forge-map1-title h2 {
+  font-size: clamp(2.25rem, 3.5vw, 3.25rem) !important;
+  line-height: 0.95 !important;
+  text-shadow: 0 0 14px rgba(66, 221, 255, 0.42) !important;
+}
+
+.upgrade-forge-screen .forge-map1-title span {
+  margin-top: 4px !important;
+  font-size: 0.94rem !important;
+}
+
+.upgrade-forge-screen .forge-map1-tagline {
+  min-width: 250px !important;
+  padding-top: 2px !important;
+  font-size: 0.78rem !important;
+}
+
+.upgrade-forge-screen .forge-map1-close {
+  width: 76px !important;
+  height: 48px !important;
+  min-width: 76px !important;
+  border-radius: 8px !important;
+  font-size: 1.75rem !important;
+}
+
+.upgrade-forge-screen .upgrade-forge-layout {
+  grid-template-columns: minmax(270px, 0.84fr) minmax(420px, 1.34fr) minmax(300px, 0.9fr) !important;
+  gap: 14px !important;
+  height: calc(100% - 86px) !important;
+  min-height: 0 !important;
+}
+
+.upgrade-forge-screen .forge-panel {
+  border-color: rgba(54, 184, 230, 0.42) !important;
+  border-radius: 8px !important;
+  background: linear-gradient(180deg, rgba(2, 17, 31, 0.9), rgba(0, 8, 17, 0.86)) !important;
+  box-shadow: inset 0 0 22px rgba(35, 151, 209, 0.1), 0 0 18px rgba(0, 0, 0, 0.34) !important;
+}
+
+.upgrade-forge-screen .forge-owned-panel,
+.upgrade-forge-screen .forge-preview-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  padding: 14px !important;
+}
+
+.upgrade-forge-screen .forge-owned-panel {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.upgrade-forge-screen .forge-owned-panel::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 18px;
+  bottom: 14px;
+  z-index: 3;
+  height: 78px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 8, 17, 0), rgba(0, 8, 17, 0.98) 18%, rgba(0, 8, 17, 1));
+}
+
+.upgrade-forge-screen .modern-store-panel-header {
+  flex: 0 0 auto !important;
+  margin-bottom: 12px !important;
+  padding-bottom: 11px !important;
+}
+
+.upgrade-forge-screen .modern-store-panel-header span {
+  font-size: 0.9rem !important;
+}
+
+.upgrade-forge-screen .forge-selected-body {
+  position: relative !important;
+  z-index: 1 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable !important;
+  gap: 8px !important;
+  padding: 0 8px 18px 0 !important;
+  scrollbar-color: #58dfff rgba(7, 35, 55, 0.82) !important;
+  scrollbar-width: thin !important;
+}
+
+.upgrade-forge-screen .forge-selected-body::-webkit-scrollbar {
+  width: 8px !important;
+}
+
+.upgrade-forge-screen .forge-selected-body::-webkit-scrollbar-track {
+  border: 1px solid rgba(69, 181, 224, 0.18);
+  border-radius: 999px;
+  background: rgba(3, 20, 34, 0.72);
+}
+
+.upgrade-forge-screen .forge-selected-body::-webkit-scrollbar-thumb {
+  border: 1px solid rgba(126, 235, 255, 0.5);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6be9ff, #1e91d0) !important;
+}
+
+.upgrade-forge-screen .forge-owned-item {
+  grid-template-columns: 58px minmax(0, 1fr) 10px !important;
+  height: 78px !important;
+  min-height: 78px !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  background: rgba(3, 16, 28, 0.82) !important;
+}
+
+.upgrade-forge-screen .forge-owned-item::after {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(90, 221, 255, 0.62);
+  box-shadow: 0 8px 0 rgba(90, 221, 255, 0.46), 0 -8px 0 rgba(90, 221, 255, 0.46);
+}
+
+.upgrade-forge-screen .forge-owned-item.selected {
+  border-color: rgba(49, 207, 255, 0.95) !important;
+  background: linear-gradient(90deg, rgba(0, 123, 205, 0.42), rgba(3, 25, 43, 0.9)) !important;
+  box-shadow: inset 0 0 14px rgba(49, 207, 255, 0.22), 0 0 12px rgba(29, 177, 232, 0.22) !important;
+}
+
+.upgrade-forge-screen .forge-owned-item.selected::before {
+  left: -7px !important;
+  width: 12px !important;
+  height: 20px !important;
+}
+
+.upgrade-forge-screen .forge-owned-item img {
+  width: 52px !important;
+  height: 46px !important;
+}
+
+.upgrade-forge-screen .forge-owned-item span {
+  min-width: 0 !important;
+}
+
+.upgrade-forge-screen .forge-owned-item strong {
+  max-width: 100% !important;
+  color: #f3fbff !important;
+  font-size: 0.9rem !important;
+  line-height: 1.08 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.upgrade-forge-screen .forge-owned-item small {
+  margin-top: 3px !important;
+  color: #65e7ff !important;
+  font-size: 0.72rem !important;
+}
+
+.upgrade-forge-screen .forge-chamber-panel {
+  border-color: rgba(54, 184, 230, 0.34) !important;
+  background: rgba(0, 9, 18, 0.58) !important;
+}
+
+.upgrade-forge-screen #forgeChamber .forge-chamber-bg {
+  opacity: 0.72 !important;
+  filter: saturate(1.05) contrast(1.06) brightness(0.74) !important;
+}
+
+.upgrade-forge-screen #forgeChamber.forge-chamber-visual .forge-chamber-item {
+  top: 50% !important;
+  width: min(50%, 300px) !important;
+  max-height: 30% !important;
+}
+
+.upgrade-forge-screen .forge-map1-shards {
+  bottom: 24px !important;
+  grid-template-columns: 42px auto !important;
+  min-width: 196px !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+}
+
+.upgrade-forge-screen .forge-map1-shards img {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.upgrade-forge-screen .forge-map1-shards strong {
+  font-size: 2.1rem !important;
+}
+
+.upgrade-forge-screen .forge-map1-preview {
+  gap: 12px !important;
+  padding: 20px 6px 0 !important;
+}
+
+.upgrade-forge-screen .forge-map1-preview h3 {
+  font-size: 1.35rem !important;
+}
+
+.upgrade-forge-screen .forge-level-flow {
+  gap: 8px !important;
+}
+
+.upgrade-forge-screen .forge-level-flow span,
+.upgrade-forge-screen .forge-level-flow strong {
+  padding: 9px 8px !important;
+  border-radius: 6px !important;
+  font-size: 0.86rem !important;
+}
+
+.upgrade-forge-screen .forge-preview-stats {
+  gap: 9px !important;
+  padding: 7px 2px 12px !important;
+}
+
+.upgrade-forge-screen .forge-preview-stat {
+  grid-template-columns: minmax(70px, 1fr) 54px 26px 54px !important;
+  gap: 6px !important;
+  font-size: 0.86rem !important;
+}
+
+.upgrade-forge-screen .forge-preview-cost {
+  margin-top: 2px !important;
+  padding: 12px !important;
+}
+
+.upgrade-forge-screen .forge-preview-cost strong {
+  font-size: 2rem !important;
+}
+
+.upgrade-forge-screen .forge-preview-cost img {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+.upgrade-forge-screen .forge-start-btn {
+  min-height: 52px !important;
+  border-radius: 8px !important;
+  font-size: 0.95rem !important;
+}
+
+.upgrade-forge-screen .forge-start-btn:disabled {
+  border-color: rgba(103, 153, 176, 0.34) !important;
+  background: linear-gradient(180deg, rgba(37, 57, 72, 0.75), rgba(18, 26, 35, 0.86)) !important;
+  color: #9db2be !important;
+  box-shadow: inset 0 0 16px rgba(70, 161, 205, 0.08) !important;
+}
