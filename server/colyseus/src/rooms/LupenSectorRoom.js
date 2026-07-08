@@ -48,6 +48,7 @@ import {
   STAGING_BOUNTY_ID,
   buildStagingBountySourceEventId,
   createStagingBountyState,
+  getStagingBountyConfigById,
   getPublicStagingBountyState,
   getStagingBounties,
   recordStagingBountyBotDestruction
@@ -365,7 +366,7 @@ const STAGING_RESOURCE_DEFINITIONS = [
 
 function rollStagingResourceShardReward(resourceName = "") {
   const crystalBonus = String(resourceName || "") === "Crystal Shards";
-  const chance = crystalBonus ? 0.35 : 0.18;
+  const chance = crystalBonus ? 0.4 : 0.3;
   if (Math.random() >= chance) return 0;
   return crystalBonus && Math.random() < 0.35 ? 2 : 1;
 }
@@ -2819,7 +2820,8 @@ export class LupenSectorRoom extends Room {
   acceptStagingBounty(client, message = {}) {
     this.touchPlayer(client.sessionId);
     const bountyId = getStringValue(message.bountyId || STAGING_BOUNTY_ID);
-    if (bountyId !== STAGING_BOUNTY_ID) {
+    const bounty = getStagingBountyConfigById(bountyId);
+    if (!bounty) {
       client.send("stagingBounty:statusResult", {
         ok: false,
         reason: "unknown_staging_bounty",
@@ -2831,7 +2833,7 @@ export class LupenSectorRoom extends Room {
     }
 
     const existing = this.getStagingBountyState(client.sessionId);
-    if (existing?.claimed) {
+    if (existing?.claimed && existing.bountyId === bountyId) {
       client.send("stagingBounty:statusResult", {
         ok: true,
         reason: "staging_bounty_already_claimed",
@@ -2851,7 +2853,7 @@ export class LupenSectorRoom extends Room {
       return;
     }
 
-    const nextState = createStagingBountyState(client.sessionId, Date.now());
+    const nextState = createStagingBountyState(client.sessionId, Date.now(), bounty.id);
     this.stagingBountyStates.set(client.sessionId, nextState);
     client.send("stagingBounty:statusResult", {
       ok: true,
@@ -2883,6 +2885,9 @@ export class LupenSectorRoom extends Room {
       const currentState = this.getStagingBountyState(sessionId);
       const result = recordStagingBountyBotDestruction(currentState, {
         botId: this.getStagingBountyDestructionKey(bot),
+        botType: bot?.botType || "",
+        botFaction: bot?.faction || "",
+        botDisplayName: bot?.displayName || bot?.name || "",
         contributorSessionIds: uniqueContributors,
         now: Date.now()
       });
@@ -2907,21 +2912,22 @@ export class LupenSectorRoom extends Room {
     const trustedPlayerId = identity.trustedPlayerId || identity.playerId || identity.supabaseUserId || "";
     const eligible = identity.authStatus === "verified" && !!trustedPlayerId;
     const sourceEventId = buildStagingBountySourceEventId(bountyState, trustedPlayerId || client.sessionId);
+    const bounty = getStagingBountyConfigById(bountyState?.bountyId) || STAGING_BOUNTY;
     return {
       playerId: eligible ? trustedPlayerId : "",
       trustedPlayerId: eligible ? trustedPlayerId : "",
       authStatus: identity.authStatus || "guest",
       displayName: identity.displayName || "Pilot",
-      botId: STAGING_BOUNTY.id,
-      botName: STAGING_BOUNTY.title,
+      botId: bounty.id,
+      botName: bounty.title,
       node: this.state.players.get(client.sessionId)?.currentNode || "",
       finalHitBy: client.sessionId,
       topContributorSessionId: client.sessionId,
       contributorSessionId: client.sessionId,
       contributionPercent: 100,
-      intendedXp: STAGING_BOUNTY.xpReward || 0,
-      intendedCredits: STAGING_BOUNTY.creditsReward || 0,
-      intendedLoot: Array.isArray(STAGING_BOUNTY.lootReward) ? STAGING_BOUNTY.lootReward : [],
+      intendedXp: bounty.xpReward || 0,
+      intendedCredits: bounty.creditsReward || 0,
+      intendedLoot: Array.isArray(bounty.lootReward) ? bounty.lootReward : [],
       intendedReason: "staging_bounty_completed",
       rewardPreviewId: sourceEventId,
       eligible,
@@ -2935,12 +2941,13 @@ export class LupenSectorRoom extends Room {
     const player = this.touchPlayer(client.sessionId);
     const bountyId = getStringValue(message.bountyId || STAGING_BOUNTY_ID);
     const bountyState = this.getStagingBountyState(client.sessionId);
+    const bounty = getStagingBountyConfigById(bountyId);
     const publicState = getPublicStagingBountyState(bountyState);
     const blockedReason = !player
       ? "session_player_not_found"
-      : bountyId !== STAGING_BOUNTY_ID
+      : !bounty
         ? "unknown_staging_bounty"
-        : !bountyState?.accepted
+        : !bountyState?.accepted || bountyState.bountyId !== bountyId
           ? "staging_bounty_not_accepted"
           : bountyState.claimed
             ? "staging_bounty_already_claimed"

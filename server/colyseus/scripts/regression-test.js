@@ -22,6 +22,7 @@ import {
   STAGING_BOUNTY_ID,
   buildStagingBountySourceEventId,
   createStagingBountyState,
+  getStagingBountyConfigById,
   getPublicStagingBountyState,
   getStagingBounties,
   recordStagingBountyBotDestruction
@@ -3128,13 +3129,27 @@ async function assertFullCargoPodTradeLoopHelpers() {
 
 async function assertStagingBountyHelpers() {
   const bounties = getStagingBounties();
-  assert(bounties.length === 1, `Expected one staging bounty, got ${bounties.length}.`);
-  assert(bounties[0].id === STAGING_BOUNTY_ID, "Staging bounty list returned unexpected id.");
-  assert(bounties[0].requiredKills === 2, "Staging bounty should require 2 bot destructions.");
-  assert(bounties[0].xpReward === 0, "Staging bounty should not award bounty XP.");
-  assert(bounties[0].creditsReward === 150, "Staging bounty should award credits.");
-  assert(bounties[0].lupenShardsReward === 1, "Staging bounty should award Lupen Shards.");
-  assert(Array.isArray(bounties[0].lootReward) && bounties[0].lootReward.length === 0, "Staging bounty should not include loot.");
+  assert(bounties.length >= 5, `Expected at least five staging bounties, got ${bounties.length}.`);
+  const expectedBounties = {
+    [STAGING_BOUNTY_ID]: { title: "Erebus Patrol Sweep", requiredKills: 2, creditsReward: 750, lupenShardsReward: 2, targetBotType: "any" },
+    staging_hunter_clearance_4: { title: "Hunter Clearance", requiredKills: 4, creditsReward: 1000, lupenShardsReward: 3, targetBotType: "hunter" },
+    staging_attacker_suppression_3: { title: "Attacker Suppression", requiredKills: 3, creditsReward: 1250, lupenShardsReward: 4, targetBotType: "attacker" },
+    staging_destroyer_contract_1: { title: "Destroyer Contract", requiredKills: 1, creditsReward: 1500, lupenShardsReward: 5, targetBotType: "destroyer" },
+    staging_behemoth_warning_1: { title: "Behemoth Warning", requiredKills: 1, creditsReward: 2500, lupenShardsReward: 8, targetBotType: "behemoth" }
+  };
+  Object.entries(expectedBounties).forEach(([id, expected]) => {
+    const bounty = bounties.find((item) => item.id === id);
+    assert(bounty, `Missing staging bounty ${id}.`);
+    assert(bounty.title === expected.title, `Unexpected title for ${id}: ${bounty.title}.`);
+    assert(bounty.requiredKills === expected.requiredKills, `Unexpected requiredKills for ${id}: ${bounty.requiredKills}.`);
+    assert(bounty.xpReward === 0, `Staging bounty ${id} should not award bounty XP.`);
+    assert(bounty.creditsReward === expected.creditsReward, `Unexpected credits for ${id}: ${bounty.creditsReward}.`);
+    assert(bounty.lupenShardsReward === expected.lupenShardsReward, `Unexpected Lupen Shards for ${id}: ${bounty.lupenShardsReward}.`);
+    assert(bounty.targetBotType === expected.targetBotType, `Unexpected targetBotType for ${id}: ${bounty.targetBotType}.`);
+    assert(Array.isArray(bounty.lootReward) && bounty.lootReward.length === 0, `Public staging bounty ${id} should not expose loot.`);
+    const internalBounty = getStagingBountyConfigById(id);
+    assert(internalBounty.lootReward.length === expected.lupenShardsReward, `Internal shard loot count mismatch for ${id}.`);
+  });
 
   let bountyState = createStagingBountyState("session-a", 1000);
   let publicState = getPublicStagingBountyState(bountyState);
@@ -3144,6 +3159,9 @@ async function assertStagingBountyHelpers() {
 
   const noContribution = recordStagingBountyBotDestruction(bountyState, {
     botId: "dev-bot-erebus-1",
+    botType: "hunter",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Hunter",
     contributorSessionIds: ["session-b"],
     now: 1100
   });
@@ -3152,6 +3170,9 @@ async function assertStagingBountyHelpers() {
 
   const firstKill = recordStagingBountyBotDestruction(bountyState, {
     botId: "dev-bot-erebus-1",
+    botType: "hunter",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Hunter",
     contributorSessionIds: ["session-a", "session-b"],
     now: 1200
   });
@@ -3161,6 +3182,9 @@ async function assertStagingBountyHelpers() {
 
   const duplicateKill = recordStagingBountyBotDestruction(bountyState, {
     botId: "dev-bot-erebus-1",
+    botType: "hunter",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Hunter",
     contributorSessionIds: ["session-a"],
     now: 1300
   });
@@ -3169,6 +3193,9 @@ async function assertStagingBountyHelpers() {
 
   const secondKill = recordStagingBountyBotDestruction(bountyState, {
     botId: "dev-bot-erebus-2",
+    botType: "destroyer",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Destroyer",
     contributorSessionIds: ["session-a"],
     now: 1400
   });
@@ -3177,6 +3204,49 @@ async function assertStagingBountyHelpers() {
   publicState = getPublicStagingBountyState(bountyState);
   assert(publicState.progress === 2 && publicState.completed === true && publicState.claimAvailable === true, "Completed staging bounty public state was incorrect.");
   assert(buildStagingBountySourceEventId(bountyState, "verified-player-a") === `${STAGING_BOUNTY_ID}:verified-player-a:1`, "Staging bounty source event id was not deterministic.");
+
+  let hunterState = createStagingBountyState("session-a", 1500, "staging_hunter_clearance_4");
+  const hunterMismatch = recordStagingBountyBotDestruction(hunterState, {
+    botId: "dev-bot-attacker-1",
+    botType: "attacker",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Attacker",
+    contributorSessionIds: ["session-a"],
+    now: 1510
+  });
+  assert(hunterMismatch.changed === false && hunterMismatch.reason === "bot_type_mismatch", "Hunter bounty counted a non-Hunter bot.");
+  assert(hunterMismatch.state.progress === 0, "Hunter bounty mismatch changed progress.");
+  const hunterMatch = recordStagingBountyBotDestruction(hunterState, {
+    botId: "dev-bot-hunter-1",
+    botType: "hunter",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Hunter",
+    contributorSessionIds: ["session-a"],
+    now: 1520
+  });
+  assert(hunterMatch.changed === true && hunterMatch.state.progress === 1, "Hunter bounty did not count a Hunter kill.");
+
+  let destroyerState = createStagingBountyState("session-a", 1600, "staging_destroyer_contract_1");
+  const destroyerMismatch = recordStagingBountyBotDestruction(destroyerState, {
+    botId: "dev-bot-behemoth-1",
+    botType: "behemoth",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Behemoth",
+    contributorSessionIds: ["session-a"],
+    now: 1610
+  });
+  assert(destroyerMismatch.changed === false && destroyerMismatch.reason === "bot_type_mismatch", "Destroyer bounty counted a Behemoth.");
+  const destroyerMatch = recordStagingBountyBotDestruction(destroyerState, {
+    botId: "dev-bot-destroyer-1",
+    botType: "destroyer",
+    botFaction: "Erebus",
+    botDisplayName: "Erebus Destroyer",
+    contributorSessionIds: ["session-a"],
+    now: 1620
+  });
+  destroyerState = destroyerMatch.state;
+  assert(destroyerMatch.changed === true && destroyerMatch.reason === "completed", "Destroyer bounty did not complete from a Destroyer kill.");
+  assert(getPublicStagingBountyState(destroyerState).claimAvailable === true, "Destroyer bounty public state was not claimable.");
 
   const lootPreview = buildStagingLootPreview({
     botId: "dev-bot-erebus-1",
@@ -3204,8 +3274,8 @@ async function assertStagingBountyHelpers() {
     contributorSessionId: "session-a",
     contributionPercent: 100,
     intendedXp: 0,
-    intendedCredits: 150,
-    intendedLoot: ["lupenShard"],
+    intendedCredits: 750,
+    intendedLoot: ["lupenShard", "lupenShard"],
     intendedReason: "staging_bounty_completed",
     rewardPreviewId: buildStagingBountySourceEventId(bountyState, "verified-player-a"),
     eligible: true,
@@ -3240,8 +3310,8 @@ async function assertStagingBountyHelpers() {
   });
   assert(bountyPatchPlan.eligible === true, `Completed staging bounty patch plan was blocked: ${bountyPatchPlan.skippedReason}`);
   assert(bountyPatchPlan.xpDelta === 0, "Completed staging bounty patch attempted to add XP.");
-  assert(bountyPatchPlan.creditsDelta === 150, "Completed staging bounty patch did not include credits.");
-  assert(bountyPatchPlan.lupenShardDelta === 1, "Completed staging bounty patch did not include Lupen Shards.");
+  assert(bountyPatchPlan.creditsDelta === 750, "Completed staging bounty patch did not include credits.");
+  assert(bountyPatchPlan.lupenShardDelta === 2, "Completed staging bounty patch did not include Lupen Shards.");
 
   const patchCalls = [];
   let bountyPersistedSave = bountySave;
@@ -3270,8 +3340,8 @@ async function assertStagingBountyHelpers() {
   const patchedBody = JSON.parse(patchCalls[1].body);
   assert(patchedBody.save_data.playerProgress.combatXp === 10, "Completed staging bounty patch changed XP.");
   assert(patchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 10, "Completed staging bounty patch changed zone XP.");
-  assert(patchedBody.save_data.credits === 927, "Completed staging bounty patch did not add credits.");
-  assert(patchedBody.save_data.upgradeMaterials.lupenShards === 3, "Completed staging bounty patch did not add Lupen Shards.");
+  assert(patchedBody.save_data.credits === 1527, "Completed staging bounty patch did not add credits.");
+  assert(patchedBody.save_data.upgradeMaterials.lupenShards === 4, "Completed staging bounty patch did not add Lupen Shards.");
   assert(patchedBody.save_data.cargo.Iron === 2, "Completed staging bounty patch changed cargo.");
   assert(patchedBody.save_data.inventoryItems[0].id === "loot-stays", "Completed staging bounty patch changed inventory.");
   assert(patchedBody.save_data.shipLoadouts.lupenOrigin.guns[0].key === "pulseLaser", "Completed staging bounty patch changed loadout.");
@@ -4952,12 +5022,15 @@ try {
     roomA.send("stagingBounty:list", {});
   });
   assert(bountyList?.ok === true, "Staging bounty list did not return ok.");
-  assert(Array.isArray(bountyList?.bounties) && bountyList.bounties.length === 1, "Staging bounty list did not return exactly one bounty.");
-  assert(bountyList.bounties[0]?.id === STAGING_BOUNTY_ID, "Staging bounty list returned unexpected bounty id.");
-  assert(bountyList.bounties[0]?.requiredKills === 2, "Staging bounty list returned unexpected kill requirement.");
-  assert(bountyList.bounties[0]?.xpReward === 0, "Staging bounty list returned unexpected XP reward.");
-  assert(bountyList.bounties[0]?.creditsReward === 150, "Staging bounty list returned unexpected credits reward.");
-  assert(bountyList.bounties[0]?.lupenShardsReward === 1, "Staging bounty list returned unexpected Lupen Shards reward.");
+  assert(Array.isArray(bountyList?.bounties) && bountyList.bounties.length >= 5, "Staging bounty list did not return multiple bounties.");
+  const bountyListById = new Map(bountyList.bounties.map((bounty) => [bounty.id, bounty]));
+  assert(bountyListById.get(STAGING_BOUNTY_ID)?.requiredKills === 2, "Patrol Sweep returned unexpected kill requirement.");
+  assert(bountyListById.get(STAGING_BOUNTY_ID)?.xpReward === 0, "Patrol Sweep returned unexpected XP reward.");
+  assert(bountyListById.get(STAGING_BOUNTY_ID)?.creditsReward === 750, "Patrol Sweep returned unexpected credits reward.");
+  assert(bountyListById.get(STAGING_BOUNTY_ID)?.lupenShardsReward === 2, "Patrol Sweep returned unexpected Lupen Shards reward.");
+  assert(bountyListById.get("staging_hunter_clearance_4")?.targetBotType === "hunter", "Hunter Clearance target type was missing.");
+  assert(bountyListById.get("staging_destroyer_contract_1")?.creditsReward === 1500, "Destroyer Contract credits reward was missing.");
+  assert(bountyListById.get("staging_behemoth_warning_1")?.lupenShardsReward === 8, "Behemoth Warning shard reward was missing.");
 
   const bountyAccepted = await expectRoomMessage(roomA, "stagingBounty:statusResult", () => {
     roomA.send("stagingBounty:accept", { bountyId: STAGING_BOUNTY_ID });

@@ -30302,7 +30302,7 @@ input::placeholder {
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-board-layout-refined .bounty-contract-grid.bounty-list {
-  grid-template-rows: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(5, minmax(0, 1fr)) !important;
   gap: 8px !important;
   padding: 10px !important;
   overflow: hidden !important;

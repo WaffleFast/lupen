@@ -5,20 +5,104 @@
 
 export const STAGING_BOUNTY_ID = "staging_erebus_patrol_2";
 
-export const STAGING_BOUNTY = Object.freeze({
-  id: STAGING_BOUNTY_ID,
-  title: "Erebus Patrol Sweep",
-  description: "Destroy 2 server-owned staging Erebus bots.",
-  targetType: "server_bot_destroy",
-  targetFaction: "Erebus",
-  requiredKills: 2,
-  xpReward: 0,
-  creditsReward: 150,
-  lupenShardsReward: 1,
-  lootReward: ["lupenShard"],
-  repeatable: false,
-  stagingOnly: true
-});
+function makeShardLootReward(quantity = 0) {
+  return Array.from({ length: Math.max(0, Math.round(Number(quantity || 0))) }, () => "lupenShard");
+}
+
+export const STAGING_BOUNTIES = Object.freeze([
+  Object.freeze({
+    id: STAGING_BOUNTY_ID,
+    title: "Erebus Patrol Sweep",
+    description: "Destroy 2 Erebus bots.",
+    targetType: "server_bot_destroy",
+    targetFaction: "Erebus",
+    target: "Erebus bots",
+    targetBotType: "any",
+    targetBotLabel: "Erebus bots",
+    difficulty: "Easy",
+    requiredKills: 2,
+    xpReward: 0,
+    creditsReward: 750,
+    lupenShardsReward: 2,
+    lootReward: makeShardLootReward(2),
+    repeatable: false,
+    stagingOnly: true
+  }),
+  Object.freeze({
+    id: "staging_hunter_clearance_4",
+    title: "Hunter Clearance",
+    description: "Destroy 4 Erebus Hunters.",
+    targetType: "server_bot_destroy",
+    targetFaction: "Erebus",
+    target: "Erebus Hunter",
+    targetBotType: "hunter",
+    targetBotLabel: "Erebus Hunters",
+    difficulty: "Easy",
+    requiredKills: 4,
+    xpReward: 0,
+    creditsReward: 1000,
+    lupenShardsReward: 3,
+    lootReward: makeShardLootReward(3),
+    repeatable: false,
+    stagingOnly: true
+  }),
+  Object.freeze({
+    id: "staging_attacker_suppression_3",
+    title: "Attacker Suppression",
+    description: "Destroy 3 Erebus Attackers.",
+    targetType: "server_bot_destroy",
+    targetFaction: "Erebus",
+    target: "Erebus Attacker",
+    targetBotType: "attacker",
+    targetBotLabel: "Erebus Attackers",
+    difficulty: "Medium",
+    requiredKills: 3,
+    xpReward: 0,
+    creditsReward: 1250,
+    lupenShardsReward: 4,
+    lootReward: makeShardLootReward(4),
+    repeatable: false,
+    stagingOnly: true
+  }),
+  Object.freeze({
+    id: "staging_destroyer_contract_1",
+    title: "Destroyer Contract",
+    description: "Destroy 1 Erebus Destroyer.",
+    targetType: "server_bot_destroy",
+    targetFaction: "Erebus",
+    target: "Erebus Destroyer",
+    targetBotType: "destroyer",
+    targetBotLabel: "Erebus Destroyer",
+    difficulty: "Heavy Threat",
+    requiredKills: 1,
+    xpReward: 0,
+    creditsReward: 1500,
+    lupenShardsReward: 5,
+    lootReward: makeShardLootReward(5),
+    repeatable: false,
+    stagingOnly: true
+  }),
+  Object.freeze({
+    id: "staging_behemoth_warning_1",
+    title: "Behemoth Warning",
+    description: "Destroy 1 Erebus Behemoth.",
+    targetType: "server_bot_destroy",
+    targetFaction: "Erebus",
+    target: "Erebus Behemoth",
+    targetBotType: "behemoth",
+    targetBotLabel: "Erebus Behemoth",
+    difficulty: "Extreme Threat",
+    requiredKills: 1,
+    xpReward: 0,
+    creditsReward: 2500,
+    lupenShardsReward: 8,
+    lootReward: makeShardLootReward(8),
+    repeatable: false,
+    stagingOnly: true
+  })
+]);
+
+export const STAGING_BOUNTY = STAGING_BOUNTIES[0];
 
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -30,20 +114,40 @@ function getNumberValue(value, fallback = 0) {
 }
 
 export function getStagingBounties() {
-  return [{ ...STAGING_BOUNTY, lootReward: [] }];
+  return STAGING_BOUNTIES.map((bounty) => ({ ...bounty, lootReward: [] }));
 }
 
 export function getStagingBountyById(id = STAGING_BOUNTY_ID) {
-  return getStringValue(id) === STAGING_BOUNTY_ID ? { ...STAGING_BOUNTY, lootReward: [] } : null;
+  const bounty = getStagingBountyConfigById(id);
+  return bounty ? { ...bounty, lootReward: [] } : null;
 }
 
-export function createStagingBountyState(sessionId = "", now = Date.now()) {
+export function getStagingBountyConfigById(id = STAGING_BOUNTY_ID) {
+  const safeId = getStringValue(id, STAGING_BOUNTY_ID);
+  return STAGING_BOUNTIES.find((bounty) => bounty.id === safeId) || null;
+}
+
+function botMatchesBountyTarget(bounty = {}, bot = {}) {
+  const targetBotType = getStringValue(bounty.targetBotType, "any").toLowerCase();
+  if (!targetBotType || targetBotType === "any" || targetBotType === "any_erebus") {
+    const faction = getStringValue(bot.faction || bot.botFaction).toLowerCase();
+    const botType = getStringValue(bot.botType).toLowerCase();
+    const displayName = getStringValue(bot.displayName || bot.name).toLowerCase();
+    return faction === "erebus" ||
+      ["hunter", "attacker", "destroyer", "behemoth"].includes(botType) ||
+      displayName.startsWith("erebus ");
+  }
+  return getStringValue(bot.botType).toLowerCase() === targetBotType;
+}
+
+export function createStagingBountyState(sessionId = "", now = Date.now(), bountyId = STAGING_BOUNTY_ID) {
+  const bounty = getStagingBountyConfigById(bountyId) || STAGING_BOUNTY;
   return {
-    bountyId: STAGING_BOUNTY_ID,
+    bountyId: bounty.id,
     sessionId: getStringValue(sessionId),
     accepted: true,
     progress: 0,
-    requiredKills: STAGING_BOUNTY.requiredKills,
+    requiredKills: bounty.requiredKills,
     completed: false,
     claimed: false,
     completionSequence: 0,
@@ -80,7 +184,7 @@ export function getPublicStagingBountyState(state = null) {
   };
 }
 
-export function recordStagingBountyBotDestruction(state = null, { botId = "", contributorSessionIds = [], now = Date.now() } = {}) {
+export function recordStagingBountyBotDestruction(state = null, { botId = "", botType = "", botFaction = "", botDisplayName = "", contributorSessionIds = [], now = Date.now() } = {}) {
   if (!state?.accepted || state.claimed) {
     return {
       state,
@@ -92,6 +196,15 @@ export function recordStagingBountyBotDestruction(state = null, { botId = "", co
   const safeBotId = getStringValue(botId);
   if (!safeBotId) {
     return { state, changed: false, reason: "bot_id_missing" };
+  }
+
+  const bounty = getStagingBountyConfigById(state.bountyId);
+  if (!bounty) {
+    return { state, changed: false, reason: "unknown_staging_bounty" };
+  }
+
+  if (!botMatchesBountyTarget(bounty, { botType, botFaction, displayName: botDisplayName })) {
+    return { state, changed: false, reason: "bot_type_mismatch" };
   }
 
   const contributors = new Set((Array.isArray(contributorSessionIds) ? contributorSessionIds : [])
@@ -108,11 +221,11 @@ export function recordStagingBountyBotDestruction(state = null, { botId = "", co
   const nextState = {
     ...state,
     countedBotIds: [...(Array.isArray(state.countedBotIds) ? state.countedBotIds : []), safeBotId],
-    progress: Math.min(STAGING_BOUNTY.requiredKills, Math.max(0, Math.round(getNumberValue(state.progress, 0))) + 1),
+    progress: Math.min(bounty.requiredKills, Math.max(0, Math.round(getNumberValue(state.progress, 0))) + 1),
     updatedAt: now,
     lastReason: "progress_updated"
   };
-  if (nextState.progress >= STAGING_BOUNTY.requiredKills && !nextState.completed) {
+  if (nextState.progress >= bounty.requiredKills && !nextState.completed) {
     nextState.completed = true;
     nextState.completedAt = now;
     nextState.completionSequence = Math.max(1, Math.round(getNumberValue(state.completionSequence, 0)) + 1);

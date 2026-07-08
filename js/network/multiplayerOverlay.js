@@ -2263,9 +2263,16 @@
     if (!bot || bot.disabled) return false;
     const bounty = getActiveStagingBounty(status);
     if (!bounty?.accepted || bounty.claimed || bounty.completed || bounty.claimAvailable) return false;
-    const targetType = normalizeNodeKey(bounty.targetType || "erebus");
-    const botFaction = normalizeNodeKey(bot.faction || bot.type || bot.name || "");
-    return targetType.includes("erebus") && botFaction.includes("erebus");
+    const targetBotType = normalizeNodeKey(bounty.targetBotType || "any");
+    const botType = normalizeNodeKey(bot.botType || bot.type || "");
+    const botFaction = normalizeNodeKey(bot.faction || "");
+    const botName = normalizeNodeKey(bot.displayName || bot.name || "");
+    if (!targetBotType || targetBotType === "any" || targetBotType === "anyerebus") {
+      return botFaction.includes("erebus") ||
+        ["hunter", "attacker", "destroyer", "behemoth"].includes(botType) ||
+        botName.includes("erebus");
+    }
+    return botType === targetBotType;
   }
 
   function getShotEventAge(status = getClient()?.getStatus?.()) {
@@ -3524,7 +3531,7 @@
     } else {
       lines.push(`Bot XP auto-applies on destruction: +${Math.round(Number(preview.previewXp || 0))}. Refreshing server XP.`);
     }
-    lines.push("Bounty bonus XP claims from Bounty Board.");
+    lines.push("Bounty Board claims pay CR and Lupen Shards.");
     const lootPreview = preview?.lootPreview;
     const items = Array.isArray(lootPreview?.items) ? lootPreview.items : [];
     if (lootPreview?.available && items.length && isLootPreviewEligibleForSelf(status, preview)) {
@@ -4704,22 +4711,14 @@
     const result = status?.lastStagingBountyClaimResult;
     if (!result) return "";
     const bounty = result.bounty || {};
-    const xp = Math.round(Number(result.xpDelta || bounty.xpReward || 0));
+    const credits = Math.round(Number(result.creditsDelta || bounty.creditsReward || 0));
+    const shards = Math.round(Number(result.lupenShardDelta || bounty.lupenShardsReward || 0));
     if (result.applied || result.playerSavePatchResult?.applied || result.playerSave?.written) {
-      const before = result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore;
-      const after = result.playerSavePatchResult?.xpAfter ?? result.playerSave?.xpAfter;
-      applyStagingXpFromRenderedResult({
-        ...result,
-        xpBefore: before,
-        xpAfter: after,
-        applied: true,
-        saveWritten: true
-      }, "bountyClaim");
-      return `XP applied ${formatPreviewValue(before)} -> ${formatPreviewValue(after)}. No credits or loot.`;
+      return `Reward applied: +${formatPreviewValue(credits)} CR and +${formatPreviewValue(shards)} Lupen Shards.`;
     }
     if (result.reason === "staging_bounty_already_claimed") return "Already claimed. Duplicate reward blocked.";
     if (result.mode === "blocked" || result.ok === false) return `Blocked: ${getFriendlyClaimReason(result.debugReason || result.reason)}.`;
-    return `Simulated: +${xp} XP preview. No credits or loot.`;
+    return `Preview only: +${formatPreviewValue(credits)} CR and +${formatPreviewValue(shards)} Lupen Shards.`;
   }
 
   function requestStagingBountyIfNeeded(status) {
@@ -4766,9 +4765,11 @@
     inner.appendChild(title);
 
     const objective = global.document.createElement("span");
+    const requiredKills = Math.round(Number(bounty.requiredKills || 2));
+    const targetLabel = bounty.targetBotLabel || bounty.target || "Erebus bots";
     objective.textContent = bounty.accepted
-      ? `Progress: ${Math.round(Number(bounty.progress || 0))}/${Math.round(Number(bounty.requiredKills || 2))} staging Erebus bots`
-      : "Destroy 2 staging Erebus bots";
+      ? `Progress: ${Math.round(Number(bounty.progress || 0))}/${requiredKills} ${targetLabel}`
+      : `Destroy ${requiredKills} ${targetLabel}`;
     inner.appendChild(objective);
 
     const progress = global.document.createElement("div");
@@ -4779,7 +4780,9 @@
     inner.appendChild(progress);
 
     const reward = global.document.createElement("span");
-    reward.textContent = "Reward: CR + Lupen Shards. No bounty XP.";
+    const credits = Math.round(Number(bounty.creditsReward || 0));
+    const shards = Math.round(Number(bounty.lupenShardsReward || 0));
+    reward.textContent = `Reward: CR ${formatPreviewValue(credits)} + ${formatPreviewValue(shards)} Lupen Shards. No bounty XP.`;
     inner.appendChild(reward);
 
     const claimLabel = getStagingBountyClaimLabel(status);

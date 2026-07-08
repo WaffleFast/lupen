@@ -87,10 +87,15 @@ function getMultiplayerStagingBountyFallback() {
     description: "Destroy 2 server-owned staging Erebus bots.",
     targetType: "server_bot_destroy",
     targetFaction: "Erebus",
+    target: "Erebus bots",
+    targetBotType: "any",
+    targetBotLabel: "Erebus bots",
+    difficulty: "Easy",
     requiredKills: 2,
     progress: 0,
-    xpReward: 40,
-    creditsReward: 0,
+    xpReward: 0,
+    creditsReward: 750,
+    lupenShardsReward: 2,
     lootReward: [],
     accepted: false,
     completed: false,
@@ -126,8 +131,9 @@ function mergeMultiplayerStagingBountyState(bounty) {
     title: bounty.title || active.title,
     description: bounty.description || active.description,
     requiredKills: Number(active.requiredKills || bounty.requiredKills || 2),
-    xpReward: Number(active.xpReward ?? bounty.xpReward ?? 40),
-    creditsReward: 0,
+    xpReward: Number(active.xpReward ?? bounty.xpReward ?? 0),
+    creditsReward: Number(active.creditsReward ?? bounty.creditsReward ?? 0),
+    lupenShardsReward: Number(active.lupenShardsReward ?? bounty.lupenShardsReward ?? 0),
     lootReward: []
   };
 }
@@ -141,7 +147,6 @@ function getMultiplayerStagingBounties() {
   return source.map((bounty) => mergeMultiplayerStagingBountyState({
     ...getMultiplayerStagingBountyFallback(),
     ...bounty,
-    creditsReward: 0,
     lootReward: []
   }));
 }
@@ -162,7 +167,6 @@ function getActiveMultiplayerStagingBountyObjective() {
   return mergeMultiplayerStagingBountyState({
     ...getMultiplayerStagingBountyFallback(),
     ...active,
-    creditsReward: 0,
     lootReward: []
   });
 }
@@ -233,15 +237,14 @@ function getMultiplayerStagingBountyStatusLabel(bounty) {
 function getMultiplayerStagingBountyClaimLine() {
   const result = getMultiplayerStagingBountyStatus().lastStagingBountyClaimResult;
   if (!result) return "";
-  const xp = Math.round(Number(result.xpDelta || result.bounty?.xpReward || 0));
+  const credits = Math.round(Number(result.creditsDelta || result.bounty?.creditsReward || 0));
+  const shards = Math.round(Number(result.lupenShardDelta || result.bounty?.lupenShardsReward || 0));
   if (result.applied || result.playerSavePatchResult?.applied || result.playerSave?.written) {
-    const before = result.playerSavePatchResult?.xpBefore ?? result.playerSave?.xpBefore;
-    const after = result.playerSavePatchResult?.xpAfter ?? result.playerSave?.xpAfter;
-    return `XP applied ${formatNumber(before)} -> ${formatNumber(after)}. Save refreshed from server.`;
+    return `Reward applied: +${formatNumber(credits)} CR and +${formatNumber(shards)} Lupen Shards. Save refreshed from server.`;
   }
   if (result.reason === "staging_bounty_already_claimed") return "Already claimed. Duplicate reward blocked.";
   if (result.mode === "blocked" || result.ok === false) return `Blocked: ${result.debugReason || result.reason || "server validation failed"}.`;
-  return `Preview only: +${formatNumber(xp)} XP. No credits, loot, cargo, or bounty save writes.`;
+  return `Preview only: +${formatNumber(credits)} CR and +${formatNumber(shards)} Lupen Shards. No bounty XP.`;
 }
 
 function selectMultiplayerStagingBounty(bountyId) {
@@ -2634,10 +2637,17 @@ function getBountyIconSrc(iconName) {
 
 function doesBotCountForBounty(bot, bounty) {
   if (!bot || !bounty) return false;
-  if (bounty.targetBotType === "any_erebus") {
-    return bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_");
+  const targetBotType = String(bounty.targetBotType || "").trim().toLowerCase();
+  const botType = String(bot.botType || bot.type || "").trim().toLowerCase();
+  const faction = String(bot.faction || "").trim().toLowerCase();
+  const displayName = String(bot.displayName || bot.name || "").trim().toLowerCase();
+  if (!targetBotType || targetBotType === "any" || targetBotType === "any_erebus") {
+    return faction === "erebus" ||
+      ["hunter", "attacker", "destroyer", "behemoth"].includes(botType) ||
+      botType.startsWith("erebus_") ||
+      displayName.startsWith("erebus ");
   }
-  return !bounty.targetBotType || bot.botType === bounty.targetBotType;
+  return botType === targetBotType;
 }
 
 function formatBountyTime(totalSeconds) {
@@ -2900,6 +2910,7 @@ function renderMultiplayerStagingBountyBoard() {
       const status = getMultiplayerStagingBountyStatusLabel(bounty);
       const requiredKills = Number(bounty.requiredKills || 2);
       const progress = Math.min(requiredKills, Math.max(0, Number(bounty.progress || 0)));
+      const rewardText = formatBountyReward({ credits: bounty.creditsReward, lupenShards: bounty.lupenShardsReward });
       const ready = statusKey === "completed";
       const complete = statusKey === "claimed";
       const active = statusKey === "active";
@@ -2912,13 +2923,13 @@ function renderMultiplayerStagingBountyBoard() {
             <span class="bounty-card__subtitle">${escapeHtml(bounty.description || "Destroy server-owned staging Erebus bots.")}</span>
             <span class="bounty-card__chips">
               <span class="bounty-chip bounty-chip--special">STAGING</span>
-              <span class="bounty-chip bounty-chip--target">PROGRESS ${formatNumber(progress)}/${formatNumber(requiredKills)}</span>
-              <span class="bounty-chip bounty-card-threat">CR + SHARDS</span>
+              <span class="bounty-chip bounty-chip--target">${escapeHtml(bounty.targetBotLabel || bounty.target || "Erebus bots")}</span>
+              <span class="bounty-chip bounty-card-threat">${escapeHtml(bounty.difficulty || "Combat")}</span>
             </span>
           </span>
           <span class="bounty-reward-box bounty-card-reward bounty-reward">
             <span class="bounty-reward-box__label">REWARD</span>
-            <strong class="bounty-reward-box__value">CR + Lupen Shards</strong>
+            <strong class="bounty-reward-box__value">${escapeHtml(rewardText)}</strong>
             <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
             <small>Progress: ${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
           </span>
@@ -2943,6 +2954,7 @@ function renderMultiplayerStagingBountyDetail() {
   const pendingAccept = isMultiplayerStagingBountyPending("accept", bounty.id);
   const pendingClaim = isMultiplayerStagingBountyPending("claim", bounty.id);
   const claimLine = getMultiplayerStagingBountyClaimLine();
+  const rewardText = formatBountyReward({ credits: bounty.creditsReward, lupenShards: bounty.lupenShardsReward });
   const shell = panel.closest(".selected-contract-panel");
   if (shell) {
     ["available", "active", "completed", "claimed", "failed"].forEach(state => shell.classList.remove(`selected-contract-panel--${state}`));
@@ -2963,9 +2975,9 @@ function renderMultiplayerStagingBountyDetail() {
 
   const infoRows = [
     ["TYPE", "Multiplayer Staging"],
-    ["TARGET", "Erebus bots"],
-    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} Erebus bots`],
-    ["REWARD", "CR + Lupen Shards"],
+    ["TARGET", bounty.targetBotLabel || bounty.target || "Erebus bots"],
+    ["OBJECTIVE", `Destroy ${formatNumber(requiredKills)} ${bounty.targetBotLabel || bounty.target || "Erebus bots"}`],
+    ["REWARD", rewardText],
     ["LIMITS", "No XP payout"]
   ];
 
@@ -3018,6 +3030,7 @@ function renderBountyBoard() {
 
   if (title) title.textContent = shouldUseLocalTutorialBountyFallback() ? "STARTER BOUNTY" : `DAILY SECTOR BOUNTIES`;
   if (countLabel && shouldUseLocalTutorialBountyFallback()) countLabel.textContent = "TUTORIAL CONTRACT";
+  if (countLabel && !shouldUseLocalTutorialBountyFallback()) countLabel.textContent = `${formatNumber(dailyBountyContracts.length)} CONTRACTS`;
 
   if (activeObjective?.type === "bounty" && activeObjective.status === "readyToClaim") {
     selectedBountyContractId = activeObjective.contractId;

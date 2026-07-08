@@ -1687,7 +1687,7 @@ function getAsteroidShardReward(asteroidOrResource) {
     ? asteroidOrResource
     : String(asteroidOrResource?.resource || asteroidOrResource?.resourceName || "");
   const crystalBonus = resourceName === "Crystal Shards";
-  const chance = crystalBonus ? 0.35 : 0.18;
+  const chance = crystalBonus ? 0.4 : 0.3;
   if (Math.random() >= chance) return 0;
   return crystalBonus && Math.random() < 0.35 ? 2 : 1;
 }
@@ -1698,7 +1698,7 @@ function awardAsteroidShardBonus(quantity = 0, sourceLabel = "Asteroid") {
   upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
   upgradeMaterials.lupenShards = Math.max(0, Number(upgradeMaterials.lupenShards || 0)) + shardDelta;
   const shardLabel = shardDelta === 1 ? "Lupen Shard" : "Lupen Shards";
-  const message = `${sourceLabel} yielded +${formatNumber(shardDelta)} ${shardLabel}.`;
+  const message = `Bonus find: +${formatNumber(shardDelta)} ${shardLabel} from ${sourceLabel}.`;
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof showGameRewardBurst === "function") {
