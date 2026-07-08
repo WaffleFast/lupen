@@ -1790,7 +1790,7 @@ test.describe("Lupen browser smoke", () => {
           displayName: "Erebus Hunter",
           faction: "Erebus",
           image: "assets/bots/erebus-hunter.png",
-          threat: "Light",
+          threat: "Light Threat",
           currentNode: "Upper Apex",
           x: 34,
           y: 25,
@@ -1811,7 +1811,7 @@ test.describe("Lupen browser smoke", () => {
           displayName: "Erebus Attacker",
           faction: "Erebus",
           image: "assets/bots/erebus-attacker.png",
-          threat: "Medium",
+          threat: "Medium Threat",
           currentNode: "Upper Apex",
           x: 45,
           y: 30,
@@ -1832,12 +1832,12 @@ test.describe("Lupen browser smoke", () => {
           displayName: "Erebus Destroyer",
           faction: "Erebus",
           image: "assets/bots/erebus-destroyer.png",
-          threat: "Heavy",
+          threat: "Heavy Threat",
           currentNode: "Upper Apex",
           x: 58,
           y: 31,
           level: 3,
-          damagePerHit: 36,
+          damagePerHit: 32,
           attackCooldownMs: 3500,
           visualScale: 1.12,
           shield: 160,
@@ -1853,7 +1853,7 @@ test.describe("Lupen browser smoke", () => {
           displayName: "Erebus Behemoth",
           faction: "Erebus",
           image: "assets/bots/erebus-behemoth.png",
-          threat: "Boss",
+          threat: "Extreme Threat",
           currentNode: "Upper Apex",
           x: 72,
           y: 27,
@@ -1867,13 +1867,20 @@ test.describe("Lupen browser smoke", () => {
           hullMax: 350
         }
       ];
+      const selectedBot = bots[2];
       window.LupenMultiplayerClient = {
         enabled: true,
-        getStatus: () => ({ enabled: true, enabledReason: "staging_enabled", connected: true, sessionId: "self" }),
+        getStatus: () => ({
+          enabled: true,
+          enabledReason: "staging_enabled",
+          connected: true,
+          sessionId: "self",
+          selectedTargetBotId: selectedBot.id
+        }),
         getPlayers: () => [],
         getBots: () => bots,
         getResources: () => [],
-        getSelectedStagingBot: () => bots[3],
+        getSelectedStagingBot: () => selectedBot,
         onServerState: () => ({ unsubscribe() {} })
       };
       window.LupenMultiplayerOverlay?.setup?.();
@@ -1906,14 +1913,20 @@ test.describe("Lupen browser smoke", () => {
     expect(renderedBots.find(bot => bot.type === "attacker")).toMatchObject({ src: "assets/bots/erebus-attacker.png", scale: "0.94" });
     expect(renderedBots.find(bot => bot.type === "destroyer")).toMatchObject({ src: "assets/bots/erebus-destroyer.png", scale: "1.12" });
     expect(renderedBots.find(bot => bot.type === "behemoth")).toMatchObject({ src: "assets/bots/erebus-behemoth.png", scale: "1.32" });
+    expect(renderedBots.find(bot => bot.type === "hunter")?.title).toContain("Light Threat");
+    expect(renderedBots.find(bot => bot.type === "attacker")?.title).toContain("Medium Threat");
+    expect(renderedBots.find(bot => bot.type === "destroyer")?.title).toContain("Heavy Threat");
+    expect(renderedBots.find(bot => bot.type === "behemoth")?.title).toContain("Extreme Threat");
     renderedBots.forEach((bot) => {
       expect(bot.naturalWidth).toBeGreaterThan(0);
       expect(bot.naturalHeight).toBeGreaterThan(0);
       expect(bot.title).toContain("Erebus");
     });
+    await expect(page.locator(".lupen-target-card.hostile")).toContainText("Erebus Destroyer");
+    await expect(page.locator(".lupen-target-card.hostile")).toContainText("Heavy Threat");
 
     fs.mkdirSync("artifacts", { recursive: true });
-    await page.locator("#spaceScreen").screenshot({ path: "artifacts/map1-erebus-bot-types.png" });
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/map1-bot-threat-labels.png" });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

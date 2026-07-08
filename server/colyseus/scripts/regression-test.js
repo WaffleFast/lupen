@@ -347,6 +347,7 @@ function assertBotDisplayFields(room) {
     assert(bot.type, `Bot ${bot.id} is missing type.`);
     assert(bot.faction === "Erebus", `Bot ${bot.id} has unexpected faction ${bot.faction}.`);
     assert(bot.image === config.image, `Bot ${bot.id} image mismatch: ${bot.image}.`);
+    assert(bot.threat === config.threat, `Bot ${bot.id} threat mismatch: ${bot.threat}.`);
     assert(Number(bot.damagePerHit) === config.damagePerHit, `Bot ${bot.id} damage mismatch: ${bot.damagePerHit}.`);
     assert(Number(bot.attackCooldownMs) === config.attackCooldownMs, `Bot ${bot.id} cooldown mismatch: ${bot.attackCooldownMs}.`);
     assert(Number(bot.level) > 0, `Bot ${bot.id} is missing level.`);
@@ -354,6 +355,24 @@ function assertBotDisplayFields(room) {
     assert(Number(bot.hullMax) >= Number(bot.hull), `Bot ${bot.id} has invalid hull values.`);
     assert(bot.disabled === true || bot.disabled === false, `Bot ${bot.id} is missing disabled state.`);
     assert(bot.visualOnly === true, `Bot ${bot.id} must remain visualOnly.`);
+  });
+}
+
+function assertMapOneBotTuning() {
+  const expected = {
+    hunter: { damagePerHit: 18, threat: "Light Threat" },
+    attacker: { damagePerHit: 24, threat: "Medium Threat" },
+    destroyer: { damagePerHit: 32, attackCooldownMs: 3500, threat: "Heavy Threat" },
+    behemoth: { damagePerHit: 58, threat: "Extreme Threat" }
+  };
+  Object.entries(expected).forEach(([botType, values]) => {
+    const config = EREBUS_BOT_TYPES[botType];
+    assert(config, `Missing Erebus ${botType} config.`);
+    assert(config.damagePerHit === values.damagePerHit, `Unexpected ${botType} damage: ${config.damagePerHit}.`);
+    if (values.attackCooldownMs) {
+      assert(config.attackCooldownMs === values.attackCooldownMs, `Unexpected ${botType} cooldown: ${config.attackCooldownMs}.`);
+    }
+    assert(config.threat === values.threat, `Unexpected ${botType} threat label: ${config.threat}.`);
   });
 }
 
@@ -5356,6 +5375,7 @@ try {
   console.log("docked and launched presence status replicated promptly");
 
   await waitFor("Erebus bot population to appear", () => botCount(roomA) >= 33 && botCount(roomB) >= 33);
+  assertMapOneBotTuning();
   assertAllowedBotNodes(roomA);
   assertAllowedBotNodes(roomB);
   assertBotDisplayFields(roomA);
@@ -5500,8 +5520,12 @@ try {
   assert(depletedResourceAfterDuplicate?.hp === depletedResourceBeforeDuplicate?.hp, "Duplicate depleted resource mine changed hp.");
   console.log("server-owned staging resource mining depleted once, paid once, and blocked duplicates");
 
-  const inspectedBotBeforeCombat = botSnapshots(roomA)[0];
+  const inspectedBotBeforeCombat = botSnapshots(roomA).find((bot) => bot.botType === "destroyer") || botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
+  assert(inspectedBotBeforeCombat.botType === "destroyer", "Regression combat bot was not a Destroyer.");
+  assert(inspectedBotBeforeCombat.damagePerHit === 32, `Destroyer damage should be 32, saw ${inspectedBotBeforeCombat.damagePerHit}.`);
+  assert(inspectedBotBeforeCombat.attackCooldownMs === 3500, `Destroyer cooldown changed unexpectedly: ${inspectedBotBeforeCombat.attackCooldownMs}.`);
+  assert(inspectedBotBeforeCombat.threat === "Heavy Threat", `Destroyer threat label mismatch: ${inspectedBotBeforeCombat.threat}.`);
 
   const stalePlayerNode = inspectedBotBeforeCombat.currentNode === "Asteron Prime" ? "Virella" : "Asteron Prime";
   roomA.send("movement:update", {

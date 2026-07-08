@@ -9,7 +9,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     shield: 60,
     hull: 60,
     level: 1,
-    threat: "Light",
+    threat: "Light Threat",
     visualScale: 0.82
   }),
   attacker: Object.freeze({
@@ -22,20 +22,20 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     shield: 90,
     hull: 90,
     level: 2,
-    threat: "Medium",
+    threat: "Medium Threat",
     visualScale: 0.94
   }),
   destroyer: Object.freeze({
     botType: "destroyer",
     displayName: "Erebus Destroyer",
-    damagePerHit: 36,
+    damagePerHit: 32,
     attackCooldownMs: 3500,
     image: "assets/bots/erebus-destroyer.png",
     targetCount: 4,
     shield: 160,
     hull: 160,
     level: 3,
-    threat: "Heavy",
+    threat: "Heavy Threat",
     visualScale: 1.12
   }),
   behemoth: Object.freeze({
@@ -48,7 +48,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     shield: 300,
     hull: 350,
     level: 5,
-    threat: "Boss",
+    threat: "Extreme Threat",
     visualScale: 1.32
   })
 });

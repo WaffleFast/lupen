@@ -1083,8 +1083,16 @@
       .lupen-target-card.hostile {
         --target-accent: #ff9a35;
         --target-glow: rgba(255, 138, 45, 0.76);
+        min-width: 142px;
+        max-width: 174px;
         border-color: rgba(255, 166, 74, 0.72);
         box-shadow: 0 0 14px rgba(255, 124, 46, 0.18);
+      }
+
+      .lupen-target-card.hostile strong,
+      .lupen-target-card.hostile small,
+      .lupen-target-card.hostile .lupen-target-meta-row {
+        max-width: 158px;
       }
 
       .lupen-target-card.player {
@@ -2102,6 +2110,12 @@
     return `${faction} ${level}${threat} / ${bot.currentNode || "unknown"}`;
   }
 
+  function getBotTargetSummary(bot) {
+    if (!bot) return "none";
+    const level = Number(bot.level || 0) > 0 ? `L${bot.level}` : "L?";
+    return bot.threat ? `${level} / ${bot.threat}` : getBotLayerSummary(bot);
+  }
+
   function getBotHullSummary(bot) {
     if (!bot) return "none";
     const shield = `${Math.round(Number(bot.shield || 0))}/${Math.round(Number(bot.shieldMax || 0))}`;
@@ -2464,6 +2478,13 @@
     card.appendChild(title);
 
     if (selectedBot) {
+      const meta = global.document.createElement("div");
+      meta.className = "lupen-target-meta-row";
+      const summary = global.document.createElement("small");
+      summary.textContent = getBotTargetSummary(selectedBot);
+      meta.appendChild(summary);
+      card.appendChild(meta);
+
       const bars = global.document.createElement("div");
       bars.className = "lupen-target-bars";
       appendTargetBar(bars, selectedBot.hull, selectedBot.hullMax ?? selectedBot.maxHull, "hull");
