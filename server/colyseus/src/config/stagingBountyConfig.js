@@ -13,17 +13,19 @@ export const STAGING_BOUNTIES = Object.freeze([
   Object.freeze({
     id: STAGING_BOUNTY_ID,
     title: "Erebus Patrol Sweep",
-    description: "Destroy 2 Erebus bots.",
+    description: "Destroy 4 Erebus bots.",
+    contractType: "Kill Contract",
     targetType: "server_bot_destroy",
     targetFaction: "Erebus",
-    target: "Erebus bots",
+    target: "Any Erebus",
     targetBotType: "any",
-    targetBotLabel: "Erebus bots",
+    targetBotLabel: "Any Erebus",
     difficulty: "Easy",
-    requiredKills: 2,
+    requiredKills: 4,
     xpReward: 0,
-    creditsReward: 750,
+    creditsReward: 900,
     lupenShardsReward: 2,
+    icon: "assets/bounties/erebus-patrol-sweep.png",
     lootReward: makeShardLootReward(2),
     repeatable: false,
     stagingOnly: true
@@ -32,53 +34,41 @@ export const STAGING_BOUNTIES = Object.freeze([
     id: "staging_hunter_clearance_4",
     title: "Hunter Clearance",
     description: "Destroy 4 Erebus Hunters.",
+    contractType: "Targeted Hunt",
     targetType: "server_bot_destroy",
     targetFaction: "Erebus",
-    target: "Erebus Hunter",
+    target: "Hunter",
     targetBotType: "hunter",
-    targetBotLabel: "Erebus Hunters",
+    targetBotLabel: "Hunter",
     difficulty: "Easy",
     requiredKills: 4,
     xpReward: 0,
-    creditsReward: 1000,
+    creditsReward: 1100,
     lupenShardsReward: 3,
+    icon: "assets/bounties/hunter-clearance.png",
     lootReward: makeShardLootReward(3),
     repeatable: false,
     stagingOnly: true
   }),
   Object.freeze({
-    id: "staging_attacker_suppression_3",
-    title: "Attacker Suppression",
-    description: "Destroy 3 Erebus Attackers.",
+    id: "staging_timed_suppression_4",
+    title: "Timed Suppression",
+    description: "Destroy 4 Erebus bots within 4 minutes.",
+    contractType: "Timed Elimination",
     targetType: "server_bot_destroy",
     targetFaction: "Erebus",
-    target: "Erebus Attacker",
-    targetBotType: "attacker",
-    targetBotLabel: "Erebus Attackers",
+    target: "Any Erebus",
+    targetBotType: "any",
+    targetBotLabel: "Any Erebus",
     difficulty: "Medium",
-    requiredKills: 3,
-    xpReward: 0,
-    creditsReward: 1250,
-    lupenShardsReward: 4,
-    lootReward: makeShardLootReward(4),
-    repeatable: false,
-    stagingOnly: true
-  }),
-  Object.freeze({
-    id: "staging_destroyer_contract_1",
-    title: "Destroyer Contract",
-    description: "Destroy 1 Erebus Destroyer.",
-    targetType: "server_bot_destroy",
-    targetFaction: "Erebus",
-    target: "Erebus Destroyer",
-    targetBotType: "destroyer",
-    targetBotLabel: "Erebus Destroyer",
-    difficulty: "Heavy Threat",
-    requiredKills: 1,
+    requiredKills: 4,
     xpReward: 0,
     creditsReward: 1500,
-    lupenShardsReward: 5,
-    lootReward: makeShardLootReward(5),
+    lupenShardsReward: 4,
+    timed: true,
+    timeLimitSeconds: 240,
+    icon: "assets/bounties/timed-suppression.png",
+    lootReward: makeShardLootReward(4),
     repeatable: false,
     stagingOnly: true
   }),
@@ -86,16 +76,18 @@ export const STAGING_BOUNTIES = Object.freeze([
     id: "staging_behemoth_warning_1",
     title: "Behemoth Warning",
     description: "Destroy 1 Erebus Behemoth.",
+    contractType: "Boss Contract",
     targetType: "server_bot_destroy",
     targetFaction: "Erebus",
     target: "Erebus Behemoth",
     targetBotType: "behemoth",
     targetBotLabel: "Erebus Behemoth",
-    difficulty: "Extreme Threat",
+    difficulty: "Extreme",
     requiredKills: 1,
     xpReward: 0,
     creditsReward: 2500,
     lupenShardsReward: 8,
+    icon: "assets/bounties/behemoth-warning.png",
     lootReward: makeShardLootReward(8),
     repeatable: false,
     stagingOnly: true
@@ -148,7 +140,11 @@ export function createStagingBountyState(sessionId = "", now = Date.now(), bount
     accepted: true,
     progress: 0,
     requiredKills: bounty.requiredKills,
+    timed: bounty.timed === true,
+    timeLimitSeconds: Math.max(0, Math.round(getNumberValue(bounty.timeLimitSeconds, 0))),
+    expiresAt: bounty.timed === true ? now + (Math.max(0, Math.round(getNumberValue(bounty.timeLimitSeconds, 0))) * 1000) : 0,
     completed: false,
+    failed: false,
     claimed: false,
     completionSequence: 0,
     completedAt: 0,
@@ -167,13 +163,20 @@ export function getPublicStagingBountyState(state = null) {
   const requiredKills = Math.max(1, Math.round(getNumberValue(state?.requiredKills, bounty?.requiredKills || 1)));
   const completed = accepted && (state?.completed === true || progress >= requiredKills);
   const claimed = state?.claimed === true;
+  const timed = bounty?.timed === true || state?.timed === true;
+  const expiresAt = Math.max(0, Math.round(getNumberValue(state?.expiresAt, 0)));
+  const failed = accepted && !completed && state?.failed === true;
 
   return {
     ...(bounty || STAGING_BOUNTY),
     accepted,
     progress: accepted ? Math.min(progress, requiredKills) : 0,
     requiredKills,
+    timed,
+    timeLimitSeconds: Math.max(0, Math.round(getNumberValue(state?.timeLimitSeconds, bounty?.timeLimitSeconds || 0))),
+    expiresAt,
     completed,
+    failed,
     claimAvailable: completed && !claimed,
     claimed,
     completionSequence: Math.max(0, Math.round(getNumberValue(state?.completionSequence, 0))),
@@ -190,6 +193,24 @@ export function recordStagingBountyBotDestruction(state = null, { botId = "", bo
       state,
       changed: false,
       reason: state?.claimed ? "bounty_already_claimed" : "bounty_not_accepted"
+    };
+  }
+
+  if (state.failed === true) {
+    return { state, changed: false, reason: "bounty_failed" };
+  }
+
+  if (state.timed === true && state.expiresAt && now > Number(state.expiresAt)) {
+    return {
+      state: {
+        ...state,
+        failed: true,
+        progress: 0,
+        lastReason: "bounty_timer_expired",
+        updatedAt: now
+      },
+      changed: true,
+      reason: "bounty_timer_expired"
     };
   }
 

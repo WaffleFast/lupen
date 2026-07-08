@@ -4446,17 +4446,33 @@ test.describe("Lupen browser smoke", () => {
         activeObjective = null;
         activeBountyId = null;
 
-        acceptBountyContract("destroyer-contract");
-        trackBountyBotKill({ id: "behemoth-1", botType: "behemoth", faction: "erebus", displayName: "Erebus Behemoth", node: "Lower Apex" });
-        const destroyerAfterMismatch = activeObjective?.kills || 0;
+        acceptBountyContract("behemoth-warning");
         trackBountyBotKill({ id: "destroyer-1", botType: "destroyer", faction: "erebus", displayName: "Erebus Destroyer", node: "Lower Apex" });
-        const destroyerReady = getBountyContract("destroyer-contract")?.status;
+        const behemothAfterMismatch = activeObjective?.kills || 0;
+        trackBountyBotKill({ id: "behemoth-1", botType: "behemoth", faction: "erebus", displayName: "Erebus Behemoth", node: "Lower Apex" });
+        const behemothReady = getBountyContract("behemoth-warning")?.status;
         const xpBeforeClaim = playerProgress.combatXp;
         const creditsBeforeClaim = credits;
         const shardsBeforeClaim = upgradeMaterials.lupenShards;
-        claimBountyReward("destroyer-contract");
+        claimBountyReward("behemoth-warning");
+        const claimedStatus = getBountyContract("behemoth-warning")?.status || "";
         openUpgradeForge();
         const forgeText = document.getElementById("upgradeForgeScreen")?.textContent || "";
+
+        const resetContract = getBountyContract("hunter-clearance");
+        resetContract.status = "readyToClaim";
+        resetContract.progress = resetContract.requiredKills;
+        dailyBountyDate = "1999-01-01";
+        ensureDailyBounties();
+        const resetStatuses = dailyBountyContracts.map(contract => contract.status);
+
+        acceptBountyContract("timed-suppression");
+        const timedAccepted = getBountyContract("timed-suppression");
+        const timedLimitSeconds = timedAccepted.timeLimitSeconds;
+        const timedHasExpiry = Number(timedAccepted.expiresAt || 0) > Date.now();
+        timedAccepted.expiresAt = Date.now() - 1000;
+        updateActiveBountyTimers();
+        const timedFailed = getBountyContract("timed-suppression")?.status;
 
         return {
           names,
@@ -4464,13 +4480,17 @@ test.describe("Lupen browser smoke", () => {
           hunterAfterMismatch,
           hunterAfterMatch,
           anyAfterBehemoth,
-          destroyerAfterMismatch,
-          destroyerReady,
+          behemothAfterMismatch,
+          behemothReady,
           creditsDelta: credits - creditsBeforeClaim,
           shardDelta: upgradeMaterials.lupenShards - shardsBeforeClaim,
           xpDelta: playerProgress.combatXp - xpBeforeClaim,
           forgeText,
-          claimedStatus: getBountyContract("destroyer-contract")?.status || "",
+          claimedStatus,
+          resetStatuses,
+          timedLimitSeconds,
+          timedHasExpiry,
+          timedFailed,
           boardCopy: document.getElementById("bountyScreen")?.textContent || ""
         };
       })()
@@ -4479,23 +4499,26 @@ test.describe("Lupen browser smoke", () => {
     expect(state.names).toEqual([
       "Erebus Patrol Sweep",
       "Hunter Clearance",
-      "Attacker Suppression",
-      "Destroyer Contract",
+      "Timed Suppression",
       "Behemoth Warning"
     ]);
-    expect(state.rewards["erebus-patrol-sweep"]).toMatchObject({ credits: 750, xp: 0, lupenShards: 2, targetBotType: "any", requiredKills: 2 });
-    expect(state.rewards["hunter-clearance"]).toMatchObject({ credits: 1000, xp: 0, lupenShards: 3, targetBotType: "hunter", requiredKills: 4 });
-    expect(state.rewards["destroyer-contract"]).toMatchObject({ credits: 1500, xp: 0, lupenShards: 5, targetBotType: "destroyer", requiredKills: 1 });
+    expect(state.rewards["erebus-patrol-sweep"]).toMatchObject({ credits: 900, xp: 0, lupenShards: 2, targetBotType: "any", requiredKills: 4 });
+    expect(state.rewards["hunter-clearance"]).toMatchObject({ credits: 1100, xp: 0, lupenShards: 3, targetBotType: "hunter", requiredKills: 4 });
+    expect(state.rewards["timed-suppression"]).toMatchObject({ credits: 1500, xp: 0, lupenShards: 4, targetBotType: "any", requiredKills: 4 });
     expect(state.rewards["behemoth-warning"]).toMatchObject({ credits: 2500, xp: 0, lupenShards: 8, targetBotType: "behemoth", requiredKills: 1 });
     expect(state.hunterAfterMismatch).toBe(0);
     expect(state.hunterAfterMatch).toBe(1);
     expect(state.anyAfterBehemoth).toBe(1);
-    expect(state.destroyerAfterMismatch).toBe(0);
-    expect(state.destroyerReady).toBe("readyToClaim");
-    expect(state.creditsDelta).toBe(1500);
-    expect(state.shardDelta).toBe(5);
+    expect(state.behemothAfterMismatch).toBe(0);
+    expect(state.behemothReady).toBe("readyToClaim");
+    expect(state.creditsDelta).toBe(2500);
+    expect(state.shardDelta).toBe(8);
     expect(state.xpDelta).toBe(0);
     expect(state.claimedStatus).toBe("claimed");
+    expect(state.resetStatuses.every(status => status === "available")).toBe(true);
+    expect(state.timedLimitSeconds).toBe(240);
+    expect(state.timedHasExpiry).toBe(true);
+    expect(state.timedFailed).toBe("failed");
     expect(state.forgeText).toContain("Lupen Shards");
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -5112,7 +5135,7 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(availableState.step).toBe("accept-bounty");
-    expect(availableState.buttonText).toContain("Accept Bounty");
+    expect(availableState.buttonText).toContain("Accept Contract");
     expect(availableState.highlighted).toBe(true);
     expect(availableState.disabled).toBe(false);
 
@@ -5164,9 +5187,9 @@ test.describe("Lupen browser smoke", () => {
 
     expect(offlineFallbackState.beforeText).toContain("STARTER BOUNTY");
     expect(offlineFallbackState.beforeText).toContain("Erebus Patrol Sweep");
-    expect(offlineFallbackState.beforeText).toContain("Accept Bounty");
+    expect(offlineFallbackState.beforeText).toContain("Accept Contract");
     expect(offlineFallbackState.beforeText).not.toContain("Waiting For Server");
-    expect(offlineFallbackState.buttonText).toContain("Accept Bounty");
+    expect(offlineFallbackState.buttonText).toContain("Accept Contract");
     expect(offlineFallbackAccepted.step).toBe("return-for-combat-launch");
     expect(offlineFallbackAccepted.objectiveType).toBe("bounty");
     expect(offlineFallbackAccepted.contractId).toBe("tutorial-erebus-patrol");
@@ -5219,7 +5242,7 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(activeStagingState.step).toBe("return-for-combat-launch");
-    expect(activeStagingState.detailText).toContain("Active Bounty");
+    expect(activeStagingState.detailText).toContain("Active Contract");
     expect(activeStagingState.detailText).not.toContain("Active Staging Bounty");
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -7679,15 +7702,17 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toHaveClass(/active/);
     await expect(page.locator(".selected-contract-panel")).toBeVisible();
     await expect(page.locator(".accept-bounty-button")).toBeVisible();
-    await expect(page.locator(".bounty-contract-card")).toHaveCount(5);
-    await expect(page.locator("#bountyScreen")).toContainText("Complete Erebus bounties to earn credits and Lupen Shards for Forge upgrades.");
+    await expect(page.locator(".bounty-contract-card")).toHaveCount(4);
+    await expect(page.locator("#bountyScreen")).toContainText("Complete daily Erebus contracts to earn credits and Lupen Shards for Forge upgrades.");
+    await expect(page.locator("#bountyScreen")).toContainText("DAILY CONTRACTS");
+    await expect(page.locator("#bountyScreen")).toContainText("4 / 4 DAILY CONTRACTS");
+    await expect(page.locator("#bountyResetCountdown")).toContainText("DAILY RESET");
     await expect(page.locator("#bountyScreen")).toContainText("Erebus Patrol Sweep");
     await expect(page.locator("#bountyScreen")).toContainText("Hunter Clearance");
-    await expect(page.locator("#bountyScreen")).toContainText("Attacker Suppression");
-    await expect(page.locator("#bountyScreen")).toContainText("Destroyer Contract");
+    await expect(page.locator("#bountyScreen")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyScreen")).toContainText("Behemoth Warning");
-    await expect(page.locator("#bountyScreen")).toContainText("CR 750 / 2 Lupen Shards");
-    await expect(page.locator("#bountyScreen")).not.toContainText(/Lupen Cores|XP payout/i);
+    await expect(page.locator("#bountyScreen")).toContainText("CR 900");
+    await expect(page.locator("#bountyScreen")).not.toContainText(/Lupen Cores/i);
 
     const measureSelectedPanelAction = async (selector) => page.evaluate((buttonSelector) => {
       const screen = document.querySelector("#bountyScreen")?.getBoundingClientRect();
@@ -7713,15 +7738,16 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator(".bounty-contract-card", { hasText: "Hunter Clearance" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter Clearance");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Hunters");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,000 / 3 Lupen Shards");
-    await page.locator(".bounty-contract-card", { hasText: "Destroyer Contract" }).click();
-    await expect(page.locator("#bountyDetailPanel")).toContainText("Destroyer Contract");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Destroyer");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,500 / 5 Lupen Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,100 / 3 Lupen Shards");
+    await page.locator(".bounty-contract-card", { hasText: "Timed Suppression" }).click();
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Timed Suppression");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("04:00");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("XP REWARD");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("None");
 
     fs.mkdirSync("artifacts", { recursive: true });
-    await page.locator("#bountyScreen").screenshot({ path: "artifacts/bounty-board-map1-contracts.png" });
+    await page.locator("#bountyScreen").screenshot({ path: "artifacts/bounty-board-daily-refresh.png" });
 
     await page.locator(".accept-bounty-button").click();
     await expect(page.locator(".bounty-cancel-btn")).toBeVisible();
@@ -7744,11 +7770,10 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.eval(`
       (() => {
         const bounties = [
-          { id: "staging_erebus_patrol_2", title: "Erebus Patrol Sweep", description: "Destroy 2 Erebus bots.", targetBotType: "any", targetBotLabel: "Erebus bots", difficulty: "Easy", requiredKills: 2, progress: 0, xpReward: 0, creditsReward: 750, lupenShardsReward: 2 },
-          { id: "staging_hunter_clearance_4", title: "Hunter Clearance", description: "Destroy 4 Erebus Hunters.", targetBotType: "hunter", targetBotLabel: "Erebus Hunters", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1000, lupenShardsReward: 3 },
-          { id: "staging_attacker_suppression_3", title: "Attacker Suppression", description: "Destroy 3 Erebus Attackers.", targetBotType: "attacker", targetBotLabel: "Erebus Attackers", difficulty: "Medium", requiredKills: 3, progress: 0, xpReward: 0, creditsReward: 1250, lupenShardsReward: 4 },
-          { id: "staging_destroyer_contract_1", title: "Destroyer Contract", description: "Destroy 1 Erebus Destroyer.", targetBotType: "destroyer", targetBotLabel: "Erebus Destroyer", difficulty: "Heavy Threat", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 1500, lupenShardsReward: 5 },
-          { id: "staging_behemoth_warning_1", title: "Behemoth Warning", description: "Destroy 1 Erebus Behemoth.", targetBotType: "behemoth", targetBotLabel: "Erebus Behemoth", difficulty: "Extreme Threat", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 2500, lupenShardsReward: 8 }
+          { id: "staging_erebus_patrol_2", title: "Erebus Patrol Sweep", description: "Destroy 4 Erebus bots.", contractType: "Kill Contract", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 900, lupenShardsReward: 2, icon: "assets/bounties/erebus-patrol-sweep.png" },
+          { id: "staging_hunter_clearance_4", title: "Hunter Clearance", description: "Destroy 4 Erebus Hunters.", contractType: "Targeted Hunt", targetBotType: "hunter", targetBotLabel: "Hunter", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1100, lupenShardsReward: 3, icon: "assets/bounties/hunter-clearance.png" },
+          { id: "staging_timed_suppression_4", title: "Timed Suppression", description: "Destroy 4 Erebus bots within 4 minutes.", contractType: "Timed Elimination", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Medium", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1500, lupenShardsReward: 4, timed: true, timeLimitSeconds: 240, icon: "assets/bounties/timed-suppression.png" },
+          { id: "staging_behemoth_warning_1", title: "Behemoth Warning", description: "Destroy 1 Erebus Behemoth.", contractType: "Boss Contract", targetBotType: "behemoth", targetBotLabel: "Erebus Behemoth", difficulty: "Extreme", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 2500, lupenShardsReward: 8, icon: "assets/bounties/behemoth-warning.png" }
         ];
         window.LupenMultiplayerClient = {
           ...(window.LupenMultiplayerClient || {}),
@@ -7767,15 +7792,15 @@ test.describe("Lupen browser smoke", () => {
 
     await openBountyBoard(page);
 
-    await expect(page.locator("#bountyScreen")).toContainText("MP STAGING BOUNTIES");
-    await expect(page.locator(".bounty-contract-card")).toHaveCount(5);
+    await expect(page.locator("#bountyScreen")).toContainText("MP STAGING CONTRACTS");
+    await expect(page.locator(".bounty-contract-card")).toHaveCount(4);
     await expect(page.locator("#bountyScreen")).toContainText("Erebus Patrol Sweep");
     await expect(page.locator("#bountyScreen")).toContainText("Hunter Clearance");
-    await expect(page.locator("#bountyScreen")).toContainText("Destroyer Contract");
+    await expect(page.locator("#bountyScreen")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyScreen")).toContainText("Behemoth Warning");
     await expect(page.locator("#bountyScreen")).toContainText(/Server-tracked staging bounty|Waiting for Multiplayer Staging/);
-    await expect(page.locator("#bountyScreen")).toContainText("CR 750 / 2 Lupen Shards");
-    await expect(page.locator("#bountyScreen")).toContainText("No XP payout");
+    await expect(page.locator("#bountyScreen")).toContainText("CR 900");
+    await expect(page.locator("#bountyScreen")).toContainText("XP REWARD");
     await page.locator(".bounty-contract-card", { hasText: "Behemoth Warning" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Behemoth");
     await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 8 Lupen Shards");

@@ -853,7 +853,7 @@ const BOUNTY_AREAS = {
 };
 
 const BOUNTY_REWARD_DEFAULT = {
-  credits: 750,
+  credits: 900,
   xp: 0,
   lupenCores: 0,
   lupenShards: 2
@@ -864,28 +864,28 @@ const DAILY_BOUNTY_CONTRACTS = [
     id: "erebus-patrol-sweep",
     name: "Erebus Patrol Sweep",
     title: "Erebus Patrol Sweep",
-    subtitle: "Destroy 2 Erebus bots",
-    description: "Destroy 2 Erebus bots.",
+    subtitle: "Destroy 4 Erebus bots",
+    description: "Destroy 4 Erebus bots.",
     type: "standard",
-    chipLabel: "STARTER",
-    contractType: "Starter",
+    chipLabel: "EASY",
+    contractType: "Kill Contract",
     area: "Any Hostile Zone",
     targetArea: "anyHostile",
     targetBotType: "any",
-    targetBotLabel: "Erebus bots",
-    requiredKills: 2,
-    killsRequired: 2,
+    targetBotLabel: "Any Erebus",
+    requiredKills: 4,
+    killsRequired: 4,
     progress: 0,
     threat: "Easy",
-    reward: { credits: 750, xp: 0, lupenCores: 0, lupenShards: 2 },
-    bonus: "Starter combat practice",
+    reward: { credits: 900, xp: 0, lupenCores: 0, lupenShards: 2 },
+    bonus: "Destroy any Erebus bots.",
     timed: false,
     timeLimitSeconds: null,
     expiresAt: null,
     status: "available",
     accent: "blue",
-    icon: "bounty-patrol-sweep",
-    fallbackIcon: "assets/bounties/bounty-patrol-sweep.png"
+    icon: "assets/bounties/erebus-patrol-sweep.png",
+    fallbackIcon: "assets/bounties/erebus-patrol-sweep.png"
   },
   {
     id: "hunter-clearance",
@@ -895,78 +895,51 @@ const DAILY_BOUNTY_CONTRACTS = [
     description: "Destroy 4 Erebus Hunters.",
     type: "standard",
     chipLabel: "EASY",
-    contractType: "Hunter Clearance",
+    contractType: "Targeted Hunt",
     area: "Any Hostile Zone",
     targetArea: "anyHostile",
     targetBotType: "hunter",
-    targetBotLabel: "Erebus Hunters",
+    targetBotLabel: "Hunter",
     requiredKills: 4,
     killsRequired: 4,
     progress: 0,
-    threat: "Light Threat",
-    reward: { credits: 1000, xp: 0, lupenCores: 0, lupenShards: 3 },
-    bonus: "Repeatable combat practice",
+    threat: "Easy",
+    reward: { credits: 1100, xp: 0, lupenCores: 0, lupenShards: 3 },
+    bonus: "Destroy Erebus Hunter-class bots.",
     timed: false,
     timeLimitSeconds: null,
     expiresAt: null,
     status: "available",
-    accent: "blue",
-    icon: "erebus-hunter",
-    fallbackIcon: "assets/bots/erebus-hunter.png"
+    accent: "purple",
+    icon: "assets/bounties/hunter-clearance.png",
+    fallbackIcon: "assets/bounties/hunter-clearance.png"
   },
   {
-    id: "attacker-suppression",
-    name: "Attacker Suppression",
-    title: "Attacker Suppression",
-    subtitle: "Destroy 3 Erebus Attackers",
-    description: "Destroy 3 Erebus Attackers.",
+    id: "timed-suppression",
+    name: "Timed Suppression",
+    title: "Timed Suppression",
+    subtitle: "Destroy 4 Erebus bots within 4 minutes",
+    description: "Destroy 4 Erebus bots within 4 minutes.",
     type: "rapid",
     chipLabel: "MEDIUM",
-    contractType: "Attacker Suppression",
+    contractType: "Timed Elimination",
     area: "Any Hostile Zone",
     targetArea: "anyHostile",
-    targetBotType: "attacker",
-    targetBotLabel: "Erebus Attackers",
-    requiredKills: 3,
-    killsRequired: 3,
+    targetBotType: "any",
+    targetBotLabel: "Any Erebus",
+    requiredKills: 4,
+    killsRequired: 4,
     progress: 0,
-    threat: "Medium Threat",
-    reward: { credits: 1250, xp: 0, lupenCores: 0, lupenShards: 4 },
-    bonus: "Mid-threat combat practice",
-    timed: false,
-    timeLimitSeconds: null,
+    threat: "Medium",
+    reward: { credits: 1500, xp: 0, lupenCores: 0, lupenShards: 4 },
+    bonus: "Complete before the timer expires.",
+    timed: true,
+    timeLimitSeconds: 240,
     expiresAt: null,
     status: "available",
-    accent: "orange",
-    icon: "erebus-attacker",
-    fallbackIcon: "assets/bots/erebus-attacker.png"
-  },
-  {
-    id: "destroyer-contract",
-    name: "Destroyer Contract",
-    title: "Destroyer Contract",
-    subtitle: "Destroy 1 Erebus Destroyer",
-    description: "Destroy 1 Erebus Destroyer.",
-    type: "priority",
-    chipLabel: "HEAVY",
-    contractType: "Destroyer Contract",
-    area: "Any Hostile Zone",
-    targetArea: "anyHostile",
-    targetBotType: "destroyer",
-    targetBotLabel: "Erebus Destroyer",
-    requiredKills: 1,
-    killsRequired: 1,
-    progress: 0,
-    threat: "Heavy Threat",
-    reward: { credits: 1500, xp: 0, lupenCores: 0, lupenShards: 5 },
-    bonus: "Risky early-player contract",
-    timed: false,
-    timeLimitSeconds: null,
-    expiresAt: null,
-    status: "available",
-    accent: "orange",
-    icon: "erebus-destroyer",
-    fallbackIcon: "assets/bots/erebus-destroyer.png"
+    accent: "cyan",
+    icon: "assets/bounties/timed-suppression.png",
+    fallbackIcon: "assets/bounties/timed-suppression.png"
   },
   {
     id: "behemoth-warning",
@@ -976,7 +949,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     description: "Destroy 1 Erebus Behemoth.",
     type: "boss",
     chipLabel: "EXTREME",
-    contractType: "Behemoth Warning",
+    contractType: "Boss Contract",
     area: "Any Hostile Zone",
     targetArea: "anyHostile",
     targetBotType: "behemoth",
@@ -984,30 +957,30 @@ const DAILY_BOUNTY_CONTRACTS = [
     requiredKills: 1,
     killsRequired: 1,
     progress: 0,
-    threat: "Extreme Threat",
+    threat: "Extreme",
     reward: { credits: 2500, xp: 0, lupenCores: 0, lupenShards: 8 },
-    bonus: "Mini-boss bounty",
+    bonus: "Destroy an Erebus Behemoth.",
     timed: false,
     timeLimitSeconds: null,
     expiresAt: null,
     status: "available",
     accent: "red",
-    icon: "bounty-behemoth-cull",
-    fallbackIcon: "assets/bounties/bounty-behemoth-cull.png"
+    icon: "assets/bounties/behemoth-warning.png",
+    fallbackIcon: "assets/bounties/behemoth-warning.png"
   }
 ];
 
 function getTodayKey() {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 function getNextDailyResetAt() {
-  const reset = new Date();
-  reset.setHours(24, 0, 0, 0);
+  const now = new Date();
+  const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
   return reset;
 }
 
