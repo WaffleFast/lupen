@@ -2934,7 +2934,6 @@ function renderMultiplayerStagingBountyBoard() {
       const status = getMultiplayerStagingBountyStatusLabel(bounty);
       const requiredKills = Number(bounty.requiredKills || 2);
       const progress = Math.min(requiredKills, Math.max(0, Number(bounty.progress || 0)));
-      const rewardText = formatBountyReward({ credits: bounty.creditsReward, lupenShards: bounty.lupenShardsReward });
       const icon = getBountyIconSrc(bounty.icon || bounty.fallbackIcon);
       const ready = statusKey === "completed";
       const complete = statusKey === "claimed";
@@ -2954,7 +2953,7 @@ function renderMultiplayerStagingBountyBoard() {
           </span>
           <span class="bounty-reward-box bounty-card-reward bounty-reward">
             <span class="bounty-reward-box__label">REWARD</span>
-            <strong class="bounty-reward-box__value">${escapeHtml(rewardText)}<img class="bounty-reward-box__icon" src="assets/items/lupen-shard.png" alt=""></strong>
+            <strong class="bounty-reward-box__value"><span>CR ${formatNumber(bounty.creditsReward)}</span><span><img class="bounty-reward-box__icon" src="assets/items/lupen-shard.png" alt=""> ${formatNumber(bounty.lupenShardsReward)} Lupen Shards</span></strong>
             <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
             <small>Progress: ${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
           </span>

@@ -30312,16 +30312,16 @@ input::placeholder {
   min-height: 0 !important;
   height: 100% !important;
   padding: 12px 14px !important;
-  grid-template-columns: 118px minmax(0, 1fr) 178px !important;
+  grid-template-columns: 104px minmax(0, 1fr) 174px !important;
   grid-template-rows: 1fr !important;
   gap: 14px !important;
   overflow: hidden !important;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-board-layout-refined .bounty-card-icon.bounty-card__icon-frame {
-  width: 110px !important;
+  width: 96px !important;
   height: 96px !important;
-  min-width: 110px !important;
+  min-width: 96px !important;
   grid-row: 1 / 2 !important;
   border-radius: 8px !important;
   clip-path: none !important;
@@ -30341,10 +30341,12 @@ input::placeholder {
 
 #bountyScreen.bounty-board-screen.active .bounty-card__title {
   font-size: clamp(0.94rem, 1.1vw, 1.12rem) !important;
+  overflow-wrap: anywhere;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-card__subtitle {
   font-size: 0.78rem !important;
+  overflow-wrap: anywhere;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-chip {
@@ -30353,29 +30355,49 @@ input::placeholder {
   font-size: 0.52rem !important;
 }
 
+#bountyScreen.bounty-board-screen.active .bounty-card-threat {
+  align-self: auto !important;
+}
+
 #bountyScreen.bounty-board-screen.active .bounty-reward-box {
-  width: 178px !important;
+  width: 174px !important;
   min-height: 54px !important;
-  padding: 7px 9px !important;
+  padding: 4px 10px !important;
+  gap: 2px;
+  box-sizing: border-box;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-reward-box__value {
   display: grid !important;
   justify-content: stretch;
-  gap: 5px;
-  font-size: 0.86rem;
+  gap: 2px;
+  font-size: 0.74rem;
+  line-height: 1.05;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-reward-box__value span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+#bountyScreen.bounty-board-screen.active .bounty-reward-box > small {
+  color: rgba(205, 225, 241, 0.76);
+  font-size: 0.55rem;
+  line-height: 1;
+}
+
+#bountyScreen.bounty-board-screen.active .bounty-status-chip {
+  align-self: start !important;
+  justify-self: start !important;
+  padding: 3px 8px;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-reward-box__icon {
-  width: 24px !important;
-  height: 24px !important;
-  flex-basis: 24px;
+  width: 20px !important;
+  height: 20px !important;
+  flex-basis: 20px;
   filter: drop-shadow(0 0 8px rgba(91, 213, 255, 0.68));
 }
 
