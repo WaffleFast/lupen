@@ -7801,6 +7801,23 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toContainText(/Server-tracked staging bounty|Waiting for Multiplayer Staging/);
     await expect(page.locator("#bountyScreen")).toContainText("CR 900");
     await expect(page.locator("#bountyScreen")).toContainText("XP REWARD");
+
+    const stagingContractCards = page.locator(".bounty-contract-card");
+    await expect(stagingContractCards.filter({ hasText: "Hunter Clearance" })).toContainText("3 Lupen Shards");
+    await expect(stagingContractCards.filter({ hasText: "Hunter Clearance" })).toContainText("Hunter");
+    await expect(stagingContractCards.filter({ hasText: "Timed Suppression" })).toContainText("4 Lupen Shards");
+    await expect(stagingContractCards.filter({ hasText: "Timed Suppression" })).toContainText("Medium");
+    await expect(stagingContractCards.filter({ hasText: "Behemoth Warning" })).toContainText("8 Lupen Shards");
+    await expect(stagingContractCards.filter({ hasText: "Behemoth Warning" })).toContainText("Extreme");
+
+    const stagingContractIcons = await page.locator(".bounty-card-icon img").evaluateAll((images) => images.map((image) => image.getAttribute("src")));
+    expect(stagingContractIcons).toEqual([
+      "assets/bounties/erebus-patrol-sweep.png",
+      "assets/bounties/hunter-clearance.png",
+      "assets/bounties/timed-suppression.png",
+      "assets/bounties/behemoth-warning.png"
+    ]);
+
     await page.locator(".bounty-contract-card", { hasText: "Behemoth Warning" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Behemoth");
     await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 8 Lupen Shards");
