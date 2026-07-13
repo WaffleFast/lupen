@@ -5598,6 +5598,7 @@ try {
   }
   assert(depletedMine, "Staging resource did not deplete after repeated valid mining.");
   assert(depletedMine.cargoDelta === inspectedResourceBeforeMine.yieldAmount, `Unexpected resource payout: ${depletedMine.cargoDelta}`);
+  assert(depletedMine.lupenShardDelta === 50, `Unexpected Lupen Shard payout: ${depletedMine.lupenShardDelta}`);
   assert(depletedMine.localApplySuggested === true, "Resource depletion did not suggest local save-path cargo application.");
   assert(depletedMine.cargoWritten === false && depletedMine.saveWritten === false, "Resource depletion reported server cargo/save writes.");
   assert(depletedMine.resourceRewardId, "Resource depletion did not include an idempotent reward id.");
@@ -5612,6 +5613,7 @@ try {
       resourceB.depletedUntil === resourceA.depletedUntil;
   });
   assert(resourceDepletedEventsB.some((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.cargoDelta === inspectedResourceBeforeMine.yieldAmount), "Client B did not receive shared resource depletion event.");
+  assert(resourceDepletedEventsB.some((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.lupenShardDelta === 50), "Client B did not receive the 50-shard asteroid payout event.");
 
   const depletedResourceBeforeDuplicate = resourceById(roomA, inspectedResourceBeforeMine.id);
   const duplicateResourceMine = await expectRoomMessage(roomA, "stagingResource:mineRejected", () => {

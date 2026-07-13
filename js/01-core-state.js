@@ -1511,6 +1511,8 @@ let engagedTarget = null;
 let engageTimer = null;
 const ASTEROID_RESPAWN_MS = 10000;
 const ASTEROID_BASE_HP = 294;
+// Temporary high-yield value for Forge economy testing. Lower this when balancing is complete.
+const ASTEROID_LUPEN_SHARD_REWARD = 50;
 const ASTEROID_ASSET_PATH = "assets/asteroids/";
 const MAP_ONE_ASTEROID_COUNT = 15;
 const MAP_ONE_ASTEROID_SPAWN_PLAN = [

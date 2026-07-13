@@ -4349,7 +4349,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("asteroid depletion keeps resource cargo and can award Lupen Shards", async ({ page }) => {
+  test("asteroid depletion keeps resource cargo and awards 50 Lupen Shards", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -4362,30 +4362,46 @@ test.describe("Lupen browser smoke", () => {
         lastPlanetNode = "Nyxara";
         mineralKeys.forEach(key => { cargo[key] = 0; });
         upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 0 });
-        window.__forceAsteroidShardReward = 2;
         const drops = generateLootFromAsteroid({ resource: "Iron", dropMin: 3, dropMax: 3 });
         const cargoResult = depositLootToCargo(drops);
         const localShardDelta = awardAsteroidShardBonus(getAsteroidShardReward({ resource: "Iron" }), "Iron asteroid");
-        delete window.__forceAsteroidShardReward;
 
         const stagingResult = applyStagingResourceMineResult({
           ok: true,
           resourceId: "staging-resource-test",
           resourceName: "Copper",
           cargoDelta: 4,
-          lupenShardDelta: 1,
+          lupenShardDelta: 50,
           resourceRewardId: "staging-resource-test:1",
+          depletedUntil: Date.now() + 1000,
+          receivedAt: Date.now()
+        });
+        const ironBeforeFullCargo = cargo.Iron;
+        const copperBeforeFullCargo = cargo.Copper;
+
+        mineralKeys.forEach(key => { cargo[key] = 0; });
+        cargo.Iron = getShipStats().cargo;
+        const fullCargoResult = applyStagingResourceMineResult({
+          ok: true,
+          resourceId: "staging-resource-full-cargo-test",
+          resourceName: "Copper",
+          cargoDelta: 4,
+          lupenShardDelta: 50,
+          resourceRewardId: "staging-resource-full-cargo-test:1",
           depletedUntil: Date.now() + 1000,
           receivedAt: Date.now()
         });
 
         return {
-          iron: cargo.Iron,
-          copper: cargo.Copper,
+          iron: ironBeforeFullCargo,
+          copper: copperBeforeFullCargo,
           cargoCollected: cargoResult.collectedAmount,
           localShardDelta,
           stagingApplied: stagingResult.applied,
           stagingShardDelta: stagingResult.lupenShardDelta,
+          fullCargoApplied: fullCargoResult.applied,
+          fullCargoReason: fullCargoResult.reason,
+          fullCargoShardDelta: fullCargoResult.lupenShardDelta,
           shards: upgradeMaterials.lupenShards
         };
       })()
@@ -4395,10 +4411,13 @@ test.describe("Lupen browser smoke", () => {
       iron: 3,
       copper: 4,
       cargoCollected: 3,
-      localShardDelta: 2,
+      localShardDelta: 50,
       stagingApplied: true,
-      stagingShardDelta: 1,
-      shards: 3
+      stagingShardDelta: 50,
+      fullCargoApplied: false,
+      fullCargoReason: "cargo_full_no_resource_recovered",
+      fullCargoShardDelta: 50,
+      shards: 150
     });
 
     await expectNoUnexpectedBrowserErrors(failures);

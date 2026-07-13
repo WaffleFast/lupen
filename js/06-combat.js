@@ -1680,16 +1680,9 @@ function generateLootFromAsteroid(asteroidOrNode) {
 function getAsteroidShardReward(asteroidOrResource) {
   const forced = window.__forceAsteroidShardReward;
   if (forced === false) return 0;
-  if (forced === true) return 1;
+  if (forced === true) return ASTEROID_LUPEN_SHARD_REWARD;
   if (Number.isFinite(Number(forced))) return Math.max(0, Math.floor(Number(forced)));
-
-  const resourceName = typeof asteroidOrResource === "string"
-    ? asteroidOrResource
-    : String(asteroidOrResource?.resource || asteroidOrResource?.resourceName || "");
-  const crystalBonus = resourceName === "Crystal Shards";
-  const chance = crystalBonus ? 0.4 : 0.3;
-  if (Math.random() >= chance) return 0;
-  return crystalBonus && Math.random() < 0.35 ? 2 : 1;
+  return ASTEROID_LUPEN_SHARD_REWARD;
 }
 
 function awardAsteroidShardBonus(quantity = 0, sourceLabel = "Asteroid") {
@@ -1698,13 +1691,13 @@ function awardAsteroidShardBonus(quantity = 0, sourceLabel = "Asteroid") {
   upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
   upgradeMaterials.lupenShards = Math.max(0, Number(upgradeMaterials.lupenShards || 0)) + shardDelta;
   const shardLabel = shardDelta === 1 ? "Lupen Shard" : "Lupen Shards";
-  const message = `Bonus find: +${formatNumber(shardDelta)} ${shardLabel} from ${sourceLabel}.`;
+  const message = `Asteroid reward: +${formatNumber(shardDelta)} ${shardLabel} from ${sourceLabel}.`;
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof showGameRewardBurst === "function") {
     showGameRewardBurst({
       type: "material",
-      kicker: "Rare Find",
+      kicker: "Asteroid Reward",
       title: `+${formatNumber(shardDelta)} ${shardLabel}`,
       meta: sourceLabel,
       image: "assets/items/lupen-shard.png"
@@ -1814,10 +1807,13 @@ function applyStagingResourceMineResult(result = {}) {
   }
 
   window.lupenStagingResourceAwardedKeys.add(awardKey);
+  const shardDelta = Math.max(0, Math.round(Number(result.lupenShardDelta || result.shardDelta || 0)));
+  const appliedShardDelta = awardAsteroidShardBonus(shardDelta, `${resourceName} asteroid`);
   const cargoUsedBefore = cargoUsed();
   const cargoCapacity = getShipStats().cargo;
   if (cargoCapacity > 0 && cargoUsedBefore >= cargoCapacity) {
-    const message = "Cargo hold full - no resource recovered.";
+    const shardText = appliedShardDelta > 0 ? ` +${formatNumber(appliedShardDelta)} Lupen Shards awarded.` : "";
+    const message = `Cargo hold full - no resource recovered.${shardText}`;
     if (typeof addHudToast === "function") addHudToast(message);
     else if (typeof addActivityLog === "function") addActivityLog(message);
     updateCargoSummary();
@@ -1833,6 +1829,7 @@ function applyStagingResourceMineResult(result = {}) {
       cargoUsedBefore,
       cargoUsedAfter: cargoUsedBefore,
       cargoCapacity,
+      lupenShardDelta: appliedShardDelta,
       awardKey
     };
   }
@@ -1840,8 +1837,6 @@ function applyStagingResourceMineResult(result = {}) {
   const collectedAmount = Math.max(0, Number(deposit.collectedAmount || 0));
   const overflowAmount = Math.max(0, Number(deposit.overflowAmount || 0));
   const cargoUsedAfter = cargoUsed();
-  const shardDelta = Math.max(0, Math.round(Number(result.lupenShardDelta || result.shardDelta || 0)));
-  const appliedShardDelta = awardAsteroidShardBonus(shardDelta, `${resourceName} asteroid`);
   const collectedText = collectedAmount > 0
     ? `Recovered ${formatNumber(collectedAmount)} ${resourceName}. Cargo ${formatNumber(cargoUsedAfter)}/${formatNumber(cargoCapacity)}.`
     : "cargo full";

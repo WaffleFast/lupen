@@ -364,11 +364,11 @@ const STAGING_RESOURCE_DEFINITIONS = [
   { id: "staging-resource-crystal-lower-apex", resourceName: "Crystal Shards", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 5 }
 ];
 
+// Temporary high-yield value for Forge economy testing. Lower this when balancing is complete.
+const STAGING_ASTEROID_LUPEN_SHARD_REWARD = 50;
+
 function rollStagingResourceShardReward(resourceName = "") {
-  const crystalBonus = String(resourceName || "") === "Crystal Shards";
-  const chance = crystalBonus ? 0.4 : 0.3;
-  if (Math.random() >= chance) return 0;
-  return crystalBonus && Math.random() < 0.35 ? 2 : 1;
+  return STAGING_ASTEROID_LUPEN_SHARD_REWARD;
 }
 
 export class LupenSectorPlayer extends Schema {

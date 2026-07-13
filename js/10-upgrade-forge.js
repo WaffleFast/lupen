@@ -826,7 +826,7 @@ function renderForgeMaterials(item, requirements) {
         </div>
         <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Upgrade Item</button>
       </div>
-      <p class="forge-bounty-help">Earn Lupen Shards from daily Bounty Board contracts.</p>
+      <p class="forge-bounty-help">Earn Lupen Shards from Bounty Board contracts or destroyed asteroids.</p>
     </div>
   `;
 
