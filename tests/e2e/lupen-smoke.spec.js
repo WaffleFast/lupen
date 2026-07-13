@@ -7781,7 +7781,17 @@ test.describe("Lupen browser smoke", () => {
             enabled: true,
             isConnected: true,
             lastStagingBountyStatus: null,
-            lastStagingBountyList: { bounties }
+            lastStagingBountyList: {
+              active: {
+                ...bounties[0],
+                accepted: false,
+                completed: false,
+                claimAvailable: false,
+                claimed: false,
+                failed: false
+              },
+              bounties
+            }
           }),
           requestStagingBounties: () => true,
           requestStagingBountyStatus: () => true,
@@ -7820,6 +7830,9 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator(".bounty-contract-card", { hasText: "Behemoth Warning" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Behemoth");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 8 Lupen Shards");
+    await page.evaluate(() => window.eval("renderBountyBoard()"));
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Behemoth Warning");
     await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 8 Lupen Shards");
 
     await expectNoUnexpectedBrowserErrors(failures);

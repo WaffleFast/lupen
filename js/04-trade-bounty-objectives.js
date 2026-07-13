@@ -157,7 +157,14 @@ function getMultiplayerStagingBounties() {
 function getSelectedMultiplayerStagingBounty() {
   const bounties = getMultiplayerStagingBounties();
   const active = getMultiplayerStagingBountyActiveState();
-  if (active?.id) multiplayerStagingBountySelectedId = active.id;
+  const activeOwnsSelection = active?.id && (
+    active.accepted ||
+    active.completed ||
+    active.claimAvailable ||
+    active.claimed ||
+    active.failed
+  );
+  if (activeOwnsSelection) multiplayerStagingBountySelectedId = active.id;
   if (!multiplayerStagingBountySelectedId || !bounties.some((bounty) => bounty.id === multiplayerStagingBountySelectedId)) {
     multiplayerStagingBountySelectedId = bounties[0]?.id || "staging_erebus_patrol_2";
   }
