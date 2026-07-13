@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260713-forge-redesign" />
   <link rel="stylesheet" href="orbit-reference.css" />
 </head>
 <body>
@@ -205,52 +205,77 @@
 
 
     <section id="upgradeForgeScreen" class="market-screen upgrade-forge-screen">
-      <div class="forge-map1-topbar">
-        <div class="forge-map1-title">
-          <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
-          <div>
-            <h2>LUPEN FORGE</h2>
-            <span id="forgeStationText">ASTERON PRIME</span>
-          </div>
+      <div class="forge-lupen-header">
+        <div class="forge-lupen-heading">
+          <p>LUPEN FORGE</p>
+          <h2 id="forgeStationText">ASTERON PRIME</h2>
         </div>
-        <div class="forge-map1-tagline">UPGRADE YOUR GEAR. GET STRONGER.</div>
-        <button class="screen-back-btn forge-map1-close" onclick="returnToHub()" aria-label="Back">X</button>
+        <button class="screen-back-btn forge-map1-close" onclick="returnToHub()">Back</button>
+      </div>
+
+      <div class="forge-lupen-info">
+        <span class="forge-info-icon" aria-hidden="true">i</span>
+        <p>Select owned gear, compare the next level, and commit Lupen Shards.</p>
+        <div class="forge-shard-pill" aria-label="Current Lupen Shards">
+          <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
+          <strong id="forgeShardCountText">0</strong>
+          <span>Lupen Shards</span>
+        </div>
       </div>
 
       <div class="upgrade-forge-layout">
         <aside class="forge-panel forge-selected-panel forge-owned-panel">
           <div class="modern-store-panel-header">
-            <span>Owned Items</span>
+            <span>Upgradeable Gear</span>
+            <em id="forgeOwnedCount">0 Owned Items</em>
           </div>
-          <div id="forgeSelectedPanel" class="forge-selected-body"></div>
+          <div class="forge-inventory-scroll">
+            <div id="forgeSelectedPanel" class="forge-selected-body"></div>
+            <div class="forge-scroll-controls">
+              <button id="forgeScrollUpBtn" type="button" onclick="scrollForgeInventory(-1)" aria-label="Scroll gear up">
+                <span aria-hidden="true"></span>
+              </button>
+              <button id="forgeScrollTrack" class="forge-scroll-track" type="button" onclick="setForgeInventoryScrollFromTrack(event)" aria-label="Scroll through owned gear">
+                <span id="forgeScrollThumb" class="forge-scroll-thumb" aria-hidden="true"></span>
+              </button>
+              <button id="forgeScrollDownBtn" type="button" onclick="scrollForgeInventory(1)" aria-label="Scroll gear down">
+                <span aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
         </aside>
 
-        <main class="forge-panel forge-chamber-panel">
-          <div id="forgeChamber" class="forge-chamber forge-chamber-visual">
-            <div class="forge-chamber-bg" aria-hidden="true"></div>
-            <div class="forge-chamber-vignette" aria-hidden="true"></div>
-            <div class="forge-ring ring-one"></div>
-            <div class="forge-ring ring-two"></div>
-            <div class="forge-beam"></div>
-            <div class="forge-scanline"></div>
-            <div class="forge-particles"></div>
-            <img id="forgePreviewImage" class="forge-chamber-item" src="assets/weapons/pulse-laser.png" alt="Selected item">
+        <main class="forge-panel forge-detail-panel forge-preview-panel">
+          <div class="modern-store-panel-header">
+            <span>Selected Upgrade</span>
           </div>
-          <div class="forge-map1-shards">
-            <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
-            <span>Lupen Shards</span>
-            <strong id="forgeShardCountText">0</strong>
+          <div class="forge-detail-body">
+            <section class="forge-showcase" aria-label="Selected gear">
+              <div class="forge-chamber-panel">
+                <div id="forgeChamber" class="forge-chamber forge-chamber-visual">
+                  <div class="forge-chamber-bg" aria-hidden="true"></div>
+                  <div class="forge-chamber-vignette" aria-hidden="true"></div>
+                  <div class="forge-ring ring-one"></div>
+                  <div class="forge-ring ring-two"></div>
+                  <div class="forge-beam"></div>
+                  <div class="forge-scanline"></div>
+                  <div class="forge-particles"></div>
+                  <img id="forgePreviewImage" class="forge-chamber-item" src="assets/weapons/pulse-laser.png" alt="Selected item">
+                </div>
+              </div>
+              <div class="forge-selected-copy">
+                <span id="forgeSelectedType" class="forge-selected-type">Weapon</span>
+                <h3 id="forgeSelectedName">Pulse Laser</h3>
+                <p id="forgeSelectedDescription">Rapid-fire energy weapon.</p>
+              </div>
+            </section>
+
+            <div id="forgeMaterialsList" class="forge-materials-list"></div>
+            <div id="forgeCorePanel" class="forge-core-panel"></div>
+            <div id="forgeStatePreview" class="forge-state-preview" aria-live="polite"></div>
+            <span id="forgeChamberStatus" class="forge-sr-only" aria-live="polite"></span>
           </div>
         </main>
-
-        <aside class="forge-panel forge-materials-panel forge-preview-panel">
-          <div class="modern-store-panel-header">
-            <span>Upgrade Preview</span>
-          </div>
-          <div id="forgeMaterialsList" class="forge-materials-list"></div>
-          <div id="forgeCorePanel" class="forge-core-panel"></div>
-          <div id="forgeStatePreview" class="forge-state-preview"></div>
-        </aside>
       </div>
     </section>
 
@@ -721,7 +746,7 @@
   <script src="js/07-save-load.js"></script>
   <script src="js/08-tutorial.js"></script>
   <script src="js/09-audio.js"></script>
-  <script src="js/10-upgrade-forge.js"></script>
+  <script src="js/10-upgrade-forge.js?v=20260713-forge-redesign"></script>
   <script src="js/11-missions.js"></script>
 
     <div id="tutorialOverlay" class="tutorial-overlay" aria-live="polite">

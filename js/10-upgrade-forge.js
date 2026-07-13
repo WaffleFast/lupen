@@ -278,6 +278,45 @@ function selectForgeItem(itemId) {
   renderUpgradeForge();
 }
 
+function updateForgeScrollIndicator() {
+  const panel = document.getElementById("forgeSelectedPanel");
+  const track = document.getElementById("forgeScrollTrack");
+  const thumb = document.getElementById("forgeScrollThumb");
+  if (!panel || !track || !thumb) return;
+
+  const maxScroll = Math.max(0, panel.scrollHeight - panel.clientHeight);
+  const trackHeight = Math.max(0, track.clientHeight);
+  const thumbHeight = maxScroll > 0
+    ? Math.max(38, Math.round(trackHeight * (panel.clientHeight / panel.scrollHeight)))
+    : trackHeight;
+  const thumbTravel = Math.max(0, trackHeight - thumbHeight);
+  const thumbOffset = maxScroll > 0 ? Math.round((panel.scrollTop / maxScroll) * thumbTravel) : 0;
+
+  thumb.style.height = `${thumbHeight}px`;
+  thumb.style.transform = `translateY(${thumbOffset}px)`;
+  track.disabled = maxScroll <= 0;
+  document.getElementById("forgeScrollUpBtn")?.toggleAttribute("disabled", panel.scrollTop <= 0);
+  document.getElementById("forgeScrollDownBtn")?.toggleAttribute("disabled", panel.scrollTop >= maxScroll - 1);
+}
+
+function scrollForgeInventory(direction = 1) {
+  const panel = document.getElementById("forgeSelectedPanel");
+  if (!panel) return;
+  panel.scrollBy({
+    top: Math.sign(Number(direction) || 1) * Math.max(96, Math.round(panel.clientHeight * 0.72)),
+    behavior: "smooth"
+  });
+}
+
+function setForgeInventoryScrollFromTrack(event) {
+  const panel = document.getElementById("forgeSelectedPanel");
+  const track = document.getElementById("forgeScrollTrack");
+  if (!panel || !track || track.disabled) return;
+  const bounds = track.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height)));
+  panel.scrollTo({ top: ratio * Math.max(0, panel.scrollHeight - panel.clientHeight), behavior: "smooth" });
+}
+
 function openForgeInventoryPicker() {
   forgeInventoryPickerOpen = true;
   renderUpgradeForge();
@@ -627,25 +666,39 @@ function startForgeUpgrade() {
 
 function renderForgeSelectedPanel(item, items = getForgeUpgradeableItems()) {
   const panel = document.getElementById("forgeSelectedPanel");
+  const count = document.getElementById("forgeOwnedCount");
   if (!panel) return;
+  if (count) count.textContent = `${formatNumber(items.length)} Owned ${items.length === 1 ? "Item" : "Items"}`;
   if (!items.length) {
     panel.innerHTML = `<div class="terminal-empty-state">No owned weapons or attachments.</div>`;
     return;
   }
 
+  const previousScrollTop = panel.scrollTop;
   panel.innerHTML = items.map(entry => {
     const definition = getForgeItemDefinition(entry.key);
     const selected = entry.id === item?.id;
+    const typeLabel = entry.categoryKey === "guns" ? "Weapon" : "Module";
+    const sourceChip = entry.source === "equipped" ? `<span class="equipped">Equipped</span>` : "";
     return `
-      <button type="button" class="forge-owned-item ${selected ? "selected" : ""}" onclick="selectForgeItem('${escapeJsString(entry.id)}')">
+      <button type="button" class="forge-owned-item ${selected ? "selected" : ""}" aria-pressed="${selected ? "true" : "false"}" onclick="selectForgeItem('${escapeJsString(entry.id)}')">
         <img src="${escapeHtml(definition?.image || "assets/items/lupen-shard.png")}" alt="${escapeHtml(definition?.name || entry.key)}">
-        <span>
+        <span class="forge-owned-copy">
           <strong>${escapeHtml(definition?.name || getForgeItemDisplayName(entry))} ${escapeHtml(getForgeItemLevelRoman(getForgeItemLevel(entry)))}</strong>
-          <small>Level ${escapeHtml(getForgeItemLevelRoman(getForgeItemLevel(entry)))}</small>
+          <small>${escapeHtml(definition?.description || "Upgradeable ship equipment.")}</small>
+          <span class="forge-owned-tags">
+            <span>${typeLabel}</span>
+            ${sourceChip}
+            <span>Level ${escapeHtml(getForgeItemLevelRoman(getForgeItemLevel(entry)))}</span>
+          </span>
         </span>
+        <span class="forge-owned-chevron" aria-hidden="true">&rsaquo;</span>
       </button>
     `;
   }).join("");
+  panel.scrollTop = previousScrollTop;
+  panel.onscroll = updateForgeScrollIndicator;
+  requestAnimationFrame(updateForgeScrollIndicator);
 }
 
 function renderForgeInventoryPicker(items) {
@@ -702,9 +755,15 @@ function renderForgeChamber(item, requirements) {
   const image = document.getElementById("forgePreviewImage");
   const state = document.getElementById("forgeStatePreview");
   const chamber = document.getElementById("forgeChamber");
+  const selectedName = document.getElementById("forgeSelectedName");
+  const selectedType = document.getElementById("forgeSelectedType");
+  const selectedDescription = document.getElementById("forgeSelectedDescription");
   if (!image || !state || !chamber) return;
   if (!item) {
     chamber.className = "forge-chamber forge-chamber-visual level-active missing-materials quality-fx-host quality-fx--standard";
+    if (selectedName) selectedName.textContent = "Select Gear";
+    if (selectedType) selectedType.textContent = "No Selection";
+    if (selectedDescription) selectedDescription.textContent = "Choose an owned item to inspect its next upgrade.";
     state.textContent = "Select an item to upgrade.";
     return;
   }
@@ -712,6 +771,9 @@ function renderForgeChamber(item, requirements) {
   const definition = getForgeItemDefinition(item.key);
   image.src = definition.image;
   image.alt = definition.name;
+  if (selectedName) selectedName.textContent = definition.name;
+  if (selectedType) selectedType.textContent = `${item.categoryKey === "guns" ? "Weapon" : "Module"}${item.source === "equipped" ? " / Equipped" : ""}`;
+  if (selectedDescription) selectedDescription.textContent = definition.description || "Upgradeable ship equipment.";
   const chamberStateClass = forgeAnimating ? "upgrading forging" : requirements.canUpgrade ? "ready" : "missing-materials";
   chamber.className = `forge-chamber forge-chamber-visual level-active ${chamberStateClass} quality-fx-host quality-fx--standard`;
   chamber.dataset.qualityTier = "standard";
@@ -750,19 +812,21 @@ function renderForgeMaterials(item, requirements) {
 
   list.innerHTML = `
     <div class="forge-map1-preview ${requirements.canUpgrade ? "ready" : "blocked"}">
-      <h3>${escapeHtml(definition?.name || getForgeItemDisplayName(item))}</h3>
+      <h3>Upgrade Comparison</h3>
       <div class="forge-level-flow">
         <span>Level ${escapeHtml(getForgeItemLevelRoman(preview?.fromLevel || getForgeItemLevel(item)))}</span>
         <b>&gt;&gt;&gt;</b>
         <strong>Level ${escapeHtml(getForgeItemLevelRoman(preview?.toLevel || getForgeItemLevel(item)))}</strong>
       </div>
       <div class="forge-preview-stats">${statRows}</div>
-      <div class="forge-preview-cost">
-        <span>Cost</span>
-        <strong><img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">${formatNumber(required)}</strong>
-        <small>Lupen Shards</small>
+      <div class="forge-upgrade-action-row">
+        <div class="forge-preview-cost">
+          <span>Upgrade Cost</span>
+          <strong><img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">${formatNumber(required)} <small>Lupen Shards</small></strong>
+        </div>
+        <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Upgrade Item</button>
       </div>
-      <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">Upgrade Item</button>
+      <p class="forge-bounty-help">Earn Lupen Shards from daily Bounty Board contracts.</p>
     </div>
   `;
 

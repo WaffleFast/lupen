@@ -4250,13 +4250,15 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#upgradeForgeScreen")).toHaveClass(/active/);
     await expect(page.locator("#upgradeForgeScreen")).toContainText("LUPEN FORGE");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Owned Items");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade Preview");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgradeable Gear");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Selected Upgrade");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Lupen Shards");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Need 15 More Shards");
     await expect(page.locator("#upgradeForgeScreen")).not.toContainText(/Quality Upgrade|Lupen Core|Lupen Cores/);
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
     await expect(page.locator("#forgeSelectedPanel")).toBeVisible();
+    await expect(page.locator("#forgeScrollThumb")).toBeVisible();
+    await expect(page.locator("#forgeScrollDownBtn")).toBeEnabled();
 
     const ownedListBefore = await page.locator("#forgeSelectedPanel").evaluate((list) => {
       const screen = document.getElementById("upgradeForgeScreen");
@@ -4273,6 +4275,12 @@ test.describe("Lupen browser smoke", () => {
     expect(ownedListBefore.scrollHeight).toBeGreaterThan(ownedListBefore.clientHeight + 20);
     expect(ownedListBefore.overflowY).toMatch(/auto|scroll/);
     expect(ownedListBefore.bottom).toBeLessThanOrEqual(ownedListBefore.viewportHeight);
+
+    await page.locator("#forgeScrollDownBtn").click();
+    await page.waitForFunction(() => document.getElementById("forgeSelectedPanel")?.scrollTop > 0);
+    await page.locator("#forgeSelectedPanel").evaluate((list) => {
+      list.scrollTop = 0;
+    });
 
     await page.locator("#forgeSelectedPanel").evaluate((list) => {
       list.scrollTop = list.scrollHeight;
@@ -4295,7 +4303,7 @@ test.describe("Lupen browser smoke", () => {
     const scrolledSelection = await page.evaluate(() => ({
       selectedForgeItemId,
       imageAlt: document.getElementById("forgePreviewImage")?.alt || "",
-      previewTitle: document.querySelector("#forgeMaterialsList .forge-map1-preview h3")?.textContent?.trim() || "",
+      previewTitle: document.getElementById("forgeSelectedName")?.textContent?.trim() || "",
       screenScrollTop: document.getElementById("upgradeForgeScreen")?.scrollTop || 0
     }));
     expect(scrolledSelection.selectedForgeItemId).not.toBe("owned:attachments:cargoPod");
