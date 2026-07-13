@@ -940,17 +940,30 @@ test.describe("Lupen browser smoke", () => {
     const layout = await page.locator("#marketScreen .map-one-market-terminal").evaluate((terminal) => {
       const screen = document.getElementById("marketScreen");
       const loadButton = terminal.querySelector(".trade-route-card__button:not(:disabled)")?.getBoundingClientRect();
+      const routeCard = terminal.querySelector(".trade-route-card")?.getBoundingClientRect();
+      const routeCargo = terminal.querySelector(".trade-route-card__cargo")?.getBoundingClientRect();
+      const routeProfit = terminal.querySelector(".trade-route-card__profit")?.getBoundingClientRect();
+      const builderPanel = terminal.querySelector(".market-builder-panel")?.getBoundingClientRect();
       const amount = terminal.querySelector(".market-amount-control--route")?.getBoundingClientRect();
       const screenRect = screen.getBoundingClientRect();
+      const overlaps = (left, right) => Boolean(left && right && left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top);
       return {
         terminalFits: terminal.scrollWidth <= terminal.clientWidth + 1,
         loadButtonVisible: Boolean(loadButton && loadButton.bottom <= screenRect.bottom && loadButton.right <= screenRect.right),
+        routeCardFitsBuilder: Boolean(routeCard && builderPanel && routeCard.bottom <= builderPanel.bottom && routeCard.right <= builderPanel.right),
+        cargoFitsCard: Boolean(routeCargo && routeCard && routeCargo.bottom <= routeCard.bottom && routeCargo.right <= routeCard.right),
+        buttonOverlapsCargo: overlaps(loadButton, routeCargo),
+        buttonOverlapsProfit: overlaps(loadButton, routeProfit),
         amountPresent: Boolean(amount)
       };
     });
     expect(layout).toMatchObject({
       terminalFits: true,
       loadButtonVisible: true,
+      routeCardFitsBuilder: true,
+      cargoFitsCard: true,
+      buttonOverlapsCargo: false,
+      buttonOverlapsProfit: false,
       amountPresent: false
     });
 

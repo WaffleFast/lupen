@@ -13067,7 +13067,7 @@ input::placeholder {
 
 .market-builder-panel {
   display: grid;
-  grid-template-rows: auto auto auto auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 7px;
   padding: 10px;
   overflow: hidden;
@@ -13208,7 +13208,7 @@ input::placeholder {
 
 .trade-route-list {
   display: grid;
-  grid-auto-rows: minmax(210px, max-content);
+  grid-auto-rows: minmax(220px, 1fr);
   align-content: start;
   gap: 10px;
   min-height: 0;
@@ -13218,11 +13218,15 @@ input::placeholder {
 
 .trade-route-card {
   display: grid;
-  grid-template-columns: 108px minmax(0, 1fr);
-  gap: 18px;
-  min-height: 210px;
-  padding: 24px 24px 24px 26px;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  padding: 16px 18px;
+  box-sizing: border-box;
   position: relative;
+  overflow: hidden;
   border: 1px solid rgba(90, 190, 255, 0.36);
   border-radius: 8px;
   background:
@@ -13273,7 +13277,9 @@ input::placeholder {
 .trade-route-card__main {
   min-width: 0;
   display: grid;
-  gap: 10px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 9px;
+  overflow: hidden;
 }
 
 .trade-route-card__title-row,
@@ -13287,12 +13293,15 @@ input::placeholder {
 
 .trade-route-card__bottom {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 164px;
+  grid-template-columns: minmax(0, 1fr) 176px;
   grid-template-areas:
     "profit action"
     "cargo action";
-  align-items: end;
-  gap: 8px 16px;
+  align-items: stretch;
+  gap: 7px 14px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .trade-route-card__title {
@@ -13366,6 +13375,7 @@ input::placeholder {
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  align-self: start;
 }
 
 .trade-route-card__profit span {
@@ -13391,10 +13401,13 @@ input::placeholder {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 2px 8px;
-  margin-top: 4px;
-  padding-top: 12px;
+  align-self: end;
+  min-width: 0;
+  margin-top: 0;
+  padding-top: 8px;
   border-top: 1px solid rgba(127, 223, 255, 0.22);
   color: #b9d7f4;
+  overflow: hidden;
 }
 
 .trade-route-card__cargo span {
@@ -13412,12 +13425,19 @@ input::placeholder {
   color: #9ebcda;
   font-size: 0.62rem;
   font-style: normal;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .trade-route-card__button {
   grid-area: action;
-  width: 164px;
-  min-height: 50px;
+  align-self: end;
+  width: 176px;
+  height: 64px;
+  min-height: 64px;
   padding: 10px 16px;
   border-radius: 7px;
   font-size: 0.88rem;
