@@ -1282,6 +1282,180 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("pilot profile presents a live, compact career record without duplicated dashboard panels", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({ username: "WaffleFast" }));
+        localStorage.setItem("sectorOneLoggedIn", "WaffleFast");
+        playerProgress = normalizePlayerProgress({
+          combatXp: 5700,
+          totals: {
+            botsDestroyed: 3,
+            erebusBotsDestroyed: 3,
+            tradesCompleted: 4,
+            tradeProfit: 8550,
+            totalTradingProfit: 8550,
+            cargoSold: 403,
+            bountiesClaimed: 2
+          }
+        });
+        ownedShips = [STARTER_SHIP_ID];
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        selectedShipyardShipId = STARTER_SHIP_ID;
+        shipLoadouts = {
+          [STARTER_SHIP_ID]: normalizeShipLoadout({
+            guns: [
+              { key: "pulseLaser", quality: "standard", level: 1 },
+              { key: "pulseLaser", quality: "standard", level: 1 }
+            ],
+            attachments: [
+              { key: "cargoPod", quality: "standard", level: 1 },
+              { key: "jumpDrive", quality: "standard", level: 1 }
+            ]
+          }, STARTER_SHIP_ID)
+        };
+        missionProgress = createDefaultMissionProgress();
+        const academyIds = JOURNEY_ASSIGNMENTS
+          .filter(assignment => assignment.chapterId === "academy")
+          .map(assignment => assignment.id);
+        academyIds.slice(0, 5).forEach(id => {
+          const mission = MISSIONS_BY_ID[id];
+          const state = missionProgress.missions[id];
+          if (!mission || !state) return;
+          state.state = MISSION_STATE_CLAIMED;
+          state.progress = getMissionRequiredAmount(mission);
+        });
+        missionProgress = reconcileMissionAvailability(missionProgress);
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        openPilotProfile();
+      })()
+    `));
+
+    const profile = page.locator("#pilotProfileScreen");
+    await expect(profile).toHaveClass(/active/);
+    await expect(page.locator("#profilePilotTitle")).toHaveText("WaffleFast");
+    await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Combat Level 3");
+    await expect(profile.locator('[data-profile-section="identity"]')).toContainText("700 / 2,500 XP to Level 4");
+    await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Azure Striker");
+
+    const summaryCards = profile.locator('[data-profile-section="career-summary"] .pilot-stat-card');
+    await expect(summaryCards).toHaveCount(4);
+    await expect(profile.locator('[data-profile-stat="bots-destroyed"]')).toContainText("3");
+    await expect(profile.locator('[data-profile-stat="bounties-completed"]')).toContainText("2");
+    await expect(profile.locator('[data-profile-stat="trade-profit"]')).toContainText("CR 8,550");
+    await expect(profile.locator('[data-profile-stat="cargo-sold"]')).toContainText("403");
+
+    const career = profile.locator('[data-profile-section="career-progress"]');
+    await expect(career).toContainText("Academy");
+    await expect(career.locator('[data-career-progress="academy"]')).toContainText("5 / 7");
+    await expect(career.locator('[data-career-progress="frontier"]')).toContainText("Pending");
+    await expect(career.locator('[data-career-progress="galaxy"]')).toContainText("Galaxy Completion");
+
+    const fleet = profile.locator('[data-profile-section="fleet-record"]');
+    await expect(fleet.locator('[data-fleet-record="current-vessel"]')).toContainText("Azure Striker");
+    await expect(fleet.locator('[data-fleet-record="ships-owned"]')).toContainText("1");
+    await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("2 / 2");
+    await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("Guns Equipped");
+    await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("Attachment Slots Used");
+
+    const systems = profile.locator('[data-profile-section="pilot-systems"]');
+    await expect(systems.locator(".future-pilot-card")).toHaveCount(3);
+    await expect(systems).toContainText("Guilds");
+    await expect(systems).toContainText("Player Search");
+    await expect(systems).toContainText("Leaderboards");
+    await expect(systems).not.toContainText("Player Stats");
+    await expect(systems.locator('[data-pilot-system="player-search"]')).toHaveAttribute("aria-disabled", "true");
+    await expect(systems.locator("button, a, [tabindex]")).toHaveCount(0);
+    await systems.locator('[data-pilot-system="player-search"]').click();
+    await expect(profile).toHaveClass(/active/);
+
+    await expect(profile.locator(".pilot-combat-progress-panel")).toHaveCount(0);
+    await expect(profile.locator('[data-profile-stat="current-vessel"]')).toHaveCount(0);
+    await expect(profile.locator('[data-profile-stat="ships-owned"]')).toHaveCount(0);
+    await expect(profile).not.toContainText("Online Pilot Systems");
+
+    const compactLayout = await profile.evaluate(screen => {
+      const screenRect = screen.getBoundingClientRect();
+      const systemsPanel = screen.querySelector('[data-profile-section="pilot-systems"]');
+      const systemsRect = systemsPanel?.getBoundingClientRect();
+      const backRect = screen.querySelector(".screen-back-btn")?.getBoundingClientRect();
+      const cards = [...screen.querySelectorAll(".pilot-stat-card")].map(card => card.getBoundingClientRect());
+      const fleetName = screen.querySelector('[data-fleet-record="current-vessel"] strong');
+      const loadoutLabels = [...screen.querySelectorAll('[data-fleet-record="loadout"] small')];
+      return {
+        documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        screenOverflowX: screen.scrollWidth - screen.clientWidth,
+        screenOverflowY: screen.scrollHeight - screen.clientHeight,
+        screenBottom: Math.round(screenRect.bottom),
+        viewportBottom: window.innerHeight,
+        systemsBottom: systemsRect ? Math.round(systemsRect.bottom) : 9999,
+        backRight: backRect ? Math.round(backRect.right) : 9999,
+        screenRight: Math.round(screenRect.right),
+        cardsFit: cards.every(rect => rect.left >= screenRect.left - 1 && rect.right <= screenRect.right + 1),
+        standardShipNameFits: Boolean(fleetName && fleetName.scrollWidth <= fleetName.clientWidth + 1),
+        loadoutLabelsFit: loadoutLabels.every(label => label.scrollWidth <= label.clientWidth + 1 && label.scrollHeight <= label.clientHeight + 1)
+      };
+    });
+    expect(compactLayout.documentOverflowX).toBeLessThanOrEqual(0);
+    expect(compactLayout.screenOverflowX).toBeLessThanOrEqual(1);
+    expect(compactLayout.screenOverflowY).toBeLessThanOrEqual(1);
+    expect(compactLayout.screenBottom).toBeLessThanOrEqual(compactLayout.viewportBottom);
+    expect(compactLayout.systemsBottom).toBeLessThanOrEqual(compactLayout.screenBottom);
+    expect(compactLayout.backRight).toBeLessThanOrEqual(compactLayout.screenRight);
+    expect(compactLayout.cardsFit).toBe(true);
+    expect(compactLayout.standardShipNameFits).toBe(true);
+    expect(compactLayout.loadoutLabelsFit).toBe(true);
+
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.screenshot({ path: "artifacts/pilot-profile-redesign-1366x768.png" });
+    await profile.screenshot({ path: "artifacts/pilot-profile-azure-striker-1366x768.png" });
+
+    await page.evaluate(() => {
+      localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({ username: "WaffleFastTheOuterRimPathfinder" }));
+      renderPilotProfile();
+    });
+    await expect(page.locator("#profilePilotTitle")).toHaveText("WaffleFastTheOuterRimPathfinder");
+    const longNameLayout = await profile.evaluate(screen => {
+      const title = screen.querySelector("#profilePilotTitle");
+      const identity = screen.querySelector(".pilot-identity-block > strong");
+      const back = screen.querySelector(".screen-back-btn");
+      const titleRect = title?.getBoundingClientRect();
+      const identityRect = identity?.getBoundingClientRect();
+      const backRect = back?.getBoundingClientRect();
+      return {
+        titleBeforeBack: Boolean(titleRect && backRect && titleRect.right <= backRect.left),
+        identityContained: Boolean(identityRect && identityRect.right <= screen.getBoundingClientRect().right),
+        noScreenOverflowX: screen.scrollWidth <= screen.clientWidth + 1
+      };
+    });
+    expect(longNameLayout).toEqual({ titleBeforeBack: true, identityContained: true, noScreenOverflowX: true });
+    await page.screenshot({ path: "artifacts/pilot-profile-long-name-1366x768.png" });
+
+    await page.setViewportSize({ width: 1680, height: 936 });
+    await page.evaluate(() => {
+      localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({ username: "WaffleFast" }));
+      renderPilotProfile();
+    });
+    await expect(page.locator("#profilePilotTitle")).toHaveText("WaffleFast");
+    await page.screenshot({ path: "artifacts/pilot-profile-large-desktop-1680x936.png" });
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.locator("#profileOpenJourneyButton").click();
+    await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
+    await expect(page.locator("#journeyScreen")).toContainText("JOURNEY");
+    await page.screenshot({ path: "artifacts/pilot-profile-open-journey-1366x768.png" });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging mode exposes staging UI without using real trade buttons", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

@@ -213,109 +213,242 @@ const PILOT_UI_ASSETS = {
   currentVessel: "assets/ui/pilot/current-vessel.png",
   combatProgress: "assets/ui/pilot/combat-progress.png",
   onlineGuilds: "assets/ui/pilot/online-guilds.png",
-  playerStats: "assets/ui/pilot/player-stats.png",
+  playerSearch: "assets/ui/pilot/player-stats.png",
   leaderboards: "assets/ui/pilot/leaderboards.png"
 };
 
 function renderPilotStatCard(label, value, meta = "", statClass = "", icon = "") {
+  const statKey = String(label || "stat").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   return `
-    <div class="pilot-stat-card ${statClass}">
+    <article class="pilot-stat-card ${statClass}" data-profile-stat="${escapeHtml(statKey)}">
       ${icon ? `<img class="pilot-stat-icon" src="${icon}" alt="" />` : ""}
       <div>
         <span>${label}</span>
         <strong>${value}</strong>
         ${meta ? `<small>${meta}</small>` : ""}
       </div>
-    </div>
+    </article>
   `;
 }
 
-function renderFuturePilotCard(title, text, icon) {
+function renderFuturePilotCard(id, title, text, icon) {
   return `
-    <div class="future-pilot-card">
+    <article class="future-pilot-card" data-pilot-system="${escapeHtml(id)}" aria-disabled="true">
       <img src="${icon}" alt="" />
-      <strong>${title}</strong>
-      <small>${text}</small>
-      <em aria-label="Locked">LOCKED</em>
+      <span>
+        <strong>${title}</strong>
+        <small>${text}</small>
+      </span>
+      <em>Coming Soon</em>
+    </article>
+  `;
+}
+
+function getPilotProfileJourneySnapshot() {
+  const unavailable = { complete: 0, total: 0, percent: 0 };
+  const readRequirements = (chapterId) => {
+    if (typeof getJourneyChapterRequirementSummary === "function") {
+      const summary = getJourneyChapterRequirementSummary(chapterId) || unavailable;
+      return {
+        complete: Math.max(0, Number(summary.complete || 0)),
+        total: Math.max(0, Number(summary.total || 0)),
+        percent: Math.min(100, Math.max(0, Number(summary.percent || 0)))
+      };
+    }
+    if (typeof getChapterProgressSummary === "function") {
+      const summary = getChapterProgressSummary(chapterId) || unavailable;
+      const complete = Math.max(0, Number(summary.completedOrClaimed || 0));
+      const total = Math.max(0, Number(summary.total || 0));
+      return {
+        complete,
+        total,
+        percent: total ? Math.min(100, Math.round((complete / total) * 100)) : 0
+      };
+    }
+    return unavailable;
+  };
+
+  const academy = readRequirements("academy");
+  const frontier = readRequirements("frontier");
+  const academyComplete = typeof isJourneyAcademyComplete === "function"
+    ? Boolean(isJourneyAcademyComplete())
+    : academy.total > 0 && academy.complete >= academy.total;
+  const frontierComplete = frontier.total > 0 && frontier.complete >= frontier.total;
+  const frontierState = frontierComplete ? "complete" : academyComplete ? "active" : "pending";
+  const galaxyPercent = typeof getGalaxyCompletionPercent === "function"
+    ? Math.min(100, Math.max(0, Number(getGalaxyCompletionPercent() || 0)))
+    : 0;
+
+  return {
+    academy,
+    frontier,
+    frontierState,
+    frontierLabel: frontierState === "complete" ? "Complete" : frontierState === "active" ? "Active" : "Pending",
+    frontierMeta: frontierState === "complete"
+      ? "Chapter complete"
+      : frontierState === "active"
+        ? `${formatNumber(frontier.complete)} / ${formatNumber(frontier.total)} assignments`
+        : "Next chapter",
+    galaxyPercent
+  };
+}
+
+function renderPilotProgressBar(percent, label) {
+  const safePercent = Math.min(100, Math.max(0, Number(percent || 0)));
+  return `
+    <div class="pilot-progress-track" role="progressbar" aria-label="${escapeHtml(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${safePercent}">
+      <i style="width:${safePercent}%"></i>
     </div>
   `;
 }
 
+function renderPilotLoadoutIcon() {
+  return `
+    <svg class="pilot-record-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <path d="M18 14l10 10-6 6-10-10-4-8 10 2zm28 0L36 24l6 6 10-10 4-8-10 2zM18 50l10-10-6-6-10 10-4 8 10-2zm28 0L36 40l6-6 10 10 4 8-10-2z"/>
+      <circle cx="32" cy="32" r="7"/>
+    </svg>
+  `;
+}
+
+function renderPilotFleetIcon() {
+  return `
+    <svg class="pilot-record-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <path d="M32 6l8 17 15-8-8 17 8 17-15-8-8 17-8-17-15 8 8-17-8-17 15 8 8-17z"/>
+      <circle cx="32" cy="32" r="7"/>
+    </svg>
+  `;
+}
 
 
 
 function renderPilotProfile() {
   const combat = getCombatLevelInfo();
-  const nextBotXp = getCombatXpPerBot();
-  const totals = playerProgress.totals || {};
+  const totals = typeof getPlayerProgressTotals === "function" ? getPlayerProgressTotals() : (playerProgress.totals || {});
+  const pilotName = String(getPilotName() || "Pilot").trim() || "Pilot";
+  const hasActiveVessel = Boolean(currentShipId && SHIPS[currentShipId]);
   const ship = getCurrentShip();
-  const loadout = getShipLoadout(currentShipId);
-  const gunLimit = getGunSlotLimit(currentShipId);
-  const attachmentLimit = getAttachmentSlotLimit(currentShipId);
+  const shipName = hasActiveVessel ? String(ship.name || "Unnamed vessel") : "No active vessel";
+  const shipImage = hasActiveVessel ? String(ship.image || "") : "";
+  const loadout = hasActiveVessel ? getShipLoadout(currentShipId) : { guns: [], attachments: [] };
+  const gunLimit = hasActiveVessel ? getGunSlotLimit(currentShipId) : 0;
+  const attachmentLimit = hasActiveVessel ? getAttachmentSlotLimit(currentShipId) : 0;
+  const gunCount = Array.isArray(loadout.guns) ? loadout.guns.length : 0;
+  const attachmentCount = Array.isArray(loadout.attachments) ? loadout.attachments.length : 0;
+  const shipsOwnedCount = Array.isArray(ownedShips) ? ownedShips.filter(shipId => SHIPS[shipId]).length : 0;
+  const journey = getPilotProfileJourneySnapshot();
+  const xpRemaining = Math.max(0, Number(combat.next || 0) - Number(combat.current || 0));
+  const loadoutUnavailable = !hasActiveVessel;
+  const gunValue = loadoutUnavailable ? "—" : `${formatNumber(gunCount)} / ${formatNumber(gunLimit)}`;
+  const attachmentValue = loadoutUnavailable ? "—" : `${formatNumber(attachmentCount)} / ${formatNumber(attachmentLimit)}`;
 
   const title = document.getElementById("profilePilotTitle");
   const body = document.getElementById("pilotProfileBody");
-  if (title) title.textContent = `${getPilotName().toUpperCase()} PROFILE`;
+  if (title) {
+    title.textContent = pilotName;
+    title.title = pilotName;
+  }
   if (!body) return;
 
-  const unlockText = `Combat Level ${combat.level}. Earn XP from bots and bounties to progress toward Level ${combat.level + 1}.`;
-
   body.innerHTML = `
-    <section class="pilot-dashboard-hero">
+    <section class="pilot-profile-panel pilot-dashboard-hero" data-profile-section="identity" aria-label="Pilot identity and combat experience">
       <div class="pilot-badge-frame">
-        <img src="${PILOT_UI_ASSETS.pilotBadge}" alt="" />
+        <img src="${PILOT_UI_ASSETS.pilotBadge}" alt="Combat Level ${formatNumber(combat.level)} pilot insignia" />
       </div>
 
       <div class="pilot-identity-block">
-        <span class="drawer-kicker">Pilot Record</span>
-        <strong>${getPilotName()}</strong>
-        <small><img src="${PILOT_UI_ASSETS.combatProgress}" alt="" /> Combat Level ${combat.level} / ${ship.name}</small>
+        <strong title="${escapeHtml(pilotName)}">${escapeHtml(pilotName)}</strong>
+        <div class="pilot-identity-level">
+          <img src="${PILOT_UI_ASSETS.combatProgress}" alt="" />
+          <span>Combat Level ${formatNumber(combat.level)}</span>
+        </div>
+        <div class="pilot-current-vessel-compact">
+          ${shipImage ? `<img src="${escapeHtml(shipImage)}" alt="${escapeHtml(shipName)}" onerror="this.hidden=true" />` : ""}
+          <span><b title="${escapeHtml(shipName)}">${escapeHtml(shipName)}</b><small>Current Vessel</small></span>
+        </div>
       </div>
 
       <div class="pilot-level-block">
-        <div>
-          <span>Combat Level</span>
-          <strong>${combat.level}</strong>
-          <small>${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP to Level ${combat.level + 1}</small>
-        </div>
-        <div class="profile-xp-track pilot"><i style="width:${combat.percent}%"></i></div>
-        <p>${unlockText}</p>
+        <span class="pilot-section-kicker">Combat XP</span>
+        <strong>${formatNumber(combat.current)} <em>/ ${formatNumber(combat.next)} XP to Level ${formatNumber(combat.level + 1)}</em></strong>
+        ${renderPilotProgressBar(combat.percent, `Combat XP progress to Level ${combat.level + 1}`)}
+        <p>${formatNumber(xpRemaining)} XP remaining to reach Level ${formatNumber(combat.level + 1)}</p>
       </div>
     </section>
 
-    <section class="pilot-dashboard-grid">
-      ${renderPilotStatCard("Bots Destroyed", formatNumber(totals.botsDestroyed || 0), `Next bot +${formatNumber(nextBotXp)} XP`, "combat-stat", PILOT_UI_ASSETS.botsDestroyed)}
-      ${renderPilotStatCard("Bounties Claimed", formatNumber(totals.bountiesClaimed || 0), "Daily contracts", "bounty-stat", PILOT_UI_ASSETS.bounties)}
-      ${renderPilotStatCard("Trade Profit", `CR ${formatNumber(totals.tradeProfit || 0)}`, `${formatNumber(totals.tradesCompleted || 0)} trades completed`, "profit-stat", PILOT_UI_ASSETS.tradeProfit)}
-      ${renderPilotStatCard("Cargo Sold", formatNumber(totals.cargoSold || 0), "Units moved", "cargo-stat", PILOT_UI_ASSETS.cargoSold)}
-      ${renderPilotStatCard("Ships Owned", formatNumber(ownedShips.length), "Fleet size", "fleet-stat", PILOT_UI_ASSETS.currentVessel)}
-      ${renderPilotStatCard("Current Vessel", ship.name, `${loadout.guns.length}/${gunLimit} guns / ${loadout.attachments.length}/${attachmentLimit} equip`, "ship-stat", PILOT_UI_ASSETS.currentVessel)}
+    <section class="pilot-dashboard-grid" data-profile-section="career-summary" aria-label="Career summary">
+      ${renderPilotStatCard("Bots Destroyed", formatNumber(totals.botsDestroyed || 0), "Career total", "combat-stat", PILOT_UI_ASSETS.botsDestroyed)}
+      ${renderPilotStatCard("Bounties Completed", formatNumber(totals.bountiesClaimed || 0), "Rewards claimed", "bounty-stat", PILOT_UI_ASSETS.bounties)}
+      ${renderPilotStatCard("Trade Profit", `CR ${formatNumber(totals.tradeProfit || 0)}`, `${formatNumber(totals.tradesCompleted || 0)} completed trades`, "profit-stat", PILOT_UI_ASSETS.tradeProfit)}
+      ${renderPilotStatCard("Cargo Sold", formatNumber(totals.cargoSold || 0), "Units sold", "cargo-stat", PILOT_UI_ASSETS.cargoSold)}
     </section>
 
-    <section class="pilot-profile-lower">
-      <div class="pilot-progression-card">
-        <div class="profile-tree-head"><span>Combat Progress</span><strong>Map 1</strong></div>
-        <div class="pilot-combat-progress-panel">
-          <img src="${PILOT_UI_ASSETS.combatProgress}" alt="" />
-          <div>
-            <strong>Combat Level ${combat.level}</strong>
-            <em>${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP</em>
-            <div class="profile-xp-track"><i style="width:${combat.percent}%"></i></div>
-            <p>Level progress: ${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP / total combat XP: ${formatNumber(combat.total)} / next bot kill: <b>+${formatNumber(nextBotXp)} XP</b></p>
-          </div>
+    <section class="pilot-profile-main">
+      <section class="pilot-profile-panel pilot-career-panel" data-profile-section="career-progress" aria-labelledby="pilotCareerHeading">
+        <header class="pilot-panel-heading">
+          <h3 id="pilotCareerHeading">Career Progress</h3>
+          <button id="profileOpenJourneyButton" type="button" class="pilot-open-journey" onclick="openJourney()">Open Journey <span aria-hidden="true">›</span></button>
+        </header>
+        <div class="pilot-career-grid">
+          <article class="pilot-career-item" data-career-progress="academy">
+            <img src="assets/chapter-academy-icon.png" alt="" />
+            <div>
+              <span>Academy</span>
+              <strong>${formatNumber(journey.academy.complete)} / ${formatNumber(journey.academy.total)}</strong>
+              ${renderPilotProgressBar(journey.academy.percent, "Academy assignment progress")}
+              <small>Assignments Complete</small>
+            </div>
+          </article>
+          <article class="pilot-career-item" data-career-progress="frontier">
+            <img src="assets/chapter-frontier-icon.png" alt="" />
+            <div>
+              <span>Frontier</span>
+              <strong class="pilot-frontier-status pilot-frontier-status--${escapeHtml(journey.frontierState)}">${escapeHtml(journey.frontierLabel)}</strong>
+              <small>${escapeHtml(journey.frontierMeta)}</small>
+            </div>
+          </article>
+          <article class="pilot-career-item" data-career-progress="galaxy">
+            <span class="pilot-galaxy-mark" aria-hidden="true">◎</span>
+            <div>
+              <span>Galaxy Completion</span>
+              <strong>${formatNumber(journey.galaxyPercent)}%</strong>
+              ${renderPilotProgressBar(journey.galaxyPercent, "Overall galaxy completion")}
+              <small>Overall Progress</small>
+            </div>
+          </article>
         </div>
-      </div>
+      </section>
 
-      ${typeof renderChapterProgressCard === "function" ? renderChapterProgressCard() : ""}
+      <section class="pilot-profile-panel pilot-fleet-panel" data-profile-section="fleet-record" aria-labelledby="pilotFleetHeading">
+        <header class="pilot-panel-heading"><h3 id="pilotFleetHeading">Fleet Record</h3></header>
+        <div class="pilot-fleet-grid">
+          <article class="pilot-fleet-item pilot-fleet-vessel" data-fleet-record="current-vessel">
+            ${shipImage ? `<img src="${escapeHtml(shipImage)}" alt="${escapeHtml(shipName)}" onerror="this.hidden=true" />` : `<img src="${PILOT_UI_ASSETS.currentVessel}" alt="" />`}
+            <div><span>Current Vessel</span><strong title="${escapeHtml(shipName)}">${escapeHtml(shipName)}</strong><small>${hasActiveVessel ? "Active" : "Unassigned"}</small></div>
+          </article>
+          <article class="pilot-fleet-item" data-fleet-record="ships-owned">
+            ${renderPilotFleetIcon()}
+            <div><span>Ships Owned</span><strong>${formatNumber(shipsOwnedCount)}</strong><small>Fleet Size</small></div>
+          </article>
+          <article class="pilot-fleet-item pilot-loadout-record" data-fleet-record="loadout">
+            ${renderPilotLoadoutIcon()}
+            <div>
+              <span>Loadout</span>
+              <strong>${gunValue}</strong><small>Guns Equipped</small>
+              <strong>${attachmentValue}</strong><small>Attachment Slots Used</small>
+            </div>
+          </article>
+        </div>
+      </section>
+    </section>
 
-      <div class="pilot-future-card">
-        <div class="profile-tree-head"><span>Online Pilot Systems</span><strong>Later</strong></div>
+    <section class="pilot-profile-panel pilot-future-card" data-profile-section="pilot-systems" aria-labelledby="pilotSystemsHeading">
+        <div class="profile-tree-head"><h3 id="pilotSystemsHeading">Pilot Systems</h3><strong>Coming Later</strong></div>
         <div class="future-profile-grid">
-          ${renderFuturePilotCard("Guilds", "Create or join guilds, build alliances, and compete with rival groups.", PILOT_UI_ASSETS.onlineGuilds)}
-          ${renderFuturePilotCard("Player Stats", "Search pilots and view public profile records, ships, combat level, trade progress, cargo moved, and bounty history.", PILOT_UI_ASSETS.playerStats)}
-          ${renderFuturePilotCard("Leaderboards", "Compare pilots by bounties, trade profit, combat progress, cargo moved, and seasonal rankings.", PILOT_UI_ASSETS.leaderboards)}
+          ${renderFuturePilotCard("guilds", "Guilds", "Form alliances with other pilots", PILOT_UI_ASSETS.onlineGuilds)}
+          ${renderFuturePilotCard("player-search", "Player Search", "Find and inspect other pilots", PILOT_UI_ASSETS.playerSearch)}
+          ${renderFuturePilotCard("leaderboards", "Leaderboards", "Compare pilot rankings", PILOT_UI_ASSETS.leaderboards)}
         </div>
-      </div>
     </section>
   `;
 }
