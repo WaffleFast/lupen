@@ -574,7 +574,14 @@ async function requestStagingLoadoutEquip(item) {
   if (itemId === "attachment:shieldBooster") multiplayerStagingShieldBoosterEquipPending = true;
   if (itemId === "gun:pulseLaser") multiplayerStagingPulseLaserEquipPending = true;
   renderStore();
-  client.equipStagingLoadoutItem({ itemId });
+  client.equipStagingLoadoutItem({
+    itemId,
+    inventorySource: item.inventorySource || item.source || "owned",
+    inventoryItemId: item.inventoryItemId || item.inventoryId || "",
+    quality: item.quality || "standard",
+    level: Math.max(1, Number(item.level || 1)),
+    slotIndex: Number.isInteger(Number(item.slotIndex)) ? Number(item.slotIndex) : null
+  });
   if (typeof addHudToast === "function") addHudToast(`Equipping ${item.name || "item"}.`);
   (async () => {
     const latest = await waitForMultiplayerStagingResult(
@@ -1335,6 +1342,7 @@ function getSelectedEquippedLoadoutEntry() {
     level: Math.max(1, Number(context.level || 1)),
     name: definition.name || context.key,
     icon: definition.image || "",
+    slotIndex: Number(context.index),
     storedCount: 0,
     count: 0,
     groupKey: `${context.key}__${quality}`
@@ -1381,7 +1389,12 @@ async function requestStagingLoadoutUnequip(entry) {
   }
   if (multiplayerStagingLoadoutUnequipPending) return true;
   multiplayerStagingLoadoutUnequipPending = true;
-  client.unequipStagingLoadoutItem({ itemId });
+  client.unequipStagingLoadoutItem({
+    itemId,
+    quality: entry.quality || "standard",
+    level: Math.max(1, Number(entry.level || 1)),
+    slotIndex: Number.isInteger(Number(entry.slotIndex)) ? Number(entry.slotIndex) : null
+  });
   if (typeof addHudToast === "function") addHudToast(`Unequipping ${entry.name}.`);
   (async () => {
     const latest = await waitForMultiplayerStagingResult(
@@ -1390,7 +1403,9 @@ async function requestStagingLoadoutUnequip(entry) {
     );
     multiplayerStagingLoadoutUnequipPending = false;
     if (latest?.itemId === itemId && latest.applied && latest.operation === "unequip") {
-      const message = `${latest.name || entry.name} unequipped. Available ${formatNumber(latest.ownedAfter ?? 1)}.`;
+      const message = latest.inventoryWritten
+        ? `${latest.name || entry.name} unequipped and returned to the vault.`
+        : `${latest.name || entry.name} unequipped. Available ${formatNumber(latest.ownedAfter ?? 1)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
       reconcileMissionProgressAfterStagingLoadoutResult(latest);
@@ -1419,7 +1434,7 @@ async function requestStagingLoadoutUnequip(entry) {
 }
 
 function unequipSelectedVaultItem() {
-  const entry = getSelectedVaultEntry() || getSelectedEquippedLoadoutEntry();
+  const entry = getSelectedEquippedLoadoutEntry() || getSelectedVaultEntry();
   if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return;
   if (isMultiplayerStagingStoreActive()) {
     requestStagingLoadoutUnequip(entry);
@@ -2336,7 +2351,7 @@ function getInventoryEntriesForCategory(categoryKey) {
   ensureInventoryObjects();
   const grouped = new Map();
 
-  function addEntry(key, quality, count, source, level = 1) {
+  function addEntry(key, quality, count, source, level = 1, inventoryId = "") {
     const definition = itemDefinitions[key];
     if (!definition || getItemCategoryKey(key) !== categoryKey || count <= 0) return;
     const safeLevel = Math.max(1, Number(level || 1));
@@ -2351,9 +2366,11 @@ function getInventoryEntriesForCategory(categoryKey) {
         categoryKey,
         name: definition.name,
         icon: definition.icon,
+        inventoryId: String(inventoryId || ""),
         count: 0
       });
     }
+    if (!grouped.get(groupKey).inventoryId && inventoryId) grouped.get(groupKey).inventoryId = String(inventoryId);
     grouped.get(groupKey).count += count;
   }
 
@@ -2367,7 +2384,7 @@ function getInventoryEntriesForCategory(categoryKey) {
 
   (inventoryItems || []).forEach(item => {
     if (!item || !itemDefinitions[item.key]) return;
-    addEntry(item.key, item.key === "lupenCore" ? LUPEN_CORE_QUALITY : (item.quality || "standard"), 1, "inventory", item.level || 1);
+    addEntry(item.key, item.key === "lupenCore" ? LUPEN_CORE_QUALITY : (item.quality || "standard"), 1, "inventory", item.level || 1, item.id || "");
   });
 
   return Array.from(grouped.values()).sort((a, b) => {
@@ -2703,8 +2720,17 @@ function equipLoadoutVaultEntry(entry) {
   }
 
   if (isMultiplayerStagingStoreActive()) {
-    if (entry.source === "owned" && entry.quality === "standard" && getStagingStoreItemId({ kind: categoryKey === "guns" ? "gun" : "attachment", key: entry.key })) {
-      requestStagingLoadoutEquip({ kind: categoryKey === "guns" ? "gun" : "attachment", key: entry.key, name: entry.name });
+    if (getStagingStoreItemId({ kind: categoryKey === "guns" ? "gun" : "attachment", key: entry.key })) {
+      requestStagingLoadoutEquip({
+        kind: categoryKey === "guns" ? "gun" : "attachment",
+        key: entry.key,
+        name: entry.name,
+        inventorySource: entry.source || "owned",
+        inventoryItemId: entry.inventoryId || "",
+        quality: entry.quality || "standard",
+        level: Math.max(1, Number(entry.level || 1)),
+        slotIndex: index
+      });
       return;
     }
     blockLoadoutMutationInMultiplayerStaging();

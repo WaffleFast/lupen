@@ -3847,6 +3847,12 @@ export class LupenSectorRoom extends Room {
     };
     const itemId = getStringValue(message?.itemId || "attachment:cargoPod");
     const operation = getStringValue(message?.operation || "equip") === "unequip" ? "unequip" : "equip";
+    const inventorySource = getStringValue(message?.inventorySource || message?.source || "");
+    const inventoryItemId = getStringValue(message?.inventoryItemId || message?.inventoryId || "");
+    const quality = getStringValue(message?.quality || "standard") || "standard";
+    const level = Number.isFinite(Number(message?.level)) ? Math.max(1, Math.min(99, Math.floor(Number(message.level)))) : 1;
+    const slotIndex = Number.isFinite(Number(message?.slotIndex)) ? Math.max(0, Math.floor(Number(message.slotIndex))) : null;
+    const loadoutOptions = { itemId, inventorySource, inventoryItemId, quality, level, slotIndex };
     const trustedState = await fetchPlayerTradeValidationState({
       authStatus: identity.authStatus,
       trustedPlayerId: identity.trustedPlayerId,
@@ -3921,6 +3927,11 @@ export class LupenSectorRoom extends Room {
         playerId: identity.trustedPlayerId || identity.playerId,
         itemId,
         operation,
+        inventorySource,
+        inventoryItemId,
+        quality,
+        level,
+        slotIndex,
         trustedState
       });
       client.send(messageType, {
@@ -3959,8 +3970,8 @@ export class LupenSectorRoom extends Room {
     let plan = null;
     if (trustedState?.available && trustedState?.rawSaveData) {
       plan = operation === "unequip"
-        ? buildStagingLoadoutUnequipPlan(trustedState.rawSaveData, { itemId })
-        : buildStagingLoadoutEquipPlan(trustedState.rawSaveData, { itemId });
+        ? buildStagingLoadoutUnequipPlan(trustedState.rawSaveData, loadoutOptions)
+        : buildStagingLoadoutEquipPlan(trustedState.rawSaveData, loadoutOptions);
       reason = plan.ok ? reason : plan.blockReason || reason;
     }
 

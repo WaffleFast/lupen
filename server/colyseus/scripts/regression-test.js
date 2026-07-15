@@ -2564,6 +2564,55 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(jumpDrivePlan.patchedSaveData.ownedAttachments.cargoPod === 2, "Jump Drive equip plan changed Cargo Pod ownership.");
   assert(jumpDrivePlan.patchedSaveData.credits === 780, "Jump Drive equip plan changed credits.");
 
+  const upgradedJumpDriveSave = {
+    ...validSaveData,
+    ownedAttachments: { cargoPod: 2, shieldBooster: 1, jumpDrive: 0 },
+    inventoryItems: [
+      ...validSaveData.inventoryItems,
+      { id: "forge-jump-drive-level-3", key: "jumpDrive", quality: "standard", level: 3 }
+    ],
+    shipLoadouts: {
+      lupenOrigin: {
+        attachments: [],
+        guns: [{ key: "pulseLaser", quality: "standard", level: 1 }]
+      }
+    }
+  };
+  const upgradedJumpDrivePlan = buildStagingLoadoutEquipPlan(upgradedJumpDriveSave, {
+    itemId: "attachment:jumpDrive",
+    inventorySource: "inventory",
+    inventoryItemId: "forge-jump-drive-level-3",
+    quality: "standard",
+    level: 3,
+    slotIndex: 0
+  });
+  assert(upgradedJumpDrivePlan.ok === true, `Level 3 Jump Drive equip plan was blocked: ${upgradedJumpDrivePlan.blockReason}`);
+  assert(upgradedJumpDrivePlan.inventoryWritten === true, "Level 3 Jump Drive equip did not report an inventory write.");
+  assert(upgradedJumpDrivePlan.ownedBefore === 0 && upgradedJumpDrivePlan.ownedAfter === 0, "Level 3 Jump Drive equip changed basic ownership.");
+  assert(!upgradedJumpDrivePlan.patchedSaveData.inventoryItems.some((entry) => entry.id === "forge-jump-drive-level-3"), "Level 3 Jump Drive equip left the item in the vault.");
+  assert(upgradedJumpDrivePlan.patchedSaveData.shipLoadouts.lupenOrigin.attachments.some((entry) => entry.key === "jumpDrive" && entry.quality === "standard" && entry.level === 3), "Level 3 Jump Drive equip did not preserve its level.");
+
+  const upgradedJumpDriveUnequipPlan = buildStagingLoadoutUnequipPlan(upgradedJumpDrivePlan.patchedSaveData, {
+    itemId: "attachment:jumpDrive",
+    quality: "standard",
+    level: 3,
+    slotIndex: 0
+  });
+  assert(upgradedJumpDriveUnequipPlan.ok === true, `Level 3 Jump Drive unequip plan was blocked: ${upgradedJumpDriveUnequipPlan.blockReason}`);
+  assert(upgradedJumpDriveUnequipPlan.inventoryWritten === true, "Level 3 Jump Drive unequip did not report an inventory write.");
+  assert(upgradedJumpDriveUnequipPlan.ownedBefore === 0 && upgradedJumpDriveUnequipPlan.ownedAfter === 0, "Level 3 Jump Drive unequip changed basic ownership.");
+  assert(upgradedJumpDriveUnequipPlan.patchedSaveData.shipLoadouts.lupenOrigin.attachments.length === 0, "Level 3 Jump Drive unequip left the attachment installed.");
+  assert(upgradedJumpDriveUnequipPlan.patchedSaveData.inventoryItems.some((entry) => entry.key === "jumpDrive" && entry.quality === "standard" && entry.level === 3), "Level 3 Jump Drive unequip did not return the item to the vault.");
+
+  const missingUpgradedJumpDrivePlan = buildStagingLoadoutEquipPlan(upgradedJumpDriveSave, {
+    itemId: "attachment:jumpDrive",
+    inventorySource: "inventory",
+    inventoryItemId: "not-a-real-item",
+    quality: "standard",
+    level: 3
+  });
+  assert(missingUpgradedJumpDrivePlan.ok === false && missingUpgradedJumpDrivePlan.blockReason === "inventory_item_not_owned", "Untrusted upgraded Jump Drive selector was not blocked.");
+
   const monolithAlmostFullAttachments = Array.from({ length: 3 }, () => ({ key: "cargoPod", quality: "standard", level: 1 }));
   const monolithAttachmentStressPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
@@ -2798,6 +2847,53 @@ async function assertStagingCargoPodEquipHelpers() {
   assert(sequentialSave.cargo.Iron === 2, "Applied Cargo Pod equip changed trade cargo.");
   assert(sequentialSave.playerProgress.combatXp === 33, "Applied Cargo Pod equip changed progression.");
   assert(fetchCalls.join(",") === "GET,PATCH", `Loadout write expected read/write pair, got ${fetchCalls.join(",")}.`);
+
+  let upgradedLoadoutSave = JSON.parse(JSON.stringify(upgradedJumpDriveSave));
+  const upgradedLoadoutFetch = async (_url, options = {}) => {
+    if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: upgradedLoadoutSave }] };
+    upgradedLoadoutSave = JSON.parse(options.body || "{}").save_data;
+    return { ok: true, status: 204, json: async () => [] };
+  };
+  const upgradedLoadoutEnv = {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+    STAGING_LOADOUT_WRITE_ENABLED: "true",
+    STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+    STAGING_LOADOUT_WRITE_SCOPE: "verified",
+    STAGING_LOADOUT_WRITE_ALLOWED_ITEMS: "attachment:jumpDrive"
+  };
+  const appliedUpgradedJumpDrive = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:jumpDrive",
+    inventorySource: "inventory",
+    inventoryItemId: "forge-jump-drive-level-3",
+    quality: "standard",
+    level: 3,
+    slotIndex: 0,
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: upgradedLoadoutEnv,
+    fetchImpl: upgradedLoadoutFetch
+  });
+  assert(appliedUpgradedJumpDrive.applied === true, `Gated Level 3 Jump Drive equip did not apply: ${appliedUpgradedJumpDrive.blockReason}`);
+  assert(appliedUpgradedJumpDrive.inventoryWritten === true && appliedUpgradedJumpDrive.attachmentWritten === true, "Applied Level 3 Jump Drive equip did not report its trusted writes.");
+  assert(upgradedLoadoutSave.shipLoadouts.lupenOrigin.attachments[0]?.level === 3, "Applied Level 3 Jump Drive equip lost its level.");
+  assert(!upgradedLoadoutSave.inventoryItems.some((entry) => entry.id === "forge-jump-drive-level-3"), "Applied Level 3 Jump Drive equip left the selected inventory item in the vault.");
+
+  const appliedUpgradedJumpDriveUnequip = await applyStagingLoadoutEquipWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:jumpDrive",
+    operation: "unequip",
+    quality: "standard",
+    level: 3,
+    slotIndex: 0,
+    trustedState: { available: true, validationState: { credits: 780 } },
+    env: upgradedLoadoutEnv,
+    fetchImpl: upgradedLoadoutFetch
+  });
+  assert(appliedUpgradedJumpDriveUnequip.applied === true, `Gated Level 3 Jump Drive unequip did not apply: ${appliedUpgradedJumpDriveUnequip.blockReason}`);
+  assert(appliedUpgradedJumpDriveUnequip.inventoryWritten === true && appliedUpgradedJumpDriveUnequip.attachmentWritten === true, "Applied Level 3 Jump Drive unequip did not report its trusted writes.");
+  assert(upgradedLoadoutSave.shipLoadouts.lupenOrigin.attachments.length === 0, "Applied Level 3 Jump Drive unequip left the attachment installed.");
+  assert(upgradedLoadoutSave.inventoryItems.some((entry) => entry.key === "jumpDrive" && entry.level === 3), "Applied Level 3 Jump Drive unequip did not restore the upgraded vault item.");
 
   let weaponLoadoutSave = JSON.parse(JSON.stringify(validSaveData));
   const weaponLoadoutFetchCalls = [];

@@ -2294,6 +2294,9 @@
       ownedAfter: Number.isFinite(Number(result.ownedAfter)) ? Number(result.ownedAfter) : null,
       equippedBefore: Number.isFinite(Number(result.equippedBefore)) ? Number(result.equippedBefore) : null,
       equippedAfter: Number.isFinite(Number(result.equippedAfter)) ? Number(result.equippedAfter) : null,
+      quality: String(result.quality || "standard"),
+      level: Number.isFinite(Number(result.level)) ? Math.max(1, Math.floor(Number(result.level))) : 1,
+      inventoryItemId: String(result.inventoryItemId || ""),
       cargoCapacityBefore: Number.isFinite(Number(result.cargoCapacityBefore)) ? Number(result.cargoCapacityBefore) : null,
       cargoCapacityAfterPreview: Number.isFinite(Number(result.cargoCapacityAfterPreview)) ? Number(result.cargoCapacityAfterPreview) : null,
       cargoCapacityAfter: Number.isFinite(Number(result.cargoCapacityAfter)) ? Number(result.cargoCapacityAfter) : null,
@@ -4043,13 +4046,23 @@
 
     equipStagingLoadoutItem(options = {}) {
       return sendRoomMessage("equipStagingLoadoutItem", "stagingLoadout:equipAttachment", {
-        itemId: String(options.itemId || "")
+        itemId: String(options.itemId || ""),
+        inventorySource: String(options.inventorySource || options.source || ""),
+        inventoryItemId: String(options.inventoryItemId || options.inventoryId || ""),
+        quality: String(options.quality || "standard"),
+        level: Number.isFinite(Number(options.level)) ? Math.max(1, Math.floor(Number(options.level))) : 1,
+        slotIndex: Number.isFinite(Number(options.slotIndex)) ? Math.max(0, Math.floor(Number(options.slotIndex))) : null
       });
     },
 
     unequipStagingLoadoutItem(options = {}) {
       return sendRoomMessage("unequipStagingLoadoutItem", "stagingLoadout:equipAttachment", {
         itemId: String(options.itemId || ""),
+        inventorySource: String(options.inventorySource || options.source || ""),
+        inventoryItemId: String(options.inventoryItemId || options.inventoryId || ""),
+        quality: String(options.quality || "standard"),
+        level: Number.isFinite(Number(options.level)) ? Math.max(1, Math.floor(Number(options.level))) : 1,
+        slotIndex: Number.isFinite(Number(options.slotIndex)) ? Math.max(0, Math.floor(Number(options.slotIndex))) : null,
         operation: "unequip"
       });
     },

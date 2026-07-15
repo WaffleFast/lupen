@@ -6623,6 +6623,99 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("multiplayer staging equips a selected forged attachment and refreshes the loadout", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        ownedShips = ["falcon"];
+        ownedAttachments.jumpDrive = 0;
+        inventoryItems = [{
+          id: "forge-jump-drive-level-3",
+          key: "jumpDrive",
+          quality: "standard",
+          level: 3
+        }];
+        shipLoadouts.falcon = { attachments: [], guns: [] };
+        window.history.replaceState({}, "", "/?mp=staging");
+
+        const stagingStatus = {
+          enabled: true,
+          isConnected: true,
+          lastStagingLoadoutEquip: null,
+          lastStagingStoreItems: { items: [] }
+        };
+        window.__forgedAttachmentEquipPayload = null;
+        window.LupenMultiplayerClient = {
+          getStatus: () => stagingStatus,
+          equipStagingLoadoutItem: (payload) => {
+            window.__forgedAttachmentEquipPayload = { ...payload };
+            stagingStatus.lastStagingLoadoutEquip = {
+              ok: true,
+              applied: true,
+              operation: "equip",
+              itemId: payload.itemId,
+              name: "Jump Drive",
+              quality: payload.quality,
+              level: payload.level,
+              inventoryItemId: payload.inventoryItemId,
+              inventoryWritten: true,
+              equippedBefore: 0,
+              equippedAfter: 1
+            };
+            return true;
+          }
+        };
+        window.loadGameFromSupabase = async () => {
+          inventoryItems = inventoryItems.filter((entry) => entry.id !== "forge-jump-drive-level-3");
+          shipLoadouts.falcon.attachments = [makeLeveledLoadoutEntry("jumpDrive", "standard", 3)];
+          applyShipStats(true);
+          return { loaded: true };
+        };
+
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("overview");
+      })()
+    `));
+
+    await page.locator("#loadoutVaultFilterAttachments").click();
+    await page.locator("#installedAttachments .loadout-grid-slot.empty").first().click();
+    const jumpDrive = page.locator("#gunInventory .hangar-equipment-card[data-item-key='jumpDrive']");
+    await expect(jumpDrive).toHaveCount(1);
+    await jumpDrive.click();
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Jump Drive / Lv 3");
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip", exact: true }).click();
+
+    await expect.poll(async () => page.evaluate(() => window.__forgedAttachmentEquipPayload)).toMatchObject({
+      itemId: "attachment:jumpDrive",
+      inventorySource: "inventory",
+      inventoryItemId: "forge-jump-drive-level-3",
+      quality: "standard",
+      level: 3,
+      slotIndex: 0
+    });
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
+    const state = await page.evaluate(() => window.eval(`({
+      inventoryCount: inventoryItems.length,
+      attachment: shipLoadouts.falcon.attachments.map((entry) => ({
+        key: getEquipmentKey(entry),
+        quality: getEquipmentQuality(entry),
+        level: getEquipmentLevel(entry)
+      }))[0]
+    })`));
+    expect(state.inventoryCount).toBe(0);
+    expect(state.attachment).toEqual({ key: "jumpDrive", quality: "standard", level: 3 });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("Azure Striker equips and persists a Godlike Ion Blaster in weapon slot two", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

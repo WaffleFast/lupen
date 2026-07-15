@@ -1,11 +1,10 @@
-/* Staging-only loadout equip prototype.
-   This service mirrors the current local standard equip behavior for current
-   Map 1 Store guns and attachments only. Equipment equip writes decrement the
-   matching owned count and append a standard level-1 entry; unequip writes
-   reverse that for supported equipment. Ship selection writes only current ship
-   selection fields. It preserves every unrelated save field and never writes credits,
-   inventoryItems, ships, loot, bounties, PvP/player damage, broad progression,
-   schema, or RLS. */
+/* Staging-only loadout equip service.
+   Basic Store equipment moves between owned counts and the current loadout.
+   Forge-upgraded equipment moves between its trusted inventoryItems entry and
+   the current loadout while preserving quality and level. Ship selection writes
+   only current ship selection fields. Every operation preserves unrelated save
+   fields and never writes credits, loot, bounties, PvP/player damage, broad
+   progression, schema, or RLS. */
 
 import { STAGING_SHIP_CONFIG } from "../config/stagingShipConfig.js";
 
@@ -131,12 +130,12 @@ function getSaveDataFromRow(row = {}) {
     : null;
 }
 
-function getLoadoutWriteFlags(applied = false, writeKind = "") {
+function getLoadoutWriteFlags(applied = false, writeKind = "", inventoryWritten = false) {
   return {
     loadoutWritten: applied && writeKind !== "ship",
     attachmentWritten: applied && writeKind === "attachment",
     saveWritten: applied,
-    inventoryWritten: false,
+    inventoryWritten: applied && inventoryWritten,
     creditsWritten: false,
     shipWritten: applied && writeKind === "ship",
     weaponWritten: applied && writeKind === "weapon",
@@ -168,6 +167,8 @@ function getUserReason(reason) {
     shield_booster_not_owned: "No owned Shield Booster is available to equip.",
     owned_guns_path_missing_or_invalid: "Saved weapon ownership path is missing or invalid.",
     pulse_laser_not_owned: "No owned Pulse Laser is available to equip.",
+    inventory_items_path_missing_or_invalid: "Saved upgraded equipment inventory is missing or invalid.",
+    inventory_item_not_owned: "That upgraded item is no longer available in the vault.",
     equipment_not_equipped: "No equipped copy is available to unequip.",
     cargo_pod_not_equipped: "No equipped Cargo Pod is available to unequip.",
     shield_booster_not_equipped: "No equipped Shield Booster is available to unequip.",
@@ -249,6 +250,29 @@ function normalizeLoadoutEntry(entry) {
   };
 }
 
+function getInventoryLoadoutSelector(options = {}) {
+  const inventoryItemId = getString(options.inventoryItemId || options.inventoryId);
+  const quality = getString(options.quality, "standard") || "standard";
+  const level = clampInteger(options.level || 1, 1, 99) || 1;
+  const inventorySource = getString(options.inventorySource || options.source).toLowerCase();
+  return {
+    inventoryItemId,
+    quality,
+    level,
+    usesInventory: inventorySource === "inventory" || !!inventoryItemId || quality !== "standard" || level > 1
+  };
+}
+
+function findTrustedInventoryItemIndex(inventoryItems, meta, selector) {
+  return inventoryItems.findIndex((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+    if (getString(entry.key) !== meta.key) return false;
+    if (selector.inventoryItemId && getString(entry.id) !== selector.inventoryItemId) return false;
+    const normalized = normalizeLoadoutEntry(entry);
+    return normalized?.quality === selector.quality && normalized.level === selector.level;
+  });
+}
+
 function getCargoPodCount(entries = []) {
   return entries.reduce((count, entry) => {
     const normalized = normalizeLoadoutEntry(entry);
@@ -305,10 +329,12 @@ export function getLoadoutWriteEnvGate(playerId, itemId = CARGO_POD_ITEM_ID, env
   };
 }
 
-function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM_ID } = {}) {
+function buildStagingEquipmentEquipPlan(saveData = {}, options = {}) {
+  const { itemId = CARGO_POD_ITEM_ID } = options;
   const meta = getLoadoutItemMeta(itemId);
   if (!meta) return blocked("unknown_loadout_item", { itemId });
   if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) return blocked("save_data_missing_or_invalid", { itemId: meta.itemId });
+  const inventorySelector = getInventoryLoadoutSelector(options);
 
   const currentShipId = getString(saveData.currentShipId);
   const ship = STAGING_SHIP_CONFIG[currentShipId];
@@ -316,7 +342,7 @@ function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM
   if (!ship) return blocked("unsupported_ship_for_loadout_preview", { itemId: meta.itemId, currentShipId });
 
   const ownedStore = saveData[meta.ownedPath];
-  if (!ownedStore || typeof ownedStore !== "object" || Array.isArray(ownedStore)) {
+  if (!inventorySelector.usesInventory && (!ownedStore || typeof ownedStore !== "object" || Array.isArray(ownedStore))) {
     return blocked(meta.ownedPath === "ownedGuns" ? "owned_guns_path_missing_or_invalid" : "owned_attachments_path_missing_or_invalid", {
       itemId: meta.itemId,
       currentShipId
@@ -324,8 +350,8 @@ function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM
   }
 
   const maxCount = meta.ownedPath === "ownedGuns" ? MAX_GUN_COUNT : MAX_ATTACHMENT_COUNT;
-  const ownedBefore = clampInteger(ownedStore[meta.key] || 0, 0, maxCount);
-  if (ownedBefore === null || ownedBefore <= 0) {
+  const ownedBefore = clampInteger(ownedStore?.[meta.key] || 0, 0, maxCount) || 0;
+  if (!inventorySelector.usesInventory && ownedBefore <= 0) {
     const legacyReason = isCargoPodItem(meta.itemId)
       ? "cargo_pod_not_owned"
       : isShieldBoosterItem(meta.itemId)
@@ -334,6 +360,26 @@ function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM
           ? "pulse_laser_not_owned"
           : "equipment_not_owned";
     return blocked(legacyReason, { itemId: meta.itemId, currentShipId, ownedBefore: ownedBefore || 0 });
+  }
+
+  let inventoryItemIndex = -1;
+  let inventoryEntry = null;
+  if (inventorySelector.usesInventory) {
+    if (!Array.isArray(saveData.inventoryItems)) {
+      return blocked("inventory_items_path_missing_or_invalid", { itemId: meta.itemId, currentShipId, ownedBefore });
+    }
+    inventoryItemIndex = findTrustedInventoryItemIndex(saveData.inventoryItems, meta, inventorySelector);
+    if (inventoryItemIndex < 0) {
+      return blocked("inventory_item_not_owned", {
+        itemId: meta.itemId,
+        currentShipId,
+        inventoryItemId: inventorySelector.inventoryItemId,
+        quality: inventorySelector.quality,
+        level: inventorySelector.level,
+        ownedBefore
+      });
+    }
+    inventoryEntry = normalizeLoadoutEntry(saveData.inventoryItems[inventoryItemIndex]);
   }
 
   if (!saveData.shipLoadouts || typeof saveData.shipLoadouts !== "object" || Array.isArray(saveData.shipLoadouts)) {
@@ -367,10 +413,15 @@ function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM
   }
 
   const patchedSaveData = cloneJson(saveData);
-  patchedSaveData[meta.ownedPath][meta.key] = Math.max(0, ownedBefore - 1);
+  if (inventorySelector.usesInventory) {
+    patchedSaveData.inventoryItems.splice(inventoryItemIndex, 1);
+  } else {
+    patchedSaveData[meta.ownedPath][meta.key] = Math.max(0, ownedBefore - 1);
+  }
+  const equippedEntry = inventoryEntry || { key: meta.key, quality: "standard", level: 1 };
   patchedSaveData.shipLoadouts[currentShipId][meta.listName] = [
     ...normalizedEntries,
-    { key: meta.key, quality: "standard", level: 1 }
+    equippedEntry
   ];
 
   const result = {
@@ -384,14 +435,25 @@ function buildStagingEquipmentEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM
     category: meta.category,
     currentShipId,
     ownedBefore,
-    ownedAfter: patchedSaveData[meta.ownedPath][meta.key],
+    ownedAfter: inventorySelector.usesInventory ? ownedBefore : patchedSaveData[meta.ownedPath][meta.key],
     equippedBefore,
     equippedAfter: equippedBefore + 1,
     gunSlots: meta.listName === "guns" ? ship.gunSlots : undefined,
     attachmentSlots: meta.listName === "attachments" ? ship.attachmentSlots : undefined,
+    quality: equippedEntry.quality,
+    level: equippedEntry.level,
+    inventoryItemId: inventorySelector.inventoryItemId || getString(saveData.inventoryItems?.[inventoryItemIndex]?.id),
+    inventoryWritten: inventorySelector.usesInventory,
     patchedSaveData,
-    appliedFields: [`${meta.ownedPath}.${meta.key}`, `shipLoadouts.${currentShipId}.${meta.listName}`],
-    untouchedFields: ["credits", "inventoryItems", "ownedShips", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"]
+    appliedFields: [
+      inventorySelector.usesInventory ? "inventoryItems" : `${meta.ownedPath}.${meta.key}`,
+      `shipLoadouts.${currentShipId}.${meta.listName}`
+    ],
+    untouchedFields: [
+      "credits",
+      ...(inventorySelector.usesInventory ? [meta.ownedPath] : ["inventoryItems"]),
+      "ownedShips", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"
+    ]
   };
 
   if (meta.key === CARGO_POD_KEY) {
@@ -674,17 +736,20 @@ export function buildStagingShipSelectPlan(saveData = {}, { itemId = "ship:falco
   };
 }
 
-export function buildStagingLoadoutEquipPlan(saveData = {}, { itemId = CARGO_POD_ITEM_ID } = {}) {
+export function buildStagingLoadoutEquipPlan(saveData = {}, options = {}) {
+  const { itemId = CARGO_POD_ITEM_ID } = options;
   if (isStagingShipItem(itemId)) return buildStagingShipSelectPlan(saveData, { itemId });
   const meta = getLoadoutItemMeta(itemId);
-  if (meta) return buildStagingEquipmentEquipPlan(saveData, { itemId });
+  if (meta) return buildStagingEquipmentEquipPlan(saveData, options);
   return blocked("unknown_loadout_item", { itemId });
 }
 
-export function buildStagingLoadoutUnequipPlan(saveData = {}, { itemId = CARGO_POD_ITEM_ID } = {}) {
+export function buildStagingLoadoutUnequipPlan(saveData = {}, options = {}) {
+  const { itemId = CARGO_POD_ITEM_ID } = options;
   const meta = getLoadoutItemMeta(itemId);
   if (!meta) return blocked("unknown_loadout_item", { itemId, operation: "unequip" });
   if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) return blocked("save_data_missing_or_invalid", { itemId: meta.itemId, operation: "unequip" });
+  const inventorySelector = getInventoryLoadoutSelector(options);
 
   const currentShipId = getString(saveData.currentShipId);
   const ship = STAGING_SHIP_CONFIG[currentShipId];
@@ -692,7 +757,7 @@ export function buildStagingLoadoutUnequipPlan(saveData = {}, { itemId = CARGO_P
   if (!ship) return blocked("unsupported_ship_for_loadout_preview", { itemId: meta.itemId, currentShipId, operation: "unequip" });
 
   const ownedStore = saveData[meta.ownedPath];
-  if (!ownedStore || typeof ownedStore !== "object" || Array.isArray(ownedStore)) {
+  if (!inventorySelector.usesInventory && (!ownedStore || typeof ownedStore !== "object" || Array.isArray(ownedStore))) {
     return blocked(meta.ownedPath === "ownedGuns" ? "owned_guns_path_missing_or_invalid" : "owned_attachments_path_missing_or_invalid", {
       itemId: meta.itemId,
       currentShipId,
@@ -710,9 +775,14 @@ export function buildStagingLoadoutUnequipPlan(saveData = {}, { itemId = CARGO_P
   }
 
   const normalizedEntries = loadout[meta.listName].map(normalizeLoadoutEntry).filter(Boolean);
-  const removeIndex = normalizedEntries.findIndex((entry) => entry.key === meta.key && entry.quality === "standard" && Number(entry.level || 1) <= 1);
+  const requestedSlotIndex = clampInteger(options.slotIndex, 0, Math.max(0, normalizedEntries.length - 1));
+  const matchesRequestedEntry = (entry) => entry?.key === meta.key &&
+    entry.quality === inventorySelector.quality && entry.level === inventorySelector.level;
+  const removeIndex = requestedSlotIndex !== null && matchesRequestedEntry(normalizedEntries[requestedSlotIndex])
+    ? requestedSlotIndex
+    : normalizedEntries.findIndex(matchesRequestedEntry);
   const equippedBefore = normalizedEntries.filter((entry) => entry.key === meta.key).length;
-  const ownedBefore = clampInteger(ownedStore[meta.key], 0, meta.ownedPath === "ownedGuns" ? MAX_GUN_COUNT : MAX_ATTACHMENT_COUNT) || 0;
+  const ownedBefore = clampInteger(ownedStore?.[meta.key], 0, meta.ownedPath === "ownedGuns" ? MAX_GUN_COUNT : MAX_ATTACHMENT_COUNT) || 0;
   if (removeIndex < 0) {
     return blocked(meta.unequippedReason, {
       itemId: meta.itemId,
@@ -725,9 +795,32 @@ export function buildStagingLoadoutUnequipPlan(saveData = {}, { itemId = CARGO_P
     });
   }
 
+  const removedEntry = normalizedEntries[removeIndex];
+  const returnsToInventory = removedEntry.quality !== "standard" || removedEntry.level > 1;
+  if (returnsToInventory && !Array.isArray(saveData.inventoryItems)) {
+    return blocked("inventory_items_path_missing_or_invalid", {
+      itemId: meta.itemId,
+      currentShipId,
+      operation: "unequip",
+      quality: removedEntry.quality,
+      level: removedEntry.level
+    });
+  }
+
   const patchedSaveData = cloneJson(saveData);
   const nextEntries = normalizedEntries.filter((_entry, index) => index !== removeIndex);
-  patchedSaveData[meta.ownedPath][meta.key] = ownedBefore + 1;
+  let returnedInventoryItemId = "";
+  if (returnsToInventory) {
+    returnedInventoryItemId = `loadout-${meta.key}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    patchedSaveData.inventoryItems.push({
+      id: returnedInventoryItemId,
+      key: meta.key,
+      quality: removedEntry.quality,
+      level: removedEntry.level
+    });
+  } else {
+    patchedSaveData[meta.ownedPath][meta.key] = ownedBefore + 1;
+  }
   patchedSaveData.shipLoadouts[currentShipId][meta.listName] = nextEntries;
 
   const result = {
@@ -741,12 +834,23 @@ export function buildStagingLoadoutUnequipPlan(saveData = {}, { itemId = CARGO_P
     category: meta.category,
     currentShipId,
     ownedBefore,
-    ownedAfter: ownedBefore + 1,
+    ownedAfter: returnsToInventory ? ownedBefore : ownedBefore + 1,
     equippedBefore,
     equippedAfter: Math.max(0, equippedBefore - 1),
+    quality: removedEntry.quality,
+    level: removedEntry.level,
+    inventoryItemId: returnedInventoryItemId,
+    inventoryWritten: returnsToInventory,
     patchedSaveData,
-    appliedFields: [`${meta.ownedPath}.${meta.key}`, `shipLoadouts.${currentShipId}.${meta.listName}`],
-    untouchedFields: ["credits", "inventoryItems", "ownedShips", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"]
+    appliedFields: [
+      returnsToInventory ? "inventoryItems" : `${meta.ownedPath}.${meta.key}`,
+      `shipLoadouts.${currentShipId}.${meta.listName}`
+    ],
+    untouchedFields: [
+      "credits",
+      ...(returnsToInventory ? [meta.ownedPath] : ["inventoryItems"]),
+      "ownedShips", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeCargo"
+    ]
   };
 
   if (meta.key === CARGO_POD_KEY) {
@@ -803,6 +907,11 @@ export async function applyStagingLoadoutEquipWrite({
   playerId = "",
   itemId = CARGO_POD_ITEM_ID,
   operation = "equip",
+  inventorySource = "",
+  inventoryItemId = "",
+  quality = "standard",
+  level = 1,
+  slotIndex = null,
   trustedState = null,
   env = process.env,
   fetchImpl = globalThis.fetch
@@ -838,9 +947,10 @@ export async function applyStagingLoadoutEquipWrite({
     const readResult = await fetchPlayerSaveRow(baseUrl, safePlayerId, config, fetchImpl);
     if (!readResult.ok) return blocked(readResult.reason, { envGate, status: readResult.status, itemId });
     const saveData = getSaveDataFromRow(readResult.row);
+    const loadoutOptions = { itemId, inventorySource, inventoryItemId, quality, level, slotIndex };
     const plan = safeOperation === "unequip"
-      ? buildStagingLoadoutUnequipPlan(saveData, { itemId })
-      : buildStagingLoadoutEquipPlan(saveData, { itemId });
+      ? buildStagingLoadoutUnequipPlan(saveData, loadoutOptions)
+      : buildStagingLoadoutEquipPlan(saveData, loadoutOptions);
     if (!plan.ok) return { ...plan, envGate, itemId };
     const patchResult = await patchPlayerSaveData(baseUrl, safePlayerId, plan.patchedSaveData, config, fetchImpl);
     if (!patchResult.ok) return blocked(patchResult.reason, { envGate, status: patchResult.status, itemId });
@@ -872,6 +982,9 @@ export async function applyStagingLoadoutEquipWrite({
       ownedAfter: plan.ownedAfter,
       equippedBefore: plan.equippedBefore,
       equippedAfter: plan.equippedAfter,
+      quality: plan.quality,
+      level: plan.level,
+      inventoryItemId: plan.inventoryItemId,
       cargoCapacityBefore: plan.cargoCapacityBefore,
       cargoCapacityAfterPreview: plan.cargoCapacityAfterPreview,
       cargoCapacityAfter: plan.cargoCapacityAfter,
@@ -894,8 +1007,8 @@ export async function applyStagingLoadoutEquipWrite({
         itemAllowed: envGate.itemAllowed
       },
       envGate,
-      writes: getLoadoutWriteFlags(true, isStagingShipItem(itemId) ? "ship" : itemId.startsWith("gun:") ? "weapon" : "attachment"),
-      ...getLoadoutWriteFlags(true, isStagingShipItem(itemId) ? "ship" : itemId.startsWith("gun:") ? "weapon" : "attachment"),
+      writes: getLoadoutWriteFlags(true, isStagingShipItem(itemId) ? "ship" : itemId.startsWith("gun:") ? "weapon" : "attachment", plan.inventoryWritten === true),
+      ...getLoadoutWriteFlags(true, isStagingShipItem(itemId) ? "ship" : itemId.startsWith("gun:") ? "weapon" : "attachment", plan.inventoryWritten === true),
       appliedFields: plan.appliedFields
     };
   } catch (_err) {
