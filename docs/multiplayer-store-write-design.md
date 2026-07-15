@@ -89,7 +89,7 @@ Pulse Laser equip flow:
 - It calls `saveGame()`.
 - `removeGun()` returns standard level-1 guns to `ownedGuns`.
 
-Staging combat now treats the equipped weapon key as a staging hint, not damage authority. The client sends equipped keys from `shipLoadouts[currentShipId].guns`; the server maps `pulseLaser` to server-known Pulse Laser test damage (`10`) and cooldown. Missing or unknown keys fall back to safe staging damage (`5`). Server-authoritative combat stat derivation from saved loadouts is still a later phase.
+Staging combat treats equipped weapon keys as loadout hints, not damage authority. The client sends the mounted keys from `shipLoadouts[currentShipId].guns`; the server resolves up to six known guns, sums their server-owned damage into one capped volley, and uses the slowest mounted gun cooldown to match the client firing cycle. A standard Pulse Laser contributes `13` damage, so two mounted Pulse Lasers resolve `26` damage every `1,250 ms`. Missing or unknown-only loadouts fall back to safe staging damage (`5`). Raw client damage remains ignored; authoritative loadout derivation from trusted saved state is still a later phase.
 
 Sell flow:
 
@@ -199,7 +199,7 @@ The current validated staging loop is:
 5. Refresh from Supabase after applied equip.
 6. Use the returned +25 cargo capacity in later staging trade validation.
 
-Regression coverage uses mocked `player_saves` to prove the sequence can buy Cargo Pod, equip it, trade with the increased capacity, sell the cargo, buy Pulse Laser, equip Pulse Laser, and preserve unrelated save fields. Shield Booster regression coverage proves the narrow purchase/equip path changes only credits, `ownedAttachments.shieldBooster`, and the current ship attachment loadout, returning shield before/after diagnostics. Live room regression separately confirms staging combat uses the server-known Pulse Laser damage value instead of trusting client-reported damage. Live-write browser testing remains manual, allowlisted, and opt-in only.
+Regression coverage uses mocked `player_saves` to prove the sequence can buy Cargo Pod, equip it, trade with the increased capacity, sell the cargo, buy Pulse Laser, equip Pulse Laser, and preserve unrelated save fields. Shield Booster regression coverage proves the narrow purchase/equip path changes only credits, `ownedAttachments.shieldBooster`, and the current ship attachment loadout, returning shield before/after diagnostics. Live room regression separately confirms staging combat resolves two mounted Pulse Lasers as a `26`-damage server-known volley, caps oversized loadouts, and ignores fake client damage inflation. Live-write browser testing remains manual, allowlisted, and opt-in only.
 
 ## Future Store Phases
 

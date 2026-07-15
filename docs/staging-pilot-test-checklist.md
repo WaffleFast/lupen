@@ -68,7 +68,7 @@ Later systems use separate gates:
 13. Confirm cargo capacity increased by `+25`.
 14. Buy Pulse Laser.
 15. Equip Pulse Laser.
-16. Open `?debug=mp` and confirm Pulse Laser / server damage `10`.
+16. Open `?debug=mp` and confirm one Pulse Laser reports server damage `13`; with two fitted, confirm the server volley reports `26`.
 17. Buy Shield Booster.
 18. Equip Shield Booster.
 19. Confirm shield stat or equipped Shield Booster state persists.

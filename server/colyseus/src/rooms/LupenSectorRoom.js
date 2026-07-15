@@ -214,6 +214,8 @@ const STAGING_PVP_SHIELD_REGEN_TICK_MS = 1000;
 const STAGING_PVP_SHIELD_REGEN_AMOUNT = 10;
 const STAGING_DAMAGE_MIN = 1;
 const STAGING_DAMAGE_MAX = 50;
+const STAGING_VOLLEY_DAMAGE_MAX = 80;
+const STAGING_EQUIPPED_WEAPON_MAX = 6;
 const STAGING_FIRE_COOLDOWN_MS = 900;
 const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
@@ -234,16 +236,16 @@ const STAGING_WEAPON_STATS = Object.freeze({
     name: "Heavy Lance",
     family: "heavy",
     type: "heavy",
-    damage: 16,
-    cooldownMs: 2222
+    damage: 23,
+    cooldownMs: 2000
   }),
   ionBlaster: Object.freeze({
     key: "ionBlaster",
     name: "Ion Blaster",
     family: "ion",
     type: "ion",
-    damage: 10,
-    cooldownMs: 909
+    damage: 9,
+    cooldownMs: 833
   }),
   meltCannon: Object.freeze({
     key: "meltCannon",
@@ -258,8 +260,8 @@ const STAGING_WEAPON_STATS = Object.freeze({
     name: "Pulse Laser",
     family: "pulse",
     type: "pulse",
-    damage: 10,
-    cooldownMs: 1000
+    damage: 13,
+    cooldownMs: 1250
   }),
   repeater: Object.freeze({
     key: "repeater",
@@ -1320,36 +1322,43 @@ function getWeaponKeysFromValue(value) {
     .filter(Boolean);
 }
 
-function getFirstWeaponKeyFromList(value) {
-  return getWeaponKeysFromValue(value)[0] || "";
+function getStagingEquippedWeaponKeys(message = {}, player = null) {
+  const payloadKeys = getWeaponKeysFromValue(message.equippedWeaponKeys);
+  const presenceKeys = getWeaponKeysFromValue(player?.equippedWeaponKeys);
+  const equippedKeys = payloadKeys.length ? [...payloadKeys] : [...presenceKeys];
+  const preferredKey = getSafeWeaponKey(
+    message.weaponKey ||
+    message.equippedWeaponKey ||
+    player?.equippedWeaponKey
+  );
+
+  if (preferredKey && !equippedKeys.includes(preferredKey)) equippedKeys.unshift(preferredKey);
+  if (!equippedKeys.length) {
+    const weaponIdKey = getSafeWeaponKey(message.weaponId);
+    if (weaponIdKey) equippedKeys.push(weaponIdKey);
+  }
+
+  return equippedKeys.slice(0, STAGING_EQUIPPED_WEAPON_MAX);
 }
 
-function getWeaponSourceDebug(message = {}, player = null, selectedKey = "") {
-  const payloadKeys = [
-    getSafeWeaponKey(message.weaponKey),
-    getSafeWeaponKey(message.equippedWeaponKey),
-    ...getWeaponKeysFromValue(message.equippedWeaponKeys)
-  ].filter(Boolean);
-  const presenceKeys = [
-    getSafeWeaponKey(player?.equippedWeaponKey),
-    ...getWeaponKeysFromValue(player?.equippedWeaponKeys)
-  ].filter(Boolean);
-  const allKeys = [...payloadKeys, ...presenceKeys];
-  const uniqueKeys = Array.from(new Set(allKeys));
-  const validKeys = uniqueKeys.filter((key) => !!STAGING_WEAPON_STATS[key]);
-  const rejectedKeys = uniqueKeys.filter((key) => !STAGING_WEAPON_STATS[key]);
+function getWeaponSourceDebug(message = {}, player = null, selectedKey = "", equippedWeaponKeys = null) {
+  const activeKeys = Array.isArray(equippedWeaponKeys)
+    ? equippedWeaponKeys
+    : getStagingEquippedWeaponKeys(message, player);
+  const validKeys = activeKeys.filter((key) => !!STAGING_WEAPON_STATS[key]);
+  const rejectedKeys = activeKeys.filter((key) => !STAGING_WEAPON_STATS[key]);
   const fallbackWeaponId = getSafeWeaponKey(message.weaponId);
-  const fallbackRejected = fallbackWeaponId && fallbackWeaponId !== selectedKey && !STAGING_WEAPON_STATS[fallbackWeaponId];
+  const fallbackRejected = fallbackWeaponId && !activeKeys.includes(fallbackWeaponId) && !STAGING_WEAPON_STATS[fallbackWeaponId];
   const firstRejectedWeaponReason = rejectedKeys[0]
     ? `unknown_weapon:${rejectedKeys[0]}`
     : fallbackRejected
       ? `weaponId_not_catalog_weapon:${fallbackWeaponId}`
-      : uniqueKeys.length
+      : activeKeys.length
         ? ""
         : "no_equipped_weapon_keys";
 
   return {
-    activeShipWeaponCount: uniqueKeys.length,
+    activeShipWeaponCount: activeKeys.length,
     validCombatWeaponCount: validKeys.length,
     rejectedWeaponCount: rejectedKeys.length + (fallbackRejected ? 1 : 0),
     firstRejectedWeaponReason,
@@ -1361,34 +1370,52 @@ function getWeaponSourceDebug(message = {}, player = null, selectedKey = "") {
   };
 }
 
+function getStagingVolleyWeaponName(weapons = []) {
+  const counts = new Map();
+  weapons.forEach((weapon) => {
+    const name = weapon?.name || "Weapon";
+    counts.set(name, Number(counts.get(name) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .map(([name, count]) => count > 1 ? `${name} x${count}` : name)
+    .join(" + ");
+}
+
 function getRequestedDamageFromPayload(message = {}) {
   const directDamage = Number(message.damage ?? message.weaponDamage);
   return Number.isFinite(directDamage) ? directDamage : 0;
 }
 
 function resolveStagingWeapon(message = {}, player = null) {
-  const payloadKey = getSafeWeaponKey(message.weaponKey || message.equippedWeaponKey);
-  const payloadListKey = getFirstWeaponKeyFromList(message.equippedWeaponKeys);
-  const presenceKey = getSafeWeaponKey(player?.equippedWeaponKey);
-  const presenceListKey = getFirstWeaponKeyFromList(player?.equippedWeaponKeys);
-  const weaponIdKey = getSafeWeaponKey(message.weaponId);
-  const weaponKey = payloadKey || payloadListKey || presenceKey || presenceListKey || weaponIdKey;
-  const known = STAGING_WEAPON_STATS[weaponKey] || null;
+  const equippedWeaponKeys = getStagingEquippedWeaponKeys(message, player);
+  const knownWeapons = equippedWeaponKeys
+    .map((key) => STAGING_WEAPON_STATS[key] || null)
+    .filter(Boolean);
+  const known = knownWeapons[0] || null;
+  const weaponKey = known?.key || equippedWeaponKeys[0] || getSafeWeaponKey(message.weaponId);
   const requestedDamage = getRequestedDamageFromPayload(message);
-  const debug = getWeaponSourceDebug(message, player, weaponKey);
+  const debug = getWeaponSourceDebug(message, player, weaponKey, equippedWeaponKeys);
 
   if (known) {
-    const knownDamage = clampNumber(Math.round(known.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
+    const volleyDamage = knownWeapons.reduce((total, weapon) => {
+      return total + clampNumber(Math.round(weapon.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
+    }, 0);
+    const knownDamage = clampNumber(volleyDamage, STAGING_DAMAGE_MIN, STAGING_VOLLEY_DAMAGE_MAX);
+    const volleyCooldownMs = Math.max(...knownWeapons.map((weapon) => Number(weapon.cooldownMs || STAGING_FIRE_COOLDOWN_MS)));
+    const volleyWeaponKeys = knownWeapons.map((weapon) => weapon.key);
+    const volleyWeaponCount = knownWeapons.length;
     return {
       weaponKey: known.key,
-      weaponName: known.name,
-      weaponFamily: known.family,
-      weaponType: known.type,
+      weaponName: getStagingVolleyWeaponName(knownWeapons),
+      weaponFamily: volleyWeaponCount > 1 ? "volley" : known.family,
+      weaponType: volleyWeaponCount > 1 ? "volley" : known.type,
       damage: knownDamage,
-      cooldownMs: clampNumber(Math.round(known.cooldownMs), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS),
+      cooldownMs: clampNumber(Math.round(volleyCooldownMs), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS),
       damageSource: "server_known_weapon",
       fallbackDamageUsed: false,
-      pulseLaserDetected: known.key === "pulseLaser",
+      pulseLaserDetected: volleyWeaponKeys.includes("pulseLaser"),
+      volleyWeaponCount,
+      volleyWeaponKeys,
       requestedDamage,
       clientDamageIgnored: requestedDamage > 0 && Math.round(requestedDamage) !== knownDamage,
       serverAuthoritative: true,
@@ -1407,6 +1434,8 @@ function resolveStagingWeapon(message = {}, player = null) {
     damageSource: weaponKey ? "fallback_unknown_weapon" : "fallback_no_weapon",
     fallbackDamageUsed: true,
     pulseLaserDetected: false,
+    volleyWeaponCount: 0,
+    volleyWeaponKeys: [],
     requestedDamage,
     clientDamageIgnored: requestedDamage > 0 && Math.round(requestedDamage) !== STAGING_TEST_DAMAGE,
     serverAuthoritative: true,
@@ -2268,6 +2297,8 @@ export class LupenSectorRoom extends Room {
       weaponKey: resolvedWeapon.weaponKey,
       weaponName: resolvedWeapon.weaponName,
       weaponFamily: resolvedWeapon.weaponFamily,
+      volleyWeaponCount: resolvedWeapon.volleyWeaponCount,
+      volleyWeaponKeys: resolvedWeapon.volleyWeaponKeys,
       damageSource: resolvedWeapon.damageSource,
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
       clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,
@@ -4355,6 +4386,8 @@ export class LupenSectorRoom extends Room {
       weaponKey: resolvedWeapon.weaponKey,
       weaponName,
       weaponFamily,
+      volleyWeaponCount: resolvedWeapon.volleyWeaponCount,
+      volleyWeaponKeys: resolvedWeapon.volleyWeaponKeys,
       weaponQuality: getStringValue(message.quality),
       weaponLevel: getNumberValue(message.level, 0),
       damage: result.damage,
@@ -4400,6 +4433,8 @@ export class LupenSectorRoom extends Room {
       weaponName,
       weaponFamily,
       weaponType: resolvedWeapon.weaponType,
+      volleyWeaponCount: resolvedWeapon.volleyWeaponCount,
+      volleyWeaponKeys: resolvedWeapon.volleyWeaponKeys,
       damageSource: resolvedWeapon.damageSource,
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
       clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,

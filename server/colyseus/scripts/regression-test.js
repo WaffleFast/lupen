@@ -1897,9 +1897,9 @@ async function assertStagingTradeValidationHelpers() {
 async function assertStagingStorePreviewHelpers() {
   const items = getStagingStoreItems();
   const expectedStoreItemIds = [
-    "gun:heavyLance",
-    "gun:ionBlaster",
     "gun:pulseLaser",
+    "gun:ionBlaster",
+    "gun:heavyLance",
     "attachment:cargoPod",
     "attachment:jumpDrive",
     "ship:falcon",
@@ -1913,6 +1913,8 @@ async function assertStagingStorePreviewHelpers() {
   for (const itemId of expectedStoreItemIds) {
     assert(items.some((item) => item.itemId === itemId), `Staging Store missing ${itemId}.`);
   }
+  assert(JSON.stringify(items.slice(0, 3).map((item) => item.itemId)) === JSON.stringify(expectedStoreItemIds.slice(0, 3)), "Starter guns were not ordered by unlock level.");
+  assert(JSON.stringify(items.slice(0, 3).map((item) => item.levelRequirement)) === JSON.stringify([1, 2, 3]), "Starter gun level requirements were not progressive.");
 
   const validTrustedPreview = buildStagingStorePurchasePreview({
     itemId: "attachment:cargoPod",
@@ -5647,8 +5649,8 @@ try {
   });
   assert(firstResourceMine?.ok === true, "Valid staging resource mine did not resolve.");
   assert(firstResourceMine?.serverAuthoritative === true, "Resource mine was not marked server-authoritative.");
-  assert(firstResourceMine?.damage === 10, `Unexpected Pulse Laser resource mining damage: ${firstResourceMine?.damage}`);
-  assert(firstResourceMine?.cooldownMs === 1000, `Resource mine did not use resolved Pulse Laser cooldown: ${firstResourceMine?.cooldownMs}`);
+  assert(firstResourceMine?.damage === 13, `Unexpected Pulse Laser resource mining damage: ${firstResourceMine?.damage}`);
+  assert(firstResourceMine?.cooldownMs === 1250, `Resource mine did not use resolved Pulse Laser cooldown: ${firstResourceMine?.cooldownMs}`);
   assert(firstResourceMine?.cargoDelta === 0, "Non-depleting resource mine unexpectedly paid cargo.");
   assert(firstResourceMine?.cargoWritten === false && firstResourceMine?.saveWritten === false, "Resource mine reported server cargo/save writes.");
   await waitFor("resource mine damage to replicate to both clients", () => {
@@ -5660,11 +5662,11 @@ try {
       resourceA.depleted === false &&
       resourceB.depleted === false;
   });
-  const firstResourceShotA = resourceShotEventsA.find((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10);
-  const firstResourceShotB = resourceShotEventsB.find((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 10);
+  const firstResourceShotA = resourceShotEventsA.find((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 13);
+  const firstResourceShotB = resourceShotEventsB.find((event) => event?.resourceId === inspectedResourceBeforeMine.id && event?.damage === 13);
   assert(firstResourceShotA, "Client A did not receive staging resource shot.");
   assert(firstResourceShotB, "Client B did not receive staging resource shot.");
-  assert(firstResourceShotA?.cooldownMs === 1000 && firstResourceShotB?.cooldownMs === 1000, "Staging resource shot did not broadcast resolved Pulse Laser cooldown.");
+  assert(firstResourceShotA?.cooldownMs === 1250 && firstResourceShotB?.cooldownMs === 1250, "Staging resource shot did not broadcast resolved Pulse Laser cooldown.");
 
   const resourceCooldownRejected = await expectRoomMessage(roomA, "stagingResource:mineRejected", () => {
     roomA.send("stagingResource:mine", {
@@ -5680,7 +5682,7 @@ try {
 
   let depletedMine = null;
   for (let attempt = 0; attempt < 6 && !depletedMine; attempt += 1) {
-    await sleep(1050);
+    await sleep(1300);
     const result = await expectRoomMessage(roomA, "stagingResource:mineResult", () => {
       roomA.send("stagingResource:mine", {
         resourceId: inspectedResourceBeforeMine.id,
@@ -5777,9 +5779,9 @@ try {
 
   assert(combatResponse?.ok === true, "Valid staging combat intent did not resolve.");
   assert(combatResponse?.reason === "staging_damage_applied", `Unexpected combat response: ${combatResponse?.reason}`);
-  assert(combatResponse?.damage === 10, `Unexpected Pulse Laser staging damage amount: ${combatResponse?.damage}`);
-  assert(combatResponse?.stagingDamage === 10, `Unexpected Pulse Laser validated staging damage: ${combatResponse?.stagingDamage}`);
-  assert(combatResponse?.serverDamageUsed === 10, `Unexpected Pulse Laser server damage: ${combatResponse?.serverDamageUsed}`);
+  assert(combatResponse?.damage === 13, `Unexpected Pulse Laser staging damage amount: ${combatResponse?.damage}`);
+  assert(combatResponse?.stagingDamage === 13, `Unexpected Pulse Laser validated staging damage: ${combatResponse?.stagingDamage}`);
+  assert(combatResponse?.serverDamageUsed === 13, `Unexpected Pulse Laser server damage: ${combatResponse?.serverDamageUsed}`);
   assert(combatResponse?.requestedDamage === 9999, "Combat response did not preserve requested damage for diagnostics.");
   assert(combatResponse?.damageSource === "server_known_weapon", `Pulse Laser did not use server-known weapon stats: ${combatResponse?.damageSource}`);
   assert(combatResponse?.fallbackDamageUsed === false, "Pulse Laser incorrectly used fallback damage.");
@@ -5829,8 +5831,8 @@ try {
   console.log("staging bot return fire used server bot-type damage and cooldown");
 
   await waitFor("both clients to receive staging shot event", () => {
-    const shotA = roomAShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 10);
-    const shotB = roomBShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 10);
+    const shotA = roomAShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 13);
+    const shotB = roomBShotEvents.find((event) => event?.targetBotId === inspectedBotBeforeCombat.id && event?.damage === 13);
     return shotA && shotB &&
       shotA.attackerSessionId === roomA.sessionId &&
       shotB.attackerSessionId === roomA.sessionId &&
@@ -5868,7 +5870,7 @@ try {
   const inspectedBotAfterCombat = botSnapshots(roomA).find((bot) => bot.id === inspectedBotBeforeCombat.id);
   const healthBeforeCombat = Number(inspectedBotBeforeCombat.shield) + Number(inspectedBotBeforeCombat.hull);
   const healthAfterCombat = Number(inspectedBotAfterCombat.shield) + Number(inspectedBotAfterCombat.hull);
-  assert(healthAfterCombat === healthBeforeCombat - 10, "Combat intent did not apply server-known Pulse Laser staging damage.");
+  assert(healthAfterCombat === healthBeforeCombat - 13, "Combat intent did not apply server-known Pulse Laser staging damage.");
   assert(inspectedBotAfterCombat?.visualOnly === true, "Combat intent changed visualOnly flag.");
   console.log("combat intent applied weapon-based staging damage without rewards");
 
@@ -5952,8 +5954,54 @@ try {
       botB.shield === clientBContributionResponse.shield &&
       botB.hull === clientBContributionResponse.hull;
   });
-  const inspectedBotAfterClientBCombat = botById(roomA, inspectedBotBeforeCombat.id);
   console.log("client B contributed staging damage to shared bot");
+
+  await waitForFireReady(roomA, roomA.sessionId);
+  const twoPulseVolleyResponse = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: inspectedBotBeforeCombat.id,
+      weaponId: "pulseLaser",
+      weaponKey: "pulseLaser",
+      equippedWeaponKeys: ["pulseLaser", "pulseLaser"],
+      damage: 9999,
+      currentNode: inspectedBotBeforeCombat.currentNode,
+      timestamp: Date.now()
+    });
+  });
+  assert(twoPulseVolleyResponse?.stagingDamage === 26, `Twin Pulse Lasers should resolve 26 volley damage: ${twoPulseVolleyResponse?.stagingDamage}`);
+  assert(twoPulseVolleyResponse?.cooldownMs === 1250, `Twin Pulse Laser volley cooldown mismatch: ${twoPulseVolleyResponse?.cooldownMs}`);
+  assert(twoPulseVolleyResponse?.volleyWeaponCount === 2, `Twin Pulse Laser volley count mismatch: ${twoPulseVolleyResponse?.volleyWeaponCount}`);
+  assert(JSON.stringify(twoPulseVolleyResponse?.volleyWeaponKeys) === JSON.stringify(["pulseLaser", "pulseLaser"]), "Twin Pulse Laser volley lost a mounted gun.");
+  assert(twoPulseVolleyResponse?.weaponName === "Pulse Laser x2", `Unexpected twin Pulse Laser name: ${twoPulseVolleyResponse?.weaponName}`);
+  assert(twoPulseVolleyResponse?.clientDamageIgnored === true, "Twin Pulse Laser volley trusted spoofed client aggregate damage.");
+  await waitFor("twin Pulse Laser volley to replicate", () => {
+    const botA = botById(roomA, inspectedBotBeforeCombat.id);
+    const botB = botById(roomB, inspectedBotBeforeCombat.id);
+    return botA && botB &&
+      botA.shield === twoPulseVolleyResponse.shield &&
+      botA.hull === twoPulseVolleyResponse.hull &&
+      botB.shield === twoPulseVolleyResponse.shield &&
+      botB.hull === twoPulseVolleyResponse.hull;
+  });
+  const inspectedBotHealthAfterTwoPulseVolley = botHealthTotal(botById(roomA, inspectedBotBeforeCombat.id));
+
+  const hunterForBalance = botSnapshots(roomA).find((bot) => bot.botType === "hunter");
+  assert(hunterForBalance, "No Hunter available for starter-trip balance estimate.");
+  const estimateReturnFireHits = (bot, volleyDamage, volleyCooldownMs) => {
+    const health = Number(bot.shield || 0) + Number(bot.hull || 0);
+    const volleyCount = Math.max(1, Math.ceil(health / volleyDamage));
+    const fightDurationMs = Math.max(0, (volleyCount - 1) * volleyCooldownMs);
+    return Math.floor(fightDurationMs / Number(bot.attackCooldownMs || 1)) + 1;
+  };
+  const destroyerReturnHits = estimateReturnFireHits(inspectedBotBeforeCombat, 26, 1250);
+  const hunterReturnHits = estimateReturnFireHits(hunterForBalance, 26, 1250);
+  const destroyerIncoming = destroyerReturnHits * Math.round(inspectedBotBeforeCombat.damagePerHit * 0.82);
+  const hunterIncoming = hunterReturnHits * Math.round(hunterForBalance.damagePerHit * 0.82);
+  const starterShieldAfterTrip = Math.max(0, 180 - destroyerIncoming - hunterIncoming);
+  const starterHullAfterTrip = 720 - Math.max(0, destroyerIncoming + hunterIncoming - 180) * 0.9;
+  assert(starterHullAfterTrip > 0, "Twin Pulse Laser starter trip cannot survive a Destroyer and Hunter estimate.");
+  assert(starterShieldAfterTrip >= 0, "Starter trip shield estimate became invalid.");
+  console.log(`twin Pulse Laser balance estimate survives Destroyer + Hunter (return hits ${destroyerReturnHits} + ${hunterReturnHits}, hull ${starterHullAfterTrip})`);
 
   await waitForFireReady(roomA, roomA.sessionId);
   const multiWeaponCombatResponse = await expectCombatResolved(roomA, () => {
@@ -5971,15 +6019,19 @@ try {
     });
   });
 
-  assert(multiWeaponCombatResponse?.stagingDamage === 10, `Multi-weapon payload did not use server-known Pulse Laser damage: ${multiWeaponCombatResponse?.stagingDamage}`);
+  assert(multiWeaponCombatResponse?.stagingDamage === 58, `Multi-weapon payload did not aggregate its server-known gun volley: ${multiWeaponCombatResponse?.stagingDamage}`);
   assert(multiWeaponCombatResponse?.requestedDamage === 37, "Multi-weapon requested damage was not kept for diagnostics.");
   assert(multiWeaponCombatResponse?.damageSource === "server_known_weapon", `Multi-weapon payload had unexpected source: ${multiWeaponCombatResponse?.damageSource}`);
   assert(multiWeaponCombatResponse?.fallbackDamageUsed === false, "Multi-weapon known weapon incorrectly used fallback damage.");
   assert(multiWeaponCombatResponse?.clientDamageIgnored === true, "Multi-weapon client aggregate damage was not marked ignored.");
   assert(multiWeaponCombatResponse?.serverAuthoritative === true, "Multi-weapon combat was not marked server-authoritative.");
   assert(multiWeaponCombatResponse?.weaponKey === "pulseLaser", `Multi-weapon payload did not prefer equipped gun keys over generic weaponId: ${multiWeaponCombatResponse?.weaponKey}`);
-  assert(Number(multiWeaponCombatResponse?.activeShipWeaponCount || 0) === 8, `Unexpected active weapon debug count: ${multiWeaponCombatResponse?.activeShipWeaponCount}`);
-  assert(Number(multiWeaponCombatResponse?.validCombatWeaponCount || 0) === 6, `Unexpected valid weapon debug count: ${multiWeaponCombatResponse?.validCombatWeaponCount}`);
+  assert(multiWeaponCombatResponse?.volleyWeaponCount === 4, `Unexpected resolved volley weapon count: ${multiWeaponCombatResponse?.volleyWeaponCount}`);
+  assert(JSON.stringify(multiWeaponCombatResponse?.volleyWeaponKeys) === JSON.stringify(["pulseLaser", "pulseLaser", "ionBlaster", "heavyLance"]), "Resolved volley did not preserve the valid equipped gun order.");
+  assert(multiWeaponCombatResponse?.weaponName === "Pulse Laser x2 + Ion Blaster + Heavy Lance", `Unexpected multi-weapon volley name: ${multiWeaponCombatResponse?.weaponName}`);
+  assert(multiWeaponCombatResponse?.cooldownMs === 2000, `Multi-weapon volley did not use its slowest gun cooldown: ${multiWeaponCombatResponse?.cooldownMs}`);
+  assert(Number(multiWeaponCombatResponse?.activeShipWeaponCount || 0) === 6, `Unexpected capped active weapon debug count: ${multiWeaponCombatResponse?.activeShipWeaponCount}`);
+  assert(Number(multiWeaponCombatResponse?.validCombatWeaponCount || 0) === 4, `Unexpected valid weapon debug count: ${multiWeaponCombatResponse?.validCombatWeaponCount}`);
   assert(Number(multiWeaponCombatResponse?.rejectedWeaponCount || 0) === 3, `Unexpected rejected weapon debug count: ${multiWeaponCombatResponse?.rejectedWeaponCount}`);
   assert(String(multiWeaponCombatResponse?.firstRejectedWeaponReason || "").startsWith("unknown_weapon:"), `Missing first rejected weapon reason: ${multiWeaponCombatResponse?.firstRejectedWeaponReason}`);
   await waitFor("both clients to receive server-authoritative multi-weapon damage", () => {
@@ -5992,8 +6044,8 @@ try {
       botB.hull === multiWeaponCombatResponse.hull;
   });
   const inspectedBotAfterMultiWeaponCombat = botById(roomA, inspectedBotBeforeCombat.id);
-  assert(botHealthTotal(inspectedBotAfterMultiWeaponCombat) === botHealthTotal(inspectedBotAfterClientBCombat) - Number(multiWeaponCombatResponse.damage || 0), "Multi-weapon aggregate did not apply resolved staging damage.");
-  console.log("multi-weapon client aggregate damage ignored in favor of server-known weapon damage");
+  assert(botHealthTotal(inspectedBotAfterMultiWeaponCombat) === inspectedBotHealthAfterTwoPulseVolley - Number(multiWeaponCombatResponse.damage || 0), "Multi-weapon aggregate did not apply resolved staging damage.");
+  console.log("multi-weapon client aggregate ignored in favor of capped server-known volley damage");
 
   await waitForFireReady(roomA, roomA.sessionId);
   const oversizedCombatResponse = await expectCombatResolved(roomA, () => {

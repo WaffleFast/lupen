@@ -9,16 +9,16 @@ const MAX_STORE_PURCHASE_QUANTITY = 5;
 
 export const STAGING_STORE_ITEMS = Object.freeze([
   Object.freeze({
-    itemId: "gun:heavyLance",
-    name: "Heavy Lance",
+    itemId: "gun:pulseLaser",
+    name: "Pulse Laser",
     category: "weapon",
     localKind: "gun",
-    localKey: "heavyLance",
-    price: 1001,
-    levelRequirement: 0,
+    localKey: "pulseLaser",
+    price: 748,
+    levelRequirement: 1,
     stockType: "fixed",
-    description: "High-impact precision beam for slow, heavy shots.",
-    reference: "GUNS.heavyLance"
+    description: "Reliable all-round energy weapon with balanced output.",
+    reference: "GUNS.pulseLaser"
   }),
   Object.freeze({
     itemId: "gun:ionBlaster",
@@ -27,22 +27,22 @@ export const STAGING_STORE_ITEMS = Object.freeze([
     localKind: "gun",
     localKey: "ionBlaster",
     price: 746,
-    levelRequirement: 0,
+    levelRequirement: 2,
     stockType: "fixed",
-    description: "Balanced ion weapon with steady damage output.",
+    description: "Fast-firing ion weapon with light per-shot damage.",
     reference: "GUNS.ionBlaster"
   }),
   Object.freeze({
-    itemId: "gun:pulseLaser",
-    name: "Pulse Laser",
+    itemId: "gun:heavyLance",
+    name: "Heavy Lance",
     category: "weapon",
     localKind: "gun",
-    localKey: "pulseLaser",
-    price: 748,
-    levelRequirement: 0,
+    localKey: "heavyLance",
+    price: 1001,
+    levelRequirement: 3,
     stockType: "fixed",
-    description: "Reliable all-round energy weapon.",
-    reference: "GUNS.pulseLaser"
+    description: "High-impact precision beam for slow, heavy shots.",
+    reference: "GUNS.heavyLance"
   }),
   Object.freeze({
     itemId: "attachment:cargoPod",

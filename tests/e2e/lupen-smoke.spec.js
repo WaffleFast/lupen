@@ -1214,6 +1214,74 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("starter gun roles and twin-gun volley follow the Map 1 balance curve", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const balance = await page.evaluate(() => window.eval(`
+      (() => {
+        const keys = ["pulseLaser", "ionBlaster", "heavyLance"];
+        const guns = Object.fromEntries(keys.map(key => {
+          const gun = GUNS[key];
+          const damage = getWeaponPurchaseDamage(gun, "standard");
+          const fireRate = getGunFireRateValue(gun);
+          return [key, {
+            damage,
+            fireRate,
+            dps: Number((damage * fireRate).toFixed(1)),
+            unlockLevel: EQUIPMENT_UNLOCK_REQUIREMENTS.guns[key].combatLevel
+          }];
+        }));
+
+        currentShipId = STARTER_SHIP_ID;
+        shipLoadouts = {
+          [STARTER_SHIP_ID]: normalizeShipLoadout({
+            attachments: [],
+            guns: ["pulseLaser", "pulseLaser"]
+          }, STARTER_SHIP_ID)
+        };
+        const twinPulse = getEquippedWeapon(STARTER_SHIP_ID);
+
+        return {
+          catalogueOrder: Object.keys(WEAPON_FAMILIES).slice(0, 3),
+          guns,
+          twinPulse: {
+            count: twinPulse.count,
+            weaponKeys: twinPulse.weaponKeys,
+            damage: twinPulse.damage,
+            damageLayers: twinPulse.damageLayers,
+            fireRate: twinPulse.fireRate,
+            speed: twinPulse.speed
+          }
+        };
+      })()
+    `));
+
+    expect(balance.catalogueOrder).toEqual(["pulseLaser", "ionBlaster", "heavyLance"]);
+    expect(balance.guns.pulseLaser).toEqual({ damage: 13, fireRate: 0.8, dps: 10.4, unlockLevel: 1 });
+    expect(balance.guns.ionBlaster).toEqual({ damage: 9, fireRate: 1.2, dps: 10.8, unlockLevel: 2 });
+    expect(balance.guns.heavyLance).toEqual({ damage: 23, fireRate: 0.5, dps: 11.5, unlockLevel: 3 });
+    expect(balance.guns.ionBlaster.damage).toBeLessThan(balance.guns.pulseLaser.damage);
+    expect(balance.guns.pulseLaser.damage).toBeLessThan(balance.guns.heavyLance.damage);
+    expect(balance.guns.ionBlaster.fireRate).toBeGreaterThan(balance.guns.pulseLaser.fireRate);
+    expect(balance.guns.pulseLaser.fireRate).toBeGreaterThan(balance.guns.heavyLance.fireRate);
+    expect(balance.guns.ionBlaster.dps).toBeGreaterThan(balance.guns.pulseLaser.dps);
+    expect(balance.guns.heavyLance.dps).toBeGreaterThan(balance.guns.ionBlaster.dps);
+    expect(balance.guns.heavyLance.dps / balance.guns.pulseLaser.dps).toBeLessThanOrEqual(1.12);
+    expect(balance.twinPulse).toMatchObject({
+      count: 2,
+      weaponKeys: ["pulseLaser", "pulseLaser"],
+      damage: 26,
+      damageLayers: { shield: 28, armor: 26, hull: 24 },
+      fireRate: 0.8,
+      speed: 1250
+    });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging mode exposes staging UI without using real trade buttons", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

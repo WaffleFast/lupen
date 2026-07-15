@@ -1,16 +1,16 @@
 const WEAPON_FAMILIES = {
-  heavyLance: {
-    id: "heavyLance",
-    name: "Heavy Lance",
-    shortDescription: "Chunky heavy lance with a decisive amber impact.",
-    role: "High damage, heavy hit",
-    image: "assets/weapons/heavy-lance.png",
-    projectileColor: "#ffbd58",
-    fireStyle: "heavy",
-    fireRate: 0.45,
-    range: 850,
-    accuracy: 88,
-    damage: { shield: 15, armor: 20, hull: 23 }
+  pulseLaser: {
+    id: "pulseLaser",
+    name: "Pulse Laser",
+    shortDescription: "Reliable blue pulse laser with steady combat output.",
+    role: "Balanced reliable weapon",
+    image: "assets/weapons/pulse-laser.png",
+    projectileColor: "#4bb7ff",
+    fireStyle: "pulse",
+    fireRate: 0.8,
+    range: 800,
+    accuracy: 92,
+    damage: { shield: 14, armor: 13, hull: 12 }
   },
   ionBlaster: {
     id: "ionBlaster",
@@ -20,10 +20,23 @@ const WEAPON_FAMILIES = {
     image: "assets/weapons/ion-blaster.png",
     projectileColor: "#bdf4ff",
     fireStyle: "ion",
-    fireRate: 1.1,
+    fireRate: 1.2,
     range: 780,
     accuracy: 93,
-    damage: { shield: 13, armor: 8, hull: 7 }
+    damage: { shield: 11, armor: 8, hull: 8 }
+  },
+  heavyLance: {
+    id: "heavyLance",
+    name: "Heavy Lance",
+    shortDescription: "Chunky heavy lance with a decisive amber impact.",
+    role: "High damage, heavy hit",
+    image: "assets/weapons/heavy-lance.png",
+    projectileColor: "#ffbd58",
+    fireStyle: "heavy",
+    fireRate: 0.5,
+    range: 850,
+    accuracy: 88,
+    damage: { shield: 20, armor: 24, hull: 25 }
   },
   meltCannon: {
     id: "meltCannon",
@@ -37,19 +50,6 @@ const WEAPON_FAMILIES = {
     range: 760,
     accuracy: 90,
     damage: { shield: 9, armor: 20, hull: 17 }
-  },
-  pulseLaser: {
-    id: "pulseLaser",
-    name: "Pulse Laser",
-    shortDescription: "Reliable blue pulse laser with steady combat output.",
-    role: "Balanced reliable weapon",
-    image: "assets/weapons/pulse-laser.png",
-    projectileColor: "#4bb7ff",
-    fireStyle: "pulse",
-    fireRate: 0.77,
-    range: 800,
-    accuracy: 92,
-    damage: { shield: 11, armor: 10, hull: 10 }
   },
   repeater: {
     id: "repeater",
