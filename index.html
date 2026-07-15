@@ -597,6 +597,55 @@
         <svg id="sectorSvg" class="sector-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
 
+      <div
+        id="tacticalPanelBackdrop"
+        class="tactical-panel-backdrop"
+        aria-hidden="true"
+        hidden
+        inert
+        onclick="handleTacticalBackdropClick(event)">
+        <section
+          id="tacticalPanel"
+          class="tactical-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="tacticalPanelTitle"
+          tabindex="-1">
+          <header class="tactical-panel-header">
+            <span class="tactical-panel-header-line" aria-hidden="true"></span>
+            <h2 id="tacticalPanelTitle">TACTICAL PANEL</h2>
+            <button type="button" class="tactical-panel-close" onclick="closeTacticalPanel()" aria-label="Close Tactical Panel">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </header>
+          <div class="tactical-panel-layout">
+            <nav class="tactical-panel-nav" role="tablist" aria-label="Tactical sections">
+              <button id="tacticalNavAcademy" type="button" role="tab" aria-selected="true" class="active" onclick="selectTacticalSection('academy')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-5 9 5-9 5-9-5zm3 3v6l6 4 6-4v-6"/></svg>
+                <span>Academy</span>
+              </button>
+              <button id="tacticalNavBounties" type="button" role="tab" aria-selected="false" onclick="selectTacticalSection('bounties')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4m-10-6v12M6 12h12"/></svg>
+                <span>Bounties</span>
+              </button>
+              <button id="tacticalNavCargo" type="button" role="tab" aria-selected="false" onclick="selectTacticalSection('cargo')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10"/></svg>
+                <span>Cargo Hold</span>
+              </button>
+              <button id="tacticalNavComms" type="button" role="tab" aria-selected="false" onclick="selectTacticalSection('comms')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z"/><path d="M8 9h8m-8 3h5"/></svg>
+                <span>Comms</span>
+              </button>
+              <button id="tacticalNavGuild" type="button" role="tab" aria-selected="false" onclick="selectTacticalSection('guild')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7l7-4z"/><path d="M9 10h6m-7 4h8"/></svg>
+                <span>Guild / Alliance</span>
+              </button>
+            </nav>
+            <div id="tacticalPanelContent" class="tactical-panel-content" role="tabpanel" aria-live="polite"></div>
+          </div>
+        </section>
+      </div>
+
       <div class="space-combat-hud compact-hud command-hud player-bottom-hud">
         <div class="vertical-stats hud-panel status-panel">
           <div class="stat-col">
@@ -630,19 +679,21 @@
         <div class="ship-display-panel ship-display-panel-action hud-panel ship-panel">
           <div class="ship-hud-hero-row">
             <div class="ship-card-main">
+              <span id="hudShipName" class="hud-ship-name">LUPEN</span>
               <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image active-player-ship">
             </div>
             <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
           </div>
           <div class="ship-hud-cargo-row">
             <div id="hudCargoSummary" class="hud-cargo-summary" aria-label="Cargo hold">
-              <span>Cargo</span>
-              <strong id="hudCargoCapacityText">0 / 100</strong>
+              <svg class="hud-cargo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10"/></svg>
+              <div class="hud-cargo-copy">
+                <span>Cargo</span>
+                <strong id="hudCargoCapacityText">0 / 100</strong>
+                <small id="hudCargoPercentText">0% CAPACITY</small>
+                <div class="hud-cargo-meter" aria-hidden="true"><i id="hudCargoCapacityFill"></i></div>
+              </div>
               <em id="hudCargoFullBadge" hidden>FULL</em>
-            </div>
-            <div id="hudGuildPlaceholder" class="hud-guild-placeholder" aria-disabled="true">
-              <span>Guild</span>
-              <strong>Soon</strong>
             </div>
           </div>
           <div class="ship-storage-strip ship-action-strip ship-hud-action-row" aria-label="Ship action">
@@ -653,18 +704,18 @@
         </div>
 
         <div class="hud-command-console hud-panel info-panel">
-          <div class="hud-command-tabs info-tabs">
-            <button id="chatDockBtn" class="info-tab active" onclick="openHudPanel('chat')">
+          <div class="hud-command-tabs info-tabs" role="tablist" aria-label="HUD panels">
+            <button id="chatDockBtn" type="button" role="tab" aria-selected="true" class="info-tab active" onclick="openHudPanel('chat')">
               <img src="assets/ui/player-ui/icon-chat.png" alt="" />
               <span>CHAT</span>
             </button>
-            <button id="objectivesDockBtn" class="info-tab" onclick="openHudPanel('objectives')">
-              <img src="assets/ui/player-ui/icon-objectives.png" alt="" />
-              <span>OBJECTIVES</span>
-            </button>
-            <button id="activityDockBtn" class="info-tab" onclick="openHudPanel('activity')">
+            <button id="activityDockBtn" type="button" role="tab" aria-selected="false" class="info-tab" onclick="openHudPanel('activity')">
               <img src="assets/ui/player-ui/icon-activity.png" alt="" />
               <span>ACTIVITY</span>
+            </button>
+            <button id="tacticalDockBtn" type="button" role="tab" aria-selected="false" class="info-tab tactical-info-tab" onclick="openHudPanel('tactical')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/><circle cx="12" cy="12" r="2"/></svg>
+              <span>TACTICAL</span>
             </button>
           </div>
 
@@ -720,6 +771,14 @@
                 </div>
               </div>
             </div>
+
+            <div id="tacticalSummaryPanel" class="hud-panel tactical-summary-panel">
+              <button type="button" class="tactical-summary-card" onclick="openHudPanel('tactical')" aria-label="Toggle Tactical Panel">
+                <span>TACTICAL PANEL OPEN</span>
+                <strong>Manage missions, cargo, comms &amp; more</strong>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -738,7 +797,7 @@
   <script src="js/network/multiplayerClient.js?v=20260715-forged-loadout"></script>
   <script src="js/01-core-state.js?v=20260713-asteroid-shards"></script>
   <script src="js/02-account-navigation.js"></script>
-  <script src="js/03-hud-space-map.js"></script>
+  <script src="js/03-hud-space-map.js?v=20260715-tactical-hud"></script>
   <script src="js/network/multiplayerOverlay.js"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260715-objective-icon"></script>
   <script src="js/05-hangar-store.js?v=20260715-forged-loadout"></script>
@@ -747,7 +806,7 @@
   <script src="js/08-tutorial.js"></script>
   <script src="js/09-audio.js"></script>
   <script src="js/10-upgrade-forge.js?v=20260713-asteroid-shards"></script>
-  <script src="js/11-missions.js"></script>
+  <script src="js/11-missions.js?v=20260715-tactical-hud"></script>
 
     <div id="tutorialOverlay" class="tutorial-overlay" aria-live="polite">
       <div id="tutorialSpotlight" class="tutorial-spotlight" aria-hidden="true"></div>

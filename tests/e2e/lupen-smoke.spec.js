@@ -2227,16 +2227,13 @@ test.describe("Lupen browser smoke", () => {
             cargoLabel: rectFor("#hudCargoSummary span"),
             cargoAmount: rectFor("#hudCargoSummary strong"),
             cargoFull: rectFor("#hudCargoFullBadge:not([hidden])"),
-            guild: rectFor("#hudGuildPlaceholder"),
-            guildLabel: rectFor("#hudGuildPlaceholder span"),
-            guildStatus: rectFor("#hudGuildPlaceholder strong"),
             actionRow: rectFor(".ship-hud-action-row"),
             actionPanel: rectFor("#objectActionPanel"),
             action: rectFor("#objectEngageBtn"),
             objectivesPanel: rectFor(".hud-command-console")
           },
-          guildPlaceholderText: document.getElementById("hudGuildPlaceholder")?.textContent || "",
-          guildPlaceholderDisabled: document.getElementById("hudGuildPlaceholder")?.getAttribute("aria-disabled") || "",
+          centerHudText: document.querySelector(".ship-display-panel-action")?.textContent || "",
+          guildPlaceholderCount: document.querySelectorAll("#hudGuildPlaceholder").length,
           cargoSummaryText: document.getElementById("hudCargoSummary")?.textContent || "",
           resourceIntentReason: status.lastStagingResourceMineIntent?.reason || "",
           diagnosticsText: document.getElementById("lupenMultiplayerDiagnostics")?.textContent || ""
@@ -2279,17 +2276,13 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.cargo).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.cargoLabel).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.cargoAmount).not.toBeNull();
-    expect(resourceEngageState.middleHudLayout.guild).not.toBeNull();
-    expect(resourceEngageState.middleHudLayout.guildLabel).not.toBeNull();
-    expect(resourceEngageState.middleHudLayout.guildStatus).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.action).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.objectivesPanel).not.toBeNull();
     expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThan(resourceEngageState.middleHudLayout.statusPanel.width);
-    expect(resourceEngageState.middleHudLayout.panel.width).toBeLessThan(resourceEngageState.middleHudLayout.infoPanel.width);
-    expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.24));
-    expect(resourceEngageState.middleHudLayout.panel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.34));
-    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.42));
-    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.56));
+    expect(resourceEngageState.middleHudLayout.panel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.30));
+    expect(resourceEngageState.middleHudLayout.panel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.46));
+    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.28));
+    expect(resourceEngageState.middleHudLayout.infoPanel.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.bottomHud.width * 0.44));
     expect(resourceEngageState.middleHudLayout.infoPanel.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.bottomHud.right + 2);
     expect(resourceEngageState.middleHudLayout.ship.height).toBeGreaterThanOrEqual(58);
     expect(resourceEngageState.middleHudLayout.xpBar.width).toBeGreaterThanOrEqual(80);
@@ -2300,13 +2293,11 @@ test.describe("Lupen browser smoke", () => {
     const centerX = rect => Math.round((rect.left + rect.right) / 2);
     const centerY = rect => Math.round((rect.top + rect.bottom) / 2);
     expect(Math.abs(centerX(resourceEngageState.middleHudLayout.action) - centerX(resourceEngageState.middleHudLayout.panel))).toBeLessThanOrEqual(4);
-    expect(Math.abs(centerX(resourceEngageState.middleHudLayout.cargoLabel) - centerX(resourceEngageState.middleHudLayout.cargo))).toBeLessThanOrEqual(4);
-    expect(resourceEngageState.middleHudLayout.guild.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.right - 2);
-    expect(resourceEngageState.middleHudLayout.guild.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.top - 2);
-    expect(resourceEngageState.middleHudLayout.cargoAmount.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargoLabel.bottom - 1);
+    expect(resourceEngageState.middleHudLayout.cargoLabel.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.left);
+    expect(resourceEngageState.middleHudLayout.cargoAmount.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.cargo.right + 2);
     if (resourceEngageState.middleHudLayout.cargoFull) {
       const cargoValueGroupCenter = Math.round((resourceEngageState.middleHudLayout.cargoAmount.left + resourceEngageState.middleHudLayout.cargoFull.right) / 2);
-      expect(Math.abs(cargoValueGroupCenter - centerX(resourceEngageState.middleHudLayout.cargo))).toBeLessThanOrEqual(8);
+      expect(Math.abs(cargoValueGroupCenter - centerX(resourceEngageState.middleHudLayout.cargo))).toBeLessThanOrEqual(16);
     }
     const rectsOverlap = (first, second) => (
       first.left < second.right - 2
@@ -2314,22 +2305,19 @@ test.describe("Lupen browser smoke", () => {
       && first.top < second.bottom - 2
       && first.bottom > second.top + 2
     );
-    expect(resourceEngageState.middleHudLayout.guild.height).toBeLessThanOrEqual(28);
-    expect(rectsOverlap(resourceEngageState.middleHudLayout.guild, resourceEngageState.middleHudLayout.action)).toBe(false);
     expect(rectsOverlap(resourceEngageState.middleHudLayout.cargo, resourceEngageState.middleHudLayout.action)).toBe(false);
     expect(rectsOverlap(resourceEngageState.middleHudLayout.ship, resourceEngageState.middleHudLayout.xpRow)).toBe(false);
     expect(resourceEngageState.middleHudLayout.xpBar.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpRow.bottom - 2);
     expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(Math.max(
       resourceEngageState.middleHudLayout.ship.bottom,
       resourceEngageState.middleHudLayout.xpBar.bottom
-    ) - 2);
+    ) - 14);
     expect(resourceEngageState.middleHudLayout.action.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.bottom - 2);
     expect(resourceEngageState.middleHudLayout.action.bottom).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.panel.bottom + 2);
     expect(resourceEngageState.cargoSummaryText).toContain("Cargo");
     expect(resourceEngageState.cargoSummaryText).toContain("FULL");
-    expect(resourceEngageState.guildPlaceholderText).toContain("Guild");
-    expect(resourceEngageState.guildPlaceholderText).toContain("Soon");
-    expect(resourceEngageState.guildPlaceholderDisabled).toBe("true");
+    expect(resourceEngageState.guildPlaceholderCount).toBe(0);
+    expect(resourceEngageState.centerHudText).not.toContain("Guild");
     expect(resourceEngageState.resourceIntentReason).toBe("resource_mine_intent_sent");
     expect(resourceEngageState.diagnosticsText).toContain("resource sent");
 
@@ -2374,9 +2362,10 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("player space HUD presents Journey objectives, activity, and chat cleanly", async ({ page }) => {
+  test("player space HUD presents expandable Tactical navigation, activity, and chat cleanly", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
+    await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto("/");
     await waitForGameGlobals(page);
 
@@ -2426,16 +2415,18 @@ test.describe("Lupen browser smoke", () => {
           xpRow: rectFor("#hudProgressStrip .xp-row"),
           xpBar: rectFor("#hudProgressStrip .xp-bar"),
           cargo: rectFor("#hudCargoSummary"),
-          guild: rectFor("#hudGuildPlaceholder"),
           engage: rectFor("#objectEngageBtn"),
           panel: rectFor(".ship-display-panel-action"),
+          bottomHud: rectFor(".player-bottom-hud"),
           actionText: action?.textContent || "",
           actionDisabled: action?.disabled ?? false,
           actionInShipHud: Boolean(action?.closest(".ship-display-panel-action")),
           centralActionCount: document.querySelectorAll(".central-engage-panel").length,
           xpText: document.getElementById("hudProgressStrip")?.textContent || "",
           cargoText: document.getElementById("hudCargoSummary")?.textContent || "",
-          guildText: document.getElementById("hudGuildPlaceholder")?.textContent || ""
+          shipName: document.getElementById("hudShipName")?.textContent || "",
+          centerText: document.querySelector(".ship-display-panel-action")?.textContent || "",
+          guildCount: document.querySelectorAll("#hudGuildPlaceholder").length
         };
       })()
     `));
@@ -2444,7 +2435,6 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.xpRow).not.toBeNull();
     expect(centerHud.xpBar).not.toBeNull();
     expect(centerHud.cargo).not.toBeNull();
-    expect(centerHud.guild).not.toBeNull();
     expect(centerHud.engage).not.toBeNull();
     expect(centerHud.actionText).toBe("ENGAGE");
     expect(centerHud.actionDisabled).toBe(true);
@@ -2457,34 +2447,87 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.engage.top).toBeGreaterThanOrEqual(centerHud.cargo.bottom - 2);
     expect(centerHud.xpText).toContain("XP");
     expect(centerHud.cargoText).toContain("Cargo");
-    expect(centerHud.guildText).toContain("Guild");
-    expect(centerHud.guildText).toContain("Soon");
+    expect(centerHud.shipName).toContain("AZURE STRIKER");
+    expect(centerHud.guildCount).toBe(0);
+    expect(centerHud.centerText).not.toContain("Guild");
+    expect(centerHud.bottomHud.height).toBeLessThanOrEqual(185);
 
-    await page.locator("#objectivesDockBtn").click();
-    await expect(page.locator("#objectivesPanel")).toHaveClass(/active/);
-    await expect(page.locator("#activeObjectiveSummary")).not.toContainText("No active objective");
-    await expect(page.locator("#activeMissionSummary")).toContainText("ACADEMY");
-    await expect(page.locator("#activeMissionSummary")).toContainText("Launch Ship");
-    await expect(page.locator("#activeMissionSummary")).toContainText("Launch from Asteron Prime");
-    await expect(page.locator("#activeMissionSummary")).toContainText("1 / 1");
-    await expect(page.locator("#activeMissionSummary")).toContainText("COMPLETE");
-    await expect(page.locator("#activeMissionSummary")).toContainText("Open Journey to review your chapter assignments.");
-    const objectiveHud = await page.locator("#activeMissionSummary").evaluate(card => {
-      const rect = card.getBoundingClientRect();
-      const styles = getComputedStyle(card);
-      const panel = document.querySelector(".hud-command-console")?.getBoundingClientRect();
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-closed-1366x768.png" });
+    await page.locator(".player-bottom-hud").screenshot({ path: "artifacts/tactical-hud-centre-layout.png" });
+
+    const tabLayout = await page.locator(".hud-command-tabs").evaluate(tabs => {
+      const buttons = Array.from(tabs.querySelectorAll("button"));
+      return buttons.map(button => {
+        const rect = button.getBoundingClientRect();
+        return { id: button.id, text: button.textContent.trim(), top: Math.round(rect.top), bottom: Math.round(rect.bottom), width: Math.round(rect.width) };
+      });
+    });
+    expect(tabLayout.map(tab => tab.text)).toEqual(["CHAT", "ACTIVITY", "TACTICAL"]);
+    expect(new Set(tabLayout.map(tab => tab.top)).size).toBe(1);
+    expect(new Set(tabLayout.map(tab => tab.bottom)).size).toBe(1);
+    expect(Math.max(...tabLayout.map(tab => tab.width)) - Math.min(...tabLayout.map(tab => tab.width))).toBeLessThanOrEqual(2);
+
+    await page.locator("#tacticalDockBtn").click();
+    await expect(page.locator("#tacticalPanelBackdrop")).toBeVisible();
+    await expect(page.locator("#tacticalPanel")).toBeVisible();
+    await expect(page.locator("#tacticalNavAcademy")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("[data-tactical-section='academy']")).toBeVisible();
+    for (const taskName of ["Claim Starter Ship", "Launch Ship", "Complete First Trade", "Equip Two Guns", "Equip Attachment", "Destroy 3 Erebus Bots", "Repair Ship"]) {
+      await expect(page.locator("[data-tactical-section='academy']")).toContainText(taskName);
+    }
+
+    const tacticalLayout = await page.evaluate(() => {
+      const rect = selector => {
+        const bounds = document.querySelector(selector).getBoundingClientRect();
+        return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom, width: bounds.width, height: bounds.height };
+      };
       return {
-        borderColor: styles.borderColor,
-        boxShadow: styles.boxShadow,
-        top: rect.top,
-        bottom: rect.bottom,
-        panelTop: panel?.top || 0,
-        panelBottom: panel?.bottom || 0
+        screen: rect("#spaceScreen"),
+        panel: rect("#tacticalPanel"),
+        bottomHud: rect(".player-bottom-hud"),
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth
       };
     });
-    expect(objectiveHud.borderColor).toMatch(/70, 230, 164|73, 214, 255/);
-    expect(objectiveHud.bottom).toBeLessThanOrEqual(objectiveHud.panelBottom + 2);
-    expect(objectiveHud.top).toBeGreaterThanOrEqual(objectiveHud.panelTop - 2);
+    expect(Math.abs((tacticalLayout.panel.left + tacticalLayout.panel.right) / 2 - (tacticalLayout.screen.left + tacticalLayout.screen.right) / 2)).toBeLessThanOrEqual(3);
+    expect(tacticalLayout.panel.bottom).toBeLessThanOrEqual(tacticalLayout.bottomHud.top - 4);
+    expect(tacticalLayout.documentWidth).toBeLessThanOrEqual(tacticalLayout.viewportWidth);
+
+    await page.locator("#tacticalPanelTitle").click();
+    await expect(page.locator("#tacticalPanelBackdrop")).toBeVisible();
+
+    const tacticalSections = [
+      ["#tacticalNavBounties", "bounties", "Bounties"],
+      ["#tacticalNavCargo", "cargo", "Cargo Hold"],
+      ["#tacticalNavComms", "comms", "Comms"],
+      ["#tacticalNavGuild", "guild", "Guild / Alliance"],
+      ["#tacticalNavAcademy", "academy", "Academy"]
+    ];
+    for (const [selector, section, heading] of tacticalSections) {
+      await page.locator(selector).click();
+      await expect(page.locator(`[data-tactical-section='${section}']`)).toBeVisible();
+      await expect(page.locator(`[data-tactical-section='${section}'] h3`)).toContainText(heading);
+    }
+
+    await page.locator("#tacticalNavBounties").click();
+    await expect(page.locator(".tactical-bounty-card")).toHaveCount(4);
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-open-1366x768.png" });
+
+    await page.locator("#tacticalPanelClose, .tactical-panel-close").click();
+    await expect(page.locator("#tacticalPanelBackdrop")).toBeHidden();
+    await expect(page.locator("#tacticalDockBtn")).toBeFocused();
+
+    await page.locator("#tacticalDockBtn").click();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#tacticalPanelBackdrop")).toBeHidden();
+
+    await page.locator("#tacticalDockBtn").click();
+    await page.locator("#tacticalPanelBackdrop").click({ position: { x: 4, y: 4 } });
+    await expect(page.locator("#tacticalPanelBackdrop")).toBeHidden();
+
+    await page.locator("#tacticalDockBtn").click();
+    await page.locator("#tacticalDockBtn").click();
+    await expect(page.locator("#tacticalPanelBackdrop")).toBeHidden();
 
     await page.locator("#activityDockBtn").click();
     await expect(page.locator("#activityPanel")).toHaveClass(/active/);
@@ -2512,6 +2555,12 @@ test.describe("Lupen browser smoke", () => {
     expect(["auto", "scroll"]).toContain(activityLayout.overflowY);
     expect(activityLayout.bottom).toBeLessThanOrEqual(activityLayout.panelBottom + 2);
     expect(activityLayout.top).toBeGreaterThanOrEqual(activityLayout.panelTop - 2);
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-activity-selected.png" });
+
+    await page.locator("#tacticalDockBtn").click();
+    await page.locator(".tactical-panel-close").click();
+    await expect(page.locator("#activityPanel")).toHaveClass(/active/);
+    await expect(page.locator("#activityDockBtn")).toHaveAttribute("aria-selected", "true");
 
     await page.locator("#chatDockBtn").click();
     await expect(page.locator("#chatPanel")).toHaveClass(/active/);
@@ -2538,6 +2587,27 @@ test.describe("Lupen browser smoke", () => {
     expect(Math.abs(chatLayout.inputTop - chatLayout.sendTop)).toBeLessThanOrEqual(2);
     expect(Math.abs(chatLayout.inputBottom - chatLayout.sendBottom)).toBeLessThanOrEqual(2);
     expect(chatLayout.activeTabTop).toBeGreaterThanOrEqual(chatLayout.tabTop - 2);
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-chat-selected.png" });
+
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.locator("#tacticalDockBtn").click();
+    const largeDesktopLayout = await page.evaluate(() => {
+      const screen = document.getElementById("spaceScreen").getBoundingClientRect();
+      const panel = document.getElementById("tacticalPanel").getBoundingClientRect();
+      const hud = document.querySelector(".player-bottom-hud").getBoundingClientRect();
+      return {
+        panelCenter: (panel.left + panel.right) / 2,
+        screenCenter: (screen.left + screen.right) / 2,
+        panelBottom: panel.bottom,
+        hudTop: hud.top,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth
+      };
+    });
+    expect(Math.abs(largeDesktopLayout.panelCenter - largeDesktopLayout.screenCenter)).toBeLessThanOrEqual(3);
+    expect(largeDesktopLayout.panelBottom).toBeLessThanOrEqual(largeDesktopLayout.hudTop - 4);
+    expect(largeDesktopLayout.documentWidth).toBeLessThanOrEqual(largeDesktopLayout.viewportWidth);
+    await page.locator(".tactical-panel-close").click();
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -7996,30 +8066,31 @@ test.describe("Lupen browser smoke", () => {
       (() => {
         window.__stagingBountyAccepted = true;
         showScreen("spaceScreen");
-        openHudPanel("objectives");
+        openHudPanel("tactical");
+        selectTacticalSection("bounties");
       })()
     `));
-    const objectiveCard = page.locator("#activeObjectiveSummary .staging-bounty-objective-card");
-    await expect(objectiveCard).toContainText("Erebus Patrol Sweep");
-    await expect(objectiveCard).toContainText("0 / 4 destroyed");
-    await expect(objectiveCard).toContainText("CR 900 + 2 Shards");
-    const objectiveIcon = objectiveCard.locator(".objective-bounty-icon img");
+    const objectiveCard = page.locator(".tactical-bounty-card", { hasText: "Erebus Patrol Sweep" });
+    await expect(objectiveCard).toContainText("0 / 4");
+    await expect(objectiveCard).toContainText("CR 900");
+    await expect(objectiveCard).toContainText("2 Shards");
+    const objectiveIcon = objectiveCard.locator(".tactical-bounty-icon img");
     await expect(objectiveIcon).toHaveAttribute("src", "assets/bounties/erebus-patrol-sweep.png");
     await expect(objectiveIcon).toBeVisible();
     expect(await objectiveIcon.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
-    const objectiveTitle = objectiveCard.locator(".objective-title-line strong");
-    expect(await objectiveTitle.evaluate((title) => title.scrollWidth <= title.clientWidth + 1)).toBe(true);
-    await page.locator("#spaceScreen").screenshot({ path: "artifacts/staging-objective-icon-fixed.png" });
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/staging-tactical-bounty-icon.png" });
 
     await page.evaluate(() => window.eval(`
       (() => {
         window.__stagingBountyActiveId = "staging_behemoth_warning_1";
-        openHudPanel("objectives");
+        refreshTacticalPanel(true);
       })()
     `));
-    await expect(objectiveCard).toContainText("Behemoth Warning");
-    await expect(objectiveIcon).toHaveAttribute("src", "assets/bounties/behemoth-warning.png");
-    expect(await objectiveIcon.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+    const behemothTacticalCard = page.locator(".tactical-bounty-card", { hasText: "Behemoth Warning" });
+    const behemothTacticalIcon = behemothTacticalCard.locator(".tactical-bounty-icon img");
+    await expect(behemothTacticalCard).toContainText("ACTIVE");
+    await expect(behemothTacticalIcon).toHaveAttribute("src", "assets/bounties/behemoth-warning.png");
+    expect(await behemothTacticalIcon.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

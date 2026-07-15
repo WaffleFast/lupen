@@ -49441,3 +49441,929 @@ input::placeholder {
     white-space: nowrap;
   }
 }
+
+/* ===== Expandable tactical space HUD ===== */
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+  grid-template-columns: minmax(250px, 0.78fr) minmax(400px, 1.35fr) minmax(390px, 1.18fr) !important;
+  gap: 14px !important;
+  height: 156px !important;
+  min-height: 156px !important;
+  max-height: 156px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(76px, 1fr) 31px 34px !important;
+  gap: 3px !important;
+  height: 156px !important;
+  min-height: 156px !important;
+  max-height: 156px !important;
+  padding: 7px 12px !important;
+  overflow: hidden !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-hud-hero-row {
+  display: grid !important;
+  grid-template-columns: minmax(150px, 0.82fr) minmax(210px, 1.18fr) !important;
+  gap: 14px !important;
+  min-height: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-card-main {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-card-main::before {
+  width: 96px !important;
+  height: 96px !important;
+  transform: translate(-50%, -50%) scale(1.15) !important;
+  opacity: 0.5 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-ship-name {
+  position: absolute !important;
+  top: 0 !important;
+  left: 8px !important;
+  z-index: 2 !important;
+  color: #5fe3ff !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.18em !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+  text-shadow: 0 0 8px rgba(54, 215, 255, 0.5) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .active-player-ship,
+.player-orbit-screen .player-bottom-hud .hud-ship-image {
+  width: 136px !important;
+  max-width: 94% !important;
+  height: 94px !important;
+  max-height: 94px !important;
+  transform: translateY(6px) !important;
+  object-fit: contain !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress {
+  display: grid !important;
+  grid-template-columns: 58px minmax(0, 1fr) !important;
+  grid-template-rows: 46px 20px 8px !important;
+  gap: 4px 10px !important;
+  align-content: center !important;
+  min-width: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress .level-badge,
+.player-orbit-screen .player-bottom-hud .level-badge {
+  grid-column: 1 !important;
+  grid-row: 1 / 3 !important;
+  align-self: center !important;
+  justify-self: stretch !important;
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  min-height: 58px !important;
+  border-color: rgba(59, 215, 255, 0.72) !important;
+  background: linear-gradient(180deg, rgba(9, 41, 70, 0.92), rgba(3, 15, 29, 0.94)) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress .xp-row,
+.player-orbit-screen .player-bottom-hud .xp-row {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: end !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  font-size: 11px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress .xp-bar,
+.player-orbit-screen .player-bottom-hud .xp-bar {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  align-self: center !important;
+  height: 8px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-hud-cargo-row {
+  display: block !important;
+  width: calc(59% - 7px) !important;
+  min-width: 210px !important;
+  justify-self: end !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary {
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) auto !important;
+  grid-template-rows: 1fr !important;
+  align-items: center !important;
+  gap: 7px !important;
+  width: 100% !important;
+  height: 31px !important;
+  min-height: 31px !important;
+  padding: 3px 8px !important;
+  text-align: left !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-icon {
+  display: block !important;
+  width: 22px !important;
+  height: 22px !important;
+  fill: none !important;
+  stroke: #21d7ff !important;
+  stroke-width: 1.6 !important;
+  filter: drop-shadow(0 0 5px rgba(33, 215, 255, 0.42)) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-copy {
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  grid-template-rows: 12px 8px !important;
+  align-items: center !important;
+  column-gap: 7px !important;
+  min-width: 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span,
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong,
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > small {
+  position: static !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+  text-align: left !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span {
+  color: #35d9ff !important;
+  font-size: 9px !important;
+  letter-spacing: 0.1em !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong {
+  color: #f4fbff !important;
+  font-size: 12px !important;
+  justify-self: end !important;
+  white-space: nowrap !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > small {
+  grid-column: 1 / -1 !important;
+  color: rgba(188, 219, 235, 0.7) !important;
+  font-size: 7px !important;
+  letter-spacing: 0.04em !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-meter {
+  grid-column: 1 / -1 !important;
+  height: 3px !important;
+  overflow: hidden !important;
+  border-radius: 999px !important;
+  background: rgba(42, 85, 111, 0.56) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-meter i {
+  display: block !important;
+  width: 0;
+  height: 100% !important;
+  border-radius: inherit !important;
+  background: linear-gradient(90deg, #11bce8, #51f0ff) !important;
+  box-shadow: 0 0 7px rgba(45, 222, 255, 0.55) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary em {
+  position: static !important;
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-action-strip.ship-hud-action-row,
+.player-orbit-screen .player-bottom-hud #objectActionPanel,
+.player-orbit-screen .player-bottom-hud .hud-engage-panel,
+.player-orbit-screen .player-bottom-hud .hud-engage-panel:not(.visible),
+.player-orbit-screen .player-bottom-hud .hud-engage-panel.visible {
+  min-height: 34px !important;
+  height: 34px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-engage-panel .engage-action {
+  width: min(350px, 82%) !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  margin: 0 !important;
+  border-radius: 5px !important;
+  font-size: 15px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-console.info-panel {
+  grid-template-rows: 30px minmax(0, 1fr) !important;
+  height: 156px !important;
+  min-height: 156px !important;
+  max-height: 156px !important;
+  padding: 8px 10px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-tabs.info-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-tabs .info-tab {
+  height: 29px !important;
+  min-height: 29px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-command-tabs .info-tab svg {
+  width: 15px !important;
+  height: 15px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.7 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel > #objectivesPanel,
+.player-orbit-screen .player-bottom-hud .hud-inline-panel.compact-tabs-panel > #inventoryPanel {
+  display: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .tactical-summary-panel.active {
+  display: grid !important;
+  place-items: stretch !important;
+}
+
+.player-orbit-screen .player-bottom-hud .tactical-summary-card {
+  position: relative !important;
+  display: grid !important;
+  align-content: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  padding: 12px 42px 12px 16px !important;
+  border: 1px solid rgba(63, 184, 239, 0.2) !important;
+  border-radius: 5px !important;
+  background: linear-gradient(100deg, rgba(5, 26, 45, 0.78), rgba(2, 12, 25, 0.62)) !important;
+  color: #e8f8ff !important;
+  text-align: left !important;
+  box-shadow: inset 0 0 20px rgba(12, 132, 190, 0.06) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .tactical-summary-card span {
+  color: #37d7ff !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.08em !important;
+}
+
+.player-orbit-screen .player-bottom-hud .tactical-summary-card strong {
+  color: rgba(216, 235, 246, 0.76) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .tactical-summary-card svg {
+  position: absolute !important;
+  right: 14px !important;
+  top: 50% !important;
+  width: 24px !important;
+  height: 24px !important;
+  transform: translateY(-50%) !important;
+  fill: none !important;
+  stroke: #43dbff !important;
+  stroke-width: 2 !important;
+}
+
+.tactical-panel-backdrop[hidden] {
+  display: none !important;
+}
+
+.player-orbit-screen .tactical-panel-backdrop {
+  position: absolute;
+  inset: 0 0 184px;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  padding: 24px 40px;
+  background: rgba(0, 5, 13, 0.14);
+  backdrop-filter: blur(1px);
+}
+
+.player-orbit-screen .tactical-panel {
+  position: relative;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr);
+  width: min(960px, calc(100% - 36px));
+  height: min(440px, calc(100% - 36px));
+  min-height: min(410px, calc(100% - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(35, 205, 255, 0.82);
+  border-radius: 12px;
+  outline: none;
+  color: #eaf8ff;
+  background:
+    linear-gradient(180deg, rgba(5, 20, 38, 0.97), rgba(1, 9, 20, 0.98)),
+    radial-gradient(circle at 50% 0, rgba(35, 163, 239, 0.18), transparent 50%);
+  box-shadow: 0 0 36px rgba(0, 157, 231, 0.2), inset 0 0 40px rgba(18, 120, 184, 0.06);
+}
+
+.player-orbit-screen .tactical-panel::before,
+.player-orbit-screen .tactical-panel::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  width: 78px;
+  height: 14px;
+  border-top: 2px solid #27d7ff;
+  pointer-events: none;
+}
+
+.player-orbit-screen .tactical-panel::before { top: 0; left: 18px; transform: skewX(-38deg); }
+.player-orbit-screen .tactical-panel::after { right: 18px; bottom: 0; transform: rotate(180deg) skewX(-38deg); }
+
+.player-orbit-screen .tactical-panel-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 12px 0 18px;
+  border-bottom: 1px solid rgba(50, 185, 237, 0.24);
+  background: linear-gradient(180deg, rgba(9, 40, 68, 0.84), rgba(4, 19, 36, 0.48));
+}
+
+.player-orbit-screen .tactical-panel-header h2 {
+  grid-column: 2;
+  margin: 0;
+  color: #bce9ff;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-shadow: 0 0 10px rgba(78, 180, 255, 0.55);
+}
+
+.player-orbit-screen .tactical-panel-header-line {
+  height: 1px;
+  margin-right: 24px;
+  background: linear-gradient(90deg, transparent, rgba(48, 198, 255, 0.45));
+}
+
+.player-orbit-screen .tactical-panel-close {
+  grid-column: 3;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(44, 197, 255, 0.55);
+  border-radius: 6px;
+  background: rgba(5, 26, 47, 0.86);
+  color: #d7f5ff;
+}
+
+.player-orbit-screen .tactical-panel-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+}
+
+.player-orbit-screen .tactical-panel-layout {
+  display: grid;
+  grid-template-columns: 178px minmax(0, 1fr);
+  min-height: 0;
+  padding: 10px;
+}
+
+.player-orbit-screen .tactical-panel-nav {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  padding: 6px 12px 6px 2px;
+  border-right: 1px solid rgba(46, 177, 230, 0.2);
+}
+
+.player-orbit-screen .tactical-panel-nav button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid rgba(68, 175, 224, 0.28);
+  border-radius: 5px;
+  background: linear-gradient(90deg, rgba(5, 22, 39, 0.82), rgba(3, 14, 27, 0.66));
+  color: rgba(184, 216, 234, 0.86);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.player-orbit-screen .tactical-panel-nav button svg,
+.player-orbit-screen .tactical-heading-icon svg,
+.player-orbit-screen .tactical-summary-icon svg,
+.player-orbit-screen .tactical-task-icon svg,
+.player-orbit-screen .tactical-placeholder-card > span svg,
+.player-orbit-screen .tactical-bounty-icon > svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.player-orbit-screen .tactical-panel-nav button.active {
+  border-color: rgba(49, 208, 255, 0.84);
+  color: #dff8ff;
+  background: linear-gradient(90deg, rgba(10, 82, 130, 0.68), rgba(4, 22, 42, 0.88));
+  box-shadow: inset 3px 0 0 #35d9ff, 0 0 16px rgba(24, 178, 240, 0.15);
+}
+
+.player-orbit-screen .tactical-panel-nav button.active svg { color: #62e5ff; filter: drop-shadow(0 0 5px rgba(55, 215, 255, 0.52)); }
+
+.player-orbit-screen .tactical-panel-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 218px;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px 2px 4px 14px;
+  overflow: hidden;
+}
+
+.player-orbit-screen .tactical-primary-column,
+.player-orbit-screen .tactical-full-view {
+  min-width: 0;
+  min-height: 0;
+}
+
+.player-orbit-screen .tactical-full-view {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  overflow: hidden;
+}
+
+.player-orbit-screen .tactical-content-heading {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid rgba(62, 185, 235, 0.2);
+}
+
+.player-orbit-screen .tactical-heading-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: #38d8ff;
+}
+
+.player-orbit-screen .tactical-content-heading h3,
+.player-orbit-screen .tactical-content-heading p,
+.player-orbit-screen .tactical-summary-box h4 {
+  margin: 0;
+}
+
+.player-orbit-screen .tactical-content-heading h3 {
+  color: #f2fbff;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-orbit-screen .tactical-content-heading p {
+  margin-top: 3px;
+  color: rgba(198, 220, 234, 0.78);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.player-orbit-screen .tactical-heading-chip,
+.player-orbit-screen .tactical-status-chip,
+.player-orbit-screen .tactical-task-status {
+  padding: 5px 7px;
+  border: 1px solid rgba(46, 199, 241, 0.34);
+  border-radius: 5px;
+  background: rgba(5, 31, 51, 0.78);
+  color: #46dfff;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+.player-orbit-screen .tactical-task-list {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 0;
+  padding-top: 6px;
+  overflow: auto;
+}
+
+.player-orbit-screen .tactical-task-row {
+  display: grid;
+  grid-template-columns: 28px minmax(130px, 1fr) minmax(92px, 0.62fr) 70px;
+  align-items: center;
+  gap: 8px;
+  min-height: 39px;
+  padding: 5px 7px;
+  border: 1px solid rgba(61, 151, 196, 0.18);
+  border-radius: 5px;
+  background: rgba(4, 18, 32, 0.56);
+}
+
+.player-orbit-screen .tactical-task-row.is-complete {
+  border-color: rgba(55, 220, 164, 0.3);
+  background: linear-gradient(90deg, rgba(5, 42, 42, 0.55), rgba(4, 18, 32, 0.5));
+}
+
+.player-orbit-screen .tactical-task-icon {
+  display: grid;
+  place-items: center;
+  color: #88b9d6;
+}
+
+.player-orbit-screen .tactical-task-icon svg { width: 19px; height: 19px; }
+.player-orbit-screen .tactical-task-row.is-complete .tactical-task-icon { color: #3be6ac; }
+
+.player-orbit-screen .tactical-task-copy {
+  min-width: 0;
+}
+
+.player-orbit-screen .tactical-task-copy strong,
+.player-orbit-screen .tactical-task-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-orbit-screen .tactical-task-copy strong { color: #edf8ff; font-size: 10px; }
+.player-orbit-screen .tactical-task-copy span { margin-top: 2px; color: rgba(178, 204, 219, 0.66); font-size: 8px; }
+
+.player-orbit-screen .tactical-task-progress {
+  display: grid;
+  grid-template-columns: minmax(42px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.player-orbit-screen .tactical-task-progress b { color: #dbeef8; font-size: 9px; white-space: nowrap; }
+
+.player-orbit-screen .tactical-task-row.is-complete .tactical-task-status {
+  border-color: rgba(44, 220, 158, 0.38);
+  background: rgba(3, 51, 41, 0.64);
+  color: #42e5aa;
+}
+
+.player-orbit-screen .tactical-meter {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(28, 71, 94, 0.54);
+}
+
+.player-orbit-screen .tactical-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f9fdf, #39ddff);
+  box-shadow: 0 0 8px rgba(41, 213, 255, 0.42);
+}
+
+.player-orbit-screen .tactical-summary-column {
+  display: grid;
+  grid-template-rows: minmax(0, 1.3fr) auto auto;
+  align-content: stretch;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.player-orbit-screen .tactical-summary-box {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(56, 171, 222, 0.32);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(5, 24, 42, 0.76), rgba(2, 13, 26, 0.7));
+}
+
+.player-orbit-screen .tactical-summary-box h4 {
+  color: #9fcfed;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.player-orbit-screen .tactical-summary-bounty {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.player-orbit-screen .tactical-bounty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 1px solid rgba(90, 197, 244, 0.42);
+  border-radius: 6px;
+  color: #66dfff;
+  background: rgba(2, 10, 22, 0.82);
+}
+
+.player-orbit-screen .tactical-bounty-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.player-orbit-screen .tactical-summary-bounty strong,
+.player-orbit-screen .tactical-summary-bounty span,
+.player-orbit-screen .tactical-summary-bounty small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-orbit-screen .tactical-summary-bounty strong { color: #f3fbff; font-size: 11px; }
+.player-orbit-screen .tactical-summary-bounty span { margin-top: 5px; color: #bfd7e5; font-size: 9px; }
+.player-orbit-screen .tactical-summary-bounty small { margin-top: 3px; color: #8aaabe; font-size: 8px; }
+
+.player-orbit-screen .tactical-summary-reward {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(55, 166, 215, 0.18);
+  font-size: 9px;
+}
+
+.player-orbit-screen .tactical-summary-reward span { color: #91b9d0; text-transform: uppercase; }
+.player-orbit-screen .tactical-summary-reward strong { color: #ecf8ff; text-align: right; }
+.player-orbit-screen .tactical-summary-empty { margin-top: 18px; color: #86a5b8; font-size: 9px; line-height: 1.4; }
+
+.player-orbit-screen .cargo-summary-box,
+.player-orbit-screen .comms-summary-box {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.player-orbit-screen .tactical-summary-icon { color: #35d9ff; }
+.player-orbit-screen .tactical-summary-icon svg { width: 27px; height: 27px; }
+.player-orbit-screen .cargo-summary-box strong,
+.player-orbit-screen .comms-summary-box strong { display: block; margin: 4px 0; color: #e5f5ff; font-size: 10px; }
+.player-orbit-screen .cargo-summary-box small,
+.player-orbit-screen .comms-summary-box small { display: block; margin-top: 4px; color: #89aabd; font-size: 8px; text-transform: uppercase; }
+
+.player-orbit-screen .tactical-bounty-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 9px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.player-orbit-screen .tactical-bounty-card {
+  display: grid;
+  grid-template-rows: minmax(56px, 1fr) auto auto;
+  gap: 8px;
+  min-width: 0;
+  min-height: 124px;
+  padding: 10px;
+  border: 1px solid rgba(58, 171, 222, 0.28);
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(6, 26, 45, 0.85), rgba(2, 12, 25, 0.76));
+}
+
+.player-orbit-screen .tactical-bounty-card-top {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 9px;
+  min-width: 0;
+}
+
+.player-orbit-screen .tactical-bounty-card h4,
+.player-orbit-screen .tactical-bounty-card p { margin: 0; }
+.player-orbit-screen .tactical-bounty-card h4 { color: #f1faff; font-size: 11px; }
+.player-orbit-screen .tactical-bounty-card p { margin-top: 4px; color: #9bb9ca; font-size: 9px; line-height: 1.25; }
+.player-orbit-screen .tactical-bounty-card .tactical-bounty-icon { width: 48px; height: 48px; }
+.player-orbit-screen .tactical-bounty-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.player-orbit-screen .tactical-bounty-progress strong { color: #dbeef8; font-size: 9px; }
+.player-orbit-screen .tactical-bounty-card footer { display: flex; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid rgba(57, 161, 207, 0.16); color: #49dfff; font-size: 9px; }
+.player-orbit-screen .tactical-bounty-card footer small { color: #f2c768; text-align: right; }
+
+.player-orbit-screen .tactical-cargo-view {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.player-orbit-screen .tactical-cargo-capacity {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 8px 10px;
+  border: 1px solid rgba(54, 169, 220, 0.24);
+  border-radius: 6px;
+  background: rgba(4, 21, 37, 0.64);
+}
+
+.player-orbit-screen .tactical-cargo-capacity strong,
+.player-orbit-screen .tactical-cargo-capacity span { display: block; }
+.player-orbit-screen .tactical-cargo-capacity strong { color: #39dbff; font-size: 10px; }
+.player-orbit-screen .tactical-cargo-capacity span { margin-top: 3px; color: #8cabbc; font-size: 8px; }
+
+.player-orbit-screen .tactical-cargo-ledgers {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.player-orbit-screen .tactical-cargo-ledgers > section {
+  min-height: 0;
+  padding: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(55, 162, 211, 0.22);
+  border-radius: 6px;
+  background: rgba(3, 16, 29, 0.62);
+}
+
+.player-orbit-screen .tactical-cargo-ledgers h4 { margin: 0 0 8px; color: #a8d7ee; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; }
+.player-orbit-screen .tactical-ledger-list,
+.player-orbit-screen .tactical-found-grid { display: grid; align-content: start; gap: 5px; min-height: 0; max-height: calc(100% - 22px); overflow: auto; }
+
+.player-orbit-screen .tactical-cargo-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(130px, auto);
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 5px;
+  background: rgba(6, 29, 48, 0.58);
+}
+
+.player-orbit-screen .tactical-cargo-item > img,
+.player-orbit-screen .tactical-found-item > img { width: 30px; height: 30px; object-fit: contain; }
+.player-orbit-screen .tactical-cargo-item strong,
+.player-orbit-screen .tactical-cargo-item span,
+.player-orbit-screen .tactical-found-item strong,
+.player-orbit-screen .tactical-found-item span { display: block; }
+.player-orbit-screen .tactical-cargo-item strong,
+.player-orbit-screen .tactical-found-item strong { color: #eaf8ff; font-size: 9px; }
+.player-orbit-screen .tactical-cargo-item span,
+.player-orbit-screen .tactical-found-item span { margin-top: 2px; color: #85a7ba; font-size: 8px; }
+.player-orbit-screen .tactical-cargo-item dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin: 0; }
+.player-orbit-screen .tactical-cargo-item dl div { padding: 3px 6px; border: 1px solid rgba(55, 170, 217, 0.16); border-radius: 4px; }
+.player-orbit-screen .tactical-cargo-item dt { color: #7f9fb2; font-size: 7px; text-transform: uppercase; }
+.player-orbit-screen .tactical-cargo-item dd { margin: 2px 0 0; color: #52ddff; font-size: 9px; font-weight: 900; }
+
+.player-orbit-screen .tactical-found-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border-radius: 5px;
+  background: rgba(6, 29, 48, 0.58);
+}
+.player-orbit-screen .tactical-found-item b { color: #51dfff; font-size: 10px; }
+
+.player-orbit-screen .tactical-comms-view {
+  grid-template-rows: auto 30px minmax(0, 1fr) 34px;
+}
+
+.player-orbit-screen .tactical-chat-channels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.player-orbit-screen .tactical-chat-channels button {
+  border: 1px solid rgba(55, 164, 215, 0.26);
+  border-radius: 4px;
+  background: rgba(4, 20, 35, 0.72);
+  color: #8daec1;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.player-orbit-screen .tactical-chat-channels button.active { border-color: rgba(53, 212, 255, 0.74); background: rgba(9, 68, 105, 0.62); color: #e5f9ff; }
+.player-orbit-screen .tactical-chat-channels button:disabled { opacity: 0.42; }
+
+.player-orbit-screen .tactical-chat-feed {
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgba(53, 163, 212, 0.2);
+  border-radius: 5px;
+  background: rgba(1, 10, 20, 0.66);
+}
+
+.player-orbit-screen .tactical-chat-line { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 8px; padding: 5px 3px; border-bottom: 1px solid rgba(58, 150, 192, 0.1); font-size: 10px; }
+.player-orbit-screen .tactical-chat-line strong { color: #3fdcff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-orbit-screen .tactical-chat-line span { color: #d7eaf4; overflow-wrap: anywhere; }
+
+.player-orbit-screen .tactical-chat-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  gap: 7px;
+}
+
+.player-orbit-screen .tactical-chat-input-row input,
+.player-orbit-screen .tactical-chat-input-row button {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid rgba(57, 182, 232, 0.42);
+  border-radius: 5px;
+  background: rgba(3, 19, 34, 0.84);
+  color: #e5f7ff;
+}
+.player-orbit-screen .tactical-chat-input-row input { padding: 0 10px; }
+.player-orbit-screen .tactical-chat-input-row button { color: #4bdeff; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+
+.player-orbit-screen .tactical-guild-view { grid-template-rows: auto minmax(0, 1fr); }
+.player-orbit-screen .tactical-placeholder-card { display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center; border: 1px solid rgba(52, 165, 217, 0.2); border-radius: 7px; background: radial-gradient(circle, rgba(21, 104, 153, 0.13), rgba(2, 12, 24, 0.48) 58%); }
+.player-orbit-screen .tactical-placeholder-card > span { display: grid; place-items: center; width: 58px; height: 58px; border: 1px solid rgba(53, 205, 255, 0.48); border-radius: 50%; color: #45ddff; }
+.player-orbit-screen .tactical-placeholder-card > span svg { width: 32px; height: 32px; }
+.player-orbit-screen .tactical-placeholder-card h4,
+.player-orbit-screen .tactical-placeholder-card p { margin: 0; }
+.player-orbit-screen .tactical-placeholder-card h4 { color: #eaf9ff; font-size: 14px; }
+.player-orbit-screen .tactical-placeholder-card p { max-width: 460px; color: #8eafc1; font-size: 10px; line-height: 1.5; }
+
+.player-orbit-screen .tactical-empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  color: #829fb1;
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.player-orbit-screen .tactical-panel button:focus-visible,
+.player-orbit-screen .tactical-panel input:focus-visible,
+.player-orbit-screen .player-bottom-hud .hud-command-tabs button:focus-visible {
+  outline: 2px solid #71e8ff !important;
+  outline-offset: 2px !important;
+}
+
+.player-orbit-screen .tactical-task-list,
+.player-orbit-screen .tactical-bounty-grid,
+.player-orbit-screen .tactical-ledger-list,
+.player-orbit-screen .tactical-found-grid,
+.player-orbit-screen .tactical-chat-feed {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(71, 190, 235, 0.72) rgba(3, 17, 30, 0.72);
+}
+
+@media (max-width: 1180px) {
+  .player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud {
+    grid-template-columns: minmax(220px, 0.72fr) minmax(360px, 1.25fr) minmax(340px, 1.08fr) !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .ship-hud-hero-row {
+    grid-template-columns: minmax(125px, 0.75fr) minmax(190px, 1.25fr) !important;
+  }
+
+  .player-orbit-screen .tactical-panel-layout { grid-template-columns: 154px minmax(0, 1fr); }
+  .player-orbit-screen .tactical-panel-nav button { padding: 0 8px; font-size: 9px; }
+  .player-orbit-screen .tactical-panel-content { grid-template-columns: minmax(0, 1fr) 200px; }
+}
+
+@media (max-height: 720px) and (min-width: 901px) {
+  .player-orbit-screen .tactical-panel-backdrop { bottom: 174px; padding-block: 14px; }
+  .player-orbit-screen .tactical-panel { height: min(410px, calc(100% - 20px)); min-height: min(380px, calc(100% - 20px)); }
+  .player-orbit-screen .tactical-panel-nav { gap: 5px; }
+  .player-orbit-screen .tactical-panel-nav button { min-height: 43px; }
+  .player-orbit-screen .tactical-task-row { min-height: 36px; padding-block: 4px; }
+}

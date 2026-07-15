@@ -1,13 +1,36 @@
 ﻿let activeHudPanel = "chat";
+let lastCompactHudPanel = "chat";
+let tacticalPanelOpen = false;
+let activeTacticalSection = "academy";
 let targetCollapseTimer = null;
 let inventoryDrawerFilter = "equipment";
 let selectedInventoryDetailId = null;
 let selectedLoadoutDetail = null;
 const INVENTORY_DRAWER_MAX_CARDS = 12;
+const TACTICAL_SECTIONS = Object.freeze(["academy", "bounties", "cargo", "comms", "guild"]);
 
 function openHudPanel(panelName) {
-  if (panelName === "sector") panelName = "objectives";
+  if (panelName === "sector") {
+    activateCompactHudPanel("chat");
+    return;
+  }
+  if (panelName === "objectives") {
+    activeTacticalSection = "academy";
+    openTacticalPanel();
+    return;
+  }
+  if (panelName === "tactical") {
+    if (tacticalPanelOpen) closeTacticalPanel();
+    else openTacticalPanel();
+    return;
+  }
+  if (tacticalPanelOpen) closeTacticalPanel({ restorePanel: false, returnFocus: false });
+  activateCompactHudPanel(panelName);
+}
+
+function activateCompactHudPanel(panelName) {
   activeHudPanel = panelName;
+  if (["chat", "activity"].includes(panelName)) lastCompactHudPanel = panelName;
 
   document.querySelectorAll(".hud-inline-panel .hud-panel").forEach(panel => {
     panel.classList.remove("active");
@@ -15,13 +38,17 @@ function openHudPanel(panelName) {
 
   document.querySelectorAll(".hud-command-tabs button").forEach(button => {
     button.classList.remove("active");
+    button.setAttribute("aria-selected", "false");
   });
 
   const panel = document.getElementById(`${panelName}Panel`);
   const dockButton = document.getElementById(`${panelName}DockBtn`);
 
   if (panel) panel.classList.add("active");
-  if (dockButton) dockButton.classList.add("active");
+  if (dockButton) {
+    dockButton.classList.add("active");
+    dockButton.setAttribute("aria-selected", "true");
+  }
 
   if (panelName === "chat" && typeof renderMultiplayerChatHud === "function") {
     renderMultiplayerChatHud();
@@ -33,6 +60,428 @@ function openHudPanel(panelName) {
   if (drawer && panelName !== "inventory") {
     drawer.classList.remove("active");
   }
+}
+
+function openTacticalPanel() {
+  const backdrop = document.getElementById("tacticalPanelBackdrop");
+  const panel = document.getElementById("tacticalPanel");
+  if (!backdrop || !panel) return;
+
+  if (["chat", "activity"].includes(activeHudPanel)) lastCompactHudPanel = activeHudPanel;
+  tacticalPanelOpen = true;
+  activeHudPanel = "tactical";
+  document.querySelectorAll(".hud-inline-panel .hud-panel").forEach(item => item.classList.remove("active"));
+  document.querySelectorAll(".hud-command-tabs button").forEach(button => {
+    const selected = button.id === "tacticalDockBtn";
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+  });
+  document.getElementById("tacticalSummaryPanel")?.classList.add("active");
+
+  backdrop.hidden = false;
+  backdrop.removeAttribute("inert");
+  backdrop.setAttribute("aria-hidden", "false");
+  document.getElementById("spaceScreen")?.classList.add("tactical-panel-is-open");
+  renderTacticalPanel(true);
+  requestAnimationFrame(() => panel.focus({ preventScroll: true }));
+}
+
+function closeTacticalPanel(options = {}) {
+  const backdrop = document.getElementById("tacticalPanelBackdrop");
+  if (!backdrop || !tacticalPanelOpen) return;
+  const restorePanel = options.restorePanel !== false;
+  const returnFocus = options.returnFocus !== false;
+
+  tacticalPanelOpen = false;
+  backdrop.hidden = true;
+  backdrop.setAttribute("inert", "");
+  backdrop.setAttribute("aria-hidden", "true");
+  document.getElementById("spaceScreen")?.classList.remove("tactical-panel-is-open");
+  if (restorePanel) activateCompactHudPanel(lastCompactHudPanel || "chat");
+  if (returnFocus) requestAnimationFrame(() => document.getElementById("tacticalDockBtn")?.focus({ preventScroll: true }));
+}
+
+function handleTacticalBackdropClick(event) {
+  if (event?.target === document.getElementById("tacticalPanelBackdrop")) closeTacticalPanel();
+}
+
+function selectTacticalSection(sectionName) {
+  if (!TACTICAL_SECTIONS.includes(sectionName)) return;
+  activeTacticalSection = sectionName;
+  renderTacticalPanel(true);
+}
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && tacticalPanelOpen) {
+    event.preventDefault();
+    closeTacticalPanel();
+  }
+});
+
+function escapeTacticalHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function getTacticalIconSvg(name = "academy") {
+  const paths = {
+    academy: '<path d="M3 8l9-5 9 5-9 5-9-5zm3 3v6l6 4 6-4v-6"/>',
+    bounties: '<circle cx="12" cy="12" r="7"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4m-10-6v12M6 12h12"/>',
+    cargo: '<path d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10"/>',
+    comms: '<path d="M4 5h16v11H9l-5 4V5z"/><path d="M8 9h8m-8 3h5"/>',
+    guild: '<path d="M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7l7-4z"/><path d="M9 10h6m-7 4h8"/>',
+    ship: '<path d="M12 3l4 6-1 8-3 4-3-4-1-8 4-6zM8 12l-4 4 5-1m7-3 4 4-5-1"/>',
+    trade: '<path d="M4 8h12l-2-3m2 3-2 3M20 16H8l2 3m-2-3 2-3"/>',
+    repair: '<path d="M14 5a5 5 0 01-6 6l-5 5 5 5 5-5a5 5 0 006-6l-3 2-3-3 1-4z"/>',
+    combat: '<path d="M5 4l6 6-3 3-6-6 3-3zm14 0-6 6 3 3 6-6-3-3M9 14l-5 5m11-5 5 5"/>'
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.academy}</svg>`;
+}
+
+function getTacticalCargoState() {
+  const used = typeof cargoUsed === "function" ? Math.max(0, Number(cargoUsed() || 0)) : 0;
+  const capacity = typeof getShipStats === "function" ? Math.max(0, Number(getShipStats()?.cargo || 0)) : 0;
+  const percent = capacity > 0 ? Math.max(0, Math.min(100, Math.round((used / capacity) * 100))) : 0;
+  return { used, capacity, percent };
+}
+
+function getTacticalTrackedBounty() {
+  if (typeof isMultiplayerStagingActive === "function" && isMultiplayerStagingActive() &&
+      typeof getActiveMultiplayerStagingBountyObjective === "function") {
+    const staging = getActiveMultiplayerStagingBountyObjective();
+    if (staging) {
+      return {
+        title: staging.title || staging.name || "Active Bounty",
+        icon: typeof getBountyIconSrc === "function" ? getBountyIconSrc(staging.icon || staging.fallbackIcon) : "",
+        progress: Math.max(0, Number(staging.progress ?? staging.kills ?? 0)),
+        required: Math.max(1, Number(staging.requiredKills || staging.killsRequired || 1)),
+        target: staging.targetNode || staging.targetLabel || "Erebus contact",
+        credits: Math.max(0, Number(staging.creditsReward || staging.reward?.credits || 0)),
+        shards: Math.max(0, Number(staging.lupenShardsReward || staging.reward?.lupenShards || 0)),
+        status: typeof getMultiplayerStagingBountyStatusLabel === "function" ? getMultiplayerStagingBountyStatusLabel(staging) : "ACTIVE"
+      };
+    }
+  }
+
+  if (typeof ensureDailyBounties === "function") ensureDailyBounties();
+  const contract = Array.isArray(dailyBountyContracts)
+    ? dailyBountyContracts.find(item => item.id === activeBountyId) ||
+      dailyBountyContracts.find(item => ["active", "readyToClaim"].includes(item.status)) || null
+    : null;
+  if (!contract) return null;
+  const objective = activeObjective?.type === "bounty" && activeObjective.contractId === contract.id ? activeObjective : null;
+  const required = typeof getBountyRequiredKills === "function"
+    ? getBountyRequiredKills(contract)
+    : Math.max(1, Number(contract.requiredKills || contract.killsRequired || 1));
+  const progress = Math.max(0, Number(objective?.kills ?? contract.progress ?? 0));
+  const reward = typeof cloneBountyReward === "function" ? cloneBountyReward(contract.reward) : (contract.reward || {});
+  return {
+    title: contract.title || contract.name || "Active Bounty",
+    icon: typeof getBountyIconSrc === "function" ? getBountyIconSrc(contract.icon || contract.fallbackIcon) : "",
+    progress,
+    required,
+    target: contract.area || contract.targetLabel || contract.targetBotLabel || "Erebus contact",
+    credits: Math.max(0, Number(reward.credits || 0)),
+    shards: Math.max(0, Number(reward.lupenShards || 0)),
+    status: typeof getBountyStatusLabel === "function" ? getBountyStatusLabel(contract) : String(contract.status || "ACTIVE").toUpperCase()
+  };
+}
+
+function getTacticalChatMessages() {
+  const client = window.LupenMultiplayerClient;
+  const status = client?.getStatus?.() || {};
+  const source = status.enabled && client?.getChatMessages
+    ? client.getChatMessages({ channel: "sector" })
+    : fallbackChatMessages;
+  const seen = new Set();
+  const messages = (Array.isArray(source) ? source : [])
+    .filter(message => message?.type !== "system" && (!message?.channel || message.channel === "sector"))
+    .filter(message => {
+      const key = String(message.id || `${message.displayName || ""}|${message.message || ""}|${message.receivedAt || ""}`);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(-30);
+  return { status, messages };
+}
+
+function renderTacticalSummaryCards() {
+  const bounty = getTacticalTrackedBounty();
+  const cargoState = getTacticalCargoState();
+  const { status } = getTacticalChatMessages();
+  const bountyHtml = bounty ? `
+    <div class="tactical-summary-bounty">
+      <span class="tactical-bounty-icon">${bounty.icon ? `<img src="${escapeTacticalHtml(bounty.icon)}" alt="">` : getTacticalIconSvg("bounties")}</span>
+      <div><strong>${escapeTacticalHtml(bounty.title)}</strong><span>${formatNumber(bounty.progress)} / ${formatNumber(bounty.required)} destroyed</span><small>${escapeTacticalHtml(bounty.target)}</small></div>
+    </div>
+    <div class="tactical-summary-reward"><span>Reward</span><strong>CR ${formatNumber(bounty.credits)} &nbsp;·&nbsp; ${formatNumber(bounty.shards)} Shards</strong></div>
+  ` : `<div class="tactical-summary-empty">No active bounty. Contracts can be accepted while docked.</div>`;
+  const commsState = status.enabled && !status.isConnected ? "Disconnected" : "Sector quiet";
+  const commsDetail = status.enabled && !status.isConnected ? "Reconnect to use sector chat" : "No new guild alerts";
+
+  return `
+    <aside class="tactical-summary-column" aria-label="Tactical summary">
+      <section class="tactical-summary-box active-bounty-summary">
+        <h4>Active Bounty</h4>
+        ${bountyHtml}
+      </section>
+      <section class="tactical-summary-box cargo-summary-box">
+        <div class="tactical-summary-icon">${getTacticalIconSvg("cargo")}</div>
+        <div><h4>Cargo Hold</h4><strong>${formatNumber(cargoState.used)} / ${formatNumber(cargoState.capacity)} used</strong><div class="tactical-meter"><i style="width:${cargoState.percent}%"></i></div><small>${cargoState.percent}% capacity</small></div>
+      </section>
+      <section class="tactical-summary-box comms-summary-box">
+        <div class="tactical-summary-icon">${getTacticalIconSvg("comms")}</div>
+        <div><h4>Comms Status</h4><strong>${escapeTacticalHtml(commsState)}</strong><small>${escapeTacticalHtml(commsDetail)}</small></div>
+      </section>
+    </aside>
+  `;
+}
+
+function getAcademyTacticalIcon(mission) {
+  const iconByType = {
+    starter_ship_claimed: "ship",
+    launch_from_station: "ship",
+    profitable_trade: "trade",
+    equip_guns: "combat",
+    equip_attachment: "repair",
+    destroy_bot: "combat",
+    repair_ship: "repair"
+  };
+  return getTacticalIconSvg(iconByType[mission?.objective?.type] || "academy");
+}
+
+function renderTacticalAcademy() {
+  if (typeof reconcileMissionProgressFromGameplayState === "function") {
+    reconcileMissionProgressFromGameplayState({ refresh: false, notify: false, save: false });
+  }
+  const missions = typeof getVisibleChapterMissions === "function" ? getVisibleChapterMissions("academy") : [];
+  const rows = missions.map(mission => {
+    const state = typeof getMissionState === "function" ? getMissionState(mission.id) : null;
+    const required = typeof getMissionRequiredAmount === "function" ? getMissionRequiredAmount(mission) : 1;
+    const progress = typeof getMissionProgressAmount === "function" ? getMissionProgressAmount(mission, state) : Number(state?.progress || 0);
+    const complete = ["completed", "claimed"].includes(state?.state) || progress >= required;
+    const started = !complete && progress > 0;
+    const percent = Math.max(0, Math.min(100, Math.round((progress / Math.max(1, required)) * 100)));
+    return `
+      <div class="tactical-task-row ${complete ? "is-complete" : started ? "is-progress" : ""}">
+        <span class="tactical-task-icon">${getAcademyTacticalIcon(mission)}</span>
+        <div class="tactical-task-copy"><strong>${escapeTacticalHtml(mission.title)}</strong><span>${escapeTacticalHtml(mission.briefing || "Complete Academy assignment.")}</span></div>
+        <div class="tactical-task-progress"><div class="tactical-meter"><i style="width:${percent}%"></i></div><b>${formatNumber(progress)} / ${formatNumber(required)}</b></div>
+        <span class="tactical-task-status">${complete ? "COMPLETE" : started ? "IN PROGRESS" : "PENDING"}</span>
+      </div>
+    `;
+  }).join("");
+  const completeCount = missions.filter(mission => {
+    const state = typeof getMissionState === "function" ? getMissionState(mission.id) : null;
+    return ["completed", "claimed"].includes(state?.state) || (typeof getMissionProgressAmount === "function" && getMissionProgressAmount(mission, state) >= getMissionRequiredAmount(mission));
+  }).length;
+
+  return `
+    <div class="tactical-primary-column tactical-academy-view" data-tactical-section="academy">
+      <div class="tactical-content-heading">
+        <span class="tactical-heading-icon">${getTacticalIconSvg("academy")}</span>
+        <div><h3>Academy</h3><p>Complete tasks to learn the basics and earn rewards.</p></div>
+        <span class="tactical-heading-chip">${formatNumber(completeCount)} / ${formatNumber(missions.length)} COMPLETE</span>
+      </div>
+      <div class="tactical-task-list">${rows || `<div class="tactical-empty-state">Academy assignments are unavailable.</div>`}</div>
+    </div>
+    ${renderTacticalSummaryCards()}
+  `;
+}
+
+function getTacticalBountyRows() {
+  if (typeof isMultiplayerStagingActive === "function" && isMultiplayerStagingActive() &&
+      typeof shouldUseLocalTutorialBountyFallback === "function" && !shouldUseLocalTutorialBountyFallback() &&
+      typeof getMultiplayerStagingBounties === "function") {
+    return getMultiplayerStagingBounties().map(contract => ({
+      id: contract.id,
+      title: contract.title || contract.name || "Bounty Contract",
+      description: contract.description || `Destroy ${contract.requiredKills || 1} Erebus bots.`,
+      icon: typeof getBountyIconSrc === "function" ? getBountyIconSrc(contract.icon || contract.fallbackIcon) : "",
+      progress: Math.max(0, Number(contract.progress ?? contract.kills ?? 0)),
+      required: Math.max(1, Number(contract.requiredKills || contract.killsRequired || 1)),
+      credits: Math.max(0, Number(contract.creditsReward || contract.reward?.credits || 0)),
+      shards: Math.max(0, Number(contract.lupenShardsReward || contract.reward?.lupenShards || 0)),
+      status: typeof getMultiplayerStagingBountyStatusLabel === "function" ? getMultiplayerStagingBountyStatusLabel(contract) : "AVAILABLE",
+      timer: ""
+    }));
+  }
+  if (typeof ensureDailyBounties === "function") ensureDailyBounties();
+  return (Array.isArray(dailyBountyContracts) ? dailyBountyContracts : []).map(contract => {
+    const objective = activeObjective?.type === "bounty" && activeObjective.contractId === contract.id ? activeObjective : null;
+    const required = typeof getBountyRequiredKills === "function" ? getBountyRequiredKills(contract) : Number(contract.requiredKills || 1);
+    const reward = typeof cloneBountyReward === "function" ? cloneBountyReward(contract.reward) : (contract.reward || {});
+    return {
+      id: contract.id,
+      title: contract.title || contract.name || "Bounty Contract",
+      description: typeof getBountyObjectiveText === "function" ? getBountyObjectiveText(contract) : contract.description,
+      icon: typeof getBountyIconSrc === "function" ? getBountyIconSrc(contract.icon || contract.fallbackIcon) : "",
+      progress: Math.max(0, Number(objective?.kills ?? contract.progress ?? 0)),
+      required: Math.max(1, Number(required || 1)),
+      credits: Math.max(0, Number(reward.credits || 0)),
+      shards: Math.max(0, Number(reward.lupenShards || 0)),
+      status: typeof getBountyStatusLabel === "function" ? getBountyStatusLabel(contract) : String(contract.status || "AVAILABLE").toUpperCase(),
+      timer: typeof getBountyTimerLabel === "function" ? getBountyTimerLabel(contract) : ""
+    };
+  });
+}
+
+function renderTacticalBounties() {
+  const rows = getTacticalBountyRows();
+  const reset = typeof getDailyResetSeconds === "function" && typeof formatBountyTime === "function"
+    ? formatBountyTime(getDailyResetSeconds())
+    : "--:--";
+  return `
+    <div class="tactical-full-view" data-tactical-section="bounties">
+      <div class="tactical-content-heading">
+        <span class="tactical-heading-icon">${getTacticalIconSvg("bounties")}</span>
+        <div><h3>Bounties</h3><p>Live contract progress. Accept and claim contracts from a bounty board.</p></div>
+        <span class="tactical-heading-chip">RESET ${escapeTacticalHtml(reset)}</span>
+      </div>
+      <div class="tactical-bounty-grid">
+        ${rows.map(contract => {
+          const percent = Math.max(0, Math.min(100, Math.round((contract.progress / Math.max(1, contract.required)) * 100)));
+          return `<article class="tactical-bounty-card status-${escapeTacticalHtml(contract.status.toLowerCase().replaceAll(" ", "-"))}">
+            <div class="tactical-bounty-card-top">
+              <span class="tactical-bounty-icon">${contract.icon ? `<img src="${escapeTacticalHtml(contract.icon)}" alt="">` : getTacticalIconSvg("bounties")}</span>
+              <div><h4>${escapeTacticalHtml(contract.title)}</h4><p>${escapeTacticalHtml(contract.description || "Contract objective")}</p></div>
+              <span class="tactical-status-chip">${escapeTacticalHtml(contract.status)}</span>
+            </div>
+            <div class="tactical-bounty-progress"><div class="tactical-meter"><i style="width:${percent}%"></i></div><strong>${formatNumber(contract.progress)} / ${formatNumber(contract.required)}</strong></div>
+            <footer><span>CR ${formatNumber(contract.credits)} &nbsp;·&nbsp; ${formatNumber(contract.shards)} Shards</span>${contract.timer ? `<small>${escapeTacticalHtml(contract.timer)}</small>` : ""}</footer>
+          </article>`;
+        }).join("") || `<div class="tactical-empty-state">No bounty contracts are currently available.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderTacticalCargo() {
+  const state = getTacticalCargoState();
+  const mineralRows = mineralKeys.map(mineral => {
+    const total = Math.max(0, Number(cargo[mineral] || 0));
+    if (!total) return "";
+    const recovered = typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity(mineral) : 0;
+    const purchased = Math.max(0, total - recovered);
+    return `<article class="tactical-cargo-item">
+      <img src="${escapeTacticalHtml(getCommodityImage(mineral))}" alt="">
+      <div><strong>${escapeTacticalHtml(mineral)}</strong><span>${formatNumber(total)} total</span></div>
+      <dl><div><dt>Purchased</dt><dd>${formatNumber(purchased)}</dd></div><div><dt>Recovered</dt><dd>${formatNumber(recovered)}</dd></div></dl>
+    </article>`;
+  }).join("");
+  const foundItems = typeof groupInventoryItems === "function" ? groupInventoryItems(inventoryItems || []) : [];
+  const itemRows = foundItems.map(item => `<article class="tactical-found-item quality-${escapeTacticalHtml(item.quality || "standard")}">
+    <img src="${escapeTacticalHtml(item.icon || "")}" alt=""><div><strong>${escapeTacticalHtml(item.name)}</strong><span>${escapeTacticalHtml(item.category || "Equipment")}</span></div><b>x${formatNumber(item.count)}</b>
+  </article>`).join("");
+  return `
+    <div class="tactical-full-view tactical-cargo-view" data-tactical-section="cargo">
+      <div class="tactical-content-heading">
+        <span class="tactical-heading-icon">${getTacticalIconSvg("cargo")}</span>
+        <div><h3>Cargo Hold</h3><p>Purchased cargo, recovered resources, and found equipment remain separate.</p></div>
+        <span class="tactical-heading-chip">${formatNumber(state.used)} / ${formatNumber(state.capacity)}</span>
+      </div>
+      <div class="tactical-cargo-capacity"><div><strong>${state.percent}% CAPACITY</strong><span>${formatNumber(Math.max(0, state.capacity - state.used))} units available</span></div><div class="tactical-meter"><i style="width:${state.percent}%"></i></div></div>
+      <div class="tactical-cargo-ledgers">
+        <section><h4>Resource Ledger</h4><div class="tactical-ledger-list">${mineralRows || `<div class="tactical-empty-state">No resources in the hold.</div>`}</div></section>
+        <section><h4>Found Equipment</h4><div class="tactical-found-grid">${itemRows || `<div class="tactical-empty-state">No found equipment carried.</div>`}</div></section>
+      </div>
+    </div>
+  `;
+}
+
+function renderTacticalComms() {
+  const { status, messages } = getTacticalChatMessages();
+  const canChat = !status.enabled || status.isConnected;
+  return `
+    <div class="tactical-full-view tactical-comms-view" data-tactical-section="comms">
+      <div class="tactical-content-heading">
+        <span class="tactical-heading-icon">${getTacticalIconSvg("comms")}</span>
+        <div><h3>Comms</h3><p>Sector communications use the same live player chat channel.</p></div>
+        <span class="tactical-heading-chip ${canChat ? "is-online" : "is-offline"}">${canChat ? "ONLINE" : "DISCONNECTED"}</span>
+      </div>
+      <div class="tactical-chat-channels" role="tablist" aria-label="Chat channels">
+        <button type="button" role="tab" aria-selected="true" class="active">Sector</button>
+        <button type="button" role="tab" aria-selected="false" disabled>Local</button>
+        <button type="button" role="tab" aria-selected="false" disabled>Guild</button>
+      </div>
+      <div class="tactical-chat-feed" aria-live="polite">
+        ${messages.length ? messages.map(entry => `<div class="tactical-chat-line"><strong>${escapeTacticalHtml(entry.displayName || "Pilot")}</strong><span>${escapeTacticalHtml(entry.message || "")}</span></div>`).join("") : `<div class="tactical-empty-state">${canChat ? "No player messages yet." : "Chat unavailable while disconnected."}</div>`}
+      </div>
+      <div class="tactical-chat-input-row">
+        <input id="tacticalChatInput" type="text" maxlength="200" placeholder="${canChat ? "Sector message..." : "Chat unavailable while disconnected."}" ${canChat ? "" : "disabled"} onkeydown="handleTacticalChatKey(event)">
+        <button type="button" onclick="sendTacticalChatMessage()" ${canChat ? "" : "disabled"}>Send</button>
+      </div>
+    </div>
+  `;
+}
+
+function sendTacticalChatMessage() {
+  const tacticalInput = document.getElementById("tacticalChatInput");
+  const compactInput = document.getElementById("localChatInput");
+  if (!tacticalInput || !compactInput) return;
+  compactInput.value = tacticalInput.value;
+  sendLocalChatMessage();
+  tacticalInput.value = "";
+  renderTacticalPanel(true);
+  requestAnimationFrame(() => document.getElementById("tacticalChatInput")?.focus({ preventScroll: true }));
+}
+
+function handleTacticalChatKey(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    sendTacticalChatMessage();
+  }
+}
+
+function renderTacticalGuild() {
+  return `
+    <div class="tactical-full-view tactical-guild-view" data-tactical-section="guild">
+      <div class="tactical-content-heading">
+        <span class="tactical-heading-icon">${getTacticalIconSvg("guild")}</span>
+        <div><h3>Guild / Alliance</h3><p>Organisation tools will connect pilots under a shared banner.</p></div>
+        <span class="tactical-heading-chip">COMING LATER</span>
+      </div>
+      <div class="tactical-placeholder-card">
+        <span>${getTacticalIconSvg("guild")}</span>
+        <h4>Alliance systems are not yet active</h4>
+        <p>This space is reserved for membership, shared alerts, and guild communications. No placeholder state is being saved.</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderTacticalPanel(force = false) {
+  const content = document.getElementById("tacticalPanelContent");
+  if (!content || !tacticalPanelOpen) return;
+  const activeElement = document.activeElement;
+  const preserveCommsInput = !force && activeTacticalSection === "comms" && activeElement?.id === "tacticalChatInput";
+
+  document.querySelectorAll(".tactical-panel-nav [role='tab']").forEach(button => {
+    const selected = button.id === `tacticalNav${activeTacticalSection.charAt(0).toUpperCase()}${activeTacticalSection.slice(1)}`;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = selected ? 0 : -1;
+  });
+
+  if (preserveCommsInput) return;
+  const renderers = {
+    academy: renderTacticalAcademy,
+    bounties: renderTacticalBounties,
+    cargo: renderTacticalCargo,
+    comms: renderTacticalComms,
+    guild: renderTacticalGuild
+  };
+  content.innerHTML = (renderers[activeTacticalSection] || renderTacticalAcademy)();
+  content.setAttribute("aria-label", `${activeTacticalSection} tactical section`);
+}
+
+function refreshTacticalPanel(force = false) {
+  if (tacticalPanelOpen) renderTacticalPanel(force);
 }
 
 function closeShipInventoryDrawer() {
@@ -934,6 +1383,7 @@ function renderMultiplayerChatHud(statusOverride = null, playersOverride = null)
 
   if (status.enabled && !status.isConnected) {
     addLocalChatLine("Chat", "Chat unavailable while disconnected.", "muted", { showTime: false });
+    refreshTacticalPanel();
     return;
   }
 
@@ -953,6 +1403,7 @@ function renderMultiplayerChatHud(statusOverride = null, playersOverride = null)
 
   if (!messages.length) {
     addLocalChatLine("Chat", "No player messages yet.", "muted", { showTime: false });
+    refreshTacticalPanel();
     return;
   }
 
@@ -961,6 +1412,7 @@ function renderMultiplayerChatHud(statusOverride = null, playersOverride = null)
       receivedAt: entry.receivedAt
     });
   });
+  refreshTacticalPanel();
 }
 
 function sendLocalChatMessage() {
@@ -1075,6 +1527,8 @@ function updateHudDock() {
   const cargoCapacityText = document.getElementById("cargoCapacityText");
   const hudCargoSummary = document.getElementById("hudCargoSummary");
   const hudCargoCapacityText = document.getElementById("hudCargoCapacityText");
+  const hudCargoPercentText = document.getElementById("hudCargoPercentText");
+  const hudCargoCapacityFill = document.getElementById("hudCargoCapacityFill");
   const hudCargoFullBadge = document.getElementById("hudCargoFullBadge");
   const inventoryItemCountText = document.getElementById("inventoryItemCountText");
   const itemInventorySummary = document.getElementById("itemInventorySummary");
@@ -1102,6 +1556,10 @@ function updateHudDock() {
   if (hudCargoCapacityText) {
     hudCargoCapacityText.textContent = `${formatNumber(usedCargo)} / ${formatNumber(maxCargo)}`;
   }
+
+  const cargoPercent = maxCargo > 0 ? Math.max(0, Math.min(100, Math.round((usedCargo / maxCargo) * 100))) : 0;
+  if (hudCargoPercentText) hudCargoPercentText.textContent = `${formatNumber(cargoPercent)}% CAPACITY`;
+  if (hudCargoCapacityFill) hudCargoCapacityFill.style.width = `${cargoPercent}%`;
 
   if (hudCargoSummary) {
     const isFull = maxCargo > 0 && usedCargo >= maxCargo;
@@ -1168,6 +1626,8 @@ function updateHudDock() {
   if (inventoryDrawer && inventoryDrawer.classList.contains("active")) {
     renderInventoryDrawer();
   }
+
+  refreshTacticalPanel();
 }
 
 function updateSpaceHUD() {
@@ -1229,6 +1689,8 @@ function updateSpaceHUD() {
     shipImage.src = typeof getShipAsset === "function" ? getShipAsset(currentShipId, "small") : ship.image;
     shipImage.alt = ship.name;
   }
+  const shipName = document.getElementById("hudShipName");
+  if (shipName) shipName.textContent = String(ship.name || "Lupen").toUpperCase();
 
   updateCargoSummary();
   updateTargetPanel();

@@ -1366,6 +1366,7 @@ function renderChapterProgressCard() {
 function refreshMissionDisplays() {
   renderMissionJournal();
   if (typeof renderObjectiveHud === "function") renderObjectiveHud();
+  if (typeof refreshTacticalPanel === "function") refreshTacticalPanel();
   const profileScreen = document.getElementById("pilotProfileScreen");
   if (profileScreen?.classList.contains("active") && typeof renderPilotProfile === "function") renderPilotProfile();
 }
