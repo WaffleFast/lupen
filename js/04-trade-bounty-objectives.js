@@ -174,8 +174,11 @@ function getSelectedMultiplayerStagingBounty() {
 function getActiveMultiplayerStagingBountyObjective() {
   const active = getMultiplayerStagingBountyActiveState();
   if (!isMultiplayerStagingActive() || !active?.accepted || active?.claimed || active?.failed) return null;
+  const listedContract = getMultiplayerStagingBounties()
+    .find((bounty) => String(bounty?.id || "") === String(active.id || ""));
   return mergeMultiplayerStagingBountyState({
     ...getMultiplayerStagingBountyFallback(),
+    ...(listedContract || {}),
     ...active,
     lootReward: []
   });
@@ -3661,22 +3664,26 @@ function renderObjectiveHud() {
         : targetNode
           ? `Target: ${targetNode}`
           : "Target: Erebus patrol";
+      const objectiveIcon = getBountyIconSrc(
+        stagingBounty.icon || getMultiplayerStagingBountyFallback().icon
+      );
+      const objectiveTitle = stagingBounty.title || `Destroy ${formatNumber(required)} Erebus bots`;
       panel.innerHTML = `
         <div class="objective-list compact-objective-list">
-          <div class="objective-hud-card bounty-objective-card compact-objective-card orbit-objective-card">
+          <div class="objective-hud-card bounty-objective-card compact-objective-card orbit-objective-card staging-bounty-objective-card">
             <div class="objective-main-row compact-objective-main objective-orbit-row">
-              <div class="objective-bounty-icon image objective-icon-large"><img src="${typeof getBountyIconSrc === "function" ? getBountyIconSrc("assets/bounties/erebus-patrol.png") : "assets/icons/bounty-board.png"}" alt=""></div>
+              <div class="objective-bounty-icon image objective-icon-large"><img src="${objectiveIcon}" alt="" onerror="this.src='assets/bounties/raider-sweep.png'; this.onerror=null;"></div>
               <div class="objective-copy objective-copy-large objective-orbit-copy">
               <div class="objective-title-line">
                 <span class="objective-type-pill bounty-pill">Bounty</span>
-                <strong>Destroy ${formatNumber(required)} Erebus bots</strong>
+                <strong>${objectiveTitle}</strong>
               </div>
-              <span>${routeText}</span>
+              <span>${formatNumber(progress)} / ${formatNumber(required)} destroyed · ${routeText.replace(/^Target:\s*/, "")}</span>
               <em>${actionText}</em>
             </div>
             <div class="objective-orbit-meta">
-              <span>${formatNumber(progress)} / ${formatNumber(required)} destroyed</span>
-              <strong>CR + Shards</strong>
+              <span>Contract reward</span>
+              <strong>CR ${formatNumber(stagingBounty.creditsReward || 0)} + ${formatNumber(stagingBounty.lupenShardsReward || 0)} Shards</strong>
             </div>
             <div class="objective-compact-actions objective-orbit-actions">
               <button class="objective-map-btn" onclick="openSectorMap()">Jump</button>

@@ -2953,6 +2953,11 @@
     activeRoom.onMessage("staging:shot", (message) => {
       const attackerSessionId = String(message?.attackerSessionId || "");
       const targetBotId = String(message?.targetBotId || "");
+      // Visual freshness must be measured from when this browser received the
+      // event. The server clock can differ from the player's clock enough for
+      // an otherwise valid shot to fall outside the short beam animation window.
+      const receivedAt = Date.now();
+      const serverReceivedAt = Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : 0;
       connection.lastShotEvent = {
         ok: message?.ok === true,
         attackerSessionId,
@@ -2977,8 +2982,9 @@
         hull: Number.isFinite(Number(message?.hull)) ? Number(message.hull) : 0,
         disabled: message?.disabled === true,
         rewardsGranted: message?.rewardsGranted === true,
-        timestamp: Number.isFinite(Number(message?.timestamp)) ? Number(message.timestamp) : Date.now(),
-        receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
+        timestamp: Number.isFinite(Number(message?.timestamp)) ? Number(message.timestamp) : serverReceivedAt || receivedAt,
+        serverReceivedAt,
+        receivedAt
       };
       connection.lastCombatVisualEvent = {
         type: "bot",

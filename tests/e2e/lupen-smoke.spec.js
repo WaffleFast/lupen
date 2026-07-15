@@ -3741,6 +3741,29 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#gameRewardBurst")).toContainText("Cargo 24/");
     const resourceBurstStyle = await page.locator("#gameRewardBurst .game-reward-kicker").evaluate((el) => getComputedStyle(el).color);
     expect(resourceBurstStyle).toBe("rgb(52, 229, 154)");
+    const recoveredSellButton = builder.locator("[data-tutorial-target='sellCargo']");
+    await expect(recoveredSellButton).toBeVisible();
+    await expect(recoveredSellButton).toBeEnabled();
+    const recoveredSellGeometry = await builder.evaluate((panel) => {
+      const button = panel.querySelector("[data-tutorial-target='sellCargo']");
+      const summary = panel.querySelector(".market-builder-summary");
+      if (!button || !summary) return null;
+      const panelRect = panel.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      const summaryRect = summary.getBoundingClientRect();
+      const hit = document.elementFromPoint(buttonRect.left + buttonRect.width / 2, buttonRect.top + buttonRect.height / 2);
+      return {
+        buttonFitsPanel: buttonRect.left >= panelRect.left && buttonRect.right <= panelRect.right + 1 && buttonRect.top >= panelRect.top && buttonRect.bottom <= panelRect.bottom + 1,
+        buttonReceivesClick: hit === button || button.contains(hit),
+        summaryStartsAfterButton: summaryRect.top >= buttonRect.bottom - 1
+      };
+    });
+    expect(recoveredSellGeometry).toEqual({
+      buttonFitsPanel: true,
+      buttonReceivesClick: true,
+      summaryStartsAfterButton: true
+    });
+    await page.locator("#marketScreen").screenshot({ path: "artifacts/trade-terminal-recovered-sell-fixed.png" });
 
     await page.evaluate(() => {
       if (typeof window.openShipStorageDrawer === "function") window.openShipStorageDrawer("cargo");
@@ -3751,32 +3774,24 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#inventoryDrawerDetail")).toContainText("Avg Cost");
     await expect(page.locator("#inventoryDrawerDetail")).toContainText("None");
 
-    const recoveredSell = await page.evaluate(() => window.eval(`
-      (() => {
-        const creditsBefore = credits;
-        const tradeProfitBefore = playerProgress.totals.tradeProfit || 0;
-        const totalTradingProfitBefore = playerProgress.totals.totalTradingProfit || 0;
-        selectedMarketResource = "Copper";
-        selectedMarketTargetPlanet = "Nyxara";
-        selectedMarketQuantity = 24;
-        currentNode = "Nyxara";
-        lastPlanetNode = "Nyxara";
-        sellMarketCargo();
-        return {
-          creditsBefore,
-          creditsAfter: credits,
-          cargoAfter: cargo.Copper || 0,
-          cargoBasisAfter: cargoCostBasis.Copper || null,
-          recoveredAfter: typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity("Copper") : 0,
-          tradeProfitBefore,
-          tradeProfitAfter: playerProgress.totals.tradeProfit || 0,
-          totalTradingProfitBefore,
-          totalTradingProfitAfter: playerProgress.totals.totalTradingProfit || 0,
-          burstText: document.getElementById("tradeResultBurst")?.textContent || "",
-          activityText: document.getElementById("activityLogFeed")?.textContent || ""
-        };
-      })()
-    `));
+    const recoveredSellBefore = await page.evaluate(() => window.eval(`({
+      creditsBefore: credits,
+      tradeProfitBefore: playerProgress.totals.tradeProfit || 0,
+      totalTradingProfitBefore: playerProgress.totals.totalTradingProfit || 0
+    })`));
+    await page.evaluate(() => window.closeShipInventoryDrawer?.());
+    await recoveredSellButton.click();
+    const recoveredSellAfter = await page.evaluate(() => window.eval(`({
+      creditsAfter: credits,
+      cargoAfter: cargo.Copper || 0,
+      cargoBasisAfter: cargoCostBasis.Copper || null,
+      recoveredAfter: typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity("Copper") : 0,
+      tradeProfitAfter: playerProgress.totals.tradeProfit || 0,
+      totalTradingProfitAfter: playerProgress.totals.totalTradingProfit || 0,
+      burstText: document.getElementById("tradeResultBurst")?.textContent || "",
+      activityText: document.getElementById("activityLogFeed")?.textContent || ""
+    })`));
+    const recoveredSell = { ...recoveredSellBefore, ...recoveredSellAfter };
     expect(recoveredSell.creditsAfter).toBe(recoveredSell.creditsBefore + 1200);
     expect(recoveredSell.cargoAfter).toBe(0);
     expect(recoveredSell.cargoBasisAfter).toBe(null);
@@ -5484,6 +5499,7 @@ test.describe("Lupen browser smoke", () => {
           targetBotId: window.__stagingVisualBot.id,
           currentNode,
           damage: 8,
+          timestamp: Date.now() - 30000,
           receivedAt: Date.now()
         };
         window.__stagingVisualBot.hull = 120;
@@ -7815,24 +7831,32 @@ test.describe("Lupen browser smoke", () => {
           { id: "staging_timed_suppression_4", title: "Timed Suppression", description: "Destroy 4 Erebus bots within 4 minutes.", contractType: "Timed Elimination", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Medium", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1500, lupenShardsReward: 4, timed: true, timeLimitSeconds: 240, icon: "assets/bounties/timed-suppression.png" },
           { id: "staging_behemoth_warning_1", title: "Behemoth Warning", description: "Destroy 1 Erebus Behemoth.", contractType: "Boss Contract", targetBotType: "behemoth", targetBotLabel: "Erebus Behemoth", difficulty: "Extreme", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 2500, lupenShardsReward: 8, icon: "assets/bounties/behemoth-warning.png" }
         ];
+        window.__stagingBountyAccepted = false;
+        window.__stagingBountyActiveId = bounties[0].id;
         window.LupenMultiplayerClient = {
           ...(window.LupenMultiplayerClient || {}),
-          getStatus: () => ({
-            enabled: true,
-            isConnected: true,
-            lastStagingBountyStatus: null,
-            lastStagingBountyList: {
-              active: {
-                ...bounties[0],
-                accepted: false,
-                completed: false,
-                claimAvailable: false,
-                claimed: false,
-                failed: false
-              },
-              bounties
-            }
-          }),
+          getStatus: () => {
+            const activeContract = bounties.find((bounty) => bounty.id === window.__stagingBountyActiveId) || bounties[0];
+            const active = {
+              id: activeContract.id,
+              title: activeContract.title,
+              progress: activeContract.progress,
+              requiredKills: activeContract.requiredKills,
+              creditsReward: activeContract.creditsReward,
+              lupenShardsReward: activeContract.lupenShardsReward,
+              accepted: window.__stagingBountyAccepted === true,
+              completed: false,
+              claimAvailable: false,
+              claimed: false,
+              failed: false
+            };
+            return {
+              enabled: true,
+              isConnected: true,
+              lastStagingBountyStatus: { active },
+              lastStagingBountyList: { active, bounties }
+            };
+          },
           requestStagingBounties: () => true,
           requestStagingBountyStatus: () => true,
           onServerState: () => ({ unsubscribe() {} })
@@ -7874,6 +7898,35 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.eval("renderBountyBoard()"));
     await expect(page.locator("#bountyDetailPanel")).toContainText("Behemoth Warning");
     await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 8 Lupen Shards");
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        window.__stagingBountyAccepted = true;
+        showScreen("spaceScreen");
+        openHudPanel("objectives");
+      })()
+    `));
+    const objectiveCard = page.locator("#activeObjectiveSummary .staging-bounty-objective-card");
+    await expect(objectiveCard).toContainText("Erebus Patrol Sweep");
+    await expect(objectiveCard).toContainText("0 / 4 destroyed");
+    await expect(objectiveCard).toContainText("CR 900 + 2 Shards");
+    const objectiveIcon = objectiveCard.locator(".objective-bounty-icon img");
+    await expect(objectiveIcon).toHaveAttribute("src", "assets/bounties/erebus-patrol-sweep.png");
+    await expect(objectiveIcon).toBeVisible();
+    expect(await objectiveIcon.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+    const objectiveTitle = objectiveCard.locator(".objective-title-line strong");
+    expect(await objectiveTitle.evaluate((title) => title.scrollWidth <= title.clientWidth + 1)).toBe(true);
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/staging-objective-icon-fixed.png" });
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        window.__stagingBountyActiveId = "staging_behemoth_warning_1";
+        openHudPanel("objectives");
+      })()
+    `));
+    await expect(objectiveCard).toContainText("Behemoth Warning");
+    await expect(objectiveIcon).toHaveAttribute("src", "assets/bounties/behemoth-warning.png");
+    expect(await objectiveIcon.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

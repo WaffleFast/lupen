@@ -13547,6 +13547,9 @@ input::placeholder {
   gap: 6px;
   padding: 10px;
   align-content: start;
+  grid-template-rows: none;
+  grid-auto-rows: auto;
+  overflow-y: auto;
 }
 
 .market-builder-panel.staging-sell-builder .market-builder-selected {
@@ -13572,7 +13575,7 @@ input::placeholder {
 }
 
 .market-builder-panel.staging-sell-builder .market-amount-control {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) 72px minmax(126px, 0.8fr);
 }
 
 .market-builder-panel.staging-sell-builder .market-amount-control strong {
@@ -49420,5 +49423,21 @@ input::placeholder {
   #upgradeForgeScreen .forge-preview-cost,
   #upgradeForgeScreen .forge-start-btn {
     min-height: 58px !important;
+  }
+}
+
+/* Keep staging bounty objectives readable in the compact combat HUD. */
+@media (min-width: 761px) {
+  .player-orbit-screen .player-bottom-hud .staging-bounty-objective-card .objective-orbit-row {
+    grid-template-columns: 42px minmax(0, 1fr) minmax(76px, 104px) 58px !important;
+    gap: 7px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .staging-bounty-objective-card .objective-orbit-copy strong {
+    font-size: 11px !important;
+  }
+
+  .player-orbit-screen .player-bottom-hud .staging-bounty-objective-card .objective-orbit-meta strong {
+    white-space: nowrap;
   }
 }
