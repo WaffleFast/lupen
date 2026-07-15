@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css?v=20260715-trade-sell" />
-  <link rel="stylesheet" href="orbit-reference.css" />
+  <link rel="stylesheet" href="style.css?v=20260715-tactical-refine" />
+  <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
 </head>
 <body>
   <div class="stars"></div>
@@ -677,23 +677,23 @@
         </div>
 
         <div class="ship-display-panel ship-display-panel-action hud-panel ship-panel">
-          <div class="ship-hud-hero-row">
-            <div class="ship-card-main">
-              <span id="hudShipName" class="hud-ship-name">LUPEN</span>
-              <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image active-player-ship">
-            </div>
-            <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
+          <div class="ship-card-main">
+            <span id="hudShipName" class="hud-ship-name">LUPEN</span>
+            <img id="hudShipImage" src="assets/ships/lupen-origin.png" alt="Your ship" class="hud-ship-image active-player-ship">
           </div>
-          <div class="ship-hud-cargo-row">
-            <div id="hudCargoSummary" class="hud-cargo-summary" aria-label="Cargo hold">
-              <svg class="hud-cargo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10"/></svg>
-              <div class="hud-cargo-copy">
-                <span>Cargo</span>
-                <strong id="hudCargoCapacityText">0 / 100</strong>
-                <small id="hudCargoPercentText">0% CAPACITY</small>
-                <div class="hud-cargo-meter" aria-hidden="true"><i id="hudCargoCapacityFill"></i></div>
+          <div class="ship-hud-info-column">
+            <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
+            <div class="ship-hud-cargo-row">
+              <div id="hudCargoSummary" class="hud-cargo-summary" aria-label="Cargo hold">
+                <svg class="hud-cargo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10"/></svg>
+                <div class="hud-cargo-copy">
+                  <span>Cargo</span>
+                  <strong id="hudCargoCapacityText">0 / 100</strong>
+                  <small id="hudCargoPercentText">0% CAPACITY</small>
+                  <div class="hud-cargo-meter" aria-hidden="true"><i id="hudCargoCapacityFill"></i></div>
+                </div>
+                <em id="hudCargoFullBadge" hidden>FULL</em>
               </div>
-              <em id="hudCargoFullBadge" hidden>FULL</em>
             </div>
           </div>
           <div class="ship-storage-strip ship-action-strip ship-hud-action-row" aria-label="Ship action">
@@ -797,7 +797,7 @@
   <script src="js/network/multiplayerClient.js?v=20260715-forged-loadout"></script>
   <script src="js/01-core-state.js?v=20260713-asteroid-shards"></script>
   <script src="js/02-account-navigation.js"></script>
-  <script src="js/03-hud-space-map.js?v=20260715-tactical-hud"></script>
+  <script src="js/03-hud-space-map.js?v=20260715-tactical-refine"></script>
   <script src="js/network/multiplayerOverlay.js"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260715-objective-icon"></script>
   <script src="js/05-hangar-store.js?v=20260715-forged-loadout"></script>

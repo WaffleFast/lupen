@@ -220,13 +220,13 @@ function renderTacticalSummaryCards() {
       <div><strong>${escapeTacticalHtml(bounty.title)}</strong><span>${formatNumber(bounty.progress)} / ${formatNumber(bounty.required)} destroyed</span><small>${escapeTacticalHtml(bounty.target)}</small></div>
     </div>
     <div class="tactical-summary-reward"><span>Reward</span><strong>CR ${formatNumber(bounty.credits)} &nbsp;·&nbsp; ${formatNumber(bounty.shards)} Shards</strong></div>
-  ` : `<div class="tactical-summary-empty">No active bounty. Contracts can be accepted while docked.</div>`;
+  ` : `<div class="tactical-summary-empty"><strong>No active bounty</strong><span>Contracts can be accepted while docked.</span></div>`;
   const commsState = status.enabled && !status.isConnected ? "Disconnected" : "Sector quiet";
   const commsDetail = status.enabled && !status.isConnected ? "Reconnect to use sector chat" : "No new guild alerts";
 
   return `
     <aside class="tactical-summary-column" aria-label="Tactical summary">
-      <section class="tactical-summary-box active-bounty-summary">
+      <section class="tactical-summary-box active-bounty-summary ${bounty ? "has-active-bounty" : "is-empty"}">
         <h4>Active Bounty</h4>
         ${bountyHtml}
       </section>
@@ -288,7 +288,7 @@ function renderTacticalAcademy() {
         <div><h3>Academy</h3><p>Complete tasks to learn the basics and earn rewards.</p></div>
         <span class="tactical-heading-chip">${formatNumber(completeCount)} / ${formatNumber(missions.length)} COMPLETE</span>
       </div>
-      <div class="tactical-task-list">${rows || `<div class="tactical-empty-state">Academy assignments are unavailable.</div>`}</div>
+      <div class="tactical-task-list" tabindex="0" aria-label="Academy assignment list">${rows || `<div class="tactical-empty-state">Academy assignments are unavailable.</div>`}</div>
     </div>
     ${renderTacticalSummaryCards()}
   `;

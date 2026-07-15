@@ -2221,6 +2221,8 @@ test.describe("Lupen browser smoke", () => {
             panel: rectFor(".ship-display-panel-action"),
             infoPanel: rectFor(".hud-command-console"),
             ship: rectFor("#hudShipImage"),
+            shipBay: rectFor(".ship-card-main"),
+            infoColumn: rectFor(".ship-hud-info-column"),
             xpRow: rectFor("#hudProgressStrip .xp-row"),
             xpBar: rectFor("#hudProgressStrip .xp-bar"),
             cargo: rectFor("#hudCargoSummary"),
@@ -2289,15 +2291,16 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.xpBar.height).toBeGreaterThanOrEqual(6);
     expect(resourceEngageState.middleHudLayout.cargo.height).toBeLessThanOrEqual(54);
     expect(resourceEngageState.middleHudLayout.action.height).toBeLessThanOrEqual(40);
-    expect(resourceEngageState.middleHudLayout.action.width).toBeLessThanOrEqual(Math.round(resourceEngageState.middleHudLayout.panel.width * 0.82));
+    expect(resourceEngageState.middleHudLayout.action.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.panel.width * 0.85));
+    expect(resourceEngageState.middleHudLayout.actionRow.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.panel.width * 0.9));
     const centerX = rect => Math.round((rect.left + rect.right) / 2);
     const centerY = rect => Math.round((rect.top + rect.bottom) / 2);
     expect(Math.abs(centerX(resourceEngageState.middleHudLayout.action) - centerX(resourceEngageState.middleHudLayout.panel))).toBeLessThanOrEqual(4);
     expect(resourceEngageState.middleHudLayout.cargoLabel.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.left);
     expect(resourceEngageState.middleHudLayout.cargoAmount.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.cargo.right + 2);
     if (resourceEngageState.middleHudLayout.cargoFull) {
-      const cargoValueGroupCenter = Math.round((resourceEngageState.middleHudLayout.cargoAmount.left + resourceEngageState.middleHudLayout.cargoFull.right) / 2);
-      expect(Math.abs(cargoValueGroupCenter - centerX(resourceEngageState.middleHudLayout.cargo))).toBeLessThanOrEqual(16);
+      expect(resourceEngageState.middleHudLayout.cargoFull.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargoAmount.right + 4);
+      expect(resourceEngageState.middleHudLayout.cargoFull.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.cargo.right + 2);
     }
     const rectsOverlap = (first, second) => (
       first.left < second.right - 2
@@ -2307,12 +2310,14 @@ test.describe("Lupen browser smoke", () => {
     );
     expect(rectsOverlap(resourceEngageState.middleHudLayout.cargo, resourceEngageState.middleHudLayout.action)).toBe(false);
     expect(rectsOverlap(resourceEngageState.middleHudLayout.ship, resourceEngageState.middleHudLayout.xpRow)).toBe(false);
+    expect(resourceEngageState.middleHudLayout.shipBay.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.infoColumn.left);
+    expect(resourceEngageState.middleHudLayout.cargo.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.shipBay.right);
     expect(resourceEngageState.middleHudLayout.xpBar.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpRow.bottom - 2);
-    expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(Math.max(
-      resourceEngageState.middleHudLayout.ship.bottom,
-      resourceEngageState.middleHudLayout.xpBar.bottom
-    ) - 14);
-    expect(resourceEngageState.middleHudLayout.action.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.bottom - 2);
+    expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpBar.bottom + 8);
+    expect(resourceEngageState.middleHudLayout.action.top).toBeGreaterThanOrEqual(Math.max(
+      resourceEngageState.middleHudLayout.shipBay.bottom,
+      resourceEngageState.middleHudLayout.infoColumn.bottom
+    ) + 4);
     expect(resourceEngageState.middleHudLayout.action.bottom).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.panel.bottom + 2);
     expect(resourceEngageState.cargoSummaryText).toContain("Cargo");
     expect(resourceEngageState.cargoSummaryText).toContain("FULL");
@@ -2411,13 +2416,25 @@ test.describe("Lupen browser smoke", () => {
         const action = document.getElementById("objectEngageBtn");
         return {
           ship: rectFor("#hudShipImage"),
+          shipBay: rectFor(".ship-card-main"),
+          infoColumn: rectFor(".ship-hud-info-column"),
+          progressStrip: rectFor("#hudProgressStrip"),
           level: rectFor("#hudProgressStrip .level-badge"),
           xpRow: rectFor("#hudProgressStrip .xp-row"),
           xpBar: rectFor("#hudProgressStrip .xp-bar"),
           cargo: rectFor("#hudCargoSummary"),
+          cargoRow: rectFor(".ship-hud-cargo-row"),
           engage: rectFor("#objectEngageBtn"),
+          actionRow: rectFor(".ship-hud-action-row"),
           panel: rectFor(".ship-display-panel-action"),
+          statusPanel: rectFor(".player-bottom-hud > .status-panel"),
+          infoPanel: rectFor(".player-bottom-hud > .info-panel"),
+          tacticalSummary: rectFor(".tactical-summary-card"),
           bottomHud: rectFor(".player-bottom-hud"),
+          documentWidth: document.documentElement.scrollWidth,
+          documentHeight: document.documentElement.scrollHeight,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
           actionText: action?.textContent || "",
           actionDisabled: action?.disabled ?? false,
           actionInShipHud: Boolean(action?.closest(".ship-display-panel-action")),
@@ -2431,6 +2448,8 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
     expect(centerHud.ship).not.toBeNull();
+    expect(centerHud.shipBay).not.toBeNull();
+    expect(centerHud.infoColumn).not.toBeNull();
     expect(centerHud.level).not.toBeNull();
     expect(centerHud.xpRow).not.toBeNull();
     expect(centerHud.xpBar).not.toBeNull();
@@ -2441,16 +2460,41 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.actionInShipHud).toBe(true);
     expect(centerHud.centralActionCount).toBe(0);
     expect(centerHud.ship.height).toBeGreaterThanOrEqual(70);
-    expect(centerHud.level.right).toBeLessThanOrEqual(centerHud.panel.right + 2);
+    expect(centerHud.ship.left).toBeGreaterThanOrEqual(centerHud.shipBay.left);
+    expect(centerHud.ship.right).toBeLessThanOrEqual(centerHud.shipBay.right);
+    expect(centerHud.ship.top).toBeGreaterThanOrEqual(centerHud.shipBay.top);
+    expect(centerHud.ship.bottom).toBeLessThanOrEqual(centerHud.shipBay.bottom);
+    expect(centerHud.shipBay.right).toBeLessThanOrEqual(centerHud.infoColumn.left);
+    expect(centerHud.infoColumn.right).toBeLessThanOrEqual(centerHud.panel.right + 2);
+    expect(centerHud.level.left).toBeGreaterThanOrEqual(centerHud.infoColumn.left);
+    expect(centerHud.level.right).toBeLessThanOrEqual(centerHud.infoColumn.right);
+    expect(centerHud.progressStrip.top).toBeGreaterThanOrEqual(centerHud.infoColumn.top);
+    expect(centerHud.progressStrip.bottom).toBeLessThanOrEqual(centerHud.infoColumn.bottom);
     expect(centerHud.xpBar.top).toBeGreaterThanOrEqual(centerHud.xpRow.bottom - 2);
-    expect(centerHud.cargo.top).toBeGreaterThanOrEqual(Math.min(centerHud.ship.bottom, centerHud.xpBar.bottom) - 8);
-    expect(centerHud.engage.top).toBeGreaterThanOrEqual(centerHud.cargo.bottom - 2);
+    expect(centerHud.cargoRow.top).toBeGreaterThanOrEqual(centerHud.xpBar.bottom + 8);
+    expect(centerHud.cargoRow.left).toBeGreaterThanOrEqual(centerHud.infoColumn.left);
+    expect(centerHud.cargoRow.right).toBeLessThanOrEqual(centerHud.infoColumn.right);
+    expect(centerHud.cargoRow.bottom).toBeLessThanOrEqual(centerHud.infoColumn.bottom + 2);
+    expect(centerHud.cargo.left).toBeGreaterThanOrEqual(centerHud.shipBay.right);
+    expect(centerHud.actionRow.top).toBeGreaterThanOrEqual(Math.max(centerHud.shipBay.bottom, centerHud.infoColumn.bottom) + 4);
+    expect(centerHud.actionRow.left).toBeLessThanOrEqual(centerHud.shipBay.left + 2);
+    expect(centerHud.actionRow.right).toBeGreaterThanOrEqual(centerHud.infoColumn.right - 2);
+    expect(centerHud.actionRow.width).toBeGreaterThanOrEqual(centerHud.panel.width * 0.9);
+    expect(centerHud.engage.width).toBeGreaterThanOrEqual(centerHud.actionRow.width * 0.9);
+    expect(centerHud.actionRow.bottom).toBeLessThanOrEqual(centerHud.panel.bottom + 2);
     expect(centerHud.xpText).toContain("XP");
     expect(centerHud.cargoText).toContain("Cargo");
     expect(centerHud.shipName).toContain("AZURE STRIKER");
     expect(centerHud.guildCount).toBe(0);
     expect(centerHud.centerText).not.toContain("Guild");
     expect(centerHud.bottomHud.height).toBeLessThanOrEqual(185);
+    expect(Math.abs(centerHud.statusPanel.top - centerHud.panel.top)).toBeLessThanOrEqual(2);
+    expect(Math.abs(centerHud.infoPanel.top - centerHud.panel.top)).toBeLessThanOrEqual(2);
+    expect(Math.abs(centerHud.statusPanel.bottom - centerHud.panel.bottom)).toBeLessThanOrEqual(2);
+    expect(Math.abs(centerHud.infoPanel.bottom - centerHud.panel.bottom)).toBeLessThanOrEqual(2);
+    expect(centerHud.tacticalSummary.height).toBeLessThanOrEqual(60);
+    expect(centerHud.documentWidth).toBeLessThanOrEqual(centerHud.viewportWidth);
+    expect(centerHud.documentHeight).toBeLessThanOrEqual(centerHud.viewportHeight);
 
     await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-closed-1366x768.png" });
     await page.locator(".player-bottom-hud").screenshot({ path: "artifacts/tactical-hud-centre-layout.png" });
@@ -2476,6 +2520,9 @@ test.describe("Lupen browser smoke", () => {
       await expect(page.locator("[data-tactical-section='academy']")).toContainText(taskName);
     }
 
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-academy-top-1366x768.png" });
+    await page.locator(".tactical-summary-column").screenshot({ path: "artifacts/tactical-hud-summary-empty.png" });
+
     const tacticalLayout = await page.evaluate(() => {
       const rect = selector => {
         const bounds = document.querySelector(selector).getBoundingClientRect();
@@ -2485,13 +2532,85 @@ test.describe("Lupen browser smoke", () => {
         screen: rect("#spaceScreen"),
         panel: rect("#tacticalPanel"),
         bottomHud: rect(".player-bottom-hud"),
+        nav: rect(".tactical-panel-nav"),
+        header: rect(".tactical-content-heading"),
+        taskList: rect(".tactical-task-list"),
+        firstTask: rect(".tactical-task-row:first-child"),
+        lastTask: rect(".tactical-task-row:last-child"),
+        summary: rect(".tactical-summary-column"),
+        emptyBounty: rect(".active-bounty-summary.is-empty"),
+        cargoSummary: rect(".cargo-summary-box"),
+        commsSummary: rect(".comms-summary-box"),
+        taskListOverflowY: getComputedStyle(document.querySelector(".tactical-task-list")).overflowY,
+        taskListScrollHeight: document.querySelector(".tactical-task-list").scrollHeight,
+        taskListClientHeight: document.querySelector(".tactical-task-list").clientHeight,
         documentWidth: document.documentElement.scrollWidth,
-        viewportWidth: window.innerWidth
+        documentHeight: document.documentElement.scrollHeight,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight
       };
     });
     expect(Math.abs((tacticalLayout.panel.left + tacticalLayout.panel.right) / 2 - (tacticalLayout.screen.left + tacticalLayout.screen.right) / 2)).toBeLessThanOrEqual(3);
-    expect(tacticalLayout.panel.bottom).toBeLessThanOrEqual(tacticalLayout.bottomHud.top - 4);
+    expect(tacticalLayout.panel.width).toBeLessThanOrEqual(tacticalLayout.viewportWidth * 0.72);
+    expect(tacticalLayout.panel.height).toBeLessThanOrEqual(400);
+    expect(tacticalLayout.panel.bottom).toBeLessThanOrEqual(tacticalLayout.bottomHud.top - 24);
+    expect(tacticalLayout.nav.width).toBeLessThanOrEqual(160);
+    expect(tacticalLayout.header.bottom).toBeLessThanOrEqual(tacticalLayout.taskList.top + 1);
+    expect(["auto", "scroll"]).toContain(tacticalLayout.taskListOverflowY);
+    expect(tacticalLayout.taskListScrollHeight).toBeGreaterThan(tacticalLayout.taskListClientHeight);
+    expect(tacticalLayout.firstTask.top).toBeGreaterThanOrEqual(tacticalLayout.taskList.top);
+    expect(tacticalLayout.firstTask.bottom).toBeLessThanOrEqual(tacticalLayout.taskList.bottom);
+    expect(tacticalLayout.lastTask.bottom).toBeGreaterThan(tacticalLayout.taskList.bottom);
+    expect(tacticalLayout.emptyBounty.height).toBeLessThanOrEqual(82);
+    expect(Math.abs(tacticalLayout.emptyBounty.height - tacticalLayout.cargoSummary.height)).toBeLessThanOrEqual(12);
+    expect(Math.abs(tacticalLayout.emptyBounty.height - tacticalLayout.commsSummary.height)).toBeLessThanOrEqual(12);
     expect(tacticalLayout.documentWidth).toBeLessThanOrEqual(tacticalLayout.viewportWidth);
+    expect(tacticalLayout.documentHeight).toBeLessThanOrEqual(tacticalLayout.viewportHeight);
+
+    const academyScrollLayout = await page.locator(".tactical-task-list").evaluate(taskList => {
+      const rectFor = element => {
+        const bounds = element.getBoundingClientRect();
+        return { top: bounds.top, bottom: bounds.bottom, left: bounds.left, right: bounds.right };
+      };
+      const header = document.querySelector(".tactical-content-heading");
+      const nav = document.querySelector(".tactical-panel-nav");
+      const summary = document.querySelector(".tactical-summary-column");
+      taskList.scrollTop = taskList.scrollHeight;
+      const lastTask = taskList.querySelector(".tactical-task-row:last-child");
+      return {
+        scrollTop: taskList.scrollTop,
+        taskList: rectFor(taskList),
+        lastTask: rectFor(lastTask),
+        header: rectFor(header),
+        nav: rectFor(nav),
+        summary: rectFor(summary)
+      };
+    });
+    expect(academyScrollLayout.scrollTop).toBeGreaterThan(0);
+    expect(academyScrollLayout.lastTask.top).toBeGreaterThanOrEqual(academyScrollLayout.taskList.top);
+    expect(academyScrollLayout.lastTask.bottom).toBeLessThanOrEqual(academyScrollLayout.taskList.bottom + 1);
+    expect(Math.abs(academyScrollLayout.header.top - tacticalLayout.header.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(academyScrollLayout.nav.top - tacticalLayout.nav.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(academyScrollLayout.summary.top - tacticalLayout.summary.top)).toBeLessThanOrEqual(1);
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-academy-final-task-1366x768.png" });
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        ensureDailyBounties();
+        const contract = dailyBountyContracts[0];
+        contract.status = "active";
+        contract.progress = 1;
+        activeBountyId = contract.id;
+        activeObjective = createBountyObjective(contract);
+        activeObjective.kills = 1;
+        refreshTacticalPanel(true);
+      })()
+    `));
+    await expect(page.locator(".active-bounty-summary.has-active-bounty")).toBeVisible();
+    await expect(page.locator(".active-bounty-summary.has-active-bounty")).toContainText("1 / 4 destroyed");
+    const activeBountyHeight = await page.locator(".active-bounty-summary.has-active-bounty").evaluate(card => card.getBoundingClientRect().height);
+    expect(activeBountyHeight).toBeLessThanOrEqual(130);
+    await page.locator(".tactical-summary-column").screenshot({ path: "artifacts/tactical-hud-summary-active.png" });
 
     await page.locator("#tacticalPanelTitle").click();
     await expect(page.locator("#tacticalPanelBackdrop")).toBeVisible();
