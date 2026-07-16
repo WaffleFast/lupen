@@ -2273,7 +2273,7 @@ function startHostileBotAttacks() {
 
   botAttackTimer = setInterval(() => {
     hostileBotAttackCycle();
-  }, HOSTILE_BOT_ATTACK_MS);
+  }, HOSTILE_BOT_ATTACK_TICK_MS);
 }
 
 function maybeMoveAsteroid() {

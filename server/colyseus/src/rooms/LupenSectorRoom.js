@@ -1376,7 +1376,14 @@ function resolveStagingWeapon(message = {}, player = null) {
       return total + clampNumber(Math.round(weapon.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
     }, 0);
     const knownDamage = clampNumber(volleyDamage, STAGING_DAMAGE_MIN, STAGING_VOLLEY_DAMAGE_MAX);
-    const volleyCooldownMs = Math.max(...knownWeapons.map((weapon) => Number(weapon.cooldownMs || STAGING_FIRE_COOLDOWN_MS)));
+    const combinedDamagePerSecond = knownWeapons.reduce((total, weapon) => {
+      const damage = clampNumber(Math.round(weapon.damage), STAGING_DAMAGE_MIN, STAGING_DAMAGE_MAX);
+      const cooldownMs = Math.max(1, Number(weapon.cooldownMs || STAGING_FIRE_COOLDOWN_MS));
+      return total + (damage * 1000 / cooldownMs);
+    }, 0);
+    const volleyCooldownMs = combinedDamagePerSecond > 0
+      ? Math.round((knownDamage / combinedDamagePerSecond) * 1000)
+      : STAGING_FIRE_COOLDOWN_MS;
     const volleyWeaponKeys = knownWeapons.map((weapon) => weapon.key);
     const volleyWeaponCount = knownWeapons.length;
     return {
@@ -2656,6 +2663,7 @@ export class LupenSectorRoom extends Room {
       threat: bot?.threat || config.threat,
       damagePerHit: Math.max(0, Math.round(Number(bot?.damagePerHit || config.damagePerHit))),
       attackCooldownMs: Math.max(1, Math.round(Number(bot?.attackCooldownMs || config.attackCooldownMs))),
+      xpReward: Math.max(0, Math.round(Number(config.xpReward || STAGING_REWARD_DRY_RUN_XP))),
       visualScale: Math.max(0.5, Math.min(1.8, Number(bot?.visualScale || config.visualScale)))
     };
   }
@@ -2870,6 +2878,7 @@ export class LupenSectorRoom extends Room {
       threat: botTypePayload.threat,
       damagePerHit: botTypePayload.damagePerHit,
       attackCooldownMs: botTypePayload.attackCooldownMs,
+      xpReward: botTypePayload.xpReward,
       disabledBySessionId,
       finalHitBy: disabledBySessionId,
       finalHitPlayerId: finalHitIdentity.trustedPlayerId || finalHitIdentity.playerId || finalHitIdentity.supabaseUserId || "",
@@ -2881,7 +2890,7 @@ export class LupenSectorRoom extends Room {
       contributors: contributionSummary.contributors,
       totalDamage: contributionSummary.totalDamage,
       node: bot?.currentNode || "",
-      previewXp: STAGING_REWARD_DRY_RUN_XP,
+      previewXp: botTypePayload.xpReward,
       previewCredits: STAGING_REWARD_DRY_RUN_CREDITS,
       previewLoot: [],
       lootPreview,

@@ -8,6 +8,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     targetCount: 16,
     shield: 60,
     hull: 60,
+    xpReward: 75,
     level: 1,
     threat: "Light Threat",
     visualScale: 0.82
@@ -21,6 +22,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     targetCount: 10,
     shield: 90,
     hull: 90,
+    xpReward: 100,
     level: 2,
     threat: "Medium Threat",
     visualScale: 0.94
@@ -34,6 +36,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     targetCount: 4,
     shield: 160,
     hull: 160,
+    xpReward: 150,
     level: 3,
     threat: "Heavy Threat",
     visualScale: 1.12
@@ -47,6 +50,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     targetCount: 3,
     shield: 300,
     hull: 350,
+    xpReward: 250,
     level: 5,
     threat: "Extreme Threat",
     visualScale: 1.32

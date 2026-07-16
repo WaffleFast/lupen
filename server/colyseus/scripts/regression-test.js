@@ -381,15 +381,16 @@ function assertBotDisplayFields(room) {
 
 function assertMapOneBotTuning() {
   const expected = {
-    hunter: { damagePerHit: 18, threat: "Light Threat" },
-    attacker: { damagePerHit: 24, threat: "Medium Threat" },
-    destroyer: { damagePerHit: 32, attackCooldownMs: 3500, threat: "Heavy Threat" },
-    behemoth: { damagePerHit: 58, threat: "Extreme Threat" }
+    hunter: { damagePerHit: 18, xpReward: 75, threat: "Light Threat" },
+    attacker: { damagePerHit: 24, xpReward: 100, threat: "Medium Threat" },
+    destroyer: { damagePerHit: 32, attackCooldownMs: 3500, xpReward: 150, threat: "Heavy Threat" },
+    behemoth: { damagePerHit: 58, xpReward: 250, threat: "Extreme Threat" }
   };
   Object.entries(expected).forEach(([botType, values]) => {
     const config = EREBUS_BOT_TYPES[botType];
     assert(config, `Missing Erebus ${botType} config.`);
     assert(config.damagePerHit === values.damagePerHit, `Unexpected ${botType} damage: ${config.damagePerHit}.`);
+    assert(config.xpReward === values.xpReward, `Unexpected ${botType} XP reward: ${config.xpReward}.`);
     if (values.attackCooldownMs) {
       assert(config.attackCooldownMs === values.attackCooldownMs, `Unexpected ${botType} cooldown: ${config.attackCooldownMs}.`);
     }
@@ -3249,10 +3250,10 @@ async function assertStagingBountyHelpers() {
   const bounties = getStagingBounties();
   assert(bounties.length === 4, `Expected four staging daily bounties, got ${bounties.length}.`);
   const expectedBounties = {
-    [STAGING_BOUNTY_ID]: { title: "Erebus Patrol Sweep", requiredKills: 4, creditsReward: 900, lupenShardsReward: 2, targetBotType: "any", timed: false },
-    staging_hunter_clearance_4: { title: "Hunter Clearance", requiredKills: 4, creditsReward: 1100, lupenShardsReward: 3, targetBotType: "hunter", timed: false },
-    staging_timed_suppression_4: { title: "Timed Suppression", requiredKills: 4, creditsReward: 1500, lupenShardsReward: 4, targetBotType: "any", timed: true },
-    staging_behemoth_warning_1: { title: "Behemoth Warning", requiredKills: 1, creditsReward: 2500, lupenShardsReward: 8, targetBotType: "behemoth" }
+    [STAGING_BOUNTY_ID]: { title: "Erebus Patrol Sweep", requiredKills: 4, creditsReward: 900, lupenShardsReward: 25, targetBotType: "any", timed: false },
+    staging_hunter_clearance_4: { title: "Hunter Clearance", requiredKills: 4, creditsReward: 1100, lupenShardsReward: 35, targetBotType: "hunter", timed: false },
+    staging_timed_suppression_4: { title: "Timed Suppression", requiredKills: 4, creditsReward: 1500, lupenShardsReward: 50, targetBotType: "any", timed: true },
+    staging_behemoth_warning_1: { title: "Behemoth Warning", requiredKills: 1, creditsReward: 2500, lupenShardsReward: 75, targetBotType: "behemoth" }
   };
   Object.entries(expectedBounties).forEach(([id, expected]) => {
     const bounty = bounties.find((item) => item.id === id);
@@ -3428,7 +3429,7 @@ async function assertStagingBountyHelpers() {
     contributionPercent: 100,
     intendedXp: 0,
     intendedCredits: 750,
-    intendedLoot: ["lupenShard", "lupenShard"],
+    intendedLoot: Array.from({ length: 25 }, () => "lupenShard"),
     intendedReason: "staging_bounty_completed",
     rewardPreviewId: buildStagingBountySourceEventId(bountyState, "verified-player-a"),
     eligible: true,
@@ -3464,7 +3465,7 @@ async function assertStagingBountyHelpers() {
   assert(bountyPatchPlan.eligible === true, `Completed staging bounty patch plan was blocked: ${bountyPatchPlan.skippedReason}`);
   assert(bountyPatchPlan.xpDelta === 0, "Completed staging bounty patch attempted to add XP.");
   assert(bountyPatchPlan.creditsDelta === 750, "Completed staging bounty patch did not include credits.");
-  assert(bountyPatchPlan.lupenShardDelta === 2, "Completed staging bounty patch did not include Lupen Shards.");
+  assert(bountyPatchPlan.lupenShardDelta === 25, "Completed staging bounty patch did not include Lupen Shards.");
 
   const patchCalls = [];
   let bountyPersistedSave = bountySave;
@@ -3494,7 +3495,7 @@ async function assertStagingBountyHelpers() {
   assert(patchedBody.save_data.playerProgress.combatXp === 10, "Completed staging bounty patch changed XP.");
   assert(patchedBody.save_data.playerProgress.zoneCombatXp["sector-one"] === 10, "Completed staging bounty patch changed zone XP.");
   assert(patchedBody.save_data.credits === 1527, "Completed staging bounty patch did not add credits.");
-  assert(patchedBody.save_data.upgradeMaterials.lupenShards === 4, "Completed staging bounty patch did not add Lupen Shards.");
+  assert(patchedBody.save_data.upgradeMaterials.lupenShards === 27, "Completed staging bounty patch did not add Lupen Shards.");
   assert(patchedBody.save_data.cargo.Iron === 2, "Completed staging bounty patch changed cargo.");
   assert(patchedBody.save_data.inventoryItems[0].id === "loot-stays", "Completed staging bounty patch changed inventory.");
   assert(patchedBody.save_data.shipLoadouts.lupenOrigin.guns[0].key === "pulseLaser", "Completed staging bounty patch changed loadout.");
@@ -5180,10 +5181,10 @@ try {
   assert(bountyListById.get(STAGING_BOUNTY_ID)?.requiredKills === 4, "Patrol Sweep returned unexpected kill requirement.");
   assert(bountyListById.get(STAGING_BOUNTY_ID)?.xpReward === 0, "Patrol Sweep returned unexpected XP reward.");
   assert(bountyListById.get(STAGING_BOUNTY_ID)?.creditsReward === 900, "Patrol Sweep returned unexpected credits reward.");
-  assert(bountyListById.get(STAGING_BOUNTY_ID)?.lupenShardsReward === 2, "Patrol Sweep returned unexpected Lupen Shards reward.");
+  assert(bountyListById.get(STAGING_BOUNTY_ID)?.lupenShardsReward === 25, "Patrol Sweep returned unexpected Lupen Shards reward.");
   assert(bountyListById.get("staging_hunter_clearance_4")?.targetBotType === "hunter", "Hunter Clearance target type was missing.");
   assert(bountyListById.get("staging_timed_suppression_4")?.timed === true, "Timed Suppression timed flag was missing.");
-  assert(bountyListById.get("staging_behemoth_warning_1")?.lupenShardsReward === 8, "Behemoth Warning shard reward was missing.");
+  assert(bountyListById.get("staging_behemoth_warning_1")?.lupenShardsReward === 75, "Behemoth Warning shard reward was missing.");
 
   const bountyAccepted = await expectRoomMessage(roomA, "stagingBounty:statusResult", () => {
     roomA.send("stagingBounty:accept", { bountyId: STAGING_BOUNTY_ID });
@@ -6052,7 +6053,7 @@ try {
   assert(multiWeaponCombatResponse?.volleyWeaponCount === 4, `Unexpected resolved volley weapon count: ${multiWeaponCombatResponse?.volleyWeaponCount}`);
   assert(JSON.stringify(multiWeaponCombatResponse?.volleyWeaponKeys) === JSON.stringify(["pulseLaser", "pulseLaser", "ionBlaster", "heavyLance"]), "Resolved volley did not preserve the valid equipped gun order.");
   assert(multiWeaponCombatResponse?.weaponName === "Pulse Laser x2 + Ion Blaster + Heavy Lance", `Unexpected multi-weapon volley name: ${multiWeaponCombatResponse?.weaponName}`);
-  assert(multiWeaponCombatResponse?.cooldownMs === 2000, `Multi-weapon volley did not use its slowest gun cooldown: ${multiWeaponCombatResponse?.cooldownMs}`);
+  assert(multiWeaponCombatResponse?.cooldownMs === 1346, `Multi-weapon volley did not preserve each gun's damage per second: ${multiWeaponCombatResponse?.cooldownMs}`);
   assert(Number(multiWeaponCombatResponse?.activeShipWeaponCount || 0) === 6, `Unexpected capped active weapon debug count: ${multiWeaponCombatResponse?.activeShipWeaponCount}`);
   assert(Number(multiWeaponCombatResponse?.validCombatWeaponCount || 0) === 4, `Unexpected valid weapon debug count: ${multiWeaponCombatResponse?.validCombatWeaponCount}`);
   assert(Number(multiWeaponCombatResponse?.rejectedWeaponCount || 0) === 3, `Unexpected rejected weapon debug count: ${multiWeaponCombatResponse?.rejectedWeaponCount}`);
@@ -6205,7 +6206,7 @@ try {
   assert(botDisabledReceipt?.botXpSourceEventId?.startsWith("staging_bot_xp:"), `Unexpected bot disabled XP source id: ${botDisabledReceipt?.botXpSourceEventId}`);
   assert(botDisabledReceipt?.xpAwardedByServer === true, "bot:disabled did not indicate server XP result was queued.");
   assert(botDisabledReceipt?.xpReceiptPending === true, "bot:disabled did not mark XP receipt as pending.");
-  assert(botDisabledReceipt?.previewXp === 100, `Unexpected bot disabled XP preview: ${botDisabledReceipt?.previewXp}`);
+  assert(botDisabledReceipt?.previewXp === 150, `Unexpected bot disabled XP preview: ${botDisabledReceipt?.previewXp}`);
   assert(botDisabledReceipt?.rewardsGranted === false, "bot:disabled incorrectly reported direct reward grants.");
   assert(botDisabledReceipt?.bountyProgressChanged === true, "bot:disabled did not include changed bounty progress.");
   assert(botDisabledReceipt?.bountyProgress?.progress === 1, `Unexpected bot disabled bounty progress: ${botDisabledReceipt?.bountyProgress?.progress}`);
@@ -6251,7 +6252,7 @@ try {
   assert(!contributorA?.trustedPlayerId && !contributorA?.playerId, "Contributor A unverified identity was trusted.");
   assert(!contributorB?.trustedPlayerId && !contributorB?.playerId, "Contributor B unverified identity was trusted.");
   assert(contributorA?.displayName === "Regression Pilot A", "Contributor A display name was not included in preview.");
-  assert(rewardPreview?.previewXp === 100, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
+  assert(rewardPreview?.previewXp === 150, `Unexpected reward preview XP: ${rewardPreview?.previewXp}`);
   assert(rewardPreview?.botType === inspectedBotBeforeCombat.botType, "Reward preview did not preserve bot type.");
   assert(rewardPreview?.botName === inspectedBotBeforeCombat.displayName, "Reward preview did not preserve bot display name.");
   assert(rewardPreview?.image === inspectedBotBeforeCombat.image, "Reward preview did not preserve bot image.");

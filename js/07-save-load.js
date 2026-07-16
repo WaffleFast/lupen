@@ -592,8 +592,8 @@ function markStagingBotKillXpAwarded(result = {}) {
 
 function getLocalStagingBotKillXpAmount(result = {}) {
   const configured = typeof getCombatXpPerBot === "function" ? Number(getCombatXpPerBot()) : 0;
-  const preview = Number(result.previewXp ?? result.claimStatus?.xpDelta ?? 0);
-  const amount = configured > 0 ? configured : preview > 0 ? preview : 4;
+  const preview = Number(result.previewXp ?? result.xpDelta ?? result.claimStatus?.xpDelta ?? 0);
+  const amount = preview > 0 ? preview : configured > 0 ? configured : 4;
   return Math.max(0, Math.round(amount));
 }
 

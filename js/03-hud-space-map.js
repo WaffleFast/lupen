@@ -2,6 +2,7 @@
 let lastCompactHudPanel = "chat";
 let tacticalPanelOpen = false;
 let activeTacticalSection = "academy";
+let tacticalPanelRenderSignature = "";
 let targetCollapseTimer = null;
 let inventoryDrawerFilter = "equipment";
 let selectedInventoryDetailId = null;
@@ -483,8 +484,29 @@ function renderTacticalPanel(force = false) {
     comms: renderTacticalComms,
     guild: renderTacticalGuild
   };
-  content.innerHTML = (renderers[activeTacticalSection] || renderTacticalAcademy)();
+  const nextHtml = (renderers[activeTacticalSection] || renderTacticalAcademy)();
+  const nextSignature = `${activeTacticalSection}|${nextHtml}`;
+  if (!force && content.childElementCount && tacticalPanelRenderSignature === nextSignature) return;
+
+  const scrollSelectors = [
+    ".tactical-task-list",
+    ".tactical-bounty-grid",
+    ".tactical-ledger-list",
+    ".tactical-found-grid",
+    ".tactical-chat-feed"
+  ];
+  const scrollPositions = Object.fromEntries(scrollSelectors.map(selector => [
+    selector,
+    content.querySelector(selector)?.scrollTop || 0
+  ]));
+
+  content.innerHTML = nextHtml;
+  tacticalPanelRenderSignature = nextSignature;
   content.setAttribute("aria-label", `${activeTacticalSection} tactical section`);
+  scrollSelectors.forEach(selector => {
+    const element = content.querySelector(selector);
+    if (element) element.scrollTop = Math.min(scrollPositions[selector] || 0, Math.max(0, element.scrollHeight - element.clientHeight));
+  });
 }
 
 function refreshTacticalPanel(force = false) {

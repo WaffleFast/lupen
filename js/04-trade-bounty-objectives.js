@@ -97,7 +97,7 @@ function getMultiplayerStagingBountyFallback() {
     progress: 0,
     xpReward: 0,
     creditsReward: 900,
-    lupenShardsReward: 2,
+    lupenShardsReward: 25,
     icon: "assets/bounties/erebus-patrol-sweep.png",
     lootReward: [],
     accepted: false,

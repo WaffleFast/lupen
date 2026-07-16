@@ -804,7 +804,8 @@ const XP_CONFIG = {
   combatLevelXp: 2500,
   combatBotXp: 100,
   bountyClaimXp: 100,
-  combatLevelThresholds: [0, 2500, 5000],
+  combatLevelThresholds: Object.freeze([0, 2500, 5000, 7500, 10000]),
+  nextMapUnlockLevel: 5,
   maxStarterCombatLevel: 99
 };
 
@@ -856,7 +857,7 @@ const BOUNTY_REWARD_DEFAULT = {
   credits: 900,
   xp: 0,
   lupenCores: 0,
-  lupenShards: 2
+  lupenShards: 25
 };
 
 const DAILY_BOUNTY_CONTRACTS = [
@@ -877,7 +878,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     killsRequired: 4,
     progress: 0,
     threat: "Easy",
-    reward: { credits: 900, xp: 0, lupenCores: 0, lupenShards: 2 },
+    reward: { credits: 900, xp: 0, lupenCores: 0, lupenShards: 25 },
     bonus: "Destroy any Erebus bots.",
     timed: false,
     timeLimitSeconds: null,
@@ -904,7 +905,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     killsRequired: 4,
     progress: 0,
     threat: "Easy",
-    reward: { credits: 1100, xp: 0, lupenCores: 0, lupenShards: 3 },
+    reward: { credits: 1100, xp: 0, lupenCores: 0, lupenShards: 35 },
     bonus: "Destroy Erebus Hunter-class bots.",
     timed: false,
     timeLimitSeconds: null,
@@ -931,7 +932,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     killsRequired: 4,
     progress: 0,
     threat: "Medium",
-    reward: { credits: 1500, xp: 0, lupenCores: 0, lupenShards: 4 },
+    reward: { credits: 1500, xp: 0, lupenCores: 0, lupenShards: 50 },
     bonus: "Complete before the timer expires.",
     timed: true,
     timeLimitSeconds: 240,
@@ -958,7 +959,7 @@ const DAILY_BOUNTY_CONTRACTS = [
     killsRequired: 1,
     progress: 0,
     threat: "Extreme",
-    reward: { credits: 2500, xp: 0, lupenCores: 0, lupenShards: 8 },
+    reward: { credits: 2500, xp: 0, lupenCores: 0, lupenShards: 75 },
     bonus: "Destroy an Erebus Behemoth.",
     timed: false,
     timeLimitSeconds: null,
@@ -1633,6 +1634,7 @@ const HOSTILE_BOT_BASE_HP = 165;
 const HOSTILE_BOT_BASE_SHIELD = 95;
 const HOSTILE_BOT_BASE_ARMOR = 12;
 const HOSTILE_BOT_ATTACK_MS = 3000;
+const HOSTILE_BOT_ATTACK_TICK_MS = 250;
 const HOSTILE_BOT_DAMAGE = 4;
 const HULL_REPAIR_COST_PER_POINT = 2;
 const DISABLED_CARGO_LOSS_RATE = 0.3;
@@ -1677,7 +1679,7 @@ const EREBUS_BOT_TYPES = {
     accuracy: 0.72,
     moveIntervalMs: 14000,
     threat: "Low",
-    xpReward: 25,
+    xpReward: 75,
     creditReward: 90
   },
   erebus_attacker: {
@@ -1694,7 +1696,7 @@ const EREBUS_BOT_TYPES = {
     accuracy: 0.75,
     moveIntervalMs: 18000,
     threat: "Medium",
-    xpReward: 45,
+    xpReward: 100,
     creditReward: 150
   },
   erebus_destroyer: {
@@ -1711,7 +1713,7 @@ const EREBUS_BOT_TYPES = {
     accuracy: 0.78,
     moveIntervalMs: 24000,
     threat: "High",
-    xpReward: 75,
+    xpReward: 150,
     creditReward: 275
   },
   erebus_behemoth: {
@@ -1720,15 +1722,15 @@ const EREBUS_BOT_TYPES = {
     className: "Behemoth",
     role: "Heavy mini-boss",
     image: "erebus-behemoth",
-    hull: 140,
-    shield: 60,
-    armor: 6,
+    hull: 420,
+    shield: 240,
+    armor: 32,
     damage: 28,
     fireRateMs: 3200,
     accuracy: 0.8,
     moveIntervalMs: 32000,
     threat: "Extreme",
-    xpReward: 130,
+    xpReward: 250,
     creditReward: 500
   }
 };
@@ -2316,10 +2318,24 @@ function normalizePlayerProgress(progress) {
 function getCombatLevelInfo() {
   const total = Math.max(0, Number(playerProgress.combatXp || 0));
   const perLevel = Math.max(1, Number(XP_CONFIG.combatLevelXp || 500));
-  const level = Math.floor(total / perLevel) + 1;
-  const levelBase = (level - 1) * perLevel;
+  const thresholds = Array.isArray(XP_CONFIG.combatLevelThresholds)
+    ? XP_CONFIG.combatLevelThresholds
+      .map(value => Math.max(0, Number(value || 0)))
+      .filter((value, index, values) => index === 0 || value > values[index - 1])
+    : [];
+  const configuredLevelIndex = thresholds.reduce((latest, threshold, index) => total >= threshold ? index : latest, 0);
+  const levelsPastConfiguredCurve = thresholds.length && total >= thresholds[thresholds.length - 1]
+    ? Math.floor((total - thresholds[thresholds.length - 1]) / perLevel)
+    : 0;
+  const level = thresholds.length
+    ? configuredLevelIndex + 1 + levelsPastConfiguredCurve
+    : Math.floor(total / perLevel) + 1;
+  const levelBase = thresholds.length && configuredLevelIndex < thresholds.length
+    ? thresholds[configuredLevelIndex] + (levelsPastConfiguredCurve * perLevel)
+    : (level - 1) * perLevel;
+  const nextThreshold = thresholds[level];
   const current = total - levelBase;
-  const next = perLevel;
+  const next = Number.isFinite(nextThreshold) ? Math.max(1, nextThreshold - levelBase) : perLevel;
 
   return {
     level,
@@ -2328,7 +2344,9 @@ function getCombatLevelInfo() {
     total,
     levelBase,
     percent: Math.min(100, Math.round((current / next) * 100)),
-    capped: false
+    capped: false,
+    nextMapUnlockLevel: Number(XP_CONFIG.nextMapUnlockLevel || 5),
+    nextMapUnlockXp: thresholds[Math.max(0, Number(XP_CONFIG.nextMapUnlockLevel || 5) - 1)] || null
   };
 }
 

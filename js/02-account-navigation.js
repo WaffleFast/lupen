@@ -1255,7 +1255,14 @@ function getEquippedWeapon(shipId = currentShipId) {
     return sum;
   }, { shield: 0, armor: 0, hull: 0 });
   const damage = Math.round((damageLayers.shield + damageLayers.armor + damageLayers.hull) / 3);
-  const speed = Math.max(...equippedGuns.map(item => item.gun.speed));
+  // The UI resolves a fitted bank as one volley. Weight its cadence by each
+  // weapon's contribution so a faster gun keeps adding its intended DPS when
+  // mixed with a slower gun instead of inheriting the slowest cooldown.
+  const totalVolleyDamage = weaponDetails.reduce((sum, item) => sum + item.damage, 0);
+  const combinedDamagePerSecond = weaponDetails.reduce((sum, item) => sum + (item.damage * item.fireRate), 0);
+  const speed = combinedDamagePerSecond > 0
+    ? Math.max(1, Math.round((totalVolleyDamage / combinedDamagePerSecond) * 1000))
+    : Math.max(...weaponDetails.map(item => item.speed));
   const fireRate = Number((1000 / speed).toFixed(2));
   const accuracy = Math.round(equippedGuns.reduce((sum, item) => sum + Number(item.gun.accuracy || 90), 0) / equippedGuns.length);
   const range = Math.max(...equippedGuns.map(item => Number(item.gun.range || 0)));

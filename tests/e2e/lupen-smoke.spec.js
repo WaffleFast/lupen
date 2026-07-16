@@ -1296,10 +1296,284 @@ test.describe("Lupen browser smoke", () => {
       weaponKeys: ["pulseLaser", "heavyLance"],
       damage: 36,
       damageLayers: { shield: 34, armor: 37, hull: 37 },
-      fireRate: 0.5,
-      speed: 2000
+      fireRate: 0.61,
+      speed: 1644
     });
 
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("isolated Map 1 playtest keeps starter combat and Forge progression within target", async ({ page }, testInfo) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const metrics = await page.evaluate(() => window.eval(`
+      (() => {
+        const starterShip = SHIPS[STARTER_SHIP_ID];
+        const makeRandom = seed => {
+          let state = seed >>> 0;
+          return () => {
+            state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+            return state / 4294967296;
+          };
+        };
+        const getWeaponFor = guns => {
+          shipLoadouts[STARTER_SHIP_ID] = normalizeShipLoadout({ attachments: [], guns }, STARTER_SHIP_ID);
+          return getEquippedWeapon(STARTER_SHIP_ID);
+        };
+        const makeEnemy = key => {
+          const definition = EREBUS_BOT_TYPES[key];
+          return LupenCombatRules.normalizeTargetCombatLayers({
+            shield: definition.shield,
+            shieldMax: definition.shield,
+            hull: definition.hull,
+            hullMax: definition.hull,
+            armor: definition.armor
+          }, definition.hull + definition.shield);
+        };
+        const fight = (weapon, enemyKey, player, random) => {
+          const definition = EREBUS_BOT_TYPES[enemyKey];
+          let target = makeEnemy(enemyKey);
+          let playerState = { ...player };
+          let playerNextShot = 0;
+          let botNextShot = definition.fireRateMs;
+          let elapsedMs = 0;
+          let shots = 0;
+          let botShots = 0;
+
+          while (target.hull > 0 && playerState.hull > 0 && elapsedMs <= 120000) {
+            if (playerNextShot <= botNextShot) {
+              elapsedMs = playerNextShot;
+              const resolved = LupenCombatRules.resolveWeaponDamageToTarget(
+                target,
+                weapon,
+                random() * 100,
+                target.maxHp
+              );
+              target = resolved.target;
+              playerNextShot += weapon.speed;
+              shots += 1;
+              continue;
+            }
+
+            elapsedMs = botNextShot;
+            botShots += 1;
+            if (random() <= definition.accuracy) {
+              const evasionReduction = Math.max(0, Math.min(0.4, starterShip.evasion / 100));
+              const mitigatedDamage = Math.max(0, Math.round(definition.damage * (1 - evasionReduction)));
+              playerState = {
+                ...LupenCombatRules.resolveIncomingPlayerDamage(playerState, mitigatedDamage),
+                armor: starterShip.armor
+              };
+            }
+            botNextShot += definition.fireRateMs;
+          }
+
+          return {
+            won: target.hull <= 0,
+            elapsedMs,
+            shots,
+            botShots,
+            player: playerState
+          };
+        };
+        const summarize = runs => ({
+          runs: runs.length,
+          wins: runs.filter(run => run.won).length,
+          deaths: runs.filter(run => run.player.hull <= 0).length,
+          averageSeconds: Number((runs.reduce((sum, run) => sum + run.elapsedMs, 0) / runs.length / 1000).toFixed(1)),
+          averageHullRemaining: Math.round(runs.reduce((sum, run) => sum + run.player.hull, 0) / runs.length),
+          minimumHullRemaining: Math.min(...runs.map(run => run.player.hull))
+        });
+
+        const twinPulse = getWeaponFor(["pulseLaser", "pulseLaser"]);
+        const twinIon = getWeaponFor(["ionBlaster", "ionBlaster"]);
+        const twinHeavy = getWeaponFor(["heavyLance", "heavyLance"]);
+        const mixed = getWeaponFor(["pulseLaser", "heavyLance"]);
+        const freshPlayer = () => ({ hull: starterShip.hull, shield: starterShip.shield, armor: starterShip.armor });
+        const destroyerRuns = [];
+        const behemothRuns = [];
+        const destroyerHunterRuns = [];
+
+        for (let seed = 1; seed <= 200; seed += 1) {
+          const destroyerRandom = makeRandom(seed);
+          destroyerRuns.push(fight(twinPulse, "erebus_destroyer", freshPlayer(), destroyerRandom));
+
+          const behemothRandom = makeRandom(seed + 1000);
+          behemothRuns.push(fight(twinPulse, "erebus_behemoth", freshPlayer(), behemothRandom));
+
+          const sequenceRandom = makeRandom(seed + 2000);
+          const destroyer = fight(twinPulse, "erebus_destroyer", freshPlayer(), sequenceRandom);
+          const hunter = destroyer.player.hull > 0
+            ? fight(twinPulse, "erebus_hunter", destroyer.player, sequenceRandom)
+            : { won: false, elapsedMs: 0, shots: 0, botShots: 0, player: destroyer.player };
+          destroyerHunterRuns.push({
+            won: destroyer.won && hunter.won,
+            elapsedMs: destroyer.elapsedMs + hunter.elapsedMs,
+            shots: destroyer.shots + hunter.shots,
+            botShots: destroyer.botShots + hunter.botShots,
+            player: hunter.player
+          });
+        }
+
+        const pairMetrics = Object.fromEntries([
+          ["twinPulse", twinPulse],
+          ["twinIon", twinIon],
+          ["twinHeavy", twinHeavy],
+          ["pulseHeavy", mixed]
+        ].map(([key, weapon], index) => {
+          const runs = Array.from({ length: 100 }, (_, runIndex) =>
+            fight(weapon, "erebus_destroyer", freshPlayer(), makeRandom(4000 + index * 500 + runIndex))
+          );
+          return [key, {
+            damage: weapon.damage,
+            fireRate: weapon.fireRate,
+            speed: weapon.speed,
+            theoreticalDps: Number((weapon.damage * weapon.fireRate).toFixed(1)),
+            ...summarize(runs)
+          }];
+        }));
+        const botFightMetrics = Object.fromEntries(Object.keys(EREBUS_BOT_TYPES).map((botKey, index) => {
+          const runs = Array.from({ length: 100 }, (_, runIndex) =>
+            fight(twinPulse, botKey, freshPlayer(), makeRandom(7000 + index * 500 + runIndex))
+          );
+          return [botKey, summarize(runs)];
+        }));
+
+        const nodeTargets = new Map();
+        [...createInitialAsteroids(), ...createInitialHostileBots()].forEach(target => {
+          const node = getCombatEntityNodeName(target);
+          if (!nodeTargets.has(node)) nodeTargets.set(node, []);
+          nodeTargets.get(node).push(target);
+        });
+        let spawnConflicts = 0;
+        let busiestNodeTargetCount = 0;
+        nodeTargets.forEach(targets => {
+          separateVisibleTargets(targets);
+          busiestNodeTargetCount = Math.max(busiestNodeTargetCount, targets.length);
+          targets.forEach((target, index) => {
+            targets.slice(index + 1).forEach(other => {
+              if (targetsTooClose(target, other)) spawnConflicts += 1;
+            });
+          });
+        });
+
+        const repeatedStarterPlan = Array.from({ length: 25 }, (_, index) => EREBUS_STARTER_SPAWN_PLAN[index % EREBUS_STARTER_SPAWN_PLAN.length]);
+        const projectedXpAt25Kills = repeatedStarterPlan.reduce((sum, key) => sum + EREBUS_BOT_TYPES[key].xpReward, 0);
+        const levelFiveXp = Number(XP_CONFIG.combatLevelThresholds[XP_CONFIG.nextMapUnlockLevel - 1]);
+        const progressionEvents = [];
+        let progressionXp = 0;
+        let progressionFightSeconds = 0;
+        let progressionKills = 0;
+        while (progressionXp < levelFiveXp && progressionKills < 500) {
+          const botKey = EREBUS_STARTER_SPAWN_PLAN[progressionKills % EREBUS_STARTER_SPAWN_PLAN.length];
+          progressionXp += EREBUS_BOT_TYPES[botKey].xpReward;
+          progressionFightSeconds += botFightMetrics[botKey].averageSeconds;
+          progressionKills += 1;
+          progressionEvents.push({
+            kills: progressionKills,
+            xp: progressionXp,
+            fightSeconds: progressionFightSeconds
+          });
+        }
+        const downtimeSeconds = { aggressive: 25, typical: 45, relaxed: 75 };
+        const levelMilestones = XP_CONFIG.combatLevelThresholds.slice(1, XP_CONFIG.nextMapUnlockLevel).map((xp, index) => {
+          const event = progressionEvents.find(entry => entry.xp >= xp) || progressionEvents[progressionEvents.length - 1];
+          return {
+            level: index + 2,
+            xp,
+            kills: event.kills,
+            activeFightMinutes: Number((event.fightSeconds / 60).toFixed(1)),
+            estimatedMinutes: Object.fromEntries(Object.entries(downtimeSeconds).map(([pace, downtime]) => [
+              pace,
+              Number(((event.fightSeconds + event.kills * downtime) / 60).toFixed(1))
+            ]))
+          };
+        });
+        const savedProgress = playerProgress;
+        const levelBoundaryAudit = [0, 2499, 2500, 4999, 5000, 7499, 7500, 9999, 10000, 12499, 12500].map(xp => {
+          playerProgress = { ...savedProgress, combatXp: xp };
+          const info = getCombatLevelInfo();
+          return { xp, level: info.level, current: info.current, next: info.next };
+        });
+        playerProgress = savedProgress;
+        const forgeCosts = Object.values(FORGE_LEVEL_COSTS);
+        const forgeCumulativeCosts = forgeCosts.map((_, index) => forgeCosts.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0));
+        const bountyShardRewards = DAILY_BOUNTY_CONTRACTS.map(contract => contract.reward.lupenShards);
+
+        return {
+          attackTickMs: HOSTILE_BOT_ATTACK_TICK_MS,
+          fastestEnemyFireRateMs: Math.min(...Object.values(EREBUS_BOT_TYPES).map(bot => bot.fireRateMs)),
+          destroyer: summarize(destroyerRuns),
+          behemoth: summarize(behemothRuns),
+          destroyerThenHunter: summarize(destroyerHunterRuns),
+          weaponPairs: pairMetrics,
+          botFightMetrics,
+          spawnConflicts,
+          busiestNodeTargetCount,
+          economy: {
+            asteroidShardReward: ASTEROID_LUPEN_SHARD_REWARD,
+            bountyShardRewards,
+            dailyBountyShardTotal: bountyShardRewards.reduce((sum, reward) => sum + reward, 0),
+            forgeCumulativeCosts,
+            projectedXpAt25Kills,
+            combatLevelTwoXp: XP_CONFIG.combatLevelXp
+          },
+          progression: {
+            nextMapUnlockLevel: XP_CONFIG.nextMapUnlockLevel,
+            levelFiveXp,
+            xpRewards: Object.fromEntries(Object.entries(EREBUS_BOT_TYPES).map(([key, bot]) => [key, bot.xpReward])),
+            levelBoundaryAudit,
+            levelMilestones
+          }
+        };
+      })()
+    `));
+
+    await testInfo.attach("map-one-playtest-metrics.json", {
+      body: Buffer.from(JSON.stringify(metrics, null, 2)),
+      contentType: "application/json"
+    });
+
+    expect(metrics.attackTickMs).toBeLessThan(metrics.fastestEnemyFireRateMs);
+    expect(metrics.destroyer.wins).toBe(200);
+    expect(metrics.behemoth.wins).toBe(200);
+    expect(metrics.behemoth.averageSeconds).toBeGreaterThan(metrics.destroyer.averageSeconds);
+    expect(metrics.destroyerThenHunter.wins).toBe(200);
+    expect(metrics.destroyerThenHunter.deaths).toBe(0);
+    expect(metrics.destroyerThenHunter.averageHullRemaining).toBeGreaterThanOrEqual(600);
+    expect(metrics.weaponPairs.twinHeavy.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinIon.theoreticalDps);
+    expect(metrics.weaponPairs.twinIon.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinPulse.theoreticalDps);
+    expect(metrics.weaponPairs.pulseHeavy.speed).toBe(1644);
+    expect(metrics.spawnConflicts).toBe(0);
+    expect(metrics.economy).toMatchObject({
+      asteroidShardReward: 50,
+      bountyShardRewards: [25, 35, 50, 75],
+      dailyBountyShardTotal: 185,
+      forgeCumulativeCosts: [25, 100, 250, 550],
+      combatLevelTwoXp: 2500
+    });
+    expect(metrics.economy.projectedXpAt25Kills).toBeGreaterThanOrEqual(metrics.economy.combatLevelTwoXp);
+    expect(metrics.progression).toMatchObject({
+      nextMapUnlockLevel: 5,
+      levelFiveXp: 10000,
+      xpRewards: {
+        erebus_hunter: 75,
+        erebus_attacker: 100,
+        erebus_destroyer: 150,
+        erebus_behemoth: 250
+      }
+    });
+    expect(metrics.progression.levelBoundaryAudit.map(({ level }) => level)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6]);
+    const levelFiveMilestone = metrics.progression.levelMilestones.find(milestone => milestone.level === 5);
+    expect(levelFiveMilestone.kills).toBeGreaterThanOrEqual(75);
+    expect(levelFiveMilestone.kills).toBeLessThanOrEqual(100);
+    expect(levelFiveMilestone.estimatedMinutes.typical).toBeGreaterThanOrEqual(60);
+    expect(levelFiveMilestone.estimatedMinutes.relaxed).toBeLessThanOrEqual(180);
+
+    console.log(`Map 1 playtest metrics: ${JSON.stringify(metrics)}`);
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
@@ -5132,17 +5406,17 @@ test.describe("Lupen browser smoke", () => {
       "Timed Suppression",
       "Behemoth Warning"
     ]);
-    expect(state.rewards["erebus-patrol-sweep"]).toMatchObject({ credits: 900, xp: 0, lupenShards: 2, targetBotType: "any", requiredKills: 4 });
-    expect(state.rewards["hunter-clearance"]).toMatchObject({ credits: 1100, xp: 0, lupenShards: 3, targetBotType: "hunter", requiredKills: 4 });
-    expect(state.rewards["timed-suppression"]).toMatchObject({ credits: 1500, xp: 0, lupenShards: 4, targetBotType: "any", requiredKills: 4 });
-    expect(state.rewards["behemoth-warning"]).toMatchObject({ credits: 2500, xp: 0, lupenShards: 8, targetBotType: "behemoth", requiredKills: 1 });
+    expect(state.rewards["erebus-patrol-sweep"]).toMatchObject({ credits: 900, xp: 0, lupenShards: 25, targetBotType: "any", requiredKills: 4 });
+    expect(state.rewards["hunter-clearance"]).toMatchObject({ credits: 1100, xp: 0, lupenShards: 35, targetBotType: "hunter", requiredKills: 4 });
+    expect(state.rewards["timed-suppression"]).toMatchObject({ credits: 1500, xp: 0, lupenShards: 50, targetBotType: "any", requiredKills: 4 });
+    expect(state.rewards["behemoth-warning"]).toMatchObject({ credits: 2500, xp: 0, lupenShards: 75, targetBotType: "behemoth", requiredKills: 1 });
     expect(state.hunterAfterMismatch).toBe(0);
     expect(state.hunterAfterMatch).toBe(1);
     expect(state.anyAfterBehemoth).toBe(1);
     expect(state.behemothAfterMismatch).toBe(0);
     expect(state.behemothReady).toBe("readyToClaim");
     expect(state.creditsDelta).toBe(2500);
-    expect(state.shardDelta).toBe(8);
+    expect(state.shardDelta).toBe(75);
     expect(state.xpDelta).toBe(0);
     expect(state.claimedStatus).toBe("claimed");
     expect(state.resetStatuses.every(status => status === "available")).toBe(true);
@@ -5835,12 +6109,12 @@ test.describe("Lupen browser smoke", () => {
         const active = {
           id: "staging_erebus_patrol_2",
           title: "Erebus Patrol Sweep",
-          description: "Destroy server-owned staging Erebus bots.",
-          requiredKills: 2,
+          description: "Destroy 4 Erebus bots.",
+          requiredKills: 4,
           progress: 0,
           xpReward: 0,
-          creditsReward: 750,
-          lupenShardsReward: 2,
+          creditsReward: 900,
+          lupenShardsReward: 25,
           targetBotType: "any",
           targetBotLabel: "Erebus bots",
           accepted: true,
@@ -5884,12 +6158,12 @@ test.describe("Lupen browser smoke", () => {
         const active = {
           id: "staging_erebus_patrol_2",
           title: "Erebus Patrol Sweep",
-          description: "Destroy server-owned staging Erebus bots.",
-          requiredKills: 2,
+          description: "Destroy 4 Erebus bots.",
+          requiredKills: 4,
           progress: 0,
           xpReward: 0,
-          creditsReward: 750,
-          lupenShardsReward: 2,
+          creditsReward: 900,
+          lupenShardsReward: 25,
           targetBotType: "any",
           targetBotLabel: "Erebus bots",
           accepted: true,
@@ -6651,11 +6925,11 @@ test.describe("Lupen browser smoke", () => {
         const active = {
           id: "staging_erebus_patrol_2",
           title: "Erebus Patrol Sweep",
-          requiredKills: 2,
+          requiredKills: 4,
           progress: 1,
           xpReward: 0,
-          creditsReward: 750,
-          lupenShardsReward: 2,
+          creditsReward: 900,
+          lupenShardsReward: 25,
           targetBotType: "any",
           targetBotLabel: "Erebus bots",
           accepted: true,
@@ -6681,6 +6955,8 @@ test.describe("Lupen browser smoke", () => {
           applied: false,
           botId: "staging-bot-1",
           botName: "Erebus Watcher",
+          botType: "destroyer",
+          previewXp: 150,
           destructionInstanceId: "staging-bot-1:kill-1",
           receivedAt: 1000
         });
@@ -6689,6 +6965,8 @@ test.describe("Lupen browser smoke", () => {
           applied: false,
           botId: "staging-bot-1",
           botName: "Erebus Watcher",
+          botType: "destroyer",
+          previewXp: 150,
           destructionInstanceId: "staging-bot-1:kill-1",
           receivedAt: 1001
         });
@@ -6697,6 +6975,8 @@ test.describe("Lupen browser smoke", () => {
           applied: false,
           botId: "staging-bot-2",
           botName: "Erebus Drone",
+          botType: "hunter",
+          previewXp: 75,
           destructionInstanceId: "staging-bot-2:kill-1",
           receivedAt: 1002
         });
@@ -6743,7 +7023,7 @@ test.describe("Lupen browser smoke", () => {
           erebusBotsDestroyed: saved.playerProgress?.totals?.erebusBotsDestroyed,
           hudText,
           pilotText,
-          fallbackKillActivityCount: activityMessages.filter(message => message === "Erebus Watcher destroyed. +100 XP.").length,
+          fallbackKillActivityCount: activityMessages.filter(message => message === "Erebus Watcher destroyed. +150 XP.").length,
           serverMarkedDuplicateActivityCount: activityMessages.filter(message => message.includes("Erebus Scout destroyed")).length,
           activeBountyProgress: window.LupenMultiplayerClient.getStatus().lastStagingBountyStatus.active.progress,
           shardCount: upgradeMaterials.lupenShards
@@ -6752,21 +7032,21 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(state.first.applied).toBe(true);
-    expect(state.first.xpDelta).toBe(100);
+    expect(state.first.xpDelta).toBe(150);
     expect(state.duplicate.applied).toBe(false);
     expect(state.duplicate.reason).toBe("duplicate_staging_bot_kill_xp");
     expect(state.secondWithBounty.applied).toBe(true);
     expect(state.serverAppliedMark).toMatchObject({ marked: true, key: "staging-bot-3:kill-1" });
     expect(state.duplicateAfterServerApplied.applied).toBe(false);
     expect(state.duplicateAfterServerApplied.reason).toBe("duplicate_staging_bot_kill_xp");
-    expect(state.savedXp).toBe(200);
-    expect(state.savedZoneXp).toBe(200);
-    expect(state.restoredXp).toBe(200);
-    expect(state.restoredZoneXp).toBe(200);
+    expect(state.savedXp).toBe(225);
+    expect(state.savedZoneXp).toBe(225);
+    expect(state.restoredXp).toBe(225);
+    expect(state.restoredZoneXp).toBe(225);
     expect(state.botsDestroyed).toBe(2);
     expect(state.erebusBotsDestroyed).toBe(2);
-    expect(state.hudText).toContain("200");
-    expect(state.pilotText).toContain("200");
+    expect(state.hudText).toContain("225");
+    expect(state.pilotText).toContain("225");
     expect(state.fallbackKillActivityCount).toBe(1);
     expect(state.serverMarkedDuplicateActivityCount).toBe(0);
     expect(state.activeBountyProgress).toBe(1);
@@ -8468,7 +8748,7 @@ test.describe("Lupen browser smoke", () => {
     await page.locator(".bounty-contract-card", { hasText: "Hunter Clearance" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter Clearance");
     await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,100 / 3 Lupen Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,100 / 35 Lupen Shards");
     await page.locator(".bounty-contract-card", { hasText: "Timed Suppression" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyDetailPanel")).toContainText("04:00");
@@ -8499,10 +8779,10 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.eval(`
       (() => {
         const bounties = [
-          { id: "staging_erebus_patrol_2", title: "Erebus Patrol Sweep", description: "Destroy 4 Erebus bots.", contractType: "Kill Contract", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 900, lupenShardsReward: 2, icon: "assets/bounties/erebus-patrol-sweep.png" },
-          { id: "staging_hunter_clearance_4", title: "Hunter Clearance", description: "Destroy 4 Erebus Hunters.", contractType: "Targeted Hunt", targetBotType: "hunter", targetBotLabel: "Hunter", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1100, lupenShardsReward: 3, icon: "assets/bounties/hunter-clearance.png" },
-          { id: "staging_timed_suppression_4", title: "Timed Suppression", description: "Destroy 4 Erebus bots within 4 minutes.", contractType: "Timed Elimination", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Medium", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1500, lupenShardsReward: 4, timed: true, timeLimitSeconds: 240, icon: "assets/bounties/timed-suppression.png" },
-          { id: "staging_behemoth_warning_1", title: "Behemoth Warning", description: "Destroy 1 Erebus Behemoth.", contractType: "Boss Contract", targetBotType: "behemoth", targetBotLabel: "Erebus Behemoth", difficulty: "Extreme", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 2500, lupenShardsReward: 8, icon: "assets/bounties/behemoth-warning.png" }
+          { id: "staging_erebus_patrol_2", title: "Erebus Patrol Sweep", description: "Destroy 4 Erebus bots.", contractType: "Kill Contract", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 900, lupenShardsReward: 25, icon: "assets/bounties/erebus-patrol-sweep.png" },
+          { id: "staging_hunter_clearance_4", title: "Hunter Clearance", description: "Destroy 4 Erebus Hunters.", contractType: "Targeted Hunt", targetBotType: "hunter", targetBotLabel: "Hunter", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1100, lupenShardsReward: 35, icon: "assets/bounties/hunter-clearance.png" },
+          { id: "staging_timed_suppression_4", title: "Timed Suppression", description: "Destroy 4 Erebus bots within 4 minutes.", contractType: "Timed Elimination", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Medium", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1500, lupenShardsReward: 50, timed: true, timeLimitSeconds: 240, icon: "assets/bounties/timed-suppression.png" },
+          { id: "staging_behemoth_warning_1", title: "Behemoth Warning", description: "Destroy 1 Erebus Behemoth.", contractType: "Boss Contract", targetBotType: "behemoth", targetBotLabel: "Erebus Behemoth", difficulty: "Extreme", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 2500, lupenShardsReward: 75, icon: "assets/bounties/behemoth-warning.png" }
         ];
         window.__stagingBountyAccepted = false;
         window.__stagingBountyCompleted = false;
@@ -8552,11 +8832,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toContainText("XP REWARD");
 
     const stagingContractCards = page.locator(".bounty-contract-card");
-    await expect(stagingContractCards.filter({ hasText: "Hunter Clearance" })).toContainText("3 Lupen Shards");
+    await expect(stagingContractCards.filter({ hasText: "Hunter Clearance" })).toContainText("35 Lupen Shards");
     await expect(stagingContractCards.filter({ hasText: "Hunter Clearance" })).toContainText("Hunter");
-    await expect(stagingContractCards.filter({ hasText: "Timed Suppression" })).toContainText("4 Lupen Shards");
+    await expect(stagingContractCards.filter({ hasText: "Timed Suppression" })).toContainText("50 Lupen Shards");
     await expect(stagingContractCards.filter({ hasText: "Timed Suppression" })).toContainText("Medium");
-    await expect(stagingContractCards.filter({ hasText: "Behemoth Warning" })).toContainText("8 Lupen Shards");
+    await expect(stagingContractCards.filter({ hasText: "Behemoth Warning" })).toContainText("75 Lupen Shards");
     await expect(stagingContractCards.filter({ hasText: "Behemoth Warning" })).toContainText("Extreme");
 
     const stagingContractIcons = await page.locator(".bounty-card-icon img").evaluateAll((images) => images.map((image) => image.getAttribute("src")));
@@ -8569,10 +8849,10 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator(".bounty-contract-card", { hasText: "Behemoth Warning" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Behemoth");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 8 Lupen Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 75 Lupen Shards");
     await page.evaluate(() => window.eval("renderBountyBoard()"));
     await expect(page.locator("#bountyDetailPanel")).toContainText("Behemoth Warning");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 8 Lupen Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 75 Lupen Shards");
 
     await page.evaluate(() => window.eval(`
       (() => {
@@ -8585,7 +8865,7 @@ test.describe("Lupen browser smoke", () => {
     const objectiveCard = page.locator(".tactical-bounty-card", { hasText: "Erebus Patrol Sweep" });
     await expect(objectiveCard).toContainText("0 / 4");
     await expect(objectiveCard).toContainText("CR 900");
-    await expect(objectiveCard).toContainText("2 Shards");
+    await expect(objectiveCard).toContainText("25 Shards");
     const objectiveIcon = objectiveCard.locator(".tactical-bounty-icon img");
     await expect(objectiveIcon).toHaveAttribute("src", "assets/bounties/erebus-patrol-sweep.png");
     await expect(objectiveIcon).toBeVisible();
@@ -8621,7 +8901,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#gameRewardBurst")).toHaveClass(/active/);
     await expect(page.locator("#gameRewardBurst")).toContainText("Bounty Complete");
     await expect(page.locator("#gameRewardBurst")).toContainText("Behemoth Warning");
-    await expect(page.locator("#gameRewardBurst")).toContainText("CR 2,500 · 8 Lupen Shards ready");
+    await expect(page.locator("#gameRewardBurst")).toContainText("CR 2,500 · 75 Lupen Shards ready");
     await expect(page.locator("#gameRewardBurst .game-reward-icon img")).toHaveAttribute("src", "assets/bounties/behemoth-warning.png");
     await page.locator("#spaceScreen").screenshot({ path: "artifacts/staging-tactical-bounty-complete-grid.png" });
 
