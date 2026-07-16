@@ -220,7 +220,6 @@ const STAGING_FIRE_COOLDOWN_MS = 900;
 const STAGING_FIRE_COOLDOWN_MIN_MS = 450;
 const STAGING_FIRE_COOLDOWN_MAX_MS = 2500;
 const STAGING_RESOURCE_RESPAWN_MS = 12000;
-const SERVER_OBJECT_SPAWN_JITTER = 3.2;
 const SERVER_OBJECT_SAFE_MIN_X = 14;
 const SERVER_OBJECT_SAFE_MAX_X = 86;
 const SERVER_OBJECT_SAFE_MIN_Y = 14;
@@ -230,6 +229,9 @@ const SERVER_OBJECT_ACTION_MAX_X = 62;
 const SERVER_OBJECT_ACTION_MIN_Y = 42;
 const SERVER_OBJECT_ACTION_LEFT_X = 34;
 const SERVER_OBJECT_ACTION_RIGHT_X = 66;
+const SERVER_OBJECT_MIN_GAP_X = 11;
+const SERVER_OBJECT_MIN_GAP_Y = 17;
+const SERVER_OBJECT_RANDOM_ATTEMPTS = 120;
 const STAGING_WEAPON_STATS = Object.freeze({
   heavyLance: Object.freeze({
     key: "heavyLance",
@@ -666,33 +668,6 @@ function getMapOnePvpZoneType(nodeId = "") {
 
 function isMapOnePvpContestedNode(nodeId = "") {
   return getMapOnePvpZoneType(nodeId) === "contested";
-}
-
-function getStableNumberSeed(input = "") {
-  let hash = 2166136261;
-  const text = String(input || "");
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash >>> 0);
-}
-
-function getServerObjectSpawnPosition(base = {}, key = "", radius = SERVER_OBJECT_SPAWN_JITTER) {
-  const seed = getStableNumberSeed(key);
-  const angle = ((seed % 360) * Math.PI) / 180;
-  const distance = radius * (0.45 + ((Math.floor(seed / 360) % 100) / 180));
-  let x = clampNumber(Number(base.x || 50) + Math.cos(angle) * distance, SERVER_OBJECT_SAFE_MIN_X, SERVER_OBJECT_SAFE_MAX_X);
-  const y = clampNumber(Number(base.y || 50) + Math.sin(angle) * distance, SERVER_OBJECT_SAFE_MIN_Y, SERVER_OBJECT_SAFE_MAX_Y);
-
-  if (y >= SERVER_OBJECT_ACTION_MIN_Y && x >= SERVER_OBJECT_ACTION_MIN_X && x <= SERVER_OBJECT_ACTION_MAX_X) {
-    x = seed % 2 === 0 ? SERVER_OBJECT_ACTION_LEFT_X : SERVER_OBJECT_ACTION_RIGHT_X;
-  }
-
-  return {
-    x,
-    y
-  };
 }
 
 function ensurePlayerPvpState(player) {
@@ -1843,6 +1818,15 @@ export class LupenSectorRoom extends Room {
     });
     updatePlayerPvpCapacityFromPresence(joinedPlayer, options);
 
+    if (joinedPlayer.presenceStatus !== "docked") {
+      const position = this.allocateOpenSpacePosition(joinedPlayer.currentNode, {
+        kind: "player",
+        id: client.sessionId
+      });
+      joinedPlayer.x = position.x;
+      joinedPlayer.y = position.y;
+    }
+
     this.state.players.set(client.sessionId, joinedPlayer);
     this.broadcast("playerJoined", this.buildPresenceEvent("joined", joinedPlayer));
   }
@@ -1868,7 +1852,7 @@ export class LupenSectorRoom extends Room {
 
     DUMMY_BOT_DEFINITIONS.forEach((definition, index) => {
       const patrolNode = BOT_NODE_POSITIONS.get(definition.startNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length];
-      const position = getServerObjectSpawnPosition(patrolNode, `${definition.id}:${patrolNode.node}:initial`, SERVER_OBJECT_SPAWN_JITTER);
+      const position = this.allocateOpenSpacePosition(patrolNode.node, { kind: "bot", id: definition.id });
       this.state.bots.set(definition.id, new LupenSectorBot({
         id: definition.id,
         botType: definition.botType,
@@ -1907,7 +1891,10 @@ export class LupenSectorRoom extends Room {
         x: definition.x,
         y: definition.y
       };
-      const objectPosition = getServerObjectSpawnPosition(position, `${definition.id}:${position.node || definition.startNode}:initial`, SERVER_OBJECT_SPAWN_JITTER);
+      const objectPosition = this.allocateOpenSpacePosition(position.node || definition.startNode, {
+        kind: "resource",
+        id: definition.id
+      });
       const hp = Math.max(1, Math.round(Number(definition.hp || 30)));
       this.state.resources.set(definition.id, new LupenSectorResource({
         id: definition.id,
@@ -1940,10 +1927,12 @@ export class LupenSectorRoom extends Room {
 
       if (bot.disabled) return;
 
-      const nodePosition = BOT_NODE_POSITIONS.get(bot.currentNode) || STAGING_BOT_NODES[0];
-      const position = getServerObjectSpawnPosition(nodePosition, `${bot.id}:${bot.currentNode}:patrol`, 1.8);
-      bot.x = position.x;
-      bot.y = position.y;
+      const occupied = this.getOccupiedSpacePositions(bot.currentNode, { kind: "bot", id: bot.id });
+      if (!this.isSpacePositionOpen(bot, occupied)) {
+        const position = this.allocateOpenSpacePosition(bot.currentNode, { kind: "bot", id: bot.id });
+        bot.x = position.x;
+        bot.y = position.y;
+      }
       bot.lastUpdatedAt = now;
     });
 
@@ -1957,8 +1946,10 @@ export class LupenSectorRoom extends Room {
       if (!resource.depleted) return;
       if (now < Number(resource.depletedUntil || 0)) return;
 
-      const nodePosition = BOT_NODE_POSITIONS.get(resource.currentNode) || { x: resource.x, y: resource.y };
-      const position = getServerObjectSpawnPosition(nodePosition, `${resource.id}:${resource.currentNode}:respawn:${Math.floor(now / 1000)}`, SERVER_OBJECT_SPAWN_JITTER);
+      const position = this.allocateOpenSpacePosition(resource.currentNode, {
+        kind: "resource",
+        id: resource.id
+      });
       resource.hp = Number(resource.hpMax || 1);
       resource.x = position.x;
       resource.y = position.y;
@@ -2069,6 +2060,85 @@ export class LupenSectorRoom extends Room {
     return player;
   }
 
+  getOccupiedSpacePositions(currentNode = "", exclusion = {}) {
+    const nodeKey = normalizePresenceNode(currentNode);
+    const excludedKind = String(exclusion.kind || "");
+    const excludedId = String(exclusion.id || "");
+    const positions = [];
+    const addPosition = (kind, id, entity) => {
+      if (kind === excludedKind && String(id || "") === excludedId) return;
+      if (normalizePresenceNode(entity?.currentNode) !== nodeKey) return;
+      const x = Number(entity?.x);
+      const y = Number(entity?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      positions.push({ kind, id: String(id || ""), x, y });
+    };
+
+    this.state.players.forEach((player, sessionId) => {
+      if (getSafePresenceStatus(player?.presenceStatus) === "docked") return;
+      addPosition("player", sessionId, player);
+    });
+    this.state.bots.forEach((bot, botId) => {
+      if (bot?.disabled) return;
+      addPosition("bot", botId, bot);
+    });
+    this.state.resources.forEach((resource, resourceId) => {
+      if (resource?.depleted) return;
+      addPosition("resource", resourceId, resource);
+    });
+
+    return positions;
+  }
+
+  isSpacePositionOpen(position = {}, occupied = []) {
+    const x = Number(position.x);
+    const y = Number(position.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    return !occupied.some((other) => (
+      Math.abs(x - Number(other.x || 0)) < SERVER_OBJECT_MIN_GAP_X &&
+      Math.abs(y - Number(other.y || 0)) < SERVER_OBJECT_MIN_GAP_Y
+    ));
+  }
+
+  allocateOpenSpacePosition(currentNode = "", exclusion = {}, random = Math.random) {
+    const occupied = this.getOccupiedSpacePositions(currentNode, exclusion);
+    const makeCandidate = () => {
+      let x = SERVER_OBJECT_SAFE_MIN_X + random() * (SERVER_OBJECT_SAFE_MAX_X - SERVER_OBJECT_SAFE_MIN_X);
+      const y = SERVER_OBJECT_SAFE_MIN_Y + random() * (SERVER_OBJECT_SAFE_MAX_Y - SERVER_OBJECT_SAFE_MIN_Y);
+      if (y >= SERVER_OBJECT_ACTION_MIN_Y && x >= SERVER_OBJECT_ACTION_MIN_X && x <= SERVER_OBJECT_ACTION_MAX_X) {
+        x = random() < 0.5 ? SERVER_OBJECT_ACTION_LEFT_X : SERVER_OBJECT_ACTION_RIGHT_X;
+      }
+      return {
+        x: Math.round(clampNumber(x, SERVER_OBJECT_SAFE_MIN_X, SERVER_OBJECT_SAFE_MAX_X) * 100) / 100,
+        y: Math.round(clampNumber(y, SERVER_OBJECT_SAFE_MIN_Y, SERVER_OBJECT_SAFE_MAX_Y) * 100) / 100
+      };
+    };
+
+    for (let attempt = 0; attempt < SERVER_OBJECT_RANDOM_ATTEMPTS; attempt += 1) {
+      const candidate = makeCandidate();
+      if (this.isSpacePositionOpen(candidate, occupied)) return candidate;
+    }
+
+    const fallbackSlots = [];
+    [14, 26, 38, 50, 62, 74, 86].forEach((x) => {
+      [14, 31, 48].forEach((y) => {
+        if (y >= SERVER_OBJECT_ACTION_MIN_Y && x >= SERVER_OBJECT_ACTION_MIN_X && x <= SERVER_OBJECT_ACTION_MAX_X) return;
+        fallbackSlots.push({ x, y, order: random() });
+      });
+    });
+    fallbackSlots.sort((a, b) => a.order - b.order);
+    const openFallback = fallbackSlots.find((candidate) => this.isSpacePositionOpen(candidate, occupied));
+    if (openFallback) return { x: openFallback.x, y: openFallback.y };
+
+    return fallbackSlots.reduce((best, candidate) => {
+      const nearest = occupied.reduce((distance, other) => Math.min(
+        distance,
+        Math.hypot(candidate.x - Number(other.x || 0), candidate.y - Number(other.y || 0))
+      ), Number.POSITIVE_INFINITY);
+      return nearest > best.nearest ? { x: candidate.x, y: candidate.y, nearest } : best;
+    }, { ...makeCandidate(), nearest: -1 });
+  }
+
   sendWarning(client, reason, messageType) {
     client.send("presence:warning", {
       ok: false,
@@ -2086,6 +2156,8 @@ export class LupenSectorRoom extends Room {
       displayName: getSafeIdentityValue(player?.displayName, "Pilot") || "Pilot",
       currentNode: player?.currentNode || "",
       presenceStatus: player?.presenceStatus || "space",
+      x: Number(player?.x || 0),
+      y: Number(player?.y || 0),
       receivedAt: Date.now(),
       ...extra
     };
@@ -4031,9 +4103,8 @@ export class LupenSectorRoom extends Room {
     const botTypePayload = this.getBotTypePayload(bot);
     const respawnNode = this.getNextBotNode(bot.currentNode, index + this.botStep + 1);
     const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
-    const position = getServerObjectSpawnPosition(nodePosition, `${bot.id}:${respawnNode}:respawn:${Math.floor(now / 1000)}`, SERVER_OBJECT_SPAWN_JITTER);
-
     bot.currentNode = nodePosition.node;
+    const position = this.allocateOpenSpacePosition(bot.currentNode, { kind: "bot", id: bot.id });
     bot.x = position.x;
     bot.y = position.y;
     bot.shield = Number(bot.shieldMax || 0);
@@ -4511,11 +4582,6 @@ export class LupenSectorRoom extends Room {
     const previousNode = player.currentNode || "";
     const previousPresenceStatus = player.presenceStatus || "space";
 
-    const x = Number(message.x);
-    const y = Number(message.y);
-    if (Number.isFinite(x)) player.x = x;
-    if (Number.isFinite(y)) player.y = y;
-
     const displayName = getStringValue(message.displayName);
     if (displayName) player.displayName = displayName;
 
@@ -4564,7 +4630,17 @@ export class LupenSectorRoom extends Room {
       player.presenceStatus = getSafePresenceStatus(message.presenceStatus || message.status);
     }
     const presenceStatusChanged = previousPresenceStatus !== (player.presenceStatus || "space");
-    if (currentNode && (normalizePresenceNode(previousNode) !== normalizePresenceNode(currentNode) || presenceStatusChanged)) {
+    const nodeChanged = normalizePresenceNode(previousNode) !== normalizePresenceNode(player.currentNode);
+    const enteredSpace = previousPresenceStatus === "docked" && player.presenceStatus !== "docked";
+    if (player.presenceStatus !== "docked" && (nodeChanged || enteredSpace || !Number.isFinite(Number(player.x)) || !Number.isFinite(Number(player.y)))) {
+      const position = this.allocateOpenSpacePosition(player.currentNode, {
+        kind: "player",
+        id: client.sessionId
+      });
+      player.x = position.x;
+      player.y = position.y;
+    }
+    if (currentNode && (nodeChanged || presenceStatusChanged)) {
       this.broadcast("playerMoved", this.buildPresenceEvent("moved", player, {
         previousNode,
         currentNode,

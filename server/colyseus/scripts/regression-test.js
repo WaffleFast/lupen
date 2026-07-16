@@ -328,8 +328,28 @@ function assertServerObjectCombatSafePosition(entity, label = "server object") {
 }
 
 function assertServerObjectCombatSafePositions(room) {
-  botSnapshots(room).forEach((bot) => assertServerObjectCombatSafePosition(bot, "Bot"));
-  resourceSnapshots(room).forEach((resource) => assertServerObjectCombatSafePosition(resource, "Resource"));
+  const players = Array.from(room?.state?.players?.values?.() || [])
+    .filter((player) => String(player?.presenceStatus || "space") !== "docked")
+    .map((player) => ({
+      id: player.sessionId || player.id,
+      currentNode: player.currentNode,
+      x: player.x,
+      y: player.y,
+      kind: "Player"
+    }));
+  const entities = [
+    ...players,
+    ...botSnapshots(room).filter((bot) => !bot.disabled).map((bot) => ({ ...bot, kind: "Bot" })),
+    ...resourceSnapshots(room).filter((resource) => !resource.depleted).map((resource) => ({ ...resource, kind: "Resource" }))
+  ];
+  entities.forEach((entity) => assertServerObjectCombatSafePosition(entity, entity.kind));
+  entities.forEach((entity, index) => {
+    entities.slice(index + 1).forEach((other) => {
+      if (String(entity.currentNode || "").toLowerCase() !== String(other.currentNode || "").toLowerCase()) return;
+      const overlaps = Math.abs(Number(entity.x) - Number(other.x)) < 11 && Math.abs(Number(entity.y) - Number(other.y)) < 17;
+      assert(!overlaps, `${entity.kind} ${entity.id} overlaps ${other.kind} ${other.id} in ${entity.currentNode}.`);
+    });
+  });
 }
 
 function assertAllowedBotNodes(room) {
@@ -5578,6 +5598,7 @@ try {
     const player = playerFrom(roomB, roomA.sessionId);
     return player?.currentNode === "Virella" && player?.presenceStatus === "space";
   });
+  assertServerObjectCombatSafePosition(playerFrom(roomA, roomA.sessionId), "Player");
   console.log("docked and launched presence status replicated promptly");
 
   await waitFor("Erebus bot population to appear", () => botCount(roomA) >= 33 && botCount(roomB) >= 33);
@@ -5636,6 +5657,8 @@ try {
   await waitFor("client A to move to staging resource node", () => {
     return playerFrom(roomA, roomA.sessionId)?.currentNode === inspectedResourceBeforeMine.currentNode;
   });
+  const playerAtResource = playerFrom(roomA, roomA.sessionId);
+  assert(!(Math.abs(Number(playerAtResource.x) - Number(inspectedResourceBeforeMine.x)) < 11 && Math.abs(Number(playerAtResource.y) - Number(inspectedResourceBeforeMine.y)) < 17), "Player spawned on top of the staging resource.");
 
   const firstResourceMine = await expectRoomMessage(roomA, "stagingResource:mineResult", () => {
     roomA.send("stagingResource:mine", {
@@ -6481,9 +6504,14 @@ try {
     return playerA &&
       playerA.currentNode === "East Link 1" &&
       playerA.shipImage === "assets/ships/lupen-origin.png" &&
-      playerA.x === 64 &&
-      playerA.y === 42;
+      Number.isFinite(Number(playerA.x)) &&
+      Number.isFinite(Number(playerA.y));
   });
+  const playerAPositionAfterMove = {
+    x: Number(playerFrom(roomB, roomA.sessionId)?.x),
+    y: Number(playerFrom(roomB, roomA.sessionId)?.y)
+  };
+  assertServerObjectCombatSafePosition(playerFrom(roomB, roomA.sessionId), "Player");
   console.log("client B received client A movement update");
 
   await waitFor("staging target to clear after node change", () => {
@@ -6520,8 +6548,8 @@ try {
 
   const playerAAfterInvalidMove = playerFrom(roomB, roomA.sessionId);
   assert(playerAAfterInvalidMove?.currentNode === "East Link 1", "Invalid movement changed currentNode.");
-  assert(playerAAfterInvalidMove?.x === 64, "Invalid movement changed x.");
-  assert(playerAAfterInvalidMove?.y === 42, "Invalid movement changed y.");
+  assert(playerAAfterInvalidMove?.x === playerAPositionAfterMove.x, "Invalid movement changed x.");
+  assert(playerAAfterInvalidMove?.y === playerAPositionAfterMove.y, "Invalid movement changed y.");
   console.log(`invalid movement ignored with warning: ${warning.reason}`);
 
   const sessionA = roomA.sessionId;

@@ -1710,15 +1710,6 @@
   }
 
   function getServerBotMapPosition(bot) {
-    const x = Number(bot?.x);
-    const y = Number(bot?.y);
-    if (Number.isFinite(x) && Number.isFinite(y)) {
-      return {
-        x: clampMapCoordinate(x),
-        y: clampMapCoordinate(y)
-      };
-    }
-
     return getEntityPosition(bot);
   }
 
@@ -2852,19 +2843,19 @@
     const previousTop = Number(previous?.spaceTop);
     const previousNode = normalizeNodeKey(getEntityNodeName(previous));
     const nextNode = normalizeNodeKey(getEntityNodeName(player) || getCurrentNodeName());
-    if (previous && previousNode && previousNode === nextNode && Number.isFinite(previousLeft) && Number.isFinite(previousTop)) {
-      return {
-        spaceLeft: clampMapCoordinate(previousLeft),
-        spaceTop: clampMapCoordinate(previousTop)
-      };
-    }
-
-    const explicitLeft = Number(player?.spaceLeft);
-    const explicitTop = Number(player?.spaceTop);
+    const explicitLeft = Number(player?.spaceLeft ?? player?.x);
+    const explicitTop = Number(player?.spaceTop ?? player?.y);
     if (Number.isFinite(explicitLeft) && Number.isFinite(explicitTop)) {
       return {
         spaceLeft: clampMapCoordinate(explicitLeft),
         spaceTop: clampMapCoordinate(explicitTop)
+      };
+    }
+
+    if (previous && previousNode && previousNode === nextNode && Number.isFinite(previousLeft) && Number.isFinite(previousTop)) {
+      return {
+        spaceLeft: clampMapCoordinate(previousLeft),
+        spaceTop: clampMapCoordinate(previousTop)
       };
     }
 
@@ -2882,8 +2873,8 @@
     const previousNode = normalizeNodeKey(getEntityNodeName(previous));
     const nextNode = normalizeNodeKey(getEntityNodeName(player));
     const sameNode = !previousNode || !nextNode || previousNode === nextNode;
-    const explicitLeft = Number(player?.spaceLeft);
-    const explicitTop = Number(player?.spaceTop);
+    const explicitLeft = Number(player?.spaceLeft ?? player?.x);
+    const explicitTop = Number(player?.spaceTop ?? player?.y);
     const positionLeft = Number(position?.spaceLeft);
     const positionTop = Number(position?.spaceTop);
     const next = {
@@ -3277,6 +3268,30 @@
     return "bot";
   }
 
+  function getCombatVolleyCount(event = {}, status = {}, isBotReturnFire = false) {
+    if (isBotReturnFire) return 1;
+    const explicitCount = Number(event?.volleyWeaponCount || 0);
+    if (Number.isFinite(explicitCount) && explicitCount > 0) return Math.max(1, Math.min(6, Math.round(explicitCount)));
+    if (Array.isArray(event?.volleyWeaponKeys) && event.volleyWeaponKeys.length) {
+      return Math.max(1, Math.min(6, event.volleyWeaponKeys.length));
+    }
+    const localWeaponKeys = Array.isArray(status?.localEquippedWeaponKeys)
+      ? status.localEquippedWeaponKeys
+      : Array.isArray(status?.equippedWeaponKeys) ? status.equippedWeaponKeys : [];
+    const fallbackCount = Number(status?.activeShipWeaponCount || status?.validCombatWeaponCount || localWeaponKeys.length || 1);
+    return Math.max(1, Math.min(6, Math.round(fallbackCount)));
+  }
+
+  function spreadCombatSourcePoint(sourcePoint, beamCount = 1) {
+    const count = Math.max(1, Math.min(6, Math.round(Number(beamCount || 1))));
+    if (count === 1 || !sourcePoint) return sourcePoint;
+    const spread = Math.min(42, 8 + count * 5);
+    return Array.from({ length: count }, (_item, index) => ({
+      ...sourcePoint,
+      y: Number(sourcePoint.y || 0) + (count === 1 ? 0 : (index / (count - 1) - 0.5) * spread)
+    }));
+  }
+
   function renderSpaceShot(players, bots, resources, status) {
     global.document?.getElementById(spaceShotLayerId)?.remove();
     const event = getCombatVisualEvent(status);
@@ -3314,9 +3329,10 @@
     const remoteSourcePoint = resolveCombatSourcePoint(event, attacker, attackerPosition, isLocalShot, {
       requireRenderedMarker: isRemotePlayerShot || isLocalIncomingBotFire
     });
+    const beamCount = getCombatVolleyCount(event, status, isBotReturnFire);
     const sourcePoint = isLocalShot && typeof global.getLocalCombatFxOriginsForTarget === "function"
-      ? global.getLocalCombatFxOriginsForTarget(targetPoint)
-      : remoteSourcePoint;
+      ? global.getLocalCombatFxOriginsForTarget(targetPoint, beamCount)
+      : spreadCombatSourcePoint(remoteSourcePoint, beamCount);
     if (!sourcePoint) return;
     const targetType = String(event.targetType || event.type || "target");
     if (typeof global.renderCombatFxBeam === "function") {

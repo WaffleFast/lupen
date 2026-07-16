@@ -50632,6 +50632,10 @@ input::placeholder {
   pointer-events: none;
 }
 
+#spaceScreen .asteroid-field.server-owned-space-layout {
+  inset: 84px 18px 170px;
+}
+
 .player-orbit-screen .tactical-panel::before { top: 0; left: 18px; transform: skewX(-38deg); }
 .player-orbit-screen .tactical-panel::after { right: 18px; bottom: 0; transform: rotate(180deg) skewX(-38deg); }
 

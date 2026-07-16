@@ -1243,6 +1243,11 @@ test.describe("Lupen browser smoke", () => {
           }, STARTER_SHIP_ID)
         };
         const twinPulse = getEquippedWeapon(STARTER_SHIP_ID);
+        shipLoadouts[STARTER_SHIP_ID] = normalizeShipLoadout({
+          attachments: [],
+          guns: ["pulseLaser", "heavyLance"]
+        }, STARTER_SHIP_ID);
+        const mixedStarter = getEquippedWeapon(STARTER_SHIP_ID);
 
         return {
           catalogueOrder: Object.keys(WEAPON_FAMILIES).slice(0, 3),
@@ -1254,6 +1259,14 @@ test.describe("Lupen browser smoke", () => {
             damageLayers: twinPulse.damageLayers,
             fireRate: twinPulse.fireRate,
             speed: twinPulse.speed
+          },
+          mixedStarter: {
+            count: mixedStarter.count,
+            weaponKeys: mixedStarter.weaponKeys,
+            damage: mixedStarter.damage,
+            damageLayers: mixedStarter.damageLayers,
+            fireRate: mixedStarter.fireRate,
+            speed: mixedStarter.speed
           }
         };
       })()
@@ -1277,6 +1290,14 @@ test.describe("Lupen browser smoke", () => {
       damageLayers: { shield: 28, armor: 26, hull: 24 },
       fireRate: 0.8,
       speed: 1250
+    });
+    expect(balance.mixedStarter).toMatchObject({
+      count: 2,
+      weaponKeys: ["pulseLaser", "heavyLance"],
+      damage: 36,
+      damageLayers: { shield: 34, armor: 37, hull: 37 },
+      fireRate: 0.5,
+      speed: 2000
     });
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -5930,6 +5951,8 @@ test.describe("Lupen browser smoke", () => {
           targetBotId: window.__stagingVisualBot.id,
           currentNode,
           damage: 8,
+          volleyWeaponCount: 2,
+          volleyWeaponKeys: ["pulseLaser", "heavyLance"],
           timestamp: Date.now() - 30000,
           receivedAt: Date.now()
         };
@@ -5986,11 +6009,11 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
     expect(stagingBotSelectedState.shotBeamCount).toBe(1);
     expect(stagingBotSelectedState.localShotBeamCount).toBe(1);
-    expect(stagingBotSelectedState.beamCoreCount).toBe(5);
+    expect(stagingBotSelectedState.beamCoreCount).toBe(2);
     expect(stagingBotSelectedState.trailShotBeamCount).toBe(0);
     expect(stagingBotSelectedState.localSourceX).toBeGreaterThan(stagingBotSelectedState.localTargetX);
     expect(stagingBotSelectedState.localSourceX).toBe(stagingBotSelectedState.fxLayerWidth);
-    expect(stagingBotSelectedState.localSourceCount).toBe(5);
+    expect(stagingBotSelectedState.localSourceCount).toBe(2);
     expect(stagingBotSelectedState.localUniqueSourceYCount).toBeGreaterThanOrEqual(2);
     expect(stagingBotSelectedState.localUniqueTargetCount).toBe(1);
     expect(stagingBotSelectedState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
@@ -6045,12 +6068,12 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(stagingBotRemoteShotState.remoteShotBeamCount).toBe(1);
-    expect(stagingBotRemoteShotState.remoteBeamCoreCount).toBe(1);
+    expect(stagingBotRemoteShotState.remoteBeamCoreCount).toBe(2);
     expect(stagingBotRemoteShotState.remoteMuzzleCount).toBe(0);
     expect(stagingBotRemoteShotState.attackerLabelText).toBe("");
     expect(stagingBotRemoteShotState.coopEngagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(Math.abs(stagingBotRemoteShotState.sourceX - stagingBotRemoteShotState.attackerCenter.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(stagingBotRemoteShotState.sourceY - stagingBotRemoteShotState.attackerCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingBotRemoteShotState.sourceY - stagingBotRemoteShotState.attackerCenter.y)).toBeLessThanOrEqual(25);
     expect(Math.abs(stagingBotRemoteShotState.endpointX - stagingBotRemoteShotState.targetCenter.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(stagingBotRemoteShotState.endpointY - stagingBotRemoteShotState.targetCenter.y)).toBeLessThanOrEqual(1);
 
@@ -6086,6 +6109,7 @@ test.describe("Lupen browser smoke", () => {
         const targetCenter = markerCenter("#asteroidField .server-resource-asteroid[data-target-id='" + targetId + "']");
         return {
           remoteShotBeamCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='remote'][data-target-id='" + targetId + "']").length || 0,
+          remoteBeamCoreCount: fxLayer?.querySelectorAll(".combat-fx-shot[data-owner='remote'][data-target-id='" + targetId + "'] .combat-fx-beam-core").length || 0,
           remoteMuzzleCount: document.querySelectorAll("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-muzzle.is-remote").length,
           attackerLabelText: document.querySelector("#lupenMultiplayerSpaceShotLayer .lupen-mp-shot-attacker-label")?.textContent || "",
           hitCount: fxLayer?.querySelectorAll(".combat-fx-impact").length || 0,
@@ -6101,12 +6125,13 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(stagingResourceRemoteShotState.remoteShotBeamCount).toBe(1);
+    expect(stagingResourceRemoteShotState.remoteBeamCoreCount).toBe(2);
     expect(stagingResourceRemoteShotState.remoteMuzzleCount).toBe(0);
     expect(stagingResourceRemoteShotState.attackerLabelText).toBe("");
     expect(stagingResourceRemoteShotState.hitCount).toBeGreaterThanOrEqual(1);
     expect(stagingResourceRemoteShotState.resourceHitCount).toBe(1);
     expect(Math.abs(stagingResourceRemoteShotState.sourceX - stagingResourceRemoteShotState.attackerCenter.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(stagingResourceRemoteShotState.sourceY - stagingResourceRemoteShotState.attackerCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(stagingResourceRemoteShotState.sourceY - stagingResourceRemoteShotState.attackerCenter.y)).toBeLessThanOrEqual(25);
     expect(Math.abs(stagingResourceRemoteShotState.endpointX - stagingResourceRemoteShotState.targetCenter.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(stagingResourceRemoteShotState.endpointY - stagingResourceRemoteShotState.targetCenter.y)).toBeLessThanOrEqual(1);
 
@@ -6318,7 +6343,7 @@ test.describe("Lupen browser smoke", () => {
     expect(pvpRemoteShotState.hull.hullHitCount).toBe(1);
     expect(pvpRemoteShotState.thirdParty.remoteShotBeamCount).toBe(1);
     expect(Math.abs(pvpRemoteShotState.thirdParty.sourceX - pvpRemoteShotState.thirdParty.attackerCenter.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(pvpRemoteShotState.thirdParty.sourceY - pvpRemoteShotState.thirdParty.attackerCenter.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(pvpRemoteShotState.thirdParty.sourceY - pvpRemoteShotState.thirdParty.attackerCenter.y)).toBeLessThanOrEqual(25);
     expect(Math.abs(pvpRemoteShotState.thirdParty.endpointX - pvpRemoteShotState.thirdParty.targetCenter.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(pvpRemoteShotState.thirdParty.endpointY - pvpRemoteShotState.thirdParty.targetCenter.y)).toBeLessThanOrEqual(1);
     expect(pvpRemoteShotState.botReturnBeamCount).toBe(1);
@@ -6627,7 +6652,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("combat laser feedback renders simple outgoing and incoming beams", async ({ page }) => {
+  test("combat laser feedback matches the equipped gun count", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -6645,13 +6670,12 @@ test.describe("Lupen browser smoke", () => {
           alive: true
         };
         pulseLaserBurstToTarget(target, {
-          name: "Pulse Laser Array",
-          count: 7,
-          weapons: Array.from({ length: 7 }, (_, index) => ({
-            name: "Pulse Laser " + (index + 1),
-            fireStyle: "pulse",
-            projectileColor: "#7fd6ff"
-          })),
+          name: "Pulse Laser + Heavy Lance",
+          count: 2,
+          weapons: [
+            { name: "Pulse Laser", fireStyle: "pulse", projectileColor: "#4bb7ff" },
+            { name: "Heavy Lance", fireStyle: "heavy", projectileColor: "#ffbd58" }
+          ],
           fireStyle: "pulse",
           projectileColor: "#7fd6ff"
         });
@@ -6680,6 +6704,7 @@ test.describe("Lupen browser smoke", () => {
           localSourceX: Number(localShot?.dataset.sourceX || 0),
           localTargetX: Number(localShot?.dataset.targetX || 0),
           localSourceCount: Number(localShot?.dataset.sourceCount || 0),
+          localBeamColors: localCores.map(line => line.getAttribute("stroke")),
           localUniqueSourceYCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("y1") || 0)))).size,
           localUniqueTargetCount: new Set(localCores.map(line => Math.round(Number(line.getAttribute("x2") || 0)) + ":" + Math.round(Number(line.getAttribute("y2") || 0)))).size,
           botEndpointX: Math.round(Number(botCore?.getAttribute("x2") || 0)),
@@ -6706,11 +6731,12 @@ test.describe("Lupen browser smoke", () => {
     expect(visualState.combatFxShotCount).toBe(2);
     expect(visualState.localCombatFxShotCount).toBe(1);
     expect(visualState.botCombatFxShotCount).toBe(1);
-    expect(visualState.combatFxBeamCoreCount).toBe(6);
+    expect(visualState.combatFxBeamCoreCount).toBe(3);
     expect(visualState.combatFxImpactCount).toBe(1);
     expect(visualState.localSourceX).toBeLessThan(visualState.localTargetX);
     expect(visualState.localSourceX).toBe(0);
-    expect(visualState.localSourceCount).toBe(5);
+    expect(visualState.localSourceCount).toBe(2);
+    expect(visualState.localBeamColors).toEqual(["#4bb7ff", "#ffbd58"]);
     expect(visualState.localUniqueSourceYCount).toBeGreaterThanOrEqual(2);
     expect(visualState.localUniqueTargetCount).toBe(1);
     expect(Math.abs(visualState.botEndpointX - visualState.cockpitPoint.x)).toBeLessThanOrEqual(1);

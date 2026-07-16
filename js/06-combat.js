@@ -472,7 +472,7 @@ let weaponVisualCycleOffset = 0;
 const COMBAT_FX_LAYER_ID = "combatFxLayer";
 const COMBAT_FX_SVG_NS = "http://www.w3.org/2000/svg";
 const COMBAT_FX_BEAM_DURATION_MS = 520;
-const LOCAL_COMBAT_FX_BEAM_COUNT = 5;
+const LOCAL_COMBAT_FX_BEAM_COUNT = 1;
 const suppressedCombatVisualTargets = new Map();
 const renderedCombatFxKeys = new Set();
 
@@ -776,6 +776,7 @@ function renderCombatFxBeam(sourcePoint, targetPoint, options = {}) {
   const durationMs = Math.max(260, Math.min(900, Number(options.durationMs || COMBAT_FX_BEAM_DURATION_MS)));
   const tone = options.tone === "bot" ? "bot" : "player";
   const color = options.color || (tone === "bot" ? "#ff8756" : "#55e8ff");
+  const colors = Array.isArray(options.colors) ? options.colors.filter(Boolean) : [];
   const sourcePoints = (Array.isArray(sourcePoint) ? sourcePoint : [sourcePoint])
     .map((point) => ({
       x: Math.max(0, Math.min(context.width, Number(point?.x || 0))),
@@ -800,6 +801,7 @@ function renderCombatFxBeam(sourcePoint, targetPoint, options = {}) {
   group.style.animationDuration = `${durationMs}ms`;
 
   sourcePoints.forEach((source, index) => {
+    const beamColor = colors[index] || color;
     const glow = document.createElementNS(COMBAT_FX_SVG_NS, "line");
     glow.classList.add("combat-fx-beam-glow");
     const core = document.createElementNS(COMBAT_FX_SVG_NS, "line");
@@ -810,7 +812,7 @@ function renderCombatFxBeam(sourcePoint, targetPoint, options = {}) {
       line.setAttribute("y1", String(source.y));
       line.setAttribute("x2", String(target.x));
       line.setAttribute("y2", String(target.y));
-      line.setAttribute("stroke", color);
+      line.setAttribute("stroke", beamColor);
       line.setAttribute("vector-effect", "non-scaling-stroke");
       tagCombatFxElement(line, ref, { ...options, owner: options.owner || tone });
       group.appendChild(line);
@@ -971,30 +973,29 @@ function pulseLaserBurstToTarget(target, weapon = null, options = {}) {
   if (!target) return;
 
   const resolvedWeapon = weapon || (typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null);
-  const shotWeapon = Array.isArray(resolvedWeapon?.weapons) && resolvedWeapon.weapons.length
-    ? resolvedWeapon.weapons[weaponVisualCycleOffset++ % resolvedWeapon.weapons.length]
-    : resolvedWeapon;
-  if (!shotWeapon) return;
+  const visibleWeapons = getVisibleShotWeapons(resolvedWeapon);
+  if (!visibleWeapons.length) return;
+  const profiles = visibleWeapons.map((shotWeapon) => getShotVisualProfile(shotWeapon));
   const targetRef = getCombatVisualTargetRef(target, options);
   if (targetRef && !isCombatVisualTargetStillValid(targetRef)) return;
-  const profile = getShotVisualProfile(shotWeapon);
   const targetPoint = getCombatFxPointFromTarget(target);
-  const sourcePoint = getLocalCombatFxOriginsForTarget(targetPoint, LOCAL_COMBAT_FX_BEAM_COUNT);
+  const sourcePoint = getLocalCombatFxOriginsForTarget(targetPoint, visibleWeapons.length);
   renderCombatFxBeam(sourcePoint, targetPoint, {
     ...options,
     targetRef,
     owner: "local",
     tone: "player",
-    color: profile.color || "#55e8ff",
+    color: profiles[0]?.color || "#55e8ff",
+    colors: profiles.map((profile) => profile.color || "#55e8ff"),
     durationMs: COMBAT_FX_BEAM_DURATION_MS,
     showImpact: options.showImpact !== false
   });
 
   debugCombatShot("shot visuals", {
     activeWeaponCount: Number(resolvedWeapon?.count || (Array.isArray(resolvedWeapon?.weapons) ? resolvedWeapon.weapons.length : 1)),
-    visibleWeaponCount: 1,
-    weaponCountVisualsEnabled: false,
-    weaponNames: [shotWeapon].map(item => item?.name || item?.key || "weapon").join(", "),
+    visibleWeaponCount: visibleWeapons.length,
+    weaponCountVisualsEnabled: true,
+    weaponNames: visibleWeapons.map(item => item?.name || item?.key || "weapon").join(", "),
     cooldownMs: Number(resolvedWeapon?.speed || 0)
   });
 }
@@ -1305,6 +1306,16 @@ function findOpenTargetPosition(target, placedTargets) {
     return base;
   }
 
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const candidate = {
+      x: Math.round((8 + Math.random() * 84) * 100) / 100,
+      y: Math.round((10 + Math.random() * 54) * 100) / 100
+    };
+    if (!placedTargets.some(other => targetsTooClose(candidate, other))) {
+      return candidate;
+    }
+  }
+
   const offsets = [
     { x: -14, y: 0 }, { x: 14, y: 0 },
     { x: 0, y: -16 }, { x: 0, y: 16 },
@@ -1419,6 +1430,7 @@ function updateAsteroidUI() {
   const field = document.getElementById("asteroidField");
   if (!field) return;
 
+  field.classList.toggle("server-owned-space-layout", serverOwnedSectorObjectsActive);
   field.innerHTML = "";
 
   const visibleBots = typeof getVisibleHostileBotsForLocalTargetUi === "function"
@@ -2037,6 +2049,8 @@ function respawnAsteroid() {
   const asteroidIndex = Math.max(0, asteroids.indexOf(asteroid));
   const node = spaceNodes[Math.floor(Math.random() * spaceNodes.length)] || createMapOneAsteroid(asteroidIndex).node;
   const refreshed = createAsteroid(asteroid.resource || MAP_ONE_ASTEROID_SPAWN_PLAN[asteroidIndex] || "Iron", node, asteroidIndex);
+  refreshed.x = Math.round((12 + Math.random() * 72) * 100) / 100;
+  refreshed.y = Math.round((12 + Math.random() * 45) * 100) / 100;
   Object.assign(asteroid, refreshed, { id: asteroid.id || refreshed.id });
 
   updateAsteroidUI();
