@@ -477,6 +477,7 @@ function resetToNoShipStarterState() {
 
   mineralKeys.forEach(mineral => { cargo[mineral] = 0; });
   cargoCostBasis = {};
+  cargoPurchased = {};
   cargoRecovered = {};
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
@@ -498,6 +499,14 @@ function resetToNoShipStarterState() {
   selectedLooseCargoSellGood = null;
   selectedStationTradeRoute = null;
   stagedTradeOpportunity = null;
+  activeTradeTerminalTab = "overview";
+  selectedMarketResource = "Iron";
+  selectedMarketMode = "buy";
+  selectedMarketQuantity = 1;
+  dailyTradeDate = null;
+  dailyTradeContracts = [];
+  selectedDailyTradeContractId = null;
+  activeDailyTradeContractId = null;
 
   dailyBountyDate = null;
   dailyBountyContracts = [];
@@ -1454,6 +1463,23 @@ function openMarketplace() {
     currentNode = lastPlanetNode || "Asteron Prime";
   }
 
+  const tutorialTradeStep = typeof getCurrentTutorialStep === "function" ? getCurrentTutorialStep()?.id : "";
+  const tutorialNeedsMarket = [
+    "select-market-resource",
+    "select-market-target",
+    "select-buy-amount",
+    "buy-cargo",
+    "open-trade-to-sell",
+    "sell-cargo"
+  ].includes(tutorialTradeStep);
+  activeTradeTerminalTab = tutorialNeedsMarket ? "market" : "overview";
+  if (["open-trade-to-sell", "sell-cargo"].includes(tutorialTradeStep)) {
+    selectedMarketMode = "sell";
+    selectedMarketResource = "Iron";
+    selectedMarketQuantity = Math.max(1, Number(cargo.Iron || 0));
+  } else if (tutorialNeedsMarket) {
+    selectedMarketMode = "buy";
+  }
   startTradeTerminalTimer();
   renderMarketplace();
   showScreen("marketScreen");

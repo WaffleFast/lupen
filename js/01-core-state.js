@@ -8,7 +8,7 @@ const SAVE_EXPORT_VERSION = 1;
 const mineralKeys = ["Iron", "Copper", "Cobalt", "Titanium", "Crystal Shards", "Xenon Gas", "Iridium", "Platinum", "Uranium", "Dark Matter Residue"];
 
 const MAP_ONE_MARKET_PLANETS = ["Asteron Prime", "Virella", "Nyxara"];
-const MAP_ONE_TRADE_RESOURCES = ["Iron", "Copper", "Cobalt", "Crystal Shards"];
+const MAP_ONE_TRADE_RESOURCES = Object.freeze(["Iron", "Copper", "Cobalt"]);
 
 const COMMODITY_ICON_PATH = "assets/commodities/";
 
@@ -740,7 +740,33 @@ const cargo = {
 };
 
 let cargoCostBasis = {};
+let cargoPurchased = {};
 let cargoRecovered = {};
+
+function getPurchasedCargoLedgerQuantity(good) {
+  if (!good || !cargoPurchased || typeof cargoPurchased !== "object") return 0;
+  return Math.max(0, Math.min(Number(cargo[good] || 0), Math.round(Number(cargoPurchased[good] || 0))));
+}
+
+function addPurchasedCargoQuantity(good, quantity) {
+  const amount = Math.max(0, Math.round(Number(quantity || 0)));
+  if (!good || !amount || !MAP_ONE_TRADE_RESOURCES.includes(good)) return 0;
+  cargoPurchased[good] = getPurchasedCargoLedgerQuantity(good) + amount;
+  cargoPurchased[good] = Math.min(Number(cargo[good] || 0), cargoPurchased[good]);
+  if (cargoPurchased[good] <= 0) delete cargoPurchased[good];
+  return getPurchasedCargoLedgerQuantity(good);
+}
+
+function consumePurchasedCargoQuantity(good, quantity) {
+  const amount = Math.max(0, Math.round(Number(quantity || 0)));
+  const purchased = getPurchasedCargoLedgerQuantity(good);
+  const consumed = Math.min(purchased, amount);
+  if (consumed > 0) {
+    cargoPurchased[good] = purchased - consumed;
+    if (cargoPurchased[good] <= 0) delete cargoPurchased[good];
+  }
+  return consumed;
+}
 
 function getRecoveredCargoQuantity(good) {
   if (!good || !cargoRecovered || typeof cargoRecovered !== "object") return 0;
@@ -784,7 +810,32 @@ function pruneRecoveredCargoQuantities() {
   return cargoRecovered;
 }
 
-let activeTradeTerminalTab = "market";
+function reconcileTradeCargoLedgers() {
+  if (!cargoPurchased || typeof cargoPurchased !== "object") cargoPurchased = {};
+  if (!cargoRecovered || typeof cargoRecovered !== "object") cargoRecovered = {};
+
+  MAP_ONE_TRADE_RESOURCES.forEach((good) => {
+    const held = Math.max(0, Math.round(Number(cargo[good] || 0)));
+    let recovered = Math.max(0, Math.min(held, Math.round(Number(cargoRecovered[good] || 0))));
+    let purchased = Math.max(0, Math.min(held - recovered, Math.round(Number(cargoPurchased[good] || 0))));
+    const unclassified = Math.max(0, held - recovered - purchased);
+    if (unclassified > 0) {
+      if (Number(cargoCostBasis?.[good] || 0) > 0) purchased += unclassified;
+      else recovered += unclassified;
+    }
+    if (purchased > 0) cargoPurchased[good] = purchased;
+    else delete cargoPurchased[good];
+    if (recovered > 0) cargoRecovered[good] = recovered;
+    else delete cargoRecovered[good];
+  });
+
+  Object.keys(cargoPurchased).forEach((good) => {
+    if (!MAP_ONE_TRADE_RESOURCES.includes(good)) delete cargoPurchased[good];
+  });
+  return { cargoPurchased, cargoRecovered };
+}
+
+let activeTradeTerminalTab = "overview";
 let tradeTerminalTimer = null;
 let storeDailyTimer = null;
 let renderedStoreDayKey = "";
@@ -794,9 +845,15 @@ let selectedStationTradeRoute = null;
 let activeTradeRoute = null;
 let activeObjective = null;
 let selectedLooseCargoSellGood = null;
-let selectedMarketResource = "Crystal Shards";
-let selectedMarketTargetPlanet = "Nyxara";
-let selectedMarketQuantity = 200;
+let selectedMarketResource = "Iron";
+let selectedMarketTargetPlanet = "";
+let selectedMarketQuantity = 1;
+let selectedMarketMode = "buy";
+let tradeTerminalStatusMessage = "";
+let dailyTradeDate = null;
+let dailyTradeContracts = [];
+let selectedDailyTradeContractId = null;
+let activeDailyTradeContractId = null;
 
 const XP_CONFIG = {
   combatZoneKey: "sector-one",

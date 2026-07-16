@@ -33,22 +33,19 @@ const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 1000;
 const MULTIPLAYER_STAGING_TRADE_RESOURCES = Object.freeze([
   Object.freeze({ resourceId: "iron", resourceName: "Iron" }),
   Object.freeze({ resourceId: "copper", resourceName: "Copper" }),
-  Object.freeze({ resourceId: "cobalt", resourceName: "Cobalt" }),
-  Object.freeze({ resourceId: "crystal_shards", resourceName: "Crystal Shards" })
+  Object.freeze({ resourceId: "cobalt", resourceName: "Cobalt" })
 ]);
 const MULTIPLAYER_STAGING_TRADE_PRICE_TABLE = Object.freeze({
-  "Asteron Prime": Object.freeze({ Iron: 18, Copper: 38, Cobalt: 90, "Crystal Shards": 95 }),
-  Virella: Object.freeze({ Iron: 30, Copper: 32, Cobalt: 74, "Crystal Shards": 120 }),
-  Nyxara: Object.freeze({ Iron: 24, Copper: 50, Cobalt: 62, "Crystal Shards": 145 })
+  "Asteron Prime": Object.freeze({ Iron: 18, Copper: 38, Cobalt: 90 }),
+  Virella: Object.freeze({ Iron: 20, Copper: 50, Cobalt: 74 }),
+  Nyxara: Object.freeze({ Iron: 30, Copper: 32, Cobalt: 128 })
 });
 const MULTIPLAYER_STAGING_TRADE_PLANET_SLUGS = Object.freeze({
   "Asteron Prime": "asteron",
   Virella: "virella",
   Nyxara: "nyxara"
 });
-const MULTIPLAYER_STAGING_TRADE_RESOURCE_SLUGS = Object.freeze({
-  crystal_shards: "crystal"
-});
+const MULTIPLAYER_STAGING_TRADE_RESOURCE_SLUGS = Object.freeze({});
 
 function getMultiplayerStagingTradeOfferId(resourceId = "", buyNode = "", sellNode = "") {
   return [
@@ -61,6 +58,13 @@ function getMultiplayerStagingTradeOfferId(resourceId = "", buyNode = "", sellNo
 
 function buildMultiplayerStagingTradeOfferFallbacks() {
   const planets = Object.keys(MULTIPLAYER_STAGING_TRADE_PRICE_TABLE);
+  const cycle = typeof getMarketCycle === "function" ? getMarketCycle() : Math.floor(Date.now() / 90000);
+  const getFallbackPrice = (resourceName, planet, priceCycle) => {
+    if (typeof getLiveMarketPriceForCycle === "function") {
+      return getLiveMarketPriceForCycle(resourceName, planet, priceCycle);
+    }
+    return MULTIPLAYER_STAGING_TRADE_PRICE_TABLE[planet][resourceName];
+  };
   return MULTIPLAYER_STAGING_TRADE_RESOURCES.flatMap((resource) => {
     return planets.flatMap((buyNode) => {
       return planets
@@ -71,15 +75,17 @@ function buildMultiplayerStagingTradeOfferFallbacks() {
           resourceName: resource.resourceName,
           buyNode,
           sellNode,
-          buyPrice: MULTIPLAYER_STAGING_TRADE_PRICE_TABLE[buyNode][resource.resourceName],
-          sellPrice: MULTIPLAYER_STAGING_TRADE_PRICE_TABLE[sellNode][resource.resourceName],
+          buyPrice: getFallbackPrice(resource.resourceName, buyNode, cycle),
+          sellPrice: getFallbackPrice(resource.resourceName, sellNode, cycle),
+          previousBuyPrice: getFallbackPrice(resource.resourceName, buyNode, cycle - 1),
+          previousSellPrice: getFallbackPrice(resource.resourceName, sellNode, cycle - 1),
+          marketCycle: cycle,
+          refreshSeconds: 90,
           maxQuantity: MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY
         }));
     });
   });
 }
-
-const MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS = Object.freeze(buildMultiplayerStagingTradeOfferFallbacks());
 
 function getMultiplayerStagingBountyFallback() {
   return {
@@ -384,7 +390,7 @@ function getMultiplayerStagingTradeOffers() {
   return Array.isArray(status.lastStagingTradeOffers?.offers) && status.lastStagingTradeOffers.offers.length
     ? status.lastStagingTradeOffers.offers
     : isMultiplayerStagingActive()
-      ? MULTIPLAYER_STAGING_TRADE_OFFER_FALLBACKS.map((offer) => ({ ...offer }))
+      ? buildMultiplayerStagingTradeOfferFallbacks()
       : [];
 }
 
@@ -393,7 +399,7 @@ function requestMultiplayerStagingTradeOffersIfNeeded() {
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.();
   if (!client?.requestStagingTradeOffers || !status?.enabled || !status?.isConnected) return;
-  if (getMultiplayerStagingTradeOffers().length) return;
+  if (Array.isArray(status.lastStagingTradeOffers?.offers) && status.lastStagingTradeOffers.offers.length) return;
   client.requestStagingTradeOffers();
 }
 

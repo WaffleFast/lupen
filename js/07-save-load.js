@@ -211,6 +211,7 @@ function buildSaveState(options = {}) {
     leftUnderAttack,
     credits,
     cargo,
+    cargoPurchased: typeof reconcileTradeCargoLedgers === "function" ? reconcileTradeCargoLedgers().cargoPurchased : cargoPurchased,
     cargoRecovered: typeof pruneRecoveredCargoQuantities === "function" ? pruneRecoveredCargoQuantities() : cargoRecovered,
     cargoCostBasis,
     currentNode: savedCurrentNode,
@@ -237,6 +238,10 @@ function buildSaveState(options = {}) {
     marketStock,
     activeTradeRoute,
     activeObjective,
+    dailyTradeDate,
+    dailyTradeContracts,
+    selectedDailyTradeContractId,
+    activeDailyTradeContractId,
     activeBountyId,
     dailyBountyDate,
     dailyBountyContracts,
@@ -924,6 +929,7 @@ function applyLoadedGameState(rawSaved) {
   applyTrustedStagingXpIfNewer("loadGameFromSupabase");
   upgradeMaterials = normalizeUpgradeMaterials(saved.upgradeMaterials);
   cargoCostBasis = saved.cargoCostBasis ?? cargoCostBasis;
+  cargoPurchased = saved.cargoPurchased && typeof saved.cargoPurchased === "object" ? saved.cargoPurchased : cargoPurchased;
   cargoRecovered = saved.cargoRecovered && typeof saved.cargoRecovered === "object" ? saved.cargoRecovered : cargoRecovered;
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
@@ -947,6 +953,10 @@ function applyLoadedGameState(rawSaved) {
   if (!activeTradeRoute && activeObjective?.type === "trade") {
     activeTradeRoute = { ...activeObjective };
   }
+  dailyTradeDate = saved.dailyTradeDate || dailyTradeDate;
+  dailyTradeContracts = Array.isArray(saved.dailyTradeContracts) ? saved.dailyTradeContracts : dailyTradeContracts;
+  selectedDailyTradeContractId = saved.selectedDailyTradeContractId || selectedDailyTradeContractId;
+  activeDailyTradeContractId = saved.activeDailyTradeContractId || activeDailyTradeContractId;
 
   dailyBountyDate = saved.dailyBountyDate || dailyBountyDate;
   dailyBountyContracts = Array.isArray(saved.dailyBountyContracts) ? saved.dailyBountyContracts : dailyBountyContracts;
@@ -1073,7 +1083,17 @@ function applyLoadedGameState(rawSaved) {
       }
     });
   }
-  if (typeof pruneRecoveredCargoQuantities === "function") pruneRecoveredCargoQuantities();
+  if (!saved.cargoPurchased) {
+    MAP_ONE_TRADE_RESOURCES.forEach((good) => {
+      const held = Math.max(0, Math.round(Number(cargo[good] || 0)));
+      const recovered = Math.max(0, Math.round(Number(cargoRecovered?.[good] || 0)));
+      const purchased = Math.max(0, held - recovered);
+      if (purchased > 0) cargoPurchased[good] = purchased;
+    });
+  }
+  if (typeof reconcileTradeCargoLedgers === "function") reconcileTradeCargoLedgers();
+  else if (typeof pruneRecoveredCargoQuantities === "function") pruneRecoveredCargoQuantities();
+  if (typeof ensureDailyTradeContracts === "function") ensureDailyTradeContracts();
 
   shieldEnabled = true;
   applyShipStats(false);

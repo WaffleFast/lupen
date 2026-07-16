@@ -205,6 +205,21 @@ function getCargoUsed(cargo = {}) {
   }, 0);
 }
 
+function readCargoLedgerAmount(saveData = {}, ledgerName = "", offer = {}, totalHeld = 0, fallback = 0) {
+  const ledger = saveData?.[ledgerName];
+  if (!ledger || typeof ledger !== "object" || Array.isArray(ledger)) return Math.max(0, Math.min(totalHeld, fallback));
+  const ledgerEntry = getCargoResourceAmount(ledger, offer);
+  const amount = ledgerEntry.found ? ledgerEntry.amount : fallback;
+  return Math.max(0, Math.min(totalHeld, amount));
+}
+
+function ensureCargoLedger(saveData = {}, ledgerName = "") {
+  if (!saveData[ledgerName] || typeof saveData[ledgerName] !== "object" || Array.isArray(saveData[ledgerName])) {
+    saveData[ledgerName] = {};
+  }
+  return saveData[ledgerName];
+}
+
 export function buildStagingTradeBuySavePatch(saveData = {}, offer = {}, quantity = 1, context = {}) {
   if (!saveData || typeof saveData !== "object" || Array.isArray(saveData)) {
     return getBlockedResult("save_data_missing_or_invalid");
@@ -241,12 +256,22 @@ export function buildStagingTradeBuySavePatch(saveData = {}, offer = {}, quantit
 
   const basisKey = findCargoResourceKey(cargoCostBasis, offer) || resourceKey;
   const previousBasis = clampInteger(cargoCostBasis[basisKey], 0, MAX_CREDITS) || buyPrice;
+  const recoveredBefore = readCargoLedgerAmount(saveData, "cargoRecovered", offer, resourceBefore, 0);
+  const purchasedBefore = readCargoLedgerAmount(saveData, "cargoPurchased", offer, resourceBefore, Math.max(0, resourceBefore - recoveredBefore));
   const resourceAfter = resourceBefore + safeQuantity;
-  const weightedBasis = Math.round(((resourceBefore * previousBasis) + (safeQuantity * buyPrice)) / Math.max(1, resourceAfter));
+  const purchasedAfter = purchasedBefore + safeQuantity;
+  const weightedBasis = Math.round(((purchasedBefore * previousBasis) + (safeQuantity * buyPrice)) / Math.max(1, purchasedAfter));
   const patchedSaveData = cloneJson(saveData);
   patchedSaveData.credits = creditsBefore - cost;
   patchedSaveData.cargo[resourceKey] = resourceAfter;
   patchedSaveData.cargoCostBasis[basisKey] = weightedBasis;
+  const purchasedLedger = ensureCargoLedger(patchedSaveData, "cargoPurchased");
+  const recoveredLedger = ensureCargoLedger(patchedSaveData, "cargoRecovered");
+  const purchasedKey = findCargoResourceKey(purchasedLedger, offer) || resourceKey;
+  const recoveredKey = findCargoResourceKey(recoveredLedger, offer) || resourceKey;
+  purchasedLedger[purchasedKey] = purchasedAfter;
+  if (recoveredBefore > 0) recoveredLedger[recoveredKey] = recoveredBefore;
+  else delete recoveredLedger[recoveredKey];
 
   return {
     ok: true,
@@ -271,8 +296,12 @@ export function buildStagingTradeBuySavePatch(saveData = {}, offer = {}, quantit
     cargoCapacity,
     cargoCostBasisBefore: previousBasis,
     cargoCostBasisAfter: weightedBasis,
+    purchasedCargoBefore: purchasedBefore,
+    purchasedCargoAfter: purchasedAfter,
+    recoveredCargoBefore: recoveredBefore,
+    recoveredCargoAfter: recoveredBefore,
     patchedSaveData,
-    appliedFields: ["credits", "cargo", "cargoCostBasis"],
+    appliedFields: ["credits", "cargo", "cargoCostBasis", "cargoPurchased", "cargoRecovered"],
     untouchedFields: ["inventory", "loot", "bounties", "PvP", "playerDamage", "progression"]
   };
 }
@@ -316,13 +345,27 @@ export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quanti
   const basisKey = findCargoResourceKey(cargoCostBasis, offer) || resourceKey;
   const basisBefore = clampInteger(cargoCostBasis[basisKey], 0, MAX_CREDITS);
   const hasCostBasis = basisBefore !== null;
+  const recoveredBefore = readCargoLedgerAmount(saveData, "cargoRecovered", offer, resourceBefore, hasCostBasis ? 0 : resourceBefore);
+  const purchasedBefore = readCargoLedgerAmount(saveData, "cargoPurchased", offer, resourceBefore, Math.max(0, resourceBefore - recoveredBefore));
+  const purchasedQuantitySold = Math.min(safeQuantity, purchasedBefore);
+  const recoveredQuantitySold = Math.min(safeQuantity - purchasedQuantitySold, recoveredBefore);
 
   const revenue = sellPrice * safeQuantity;
   const resourceAfter = Math.max(0, resourceBefore - safeQuantity);
   const patchedSaveData = cloneJson(saveData);
   patchedSaveData.credits = Math.min(MAX_CREDITS, creditsBefore + revenue);
   patchedSaveData.cargo[resourceKey] = resourceAfter;
-  if (resourceAfter <= 0) {
+  const purchasedAfter = Math.max(0, purchasedBefore - purchasedQuantitySold);
+  const recoveredAfter = Math.max(0, recoveredBefore - recoveredQuantitySold);
+  const purchasedLedger = ensureCargoLedger(patchedSaveData, "cargoPurchased");
+  const recoveredLedger = ensureCargoLedger(patchedSaveData, "cargoRecovered");
+  const purchasedKey = findCargoResourceKey(purchasedLedger, offer) || resourceKey;
+  const recoveredKey = findCargoResourceKey(recoveredLedger, offer) || resourceKey;
+  if (purchasedAfter > 0) purchasedLedger[purchasedKey] = purchasedAfter;
+  else delete purchasedLedger[purchasedKey];
+  if (recoveredAfter > 0) recoveredLedger[recoveredKey] = recoveredAfter;
+  else delete recoveredLedger[recoveredKey];
+  if (purchasedAfter <= 0) {
     delete patchedSaveData.cargoCostBasis[basisKey];
   } else if (hasCostBasis) {
     // cargoCostBasis is an average unit basis in the local save. A partial
@@ -352,10 +395,16 @@ export function buildStagingTradeSellSavePatch(saveData = {}, offer = {}, quanti
     cargoUsedAfter: Math.max(0, cargoUsedBefore - safeQuantity),
     cargoCapacity,
     cargoCostBasisBefore: hasCostBasis ? basisBefore : null,
-    cargoCostBasisAfter: hasCostBasis && resourceAfter > 0 ? basisBefore : null,
-    recoveredResourceSale: !hasCostBasis,
+    cargoCostBasisAfter: hasCostBasis && purchasedAfter > 0 ? basisBefore : null,
+    purchasedQuantitySold,
+    recoveredQuantitySold,
+    purchasedCargoBefore: purchasedBefore,
+    purchasedCargoAfter: purchasedAfter,
+    recoveredCargoBefore: recoveredBefore,
+    recoveredCargoAfter: recoveredAfter,
+    recoveredResourceSale: recoveredQuantitySold > 0 && purchasedQuantitySold === 0,
     patchedSaveData,
-    appliedFields: ["credits", "cargo", "cargoCostBasis"],
+    appliedFields: ["credits", "cargo", "cargoCostBasis", "cargoPurchased", "cargoRecovered"],
     untouchedFields: ["inventory", "loot", "bounties", "PvP", "playerDamage", "progression", "tradeTotals"]
   };
 }

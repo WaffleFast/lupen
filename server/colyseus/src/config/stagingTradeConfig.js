@@ -1,33 +1,28 @@
-/* Static staging trade preview config.
-   This is intentionally deterministic server-side data for multiplayer trade.
-   The offer list is derived from one Map 1 price table so every planet can buy
-   and sell the current staging resources without finite route stock. */
+/* Map 1 live-market config. Prices are deterministic within a 90-second
+   server cycle, allowing the client to render a stable table while keeping
+   verified writes authoritative. */
 
 export const STAGING_TRADE_RESOURCES = Object.freeze([
   Object.freeze({ resourceId: "iron", resourceName: "Iron" }),
   Object.freeze({ resourceId: "copper", resourceName: "Copper" }),
-  Object.freeze({ resourceId: "cobalt", resourceName: "Cobalt" }),
-  Object.freeze({ resourceId: "crystal_shards", resourceName: "Crystal Shards" })
+  Object.freeze({ resourceId: "cobalt", resourceName: "Cobalt" })
 ]);
 
 export const STAGING_TRADE_PRICE_TABLE = Object.freeze({
   "Asteron Prime": Object.freeze({
     Iron: 18,
     Copper: 38,
-    Cobalt: 90,
-    "Crystal Shards": 95
+    Cobalt: 90
   }),
   Virella: Object.freeze({
-    Iron: 30,
-    Copper: 32,
-    Cobalt: 74,
-    "Crystal Shards": 120
+    Iron: 20,
+    Copper: 50,
+    Cobalt: 74
   }),
   Nyxara: Object.freeze({
-    Iron: 24,
-    Copper: 50,
-    Cobalt: 62,
-    "Crystal Shards": 145
+    Iron: 30,
+    Copper: 32,
+    Cobalt: 128
   })
 });
 
@@ -37,9 +32,27 @@ const STAGING_TRADE_PLANET_SLUGS = Object.freeze({
   Virella: "virella",
   Nyxara: "nyxara"
 });
-const STAGING_TRADE_RESOURCE_SLUGS = Object.freeze({
-  crystal_shards: "crystal"
-});
+const STAGING_TRADE_RESOURCE_SLUGS = Object.freeze({});
+export const STAGING_TRADE_REFRESH_MS = 90000;
+
+function marketHash(input = "") {
+  let hash = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = ((hash << 5) - hash) + input.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getMarketCycle(now = Date.now()) {
+  return Math.floor(Number(now || Date.now()) / STAGING_TRADE_REFRESH_MS);
+}
+
+function getLivePrice(resourceName, planet, cycle) {
+  const base = Number(STAGING_TRADE_PRICE_TABLE[planet]?.[resourceName] || 1);
+  const swing = (marketHash(`${cycle}:${planet}:${resourceName}:live`) % 17) - 8;
+  return Math.max(1, Math.round(base * (1 + swing / 100)));
+}
 
 function getStagingTradeOfferId(resourceId = "", buyNode = "", sellNode = "") {
   return [
@@ -50,7 +63,10 @@ function getStagingTradeOfferId(resourceId = "", buyNode = "", sellNode = "") {
   ].filter(Boolean).join("-");
 }
 
-function buildStagingTradeOffers() {
+function buildStagingTradeOffers(now = Date.now()) {
+  const cycle = getMarketCycle(now);
+  const nextRefreshAt = (cycle + 1) * STAGING_TRADE_REFRESH_MS;
+  const secondsUntilRefresh = Math.max(0, Math.ceil((nextRefreshAt - now) / 1000));
   return STAGING_TRADE_RESOURCES.flatMap((resource) => {
     return STAGING_TRADE_PLANETS.flatMap((buyNode) => {
       return STAGING_TRADE_PLANETS
@@ -61,24 +77,26 @@ function buildStagingTradeOffers() {
           resourceName: resource.resourceName,
           buyNode,
           sellNode,
-          buyPrice: STAGING_TRADE_PRICE_TABLE[buyNode][resource.resourceName],
-          sellPrice: STAGING_TRADE_PRICE_TABLE[sellNode][resource.resourceName],
+          buyPrice: getLivePrice(resource.resourceName, buyNode, cycle),
+          sellPrice: getLivePrice(resource.resourceName, sellNode, cycle),
+          previousBuyPrice: getLivePrice(resource.resourceName, buyNode, cycle - 1),
+          previousSellPrice: getLivePrice(resource.resourceName, sellNode, cycle - 1),
+          marketCycle: cycle,
           maxQuantity: 1000,
-          refreshSeconds: 300
+          refreshSeconds: 90,
+          secondsUntilRefresh
         }));
     });
   });
 }
 
-export const STAGING_TRADE_OFFERS = Object.freeze(buildStagingTradeOffers());
-
-export function getStagingTradeOffers() {
-  return STAGING_TRADE_OFFERS.map((offer) => ({ ...offer }));
+export function getStagingTradeOffers(now = Date.now()) {
+  return buildStagingTradeOffers(now).map((offer) => ({ ...offer }));
 }
 
-export function getStagingTradeOfferById(offerId = "") {
+export function getStagingTradeOfferById(offerId = "", now = Date.now()) {
   const safeOfferId = String(offerId || "").trim();
-  const offer = STAGING_TRADE_OFFERS.find((entry) => entry.offerId === safeOfferId);
+  const offer = buildStagingTradeOffers(now).find((entry) => entry.offerId === safeOfferId);
   return offer ? { ...offer } : null;
 }
 

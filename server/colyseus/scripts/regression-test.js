@@ -12,6 +12,7 @@ import {
 import {
   buildStagingTradePreview,
   buildStagingTradeWriteDryRun,
+  getStagingTradeOfferById,
   getStagingTradeOffers
 } from "../src/config/stagingTradeConfig.js";
 import {
@@ -793,7 +794,7 @@ async function assertStagingLootWriteHelpers() {
 
 async function assertStagingTradeValidationHelpers() {
   const generatedOffers = getStagingTradeOffers();
-  const stagingResources = ["Iron", "Copper", "Cobalt", "Crystal Shards"];
+  const stagingResources = ["Iron", "Copper", "Cobalt"];
   const stagingPlanets = ["Asteron Prime", "Virella", "Nyxara"];
   assert(generatedOffers.length === stagingResources.length * stagingPlanets.length * (stagingPlanets.length - 1), "Generated staging trade offers did not cover every cross-planet resource pair.");
   for (const resourceName of stagingResources) {
@@ -807,6 +808,9 @@ async function assertStagingTradeValidationHelpers() {
       assert(sellOffers.length === stagingPlanets.length - 1, `Missing staging sell offers for ${resourceName} at ${sellNode}.`);
     }
   }
+  assert(!generatedOffers.some((offer) => offer.resourceName === "Crystal Shards"), "Upgrade-only Crystal Shards leaked into live-market offers.");
+  assert(generatedOffers.every((offer) => offer.refreshSeconds === 90), "Live-market offers did not advertise the 90-second refresh cycle.");
+  assert(generatedOffers.every((offer) => Number.isFinite(offer.previousBuyPrice) && Number.isFinite(offer.previousSellPrice)), "Live-market offers did not include previous-cycle prices for trend arrows.");
 
   const extracted = extractTradeValidationStateFromSave({
     credits: 500,
@@ -998,6 +1002,8 @@ async function assertStagingTradeValidationHelpers() {
   assert(unverified.reason === "verified_identity_required", `Unexpected unverified trade save reason: ${unverified.reason}`);
 
   const offerId = "staging-iron-asteron-virella";
+  const liveIronOffer = getStagingTradeOfferById(offerId);
+  assert(liveIronOffer, "Expected live Iron offer was not generated.");
   const trustedPreview = buildStagingTradePreview({
     offerId,
     quantity: 3,
@@ -1133,8 +1139,8 @@ async function assertStagingTradeValidationHelpers() {
   assert(buyWriteDryRun.mode === "dry_run", `Unexpected buy write mode: ${buyWriteDryRun.mode}`);
   assert(buyWriteDryRun.operation === "buy", "Buy write result did not report buy operation.");
   assert(buyWriteDryRun.applied === false, "Buy write dry-run applied a trade.");
-  assert(buyWriteDryRun.cost === 54, `Unexpected buy write cost: ${buyWriteDryRun.cost}`);
-  assert(buyWriteDryRun.creditsDelta === -54, `Unexpected buy credits delta: ${buyWriteDryRun.creditsDelta}`);
+  assert(buyWriteDryRun.cost === liveIronOffer.buyPrice * 3, `Unexpected buy write cost: ${buyWriteDryRun.cost}`);
+  assert(buyWriteDryRun.creditsDelta === -(liveIronOffer.buyPrice * 3), `Unexpected buy credits delta: ${buyWriteDryRun.creditsDelta}`);
   assert(buyWriteDryRun.cargoDelta === 3, `Unexpected buy cargo delta: ${buyWriteDryRun.cargoDelta}`);
   assert(buyWriteDryRun.writes.saveWritten === false, "Buy write dry-run reported save write.");
 
@@ -1162,8 +1168,8 @@ async function assertStagingTradeValidationHelpers() {
   assert(sellWriteDryRun.mode === "dry_run", `Unexpected sell write mode: ${sellWriteDryRun.mode}`);
   assert(sellWriteDryRun.operation === "sell", "Sell write result did not report sell operation.");
   assert(sellWriteDryRun.applied === false, "Sell write dry-run applied a trade.");
-  assert(sellWriteDryRun.revenue === 60, `Unexpected sell write revenue: ${sellWriteDryRun.revenue}`);
-  assert(sellWriteDryRun.creditsDelta === 60, `Unexpected sell credits delta: ${sellWriteDryRun.creditsDelta}`);
+  assert(sellWriteDryRun.revenue === liveIronOffer.sellPrice * 2, `Unexpected sell write revenue: ${sellWriteDryRun.revenue}`);
+  assert(sellWriteDryRun.creditsDelta === liveIronOffer.sellPrice * 2, `Unexpected sell credits delta: ${sellWriteDryRun.creditsDelta}`);
   assert(sellWriteDryRun.cargoDelta === -2, `Unexpected sell cargo delta: ${sellWriteDryRun.cargoDelta}`);
   assert(sellWriteDryRun.validationMode === "trusted_save_limited", `Unexpected limited sell validation mode: ${sellWriteDryRun.validationMode}`);
   assert(sellWriteDryRun.writes.saveWritten === false, "Sell write dry-run reported save write.");
@@ -1188,9 +1194,8 @@ async function assertStagingTradeValidationHelpers() {
       trustedPlayerId: "verified-player-a"
     }
   });
-  assert(crystalSellWriteDryRun.ok === true, `Crystal Shards sell dry-run was blocked: ${crystalSellWriteDryRun.reason}`);
-  assert(crystalSellWriteDryRun.revenue === 580, `Unexpected Crystal Shards sell revenue: ${crystalSellWriteDryRun.revenue}`);
-  assert(crystalSellWriteDryRun.cargoBefore === 64 && crystalSellWriteDryRun.cargoAfter === 60, "Crystal Shards sell dry-run did not use normalized cargo.");
+  assert(crystalSellWriteDryRun.ok === false, "Upgrade-only Crystal Shards unexpectedly received a live-market sell offer.");
+  assert(crystalSellWriteDryRun.reason === "unknown_trade_offer", `Unexpected Crystal Shards market exclusion reason: ${crystalSellWriteDryRun.reason}`);
 
   const sellUnknownResource = buildStagingTradeWriteDryRun({
     operation: "sell",
@@ -1375,6 +1380,8 @@ async function assertStagingTradeValidationHelpers() {
   assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 946, "Trade buy patch did not subtract server cost.");
   assert(patchPlan.cargoBefore === 2 && patchPlan.cargoAfter === 5, "Trade buy patch did not add cargo resource.");
   assert(patchPlan.cargoCostBasisAfter === 15, `Unexpected cargo cost basis after buy: ${patchPlan.cargoCostBasisAfter}`);
+  assert(patchPlan.patchedSaveData.cargoPurchased.Iron === 5, "Trade buy patch did not preserve the purchased cargo ledger.");
+  assert(patchPlan.patchedSaveData.cargoRecovered.Iron === undefined, "Trade buy patch incorrectly classified purchased cargo as recovered.");
   assert(originalSave.credits === 1000 && originalSave.cargo.Iron === 2, "Trade buy patch mutated the original save object.");
   assert(patchPlan.patchedSaveData.inventoryItems[0].id === "keep", "Trade buy patch changed inventory.");
   assert(patchPlan.patchedSaveData.activeBountyId === "bounty-1", "Trade buy patch changed bounty state.");
@@ -1665,6 +1672,25 @@ async function assertStagingTradeValidationHelpers() {
   assert(crystalSellPatchPlan.patchedSaveData.cargo.Iron === 2, "Crystal Shards sell patch changed unrelated cargo.");
   assert(crystalSellPatchPlan.patchedSaveData.inventoryItems[0].id === "kept", "Crystal Shards sell patch changed inventory.");
   assert(crystalSellPatchPlan.patchedSaveData.activeBountyId === "bounty-safe", "Crystal Shards sell patch changed bounty.");
+
+  const mixedIronSellPatchPlan = buildStagingTradeSellSavePatch({
+    credits: 1000,
+    cargo: { Iron: 8 },
+    cargoPurchased: { Iron: 5 },
+    cargoRecovered: { Iron: 3 },
+    cargoCostBasis: { Iron: 18 }
+  }, {
+    offerId,
+    resourceId: "iron",
+    resourceName: "Iron",
+    sellPrice: 30
+  }, 7, {
+    cargoCapacity: 150
+  });
+  assert(mixedIronSellPatchPlan.ok === true, `Mixed-ledger sell patch failed: ${mixedIronSellPatchPlan.reason}`);
+  assert(mixedIronSellPatchPlan.purchasedQuantitySold === 5 && mixedIronSellPatchPlan.recoveredQuantitySold === 2, "Mixed-ledger sell patch did not consume purchased cargo before recovered cargo.");
+  assert(mixedIronSellPatchPlan.patchedSaveData.cargo.Iron === 1, "Mixed-ledger sell patch left an incorrect cargo total.");
+  assert(mixedIronSellPatchPlan.patchedSaveData.cargoPurchased.Iron === undefined && mixedIronSellPatchPlan.patchedSaveData.cargoRecovered.Iron === 1, "Mixed-ledger sell patch did not reconcile the two cargo ledgers.");
 
   const minedCopperSellPatchPlan = buildStagingTradeSellSavePatch({
     credits: 1000,
@@ -5211,7 +5237,7 @@ try {
   assert(Array.isArray(tradeOffers?.offers) && tradeOffers.offers.length >= 3, "Staging trade offers were not deterministic/non-empty.");
   assert(tradeOffers?.creditsWritten === false && tradeOffers?.cargoWritten === false && tradeOffers?.saveWritten === false, "Staging trade offers reported writes.");
   const firstTradeOffer = tradeOffers.offers[0];
-  assert(firstTradeOffer?.offerId && firstTradeOffer?.buyPrice > 0 && firstTradeOffer?.sellPrice > firstTradeOffer?.buyPrice, "First staging trade offer is invalid.");
+  assert(firstTradeOffer?.offerId && firstTradeOffer?.buyPrice > 0 && firstTradeOffer?.sellPrice > 0, "First staging trade offer is invalid.");
 
   const validTradePreview = await expectStagingTradePreview(roomA, () => {
     roomA.send("stagingTrade:preview", {

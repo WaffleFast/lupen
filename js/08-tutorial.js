@@ -67,10 +67,10 @@ const STARTER_TUTORIAL_STEPS = [
   },
   {
     id: "select-market-target",
-    title: "Choose destination",
-    text: "Select the Virella route card. Asteron Prime sells Iron cheap; Virella pays more.",
-    target: "tutorial:marketTarget",
-    event: "selectedMarketTarget"
+    title: "Set cargo amount",
+    text: "Load as much Iron as your credits and cargo hold allow. The live market does not lock a destination; Virella currently offers a useful first route.",
+    target: "tutorial:marketMaxAmount",
+    event: "selectedBuyAmount"
   },
   {
     id: "buy-cargo",
@@ -880,6 +880,10 @@ function getDynamicTutorialTarget(step) {
   if (step.target === "tutorial:marketTarget") {
     return document.querySelector("[data-tutorial-target='marketRouteCard']") ||
            document.querySelector(".trade-route-card:not(.is-loss)");
+  }
+
+  if (step.target === "tutorial:marketMaxAmount") {
+    return document.querySelector("[data-tutorial-target='marketMaxAmount']:not(:disabled)");
   }
 
   if (step.target === "tutorial:planetTradeTerminal") {

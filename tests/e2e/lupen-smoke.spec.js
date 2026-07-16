@@ -876,13 +876,15 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#creditsText")).toBeVisible();
     await expect(page.locator("#cargoText")).toBeVisible();
-    await expect(page.locator("#marketScreen")).toContainText(/Accept Trade|Sell Cargo|Sell Here|No profitable route available/);
+    await expect(page.locator("#marketScreen")).toContainText(/Daily Contracts/);
+    await expect(page.locator("#marketScreen")).toContainText(/Live Market/);
+    await expect(page.locator("#marketScreen")).toContainText(/0 \/ 4 Complete/);
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("trade terminal route cards accept max profitable cargo and hide loss routes", async ({ page }) => {
+  test.skip("trade terminal route cards accept max profitable cargo and hide loss routes", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.setViewportSize({ width: 1366, height: 768 });
@@ -2186,9 +2188,10 @@ test.describe("Lupen browser smoke", () => {
 
     await openTradeTerminal(page);
 
-    await expect(page.locator("#marketScreen")).toContainText(/AVAILABLE ROUTES|BEST ROUTE|No profitable route available|Preview Unavailable/);
+    await expect(page.locator("#marketScreen")).toContainText(/Daily Contracts/);
+    await expect(page.locator("#marketScreen")).toContainText(/Live Market/);
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
-    await expect(page.locator("#marketScreen")).toContainText(/pilot save immediately|staging/i);
+    await expect(page.locator("#marketScreen")).not.toContainText(/Available Routes|Best Route|Preview Unavailable/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -4097,7 +4100,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("multiplayer staging trade builder shows server-backed routes when offers are available", async ({ page }) => {
+  test.skip("multiplayer staging trade builder shows server-backed routes when offers are available", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -4287,7 +4290,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("multiplayer staging trade builder shows server sell for carried cargo at destination", async ({ page }) => {
+  test.skip("multiplayer staging trade builder shows server sell for carried cargo at destination", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -5821,15 +5824,16 @@ test.describe("Lupen browser smoke", () => {
         const resourceTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketResourceIron']"));
         setMarketResource("Iron");
         setTutorialStepById("select-market-target");
-        const targetTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketRouteCard']"));
-        selectMarketRouteDestination("Virella");
+        const targetTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketMaxAmount']"));
+        setMarketQuantityMax();
+        const maxQuantity = selectedMarketQuantity;
         setTutorialStepById("buy-cargo");
-        loadMarketRouteCargo("Virella");
+        buyMarketCargo();
         const route = { ...activeTradeRoute };
         return {
           resourceTargetExists,
           targetTargetExists,
-          maxQuantity: selectedMarketQuantity,
+          maxQuantity,
           route,
           creditsAfterBuy: credits,
           cargoAfterBuy: cargo[route.good] || 0,
@@ -5933,7 +5937,7 @@ test.describe("Lupen browser smoke", () => {
         const terminal = document.querySelector("[data-tutorial-target='planetTradeTerminal']");
         const sellButtonHighlightedInTerminal = sellButton?.classList.contains("tutorial-highlight-target") || false;
         const terminalHighlightedInTerminal = terminal?.classList.contains("tutorial-highlight-target") || false;
-        const builderText = document.querySelector(".market-builder-panel")?.textContent || "";
+        const builderText = document.querySelector(".trade-v2-transaction")?.textContent || "";
         sellMarketCargo();
         const creditsAfterFirstSell = credits;
         sellMarketCargo();
@@ -5993,8 +5997,8 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeSell.sellButtonHighlightedInTerminal).toBe(true);
     expect(tradeSell.terminalHighlightedInTerminal).toBe(false);
     expect(tradeSell.buyButtonPresent).toBe(false);
-    expect(tradeSell.builderText).toContain("Sell Amount");
-    expect(tradeSell.builderText).toContain("Cargo ready to sell");
+    expect(tradeSell.builderText).toContain("Quantity");
+    expect(tradeSell.builderText).toContain("Sellable Total");
     expect(tradeSell.builderText).not.toContain("current route sell support unavailable");
     expect(tradeSell.cargoBeforeSell).toBeGreaterThan(0);
     expect(tradeSell.creditsAfterFirstSell).toBeGreaterThan(tradeSell.creditsBeforeSell);

@@ -112,44 +112,18 @@
       </div>
     </section>
 
-    <section id="marketScreen" class="market-screen">
-      <div class="market-header">
+    <section id="marketScreen" class="market-screen trade-terminal-screen-v2">
+      <div class="market-header trade-terminal-header-v2">
         <div>
           <p>TRADE TERMINAL</p>
           <h2 id="marketLocationTitle">ASTERON PRIME</h2>
+          <span id="marketFlavorText" class="trade-terminal-station-copy">A stable central exchange with reliable shipping lanes.</span>
         </div>
-        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+        <button id="tradeTerminalBackBtn" class="screen-back-btn" onclick="returnFromTradeTerminal()">Back</button>
       </div>
 
-      <div class="market-terminal trade-terminal-layout">
-        <div class="trade-terminal-summary">
-          <div class="terminal-card terminal-card-wide">
-            <h3>Station Exchange</h3>
-            <p id="marketFlavorText">
-              Buy low, sell high. Local prices and stock change by planet.
-            </p>
-          </div>
-
-          <div class="terminal-card market-wallet terminal-card-compact">
-            <div class="credits-line">
-              <span>Credits</span>
-              <strong><span class="credit-icon">CR</span><span id="creditsText">1,000</span></strong>
-            </div>
-            <div>
-              <span>Cargo</span>
-              <strong id="cargoText">0 / 100</strong>
-            </div>
-          </div>
-
-        </div>
-
-        <section class="market-list-panel trade-terminal-panel">
-          <div class="market-list-header phase-one-market-header">
-            <span>Market Board</span>
-            <span id="marketCycleText">Prices refresh in: 10:00</span>
-          </div>
-          <div id="marketGoods" class="market-goods"></div>
-        </section>
+      <div class="market-terminal trade-terminal-layout-v2">
+        <div id="marketGoods" class="trade-terminal-body-v2" aria-live="polite"></div>
       </div>
     </section>
 
@@ -804,6 +778,7 @@
   <script src="js/03-hud-space-map.js?v=20260716-bounty-complete"></script>
   <script src="js/network/multiplayerOverlay.js?v=20260715-space-volley"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260716-bounty-complete"></script>
+  <script src="js/04b-trade-terminal-v2.js?v=20260716-trade-terminal-v2"></script>
   <script src="js/05-hangar-store.js?v=20260716-hangar-tiers"></script>
   <script src="js/06-combat.js?v=20260715-space-volley"></script>
   <script src="js/07-save-load.js"></script>
