@@ -4711,11 +4711,11 @@ test.describe("Lupen browser smoke", () => {
         ownedGuns.pulseLaser = 0;
         ownedGuns.ionBlaster = 1;
         inventoryItems = [
-          ...Object.keys(attachments).map((key, index) => ({ id: \`forge-scroll-attachment-\${index}\`, key, quality: "standard", level: 1 })),
+          ...Object.keys(attachments).map((key, index) => ({ id: \`forge-scroll-attachment-\${index}\`, key, quality: "standard", level: (index % 5) + 1 })),
           ...Object.keys(GUNS)
             .filter(key => GUNS[key] && !GUNS[key].hiddenFromStore)
             .slice(0, 9)
-            .map((key, index) => ({ id: \`forge-scroll-gun-\${index}\`, key, quality: "standard", level: 1 }))
+            .map((key, index) => ({ id: \`forge-scroll-gun-\${index}\`, key, quality: "standard", level: ((index + 2) % 5) + 1 }))
         ];
         shipLoadouts = {
           falcon: normalizeShipLoadout({ attachments: [], guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)] }, "falcon")
@@ -4734,11 +4734,37 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Selected Upgrade");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Lupen Shards");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Need 15 More Shards");
+    await expect(page.locator("#forgeTierLegend")).toContainText("Common");
+    await expect(page.locator("#forgeTierLegend")).toContainText("Refined");
+    await expect(page.locator("#forgeTierLegend")).toContainText("Unique");
+    await expect(page.locator("#forgeTierLegend")).toContainText("Elite");
+    await expect(page.locator("#forgeTierLegend")).toContainText("Super");
+    await expect(page.locator("#forgeTierLegend .forge-tier-legend-item")).toHaveCount(5);
     await expect(page.locator("#upgradeForgeScreen")).not.toContainText(/Quality Upgrade|Lupen Core|Lupen Cores/);
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
     await expect(page.locator("#forgeSelectedPanel")).toBeVisible();
     await expect(page.locator("#forgeScrollThumb")).toBeVisible();
     await expect(page.locator("#forgeScrollDownBtn")).toBeEnabled();
+
+    const forgeTierModel = await page.evaluate(() => window.eval(`
+      [1, 2, 3, 4, 5].map(level => ({
+        level,
+        name: getForgeLevelTier(level).label,
+        className: getForgeTierClass(level),
+        cost: getForgeRequirement({ key: "cargoPod", categoryKey: "attachments", quality: "standard", level }).required
+      }))
+    `));
+    expect(forgeTierModel).toEqual([
+      { level: 1, name: "Common", className: "forge-tier-common", cost: 25 },
+      { level: 2, name: "Refined", className: "forge-tier-refined", cost: 75 },
+      { level: 3, name: "Unique", className: "forge-tier-unique", cost: 150 },
+      { level: 4, name: "Elite", className: "forge-tier-elite", cost: 300 },
+      { level: 5, name: "Super", className: "forge-tier-super", cost: 0 }
+    ]);
+    const selectedCommonItem = page.locator("#forgeSelectedPanel .forge-owned-item.selected");
+    await expect(selectedCommonItem).toHaveClass(/forge-tier-common/);
+    await expect(selectedCommonItem.locator(".forge-tier-pips i")).toHaveCount(1);
+    await expect(page.locator("#forgeSelectedTier")).toContainText("Common · Level I");
 
     const ownedListBefore = await page.locator("#forgeSelectedPanel").evaluate((list) => {
       const screen = document.getElementById("upgradeForgeScreen");
@@ -4816,14 +4842,35 @@ test.describe("Lupen browser smoke", () => {
     expect(upgraded.level).toBe(2);
     expect(upgraded.shards).toBe(0);
     expect(upgraded.previewText).toContain("Level II");
+    expect(upgraded.previewText).toContain("Refined");
     expect(upgraded.previewText).toContain("Not enough Lupen Shards");
+    const selectedRefinedItem = page.locator("#forgeSelectedPanel .forge-owned-item.selected");
+    await expect(selectedRefinedItem).toHaveClass(/forge-tier-refined/);
+    await expect(selectedRefinedItem.locator(".forge-tier-pips i")).toHaveCount(2);
+    await expect(page.locator("#forgeSelectedTier")).toContainText("Refined · Level II");
+    await expect(page.locator("#gameRewardBurst")).toHaveClass(/active/);
+    await expect(page.locator("#gameRewardBurst")).toContainText("Forge Upgrade Complete");
+    await expect(page.locator("#gameRewardBurst")).toContainText("Refined tier reached · Level II");
 
     await page.evaluate(() => window.eval(`
       shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 3);
-      upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 100 });
+      upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 150 });
       renderUpgradeForge();
     `));
-    await expect(page.locator("#forgeStatePreview")).toContainText("Item is already max level for Map 1.");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Unique");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Elite");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Level IV");
+    await expect(page.locator("#forgeStartBtn")).toBeEnabled();
+
+    await page.evaluate(() => window.eval(`
+      shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 5);
+      upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 1000 });
+      renderUpgradeForge();
+    `));
+    await expect(page.locator("#forgeStatePreview")).toContainText("Item has reached Super tier, the maximum Forge level.");
+    await expect(page.locator("#forgeSelectedTier")).toContainText("Super · Level V");
+    await expect(page.locator("#forgeSelectedPanel .forge-owned-item.selected")).toHaveClass(/forge-tier-super/);
+    await expect(page.locator("#forgeSelectedPanel .forge-owned-item.selected .forge-tier-pips i")).toHaveCount(5);
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
 
     await expectNoUnexpectedBrowserErrors(failures);

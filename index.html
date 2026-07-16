@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css?v=20260716-bounty-complete" />
+  <link rel="stylesheet" href="style.css?v=20260716-forge-tiers" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
 </head>
 <body>
@@ -243,6 +243,7 @@
               </button>
             </div>
           </div>
+          <div id="forgeTierLegend" class="forge-tier-legend" aria-label="Forge level tiers"></div>
         </aside>
 
         <main class="forge-panel forge-detail-panel forge-preview-panel">
@@ -264,7 +265,10 @@
                 </div>
               </div>
               <div class="forge-selected-copy">
-                <span id="forgeSelectedType" class="forge-selected-type">Weapon</span>
+                <div class="forge-selected-badges">
+                  <span id="forgeSelectedType" class="forge-selected-type">Weapon</span>
+                  <span id="forgeSelectedTier" class="forge-selected-tier">Common · Level I</span>
+                </div>
                 <h3 id="forgeSelectedName">Pulse Laser</h3>
                 <p id="forgeSelectedDescription">Rapid-fire energy weapon.</p>
               </div>
@@ -805,7 +809,7 @@
   <script src="js/07-save-load.js"></script>
   <script src="js/08-tutorial.js"></script>
   <script src="js/09-audio.js"></script>
-  <script src="js/10-upgrade-forge.js?v=20260713-asteroid-shards"></script>
+  <script src="js/10-upgrade-forge.js?v=20260716-forge-tiers"></script>
   <script src="js/11-missions.js?v=20260715-tactical-hud"></script>
 
     <div id="tutorialOverlay" class="tutorial-overlay" aria-live="polite">
