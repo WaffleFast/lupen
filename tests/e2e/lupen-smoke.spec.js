@@ -4615,6 +4615,82 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("hangar loadout and vault mirror all five Forge level tiers", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 800 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        playerProgress = normalizePlayerProgress({ combatXp: 5000 });
+        ownedGuns = { ...ownedGuns, pulseLaser: 0, ionBlaster: 0, heavyLance: 0 };
+        inventoryItems = [
+          { id: "tier-refined-ion", key: "ionBlaster", quality: "standard", level: 2 },
+          { id: "tier-elite-heavy", key: "heavyLance", quality: "standard", level: 4 },
+          { id: "tier-super-pulse", key: "pulseLaser", quality: "standard", level: 5 }
+        ];
+        shipLoadouts[STARTER_SHIP_ID] = {
+          attachments: [],
+          guns: [
+            makeLeveledLoadoutEntry("pulseLaser", "standard", 1),
+            makeLeveledLoadoutEntry("heavyLance", "standard", 3)
+          ]
+        };
+        selectedLoadoutSlotCategory = "guns";
+        selectedLoadoutVaultFilter = "guns";
+        selectedLoadoutItemContext = {
+          source: "equipped",
+          categoryKey: "guns",
+          index: 0,
+          key: "pulseLaser",
+          quality: "standard",
+          level: 1
+        };
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("overview");
+      })()
+    `));
+
+    const equipped = page.locator("#installedGuns .loadout-grid-slot.filled");
+    await expect(equipped).toHaveCount(2);
+    await expect(equipped.nth(0)).toHaveAttribute("data-tier", "common");
+    await expect(equipped.nth(0).locator(".forge-tier-pips i")).toHaveCount(1);
+    await expect(equipped.nth(1)).toHaveAttribute("data-tier", "unique");
+    await expect(equipped.nth(1).locator(".forge-tier-pips i")).toHaveCount(3);
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Common · I");
+
+    const available = page.locator("#gunInventory .loadout-vault-row");
+    await expect(available).toHaveCount(3);
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-tier='refined'] .forge-tier-pips i")).toHaveCount(2);
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-tier='elite'] .forge-tier-pips i")).toHaveCount(4);
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-tier='super'] .forge-tier-pips i")).toHaveCount(5);
+    await page.locator("#gunInventory .loadout-vault-row[data-tier='super']").click();
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Super · V");
+    await page.mouse.move(10, 10);
+    await page.screenshot({ path: "artifacts/hangar-loadout-tiers-1366x800.png", fullPage: false });
+
+    await page.evaluate(() => showHangarSection("vault"));
+    await expect(page.locator("#hangarVaultSection")).toHaveClass(/active/);
+    await expect(page.locator("#vaultCatalogGrid .vault-storage-card[data-tier='refined'] .forge-tier-pips i")).toHaveCount(2);
+    await expect(page.locator("#vaultCatalogGrid .vault-storage-card[data-tier='elite'] .forge-tier-pips i")).toHaveCount(4);
+    await expect(page.locator("#vaultCatalogGrid .vault-storage-card[data-tier='super'] .forge-tier-pips i")).toHaveCount(5);
+    await page.locator("#vaultCatalogGrid .vault-storage-card[data-tier='super']").click();
+    await expect(page.locator("#vaultDetailPanel .vault-item-detail-shell")).toHaveAttribute("data-tier", "super");
+    await expect(page.locator("#vaultDetailPanel .hangar-tier-detail-badge")).toContainText("Super");
+    await expect(page.locator("#vaultDetailPanel .hangar-tier-detail-badge")).toContainText("LEVEL V");
+    await page.mouse.move(10, 10);
+    await page.screenshot({ path: "artifacts/hangar-vault-tiers-1366x800.png", fullPage: false });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("starter tutorial definitions match current progression loop", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

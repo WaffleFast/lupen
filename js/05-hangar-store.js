@@ -1127,6 +1127,38 @@ function formatRomanLevel(level = 1) {
   return numerals[value] || String(value);
 }
 
+const HANGAR_LEVEL_TIERS = Object.freeze({
+  1: Object.freeze({ key: "common", label: "Common" }),
+  2: Object.freeze({ key: "refined", label: "Refined" }),
+  3: Object.freeze({ key: "unique", label: "Unique" }),
+  4: Object.freeze({ key: "elite", label: "Elite" }),
+  5: Object.freeze({ key: "super", label: "Super" })
+});
+
+function getHangarEquipmentTier(level = 1) {
+  const safeLevel = Math.max(1, Math.min(5, Math.floor(Number(level || 1))));
+  if (typeof getForgeLevelTier === "function") return getForgeLevelTier(safeLevel);
+  return HANGAR_LEVEL_TIERS[safeLevel] || HANGAR_LEVEL_TIERS[1];
+}
+
+function getHangarEquipmentTierClass(level = 1) {
+  if (typeof getForgeTierClass === "function") return getForgeTierClass(level);
+  return `forge-tier-${getHangarEquipmentTier(level).key}`;
+}
+
+function renderHangarEquipmentTierPips(level = 1, className = "compact") {
+  if (typeof renderForgeTierPips === "function") return renderForgeTierPips(level, className);
+  const safeLevel = Math.max(1, Math.min(5, Math.floor(Number(level || 1))));
+  const tier = getHangarEquipmentTier(safeLevel);
+  const pips = Array.from({ length: safeLevel }, () => "<i></i>").join("");
+  return `<span class="forge-tier-pips ${escapeHtml(className)}" role="img" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(safeLevel))}">${pips}</span>`;
+}
+
+function getHangarTierLabel(level = 1) {
+  const tier = getHangarEquipmentTier(level);
+  return `${tier.label} · ${formatRomanLevel(level)}`;
+}
+
 function getVaultFireRateLabel(gun) {
   const rate = getGunFireRateValue(gun);
   if (rate <= 0) return "Unknown";
@@ -1227,7 +1259,14 @@ function renderVaultCatalog() {
   entries.forEach(entry => {
     const button = document.createElement("button");
     const selected = selectedVaultGroupKey === entry.groupKey || Boolean(selectedVaultGroupKey && entry.groupKey.startsWith(`${selectedVaultGroupKey}__`));
-    button.className = `vault-storage-card ${selected ? "selected" : ""} ${entry.stackable ? "resource-entry" : "gear-entry"} quality-${entry.quality}`;
+    const level = Math.max(1, Number(entry.level || 1));
+    const tier = getHangarEquipmentTier(level);
+    const tierClass = entry.stackable ? "" : `forge-tier-scope ${getHangarEquipmentTierClass(level)}`;
+    button.className = `vault-storage-card ${selected ? "selected" : ""} ${entry.stackable ? "resource-entry" : "gear-entry"} quality-${entry.quality} ${tierClass}`;
+    if (!entry.stackable) {
+      button.dataset.level = String(level);
+      button.dataset.tier = tier.key;
+    }
     button.onclick = () => selectVaultItem(entry.groupKey);
     button.removeAttribute("title");
     showHangarTooltip(button, getVaultTooltipHtml(entry));
@@ -1241,7 +1280,13 @@ function renderVaultCatalog() {
       <div class="vault-storage-copy">
         <strong>${entry.name}</strong>
       </div>
-      ${entry.stackable ? "" : `<span class="vault-level-badge">LV ${formatRomanLevel(entry.level || 1)}</span>`}
+      ${entry.stackable ? "" : `
+        <span class="vault-level-badge hangar-tier-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
+          ${renderHangarEquipmentTierPips(level, "compact")}
+          <b>${escapeHtml(tier.label)}</b>
+          <em>${formatRomanLevel(level)}</em>
+        </span>
+      `}
     `;
 
     grid.appendChild(button);
@@ -1259,9 +1304,12 @@ function renderVaultDetail() {
   }
 
   const infoStats = getVaultEntryStats(entry);
+  const level = Math.max(1, Number(entry.level || 1));
+  const tier = getHangarEquipmentTier(level);
+  const tierClass = entry.stackable ? "" : `forge-tier-scope ${getHangarEquipmentTierClass(level)}`;
 
   panel.innerHTML = `
-    <div class="vault-item-detail-shell quality-${entry.quality}">
+    <div class="vault-item-detail-shell quality-${entry.quality} ${tierClass}" ${entry.stackable ? "" : `data-level="${escapeHtml(level)}" data-tier="${escapeHtml(tier.key)}"`}>
       <div class="vault-item-preview">
         <div class="vault-item-preview-glow"></div>
         <div class="exchange-hero-ring"></div>
@@ -1273,7 +1321,13 @@ function renderVaultDetail() {
           <h4>${entry.name}</h4>
           <p>${entry.category} / <strong class="quality-${entry.quality}">${getVaultQualityLabel(entry)}</strong></p>
         </div>
-        ${entry.stackable ? "" : `<span>LV ${formatRomanLevel(entry.level || 1)}</span>`}
+        ${entry.stackable ? "" : `
+          <span class="hangar-tier-detail-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
+            ${renderHangarEquipmentTierPips(level, "compact")}
+            <strong>${escapeHtml(tier.label)}</strong>
+            <b>LEVEL ${formatRomanLevel(level)}</b>
+          </span>
+        `}
       </div>
 
       <div class="vault-item-description">${getVaultEntryDescription(entry)}</div>
@@ -1638,14 +1692,20 @@ function renderLoadoutItemDetail() {
     { label: "Available", value: formatNumber(detail.availableCount) },
     ...detail.stats
   ].slice(0, 7);
+  const tier = getHangarEquipmentTier(detail.level);
+  const tierClass = getHangarEquipmentTierClass(detail.level);
 
   panel.innerHTML = `
-    <div class="loadout-detail-card quality-${escapeHtml(detail.quality)}">
+    <div class="loadout-detail-card quality-${escapeHtml(detail.quality)} forge-tier-scope ${tierClass}" data-level="${escapeHtml(detail.level)}" data-tier="${escapeHtml(tier.key)}">
       <div class="loadout-detail-head">
         ${renderQualityFx(detail.quality, { src: detail.icon, alt: detail.name, size: "small" })}
         <div>
           <span>${escapeHtml(detail.typeLabel)} / ${escapeHtml(titleCaseQuality(detail.quality))}</span>
           <strong>${escapeHtml(detail.name)} / Lv ${formatNumber(detail.level)}</strong>
+          <small class="loadout-detail-tier">
+            ${renderHangarEquipmentTierPips(detail.level, "compact")}
+            <b>${escapeHtml(tier.label)} · ${escapeHtml(formatRomanLevel(detail.level))}</b>
+          </small>
         </div>
       </div>
       <div class="loadout-detail-stats">
@@ -2216,7 +2276,7 @@ function updateLoadoutSlotSummaries() {
 }
 
 
-function getEquippedTooltipEntry(key, quality, categoryKey) {
+function getEquippedTooltipEntry(key, quality, categoryKey, level = 1) {
   const isGun = categoryKey === "guns";
   const definition = isGun ? GUNS[key] : attachments[key];
   if (!definition) return null;
@@ -2224,6 +2284,7 @@ function getEquippedTooltipEntry(key, quality, categoryKey) {
   return {
     key,
     quality: quality || "standard",
+    level: Math.max(1, Number(level || 1)),
     count: 1,
     name: definition.name,
     icon: definition.image
@@ -2297,19 +2358,27 @@ function renderLoadoutSlotGrid(box, categoryKey) {
     const entry = list[i];
     const key = getEquipmentKey(entry);
     const quality = getEquipmentQuality(entry);
+    const level = getEquipmentLevel(entry);
+    const tier = getHangarEquipmentTier(level);
     const item = definitionMap[key];
     const supported = i < limit;
     const selected = selectedLoadoutItemContext?.categoryKey === categoryKey &&
       selectedLoadoutItemContext.index === i;
 
     const slot = document.createElement("button");
-    slot.className = `equipment-slot scalable-loadout-slot loadout-grid-slot ${item ? "filled" : supported ? "empty" : "locked"} ${selected ? "selected" : ""} quality-${quality}`;
+    const tierClass = item ? `forge-tier-scope ${getHangarEquipmentTierClass(level)}` : "";
+    slot.className = `equipment-slot scalable-loadout-slot loadout-grid-slot ${item ? "filled" : supported ? "empty" : "locked"} ${selected ? "selected" : ""} quality-${quality} ${tierClass}`;
     slot.dataset.slotIndex = String(i + 1).padStart(2, "0");
+    if (item) {
+      slot.dataset.level = String(level);
+      slot.dataset.tier = tier.key;
+      slot.setAttribute("aria-label", `${item.name}, ${tier.label} tier, Level ${formatRomanLevel(level)}, slot ${i + 1}`);
+    }
     slot.disabled = !supported;
     slot.onclick = () => selectEquippedLoadoutVaultItem(categoryKey, i);
 
     if (item) {
-      const tooltipEntry = getEquippedTooltipEntry(key, quality, categoryKey);
+      const tooltipEntry = getEquippedTooltipEntry(key, quality, categoryKey, level);
       showHangarTooltip(slot, getEquipmentTooltipHtml(tooltipEntry, categoryKey));
       bindHangarEquipmentTooltip(slot);
     } else {
@@ -2319,7 +2388,11 @@ function renderLoadoutSlotGrid(box, categoryKey) {
     }
 
     slot.innerHTML = item
-      ? renderQualityFx(quality, { src: item.image, alt: item.name, size: "slot" })
+      ? `${renderQualityFx(quality, { src: item.image, alt: item.name, size: "slot" })}
+        <span class="loadout-slot-tier-badge" aria-hidden="true">
+          ${renderHangarEquipmentTierPips(level, "compact")}
+          <b>${formatRomanLevel(level)}</b>
+        </span>`
       : supported
         ? `<span class="slot-empty-label" aria-hidden="true"><b>Empty</b> <small>Available</small></span>`
         : `<span class="slot-lock-mark" aria-hidden="true">LOCK</span>`;
@@ -2426,6 +2499,8 @@ function escapeHtml(value) {
 function getEquipmentTooltipHtml(entry, categoryKey) {
   const quality = entry.quality || "standard";
   const qualityLabel = titleCaseQuality(quality);
+  const level = Math.max(1, Number(entry.level || 1));
+  const tier = getHangarEquipmentTier(level);
   const qty = formatNumber(entry.count || 0);
   const isGun = categoryKey === "guns";
   const definition = isGun ? GUNS[entry.key] : attachments[entry.key];
@@ -2463,7 +2538,7 @@ function getEquipmentTooltipHtml(entry, categoryKey) {
         <img src="${escapeHtml(entry.icon || definition.image)}" alt="">
         <div>
           <div class="hangar-tooltip-name">${escapeHtml(entry.name || definition.name)}</div>
-          <div class="hangar-tooltip-meta">${escapeHtml(qualityLabel)} / x${qty} owned</div>
+          <div class="hangar-tooltip-meta">${escapeHtml(tier.label)} · Level ${escapeHtml(formatRomanLevel(level))} / ${escapeHtml(qualityLabel)} / x${qty} owned</div>
         </div>
       </div>
       <div class="hangar-tooltip-stats">${statHtml}</div>
@@ -2793,15 +2868,19 @@ function renderGunInventory() {
   entries.forEach(entry => {
     const compatible = selectedCategory === entry.categoryKey || !["guns", "attachments"].includes(selectedCategory);
     const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
+    const level = Math.max(1, Number(entry.level || 1));
+    const tier = getHangarEquipmentTier(level);
     const btn = document.createElement("button");
     const selected = selectedLoadoutItemContext?.source === "available" &&
       selectedLoadoutItemContext.categoryKey === entry.categoryKey &&
       selectedLoadoutItemContext.key === entry.key &&
       selectedLoadoutItemContext.quality === entry.quality &&
       Number(selectedLoadoutItemContext.level || 1) === Number(entry.level || 1);
-    btn.className = `inventory-icon-card hangar-equipment-card loadout-vault-row quality-${entry.quality} ${selected ? "selected" : ""} ${unlock.locked ? "progression-locked" : ""}`;
+    btn.className = `inventory-icon-card hangar-equipment-card loadout-vault-row quality-${entry.quality} forge-tier-scope ${getHangarEquipmentTierClass(level)} ${selected ? "selected" : ""} ${unlock.locked ? "progression-locked" : ""}`;
     btn.dataset.itemKey = entry.key;
     btn.dataset.itemType = entry.categoryKey === "guns" ? "gun" : "attachment";
+    btn.dataset.level = String(level);
+    btn.dataset.tier = tier.key;
     btn.disabled = entry.count <= 0 || !compatible;
     btn.onclick = () => compatible && selectAvailableLoadoutItem(entry.categoryKey, entry);
     btn.removeAttribute("title");
@@ -2814,7 +2893,13 @@ function renderGunInventory() {
         <strong>${escapeHtml(entry.name)}</strong>
         <small>${escapeHtml(unlock.locked ? unlock.requirementLines.join(" / ") : getLoadoutVaultEntryStatLine(entry))}</small>
       </span>
-      <b>${unlock.locked ? "LOCK" : `LV ${formatRomanLevel(entry.level || 1)}`}</b>
+      ${unlock.locked ? `<b class="loadout-vault-lock">LOCK</b>` : `
+        <span class="loadout-vault-tier-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
+          ${renderHangarEquipmentTierPips(level, "compact")}
+          <strong>${escapeHtml(tier.label)}</strong>
+          <b>${formatRomanLevel(level)}</b>
+        </span>
+      `}
     `;
 
     box.appendChild(btn);
