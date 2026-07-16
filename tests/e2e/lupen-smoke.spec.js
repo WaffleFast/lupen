@@ -8382,6 +8382,7 @@ test.describe("Lupen browser smoke", () => {
           { id: "staging_behemoth_warning_1", title: "Behemoth Warning", description: "Destroy 1 Erebus Behemoth.", contractType: "Boss Contract", targetBotType: "behemoth", targetBotLabel: "Erebus Behemoth", difficulty: "Extreme", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 2500, lupenShardsReward: 8, icon: "assets/bounties/behemoth-warning.png" }
         ];
         window.__stagingBountyAccepted = false;
+        window.__stagingBountyCompleted = false;
         window.__stagingBountyActiveId = bounties[0].id;
         window.LupenMultiplayerClient = {
           ...(window.LupenMultiplayerClient || {}),
@@ -8390,13 +8391,14 @@ test.describe("Lupen browser smoke", () => {
             const active = {
               id: activeContract.id,
               title: activeContract.title,
-              progress: activeContract.progress,
+              progress: window.__stagingBountyCompleted ? activeContract.requiredKills : activeContract.progress,
               requiredKills: activeContract.requiredKills,
               creditsReward: activeContract.creditsReward,
               lupenShardsReward: activeContract.lupenShardsReward,
               accepted: window.__stagingBountyAccepted === true,
-              completed: false,
-              claimAvailable: false,
+              completed: window.__stagingBountyCompleted === true,
+              claimAvailable: window.__stagingBountyCompleted === true,
+              completionSequence: window.__stagingBountyCompleted ? 1 : 0,
               claimed: false,
               failed: false
             };
@@ -8478,6 +8480,34 @@ test.describe("Lupen browser smoke", () => {
     await expect(behemothTacticalCard).toContainText("ACTIVE");
     await expect(behemothTacticalIcon).toHaveAttribute("src", "assets/bounties/behemoth-warning.png");
     expect(await behemothTacticalIcon.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+
+    const completionVisualResult = await page.evaluate(() => window.eval(`
+      (() => {
+        window.__stagingBountyCompleted = true;
+        const bounty = getMultiplayerStagingBounties().find((contract) => contract.id === window.__stagingBountyActiveId);
+        return {
+          first: handleMultiplayerStagingBountyCompleted(bounty),
+          duplicate: handleMultiplayerStagingBountyCompleted(bounty)
+        };
+      })()
+    `));
+    expect(completionVisualResult).toEqual({ first: true, duplicate: false });
+    await expect(behemothTacticalCard).toHaveClass(/is-ready/);
+    await expect(behemothTacticalCard).toContainText("COMPLETE");
+    await expect(behemothTacticalCard).toContainText("CLAIM AT BOUNTY BOARD");
+    await expect(page.locator("#gameRewardBurst")).toHaveClass(/active/);
+    await expect(page.locator("#gameRewardBurst")).toContainText("Bounty Complete");
+    await expect(page.locator("#gameRewardBurst")).toContainText("Behemoth Warning");
+    await expect(page.locator("#gameRewardBurst")).toContainText("CR 2,500 · 8 Lupen Shards ready");
+    await expect(page.locator("#gameRewardBurst .game-reward-icon img")).toHaveAttribute("src", "assets/bounties/behemoth-warning.png");
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/staging-tactical-bounty-complete-grid.png" });
+
+    await page.locator("#tacticalNavAcademy").click();
+    const completedBountySummary = page.locator(".active-bounty-summary.is-ready");
+    await expect(completedBountySummary).toContainText("Bounty Complete");
+    await expect(completedBountySummary).toContainText("REWARD READY");
+    await expect(completedBountySummary).toContainText("Reward Ready");
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/staging-tactical-bounty-complete.png" });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

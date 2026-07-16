@@ -138,12 +138,26 @@ function dismissGameRewardBurst() {
 
 function showBountyCompleteBurst(objective) {
   if (!objective) return;
+  const reward = objective.reward && typeof objective.reward === "object" ? objective.reward : {};
+  const legacyCredits = typeof objective.reward === "number" ? objective.reward : 0;
+  const credits = Math.max(0, Number(objective.creditsReward ?? reward.credits ?? legacyCredits ?? 0));
+  const shards = Math.max(0, Number(objective.lupenShardsReward ?? reward.lupenShards ?? 0));
+  const rewardParts = [];
+  if (credits > 0) rewardParts.push(`CR ${formatNumber(credits)}`);
+  if (shards > 0) rewardParts.push(`${formatNumber(shards)} Lupen Shard${shards === 1 ? "" : "s"}`);
+  const rewardText = rewardParts.length ? rewardParts.join(" · ") : "Reward ready";
+  const rawIcon = objective.icon || objective.fallbackIcon || "";
+  const bountyIcon = rawIcon && typeof getBountyIconSrc === "function"
+    ? getBountyIconSrc(rawIcon)
+    : rawIcon;
+
   showGameRewardBurst({
     type: "bounty",
     kicker: "Bounty Complete",
     title: objective.title || "Contract Complete",
-    meta: `Return to station / CR ${formatNumber(objective.reward || 0)} ready`,
-    icon: "!"
+    meta: `${rewardText} ready · Claim at a bounty board`,
+    icon: "✓",
+    image: bountyIcon
   });
 }
 

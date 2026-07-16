@@ -210,24 +210,29 @@ function getTacticalChatMessages() {
   return { status, messages };
 }
 
+function isTacticalBountyComplete(status = "") {
+  return ["READY", "COMPLETE", "COMPLETED", "READY TO CLAIM"].includes(String(status || "").toUpperCase());
+}
+
 function renderTacticalSummaryCards() {
   const bounty = getTacticalTrackedBounty();
   const cargoState = getTacticalCargoState();
   const { status } = getTacticalChatMessages();
+  const bountyComplete = bounty ? isTacticalBountyComplete(bounty.status) : false;
   const bountyHtml = bounty ? `
     <div class="tactical-summary-bounty">
       <span class="tactical-bounty-icon">${bounty.icon ? `<img src="${escapeTacticalHtml(bounty.icon)}" alt="">` : getTacticalIconSvg("bounties")}</span>
       <div><strong>${escapeTacticalHtml(bounty.title)}</strong><span>${formatNumber(bounty.progress)} / ${formatNumber(bounty.required)} destroyed</span><small>${escapeTacticalHtml(bounty.target)}</small></div>
     </div>
-    <div class="tactical-summary-reward"><span>Reward</span><strong>CR ${formatNumber(bounty.credits)} &nbsp;·&nbsp; ${formatNumber(bounty.shards)} Shards</strong></div>
+    <div class="tactical-summary-reward"><span>${bountyComplete ? "Reward Ready" : "Reward"}</span><strong>CR ${formatNumber(bounty.credits)} &nbsp;·&nbsp; ${formatNumber(bounty.shards)} Shards</strong></div>
   ` : `<div class="tactical-summary-empty"><strong>No active bounty</strong><span>Contracts can be accepted while docked.</span></div>`;
   const commsState = status.enabled && !status.isConnected ? "Disconnected" : "Sector quiet";
   const commsDetail = status.enabled && !status.isConnected ? "Reconnect to use sector chat" : "No new guild alerts";
 
   return `
     <aside class="tactical-summary-column" aria-label="Tactical summary">
-      <section class="tactical-summary-box active-bounty-summary ${bounty ? "has-active-bounty" : "is-empty"}">
-        <h4>Active Bounty</h4>
+      <section class="tactical-summary-box active-bounty-summary ${bounty ? "has-active-bounty" : "is-empty"} ${bountyComplete ? "is-ready" : ""}">
+        <div class="tactical-summary-heading"><h4>${bountyComplete ? "Bounty Complete" : "Active Bounty"}</h4>${bountyComplete ? `<span>✓ REWARD READY</span>` : ""}</div>
         ${bountyHtml}
       </section>
       <section class="tactical-summary-box cargo-summary-box">
@@ -346,14 +351,16 @@ function renderTacticalBounties() {
       <div class="tactical-bounty-grid">
         ${rows.map(contract => {
           const percent = Math.max(0, Math.min(100, Math.round((contract.progress / Math.max(1, contract.required)) * 100)));
-          return `<article class="tactical-bounty-card status-${escapeTacticalHtml(contract.status.toLowerCase().replaceAll(" ", "-"))}">
+          const complete = isTacticalBountyComplete(contract.status);
+          const statusLabel = complete ? "✓ COMPLETE" : contract.status;
+          return `<article class="tactical-bounty-card status-${escapeTacticalHtml(contract.status.toLowerCase().replaceAll(" ", "-"))} ${complete ? "is-ready" : ""}">
             <div class="tactical-bounty-card-top">
               <span class="tactical-bounty-icon">${contract.icon ? `<img src="${escapeTacticalHtml(contract.icon)}" alt="">` : getTacticalIconSvg("bounties")}</span>
               <div><h4>${escapeTacticalHtml(contract.title)}</h4><p>${escapeTacticalHtml(contract.description || "Contract objective")}</p></div>
-              <span class="tactical-status-chip">${escapeTacticalHtml(contract.status)}</span>
+              <span class="tactical-status-chip">${escapeTacticalHtml(statusLabel)}</span>
             </div>
             <div class="tactical-bounty-progress"><div class="tactical-meter"><i style="width:${percent}%"></i></div><strong>${formatNumber(contract.progress)} / ${formatNumber(contract.required)}</strong></div>
-            <footer><span>CR ${formatNumber(contract.credits)} &nbsp;·&nbsp; ${formatNumber(contract.shards)} Shards</span>${contract.timer ? `<small>${escapeTacticalHtml(contract.timer)}</small>` : ""}</footer>
+            <footer><span>CR ${formatNumber(contract.credits)} &nbsp;·&nbsp; ${formatNumber(contract.shards)} Shards</span>${complete ? `<small>CLAIM AT BOUNTY BOARD</small>` : contract.timer ? `<small>${escapeTacticalHtml(contract.timer)}</small>` : ""}</footer>
           </article>`;
         }).join("") || `<div class="tactical-empty-state">No bounty contracts are currently available.</div>`}
       </div>

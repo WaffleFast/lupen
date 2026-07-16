@@ -26,6 +26,7 @@ let multiplayerStagingBountyLastHandledAt = 0;
 let multiplayerStagingBountyPending = null;
 let multiplayerStagingBountySubscribed = false;
 let multiplayerStagingBountyLastRefreshAt = 0;
+let multiplayerStagingBountyLastCompletionBurstKey = "";
 // Mirrors the current Colyseus STAGING_TRADE_WRITE_MAX_QUANTITY gate so the
 // Trade Builder never asks staging to write more than the server will accept.
 const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 1000;
@@ -247,6 +248,29 @@ function getMultiplayerStagingBountyStatusLabel(bounty) {
   if (bounty?.accepted) return "ACTIVE";
   if (!isMultiplayerStagingBountyReady()) return "OFFLINE";
   return "AVAILABLE";
+}
+
+function handleMultiplayerStagingBountyCompleted(bounty) {
+  if (!bounty || (!bounty.claimAvailable && !bounty.completed)) return false;
+  const completionKey = [
+    bounty.id || "staging-bounty",
+    bounty.completionSequence || bounty.updatedAt || bounty.progress || bounty.requiredKills || 1
+  ].join(":");
+  if (completionKey === multiplayerStagingBountyLastCompletionBurstKey) return false;
+  multiplayerStagingBountyLastCompletionBurstKey = completionKey;
+
+  const resolvedBounty = {
+    ...bounty,
+    icon: getBountyIconSrc(bounty.icon || bounty.fallbackIcon),
+    reward: {
+      credits: Math.max(0, Number(bounty.creditsReward || bounty.reward?.credits || 0)),
+      lupenShards: Math.max(0, Number(bounty.lupenShardsReward || bounty.reward?.lupenShards || 0))
+    }
+  };
+  if (typeof showBountyCompleteBurst === "function") showBountyCompleteBurst(resolvedBounty);
+  if (typeof addHudToast === "function") addHudToast("Bounty complete — reward ready to claim.");
+  if (typeof refreshTacticalPanel === "function") refreshTacticalPanel(true);
+  return true;
 }
 
 function getMultiplayerStagingBountyClaimLine() {

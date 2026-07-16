@@ -3374,6 +3374,9 @@
           `Bounty complete: ${active.title}.`
         );
       }
+      if (message?.reason === "completed" && (active?.claimAvailable || active?.completed)) {
+        global.handleMultiplayerStagingBountyCompleted?.(active);
+      }
       logDev("server staging bounty status", message);
       notifyServerState(activeRoom.state || null);
     });
