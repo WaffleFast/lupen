@@ -5937,7 +5937,7 @@ test.describe("Lupen browser smoke", () => {
         const terminal = document.querySelector("[data-tutorial-target='planetTradeTerminal']");
         const sellButtonHighlightedInTerminal = sellButton?.classList.contains("tutorial-highlight-target") || false;
         const terminalHighlightedInTerminal = terminal?.classList.contains("tutorial-highlight-target") || false;
-        const builderText = document.querySelector(".trade-v2-transaction")?.textContent || "";
+        const builderText = document.querySelector(".trade-v2-quick-action")?.textContent || "";
         sellMarketCargo();
         const creditsAfterFirstSell = credits;
         sellMarketCargo();
@@ -5996,9 +5996,9 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeSell.sellButtonDisabled).toBe(false);
     expect(tradeSell.sellButtonHighlightedInTerminal).toBe(true);
     expect(tradeSell.terminalHighlightedInTerminal).toBe(false);
-    expect(tradeSell.buyButtonPresent).toBe(false);
+    expect(tradeSell.buyButtonPresent).toBe(true);
     expect(tradeSell.builderText).toContain("Quantity");
-    expect(tradeSell.builderText).toContain("Sellable Total");
+    expect(tradeSell.builderText).toContain("Sale value");
     expect(tradeSell.builderText).not.toContain("current route sell support unavailable");
     expect(tradeSell.cargoBeforeSell).toBeGreaterThan(0);
     expect(tradeSell.creditsAfterFirstSell).toBeGreaterThan(tradeSell.creditsBeforeSell);

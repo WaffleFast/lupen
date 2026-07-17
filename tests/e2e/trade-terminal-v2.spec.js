@@ -22,6 +22,14 @@ async function prepareTerminal(page, viewport = { width: 1366, height: 768 }) {
     dailyTradeContracts = [];
     activeDailyTradeContractId = null;
     selectedDailyTradeContractId = null;
+    selectedMarketResource = "Iron";
+    selectedMarketMode = "buy";
+    selectedMarketQuantity = 1;
+    tradeTerminalStatusMessage = "";
+    playerProgress = normalizePlayerProgress({
+      combatXp: 0,
+      totals: { tradeProfit: 0, totalTradingProfit: 0, tradesCompleted: 0, cargoSold: 0 }
+    });
     if (typeof applyShipStats === "function") applyShipStats(true);
     showScreen("gameScreen");
     openMarketplace();
@@ -29,207 +37,317 @@ async function prepareTerminal(page, viewport = { width: 1366, height: 768 }) {
   await expect(page.locator("#marketScreen")).toHaveClass(/active/);
 }
 
-async function expectInsideViewport(page, selector) {
-  const geometry = await page.locator(selector).evaluate((element) => {
-    const rect = element.getBoundingClientRect();
+async function getPageGeometry(page) {
+  return page.evaluate(() => {
+    const screen = document.getElementById("marketScreen").getBoundingClientRect();
+    const panels = [...document.querySelectorAll(".trade-v2-primary-grid > .trade-v2-primary-panel")].map((panel) => {
+      const rect = panel.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+    });
     return {
-      left: rect.left,
-      top: rect.top,
-      right: rect.right,
-      bottom: rect.bottom,
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-      scrollWidth: element.scrollWidth,
-      clientWidth: element.clientWidth
+      screen: { left: screen.left, top: screen.top, right: screen.right, bottom: screen.bottom },
+      panels,
+      viewport: { width: innerWidth, height: innerHeight },
+      document: {
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+        clientHeight: document.documentElement.clientHeight,
+        scrollY
+      }
     };
   });
-  expect(geometry.left).toBeGreaterThanOrEqual(0);
-  expect(geometry.top).toBeGreaterThanOrEqual(0);
-  expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth + 1);
-  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
-  expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1);
 }
 
-test.describe("Trade Terminal V2", () => {
-  test("overview matches the two-panel target and excludes removed trading modes", async ({ page }) => {
+function expectPageFits(geometry) {
+  expect(geometry.screen.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.screen.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.screen.right).toBeLessThanOrEqual(geometry.viewport.width + 1);
+  expect(geometry.screen.bottom).toBeLessThanOrEqual(geometry.viewport.height + 1);
+  expect(geometry.document.scrollWidth).toBeLessThanOrEqual(geometry.document.clientWidth + 1);
+  expect(geometry.document.scrollHeight).toBeLessThanOrEqual(geometry.document.clientHeight + 1);
+  expect(geometry.document.scrollY).toBe(0);
+  expect(geometry.panels).toHaveLength(2);
+  expect(Math.abs(geometry.panels[0].top - geometry.panels[1].top)).toBeLessThanOrEqual(1);
+  expect(Math.abs(geometry.panels[0].bottom - geometry.panels[1].bottom)).toBeLessThanOrEqual(1);
+  expect(geometry.panels[1].right).toBeLessThanOrEqual(geometry.viewport.width + 1);
+}
+
+test.describe("Trade Terminal final quick actions", () => {
+  test("single workspace fits at 1366x768 and exposes only Map 1 commodities", async ({ page }) => {
     await prepareTerminal(page);
 
-    await expect(page.locator("#marketScreen")).toContainText(/Daily Contracts/i);
-    await expect(page.locator("#marketScreen")).toContainText(/Live Market/i);
-    await expect(page.locator("#marketScreen")).toContainText(/0 \/ 4 Complete/i);
     await expect(page.locator(".trade-v2-primary-grid > .trade-v2-primary-panel")).toHaveCount(2);
+    await expect(page.locator(".trade-v2-contract-preview")).toHaveCount(4);
+    await expect(page.locator(".trade-v2-contract-preview [data-contract-action='accept']")).toHaveCount(4);
     await expect(page.locator(".trade-v2-market-table tbody tr")).toHaveCount(3);
     await expect(page.locator(".trade-v2-market-table")).toContainText("Iron");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Copper");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Cobalt");
-    await expect(page.locator("#marketScreen")).not.toContainText(/Salvage|Black Market|Best Opportunity|Crystal Shards|Lupen Shards/i);
-
-    const widths = await page.locator(".trade-v2-primary-grid > .trade-v2-primary-panel").evaluateAll((panels) => panels.map((panel) => panel.getBoundingClientRect().width));
-    expect(widths[1]).toBeGreaterThan(widths[0]);
-    await expectInsideViewport(page, "#marketScreen");
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-overview-1366x768.png" });
+    await expect(page.locator(".trade-v2-quick-action")).toBeVisible();
+    await expect(page.locator("#marketScreen")).not.toContainText(/Open Contracts|Open Market|Best Opportunity|Titanium|Nickel|Crystal Shards|Lupen Shards/i);
+    expectPageFits(await getPageGeometry(page));
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-default-1366x768.png" });
 
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.evaluate(() => renderMarketplace());
-    await expectInsideViewport(page, "#marketScreen");
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-overview-large.png" });
+    expectPageFits(await getPageGeometry(page));
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-large-desktop.png" });
   });
 
-  test("daily contracts lock, persist, settle once, and reset on a new UTC day", async ({ page }) => {
+  test("contracts accept inline, auto-load where possible, lock, persist, complete once, and reset", async ({ page }) => {
     await prepareTerminal(page);
-    await page.getByRole("button", { name: /Open Contracts/i }).click();
-    await expect(page.locator(".trade-v2-contract-card")).toHaveCount(4);
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-contracts-none-active.png" });
+    const firstRow = page.locator("[data-contract-id='safe-delivery']");
+    const secondRow = page.locator("[data-contract-id='bulk-freight']");
 
-    await page.getByRole("button", { name: /Accept Contract/i }).click();
-    await expect(page.locator(".trade-v2-contract-card.is-active")).toHaveCount(1);
-    await expect(page.locator(".trade-v2-contract-card.is-locked")).toHaveCount(3);
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-contract-active.png" });
+    await firstRow.getByRole("button", { name: "Accept Contract" }).click();
+    await expect(firstRow).toHaveClass(/is-active/);
+    await expect(firstRow).toContainText(/Active · Virella/i);
+    await expect(secondRow).toHaveClass(/is-locked/);
+    await expect(secondRow.getByRole("button", { name: "Locked" })).toBeDisabled();
 
-    await page.getByRole("button", { name: /Load Contract Cargo/i }).click();
+    const accepted = await page.evaluate(() => ({
+      credits,
+      cargoIron: cargo.Iron || 0,
+      purchasedIron: cargoPurchased.Iron || 0,
+      activeId: activeDailyTradeContractId,
+      activeObjective: activeTradeRoute && {
+        contractId: activeTradeRoute.contractId,
+        destination: activeTradeRoute.destination,
+        daily: activeTradeRoute.dailyTradeContract
+      },
+      purchaseCost: DAILY_TRADE_CONTRACT_DEFINITIONS[0].purchaseCost,
+      contractQuantity: DAILY_TRADE_CONTRACT_DEFINITIONS[0].quantity,
+      saved: buildSaveState()
+    }));
+    expect(accepted.credits).toBe(50000 - accepted.purchaseCost);
+    expect(accepted.cargoIron).toBe(accepted.contractQuantity);
+    expect(accepted.purchasedIron).toBe(accepted.contractQuantity);
+    expect(accepted.activeId).toBe("safe-delivery");
+    expect(accepted.activeObjective).toEqual({ contractId: "safe-delivery", destination: "Virella", daily: true });
+    expect(accepted.saved.activeDailyTradeContractId).toBe("safe-delivery");
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-contract-active.png" });
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-contract-locked.png" });
+
     await page.evaluate(() => {
+      const saved = buildSaveState();
+      activeDailyTradeContractId = null;
+      dailyTradeContracts = [];
+      activeTradeRoute = null;
+      activeObjective = null;
+      applyLoadedGameState(saved);
       currentNode = "Virella";
       lastPlanetNode = "Virella";
-      renderMarketplace();
+      openMarketplace();
     });
-    await page.getByRole("button", { name: /Complete Delivery/i }).click();
-    await expect(page.locator(".trade-v2-contract-card.is-complete")).toHaveCount(1);
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-contract-one-complete.png" });
+    await expect(page.locator("[data-contract-id='safe-delivery']")).toHaveClass(/is-active/);
+    await page.locator("[data-contract-id='safe-delivery']").getByRole("button", { name: "Complete Delivery" }).click();
+    await expect(page.locator("[data-contract-id='safe-delivery']")).toHaveClass(/is-complete/);
+    await expect(page.locator(".trade-v2-summary")).toContainText("1 / 4 Complete");
+    await expect(secondRow).not.toHaveClass(/is-locked/);
 
-    const settlement = await page.evaluate(() => {
-      const first = dailyTradeContracts[0];
+    const completion = await page.evaluate(() => {
+      const completed = dailyTradeContracts[0];
       const creditsAfterFirst = credits;
-      const duplicateBlocked = completeDailyTradeContract(first.id, first.completionEventId) === false;
+      const duplicateBlocked = completeDailyTradeContract(completed.id, completed.completionEventId) === false;
       const creditsAfterDuplicate = credits;
-
       for (const contract of dailyTradeContracts.filter((entry) => entry.status !== "complete")) {
         currentNode = contract.origin;
         lastPlanetNode = contract.origin;
         if (!acceptDailyTradeContract(contract.id)) throw new Error("Could not accept " + contract.id);
-        if (!loadDailyTradeContractCargo(contract.id)) throw new Error("Could not load " + contract.id);
+        if (getDailyTradeContract(contract.id).loadedQuantity <= 0 && !loadDailyTradeContractCargo(contract.id)) throw new Error("Could not load " + contract.id);
         currentNode = contract.destination;
         lastPlanetNode = contract.destination;
         if (!completeDailyTradeContract(contract.id)) throw new Error("Could not complete " + contract.id);
       }
-
-      const completedBeforeReset = getDailyTradeProgress();
       const saved = buildSaveState();
-      const persistedStatuses = saved.dailyTradeContracts.map((contract) => contract.status);
-      const tomorrow = new Date(Date.now() + 86400000);
-      ensureDailyTradeContracts(tomorrow);
-      const resetStatuses = dailyTradeContracts.map((contract) => contract.status);
+      const completedBeforeReset = getDailyTradeProgress();
+      ensureDailyTradeContracts(new Date(Date.now() + 86400000));
       return {
+        duplicateBlocked,
         creditsAfterFirst,
         creditsAfterDuplicate,
-        duplicateBlocked,
         completedBeforeReset,
-        persistedStatuses,
-        resetStatuses
+        savedStatuses: saved.dailyTradeContracts.map((entry) => entry.status),
+        resetStatuses: dailyTradeContracts.map((entry) => entry.status)
       };
     });
-    expect(settlement.duplicateBlocked).toBe(true);
-    expect(settlement.creditsAfterDuplicate).toBe(settlement.creditsAfterFirst);
-    expect(settlement.completedBeforeReset).toBe(4);
-    expect(settlement.persistedStatuses).toEqual(["complete", "complete", "complete", "complete"]);
-    expect(settlement.resetStatuses).toEqual(["available", "available", "available", "available"]);
-
-    await page.evaluate(() => {
-      dailyTradeDate = getDailyTradeDateKey();
-      dailyTradeContracts = DAILY_TRADE_CONTRACT_DEFINITIONS.map((definition) => ({
-        ...createDailyTradeContract(definition),
-        status: "complete",
-        completionEventId: "test:" + definition.id
-      }));
-      activeDailyTradeContractId = null;
-      renderMarketplace();
-    });
-    await expect(page.locator(".trade-v2-contract-card.is-complete")).toHaveCount(4);
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-contracts-four-complete.png" });
+    expect(completion.duplicateBlocked).toBe(true);
+    expect(completion.creditsAfterDuplicate).toBe(completion.creditsAfterFirst);
+    expect(completion.completedBeforeReset).toBe(4);
+    expect(completion.savedStatuses).toEqual(["complete", "complete", "complete", "complete"]);
+    expect(completion.resetStatuses).toEqual(["available", "available", "available", "available"]);
   });
 
-  test("live market buys and sells purchased, recovered, and mixed cargo without a route objective", async ({ page }) => {
+  test("commodity selection, quantity, MAX, buy, sell-all, ledgers, and progression work inline", async ({ page }) => {
     await prepareTerminal(page);
-    await page.getByRole("button", { name: /Open Market/i }).click();
-    await expect(page.locator(".trade-v2-market-table .trade-v2-trend")).toHaveCount(9);
-    await expect(page.locator(".trade-v2-market-table th.is-current")).toContainText("Asteron Prime");
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-live-market.png" });
+    const ironRow = page.locator(".trade-v2-market-table tbody tr", { hasText: "Iron" });
+    const copperRow = page.locator(".trade-v2-market-table tbody tr", { hasText: "Copper" });
 
-    await page.evaluate(() => {
-      setMarketResource("Iron");
-      setMarketMode("buy");
-      syncMarketQuantity(10);
-    });
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-buy-flow.png" });
-    await page.getByRole("button", { name: /Buy Cargo/i }).click();
-    const purchased = await page.evaluate(() => ({
-      held: cargo.Iron,
-      purchased: cargoPurchased.Iron,
-      recovered: cargoRecovered.Iron || 0,
+    await expect(page.getByRole("button", { name: "Sell Iron" })).toBeDisabled();
+    await copperRow.click();
+    await expect(copperRow).toHaveAttribute("aria-selected", "true");
+    await expect(ironRow).toHaveAttribute("aria-selected", "false");
+    await expect(page.locator(".trade-v2-market-table tbody tr[aria-selected='true']")).toHaveCount(1);
+    await expect(page.locator(".trade-v2-quick-action")).toContainText(/Copper/i);
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-copper-selected.png" });
+
+    await page.getByRole("button", { name: "Max" }).click();
+    const maxState = await page.evaluate(() => ({
+      quantity: selectedMarketQuantity,
+      expected: Math.min(
+        Math.floor(credits / getLiveMarketPrice("Copper", getCurrentMarketPlanet())),
+        getShipStats().cargo - cargoUsed(),
+        MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY
+      )
+    }));
+    expect(maxState.quantity).toBe(maxState.expected);
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-max-buy.png" });
+
+    const beforeBuy = await page.evaluate(() => ({ credits, quantity: selectedMarketQuantity, price: getLiveMarketPrice("Copper", "Asteron Prime") }));
+    await page.getByRole("button", { name: "Buy Copper" }).click();
+    const afterBuy = await page.evaluate(() => ({
+      credits,
+      held: cargo.Copper || 0,
+      purchased: cargoPurchased.Copper || 0,
+      recovered: cargoRecovered.Copper || 0,
       objective: activeTradeRoute
     }));
-    expect(purchased).toEqual({ held: 10, purchased: 10, recovered: 0, objective: null });
+    expect(afterBuy.credits).toBe(beforeBuy.credits - beforeBuy.quantity * beforeBuy.price);
+    expect(afterBuy.held).toBe(beforeBuy.quantity);
+    expect(afterBuy.purchased).toBe(beforeBuy.quantity);
+    expect(afterBuy.recovered).toBe(0);
+    expect(afterBuy.objective).toBeNull();
+    await expect(page.getByRole("button", { name: new RegExp(`Sell ${beforeBuy.quantity} Copper`, "i") })).toBeEnabled();
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-sell-enabled.png" });
 
     await page.evaluate(() => {
       currentNode = "Virella";
       lastPlanetNode = "Virella";
-      setMarketMode("sell");
-      syncMarketQuantity(6);
+      renderMarketplace();
     });
-    await page.getByRole("button", { name: /Sell Cargo/i }).click();
-    const partialSale = await page.evaluate(() => ({ held: cargo.Iron, purchased: cargoPurchased.Iron, recovered: cargoRecovered.Iron || 0 }));
-    expect(partialSale).toEqual({ held: 4, purchased: 4, recovered: 0 });
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-sell-purchased.png" });
+    const beforeSale = await page.evaluate(() => ({ credits, cargoSold: playerProgress.totals.cargoSold || 0 }));
+    await page.getByRole("button", { name: /Sell .* Copper/i }).click();
+    const afterSale = await page.evaluate(() => ({
+      credits,
+      held: cargo.Copper || 0,
+      purchased: cargoPurchased.Copper || 0,
+      recovered: cargoRecovered.Copper || 0,
+      cargoSold: playerProgress.totals.cargoSold || 0,
+      tradeProfit: playerProgress.totals.tradeProfit || 0,
+      tradesCompleted: playerProgress.totals.tradesCompleted || 0,
+      saved: buildSaveState()
+    }));
+    expect(afterSale.credits).toBeGreaterThan(beforeSale.credits);
+    expect(afterSale.held).toBe(0);
+    expect(afterSale.purchased).toBe(0);
+    expect(afterSale.recovered).toBe(0);
+    expect(afterSale.cargoSold).toBe(beforeSale.cargoSold + beforeBuy.quantity);
+    expect(afterSale.tradeProfit).toBeGreaterThan(0);
+    expect(afterSale.tradesCompleted).toBe(1);
+    expect(afterSale.saved.cargoPurchased.Copper || 0).toBe(0);
+    expect(afterSale.saved.cargoRecovered.Copper || 0).toBe(0);
+    const creditsAfterFirstSale = afterSale.credits;
+    await page.evaluate(() => sellMarketCargo());
+    expect(await page.evaluate(() => credits)).toBe(creditsAfterFirstSale);
 
     const mixedSale = await page.evaluate(() => {
       cargo.Copper = 8;
       cargoPurchased.Copper = 5;
       cargoRecovered.Copper = 3;
-      cargoCostBasis.Copper = 38;
+      cargoCostBasis.Copper = 1;
       selectedMarketResource = "Copper";
-      selectedMarketMode = "sell";
-      selectedMarketQuantity = 7;
       renderMarketplace();
       sellMarketCargo();
       return {
-        held: cargo.Copper,
+        held: cargo.Copper || 0,
         purchased: cargoPurchased.Copper || 0,
-        recovered: cargoRecovered.Copper || 0
+        recovered: cargoRecovered.Copper || 0,
+        saved: buildSaveState()
       };
     });
-    expect(mixedSale).toEqual({ held: 1, purchased: 0, recovered: 1 });
-
-    await page.evaluate(() => {
-      cargo.Cobalt = 6;
-      delete cargoPurchased.Cobalt;
-      cargoRecovered.Cobalt = 6;
-      selectedMarketResource = "Cobalt";
-      selectedMarketMode = "sell";
-      selectedMarketQuantity = 6;
-      renderMarketplace();
-    });
-    await page.screenshot({ path: "artifacts/trade-terminal-v2-sell-recovered.png" });
-    await page.getByRole("button", { name: /Sell Cargo/i }).click();
-    await expect(page.locator("body")).toContainText(/Recovered Cargo Sold/i);
-
-    const cycles = await page.evaluate(() => {
-      const cycle = getMarketCycle();
-      const current = MAP_ONE_TRADE_RESOURCES.flatMap((good) => MAP_ONE_MARKET_PLANETS.map((planet) => getLiveMarketPriceForCycle(good, planet, cycle)));
-      const next = MAP_ONE_TRADE_RESOURCES.flatMap((good) => MAP_ONE_MARKET_PLANETS.map((planet) => getLiveMarketPriceForCycle(good, planet, cycle + 1)));
-      return { current, next, seconds: getNextMarketRefreshSeconds() };
-    });
-    expect(cycles.current.some((price, index) => price !== cycles.next[index])).toBe(true);
-    expect(cycles.seconds).toBeGreaterThanOrEqual(0);
-    expect(cycles.seconds).toBeLessThanOrEqual(90);
+    expect(mixedSale.held).toBe(0);
+    expect(mixedSale.purchased).toBe(0);
+    expect(mixedSale.recovered).toBe(0);
+    expect(mixedSale.saved.cargoPurchased.Copper || 0).toBe(0);
+    expect(mixedSale.saved.cargoRecovered.Copper || 0).toBe(0);
   });
 
-  test("contracts and market remain usable at the 1366x768 minimum", async ({ page }) => {
+  test("market refresh preserves selection, clamps quantity, and updates total cost", async ({ page }) => {
     await prepareTerminal(page);
-    await page.getByRole("button", { name: /Open Contracts/i }).click();
-    await expectInsideViewport(page, "#marketScreen");
-    await expect(page.locator(".trade-v2-contract-list")).toBeVisible();
+    await page.locator(".trade-v2-market-table tbody tr", { hasText: "Copper" }).click();
+    await page.evaluate(() => syncMarketQuantity(10));
+    const before = await page.evaluate(() => ({
+      cycle: getMarketCycle(),
+      price: getLiveMarketPrice("Copper", "Asteron Prime"),
+      quantity: selectedMarketQuantity,
+      selected: selectedMarketResource
+    }));
 
-    await page.evaluate(() => openLiveMarket());
-    await expectInsideViewport(page, "#marketScreen");
-    await expect(page.locator(".trade-v2-transaction")).toBeVisible();
+    const after = await page.evaluate(({ cycle, price }) => {
+      let targetCycle = cycle + 1;
+      while (targetCycle < cycle + 30 && getLiveMarketPriceForCycle("Copper", "Asteron Prime", targetCycle) === price) targetCycle += 1;
+      const realNow = Date.now;
+      Date.now = () => targetCycle * TRADE_MARKET_REFRESH_MS + 1;
+      renderedMarketCycle = cycle;
+      updateTradeTimerDisplay();
+      const result = {
+        price: getLiveMarketPrice("Copper", "Asteron Prime"),
+        quantity: selectedMarketQuantity,
+        selected: selectedMarketResource,
+        selectedRows: document.querySelectorAll(".trade-v2-market-table tbody tr[aria-selected='true']").length,
+        totalText: document.querySelector(".trade-v2-buy-control > small")?.textContent || ""
+      };
+      Date.now = realNow;
+      renderedMarketCycle = getMarketCycle();
+      return result;
+    }, before);
+    expect(after.price).not.toBe(before.price);
+    expect(after.selected).toBe("Copper");
+    expect(after.selectedRows).toBe(1);
+    expect(after.quantity).toBeGreaterThan(0);
+    expect(after.totalText).toContain(`CR ${after.price * after.quantity}`);
+    await expect(page.locator("#marketScreen")).not.toContainText(/Best Opportunity/i);
+  });
+
+  test("future commodity rows scroll internally while header and quick actions remain fixed", async ({ page }) => {
+    await prepareTerminal(page);
+    const layout = await page.evaluate(() => {
+      const wrap = document.querySelector("[data-market-scroll-region]");
+      const tbody = wrap.querySelector("tbody");
+      const sourceRows = [...tbody.querySelectorAll("tr")];
+      for (let index = 0; index < 9; index += 1) {
+        const clone = sourceRows[index % sourceRows.length].cloneNode(true);
+        clone.removeAttribute("data-tutorial-target");
+        clone.setAttribute("data-test-future-row", String(index));
+        tbody.appendChild(clone);
+      }
+      const header = wrap.querySelector("thead th").getBoundingClientRect();
+      const quick = document.querySelector(".trade-v2-quick-action").getBoundingClientRect();
+      const before = { headerTop: header.top, quickTop: quick.top, pageScroll: scrollY };
+      wrap.scrollTop = 140;
+      const headerAfter = wrap.querySelector("thead th").getBoundingClientRect();
+      const quickAfter = document.querySelector(".trade-v2-quick-action").getBoundingClientRect();
+      return {
+        scrollHeight: wrap.scrollHeight,
+        clientHeight: wrap.clientHeight,
+        scrollTop: wrap.scrollTop,
+        headerTopBefore: before.headerTop,
+        headerTopAfter: headerAfter.top,
+        quickTopBefore: before.quickTop,
+        quickTopAfter: quickAfter.top,
+        pageScrollBefore: before.pageScroll,
+        pageScrollAfter: scrollY,
+        pageFits: document.documentElement.scrollHeight <= document.documentElement.clientHeight + 1
+      };
+    });
+    expect(layout.scrollHeight).toBeGreaterThan(layout.clientHeight);
+    expect(layout.scrollTop).toBeGreaterThan(0);
+    expect(Math.abs(layout.headerTopAfter - layout.headerTopBefore)).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.quickTopAfter - layout.quickTopBefore)).toBeLessThanOrEqual(1);
+    expect(layout.pageScrollBefore).toBe(0);
+    expect(layout.pageScrollAfter).toBe(0);
+    expect(layout.pageFits).toBe(true);
+    await page.screenshot({ path: "artifacts/trade-terminal-quick-internal-scroll.png" });
   });
 });
