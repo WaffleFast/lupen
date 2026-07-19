@@ -32,13 +32,16 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await expect(page.locator("#hangarShipyardSection .shipyard-title-row")).toContainText("Select an available hull");
     await expect(page.locator("#shipyardCreditText")).toHaveText("100,000");
     await expect(page.locator("#shipShop .vessel-exchange-card")).toHaveCount(4);
+    await expect.poll(() => page.evaluate(() => Object.values(SHIPS)
+      .filter(ship => !ship.hiddenFromExchange)
+      .every(ship => ship.price === 0))).toBe(true);
     await page.locator("#shipShop .vessel-exchange-card[data-ship-id='monolith']").click();
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Pioneer Moth");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Ship Stats");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Weapon Slots");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Equipment Slots");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 48,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 0");
 
     const layout = await page.locator("#hangarShipyardSection .vessel-exchange-layout").evaluate(shell => {
       const catalogue = shell.querySelector(".exchange-catalog-panel")?.getBoundingClientRect();
@@ -59,7 +62,7 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await page.locator("#shipyardDetailPanel .buy-ship-action").click();
     await expect(page.locator("#shipShop .vessel-exchange-card[data-ship-id='monolith']")).toHaveClass(/owned/);
     await expect(page.locator("#shipyardDetailPanel .set-active-ship-action")).toHaveText("Set Active");
-    await expect.poll(() => page.evaluate(() => credits)).toBe(52000);
+    await expect.poll(() => page.evaluate(() => credits)).toBe(100000);
   });
 
   test("presents the Vault as a searchable equipment library with focused detail", async ({ page }) => {

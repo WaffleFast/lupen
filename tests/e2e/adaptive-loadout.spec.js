@@ -44,19 +44,17 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.screenshot({ path: "artifacts/adaptive-loadout-hunter.png", fullPage: false });
   });
 
-  test("fits a 15-weapon Moth without rendering unsupported cells", async ({ page }) => {
+  test("fits the Moth's 15 weapon and 15 attachment slots without unsupported cells", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
       localStorage.clear();
-      SHIPS.monolith.gunSlots = 15;
-      SHIPS.monolith.attachmentSlots = 5;
       currentShipId = "monolith";
       selectedHangarShipId = "monolith";
       ownedShips = ["monolith"];
       const weaponKeys = ["pulseLaser", "ionBlaster", "heavyLance", "repeater", "meltCannon", "pulseLaser", "ionBlaster", "heavyLance", "repeater", "meltCannon", "pulseLaser", "ionBlaster"];
       shipLoadouts.monolith = {
         guns: weaponKeys.map((key, index) => makeLeveledLoadoutEntry(key, index % 3 === 0 ? "advanced" : "standard", (index % 5) + 1)),
-        attachments: Array.from({ length: 5 }, () => makeLeveledLoadoutEntry("cargoPod", "standard", 1))
+        attachments: Array.from({ length: 15 }, (_unused, index) => makeLeveledLoadoutEntry(index % 2 ? "jumpDrive" : "cargoPod", "standard", (index % 5) + 1))
       };
       showScreen("gameScreen");
       openHangar();
@@ -69,7 +67,7 @@ test.describe("Adaptive Hangar Loadout", () => {
     await expect(page.locator("#installedGuns .loadout-grid-slot.locked")).toHaveCount(0);
     await expect(page.locator("#installedGuns")).toHaveClass(/dense-slots/);
     await expect(page.locator("#loadoutCategoryWeapons")).toHaveText("Weapons 12/15");
-    await expect(page.locator("#loadoutFittedSummary")).toHaveText("17 / 20 slots fitted");
+    await expect(page.locator("#loadoutFittedSummary")).toHaveText("27 / 30 slots fitted");
 
     await page.locator("#installedGuns .loadout-grid-slot").nth(8).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot").nth(8)).toHaveClass(/selected/);
@@ -85,8 +83,9 @@ test.describe("Adaptive Hangar Loadout", () => {
     expect(allSlotsFit).toBe(true);
 
     await page.locator("#loadoutCategoryAttachments").click();
-    await expect(page.locator("#installedAttachments .loadout-grid-slot")).toHaveCount(5);
-    await expect(page.locator("#installedAttachments")).toHaveClass(/spacious-slots/);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot")).toHaveCount(15);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(15);
+    await expect(page.locator("#installedAttachments")).toHaveClass(/dense-slots/);
     await page.locator("#loadoutCategoryWeapons").click();
     await page.locator("#installedGuns .loadout-grid-slot").nth(8).click();
     await page.mouse.move(20, 20);
@@ -94,7 +93,7 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.screenshot({ path: "artifacts/adaptive-loadout-moth-15-slots.png", fullPage: false });
   });
 
-  test("compares and replaces gear in a fully fitted selected slot", async ({ page }) => {
+  test("directly replaces and unequips gear in a fully fitted selected slot", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
       localStorage.clear();
@@ -113,13 +112,13 @@ test.describe("Adaptive Hangar Loadout", () => {
     })()`));
 
     await page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Heavy Lance" }).click();
-    await expect(page.locator(".loadout-comparison-item").last()).toContainText("Heavy Lance");
-    await expect(page.locator(".loadout-replace-action")).toBeEnabled();
-    await expect(page.locator(".loadout-replace-action")).toContainText("Replace Ion Blaster");
-    await page.screenshot({ path: "artifacts/adaptive-loadout-comparison.png", fullPage: false });
-    await page.locator(".loadout-replace-action").click();
-
     await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[1]))).toBe("heavyLance");
     await expect(page.locator("#installedGuns .loadout-grid-slot").nth(1)).toContainText("Heavy Lance");
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Heavy Lance");
+    await page.screenshot({ path: "artifacts/adaptive-loadout-direct-equip.png", fullPage: false });
+
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip", exact: true }).click();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+    await expect.poll(() => page.evaluate(() => shipLoadouts.falcon.guns.some(entry => getEquipmentKey(entry) === "heavyLance"))).toBe(false);
   });
 });

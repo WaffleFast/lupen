@@ -1151,16 +1151,16 @@ test.describe("Lupen browser smoke", () => {
     expect(progression.shieldOwned).toBe(0);
     expect(progression.ionOwned).toBe(1);
     expect(progression.equippedGuns).toBe(0);
-    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
+    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy);
     expect(progression.ownedAfterLockedBuy).toEqual(["falcon", "zeusExplorer", "bison"]);
     expect(progression.nightshadeAvailable.locked).toBe(false);
     expect(progression.nightshadeAvailable.state).toBe("owned");
     expect(progression.haulerAvailable.locked).toBe(false);
     expect(progression.haulerAvailable.state).toBe("owned");
     expect(progression.ownedAfterNightshadeBuy).toContain("zeusExplorer");
-    expect(progression.creditsAfterNightshadeBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
+    expect(progression.creditsAfterNightshadeBuy).toBe(progression.creditsBeforeLockedBuy);
     expect(progression.ownedAfterHaulerBuy).toContain("bison");
-    expect(progression.creditsAfterHaulerBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
+    expect(progression.creditsAfterHaulerBuy).toBe(progression.creditsBeforeLockedBuy);
     expect(progression.feedbackText).not.toContain("Unlocked:");
     expect(progression.savedProgress).toMatchObject({
       erebusBotsDestroyed: 25,
@@ -1192,7 +1192,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).not.toHaveClass(/progression-locked/);
     await expect(page.locator("#shipyardDetailPanel")).not.toContainText("Unlock Requirements");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 48,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 0");
 
     await page.reload();
     await waitForGameGlobals(page);
@@ -4875,7 +4875,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
 
     await expect(page.locator("#loadoutSelectedSlotBar")).toContainText("Weapon 02");
-    await expect(page.locator("#hangarScreen")).toContainText("Vault Equipment");
+    await expect(page.locator("#hangarScreen")).toContainText("Vault Weapons");
     await expect(page.locator("#hangarScreen")).toContainText("Selected Slot · Weapon 02");
     await expect(page.locator("#hangarScreen")).toContainText("Weapons");
     await expect(page.locator("#hangarScreen")).toContainText("Attachments");
@@ -4940,8 +4940,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#gunInventory .loadout-vault-row[data-tier='refined'] .forge-tier-pips i")).toHaveCount(2);
     await expect(page.locator("#gunInventory .loadout-vault-row[data-tier='elite'] .forge-tier-pips i")).toHaveCount(4);
     await expect(page.locator("#gunInventory .loadout-vault-row[data-tier='super'] .forge-tier-pips i")).toHaveCount(5);
-    await page.locator("#gunInventory .loadout-vault-row[data-tier='super']").click();
-    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Super · V");
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-tier='super']")).toContainText("Super · V");
     await page.mouse.move(10, 10);
     await page.screenshot({ path: "artifacts/hangar-loadout-tiers-1366x800.png", fullPage: false });
 
@@ -7399,11 +7398,8 @@ test.describe("Lupen browser smoke", () => {
       }).length;
     }, "#gunInventory")).toBeGreaterThanOrEqual(3);
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']").first().click();
-    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
-    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser");
-    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip Pulse Laser", exact: true })).toBeEnabled();
-    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip Pulse Laser", exact: true }).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser");
 
     await page.reload();
     await openHangar(page);
@@ -7436,11 +7432,8 @@ test.describe("Lupen browser smoke", () => {
       }).length;
     }, "#gunInventory")).toBeGreaterThanOrEqual(3);
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']").first().click();
-    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
-    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
-    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip Cargo Pod", exact: true })).toBeEnabled();
-    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip Cargo Pod", exact: true }).click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
 
     await page.reload();
     await openHangar(page);
@@ -7472,9 +7465,9 @@ test.describe("Lupen browser smoke", () => {
         showHangarSection("overview");
       `);
     });
-    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(6);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(15);
     await page.locator("#loadoutCategoryAttachments").click();
-    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(5);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(15);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -7508,6 +7501,7 @@ test.describe("Lupen browser smoke", () => {
           lastStagingStoreItems: { items: [] }
         };
         window.__forgedAttachmentEquipPayload = null;
+        window.__forgedAttachmentUnequipPayload = null;
         window.LupenMultiplayerClient = {
           getStatus: () => stagingStatus,
           equipStagingLoadoutItem: (payload) => {
@@ -7526,11 +7520,30 @@ test.describe("Lupen browser smoke", () => {
               equippedAfter: 1
             };
             return true;
+          },
+          unequipStagingLoadoutItem: (payload) => {
+            window.__forgedAttachmentUnequipPayload = { ...payload };
+            stagingStatus.lastStagingLoadoutEquip = {
+              ok: true,
+              applied: true,
+              operation: "unequip",
+              itemId: payload.itemId,
+              name: "Jump Drive",
+              quality: payload.quality,
+              level: payload.level,
+              inventoryWritten: true,
+              equippedBefore: 1,
+              equippedAfter: 0
+            };
+            return true;
           }
         };
         window.loadGameFromSupabase = async () => {
-          inventoryItems = inventoryItems.filter((entry) => entry.id !== "forge-jump-drive-level-3");
-          shipLoadouts.falcon.attachments = [makeLeveledLoadoutEntry("jumpDrive", "standard", 3)];
+          const unequipped = stagingStatus.lastStagingLoadoutEquip?.operation === "unequip";
+          inventoryItems = unequipped
+            ? [{ id: "forge-jump-drive-level-3-returned", key: "jumpDrive", quality: "standard", level: 3 }]
+            : inventoryItems.filter((entry) => entry.id !== "forge-jump-drive-level-3");
+          shipLoadouts.falcon.attachments = unequipped ? [] : [makeLeveledLoadoutEntry("jumpDrive", "standard", 3)];
           applyShipStats(true);
           return { loaded: true };
         };
@@ -7548,7 +7561,6 @@ test.describe("Lupen browser smoke", () => {
     await jumpDrive.click();
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Jump Drive");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText(/Unique\s*·\s*III/i);
-    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip Jump Drive", exact: true }).click();
 
     await expect.poll(async () => page.evaluate(() => window.__forgedAttachmentEquipPayload)).toMatchObject({
       itemId: "attachment:jumpDrive",
@@ -7569,6 +7581,16 @@ test.describe("Lupen browser smoke", () => {
     })`));
     expect(state.inventoryCount).toBe(0);
     expect(state.attachment).toEqual({ key: "jumpDrive", quality: "standard", level: 3 });
+
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip", exact: true }).click();
+    await expect.poll(async () => page.evaluate(() => window.__forgedAttachmentUnequipPayload)).toMatchObject({
+      itemId: "attachment:jumpDrive",
+      quality: "standard",
+      level: 3,
+      slotIndex: 0
+    });
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
+    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='jumpDrive']")).toHaveCount(1);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -7619,8 +7641,6 @@ test.describe("Lupen browser smoke", () => {
     await godlikeIon.click();
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Ion Blaster");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText(/Godlike/i);
-    await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip Ion Blaster", exact: true })).toBeEnabled();
-    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Equip Ion Blaster", exact: true }).click();
 
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(2);
     let loadoutState = await page.evaluate(() => ({

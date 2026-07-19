@@ -158,7 +158,7 @@ test.describe("Pioneer ship line", () => {
 
     expect(result.active).toBe("falcon");
     expect(result.owned).toEqual(["falcon", "bison"]);
-    expect(result.credits).toBe(36000);
+    expect(result.credits).toBe(50000);
     expect(result.migratedCurrent).toBe("bison");
     expect(result.migratedSelected).toBe("zeusExplorer");
     expect(result.migratedOwned).toEqual(["bison", "zeusExplorer", "falcon"]);
