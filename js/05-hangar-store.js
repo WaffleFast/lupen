@@ -51,6 +51,7 @@ let selectedVaultSearch = "";
 let selectedVaultSort = "quality";
 let selectedShipyardFilter = "all";
 let selectedShipPlanLineId = typeof PIONEER_LINE_ID !== "undefined" ? PIONEER_LINE_ID : "pioneer";
+let selectedShipPlanShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
 const LOADOUT_GRID_SLOT_COUNT = 20;
 const LOADOUT_VAULT_CAPACITY = 50;
 
@@ -2999,10 +3000,42 @@ function openShipPlanShip(shipId) {
 function selectShipPlanLine(lineId) {
   const validLine = Boolean(SHIP_LINES?.[lineId]);
   selectedShipPlanLineId = validLine ? lineId : "encrypted-future";
+  if (validLine && !SHIP_LINES[lineId].shipIds.includes(selectedShipPlanShipId)) {
+    selectedShipPlanShipId = SHIP_LINES[lineId].shipIds[0] || "";
+  }
+  renderShipPlans();
+}
+
+function selectShipPlanShip(shipId) {
+  if (!SHIPS[shipId]) return;
+  selectedShipPlanShipId = shipId;
   renderShipPlans();
 }
 
 function renderShipPlanCard(shipId) {
+  const ship = SHIPS[shipId];
+  if (!ship) return "";
+  const status = getShipPlanStatus(shipId);
+  const selected = selectedShipPlanShipId === shipId;
+
+  return `
+    <button type="button" class="ship-plan-card ${status.state} ${selected ? "selected" : ""}"
+      data-ship-id="${escapeHtml(shipId)}" aria-pressed="${selected ? "true" : "false"}"
+      onclick="selectShipPlanShip('${escapeHtml(shipId)}')">
+      <div class="ship-plan-card-status">${escapeHtml(status.label)}</div>
+      <div class="ship-plan-image-wrap">
+        <div class="ship-plan-image-halo"></div>
+        <img src="${escapeHtml(getShipAsset(shipId, "medium"))}" alt="${escapeHtml(ship.name)}">
+      </div>
+      <div class="ship-plan-card-copy">
+        <span>${escapeHtml(ship.className || getVesselExchangeClassLabel(ship))}</span>
+        <h4>${escapeHtml(ship.name)}</h4>
+      </div>
+    </button>
+  `;
+}
+
+function renderSelectedShipPlan(shipId) {
   const ship = SHIPS[shipId];
   if (!ship) return "";
   const status = getShipPlanStatus(shipId);
@@ -3012,35 +3045,22 @@ function renderShipPlanCard(shipId) {
       ? "View in Fleet"
       : shipId === STARTER_SHIP_ID && !hasActiveShip()
         ? "Claim in Exchange"
-        : "View in Exchange";
-  const priceLabel = shipId === STARTER_SHIP_ID ? "Starter Hull" : `CR ${formatNumber(ship.price)}`;
+        : "View Full Specs";
+  const acquisition = shipId === STARTER_SHIP_ID ? "Starter hull" : `CR ${formatNumber(ship.price)}`;
 
   return `
-    <article class="ship-plan-card ${status.state}" data-ship-id="${escapeHtml(shipId)}">
-      <div class="ship-plan-card-status">${escapeHtml(status.label)}</div>
-      <div class="ship-plan-image-wrap">
-        <div class="ship-plan-image-halo"></div>
-        <img src="${escapeHtml(getShipAsset(shipId, "medium"))}" alt="${escapeHtml(ship.name)}">
+    <section class="ship-plan-selection" data-selected-ship-id="${escapeHtml(shipId)}" aria-live="polite">
+      <div class="ship-plan-selection-copy">
+        <span>SELECTED PLAN · ${escapeHtml(ship.className || getVesselExchangeClassLabel(ship))}</span>
+        <h5>${escapeHtml(ship.name)}</h5>
+        <p>${escapeHtml(ship.description || ship.roleSubtitle || ship.role || "Recovered ship plan.")}</p>
       </div>
-      <div class="ship-plan-card-copy">
-        <div class="ship-plan-card-meta">
-          <span>${escapeHtml(ship.className || getVesselExchangeClassLabel(ship))}</span>
-          <strong>${escapeHtml(priceLabel)}</strong>
-        </div>
-        <h4>${escapeHtml(ship.name)}</h4>
+      <div class="ship-plan-selection-action">
+        <small>${escapeHtml(ship.roleSubtitle || ship.role || "General purpose")}</small>
+        <strong>${escapeHtml(acquisition)}</strong>
+        <button type="button" onclick="openShipPlanShip('${escapeHtml(shipId)}')" ${status.state === "active" ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
       </div>
-      <div class="ship-plan-stat-row">
-        <span><small>Hull</small><strong>${formatNumber(ship.hull)}</strong></span>
-        <span><small>Shield</small><strong>${formatNumber(ship.shield)}</strong></span>
-        <span><small>Armor</small><strong>${formatNumber(ship.armor)}</strong></span>
-        <span><small>Cargo</small><strong>${formatNumber(ship.cargo)}</strong></span>
-        <span><small>Jump</small><strong>${formatNumber(ship.jumpRecharge)} LY</strong></span>
-        <span><small>Evasion</small><strong>${formatEvasion(ship.evasion)}</strong></span>
-        <span><small>Weapons</small><strong>${formatNumber(ship.gunSlots)}</strong></span>
-        <span><small>Equipment</small><strong>${formatNumber(ship.attachmentSlots)}</strong></span>
-      </div>
-      <button type="button" onclick="openShipPlanShip('${shipId}')" ${status.state === "active" ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
-    </article>
+    </section>
   `;
 }
 
@@ -3063,6 +3083,9 @@ function renderShipPlans() {
 
   const selectedLine = SHIP_LINES?.[selectedShipPlanLineId];
   const selectedUnlocked = selectedLine ? isShipLineUnlocked(selectedLine.id) : false;
+  if (selectedLine && !selectedLine.shipIds.includes(selectedShipPlanShipId)) {
+    selectedShipPlanShipId = selectedLine.shipIds[0] || "";
+  }
 
   const selectorCards = lines.map(line => {
     const unlocked = isShipLineUnlocked(line.id);
@@ -3096,6 +3119,7 @@ function renderShipPlans() {
         <div class="ship-plan-card-grid">
           ${selectedLine.shipIds.map(renderShipPlanCard).join("")}
         </div>
+        ${renderSelectedShipPlan(selectedShipPlanShipId)}
       ` : `
         <div class="ship-plan-locked-lineup">
           <strong>Lineup data encrypted</strong>

@@ -45,10 +45,18 @@ test.describe("Pioneer ship line", () => {
     await expect(page.locator(".ship-plan-selector-card[data-line-id='pioneer']")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator(".ship-plan-card")).toHaveCount(4);
     await expect(page.locator(".ship-plan-card[data-ship-id='falcon']")).toContainText("Starter Plan");
-    await expect(page.locator(".ship-plan-card[data-ship-id='falcon']")).toContainText("Armor");
-    await expect(page.locator(".ship-plan-card[data-ship-id='falcon']")).toContainText("Cargo");
-    await expect(page.locator(".ship-plan-card[data-ship-id='falcon']")).toContainText("Evasion");
-    await expect(page.locator(".ship-plan-card-copy p")).toHaveCount(0);
+    await expect(page.locator(".ship-plan-stat-row")).toHaveCount(0);
+    await expect(page.locator(".ship-plan-card[data-ship-id='falcon']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".ship-plan-selection")).toContainText("Pioneer Hunter");
+    await expect(page.locator(".ship-plan-selection")).toContainText("Attacker / Interceptor");
+
+    await page.locator(".ship-plan-card[data-ship-id='zeusExplorer']").click();
+    await expect(page.locator(".ship-plan-card[data-ship-id='zeusExplorer']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".ship-plan-selection")).toContainText("Pioneer Destroyer");
+    await expect(page.locator(".ship-plan-selection button")).toHaveText("View Full Specs");
+
+    const readableDetailCopy = await page.locator(".ship-plan-selection-copy p").evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+    expect(readableDetailCopy).toBeGreaterThanOrEqual(13);
 
     await page.locator(".ship-plan-selector-card[data-line-id='encrypted-future']").click();
     await expect(page.locator(".ship-plan-selector-card[data-line-id='encrypted-future']")).toHaveAttribute("aria-pressed", "true");
