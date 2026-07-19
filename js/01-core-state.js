@@ -411,10 +411,10 @@ const SHIP_ASSET_MANIFEST = Object.freeze({
     small: "assets/ships/pioneer-moth/pioneer-moth-small.webp"
   }),
   zeusExplorer: Object.freeze({
-    master: "assets/ships/pioneer-destroyer/pioneer-destroyer-master.webp?v=20260719",
-    large: "assets/ships/pioneer-destroyer/pioneer-destroyer-large.webp?v=20260719",
-    medium: "assets/ships/pioneer-destroyer/pioneer-destroyer-medium.webp?v=20260719",
-    small: "assets/ships/pioneer-destroyer/pioneer-destroyer-small.webp?v=20260719"
+    master: "assets/ships/pioneer-destroyer/pioneer-destroyer-master.webp?v=20260719-colour-match",
+    large: "assets/ships/pioneer-destroyer/pioneer-destroyer-large.webp?v=20260719-colour-match",
+    medium: "assets/ships/pioneer-destroyer/pioneer-destroyer-medium.webp?v=20260719-colour-match",
+    small: "assets/ships/pioneer-destroyer/pioneer-destroyer-small.webp?v=20260719-colour-match"
   }),
   hephaestusTrader: Object.freeze({
     master: "assets/ships/champa-carrier/champa-carrier-master.webp",
