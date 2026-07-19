@@ -624,7 +624,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(starterClaim.selectedShipName).toBe("Azure Striker");
+    expect(starterClaim.selectedShipName).toBe("Pioneer Hunter");
     expect(starterClaim.text).toBe("Claim Starter Ship");
     expect(starterClaim.disabled).toBe(false);
     expect(starterClaim.visible).toBe(true);
@@ -1633,7 +1633,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#profilePilotTitle")).toHaveText("WaffleFast");
     await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Combat Level 3");
     await expect(profile.locator('[data-profile-section="identity"]')).toContainText("700 / 2,500 XP to Level 4");
-    await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Azure Striker");
+    await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Pioneer Hunter");
 
     const summaryCards = profile.locator('[data-profile-section="career-summary"] .pilot-stat-card');
     await expect(summaryCards).toHaveCount(4);
@@ -1649,7 +1649,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(career.locator('[data-career-progress="galaxy"]')).toContainText("Galaxy Completion");
 
     const fleet = profile.locator('[data-profile-section="fleet-record"]');
-    await expect(fleet.locator('[data-fleet-record="current-vessel"]')).toContainText("Azure Striker");
+    await expect(fleet.locator('[data-fleet-record="current-vessel"]')).toContainText("Pioneer Hunter");
     await expect(fleet.locator('[data-fleet-record="ships-owned"]')).toContainText("1");
     await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("2 / 2");
     await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("Guns Equipped");
@@ -5001,7 +5001,7 @@ test.describe("Lupen browser smoke", () => {
 
     const stepById = Object.fromEntries(tutorial.steps.map(step => [step.id, step]));
     expect(stepById["buy-first-ship"]).toMatchObject({
-      title: "Claim Azure Striker",
+      title: "Claim Pioneer Hunter",
       target: "tutorial:firstShipBuy",
       event: "boughtFirstShip"
     });
@@ -5024,15 +5024,15 @@ test.describe("Lupen browser smoke", () => {
       target: "tutorial:forgeUpgradeButton",
       event: "upgradedTutorialWeapon"
     });
-    expect(stepById.complete.text).toContain("Combat Level 2");
-    expect(stepById.complete.text).toContain("Buu Hauler");
-    expect(stepById.complete.text).toContain("Nightshade Hawk");
-    expect(stepById.complete.text).toContain("Forge");
+    expect(stepById.complete.text).toContain("Pioneer Line");
+    expect(stepById.complete.text).toContain("Freighter");
+    expect(stepById.complete.text).toContain("Destroyer");
+    expect(stepById.complete.text).toContain("Moth");
     expect(stepById.complete.voiceCue).toBe("tutorial_outro_complete");
 
     const allCopy = tutorial.steps.map(step => `${step.title} ${step.text} ${step.target} ${step.event}`).join("\n");
     expect(allCopy).not.toMatch(/Falcon|LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix|tutorial:spareAttachment/);
-    expect(allCopy).toMatch(/Azure Striker|Buu Hauler|Nightshade Hawk|credits|XP|bounties|Forge/i);
+    expect(allCopy).toMatch(/Pioneer Hunter|Pioneer Line|Freighter|Destroyer|Moth|credits|XP|bounties|Forge/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -5618,7 +5618,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(cta.selectedShipName).toBe("Azure Striker");
+    expect(cta.selectedShipName).toBe("Pioneer Hunter");
     expect(cta.hasActiveShip).toBe(false);
     expect(cta.currentShipId).toBe("");
     expect(cta.ownedShips).toEqual([]);
@@ -5626,8 +5626,8 @@ test.describe("Lupen browser smoke", () => {
     expect(cta.visible).toBe(true);
     expect(cta.disabled).toBe(false);
     expect(cta.insidePanel).toBe(true);
-    expect(cta.visibleShipNames).toEqual(expect.arrayContaining(["Azure Striker", "Buu Hauler", "Nightshade Hawk"]));
-    expect(cta.lockedShipNames).toEqual(expect.arrayContaining(["Buu Hauler", "Nightshade Hawk"]));
+    expect(cta.visibleShipNames).toEqual(expect.arrayContaining(["Pioneer Hunter", "Pioneer Destroyer", "Pioneer Freighter", "Pioneer Moth"]));
+    expect(cta.lockedShipNames).toEqual([]);
 
     await page.locator("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") !== "buy-first-ship");
@@ -5644,7 +5644,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("resetPilot staging starter claim CTA owns and activates Azure Striker without server purchase", async ({ page }) => {
+  test("resetPilot staging starter claim CTA owns and activates Pioneer Hunter without server purchase", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&resetPilot=1");
@@ -5737,7 +5737,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("starter claim step advances gracefully when Azure Striker is already active", async ({ page }) => {
+  test("starter claim step advances gracefully when Pioneer Hunter is already active", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -7572,7 +7572,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("Azure Striker equips and persists a Godlike Ion Blaster in weapon slot two", async ({ page }) => {
+  test("Pioneer Hunter equips and persists a Godlike Ion Blaster in weapon slot two", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
