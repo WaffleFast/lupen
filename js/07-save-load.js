@@ -226,6 +226,7 @@ function buildSaveState(options = {}) {
     selectedFleetShipId,
     currentShipId,
     ownedShips,
+    unlockedShipLines,
     armor,
     hull,
     shield,
@@ -936,6 +937,7 @@ function applyLoadedGameState(rawSaved) {
   const savedOwnedShips = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : ownedShips;
   const noShipStarterState = Array.isArray(saved.ownedShips) && saved.ownedShips.length === 0 && !saved.currentShipId;
   ownedShips = savedOwnedShips;
+  unlockedShipLines = Array.from(new Set([PIONEER_LINE_ID, ...(Array.isArray(saved.unlockedShipLines) ? saved.unlockedShipLines : [])]));
   if (!ownedShips.length && !noShipStarterState && SHIPS[starterShipId]) ownedShips = [starterShipId];
   currentShipId = noShipStarterState ? "" : (SHIPS[saved.currentShipId] && ownedShips.includes(saved.currentShipId) ? saved.currentShipId : (ownedShips[0] || starterShipId));
   selectedHangarShipId = SHIPS[saved.selectedHangarShipId] ? saved.selectedHangarShipId : (currentShipId || starterShipId);

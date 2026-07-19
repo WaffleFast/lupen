@@ -1033,7 +1033,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("early progression locks ships and equipment while preserving starter access", async ({ page }) => {
+  test("Pioneer plans are issued automatically while equipment progression remains gated", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -1135,10 +1135,10 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(progression.starterShip.locked).toBe(false);
-    expect(progression.nightshade.locked).toBe(true);
-    expect(progression.nightshade.requirementLines.join(" ")).toContain("Destroy Erebus bots: 12 / 25");
-    expect(progression.hauler.locked).toBe(true);
-    expect(progression.hauler.requirementLines.join(" ")).toContain("Trading profit: CR 3,456 / CR 7,500");
+    expect(progression.nightshade.locked).toBe(false);
+    expect(progression.nightshade.requirementLines).toEqual([]);
+    expect(progression.hauler.locked).toBe(false);
+    expect(progression.hauler.requirementLines).toEqual([]);
     expect(progression.pulse.locked).toBe(false);
     expect(progression.cargoPod.locked).toBe(false);
     expect(progression.jumpDrive.locked).toBe(false);
@@ -1151,18 +1151,17 @@ test.describe("Lupen browser smoke", () => {
     expect(progression.shieldOwned).toBe(0);
     expect(progression.ionOwned).toBe(1);
     expect(progression.equippedGuns).toBe(0);
-    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy);
-    expect(progression.ownedAfterLockedBuy).toEqual(["falcon"]);
+    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
+    expect(progression.ownedAfterLockedBuy).toEqual(["falcon", "zeusExplorer", "bison"]);
     expect(progression.nightshadeAvailable.locked).toBe(false);
-    expect(progression.nightshadeAvailable.state).toBe("available");
+    expect(progression.nightshadeAvailable.state).toBe("owned");
     expect(progression.haulerAvailable.locked).toBe(false);
-    expect(progression.haulerAvailable.state).toBe("available");
+    expect(progression.haulerAvailable.state).toBe("owned");
     expect(progression.ownedAfterNightshadeBuy).toContain("zeusExplorer");
-    expect(progression.creditsAfterNightshadeBuy).toBe(progression.creditsBeforeLockedBuy - 8500);
+    expect(progression.creditsAfterNightshadeBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
     expect(progression.ownedAfterHaulerBuy).toContain("bison");
-    expect(progression.creditsAfterHaulerBuy).toBe(progression.creditsBeforeLockedBuy - 8500 - 10500);
-    expect(progression.feedbackText).toContain("Unlocked: Nightshade Hawk is now available in Vessel Exchange.");
-    expect(progression.feedbackText).toContain("Unlocked: Buu Hauler is now available in Vessel Exchange.");
+    expect(progression.creditsAfterHaulerBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
+    expect(progression.feedbackText).not.toContain("Unlocked:");
     expect(progression.savedProgress).toMatchObject({
       erebusBotsDestroyed: 25,
       botsDestroyed: 25,
@@ -1183,23 +1182,16 @@ test.describe("Lupen browser smoke", () => {
       saveGame();
     `));
 
-    await expect(page.locator(".vessel-exchange-card[data-ship-id='zeusExplorer']")).toHaveClass(/progression-locked/);
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Unlock Requirements");
+    await expect(page.locator(".vessel-exchange-card[data-ship-id='zeusExplorer']")).not.toHaveClass(/progression-locked/);
+    await expect(page.locator("#shipyardDetailPanel")).not.toContainText("Unlock Requirements");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Ship Stats");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Combat Level");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("1 / 2");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Erebus Bots Destroyed");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("12 / 25");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Weapon Slots");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Equipment Slots");
 
     await page.evaluate(() => window.eval("selectShipyardShip('monolith')"));
-    await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).toHaveClass(/progression-locked/);
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Unlock Requirements");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Combat Level");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Erebus Bots Destroyed");
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Bounties Completed");
-    await expect(page.locator("#shipyardDetailPanel .locked-action")).toHaveText("Locked");
+    await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).not.toHaveClass(/progression-locked/);
+    await expect(page.locator("#shipyardDetailPanel")).not.toContainText("Unlock Requirements");
+    await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
     await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 48,000");
 
     await page.reload();
@@ -1208,10 +1200,10 @@ test.describe("Lupen browser smoke", () => {
       nightshade: getShipUnlockStatus("zeusExplorer"),
       hauler: getShipUnlockStatus("bison")
     }));
-    expect(restored.nightshade.locked).toBe(true);
-    expect(restored.nightshade.requirementLines.join(" ")).toContain("Destroy Erebus bots: 12 / 25");
-    expect(restored.hauler.locked).toBe(true);
-    expect(restored.hauler.requirementLines.join(" ")).toContain("Trading profit: CR 3,456 / CR 7,500");
+    expect(restored.nightshade.locked).toBe(false);
+    expect(restored.nightshade.requirementLines).toEqual([]);
+    expect(restored.hauler.locked).toBe(false);
+    expect(restored.hauler.requirementLines).toEqual([]);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -7358,7 +7350,7 @@ test.describe("Lupen browser smoke", () => {
     expect(state.pvpRepairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, armor: 18, armorMax: 18, reason: "hangar_repair" });
     expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 720, shield: 111, shieldMax: 180 });
     expect(state.monolith.armor).toBe(28);
-    expect(state.bisonBeforeRepair.cargo).toBe(260);
+    expect(state.bisonBeforeRepair.cargo).toBe(300);
     expect(state.falcon.jumpRecharge).toBe(16);
 
     await expectNoUnexpectedBrowserErrors(failures);

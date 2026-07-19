@@ -41,18 +41,18 @@
   const remoteGhostArrivals = new Map();
   const handledPresenceEventKeys = new Set();
   const shipImageById = {
-    falcon: "assets/ships/azure-striker/azure-striker-medium.webp",
-    bison: "assets/ships/buu-hauler/buu-hauler-medium.webp",
-    monolith: "assets/ships/majin-vindicator/majin-vindicator-medium.webp",
-    lupenOrigin: "assets/ships/lupen-origin.png",
-    lupenHauler: "assets/ships/lupen-hauler.png",
-    lupenStriker: "assets/ships/lupen-striker.png",
-    hermesCourier: "assets/ships/hermes-courier.png",
-    athenaSentinel: "assets/ships/athena-sentinel.png",
-    aresVindicator: "assets/ships/ares-vindicator.png",
-    hephaestusTrader: "assets/ships/champa-carrier/champa-carrier-medium.webp",
-    poseidonAggressor: "assets/ships/silver-instinct/silver-instinct-medium.webp",
-    zeusExplorer: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
+    falcon: "assets/ships/pioneer-hunter/pioneer-hunter-medium.webp",
+    bison: "assets/ships/pioneer-freighter/pioneer-freighter-medium.webp",
+    monolith: "assets/ships/pioneer-moth/pioneer-moth-medium.webp",
+    lupenOrigin: "assets/ships/pioneer-hunter/pioneer-hunter-medium.webp",
+    lupenHauler: "assets/ships/pioneer-freighter/pioneer-freighter-medium.webp",
+    lupenStriker: "assets/ships/pioneer-destroyer/pioneer-destroyer-medium.webp",
+    hermesCourier: "assets/ships/pioneer-hunter/pioneer-hunter-medium.webp",
+    athenaSentinel: "assets/ships/pioneer-moth/pioneer-moth-medium.webp",
+    aresVindicator: "assets/ships/pioneer-destroyer/pioneer-destroyer-medium.webp",
+    hephaestusTrader: "assets/ships/pioneer-freighter/pioneer-freighter-medium.webp",
+    poseidonAggressor: "assets/ships/pioneer-destroyer/pioneer-destroyer-medium.webp",
+    zeusExplorer: "assets/ships/pioneer-destroyer/pioneer-destroyer-medium.webp",
     cobraSeeker: "assets/ships/cobra-seeker.png",
     cobraMoth: "assets/ships/cobra-moth.png"
   };
@@ -60,11 +60,14 @@
     "falcon": shipImageById.falcon,
     "f-1 falcon": shipImageById.falcon,
     "azure striker": shipImageById.falcon,
+    "pioneer hunter": shipImageById.falcon,
     "bison": shipImageById.bison,
     "b-1 bison": shipImageById.bison,
     "buu hauler": shipImageById.bison,
+    "pioneer freighter": shipImageById.bison,
     "monolith": shipImageById.monolith,
     "majin vindicator": shipImageById.monolith,
+    "pioneer moth": shipImageById.monolith,
     "lf 1 origin": shipImageById.lupenOrigin,
     "lf-1 origin": shipImageById.lupenOrigin,
     "hauler": shipImageById.lupenHauler,
@@ -78,6 +81,7 @@
     "silver instinct": shipImageById.poseidonAggressor,
     "zeus explorer": shipImageById.zeusExplorer,
     "nightshade hawk": shipImageById.zeusExplorer,
+    "pioneer destroyer": shipImageById.zeusExplorer,
     "cobra seeker": shipImageById.cobraSeeker,
     "cobra moth": shipImageById.cobraMoth
   };

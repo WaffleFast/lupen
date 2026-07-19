@@ -24,7 +24,8 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
   "core:lupenCore": "core:lupenCore",
   "ship:falcon": "ship:falcon",
   "ship:bison": "ship:bison",
-  "ship:monolith": "ship:monolith"
+  "ship:monolith": "ship:monolith",
+  "ship:zeusExplorer": "ship:zeusExplorer"
 });
 
 const MAP_ONE_STORE_GUN_KEYS = Object.freeze(["pulseLaser", "ionBlaster", "heavyLance"]);
@@ -1798,6 +1799,7 @@ function renderHangar() {
   renderOwnedShips();
   renderHangarVault();
   renderShipShop();
+  renderShipPlans();
 
   const activeSection = document.querySelector(".hangar-section.active");
   if (!activeSection) {
@@ -2967,8 +2969,128 @@ function renderGunShop() {
   });
 }
 
+function isShipLineUnlocked(lineId) {
+  const line = SHIP_LINES?.[lineId];
+  return Boolean(line?.unlockedByDefault || (Array.isArray(unlockedShipLines) && unlockedShipLines.includes(lineId)));
+}
+
+function getShipPlanStatus(shipId) {
+  const ship = SHIPS[shipId];
+  if (!ship) return { state: "unknown", label: "Unknown" };
+  const lineUnlocked = isShipLineUnlocked(ship.lineId);
+  if (!lineUnlocked) return { state: "locked", label: "Plan Locked" };
+  if (currentShipId === shipId) return { state: "active", label: "Active" };
+  if (ownedShips.includes(shipId)) return { state: "owned", label: "Owned" };
+  return { state: "available", label: shipId === STARTER_SHIP_ID ? "Starter Plan" : "Ready to Purchase" };
+}
+
+function openShipPlanShip(shipId) {
+  if (!SHIPS[shipId]) return;
+  if (ownedShips.includes(shipId)) {
+    selectedFleetShipId = shipId;
+    showHangarSection("owned");
+    return;
+  }
+  selectedShipyardShipId = shipId;
+  showHangarSection("shipyard");
+}
+
+function renderShipPlanCard(shipId) {
+  const ship = SHIPS[shipId];
+  if (!ship) return "";
+  const status = getShipPlanStatus(shipId);
+  const actionLabel = status.state === "active"
+    ? "Active Vessel"
+    : status.state === "owned"
+      ? "View in Fleet"
+      : shipId === STARTER_SHIP_ID && !hasActiveShip()
+        ? "Claim in Exchange"
+        : "View in Exchange";
+
+  return `
+    <article class="ship-plan-card ${status.state}" data-ship-id="${escapeHtml(shipId)}">
+      <div class="ship-plan-card-status">${escapeHtml(status.label)}</div>
+      <div class="ship-plan-image-wrap">
+        <div class="ship-plan-image-halo"></div>
+        <img src="${escapeHtml(getShipAsset(shipId, "medium"))}" alt="${escapeHtml(ship.name)}">
+      </div>
+      <div class="ship-plan-card-copy">
+        <span>${escapeHtml(ship.className || getVesselExchangeClassLabel(ship))}</span>
+        <h4>${escapeHtml(ship.name)}</h4>
+        <p>${escapeHtml(ship.description)}</p>
+      </div>
+      <div class="ship-plan-stat-row">
+        <span><small>Hull</small><strong>${formatNumber(ship.hull)}</strong></span>
+        <span><small>Shield</small><strong>${formatNumber(ship.shield)}</strong></span>
+        <span><small>Weapons</small><strong>${formatNumber(ship.gunSlots)}</strong></span>
+        <span><small>Equipment</small><strong>${formatNumber(ship.attachmentSlots)}</strong></span>
+      </div>
+      <button type="button" onclick="openShipPlanShip('${shipId}')" ${status.state === "active" ? "disabled" : ""}>${escapeHtml(actionLabel)}</button>
+    </article>
+  `;
+}
+
+function renderShipPlans() {
+  const content = document.getElementById("shipPlansContent");
+  if (!content) return;
+
+  const title = document.getElementById("hangarShipTitle");
+  const subtitle = document.getElementById("hangarShipSubtitle");
+  if (title) title.textContent = "Ship Plans";
+  if (subtitle) subtitle.textContent = "Discovered families and construction access";
+
+  const lines = Object.values(SHIP_LINES || {});
+  const unlockedCount = lines.filter(line => isShipLineUnlocked(line.id)).length;
+  const count = document.getElementById("shipPlansUnlockedCount");
+  if (count) count.textContent = formatNumber(unlockedCount);
+
+  content.innerHTML = `
+    ${lines.map(line => {
+      const unlocked = isShipLineUnlocked(line.id);
+      return `
+        <section class="ship-plan-line ${unlocked ? "unlocked" : "locked"}" data-line-id="${escapeHtml(line.id)}">
+          <header class="ship-plan-line-header">
+            <div>
+              <span>${escapeHtml(line.manufacturer)}</span>
+              <h4>${escapeHtml(line.name)}</h4>
+              <p>${escapeHtml(line.description)}</p>
+            </div>
+            <div class="ship-plan-line-state ${unlocked ? "unlocked" : "locked"}">
+              <strong>${unlocked ? "PLANS UNLOCKED" : "PLANS ENCRYPTED"}</strong>
+              <small>${escapeHtml(line.unlockHint || "Discovery method unknown.")}</small>
+            </div>
+          </header>
+          <div class="ship-plan-card-grid">
+            ${unlocked ? line.shipIds.map(renderShipPlanCard).join("") : ""}
+          </div>
+        </section>
+      `;
+    }).join("")}
+
+    <section class="ship-plan-line future locked">
+      <header class="ship-plan-line-header">
+        <div>
+          <span>UNDISCOVERED MANUFACTURER</span>
+          <h4>Encrypted Ship Line</h4>
+          <p>Future ship families will appear here when their plans are recovered through exploration, missions or regional progression.</p>
+        </div>
+        <div class="ship-plan-line-state locked">
+          <strong>NOT DISCOVERED</strong>
+          <small>Unlock method not yet known.</small>
+        </div>
+      </header>
+      <div class="ship-plan-encrypted-preview" aria-label="Undiscovered ship plans">
+        <span>?</span><span>?</span><span>?</span><span>?</span>
+      </div>
+    </section>
+  `;
+}
+
 function getExchangeShips() {
-  return Object.values(SHIPS).filter(ship => !ship.hiddenFromExchange);
+  const plannedOrder = Object.values(SHIP_LINES || {}).flatMap(line => line.shipIds || []);
+  const plannedShips = plannedOrder.map(shipId => SHIPS[shipId]).filter(Boolean);
+  const unplannedShips = Object.values(SHIPS).filter(ship => !ship.lineId && !ship.hiddenFromExchange);
+  return [...plannedShips, ...unplannedShips].filter(ship => !ship.hiddenFromExchange);
 }
 
 function getShipyardSelectedShip() {

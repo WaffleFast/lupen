@@ -486,6 +486,7 @@ function resetToNoShipStarterState() {
   selectedFleetShipId = starterShipId;
   selectedShipyardShipId = starterShipId;
   ownedShips = [];
+  unlockedShipLines = [PIONEER_LINE_ID];
   shipLoadouts = {};
   shipConditions = {};
 
@@ -984,7 +985,7 @@ function getCurrentShip() {
     manufacturer: "Unassigned",
     roleSubtitle: "Purchase your first hull",
     description: "No active vessel.",
-    image: typeof getShipAsset === "function" ? getShipAsset(STARTER_SHIP_ID, "medium") : "assets/ships/azure-striker/azure-striker-medium.webp",
+    image: typeof getShipAsset === "function" ? getShipAsset(STARTER_SHIP_ID, "medium") : "assets/ships/pioneer-hunter/pioneer-hunter-medium.webp",
     price: 0,
     hull: 0,
     shield: 0,
@@ -1353,6 +1354,10 @@ function showHangarSection(sectionName) {
     tutorialEvent("openedVesselExchange");
     renderShipShop();
     renderShipyardDetail();
+  }
+
+  if (sectionName === "plans") {
+    renderShipPlans();
   }
 }
 

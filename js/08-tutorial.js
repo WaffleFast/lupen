@@ -25,14 +25,14 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-first-ship",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. We will confirm your Azure Striker and inspect the systems that carry you through the first route.",
+    text: "Open Hangar Bay. We will confirm your Pioneer Hunter and inspect the systems that carry you through the first route.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
   {
     id: "buy-first-ship",
-    title: "Claim Azure Striker",
-    text: "Claim Azure Striker if she is waiting in the Vessel Exchange. If she is already active, I will move us forward.",
+    title: "Claim Pioneer Hunter",
+    text: "Claim the Pioneer Hunter if it is waiting in the Vessel Exchange. If it is already active, I will move us forward.",
     target: "tutorial:firstShipBuy",
     event: "boughtFirstShip"
   },
@@ -82,7 +82,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "return-to-station-for-launch",
     title: "Back to station",
-    text: "Return to the station hub, then take Azure Striker into orbit.",
+    text: "Return to the station hub, then take the Pioneer Hunter into orbit.",
     target: "#marketScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -125,7 +125,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "sell-cargo",
     title: "Sell cargo",
-    text: "Sell the Iron. The profit is yours, and every clean run brings the Buu Hauler closer.",
+    text: "Sell the Iron. The profit is yours, and every clean run brings a Pioneer Freighter closer.",
     target: "tutorial:sellCargo",
     event: "soldTradeCargo"
   },
@@ -147,7 +147,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "buy-equipment",
     title: "Buy first weapon",
-    text: "Buy a Pulse Laser if one is not already in your hold or mounted on Azure Striker. It is reliable enough for your first bounty.",
+    text: "Buy a Pulse Laser if one is not already in your hold or mounted on the Pioneer Hunter. It is reliable enough for your first bounty.",
     target: "tutorial:storePulseLaser",
     event: "boughtStoreGun"
   },
@@ -325,7 +325,7 @@ const STARTER_TUTORIAL_STEPS = [
     title: "Programme Complete",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_outro_complete",
-    text: "Starter route complete. Run trades to save for the Buu Hauler, take bounties for credits and Lupen Shards, strengthen weapons through the Forge, and work toward Combat Level 2. The Nightshade Hawk waits for pilots who prove they are ready.",
+    text: "Starter route complete. The full Pioneer Line is already available in Ship Plans. Run trades and bounties to afford the Freighter, Destroyer and, eventually, the Moth.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin your journey",
@@ -1309,7 +1309,7 @@ function renderStarterTutorial() {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
       if (tutorialState.active && getCurrentTutorialStep()?.id === "buy-first-ship") {
-        addHudToast("Azure Striker is already active. Continuing the Starter Pilot Programme.");
+        addHudToast("Pioneer Hunter is already active. Continuing the Starter Pilot Programme.");
         tutorialEvent("boughtFirstShip");
       }
     }, 120);

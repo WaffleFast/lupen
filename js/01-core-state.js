@@ -2,8 +2,35 @@
 const STORAGE_GAME_KEY = "lupenGameState";
 const STORAGE_VAULT_RESET_KEY = "lupenVaultClearedForIntegratedHangarV2";
 const SAVE_SCHEMA_ID = "lupen-single-player-save";
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 const SAVE_EXPORT_VERSION = 1;
+
+const LEGACY_SHIP_ID_MAP = Object.freeze({
+  lupenOrigin: "falcon",
+  hermesCourier: "falcon",
+  lupenHauler: "bison",
+  hephaestusTrader: "bison",
+  lupenStriker: "zeusExplorer",
+  aresVindicator: "zeusExplorer",
+  poseidonAggressor: "zeusExplorer",
+  athenaSentinel: "monolith"
+});
+
+function migrateLegacyShipId(shipId) {
+  const safeId = String(shipId || "");
+  return LEGACY_SHIP_ID_MAP[safeId] || safeId;
+}
+
+function migrateShipIndexedState(record) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) return record;
+  return Object.entries(record)
+    .sort(([shipId]) => LEGACY_SHIP_ID_MAP[shipId] ? 1 : -1)
+    .reduce((next, [shipId, value]) => {
+      const migratedId = migrateLegacyShipId(shipId);
+      if (migratedId && next[migratedId] === undefined) next[migratedId] = value;
+      return next;
+    }, {});
+}
 
 const mineralKeys = ["Iron", "Copper", "Cobalt", "Titanium", "Crystal Shards", "Xenon Gas", "Iridium", "Platinum", "Uranium", "Dark Matter Residue"];
 
@@ -333,6 +360,16 @@ function migrateSavedGame(saved) {
       : migrated.homePlanet;
   }
 
+  ["currentShipId", "selectedHangarShipId", "selectedFleetShipId", "selectedShipyardShipId"].forEach(key => {
+    if (migrated[key]) migrated[key] = migrateLegacyShipId(migrated[key]);
+  });
+  if (Array.isArray(migrated.ownedShips)) {
+    migrated.ownedShips = Array.from(new Set(migrated.ownedShips.map(migrateLegacyShipId).filter(Boolean)));
+  }
+  migrated.shipLoadouts = migrateShipIndexedState(migrated.shipLoadouts);
+  migrated.shipConditions = migrateShipIndexedState(migrated.shipConditions);
+  migrated.unlockedShipLines = Array.from(new Set(["pioneer", ...(Array.isArray(migrated.unlockedShipLines) ? migrated.unlockedShipLines : [])]));
+
   migrated.upgradeMaterials = normalizeUpgradeMaterials(migrated.upgradeMaterials);
 
   migrated.saveVersion = SAVE_VERSION;
@@ -340,31 +377,44 @@ function migrateSavedGame(saved) {
   return migrated;
 }
 
+const PIONEER_LINE_ID = "pioneer";
+const SHIP_LINES = Object.freeze({
+  pioneer: Object.freeze({
+    id: PIONEER_LINE_ID,
+    name: "Pioneer Line",
+    manufacturer: "Lupen Foundry",
+    description: "The dependable first-generation fleet issued to every new pilot. Its shared core architecture supports agile combat, freight, heavy assault and command roles.",
+    unlockHint: "Plans issued automatically with every pilot profile.",
+    shipIds: Object.freeze(["falcon", "zeusExplorer", "bison", "monolith"]),
+    unlockedByDefault: true
+  })
+});
+
 const STARTER_SHIP_ID = "falcon";
 const SHIP_ASSET_MANIFEST = Object.freeze({
   falcon: Object.freeze({
-    master: "assets/ships/azure-striker/azure-striker-master.webp",
-    large: "assets/ships/azure-striker/azure-striker-large.webp",
-    medium: "assets/ships/azure-striker/azure-striker-medium.webp",
-    small: "assets/ships/azure-striker/azure-striker-small.webp"
+    master: "assets/ships/pioneer-hunter/pioneer-hunter-master.webp",
+    large: "assets/ships/pioneer-hunter/pioneer-hunter-large.webp",
+    medium: "assets/ships/pioneer-hunter/pioneer-hunter-medium.webp",
+    small: "assets/ships/pioneer-hunter/pioneer-hunter-small.webp"
   }),
   bison: Object.freeze({
-    master: "assets/ships/buu-hauler/buu-hauler-master.webp",
-    large: "assets/ships/buu-hauler/buu-hauler-large.webp",
-    medium: "assets/ships/buu-hauler/buu-hauler-medium.webp",
-    small: "assets/ships/buu-hauler/buu-hauler-small.webp"
+    master: "assets/ships/pioneer-freighter/pioneer-freighter-master.webp",
+    large: "assets/ships/pioneer-freighter/pioneer-freighter-large.webp",
+    medium: "assets/ships/pioneer-freighter/pioneer-freighter-medium.webp",
+    small: "assets/ships/pioneer-freighter/pioneer-freighter-small.webp"
   }),
   monolith: Object.freeze({
-    master: "assets/ships/majin-vindicator/majin-vindicator-master.webp",
-    large: "assets/ships/majin-vindicator/majin-vindicator-large.webp",
-    medium: "assets/ships/majin-vindicator/majin-vindicator-medium.webp",
-    small: "assets/ships/majin-vindicator/majin-vindicator-small.webp"
+    master: "assets/ships/pioneer-moth/pioneer-moth-master.webp",
+    large: "assets/ships/pioneer-moth/pioneer-moth-large.webp",
+    medium: "assets/ships/pioneer-moth/pioneer-moth-medium.webp",
+    small: "assets/ships/pioneer-moth/pioneer-moth-small.webp"
   }),
   zeusExplorer: Object.freeze({
-    master: "assets/ships/nightshade-hawk/nightshade-hawk-master.webp",
-    large: "assets/ships/nightshade-hawk/nightshade-hawk-large.webp",
-    medium: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
-    small: "assets/ships/nightshade-hawk/nightshade-hawk-small.webp"
+    master: "assets/ships/pioneer-destroyer/pioneer-destroyer-master.webp",
+    large: "assets/ships/pioneer-destroyer/pioneer-destroyer-large.webp",
+    medium: "assets/ships/pioneer-destroyer/pioneer-destroyer-medium.webp",
+    small: "assets/ships/pioneer-destroyer/pioneer-destroyer-small.webp"
   }),
   hephaestusTrader: Object.freeze({
     master: "assets/ships/champa-carrier/champa-carrier-master.webp",
@@ -390,17 +440,19 @@ function getShipAsset(shipId, size = "medium") {
   const manifest = SHIP_ASSET_MANIFEST[shipId] || SHIP_ASSET_MANIFEST[STARTER_SHIP_ID] || {};
   const order = SHIP_ASSET_SIZE_FALLBACKS[size] || SHIP_ASSET_SIZE_FALLBACKS.medium;
   const path = order.map(key => manifest[key]).find(Boolean);
-  return path || "assets/ships/azure-striker/azure-striker-medium.webp";
+  return path || "assets/ships/pioneer-hunter/pioneer-hunter-medium.webp";
 }
 
 const SHIPS = {
   falcon: {
     id: "falcon",
-    name: "Azure Striker",
+    name: "Pioneer Hunter",
     manufacturer: "Lupen Foundry",
-    role: "Starter Fighter / Interceptor",
-    roleSubtitle: "Starter Fighter / Interceptor",
-    description: "A nimble first-map striker with twin forward mounts, clean jump recovery and enough cargo room for early trade runs.",
+    lineId: PIONEER_LINE_ID,
+    className: "Hunter",
+    role: "Attacker / Interceptor",
+    roleSubtitle: "Attacker / Interceptor",
+    description: "The free starter hull for every new pilot: fast, evasive and flexible enough for early combat and trade runs.",
     image: getShipAsset("falcon", "medium"),
     assets: SHIP_ASSET_MANIFEST.falcon,
     price: 0,
@@ -417,41 +469,45 @@ const SHIPS = {
   },
   bison: {
     id: "bison",
-    name: "Buu Hauler",
+    name: "Pioneer Freighter",
     manufacturer: "Lupen Foundry",
-    role: "Cargo / Trader",
-    roleSubtitle: "Cargo / Trader",
-    description: "A broad early hauler with steady plating, useful cargo volume and a single defensive weapon bank.",
+    lineId: PIONEER_LINE_ID,
+    className: "Freighter",
+    role: "Freight / Trade",
+    roleSubtitle: "Freight / Trade",
+    description: "A cargo-focused branch hull with generous equipment capacity, durable plating and enough armament to survive contested routes.",
     image: getShipAsset("bison", "medium"),
     assets: SHIP_ASSET_MANIFEST.bison,
-    price: 10500,
+    price: 14000,
     hull: 1300,
     shield: 135,
     armor: 18,
-    cargo: 260,
-    jumpRecharge: 8,
-    evasion: 5,
-    gunSlots: 1,
+    cargo: 300,
+    jumpRecharge: 10,
+    evasion: 7,
+    gunSlots: 2,
     attachmentSlots: 4
   },
   monolith: {
     id: "monolith",
-    name: "Majin Vindicator",
-    manufacturer: "Asteron Skunkworks",
-    role: "Heavy Combat Hull",
-    roleSubtitle: "Heavy Combat Hull",
-    description: "A costly first-map heavy fighter with strong armor, six compact hardpoints and limited utility space.",
+    name: "Pioneer Moth",
+    manufacturer: "Lupen Foundry",
+    lineId: PIONEER_LINE_ID,
+    className: "Moth",
+    role: "Behemoth / Command",
+    roleSubtitle: "Behemoth / Command",
+    description: "The Pioneer Line flagship: a costly command hull with immense defences, six weapon mounts and the deepest first-map equipment capacity.",
     image: getShipAsset("monolith", "medium"),
     assets: SHIP_ASSET_MANIFEST.monolith,
     price: 48000,
     hull: 1800,
     shield: 360,
     armor: 28,
-    cargo: 150,
+    cargo: 220,
     jumpRecharge: 10,
-    evasion: 10,
+    evasion: 6,
     gunSlots: 6,
-    attachmentSlots: 4
+    attachmentSlots: 5
   },
   lupenOrigin: {
     id: "lupenOrigin",
@@ -583,7 +639,9 @@ const SHIPS = {
     jumpRecharge: 8,
     evasion: 6,
     gunSlots: 2,
-    attachmentSlots: 6
+    attachmentSlots: 6,
+    hiddenFromExchange: true,
+    legacy: true
   },
   poseidonAggressor: {
     id: "poseidonAggressor",
@@ -601,35 +659,38 @@ const SHIPS = {
     jumpRecharge: 14,
     evasion: 22,
     gunSlots: 5,
-    attachmentSlots: 4
+    attachmentSlots: 4,
+    hiddenFromExchange: true,
+    legacy: true
   },
   zeusExplorer: {
     id: "zeusExplorer",
-    name: "Nightshade Hawk",
-    manufacturer: "Asteron Skunkworks",
-    roleSubtitle: "Fast Scout / Skirmisher",
-    description: "A fast black-crystal scout built for quick jumps, high evasion and a flexible three-gun skirmish loadout.",
+    name: "Pioneer Destroyer",
+    manufacturer: "Lupen Foundry",
+    lineId: PIONEER_LINE_ID,
+    className: "Destroyer",
+    role: "Combat / Assault",
+    roleSubtitle: "Combat / Assault",
+    description: "An armoured combat step beyond the Hunter, trading some speed and evasion for stronger shields, hull and hardpoint capacity.",
     image: getShipAsset("zeusExplorer", "medium"),
     assets: SHIP_ASSET_MANIFEST.zeusExplorer,
-    price: 8500,
-    hull: 900,
-    shield: 150,
-    armor: 10,
-    cargo: 150,
-    jumpRecharge: 20,
-    evasion: 28,
-    gunSlots: 3,
+    price: 22000,
+    hull: 1250,
+    shield: 240,
+    armor: 20,
+    cargo: 120,
+    jumpRecharge: 13,
+    evasion: 12,
+    gunSlots: 4,
     attachmentSlots: 3
   }
 };
 
 const SHIP_UNLOCK_REQUIREMENTS = Object.freeze({
-  falcon: Object.freeze({ combatLevel: 1 }),
-  zeusExplorer: Object.freeze({ combatLevel: 2, erebusBotsDestroyed: 25 }),
-  bison: Object.freeze({ totalTradingProfit: 7500 }),
-  monolith: Object.freeze({ combatLevel: 3, erebusBotsDestroyed: 75, bountiesClaimed: 5 }),
-  hephaestusTrader: Object.freeze({ combatLevel: 3, totalTradingProfit: 35000 }),
-  poseidonAggressor: Object.freeze({ combatLevel: 4, erebusBotsDestroyed: 125, totalTradingProfit: 25000 })
+  falcon: Object.freeze({}),
+  zeusExplorer: Object.freeze({}),
+  bison: Object.freeze({}),
+  monolith: Object.freeze({})
 });
 
 const attachments = {
@@ -710,6 +771,7 @@ let ownedShips = [STARTER_SHIP_ID];
 let selectedHangarShipId = STARTER_SHIP_ID;
 let selectedFleetShipId = STARTER_SHIP_ID;
 let selectedShipyardShipId = STARTER_SHIP_ID;
+let unlockedShipLines = [PIONEER_LINE_ID];
 let stationVaultWasClearedThisSession = false;
 let installedAttachments = [];
 let shipConditions = {};
@@ -2462,20 +2524,25 @@ function getShipUnlockRequirements(shipId) {
 function getShipUnlockStatus(shipId) {
   const requirements = getShipUnlockRequirements(shipId);
   const progress = getUnlockRequirementProgress(requirements);
-  const unlocked = progress.every(item => item.met);
+  const line = SHIP_LINES[SHIPS[shipId]?.lineId];
+  const planUnlocked = Boolean(!line || line.unlockedByDefault || (Array.isArray(unlockedShipLines) && unlockedShipLines.includes(line.id)));
+  const unlocked = planUnlocked && progress.every(item => item.met);
   const owned = ownedShips.includes(shipId);
   const active = currentShipId === shipId;
   return {
     shipId,
     requirements,
     progress,
+    planUnlocked,
     unlocked,
     locked: !unlocked,
     owned,
     active,
     state: active ? "active" : owned ? "owned" : unlocked ? "available" : "locked",
     requirementLines: progress.map(formatUnlockRequirementLine),
-    message: getFirstLockedRequirementMessage(requirements, "Complete this ship unlock challenge first.")
+    message: planUnlocked
+      ? getFirstLockedRequirementMessage(requirements, "Complete this ship unlock challenge first.")
+      : "Recover this ship line's plans before purchasing the hull."
   };
 }
 
@@ -2510,7 +2577,7 @@ function reportErebusBotShipProgress(beforeNightshadeStatus) {
   const afterStatus = getShipUnlockStatus("zeusExplorer");
   const botProgress = getUnlockProgressItem(afterStatus, "erebusBotsDestroyed");
   if (beforeNightshadeStatus?.locked && botProgress && !botProgress.met) {
-    addProgressionActivity(`Erebus destroyed. Nightshade Hawk progress: ${formatNumber(Math.min(botProgress.current, botProgress.required))} / ${formatNumber(botProgress.required)}.`);
+    addProgressionActivity(`Erebus destroyed. Pioneer Destroyer progress: ${formatNumber(Math.min(botProgress.current, botProgress.required))} / ${formatNumber(botProgress.required)}.`);
   }
   reportShipUnlockTransition("zeusExplorer", beforeNightshadeStatus);
 }
@@ -2519,7 +2586,7 @@ function reportTradingShipProgress(beforeHaulerStatus) {
   const afterStatus = getShipUnlockStatus("bison");
   const profitProgress = getUnlockProgressItem(afterStatus, "totalTradingProfit");
   if (beforeHaulerStatus?.locked && profitProgress && !profitProgress.met) {
-    addProgressionActivity(`Trade profit banked. Buu Hauler progress: CR ${formatNumber(Math.min(profitProgress.current, profitProgress.required))} / CR ${formatNumber(profitProgress.required)}.`);
+    addProgressionActivity(`Trade profit banked. Pioneer Freighter progress: CR ${formatNumber(Math.min(profitProgress.current, profitProgress.required))} / CR ${formatNumber(profitProgress.required)}.`);
   }
   reportShipUnlockTransition("bison", beforeHaulerStatus);
 }

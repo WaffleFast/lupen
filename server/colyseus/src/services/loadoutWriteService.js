@@ -18,12 +18,10 @@ const SHIELD_BOOSTER_SHIELD_BONUS = 50;
 const PULSE_LASER_ITEM_ID = "gun:pulseLaser";
 const PULSE_LASER_KEY = "pulseLaser";
 const STAGING_SHIP_ITEMS = Object.freeze([
-  Object.freeze({ itemId: "ship:falcon", key: "falcon", name: "Azure Striker" }),
-  Object.freeze({ itemId: "ship:bison", key: "bison", name: "Buu Hauler" }),
-  Object.freeze({ itemId: "ship:monolith", key: "monolith", name: "Majin Vindicator" }),
-  Object.freeze({ itemId: "ship:zeusExplorer", key: "zeusExplorer", name: "Nightshade Hawk" }),
-  Object.freeze({ itemId: "ship:hephaestusTrader", key: "hephaestusTrader", name: "Champa Carrier" }),
-  Object.freeze({ itemId: "ship:poseidonAggressor", key: "poseidonAggressor", name: "Silver Instinct" })
+  Object.freeze({ itemId: "ship:falcon", key: "falcon", name: "Pioneer Hunter" }),
+  Object.freeze({ itemId: "ship:bison", key: "bison", name: "Pioneer Freighter" }),
+  Object.freeze({ itemId: "ship:monolith", key: "monolith", name: "Pioneer Moth" }),
+  Object.freeze({ itemId: "ship:zeusExplorer", key: "zeusExplorer", name: "Pioneer Destroyer" })
 ]);
 const MAX_ATTACHMENT_COUNT = 9999;
 const MAX_GUN_COUNT = 9999;

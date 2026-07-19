@@ -1952,9 +1952,7 @@ async function assertStagingStorePreviewHelpers() {
     "ship:falcon",
     "ship:bison",
     "ship:monolith",
-    "ship:zeusExplorer",
-    "ship:hephaestusTrader",
-    "ship:poseidonAggressor"
+    "ship:zeusExplorer"
   ];
   assert(items.length >= expectedStoreItemIds.length, "Staging Store item list did not include deterministic Map 1 items.");
   for (const itemId of expectedStoreItemIds) {
@@ -2132,10 +2130,10 @@ async function assertStagingStorePreviewHelpers() {
   assert(jumpDrivePatch.patchedSaveData.ownedAttachments.cargoPod === 1, "Jump Drive Store patch changed Cargo Pod ownership.");
   assert(jumpDrivePatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Jump Drive Store patch changed shipLoadouts.");
 
-  const bisonSaveData = { ...validSaveData, credits: 13000 };
+  const bisonSaveData = { ...validSaveData, credits: 15000 };
   const bisonPatch = buildStagingStorePurchasePatch(bisonSaveData, bisonItem, 1);
   assert(bisonPatch.ok === true, `Valid Bison Store patch was blocked: ${bisonPatch.blockReason}`);
-  assert(bisonPatch.creditsBefore === 13000 && bisonPatch.creditsAfter === 1000, "Bison Store patch did not subtract the server price.");
+  assert(bisonPatch.creditsBefore === 15000 && bisonPatch.creditsAfter === 1000, "Pioneer Freighter Store patch did not subtract the server price.");
   assert(bisonPatch.itemBefore === 1 && bisonPatch.itemAfter === 2, "Bison Store patch did not append ownedShips.");
   assert(bisonPatch.patchedSaveData.ownedShips.includes("bison"), "Bison Store patch did not add the ship.");
   assert(bisonPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Bison Store patch changed existing loadouts.");
@@ -2339,7 +2337,7 @@ async function assertStagingStorePreviewHelpers() {
   assert(weaponSave.playerProgress.combatXp === 33, "Applied Pulse Laser Store write changed progression.");
   assert(weaponFetchCalls.join(",") === "GET,PATCH", `Pulse Laser Store write expected read/write pair, got ${weaponFetchCalls.join(",")}.`);
 
-  let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 13000 }));
+  let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 15000 }));
   const haulerFetchCalls = [];
   const appliedHaulerWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
@@ -2347,7 +2345,7 @@ async function assertStagingStorePreviewHelpers() {
     quantity: 1,
     trustedState: {
       available: true,
-      validationState: { credits: 13000 }
+      validationState: { credits: 15000 }
     },
     env: {
       SUPABASE_URL: "https://example.supabase.co",
@@ -2366,7 +2364,7 @@ async function assertStagingStorePreviewHelpers() {
     }
   });
   assert(appliedHaulerWrite.applied === true && appliedHaulerWrite.mode === "store_write", `Gated Bison Store write did not apply: ${appliedHaulerWrite.blockReason}`);
-  assert(appliedHaulerWrite.creditsBefore === 13000 && appliedHaulerWrite.creditsAfter === 1000, "Applied Bison Store write returned incorrect credits.");
+  assert(appliedHaulerWrite.creditsBefore === 15000 && appliedHaulerWrite.creditsAfter === 1000, "Applied Pioneer Freighter Store write returned incorrect credits.");
   assert(appliedHaulerWrite.creditsWritten === true && appliedHaulerWrite.shipWritten === true && appliedHaulerWrite.saveWritten === true, "Applied Bison Store write did not report allowed writes.");
   assert(appliedHaulerWrite.inventoryWritten === false && appliedHaulerWrite.attachmentWritten === false && appliedHaulerWrite.weaponWritten === false, "Applied Bison Store write reported forbidden writes.");
   assert(haulerSave.credits === 1000 && haulerSave.ownedShips.includes("bison"), "Applied Bison Store write did not update mocked save state.");
@@ -2662,7 +2660,7 @@ async function assertStagingCargoPodEquipHelpers() {
   });
   assert(missingUpgradedJumpDrivePlan.ok === false && missingUpgradedJumpDrivePlan.blockReason === "inventory_item_not_owned", "Untrusted upgraded Jump Drive selector was not blocked.");
 
-  const monolithAlmostFullAttachments = Array.from({ length: 3 }, () => ({ key: "cargoPod", quality: "standard", level: 1 }));
+  const monolithAlmostFullAttachments = Array.from({ length: 4 }, () => ({ key: "cargoPod", quality: "standard", level: 1 }));
   const monolithAttachmentStressPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
     currentShipId: "monolith",
@@ -2675,9 +2673,9 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "attachment:jumpDrive" });
-  assert(monolithAttachmentStressPlan.ok === true, `Majin Vindicator fourth attachment slot equip was blocked: ${monolithAttachmentStressPlan.blockReason}`);
-  assert(monolithAttachmentStressPlan.attachmentSlots === 4, "Majin Vindicator attachment stress plan reported unexpected attachment slot count.");
-  assert(monolithAttachmentStressPlan.patchedSaveData.shipLoadouts.monolith.attachments.length === 4, "Majin Vindicator attachment stress plan did not fill the fourth attachment slot.");
+  assert(monolithAttachmentStressPlan.ok === true, `Pioneer Moth fifth attachment slot equip was blocked: ${monolithAttachmentStressPlan.blockReason}`);
+  assert(monolithAttachmentStressPlan.attachmentSlots === 5, "Pioneer Moth attachment stress plan reported unexpected attachment slot count.");
+  assert(monolithAttachmentStressPlan.patchedSaveData.shipLoadouts.monolith.attachments.length === 5, "Pioneer Moth attachment stress plan did not fill the fifth attachment slot.");
 
   const monolithFullAttachmentSlotsPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
@@ -2691,7 +2689,7 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "attachment:jumpDrive" });
-  assert(monolithFullAttachmentSlotsPlan.ok === false && monolithFullAttachmentSlotsPlan.blockReason === "attachment_slots_full", "Majin Vindicator fifth attachment slot was not blocked.");
+  assert(monolithFullAttachmentSlotsPlan.ok === false && monolithFullAttachmentSlotsPlan.blockReason === "attachment_slots_full", "Pioneer Moth sixth attachment slot was not blocked.");
 
   const pulseLaserUnequipPlan = buildStagingLoadoutUnequipPlan({
     ...validSaveData,
@@ -2776,7 +2774,7 @@ async function assertStagingCargoPodEquipHelpers() {
   }, { itemId: "ship:bison" });
   assert(bisonSelectPlan.ok === true, `Valid Bison select plan was blocked: ${bisonSelectPlan.blockReason}`);
   assert(bisonSelectPlan.selectedShipBefore === "lupenOrigin" && bisonSelectPlan.selectedShipAfter === "bison", "Bison select plan did not report ship change.");
-  assert(bisonSelectPlan.cargoCapacityBefore === 150 && bisonSelectPlan.cargoCapacityAfter === 260, "Bison select plan did not report cargo capacity change.");
+  assert(bisonSelectPlan.cargoCapacityBefore === 150 && bisonSelectPlan.cargoCapacityAfter === 300, "Pioneer Freighter select plan did not report cargo capacity change.");
   assert(bisonSelectPlan.patchedSaveData.currentShipId === "bison", "Bison select plan did not set currentShipId.");
   assert(bisonSelectPlan.patchedSaveData.selectedHangarShipId === "bison", "Bison select plan did not set selectedHangarShipId.");
   assert(bisonSelectPlan.patchedSaveData.selectedFleetShipId === "bison", "Bison select plan did not set selectedFleetShipId.");

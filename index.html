@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css?v=20260716-hangar-tiers" />
+  <link rel="stylesheet" href="style.css?v=20260718-pioneer-line" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
 </head>
 <body>
@@ -301,7 +301,7 @@
       <div class="hangar-header prestige-header">
         <div>
           <p>HANGAR BAY</p>
-          <h2 id="hangarShipTitle">LF-1 Origin</h2>
+          <h2 id="hangarShipTitle">Pioneer Hunter</h2>
           <span id="hangarShipSubtitle" class="hangar-subtitle">Equipped Hull</span>
         </div>
         <button class="screen-back-btn" onclick="returnToHub()">Back</button>
@@ -311,6 +311,7 @@
         <button id="hangarOverviewTab" data-tutorial-target="hangarLoadout" onclick="showHangarSection('overview')">Loadout</button>
         <button id="hangarOwnedTab" onclick="showHangarSection('owned')">Fleet</button>
         <button id="hangarShipyardTab" data-tutorial-target="vesselExchange" onclick="showHangarSection('shipyard')">Vessel Exchange</button>
+        <button id="hangarPlansTab" onclick="showHangarSection('plans')">Ship Plans</button>
         <button id="hangarVaultTab" onclick="showHangarSection('vault')">Vault</button>
       </div>
 
@@ -318,7 +319,7 @@
         <div class="integrated-hangar-grid">
           <aside class="hangar-info-panel integrated-stats-panel">
             <div class="panel-kicker">Current Hull</div>
-            <h3 id="overviewShipName">LF-1 Origin</h3>
+            <h3 id="overviewShipName">Pioneer Hunter</h3>
             <div id="overviewStats" class="overview-stat-grid"></div>
             <div id="overviewRepairPanel" class="overview-repair compact-repair-panel"></div>
           </aside>
@@ -328,7 +329,7 @@
               <span>Equipped Loadout</span>
               <div class="loadout-title-cluster">
                 <small>Active Vessel</small>
-                <strong id="overviewNameplate">LF-1 Origin</strong>
+                <strong id="overviewNameplate">Pioneer Hunter</strong>
               </div>
             </div>
 
@@ -478,6 +479,17 @@
             <div id="shipyardDetailPanel" class="shipyard-detail-body fleet-detail-body"></div>
           </div>
         </div>
+      </div>
+
+      <div id="hangarPlansSection" class="hangar-section">
+        <div class="hangar-section-title compact-title ship-plans-title-row">
+          <div>
+            <h3>Ship Plans</h3>
+            <p>Review discovered ship families, owned vessels and the plans still waiting to be recovered.</p>
+          </div>
+          <div class="ship-plans-count-pill"><strong id="shipPlansUnlockedCount">1</strong> line unlocked</div>
+        </div>
+        <div id="shipPlansContent" class="ship-plans-content"></div>
       </div>
 
       <div id="hangarVaultSection" class="hangar-section">
@@ -773,16 +785,16 @@
   <script src="js/rules/movementRules.js"></script>
   <script src="js/services/saveService.js"></script>
   <script src="js/network/multiplayerClient.js?v=20260716-bounty-complete"></script>
-  <script src="js/01-core-state.js?v=20260713-asteroid-shards"></script>
-  <script src="js/02-account-navigation.js?v=20260716-bounty-complete"></script>
+  <script src="js/01-core-state.js?v=20260718-pioneer-line"></script>
+  <script src="js/02-account-navigation.js?v=20260718-pioneer-line"></script>
   <script src="js/03-hud-space-map.js?v=20260716-bounty-complete"></script>
-  <script src="js/network/multiplayerOverlay.js?v=20260715-space-volley"></script>
+  <script src="js/network/multiplayerOverlay.js?v=20260718-pioneer-line"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260716-bounty-complete"></script>
   <script src="js/04b-trade-terminal-v2.js?v=20260717-trade-quick-actions"></script>
-  <script src="js/05-hangar-store.js?v=20260716-hangar-tiers"></script>
+  <script src="js/05-hangar-store.js?v=20260718-pioneer-line"></script>
   <script src="js/06-combat.js?v=20260715-space-volley"></script>
-  <script src="js/07-save-load.js"></script>
-  <script src="js/08-tutorial.js"></script>
+  <script src="js/07-save-load.js?v=20260718-pioneer-line"></script>
+  <script src="js/08-tutorial.js?v=20260718-pioneer-line"></script>
   <script src="js/09-audio.js"></script>
   <script src="js/10-upgrade-forge.js?v=20260716-forge-tiers"></script>
   <script src="js/11-missions.js?v=20260715-tactical-hud"></script>
