@@ -1,0 +1,226 @@
+/* Comparison-led Hangar Loadout, kept separate so the shared Hangar system stays stable. */
+#hangarOverviewSection .adaptive-loadout-shell {
+  grid-template-columns: minmax(300px, 33%) minmax(0, 1fr) !important;
+  gap: 14px !important;
+}
+
+#hangarOverviewSection .active-vessel-panel,
+#hangarOverviewSection .adaptive-loadout-workspace {
+  border-color: rgba(83, 191, 220, 0.36) !important;
+  background: radial-gradient(circle at 50% 8%, rgba(32, 173, 216, 0.13), transparent 38%), linear-gradient(155deg, rgba(10, 27, 37, 0.98), rgba(3, 11, 18, 0.99)) !important;
+}
+
+#hangarOverviewSection .active-vessel-panel {
+  grid-template-rows: auto minmax(170px, 1fr) auto auto auto !important;
+  gap: 9px !important;
+  padding: 16px 18px !important;
+}
+
+#hangarOverviewSection .active-vessel-hero { min-height: 170px !important; }
+#hangarOverviewSection .active-vessel-hero img { width: 92% !important; height: 92% !important; }
+#hangarOverviewSection .active-vessel-identity h3 { font-size: 22px !important; }
+
+#hangarOverviewSection .adaptive-vessel-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+#hangarOverviewSection .adaptive-vessel-stats .hangar-stat-card,
+#hangarOverviewSection .adaptive-vessel-stats .hangar-stat-card.featured-stat {
+  grid-column: auto !important;
+  min-height: 58px !important;
+  padding: 9px 12px !important;
+  border-color: rgba(83, 172, 207, 0.48) !important;
+  background: linear-gradient(135deg, rgba(28, 58, 75, 0.68), rgba(3, 16, 25, 0.9)) !important;
+}
+
+#hangarOverviewSection .adaptive-vessel-stats .shield-stat {
+  border-color: rgba(35, 209, 244, 0.7) !important;
+  background: linear-gradient(135deg, rgba(8, 79, 105, 0.72), rgba(3, 20, 30, 0.92)) !important;
+}
+
+#hangarOverviewSection .adaptive-vessel-stats .cargo-stat {
+  border-color: rgba(214, 176, 40, 0.74) !important;
+  background: linear-gradient(135deg, rgba(89, 73, 7, 0.68), rgba(25, 24, 4, 0.92)) !important;
+}
+
+#hangarOverviewSection .adaptive-vessel-stats .evasion-stat {
+  border-color: rgba(41, 210, 166, 0.7) !important;
+  background: linear-gradient(135deg, rgba(5, 75, 69, 0.7), rgba(2, 26, 28, 0.94)) !important;
+}
+
+#hangarOverviewSection .adaptive-vessel-stats .hangar-stat-card span { font-size: 10px !important; }
+#hangarOverviewSection .adaptive-vessel-stats .hangar-stat-card strong { display: block !important; margin-top: 4px !important; font-size: 18px !important; }
+#hangarOverviewSection .adaptive-vessel-stats .featured-stat i { display: none !important; }
+#hangarOverviewSection .active-vessel-panel .prestige-repair-strip { min-height: 46px !important; padding: 6px 10px !important; }
+
+#hangarOverviewSection .adaptive-loadout-workspace {
+  grid-template-rows: auto 42px minmax(92px, 1fr) auto minmax(104px, auto) !important;
+  gap: 8px !important;
+  padding: 14px 16px !important;
+}
+
+#hangarOverviewSection .adaptive-loadout-header span,
+#hangarOverviewSection .compatible-vault-panel > header span,
+#hangarOverviewSection .active-vessel-panel > .panel-kicker { font-size: 13px !important; }
+
+#hangarOverviewSection #loadoutFittedSummary {
+  padding: 6px 13px !important;
+  border: 1px solid rgba(83, 191, 220, 0.34) !important;
+  border-radius: 999px !important;
+  background: rgba(2, 16, 25, 0.72) !important;
+  white-space: nowrap !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace .loadout-slot-bank {
+  grid-template-rows: minmax(0, 1fr) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace .loadout-bank-title { display: none !important; }
+#hangarOverviewSection .adaptive-slot-workspace .scalable-loadout-grid { gap: 10px !important; }
+#hangarOverviewSection .adaptive-slot-workspace .scalable-loadout-grid.spacious-slots { grid-auto-rows: minmax(100px, 1fr) !important; }
+#hangarOverviewSection .adaptive-slot-workspace .scalable-loadout-grid.compact-slots,
+#hangarOverviewSection .adaptive-slot-workspace .scalable-loadout-grid.dense-slots { grid-auto-rows: minmax(40px, 1fr) !important; gap: 6px !important; }
+
+#hangarOverviewSection .adaptive-slot-workspace .equipment-slot.loadout-grid-slot {
+  grid-template-columns: 92px minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  min-height: 66px !important;
+  padding: 10px 14px !important;
+  border-radius: 11px !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace .equipment-slot.loadout-grid-slot.selected {
+  border-color: #4de1f8 !important;
+  box-shadow: 0 0 0 1px rgba(77, 225, 248, 0.42), inset 0 0 24px rgba(37, 198, 231, 0.09), 0 0 18px rgba(37, 198, 231, 0.12) !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace .loadout-slot-number { position: absolute !important; top: 8px !important; left: 11px !important; letter-spacing: 0.1em !important; }
+#hangarOverviewSection .weapon-slot-bank .loadout-slot-number::before { content: "WEAPON " !important; }
+#hangarOverviewSection .attachment-slot-bank .loadout-slot-number::before { content: "ATTACHMENT " !important; }
+#hangarOverviewSection .adaptive-slot-workspace .equipment-slot > .quality-fx { grid-column: 1 !important; grid-row: 1 / -1 !important; margin-top: 14px !important; }
+#hangarOverviewSection .adaptive-slot-workspace .equipment-slot > .quality-fx .quality-fx__item { max-width: 80px !important; max-height: 58px !important; }
+#hangarOverviewSection .adaptive-slot-workspace .loadout-slot-copy { grid-column: 2 !important; grid-row: 1 / -1 !important; display: grid !important; align-content: center !important; gap: 5px !important; padding: 12px 0 0 !important; }
+#hangarOverviewSection .adaptive-slot-workspace .loadout-slot-copy > strong { font-size: 15px !important; }
+#hangarOverviewSection .adaptive-slot-workspace .loadout-slot-tier-badge { position: static !important; justify-content: flex-start !important; }
+
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .equipment-slot.loadout-grid-slot {
+  grid-template-columns: 40px minmax(0, 1fr) !important;
+  min-height: 40px !important;
+  padding: 4px 6px !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .loadout-slot-number { top: 3px !important; left: 5px !important; font-size: 7px !important; }
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .equipment-slot > .quality-fx { margin-top: 8px !important; }
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .equipment-slot > .quality-fx .quality-fx__item { max-width: 36px !important; max-height: 28px !important; }
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .loadout-slot-copy { gap: 1px !important; padding: 7px 0 0 !important; }
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .loadout-slot-copy > strong { font-size: 9px !important; }
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .loadout-slot-tier-badge { display: none !important; }
+
+#hangarOverviewSection .selected-loadout-panel {
+  gap: 6px !important;
+  padding: 9px 11px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(145deg, rgba(5, 20, 29, 0.92), rgba(2, 11, 18, 0.94)) !important;
+}
+
+#hangarOverviewSection .selected-loadout-panel .loadout-selected-slot-bar { padding-bottom: 5px !important; border-bottom: 1px solid rgba(82, 181, 213, 0.22) !important; font-size: 10px !important; }
+#hangarOverviewSection .loadout-comparison-card { display: grid !important; gap: 7px !important; }
+#hangarOverviewSection .loadout-comparison-flow { display: grid !important; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) !important; gap: 6px !important; align-items: stretch !important; }
+
+#hangarOverviewSection .loadout-comparison-item,
+#hangarOverviewSection .loadout-comparison-empty {
+  min-width: 0 !important;
+  min-height: 62px !important;
+  padding: 7px 9px !important;
+  border: 1px solid rgba(77, 169, 201, 0.3) !important;
+  border-radius: 9px !important;
+  background: rgba(5, 20, 30, 0.68) !important;
+}
+
+#hangarOverviewSection .loadout-comparison-item {
+  display: grid !important;
+  grid-template-columns: minmax(128px, 0.85fr) minmax(150px, 1fr) !important;
+  grid-template-rows: auto 1fr !important;
+  column-gap: 8px !important;
+  align-items: center !important;
+}
+
+#hangarOverviewSection .loadout-comparison-item:last-child { border-color: rgba(51, 209, 171, 0.44) !important; background: linear-gradient(140deg, rgba(5, 43, 43, 0.54), rgba(4, 17, 25, 0.78)) !important; }
+#hangarOverviewSection .loadout-comparison-label { display: block !important; grid-column: 1 / -1 !important; margin-bottom: 3px !important; color: #70def4 !important; font-size: 8px !important; font-weight: 900 !important; letter-spacing: 0.11em !important; text-transform: uppercase !important; }
+#hangarOverviewSection .loadout-comparison-item:last-child .loadout-comparison-label { color: #62e3ba !important; }
+#hangarOverviewSection .loadout-comparison-identity { display: grid !important; grid-template-columns: 48px minmax(0, 1fr) !important; gap: 7px !important; align-items: center !important; }
+#hangarOverviewSection .loadout-comparison-identity .quality-fx,
+#hangarOverviewSection .loadout-comparison-identity .quality-fx__item { width: 46px !important; height: 40px !important; max-width: 46px !important; max-height: 40px !important; }
+#hangarOverviewSection .loadout-comparison-identity strong,
+#hangarOverviewSection .loadout-comparison-identity small { display: block !important; }
+#hangarOverviewSection .loadout-comparison-identity strong { color: #f3fbff !important; font-size: 12px !important; }
+#hangarOverviewSection .loadout-comparison-identity small { margin-top: 2px !important; color: #bb87ff !important; font-size: 8px !important; font-weight: 800 !important; text-transform: uppercase !important; }
+
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 4px !important; margin-top: 0 !important; }
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats > div { position: relative !important; min-height: 35px !important; padding: 4px 6px !important; border: 1px solid rgba(89, 164, 190, 0.2) !important; border-radius: 6px !important; background: rgba(1, 10, 17, 0.54) !important; }
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats span,
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats strong { display: block !important; }
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats span { color: #849da8 !important; font-size: 7px !important; font-weight: 900 !important; text-transform: uppercase !important; }
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats strong { margin-top: 2px !important; color: #f2fbff !important; font-size: 10px !important; }
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats em { position: absolute !important; right: 4px !important; bottom: 3px !important; font-size: 7px !important; font-style: normal !important; font-weight: 900 !important; }
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats em.positive { color: #61e5b6 !important; }
+#hangarOverviewSection .loadout-comparison-item .loadout-detail-stats em.negative { color: #ff6d79 !important; }
+#hangarOverviewSection .loadout-comparison-arrow { display: grid !important; place-items: center !important; color: #57cffa !important; font-size: 34px !important; }
+#hangarOverviewSection .loadout-comparison-empty { display: grid !important; align-content: center !important; gap: 4px !important; color: #78909b !important; text-align: center !important; }
+#hangarOverviewSection .loadout-comparison-empty strong { color: #9cb6c1 !important; font-size: 8px !important; letter-spacing: 0.1em !important; text-transform: uppercase !important; }
+#hangarOverviewSection .loadout-comparison-empty span { font-size: 9px !important; }
+
+#hangarOverviewSection .loadout-comparison-card .loadout-detail-actions { display: flex !important; justify-content: flex-end !important; gap: 7px !important; }
+#hangarOverviewSection .loadout-comparison-card .loadout-detail-actions button { width: auto !important; min-width: 142px !important; min-height: 31px !important; padding: 0 16px !important; border: 1px solid rgba(68, 183, 230, 0.44) !important; border-radius: 7px !important; background: rgba(4, 27, 43, 0.9) !important; color: #d9f4ff !important; font: inherit !important; font-size: 9px !important; font-weight: 900 !important; text-transform: uppercase !important; cursor: pointer !important; }
+#hangarOverviewSection .loadout-comparison-card .loadout-detail-actions button.primary { border-color: rgba(52, 194, 255, 0.84) !important; background: linear-gradient(180deg, rgba(37, 119, 218, 0.98), rgba(10, 71, 150, 0.99)) !important; color: #fff !important; }
+#hangarOverviewSection .loadout-comparison-card .loadout-detail-actions button:disabled { opacity: 0.42 !important; cursor: not-allowed !important; }
+
+#hangarOverviewSection .compatible-vault-panel { grid-template-rows: auto minmax(72px, 1fr) !important; gap: 7px !important; padding: 9px 11px !important; border-radius: 12px !important; }
+#hangarOverviewSection .compatible-vault-actions .equipment-count-chip,
+#hangarOverviewSection .loadout-vault-controls-hidden { display: none !important; }
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-list { grid-auto-columns: minmax(214px, 1fr) !important; gap: 8px !important; }
+
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-row {
+  display: grid !important;
+  grid-template-columns: 52px minmax(0, 1fr) auto !important;
+  grid-template-rows: auto !important;
+  align-items: center !important;
+  min-width: 214px !important;
+  width: auto !important;
+  height: 100% !important;
+  min-height: 74px !important;
+  max-height: none !important;
+  padding: 7px 9px !important;
+  border-radius: 10px !important;
+}
+
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-row.selected { border-color: #4de1f8 !important; box-shadow: inset 0 0 20px rgba(50, 198, 229, 0.1), 0 0 0 1px rgba(77, 225, 248, 0.24) !important; }
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-row > .quality-fx,
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-row > .quality-fx .quality-fx__item { grid-column: 1 !important; grid-row: 1 !important; width: 50px !important; height: 42px !important; min-width: 50px !important; max-width: 50px !important; max-height: 42px !important; }
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-row-copy { grid-column: 2 !important; grid-row: 1 !important; }
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-row-copy strong { font-size: 12px !important; }
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-row-copy small { color: #9f75e5 !important; font-size: 8px !important; font-weight: 800 !important; text-transform: uppercase !important; }
+#hangarOverviewSection .compatible-vault-panel .loadout-vault-tier-badge,
+#hangarOverviewSection .loadout-vault-row-stats { display: none !important; }
+
+#hangarOverviewSection .loadout-vault-row-stats > span { display: grid !important; align-content: center !important; min-width: 0 !important; padding: 3px 5px !important; border: 1px solid rgba(72, 150, 181, 0.2) !important; border-radius: 6px !important; background: rgba(1, 10, 17, 0.54) !important; text-align: center !important; }
+#hangarOverviewSection .loadout-vault-row-stats small,
+#hangarOverviewSection .loadout-vault-row-stats strong { display: block !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+#hangarOverviewSection .loadout-vault-row-stats small { color: #78909b !important; font-size: 7px !important; font-weight: 900 !important; text-transform: uppercase !important; }
+#hangarOverviewSection .loadout-vault-row-stats strong { margin-top: 1px !important; color: #edf9fd !important; font-size: 9px !important; }
+
+@media (max-width: 1120px) {
+  #hangarOverviewSection .adaptive-loadout-workspace { min-height: 730px !important; }
+}
+
+@media (max-width: 720px) {
+  #hangarOverviewSection .loadout-comparison-flow { grid-template-columns: 1fr !important; }
+  #hangarOverviewSection .loadout-comparison-arrow { height: 18px !important; transform: rotate(90deg) !important; }
+  #hangarOverviewSection .loadout-comparison-card .loadout-detail-actions { display: grid !important; }
+  #hangarOverviewSection .loadout-comparison-card .loadout-detail-actions button { width: 100% !important; }
+}

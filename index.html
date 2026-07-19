@@ -6,6 +6,7 @@
   <title>Lupen - Explore, Trade, Fight</title>
   <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
+  <link rel="stylesheet" href="loadout-redesign.css?v=20260719-comparison" />
 </head>
 <body>
   <div class="stars"></div>
@@ -301,8 +302,8 @@
       <div class="hangar-header prestige-header">
         <div>
           <p>HANGAR BAY</p>
-          <h2 id="hangarShipTitle">Pioneer Hunter</h2>
-          <span id="hangarShipSubtitle" class="hangar-subtitle">Equipped Hull</span>
+          <h2 id="hangarShipTitle">Loadout</h2>
+          <span id="hangarShipSubtitle" class="hangar-subtitle">Pioneer Hunter · Attacker / Interceptor</span>
         </div>
         <button class="screen-back-btn" onclick="returnToHub()">Back</button>
       </div>
@@ -335,7 +336,7 @@
             <header class="adaptive-loadout-header">
               <div>
                 <span>Equipped Loadout</span>
-                <small>Select a slot to inspect or replace its equipment.</small>
+                <small>Choose a slot, compare compatible gear, then confirm the replacement.</small>
               </div>
               <strong id="loadoutFittedSummary">0 / 0 slots fitted</strong>
             </header>
@@ -372,11 +373,11 @@
               <header>
                 <div>
                   <span>Compatible Vault Equipment</span>
-                  <small>Spare gear for the selected slot</small>
+                  <small id="loadoutVaultHint">Spare gear compatible with the selected slot</small>
                 </div>
                 <div class="compatible-vault-actions">
                   <strong class="equipment-count-chip" id="equipmentInventoryCount">0 / 50</strong>
-                  <button type="button" onclick="showHangarSection('vault')">Open Vault</button>
+                  <button type="button" onclick="showHangarSection('vault')">View All in Vault</button>
                 </div>
               </header>
 

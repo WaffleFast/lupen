@@ -93,4 +93,33 @@ test.describe("Adaptive Hangar Loadout", () => {
 
     await page.screenshot({ path: "artifacts/adaptive-loadout-moth-15-slots.png", fullPage: false });
   });
+
+  test("compares and replaces gear in a fully fitted selected slot", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await openAdaptiveLoadout(page, () => window.eval(`(() => {
+      localStorage.clear();
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      ownedShips = ["falcon"];
+      playerProgress.combatXp = 100000;
+      ownedGuns.heavyLance = 1;
+      shipLoadouts.falcon = {
+        guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1), makeLeveledLoadoutEntry("ionBlaster", "advanced", 3)],
+        attachments: [makeLeveledLoadoutEntry("cargoPod", "standard", 1), makeLeveledLoadoutEntry("jumpDrive", "refined", 2)]
+      };
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+    })()`));
+
+    await page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Heavy Lance" }).click();
+    await expect(page.locator(".loadout-comparison-item").last()).toContainText("Heavy Lance");
+    await expect(page.locator(".loadout-replace-action")).toBeEnabled();
+    await expect(page.locator(".loadout-replace-action")).toContainText("Replace Ion Blaster");
+    await page.screenshot({ path: "artifacts/adaptive-loadout-comparison.png", fullPage: false });
+    await page.locator(".loadout-replace-action").click();
+
+    await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[1]))).toBe("heavyLance");
+    await expect(page.locator("#installedGuns .loadout-grid-slot").nth(1)).toContainText("Heavy Lance");
+  });
 });

@@ -1382,8 +1382,13 @@ function canEquipVaultEntry(entry) {
   const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
   if (!unlock.unlocked) return false;
   const loadout = getShipLoadout(selectedHangarShipId);
-  if (entry.categoryKey === "guns") return (loadout.guns || []).length < getGunSlotLimit(selectedHangarShipId);
-  return (loadout.attachments || []).length < getAttachmentSlotLimit(selectedHangarShipId);
+  const list = entry.categoryKey === "guns" ? (loadout.guns || []) : (loadout.attachments || []);
+  const limit = entry.categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
+  const selectedIndex = Number(selectedLoadoutItemContext?.index);
+  const selectedSlotIsValid = selectedLoadoutItemContext?.categoryKey === entry.categoryKey &&
+    Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < limit;
+  if (selectedSlotIsValid) return true;
+  return list.filter(item => getEquipmentKey(item)).length < limit;
 }
 
 function findEquippedVaultEntryIndex(entry) {
@@ -1668,77 +1673,103 @@ function renderLoadoutItemDetail() {
   const panel = document.getElementById("loadoutItemDetailPanel");
   if (!panel) return;
 
-  if (selectedLoadoutItemContext?.source === "slot" && !selectedLoadoutItemContext.key) {
-    panel.innerHTML = `
-      <div class="loadout-detail-empty">
-        <strong>${escapeHtml(getSelectedLoadoutSlotLabel())}</strong>
-        <span>Select compatible equipment from the vault to fill this slot.</span>
-      </div>
-    `;
-    updateLoadoutVaultChrome();
-    return;
+  ensureSelectedLoadoutSlot();
+  const context = selectedLoadoutItemContext || {};
+  const categoryKey = context.categoryKey === "attachments" ? "attachments" : "guns";
+  const index = Math.max(0, Number(context.index || 0));
+  const loadout = getShipLoadout(selectedHangarShipId);
+  const list = categoryKey === "guns" ? (loadout.guns || []) : (loadout.attachments || []);
+  const currentEntry = list[index];
+  const currentKey = getEquipmentKey(currentEntry);
+  const currentDetail = currentKey ? getLoadoutDetailDefinition({
+    source: "equipped",
+    categoryKey,
+    index,
+    key: currentKey,
+    quality: getEquipmentQuality(currentEntry),
+    level: getEquipmentLevel(currentEntry)
+  }) : null;
+  const proposedDetail = context.source === "available" ? getLoadoutDetailDefinition(context) : null;
+
+  function parseStatValue(value) {
+    const parsed = Number.parseFloat(String(value ?? "").replaceAll(",", ""));
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
-  const detail = getLoadoutDetailDefinition(selectedLoadoutItemContext);
-  if (!detail) {
-    panel.innerHTML = `
-      <div class="loadout-detail-empty">
-        <strong>Select equipment</strong>
-        <span>Choose an installed slot or available item to manage this ship.</span>
-      </div>
-    `;
-    return;
+  function renderComparisonStats(detail, compareDetail = null) {
+    if (!detail?.stats?.length) return `<div class="loadout-comparison-empty-stats">No stat data</div>`;
+    const compareRows = new Map((compareDetail?.stats || []).map(row => [row.label, row]));
+    return detail.stats.slice(0, 3).map(row => {
+      const currentValue = parseStatValue(compareRows.get(row.label)?.value);
+      const nextValue = parseStatValue(row.value);
+      const delta = currentValue !== null && nextValue !== null ? nextValue - currentValue : null;
+      const deltaHtml = delta && Math.abs(delta) > 0.001
+        ? `<em class="${delta > 0 ? "positive" : "negative"}">${delta > 0 ? "+" : ""}${escapeHtml(Number.isInteger(delta) ? delta : delta.toFixed(1))}</em>`
+        : "";
+      return `
+        <div>
+          <span>${escapeHtml(row.label)}</span>
+          <strong>${escapeHtml(row.value)}</strong>
+          ${deltaHtml}
+        </div>
+      `;
+    }).join("");
   }
 
-  const equipAvailable = canEquipVaultEntry({
-    categoryKey: detail.categoryKey,
-    key: detail.key,
-    storedCount: detail.availableCount
-  });
-  const unequipAvailable = findEquippedVaultEntryIndex({
-    categoryKey: detail.categoryKey,
-    key: detail.key,
-    quality: detail.quality
-  }) >= 0;
-  const actionButton = detail.source === "equipped"
-    ? `<button type="button" class="primary" onclick="unequipSelectedLoadoutItem()" ${unequipAvailable ? "" : "disabled"}>
-          Unequip
-        </button>`
-    : `<button type="button" class="primary" onclick="equipSelectedLoadoutItem()" ${equipAvailable ? "" : "disabled"}>
-          Equip
-        </button>`;
-  const statRows = detail.stats.slice(0, 3);
-  const tier = getHangarEquipmentTier(detail.level);
-  const tierClass = getHangarEquipmentTierClass(detail.level);
+  function renderComparisonItem(detail, stateLabel, compareDetail = null) {
+    if (!detail) {
+      return `
+        <div class="loadout-comparison-empty">
+          <strong>${escapeHtml(stateLabel)}</strong>
+          <span>${currentDetail ? "Select compatible gear below to preview a replacement." : "This slot is empty. Select compatible gear below."}</span>
+        </div>
+      `;
+    }
+    const tier = getHangarEquipmentTier(detail.level);
+    return `
+      <div class="loadout-comparison-item quality-${escapeHtml(detail.quality)} forge-tier-scope ${getHangarEquipmentTierClass(detail.level)}" data-level="${escapeHtml(detail.level)}" data-tier="${escapeHtml(tier.key)}">
+        <span class="loadout-comparison-label">${escapeHtml(stateLabel)}</span>
+        <div class="loadout-comparison-identity">
+          ${renderQualityFx(detail.quality, { src: detail.icon, alt: detail.name, size: "small" })}
+          <div>
+            <strong>${escapeHtml(detail.name)}</strong>
+            <small>${renderHangarEquipmentTierPips(detail.level, "compact")} ${detail.quality !== "standard" ? `${escapeHtml(titleCaseQuality(detail.quality))} · ` : ""}${escapeHtml(tier.label)} · ${escapeHtml(formatRomanLevel(detail.level))}</small>
+          </div>
+        </div>
+        <div class="loadout-detail-stats">${renderComparisonStats(detail, compareDetail)}</div>
+      </div>
+    `;
+  }
+
+  const equipAvailable = proposedDetail ? canEquipVaultEntry({
+    categoryKey: proposedDetail.categoryKey,
+    key: proposedDetail.key,
+    storedCount: proposedDetail.availableCount
+  }) : false;
+  const primaryLabel = currentDetail ? `Replace ${currentDetail.name}` : `Equip ${proposedDetail?.name || "Item"}`;
+  const primaryButton = proposedDetail
+    ? `<button type="button" class="primary loadout-replace-action" onclick="equipSelectedLoadoutItem()" ${equipAvailable ? "" : "disabled"}>${escapeHtml(primaryLabel)}</button>`
+    : "";
+  const unequipButton = currentDetail
+    ? `<button type="button" class="loadout-unequip-action" onclick="unequipSelectedLoadoutSlotItem()">Unequip</button>`
+    : "";
 
   panel.innerHTML = `
-    <div class="loadout-detail-card quality-${escapeHtml(detail.quality)} forge-tier-scope ${tierClass}" data-level="${escapeHtml(detail.level)}" data-tier="${escapeHtml(tier.key)}">
-      <div class="loadout-detail-head">
-        ${renderQualityFx(detail.quality, { src: detail.icon, alt: detail.name, size: "small" })}
-        <div>
-          <span>${escapeHtml(detail.typeLabel)} / ${escapeHtml(titleCaseQuality(detail.quality))}</span>
-          <strong>${escapeHtml(detail.name)} / Lv ${formatNumber(detail.level)}</strong>
-          <small class="loadout-detail-tier">
-            ${renderHangarEquipmentTierPips(detail.level, "compact")}
-            <b>${escapeHtml(tier.label)} · ${escapeHtml(formatRomanLevel(detail.level))}</b>
-          </small>
-          ${detail.unlock?.locked ? `<small class="loadout-detail-inline-status">${escapeHtml(detail.unlock.message)}</small>` : ""}
-          ${selectedLoadoutStatusMessage ? `<small class="loadout-detail-inline-status">${escapeHtml(selectedLoadoutStatusMessage)}</small>` : ""}
-        </div>
-      </div>
-      <div class="loadout-detail-stats">
-        ${statRows.map(row => `
-          <div>
-            <span>${escapeHtml(row.label)}</span>
-            <strong>${escapeHtml(row.value)}</strong>
-          </div>
-        `).join("")}
+    <div class="loadout-comparison-card">
+      <div class="loadout-comparison-flow">
+        ${renderComparisonItem(currentDetail, "Currently Fitted")}
+        <span class="loadout-comparison-arrow" aria-hidden="true">›</span>
+        ${renderComparisonItem(proposedDetail, "Proposed Replacement", currentDetail)}
       </div>
       <div class="loadout-detail-actions">
-        ${actionButton}
+        ${primaryButton}
+        ${unequipButton}
       </div>
+      ${proposedDetail?.unlock?.locked ? `<small class="loadout-detail-inline-status">${escapeHtml(proposedDetail.unlock.message)}</small>` : ""}
+      ${selectedLoadoutStatusMessage ? `<small class="loadout-detail-inline-status">${escapeHtml(selectedLoadoutStatusMessage)}</small>` : ""}
     </div>
   `;
+  updateLoadoutVaultChrome();
 }
 
 function equipSelectedLoadoutItem() {
@@ -1788,6 +1819,17 @@ function unequipSelectedLoadoutItem() {
     level: detail.level
   };
   unequipSelectedVaultItem();
+}
+
+function unequipSelectedLoadoutSlotItem() {
+  ensureSelectedLoadoutSlot();
+  const categoryKey = selectedLoadoutItemContext?.categoryKey === "attachments" ? "attachments" : "guns";
+  const index = Number(selectedLoadoutItemContext?.index);
+  const limit = categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
+  if (!Number.isInteger(index) || index < 0 || index >= limit) return;
+  selectedLoadoutStatusMessage = "";
+  if (categoryKey === "guns") removeGun(index);
+  else removeAttachment(index);
 }
 
 function renderHangarVault() {
@@ -1869,8 +1911,8 @@ function renderHangarOverview() {
   const subtitle = document.getElementById("hangarShipSubtitle");
 
   const title = document.getElementById("hangarShipTitle");
-  if (title) title.textContent = ship.name;
-  if (subtitle) subtitle.textContent = getShipRole(currentShipId);
+  if (title) title.textContent = "Loadout";
+  if (subtitle) subtitle.textContent = `${ship.name} · ${getShipRole(currentShipId)}`;
 
   if (overviewName) overviewName.textContent = ship.name;
   if (overviewRole) overviewRole.textContent = getShipRole(currentShipId);
@@ -1887,7 +1929,7 @@ function renderHangarOverview() {
       <div class="hangar-stat-card shield-stat"><span>Shield</span><strong>${formatNumber(stats.shield)}</strong></div>
       <div class="hangar-stat-card hull-stat"><span>Armor</span><strong>${formatNumber(stats.armor)}</strong></div>
       <div class="hangar-stat-card cargo-stat"><span>Cargo</span><strong>${formatNumber(stats.cargo)}</strong></div>
-      <div class="hangar-stat-card jump-stat"><span>Jump</span><strong>${formatNumber(stats.jumpRecharge)}</strong></div>
+      <div class="hangar-stat-card jump-stat"><span>Jump</span><strong>${formatNumber(stats.jumpRecharge)} LY</strong></div>
       <div class="hangar-stat-card evasion-stat"><span>Evasion</span><strong>${formatEvasion(stats.evasion)}</strong></div>
     `;
   }
@@ -2765,6 +2807,8 @@ function updateLoadoutVaultChrome() {
 
   const selectedSlotBar = document.getElementById("loadoutSelectedSlotBar");
   if (selectedSlotBar) selectedSlotBar.textContent = `Selected Slot · ${getSelectedLoadoutSlotLabel()}`;
+  const vaultHint = document.getElementById("loadoutVaultHint");
+  if (vaultHint) vaultHint.textContent = `Spare gear compatible with ${getSelectedLoadoutSlotLabel()}`;
 
   const search = document.getElementById("loadoutVaultSearch");
   if (search && search.value !== selectedLoadoutVaultSearch) search.value = selectedLoadoutVaultSearch;
@@ -2962,14 +3006,14 @@ function renderGunInventory() {
     btn.disabled = entry.count <= 0 || !compatible;
     btn.onclick = () => compatible && selectAvailableLoadoutItem(entry.categoryKey, entry);
     btn.removeAttribute("title");
-    showHangarTooltip(btn, getEquipmentTooltipHtml(entry, entry.categoryKey));
-    bindHangarEquipmentTooltip(btn);
 
     btn.innerHTML = `
       ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "row" })}
       <span class="loadout-vault-row-copy">
         <strong>${escapeHtml(entry.name)}</strong>
-        <small>${escapeHtml(unlock.locked ? unlock.requirementLines.join(" / ") : getLoadoutVaultEntryStatLine(entry))}</small>
+        <small>${escapeHtml(unlock.locked
+          ? unlock.requirementLines.join(" / ")
+          : `${entry.quality !== "standard" ? `${titleCaseQuality(entry.quality)} · ` : ""}${tier.label} · ${formatRomanLevel(level)}`)}</small>
       </span>
       ${unlock.locked ? `<b class="loadout-vault-lock">LOCK</b>` : `
         <span class="loadout-vault-tier-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
@@ -2978,6 +3022,12 @@ function renderGunInventory() {
           <b>${formatRomanLevel(level)}</b>
         </span>
       `}
+      <span class="loadout-vault-row-stats">
+        ${(entry.categoryKey === "guns"
+          ? getWeaponPurchaseStatRows(GUNS[entry.key], entry.quality)
+          : getAttachmentPurchaseStatRows({ key: entry.key }, entry.quality)
+        ).slice(0, 3).map(row => `<span><small>${escapeHtml(row.label)}</small><strong>${escapeHtml(row.value)}</strong></span>`).join("")}
+      </span>
     `;
 
     box.appendChild(btn);
