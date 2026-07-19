@@ -6,10 +6,12 @@ const repoRoot = path.resolve(__dirname, "..");
 const downloadsDir = path.resolve(process.env.USERPROFILE || process.env.HOME || ".", "Downloads");
 
 const ships = {
-  "pioneer-hunter": "hunter.png",
-  "pioneer-destroyer": "destroyer.png",
-  "pioneer-moth": "moth.png",
-  "pioneer-freighter": "freighter.png"
+  "pioneer-hunter": { source: path.join(downloadsDir, "hunter.png") },
+  "pioneer-destroyer": {
+    source: path.join(repoRoot, "assets", "ships", "pioneer-destroyer", "pioneer-destroyer-source.png")
+  },
+  "pioneer-moth": { source: path.join(downloadsDir, "moth.png") },
+  "pioneer-freighter": { source: path.join(downloadsDir, "freighter.png") }
 };
 
 const sizes = {
@@ -19,13 +21,18 @@ const sizes = {
   small: 180
 };
 
-async function prepareShip(page, shipId, sourcePath) {
+async function prepareShip(page, shipId, sourcePath, mattePath = sourcePath) {
   if (!fs.existsSync(sourcePath)) throw new Error(`Missing source image: ${sourcePath}`);
+  if (!fs.existsSync(mattePath)) throw new Error(`Missing matte image: ${mattePath}`);
   const dataUrl = `data:image/png;base64,${fs.readFileSync(sourcePath).toString("base64")}`;
-  const variants = await page.evaluate(async ({ src, shipId, sizes }) => {
+  const matteDataUrl = `data:image/png;base64,${fs.readFileSync(mattePath).toString("base64")}`;
+  const variants = await page.evaluate(async ({ src, matteSrc, shipId, sizes }) => {
     const image = new Image();
     image.src = src;
     await image.decode();
+    const matteImage = new Image();
+    matteImage.src = matteSrc;
+    await matteImage.decode();
 
     const source = document.createElement("canvas");
     source.width = image.naturalWidth;
@@ -34,6 +41,13 @@ async function prepareShip(page, shipId, sourcePath) {
     context.drawImage(image, 0, 0);
     const imageData = context.getImageData(0, 0, source.width, source.height);
     const { data, width, height } = imageData;
+    const matte = document.createElement("canvas");
+    matte.width = width;
+    matte.height = height;
+    const matteContext = matte.getContext("2d", { willReadFrequently: true });
+    matteContext.drawImage(matteImage, 0, 0, width, height);
+    const matteData = matteContext.getImageData(0, 0, width, height).data;
+    const usesAlphaMatte = matteData[3] < 250;
     const pixelCount = width * height;
     const background = new Uint8Array(pixelCount);
     const queue = new Int32Array(pixelCount);
@@ -42,9 +56,10 @@ async function prepareShip(page, shipId, sourcePath) {
 
     function isRemovable(index) {
       const offset = index * 4;
-      const r = data[offset];
-      const g = data[offset + 1];
-      const b = data[offset + 2];
+      if (usesAlphaMatte) return matteData[offset + 3] <= 12;
+      const r = matteData[offset];
+      const g = matteData[offset + 1];
+      const b = matteData[offset + 2];
       const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
       const chroma = Math.max(r, g, b) - Math.min(r, g, b);
       return luminance <= 76 && chroma <= 42;
@@ -94,7 +109,7 @@ async function prepareShip(page, shipId, sourcePath) {
       entries[`${shipId}-${label}.webp`] = canvas.toDataURL("image/webp", 0.95);
     }
     return entries;
-  }, { src: dataUrl, shipId, sizes });
+  }, { src: dataUrl, matteSrc: matteDataUrl, shipId, sizes });
 
   const outputDir = path.join(repoRoot, "assets", "ships", shipId);
   fs.mkdirSync(outputDir, { recursive: true });
@@ -109,8 +124,8 @@ async function prepareShip(page, shipId, sourcePath) {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   try {
-    for (const [shipId, fileName] of Object.entries(ships)) {
-      await prepareShip(page, shipId, path.join(downloadsDir, fileName));
+    for (const [shipId, paths] of Object.entries(ships)) {
+      await prepareShip(page, shipId, paths.source, paths.matte || paths.source);
     }
   } finally {
     await browser.close();
