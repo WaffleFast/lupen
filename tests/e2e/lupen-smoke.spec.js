@@ -7474,7 +7474,7 @@ test.describe("Lupen browser smoke", () => {
     });
     await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(6);
     await page.locator("#loadoutVaultFilterAttachments").click();
-    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(4);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(5);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

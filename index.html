@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css?v=20260719-plan-gallery" />
+  <link rel="stylesheet" href="style.css?v=20260719-adaptive-loadout" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
 </head>
 <body>
@@ -316,108 +316,94 @@
       </div>
 
       <div id="hangarOverviewSection" class="hangar-section active">
-        <div class="integrated-hangar-grid">
-          <aside class="hangar-info-panel integrated-stats-panel">
-            <div class="panel-kicker">Current Hull</div>
-            <h3 id="overviewShipName">Pioneer Hunter</h3>
-            <div id="overviewStats" class="overview-stat-grid"></div>
+        <div class="adaptive-loadout-shell">
+          <aside class="active-vessel-panel">
+            <div class="panel-kicker">Active Vessel</div>
+            <div class="active-vessel-hero">
+              <div class="active-vessel-halo"></div>
+              <img id="overviewShipImage" src="assets/ships/lupen-origin.png" alt="Equipped ship">
+            </div>
+            <div class="active-vessel-identity">
+              <h3 id="overviewShipName">Pioneer Hunter</h3>
+              <p id="overviewShipRole">Attacker / Interceptor</p>
+            </div>
+            <div id="overviewStats" class="overview-stat-grid adaptive-vessel-stats"></div>
             <div id="overviewRepairPanel" class="overview-repair compact-repair-panel"></div>
           </aside>
 
-          <main class="hangar-loadout-stage hangar-loadout-stage-scalable hangar-orbit-loadout">
-            <div class="loadout-stage-header">
-              <span>Equipped Loadout</span>
-              <div class="loadout-title-cluster">
-                <small>Active Vessel</small>
-                <strong id="overviewNameplate">Pioneer Hunter</strong>
+          <main class="adaptive-loadout-workspace">
+            <header class="adaptive-loadout-header">
+              <div>
+                <span>Equipped Loadout</span>
+                <small>Select a slot to inspect or replace its equipment.</small>
               </div>
+              <strong id="loadoutFittedSummary">0 / 0 slots fitted</strong>
+            </header>
+
+            <div class="loadout-category-toggle" role="tablist" aria-label="Loadout category">
+              <button id="loadoutCategoryWeapons" type="button" onclick="setLoadoutSlotCategory('guns')">Weapons 0/0</button>
+              <button id="loadoutCategoryAttachments" type="button" onclick="setLoadoutSlotCategory('attachments')">Attachments 0/0</button>
             </div>
 
-            <div class="orbit-loadout-arena scalable-loadout-arena">
-              <div class="orbit-ship-stage loadout-hero-stage">
-                <div class="orbit-halo orbit-halo-outer"></div>
-                <div class="orbit-halo orbit-halo-inner"></div>
-                <img id="overviewShipImage" src="assets/ships/lupen-origin.png" alt="Equipped ship">
-                <div class="ship-effect-anchor ship-effect-blue"></div>
-              </div>
-
-              <div class="loadout-slot-matrix loadout-grid-stack" aria-label="Equipped loadout slots">
-                <div class="loadout-category-toggle" role="tablist" aria-label="Loadout category">
-                  <button id="loadoutCategoryWeapons" type="button" onclick="setLoadoutSlotCategory('guns')">Weapons 0/20</button>
-                  <button id="loadoutCategoryAttachments" type="button" onclick="setLoadoutSlotCategory('attachments')">Attachments 0/20</button>
+            <div class="adaptive-slot-workspace" aria-label="Equipped loadout slots">
+              <section class="loadout-slot-bank weapon-slot-bank">
+                <div class="loadout-bank-title compact-bank-title">
+                  <span>Weapon Hardpoints</span>
+                  <small id="gunSlotSummary">0 / 0 equipped</small>
                 </div>
-                <section class="loadout-slot-bank weapon-slot-bank">
-                  <div class="loadout-bank-title compact-bank-title">
-                    <span>Weapons</span>
-                    <small id="gunSlotSummary">0/20</small>
-                  </div>
-                  <div id="installedGuns" class="orbit-slot-rail gun-slot-grid scalable-loadout-grid"></div>
-                </section>
+                <div id="installedGuns" class="orbit-slot-rail gun-slot-grid scalable-loadout-grid"></div>
+              </section>
 
-                <section class="loadout-slot-bank attachment-slot-bank">
-                  <div class="loadout-bank-title compact-bank-title">
-                    <span>Attachments</span>
-                    <small id="attachmentSlotSummary">0/20</small>
-                  </div>
-                  <div id="installedAttachments" class="orbit-slot-rail attachment-slot-grid scalable-loadout-grid"></div>
-                </section>
-              </div>
+              <section class="loadout-slot-bank attachment-slot-bank">
+                <div class="loadout-bank-title compact-bank-title">
+                  <span>Equipment Mounts</span>
+                  <small id="attachmentSlotSummary">0 / 0 equipped</small>
+                </div>
+                <div id="installedAttachments" class="orbit-slot-rail attachment-slot-grid scalable-loadout-grid"></div>
+              </section>
             </div>
 
-            <div class="loadout-quick-stats" aria-label="Loadout totals">
-              <div>
-                <span>Weapons</span>
-                <strong id="gunSlotSummaryMirror">0/0</strong>
-                <div id="gunSlotPipsMirror" class="loadout-summary-pips ship-slot-pips" aria-hidden="true"></div>
-              </div>
-              <div>
-                <span>Attachments</span>
-                <strong id="attachmentSlotSummaryMirror">0/0</strong>
-                <div id="attachmentSlotPipsMirror" class="loadout-summary-pips ship-slot-pips" aria-hidden="true"></div>
-              </div>
-            </div>
-
-            <div class="loadout-stage-footer">
-              <span>Click installed systems to unequip</span>
-              <span>Large hulls support dense 15-slot banks</span>
-            </div>
-          </main>
-
-          <aside class="hangar-info-panel integrated-equipment-panel equipment-drawer-panel">
-            <div class="equipment-panel-header">
-              <div>
-                <div class="panel-kicker">Vault Equipment</div>
-                <small>Spare unequipped ship gear</small>
-              </div>
-              <div class="equipment-count-chip" id="equipmentInventoryCount">0 items</div>
-            </div>
-
-            <div class="loadout-vault-controls">
-              <div class="loadout-vault-filters">
-                <button id="loadoutVaultFilterGuns" type="button" onclick="setLoadoutVaultFilter('guns')">Guns</button>
-                <button id="loadoutVaultFilterAttachments" type="button" onclick="setLoadoutVaultFilter('attachments')">Attachments</button>
-              </div>
-              <div class="loadout-vault-search-row">
-                <label class="loadout-vault-search">
-                  <span class="loadout-search-icon" aria-hidden="true"></span>
-                  <input id="loadoutVaultSearch" type="search" placeholder="Search equipment..." oninput="setLoadoutVaultSearch(this.value)" />
-                </label>
-                <select id="loadoutVaultSort" class="loadout-vault-sort" onchange="setLoadoutVaultSort(this.value)">
-                  <option value="quality">Sort: Quality</option>
-                  <option value="name">Sort: Name</option>
-                  <option value="quantity">Sort: Quantity</option>
-                </select>
-              </div>
-              <div id="loadoutSelectedSlotBar" class="loadout-selected-slot-bar">Selected Slot: Weapon 02</div>
-            </div>
-
-            <div class="equipment-drawer">
+            <section class="selected-loadout-panel">
+              <div id="loadoutSelectedSlotBar" class="loadout-selected-slot-bar">Selected Slot · Weapon 02</div>
               <div id="loadoutItemDetailPanel" class="loadout-item-detail-panel"></div>
-              <div class="loadout-compatible-heading">Compatible Items</div>
-              <div id="gunInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid loadout-vault-list"></div>
-              <div id="attachmentInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid hidden-loadout-inventory"></div>
-            </div>
-          </aside>
+            </section>
+
+            <section class="compatible-vault-panel">
+              <header>
+                <div>
+                  <span>Compatible Vault Equipment</span>
+                  <small>Spare gear for the selected slot</small>
+                </div>
+                <div class="compatible-vault-actions">
+                  <strong class="equipment-count-chip" id="equipmentInventoryCount">0 / 50</strong>
+                  <button type="button" onclick="showHangarSection('vault')">Open Vault</button>
+                </div>
+              </header>
+
+              <div class="loadout-vault-controls loadout-vault-controls-hidden">
+                <div class="loadout-vault-filters">
+                  <button id="loadoutVaultFilterGuns" type="button" onclick="setLoadoutVaultFilter('guns')">Guns</button>
+                  <button id="loadoutVaultFilterAttachments" type="button" onclick="setLoadoutVaultFilter('attachments')">Attachments</button>
+                </div>
+                <div class="loadout-vault-search-row">
+                  <label class="loadout-vault-search">
+                    <span class="loadout-search-icon" aria-hidden="true"></span>
+                    <input id="loadoutVaultSearch" type="search" placeholder="Search equipment..." oninput="setLoadoutVaultSearch(this.value)" />
+                  </label>
+                  <select id="loadoutVaultSort" class="loadout-vault-sort" onchange="setLoadoutVaultSort(this.value)">
+                    <option value="quality">Sort: Quality</option>
+                    <option value="name">Sort: Name</option>
+                    <option value="quantity">Sort: Quantity</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="equipment-drawer adaptive-vault-drawer">
+                <div id="gunInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid loadout-vault-list"></div>
+                <div id="attachmentInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid hidden-loadout-inventory"></div>
+              </div>
+            </section>
+          </main>
         </div>
       </div>
 
@@ -791,7 +777,7 @@
   <script src="js/network/multiplayerOverlay.js?v=20260718-pioneer-line"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260716-bounty-complete"></script>
   <script src="js/04b-trade-terminal-v2.js?v=20260717-trade-quick-actions"></script>
-  <script src="js/05-hangar-store.js?v=20260719-plan-gallery"></script>
+  <script src="js/05-hangar-store.js?v=20260719-adaptive-loadout"></script>
   <script src="js/06-combat.js?v=20260715-space-volley"></script>
   <script src="js/07-save-load.js?v=20260718-pioneer-line"></script>
   <script src="js/08-tutorial.js?v=20260718-pioneer-line"></script>

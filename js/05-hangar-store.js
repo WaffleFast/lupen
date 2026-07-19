@@ -52,7 +52,6 @@ let selectedVaultSort = "quality";
 let selectedShipyardFilter = "all";
 let selectedShipPlanLineId = typeof PIONEER_LINE_ID !== "undefined" ? PIONEER_LINE_ID : "pioneer";
 let selectedShipPlanShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
-const LOADOUT_GRID_SLOT_COUNT = 20;
 const LOADOUT_VAULT_CAPACITY = 50;
 
 function isMultiplayerStagingStoreActive() {
@@ -1689,12 +1688,7 @@ function renderLoadoutItemDetail() {
     : `<button type="button" class="primary" onclick="equipSelectedLoadoutItem()" ${equipAvailable ? "" : "disabled"}>
           Equip
         </button>`;
-  const statRows = [
-    { label: "Owned", value: formatNumber(detail.ownedCount) },
-    { label: "Equipped", value: formatNumber(detail.equippedCount) },
-    { label: "Available", value: formatNumber(detail.availableCount) },
-    ...detail.stats
-  ].slice(0, 7);
+  const statRows = detail.stats.slice(0, 3);
   const tier = getHangarEquipmentTier(detail.level);
   const tierClass = getHangarEquipmentTierClass(detail.level);
 
@@ -1709,6 +1703,8 @@ function renderLoadoutItemDetail() {
             ${renderHangarEquipmentTierPips(detail.level, "compact")}
             <b>${escapeHtml(tier.label)} · ${escapeHtml(formatRomanLevel(detail.level))}</b>
           </small>
+          ${detail.unlock?.locked ? `<small class="loadout-detail-inline-status">${escapeHtml(detail.unlock.message)}</small>` : ""}
+          ${selectedLoadoutStatusMessage ? `<small class="loadout-detail-inline-status">${escapeHtml(selectedLoadoutStatusMessage)}</small>` : ""}
         </div>
       </div>
       <div class="loadout-detail-stats">
@@ -1719,8 +1715,6 @@ function renderLoadoutItemDetail() {
           </div>
         `).join("")}
       </div>
-      ${detail.unlock?.locked ? `<div class="loadout-detail-status">${escapeHtml(detail.unlock.message)}</div>` : ""}
-      ${selectedLoadoutStatusMessage ? `<div class="loadout-detail-status">${escapeHtml(selectedLoadoutStatusMessage)}</div>` : ""}
       <div class="loadout-detail-actions">
         ${actionButton}
       </div>
@@ -1848,6 +1842,7 @@ function renderHangarOverview() {
   const repairDisabled = missingHull <= 0 || credits < repairCost;
 
   const overviewName = document.getElementById("overviewShipName");
+  const overviewRole = document.getElementById("overviewShipRole");
   const overviewImage = document.getElementById("overviewShipImage");
   const overviewNameplate = document.getElementById("overviewNameplate");
   const overviewStats = document.getElementById("overviewStats");
@@ -1859,6 +1854,7 @@ function renderHangarOverview() {
   if (subtitle) subtitle.textContent = getShipRole(currentShipId);
 
   if (overviewName) overviewName.textContent = ship.name;
+  if (overviewRole) overviewRole.textContent = getShipRole(currentShipId);
   if (overviewImage) {
     overviewImage.src = typeof getShipAsset === "function" ? getShipAsset(ship.id, "master") : ship.image;
     overviewImage.alt = ship.name;
@@ -2226,8 +2222,18 @@ function renderHangarEditor() {
 
 function setSlotRailDensity(box, limit) {
   if (!box) return;
+  const spaciousColumns = Math.max(1, Math.min(3, limit <= 3 ? limit : Math.ceil(limit / 2)));
+  const columns = limit <= 6 ? spaciousColumns : 5;
+  const rows = Math.max(1, Math.ceil(limit / columns));
+  box.style.setProperty("--loadout-slot-columns", String(columns));
+  box.style.setProperty("grid-template-columns", `repeat(${columns}, minmax(0, 1fr))`, "important");
+  box.style.setProperty("grid-template-rows", `repeat(${rows}, minmax(0, 1fr))`, "important");
+  box.classList.toggle("spacious-slots", limit <= 6);
+  box.classList.toggle("compact-slots", limit >= 7 && limit <= 10);
+  box.classList.toggle("dense-slots", limit >= 11);
   box.classList.toggle("many-slots", limit >= 8);
   box.classList.toggle("very-many-slots", limit >= 14);
+  box.dataset.slotCount = String(limit);
 }
 
 function updateLoadoutSlotSummaries() {
@@ -2242,6 +2248,8 @@ function updateLoadoutSlotSummaries() {
   const attachmentToggleText = `Attachments ${attachmentCount}/${attachmentLimit}`;
   const gunMirrorText = `${gunCount}/${gunLimit}`;
   const attachmentMirrorText = `${attachmentCount}/${attachmentLimit}`;
+  const fittedTotal = gunCount + attachmentCount;
+  const slotTotal = gunLimit + attachmentLimit;
 
   const summaries = {
     gunSlotSummary: gunText,
@@ -2254,6 +2262,9 @@ function updateLoadoutSlotSummaries() {
     const node = document.getElementById(id);
     if (node) node.textContent = text;
   });
+
+  const fittedSummary = document.getElementById("loadoutFittedSummary");
+  if (fittedSummary) fittedSummary.textContent = `${fittedTotal} / ${slotTotal} slots fitted`;
 
   const toggleButtons = {
     loadoutCategoryWeapons: { categoryKey: "guns", text: gunToggleText },
@@ -2310,6 +2321,20 @@ function ensureSelectedLoadoutSlot() {
   const index = Number(current?.index);
   if (validCategory && Number.isInteger(index) && index >= 0 && index < limit) {
     selectedLoadoutSlotCategory = current.categoryKey;
+    if (current.source !== "available") {
+      const loadout = getShipLoadout(selectedHangarShipId);
+      const list = current.categoryKey === "guns" ? loadout.guns : loadout.attachments;
+      const entry = list?.[index];
+      const key = getEquipmentKey(entry);
+      selectedLoadoutItemContext = {
+        source: key ? "equipped" : "slot",
+        categoryKey: current.categoryKey,
+        index,
+        key,
+        quality: getEquipmentQuality(entry),
+        level: getEquipmentLevel(entry)
+      };
+    }
     return;
   }
 
@@ -2353,32 +2378,30 @@ function renderLoadoutSlotGrid(box, categoryKey) {
   const list = loadout[listName] || [];
   const limit = categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
   const definitionMap = categoryKey === "guns" ? GUNS : attachments;
-  setSlotRailDensity(box, LOADOUT_GRID_SLOT_COUNT);
+  setSlotRailDensity(box, limit);
   box.closest(".loadout-slot-bank")?.classList.toggle("active", selectedLoadoutSlotCategory === categoryKey);
 
   box.innerHTML = "";
 
-  for (let i = 0; i < LOADOUT_GRID_SLOT_COUNT; i++) {
+  for (let i = 0; i < limit; i++) {
     const entry = list[i];
     const key = getEquipmentKey(entry);
     const quality = getEquipmentQuality(entry);
     const level = getEquipmentLevel(entry);
     const tier = getHangarEquipmentTier(level);
     const item = definitionMap[key];
-    const supported = i < limit;
     const selected = selectedLoadoutItemContext?.categoryKey === categoryKey &&
       selectedLoadoutItemContext.index === i;
 
     const slot = document.createElement("button");
     const tierClass = item ? `forge-tier-scope ${getHangarEquipmentTierClass(level)}` : "";
-    slot.className = `equipment-slot scalable-loadout-slot loadout-grid-slot ${item ? "filled" : supported ? "empty" : "locked"} ${selected ? "selected" : ""} quality-${quality} ${tierClass}`;
+    slot.className = `equipment-slot scalable-loadout-slot loadout-grid-slot ${item ? "filled" : "empty"} ${selected ? "selected" : ""} quality-${quality} ${tierClass}`;
     slot.dataset.slotIndex = String(i + 1).padStart(2, "0");
     if (item) {
       slot.dataset.level = String(level);
       slot.dataset.tier = tier.key;
       slot.setAttribute("aria-label", `${item.name}, ${tier.label} tier, Level ${formatRomanLevel(level)}, slot ${i + 1}`);
     }
-    slot.disabled = !supported;
     slot.onclick = () => selectEquippedLoadoutVaultItem(categoryKey, i);
 
     if (item) {
@@ -2386,20 +2409,22 @@ function renderLoadoutSlotGrid(box, categoryKey) {
       showHangarTooltip(slot, getEquipmentTooltipHtml(tooltipEntry, categoryKey));
       bindHangarEquipmentTooltip(slot);
     } else {
-      slot.title = supported
-        ? `Empty ${categoryKey === "guns" ? "weapon" : "attachment"} slot ${i + 1}`
-        : `Locked ${categoryKey === "guns" ? "weapon" : "attachment"} slot ${i + 1}`;
+      slot.title = `Empty ${categoryKey === "guns" ? "weapon" : "attachment"} slot ${i + 1}`;
     }
 
     slot.innerHTML = item
-      ? `${renderQualityFx(quality, { src: item.image, alt: item.name, size: "slot" })}
-        <span class="loadout-slot-tier-badge" aria-hidden="true">
-          ${renderHangarEquipmentTierPips(level, "compact")}
-          <b>${formatRomanLevel(level)}</b>
+      ? `<span class="loadout-slot-number">${String(i + 1).padStart(2, "0")}</span>
+        ${renderQualityFx(quality, { src: item.image, alt: item.name, size: "slot" })}
+        <span class="loadout-slot-copy">
+          <strong>${escapeHtml(item.name)}</strong>
+          <small class="loadout-slot-tier-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
+            ${renderHangarEquipmentTierPips(level, "compact")}
+            <b>${formatRomanLevel(level)}</b>
+          </small>
         </span>`
-      : supported
-        ? `<span class="slot-empty-label" aria-hidden="true"><b>Empty</b> <small>Available</small></span>`
-        : `<span class="slot-lock-mark" aria-hidden="true">LOCK</span>`;
+      : `<span class="loadout-slot-number">${String(i + 1).padStart(2, "0")}</span>
+        <span class="slot-empty-plus" aria-hidden="true">+</span>
+        <span class="slot-empty-label" aria-hidden="true"><b>Empty</b><small>Available</small></span>`;
 
     box.appendChild(slot);
   }
@@ -2690,7 +2715,7 @@ function updateLoadoutVaultChrome() {
   if (countEl) countEl.textContent = `${formatNumber(total)} / ${formatNumber(LOADOUT_VAULT_CAPACITY)}`;
 
   const selectedSlotBar = document.getElementById("loadoutSelectedSlotBar");
-  if (selectedSlotBar) selectedSlotBar.textContent = `Selected Slot: ${getSelectedLoadoutSlotLabel()}`;
+  if (selectedSlotBar) selectedSlotBar.textContent = `Selected Slot · ${getSelectedLoadoutSlotLabel()}`;
 
   const search = document.getElementById("loadoutVaultSearch");
   if (search && search.value !== selectedLoadoutVaultSearch) search.value = selectedLoadoutVaultSearch;
