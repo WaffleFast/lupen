@@ -1972,6 +1972,8 @@ function renderOwnedShips() {
 
   const fleetCount = document.getElementById("fleetCountText");
   if (fleetCount) fleetCount.textContent = formatNumber(ownedShips.length);
+  const fleetCountLabel = document.getElementById("fleetCountLabel");
+  if (fleetCountLabel) fleetCountLabel.textContent = ownedShips.length === 1 ? "vessel owned" : "vessels owned";
 
   if (!ownedShips.includes(selectedFleetShipId)) {
     selectedFleetShipId = currentShipId || ownedShips[0];
@@ -1987,16 +1989,21 @@ function renderOwnedShips() {
     const isSelected = selectedFleetShipId === shipId;
 
     const card = document.createElement("button");
-    card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card owned ${isSelected ? "selected" : ""} ${isEquipped ? "active" : ""}`;
+    card.className = `fleet-ship-card fleet-roster-card owned ${isSelected ? "selected" : ""} ${isEquipped ? "active" : ""}`;
     card.dataset.shipId = shipId;
+    card.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    card.setAttribute("aria-label", `${ship.name}, ${getVesselExchangeClassLabel(ship)}${isEquipped ? ", active vessel" : ""}`);
     card.onclick = () => selectFleetShip(shipId);
     card.innerHTML = `
-      <div class="fleet-card-badge">${isEquipped ? "Active" : "Owned"}</div>
-      <div class="fleet-card-image-wrap">
+      <div class="fleet-roster-image">
         <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
       </div>
-      <div class="fleet-card-name">${ship.name}</div>
-      <div class="fleet-card-role">${getVesselExchangeClassLabel(ship)}</div>
+      <div class="fleet-roster-copy">
+        <span>${escapeHtml(ship.className || "Vessel")}</span>
+        <strong>${escapeHtml(ship.name)}</strong>
+        <small>${isEquipped ? "Current vessel" : getVesselExchangeClassLabel(ship)}</small>
+      </div>
+      ${isEquipped ? `<div class="fleet-roster-badge">Active</div>` : ""}
     `;
 
     box.appendChild(card);
@@ -2021,43 +2028,66 @@ function renderFleetDetail() {
   const status = document.getElementById("fleetDetailStatus");
   if (status) status.textContent = isEquipped ? "Active" : "Owned";
 
-  const primaryAction = isEquipped
-    ? `<button class="exchange-footer-secondary" disabled>Active</button>`
-    : `<button class="exchange-footer-secondary" disabled>Owned</button>`;
-  const secondaryAction = isEquipped
-    ? `<button class="exchange-footer-primary" onclick="showHangarSection('overview');">Open Loadout</button>`
-    : `<button class="exchange-footer-primary" onclick="equipShip('${shipId}'); showHangarSection('owned');">Set Active</button>`;
+  const hullState = isEquipped
+    ? getEffectiveRepairHullState()
+    : { hull: stats.hull, hullMax: stats.hullMax || stats.hull, missingHull: 0, source: "stored" };
+  const repairCost = isEquipped ? getRepairCost() : 0;
+  const hullPercent = hullState.hullMax > 0
+    ? Math.max(0, Math.min(100, (hullState.hull / hullState.hullMax) * 100))
+    : 0;
+  const needsRepair = isEquipped && hullState.missingHull > 0;
+  const repairDisabled = !needsRepair || credits < repairCost;
+  const statusLabel = isEquipped ? "Active" : "Owned";
+  const statusMessage = isEquipped ? "Vessel is ready for deployment." : "Ready to become your active vessel.";
+  const conditionLabel = needsRepair ? `${Math.round(hullPercent)}% hull integrity` : "Ready";
+  const repairButtonLabel = !isEquipped
+    ? "Activate to Repair"
+    : needsRepair
+      ? `Repair Hull · CR ${formatNumber(repairCost)}`
+      : "Repair Hull";
+  const managementAction = isEquipped
+    ? `<button class="fleet-management-primary" onclick="showHangarSection('overview');">Open Loadout</button>`
+    : `<button class="fleet-management-primary" onclick="equipShip('${shipId}'); showHangarSection('owned');">Set Active</button>`;
 
   panel.innerHTML = `
-    <div class="exchange-detail-stack">
-      <div class="exchange-detail-preview">
-        <div class="exchange-detail-glow"></div>
-        <div class="exchange-hero-ring"></div>
-        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
-      </div>
+    <div class="fleet-selected-vessel">
+      <section class="fleet-selected-hero">
+        <div class="fleet-selected-identity">
+          <span>${isEquipped ? "Active Vessel" : "Selected Vessel"}</span>
+          <h4>${escapeHtml(ship.name)}</h4>
+          <p>${getVesselExchangeClassLabel(ship)}</p>
+        </div>
+        <div class="fleet-selected-status ${isEquipped ? "active" : "owned"}">
+          <strong>${statusLabel}</strong>
+          <small>${statusMessage}</small>
+        </div>
+        <div class="fleet-selected-presentation">
+          <div class="fleet-selected-glow"></div>
+          <div class="fleet-selected-ring"></div>
+          <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
+        </div>
+      </section>
 
-      <div class="exchange-detail-identity">
-        <h4>${ship.name}</h4>
-        <p>${getVesselExchangeClassLabel(ship)}</p>
-      </div>
-
-      <div class="exchange-detail-stat-grid">
-        ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
+      <div class="fleet-selected-stats">
+        ${renderFleetStatChip("Hull", `${formatNumber(Math.floor(hullState.hull))} / ${formatNumber(hullState.hullMax)}`, "hull-stat")}
         ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
         ${renderFleetStatChip("Armor", formatNumber(stats.armor), "armor-stat")}
         ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
-        ${renderFleetStatChip("Jump", formatNumber(stats.jumpRecharge), "jump-stat")}
+        ${renderFleetStatChip("Jump", `${formatNumber(stats.jumpRecharge)} LY`, "jump-stat")}
         ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
       </div>
 
-      <div class="exchange-detail-loadout">
-        ${renderExchangeHardpointRail(shipId)}
-      </div>
-
-      <div class="exchange-detail-footer">
-        ${primaryAction}
-        ${secondaryAction}
-      </div>
+      <footer class="fleet-management-bar ${needsRepair ? "needs-repair" : "ready"}">
+        <div class="fleet-condition-summary">
+          <span>Hull Condition</span>
+          <strong>${conditionLabel}</strong>
+          <small>${formatNumber(Math.floor(hullState.hull))} / ${formatNumber(hullState.hullMax)} hull</small>
+        </div>
+        <div class="fleet-management-actions">
+          <button class="fleet-repair-action" onclick="repairCurrentShip()" ${repairDisabled ? "disabled" : ""}>${repairButtonLabel}</button>
+          ${managementAction}
+        </div>
+      </footer>
     </div>
   `;
 }

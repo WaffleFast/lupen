@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css?v=20260719-adaptive-loadout" />
+  <link rel="stylesheet" href="style.css?v=20260719-fleet-roster" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
 </head>
 <body>
@@ -408,30 +408,27 @@
       </div>
 
       <div id="hangarOwnedSection" class="hangar-section">
-        <div class="hangar-section-title compact-title fleet-title-row">
+        <div class="hangar-section-title fleet-title-row">
           <div>
             <h3>Fleet</h3>
-            <p>Browse owned vessels, compare builds and activate your current ship.</p>
+            <p>Select an owned vessel, review its condition and manage its loadout.</p>
           </div>
-          <div class="fleet-count-pill"><strong id="fleetCountText">0</strong> owned</div>
+          <div class="fleet-count-pill"><strong id="fleetCountText">0</strong> <span id="fleetCountLabel">vessels owned</span></div>
         </div>
 
         <div class="fleet-layout">
-          <div class="fleet-gallery-panel">
-            <div class="modern-store-panel-header vessel-browser-header">
-              <span>Owned Vessels</span>
+          <aside class="fleet-roster-panel">
+            <div class="fleet-roster-header">
+              <span>Fleet Roster</span>
+              <small>Owned vessels</small>
             </div>
-            <div class="vessel-filter-row fleet-filter-spacer" aria-hidden="true"></div>
-            <div id="ownedShipsList" class="fleet-card-grid"></div>
-          </div>
-
-          <aside class="fleet-detail-panel">
-            <div class="modern-store-panel-header">
-              <span>Ship Detail</span>
-              <small id="fleetDetailStatus">Active</small>
-            </div>
-            <div id="fleetDetailPanel" class="fleet-detail-body"></div>
+            <div id="ownedShipsList" class="fleet-card-grid fleet-roster-list"></div>
           </aside>
+
+          <section class="fleet-vessel-workspace">
+            <span id="fleetDetailStatus" class="sr-only">Active</span>
+            <div id="fleetDetailPanel" class="fleet-detail-body"></div>
+          </section>
         </div>
       </div>
 
@@ -777,7 +774,7 @@
   <script src="js/network/multiplayerOverlay.js?v=20260718-pioneer-line"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260716-bounty-complete"></script>
   <script src="js/04b-trade-terminal-v2.js?v=20260717-trade-quick-actions"></script>
-  <script src="js/05-hangar-store.js?v=20260719-adaptive-loadout"></script>
+  <script src="js/05-hangar-store.js?v=20260719-fleet-roster"></script>
   <script src="js/06-combat.js?v=20260715-space-volley"></script>
   <script src="js/07-save-load.js?v=20260718-pioneer-line"></script>
   <script src="js/08-tutorial.js?v=20260718-pioneer-line"></script>
