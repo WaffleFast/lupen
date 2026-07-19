@@ -896,8 +896,19 @@ function sortVaultEntries(a, b) {
 
 function getVaultFilteredEntries() {
   const entries = buildVaultEntries();
+  const query = selectedVaultSearch.trim().toLowerCase();
   return entries.filter(entry => {
     if (hangarVaultFilter !== "all" && entry.categoryKey !== hangarVaultFilter) return false;
+    if (query) {
+      const haystack = [
+        entry.name,
+        entry.category,
+        entry.categoryKey,
+        getVaultQualityLabel(entry),
+        entry.stackable ? "resource material" : getHangarTierLabel(entry.level)
+      ].join(" ").toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
     return true;
   });
 }
@@ -1099,16 +1110,24 @@ function renderVaultFilters() {
   const bar = document.getElementById("vaultFilterBar");
   if (!bar) return;
 
+  const entries = buildVaultEntries();
   const filters = [
-    { key: "all", label: "All" },
-    { key: "guns", label: "Guns" },
-    { key: "attachments", label: "Attachments" },
-    { key: "cores", label: "Cores" }
+    { key: "all", label: "All Items", helper: "Everything stored" },
+    { key: "guns", label: "Weapons", helper: "Ship armaments" },
+    { key: "attachments", label: "Attachments", helper: "Hull equipment" },
+    { key: "cores", label: "Cores", helper: "Upgrade materials" }
   ];
 
-  bar.innerHTML = filters.map(filter => `
-    <button id="vaultFilter${filter.label.replace(/\s+/g, "")}" class="vault-filter-btn ${hangarVaultFilter === filter.key ? "active" : ""}" onclick="setHangarVaultFilter('${filter.key}')">${filter.label}</button>
-  `).join("");
+  bar.innerHTML = filters.map(filter => {
+    const count = filter.key === "all" ? entries.length : entries.filter(entry => entry.categoryKey === filter.key).length;
+    const legacyId = filter.key === "all" ? "All" : filter.key === "guns" ? "Guns" : filter.key === "attachments" ? "Attachments" : "Cores";
+    return `
+      <button id="vaultFilter${legacyId}" class="vault-filter-btn ${hangarVaultFilter === filter.key ? "active" : ""}" aria-pressed="${hangarVaultFilter === filter.key ? "true" : "false"}" onclick="setHangarVaultFilter('${filter.key}')">
+        <span><strong>${filter.label}</strong><small>${filter.helper}</small></span>
+        <b>${formatNumber(count)}</b>
+      </button>
+    `;
+  }).join("");
 
   const search = document.getElementById("vaultSearchInput");
   if (search && search.value !== selectedVaultSearch) search.value = selectedVaultSearch;
@@ -3450,28 +3469,46 @@ function renderShipyardDetail() {
 
   const requirementHtml = renderExchangeRequirementRows(unlock);
   const statusLabel = unlock.state === "locked" ? "Locked" : equipped ? "Active" : owned ? "Owned" : "Available";
+  const statusMessage = unlock.state === "locked"
+    ? "Recover the required plan progress before purchase."
+    : equipped
+      ? "This vessel is currently active."
+      : owned
+        ? "Owned and ready to become your active vessel."
+        : starterClaim
+          ? "Your first hull is ready to claim."
+          : `Available for CR ${formatNumber(ship.price)}.`;
 
   panel.innerHTML = `
-    <div class="exchange-detail-stack ${unlock.locked ? "is-locked" : "is-open"}">
-      <div class="exchange-detail-preview">
+    <div class="exchange-selected-vessel ${unlock.locked ? "is-locked" : "is-open"}">
+      <section class="exchange-detail-preview">
+        <div class="exchange-selected-identity">
+          <span>${equipped ? "Active Vessel" : owned ? "Owned Vessel" : "Selected Hull"}</span>
+          <h4>${escapeHtml(ship.name)}</h4>
+          <p>${getVesselExchangeClassLabel(ship)}</p>
+        </div>
         <div class="exchange-detail-status-chip ${unlock.state}">${statusLabel}</div>
-        <div class="exchange-detail-glow"></div>
-        <div class="exchange-hero-ring"></div>
-        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
-      </div>
-
-      <div class="exchange-detail-identity">
-        <h4>${ship.name}</h4>
-        <p>${getVesselExchangeClassLabel(ship)}</p>
-      </div>
+        <div class="exchange-selected-presentation">
+          <div class="exchange-detail-glow"></div>
+          <div class="exchange-hero-ring"></div>
+          <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
+        </div>
+      </section>
       ${requirementHtml}
 
       ${renderExchangeShipStatsSection(ship.id, stats)}
 
-      <div class="exchange-detail-footer">
-        ${primaryAction}
-        ${secondaryAction}
-      </div>
+      <footer class="exchange-purchase-bar">
+        <div class="exchange-purchase-summary">
+          <span>Hull Status</span>
+          <strong>${statusLabel}</strong>
+          <small>${statusMessage}</small>
+        </div>
+        <div class="exchange-detail-footer">
+          ${primaryAction}
+          ${secondaryAction}
+        </div>
+      </footer>
     </div>
   `;
 }

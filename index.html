@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css?v=20260719-fleet-roster" />
+  <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
 </head>
 <body>
@@ -433,18 +433,19 @@
       </div>
 
       <div id="hangarShipyardSection" class="hangar-section">
-        <div class="hangar-section-title compact-title shipyard-title-row fleet-title-row">
+        <div class="hangar-section-title shipyard-title-row">
           <div>
             <h3>Vessel Exchange</h3>
-            <p>Purchase new hulls. Your loadout decides how each vessel performs.</p>
+            <p>Select an available hull, compare its capabilities and expand your fleet.</p>
           </div>
           <div class="shipyard-credit-pill">CR <strong id="shipyardCreditText">0</strong></div>
         </div>
 
         <div class="shipyard-layout vessel-exchange-layout">
-          <div class="shipyard-catalog-panel fleet-gallery-panel">
-            <div class="modern-store-panel-header vessel-browser-header">
-              <span>Available Vessels</span>
+          <aside class="shipyard-catalog-panel exchange-catalog-panel">
+            <div class="exchange-catalog-header">
+              <span>Hull Catalogue</span>
+              <small>Available vessels</small>
             </div>
             <div class="vessel-filter-row" aria-label="Vessel filters">
               <button id="shipyardFilterAll" type="button" onclick="setShipyardFilter('all')">All</button>
@@ -452,15 +453,12 @@
               <button id="shipyardFilterUnowned" type="button" onclick="setShipyardFilter('unowned')">Unowned</button>
             </div>
             <div id="shipShop" class="shipyard-grid vessel-card-grid"></div>
-          </div>
+          </aside>
 
-          <div class="shipyard-detail-panel fleet-detail-panel">
-            <div class="modern-store-panel-header">
-              <span>Ship Detail</span>
-              <small id="shipyardDetailStatus">Available</small>
-            </div>
-            <div id="shipyardDetailPanel" class="shipyard-detail-body fleet-detail-body"></div>
-          </div>
+          <section class="shipyard-detail-panel exchange-vessel-workspace">
+            <span id="shipyardDetailStatus" class="sr-only">Available</span>
+            <div id="shipyardDetailPanel" class="shipyard-detail-body"></div>
+          </section>
         </div>
       </div>
 
@@ -476,38 +474,48 @@
       </div>
 
       <div id="hangarVaultSection" class="hangar-section">
+        <div class="hangar-section-title vault-title-row">
+          <div>
+            <h3>Vault</h3>
+            <p>Browse stored equipment, compare tiers and review upgrade materials.</p>
+          </div>
+          <strong id="vaultCapacityText" class="vault-capacity-pill">0 / 50</strong>
+        </div>
+
         <div class="vault-layout station-vault-layout">
-          <div class="vault-main-panel">
-            <div class="vault-storage-header">
+          <aside class="vault-index-panel">
+            <div class="vault-index-header">
+              <span>Vault Index</span>
+              <small>Stored inventory</small>
+            </div>
+            <div id="vaultFilterBar" class="vault-filter-row"></div>
+          </aside>
+
+          <section class="vault-main-panel vault-workspace-panel">
+            <header class="vault-workspace-header">
               <div>
                 <span>Vault Storage</span>
-                <p>Spare weapons, attachments, and upgrade cores stored at this station.</p>
+                <small>Weapons, attachments and upgrade materials</small>
               </div>
-              <strong id="vaultCapacityText">0 / 50</strong>
-            </div>
-            <div class="vault-filter-header">
-              <div id="vaultFilterBar" class="vault-filter-row"></div>
-            </div>
-            <div class="vault-utility-row">
-              <label class="vault-search-field">
-                <span aria-hidden="true"></span>
-                <input id="vaultSearchInput" type="search" placeholder="Search vault..." oninput="setHangarVaultSearch(this.value)" />
-              </label>
-              <select id="vaultSortSelect" class="vault-sort-select" onchange="setHangarVaultSort(this.value)">
-                <option value="quality">Sort: Quality</option>
-                <option value="name">Sort: Name</option>
-                <option value="level">Sort: Level</option>
-              </select>
-            </div>
-            <div id="vaultCatalogGrid" class="vault-catalog-grid"></div>
-          </div>
+              <div class="vault-utility-row">
+                <label class="vault-search-field">
+                  <span aria-hidden="true"></span>
+                  <input id="vaultSearchInput" type="search" placeholder="Search vault..." oninput="setHangarVaultSearch(this.value)" />
+                </label>
+                <select id="vaultSortSelect" class="vault-sort-select" onchange="setHangarVaultSort(this.value)">
+                  <option value="quality">Sort: Quality</option>
+                  <option value="name">Sort: Name</option>
+                  <option value="level">Sort: Level</option>
+                </select>
+              </div>
+            </header>
 
-          <div class="vault-detail-panel">
-            <div class="modern-store-panel-header">
-              <span>Item Detail</span>
+            <div id="vaultCatalogGrid" class="vault-catalog-grid"></div>
+
+            <div class="vault-detail-panel vault-selection-panel">
+              <div id="vaultDetailPanel" class="vault-detail-panel-body"></div>
             </div>
-            <div id="vaultDetailPanel" class="vault-detail-panel-body"></div>
-          </div>
+          </section>
         </div>
       </div>
     </section>
@@ -774,7 +782,7 @@
   <script src="js/network/multiplayerOverlay.js?v=20260718-pioneer-line"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260716-bounty-complete"></script>
   <script src="js/04b-trade-terminal-v2.js?v=20260717-trade-quick-actions"></script>
-  <script src="js/05-hangar-store.js?v=20260719-fleet-roster"></script>
+  <script src="js/05-hangar-store.js?v=20260719-exchange-vault"></script>
   <script src="js/06-combat.js?v=20260715-space-volley"></script>
   <script src="js/07-save-load.js?v=20260718-pioneer-line"></script>
   <script src="js/08-tutorial.js?v=20260718-pioneer-line"></script>
