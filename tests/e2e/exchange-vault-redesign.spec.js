@@ -105,11 +105,31 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await page.locator("#vaultSearchInput").fill("Pulse");
     await expect(page.locator("#vaultCatalogGrid .vault-storage-card")).toHaveCount(1);
     await expect(page.locator("#vaultCatalogGrid .vault-storage-card")).toContainText("Pulse Laser");
+    await expect(page.locator("#vaultCatalogGrid .vault-storage-card")).toContainText("1 stored · 1 equipped");
     await expect(page.locator("#vaultDetailPanel")).toContainText("Pulse Laser");
 
     await page.locator("#vaultSearchInput").fill("");
     await page.locator("#vaultFilterAll").click();
     await expect(page.locator("#vaultCatalogGrid .vault-storage-card")).toHaveCount(5);
     await page.screenshot({ path: "artifacts/vault-library-redesign.png", fullPage: false });
+  });
+
+  test("keeps equipped-only gear visible in the owned equipment library", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await openHangarSection(page, "vault", `
+      ownedGuns = { ...ownedGuns, pulseLaser: 0 };
+      inventoryItems = [];
+      shipLoadouts.falcon = { guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)], attachments: [] };
+      hangarVaultFilter = "guns";
+      selectedVaultSearch = "";
+      selectedVaultGroupKey = null;
+    `);
+
+    const pulseCard = page.locator("#vaultCatalogGrid .vault-storage-card").filter({ hasText: "Pulse Laser" });
+    await expect(pulseCard).toHaveCount(1);
+    await expect(pulseCard).toContainText("0 stored · 1 equipped");
+    await pulseCard.click();
+    await expect(page.locator("#vaultDetailPanel")).toContainText("Stored");
+    await expect(page.locator("#vaultDetailPanel")).toContainText("Equipped");
   });
 });

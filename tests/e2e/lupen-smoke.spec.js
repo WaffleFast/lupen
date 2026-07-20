@@ -3016,7 +3016,7 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.actionRow.bottom).toBeLessThanOrEqual(centerHud.panel.bottom + 2);
     expect(centerHud.xpText).toContain("XP");
     expect(centerHud.cargoText).toContain("Cargo");
-    expect(centerHud.shipName).toContain("AZURE STRIKER");
+    expect(centerHud.shipName).toContain("PIONEER HUNTER");
     expect(centerHud.guildCount).toBe(0);
     expect(centerHud.centerText).not.toContain("Guild");
     expect(centerHud.bottomHud.height).toBeLessThanOrEqual(185);
@@ -7398,6 +7398,8 @@ test.describe("Lupen browser smoke", () => {
       }).length;
     }, "#gunInventory")).toBeGreaterThanOrEqual(3);
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']").first().click();
+    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Pulse Laser");
+    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 01" }).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser");
 
@@ -7432,6 +7434,8 @@ test.describe("Lupen browser smoke", () => {
       }).length;
     }, "#gunInventory")).toBeGreaterThanOrEqual(3);
     await page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']").first().click();
+    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Cargo Pod");
+    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Attachment 01" }).click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
 
@@ -7559,6 +7563,8 @@ test.describe("Lupen browser smoke", () => {
     const jumpDrive = page.locator("#gunInventory .hangar-equipment-card[data-item-key='jumpDrive']");
     await expect(jumpDrive).toHaveCount(1);
     await jumpDrive.click();
+    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Jump Drive");
+    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Attachment 01" }).click();
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Jump Drive");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText(/Unique\s*·\s*III/i);
 
@@ -7639,6 +7645,8 @@ test.describe("Lupen browser smoke", () => {
     const godlikeIon = page.locator("#gunInventory .hangar-equipment-card[data-item-key='ionBlaster']");
     await expect(godlikeIon).toHaveCount(1);
     await godlikeIon.click();
+    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Ion Blaster");
+    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 02" }).click();
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Ion Blaster");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText(/Godlike/i);
 
@@ -8329,7 +8337,7 @@ test.describe("Lupen browser smoke", () => {
     expect(matrix.rows).toHaveLength(6);
     expect(matrix.alerts.filter(message => /No empty gun slots|No empty attachment slots/.test(message))).toHaveLength(12);
     for (const row of matrix.rows) {
-      expect(row.image, row.name).toMatch(/assets\/ships\/.+\.webp$/);
+      expect(row.image, row.name).toMatch(/assets\/ships\/.+\.webp(?:\?.*)?$/);
       expect(row.gunCount, row.name).toBe(row.gunSlots);
       expect(row.gunCountAfterOverflow, row.name).toBe(row.gunSlots);
       expect(row.attachmentCount, row.name).toBe(row.attachmentSlots);

@@ -786,7 +786,7 @@ function buildVaultEntries() {
     const signature = getSignature(key, quality, safeLevel);
     const safeInventoryId = String(inventoryId || "");
     return {
-      groupKey: resource ? `${signature}__resource` : `${signature}__${source}__${safeInventoryId || index}`,
+      groupKey: resource ? `${signature}__resource` : `${signature}__${source}__${safeInventoryId || (source === "owned" ? "stored" : index)}`,
       signature,
       key,
       quality,
@@ -810,7 +810,7 @@ function buildVaultEntries() {
     const signature = getSignature(key, quality, level);
     storedCounts.set(signature, (storedCounts.get(signature) || 0) + 1);
     const entry = makeEntry({ key, quality, level, source, index, storedCount: 1, count: 1, inventoryId });
-    if (entry) entries.push(entry);
+    if (entry && !entries.some(existing => existing.groupKey === entry.groupKey)) entries.push(entry);
   }
 
   function addResource(key, quality, quantity = 1, override = {}) {
@@ -873,6 +873,21 @@ function buildVaultEntries() {
     });
   }
 
+  const representedSignatures = new Set(entries.map(entry => entry.signature));
+  equippedCounts.forEach((equippedCount, signature) => {
+    if (representedSignatures.has(signature) || equippedCount <= 0) return;
+    const [key, quality = "standard", rawLevel = "1"] = signature.split("__");
+    const entry = makeEntry({
+      key,
+      quality,
+      level: Math.max(1, Number(rawLevel || 1)),
+      source: "equipped",
+      storedCount: 0,
+      count: equippedCount
+    });
+    if (entry) entries.push(entry);
+  });
+
   entries.forEach(entry => {
     entry.storedCount = storedCounts.get(entry.signature) || entry.storedCount || 0;
     entry.count = entry.storedCount + (equippedCounts.get(entry.signature) || 0);
@@ -882,7 +897,8 @@ function buildVaultEntries() {
 }
 
 function getVaultCapacityUsage() {
-  return buildVaultEntries().filter(entry => ["guns", "attachments"].includes(entry.categoryKey) && !entry.resource).length;
+  return ["guns", "attachments"].reduce((total, categoryKey) => total + getInventoryEntriesForCategory(categoryKey)
+    .reduce((sum, entry) => sum + Number(entry.count || 0), 0), 0);
 }
 
 function sortVaultEntries(a, b) {
@@ -1201,14 +1217,16 @@ function getVaultEntryStats(entry) {
       return [
         { label: "Damage", value: formatNumber(getWeaponPurchaseDamage(gun, entry.quality)) },
         { label: "Fire Rate", value: getVaultFireRateLabel(gun) },
-        { label: "Owned", value: formatNumber(entry.storedCount || 0) }
+        { label: "Stored", value: formatNumber(entry.storedCount || 0) },
+        { label: "Equipped", value: formatNumber(entry.equippedCount || 0) }
       ];
     }
   } else if (item.kind === "attachment") {
     const effectStats = getAttachmentPurchaseStatRows(item, entry.quality);
     return [
       ...(effectStats.length ? [effectStats[0]] : []),
-      { label: "Owned", value: formatNumber(entry.storedCount || 0) }
+      { label: "Stored", value: formatNumber(entry.storedCount || 0) },
+      { label: "Equipped", value: formatNumber(entry.equippedCount || 0) }
     ];
   } else if (item.kind === "core") {
     const useText = entry.key === "lupenShards" ? "Level upgrade" : "Quality upgrade";
@@ -1300,6 +1318,7 @@ function renderVaultCatalog() {
       </div>
       <div class="vault-storage-copy">
         <strong>${entry.name}</strong>
+        ${entry.stackable ? "" : `<span>${formatNumber(entry.storedCount || 0)} stored · ${formatNumber(entry.equippedCount || 0)} equipped</span>`}
       </div>
       ${entry.stackable ? "" : `
         <span class="vault-level-badge hangar-tier-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
@@ -1561,7 +1580,10 @@ function selectAvailableLoadoutItem(categoryKey, entry) {
     quality: entry.quality || "standard",
     level: Math.max(1, Number(entry.level || 1))
   };
-  equipSelectedLoadoutItem();
+  renderInstalledGuns();
+  renderInstalledAttachments();
+  renderGunInventory();
+  renderLoadoutItemDetail();
 }
 
 function getCurrentShipEquippedCount(key, quality, categoryKey) {
@@ -2779,7 +2801,7 @@ function updateLoadoutVaultChrome() {
   const vaultTitle = document.getElementById("loadoutVaultTitle");
   if (vaultTitle) vaultTitle.textContent = isAttachmentSlot ? "Vault Attachments" : "Vault Weapons";
   const vaultHint = document.getElementById("loadoutVaultHint");
-  if (vaultHint) vaultHint.textContent = `Select an item to equip it to ${getSelectedLoadoutSlotLabel()}`;
+  if (vaultHint) vaultHint.textContent = `Choose stored gear for ${getSelectedLoadoutSlotLabel()}, then confirm Equip`;
 
   const search = document.getElementById("loadoutVaultSearch");
   if (search && search.value !== selectedLoadoutVaultSearch) search.value = selectedLoadoutVaultSearch;
@@ -2934,28 +2956,56 @@ function renderAttachmentInventory() {
   updateLoadoutVaultChrome();
 }
 
+function renderLoadoutVaultSelectionAction() {
+  const panel = document.getElementById("loadoutVaultSelectionAction");
+  if (!panel) return;
+
+  const context = selectedLoadoutItemContext;
+  const detail = context?.source === "available" ? getLoadoutDetailDefinition(context) : null;
+  if (!detail || detail.availableCount <= 0) {
+    panel.innerHTML = "";
+    panel.classList.remove("visible");
+    return;
+  }
+
+  const slotLabel = getSelectedLoadoutSlotLabel();
+  const countLabel = `${formatNumber(detail.availableCount)} stored`;
+  panel.classList.add("visible");
+  panel.innerHTML = `
+    <div class="loadout-vault-selection-copy">
+      <span>Selected from Vault</span>
+      <strong>${escapeHtml(detail.name)}</strong>
+      <small>${escapeHtml(countLabel)} · ${escapeHtml(slotLabel)}</small>
+    </div>
+    <button type="button" class="loadout-vault-confirm-action" onclick="equipSelectedLoadoutItem()">
+      Equip to ${escapeHtml(slotLabel)}
+    </button>
+  `;
+}
+
 function renderGunInventory() {
   const box = document.getElementById("gunInventory");
   if (!box) return;
 
-  const entries = getFilteredLoadoutVaultEntries()
-    .flatMap(entry => Array.from({ length: Math.max(1, Number(entry.count || 1)) }, (_unused, index) => ({
-      ...entry,
-      count: 1,
-      displayKey: `${entry.groupKey}__${index}`
-    })));
+  const entries = getFilteredLoadoutVaultEntries();
   const selectedCategory = selectedLoadoutItemContext?.categoryKey;
   box.innerHTML = "";
   updateLoadoutVaultChrome();
 
   if (!entries.length) {
     const categoryLabel = selectedLoadoutItemContext?.categoryKey === "attachments" ? "attachments" : "weapons";
+    const loadout = getShipLoadout(selectedHangarShipId);
+    const equippedList = categoryLabel === "attachments" ? (loadout.attachments || []) : (loadout.guns || []);
+    const equippedCount = equippedList.filter(entry => getEquipmentKey(entry)).length;
     box.innerHTML = `
       <div class="loadout-vault-empty">
-        <strong>No ${categoryLabel} in your Vault</strong>
-        <span>Purchased and recovered ${categoryLabel} will appear here.</span>
+        <strong>No stored ${categoryLabel}</strong>
+        <span>${equippedCount > 0
+          ? `Your equipped ${categoryLabel} are shown above. Unequip one to return it here.`
+          : `Purchased and recovered ${categoryLabel} will appear here.`}</span>
       </div>
     `;
+    renderLoadoutVaultSelectionAction();
     return;
   }
 
@@ -2987,6 +3037,7 @@ function renderGunInventory() {
           ? unlock.requirementLines.join(" / ")
           : `${entry.quality !== "standard" ? `${titleCaseQuality(entry.quality)} · ` : ""}${tier.label} · ${formatRomanLevel(level)}`)}</small>
       </span>
+      <b class="loadout-vault-quantity">x${formatNumber(entry.count)} stored</b>
       ${unlock.locked ? `<b class="loadout-vault-lock">LOCK</b>` : `
         <span class="loadout-vault-tier-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
           ${renderHangarEquipmentTierPips(level, "compact")}
@@ -3004,6 +3055,7 @@ function renderGunInventory() {
 
     box.appendChild(btn);
   });
+  renderLoadoutVaultSelectionAction();
 }
 
 function renderAttachmentShop() {

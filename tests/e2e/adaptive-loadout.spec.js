@@ -93,7 +93,7 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.screenshot({ path: "artifacts/adaptive-loadout-moth-15-slots.png", fullPage: false });
   });
 
-  test("directly replaces and unequips gear in a fully fitted selected slot", async ({ page }) => {
+  test("selects, explicitly replaces and unequips gear in a fully fitted slot", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
       localStorage.clear();
@@ -112,6 +112,9 @@ test.describe("Adaptive Hangar Loadout", () => {
     })()`));
 
     await page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Heavy Lance" }).click();
+    await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[1]))).toBe("ionBlaster");
+    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Heavy Lance");
+    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 02" }).click();
     await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[1]))).toBe("heavyLance");
     await expect(page.locator("#installedGuns .loadout-grid-slot").nth(1)).toContainText("Heavy Lance");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Heavy Lance");
@@ -120,5 +123,48 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip", exact: true }).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
     await expect.poll(() => page.evaluate(() => shipLoadouts.falcon.guns.some(entry => getEquipmentKey(entry) === "heavyLance"))).toBe(false);
+  });
+
+  test("keeps a purchased weapon through selection, equip, unequip and reload", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await openAdaptiveLoadout(page, () => window.eval(`(() => {
+      localStorage.clear();
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      ownedShips = ["falcon"];
+      playerProgress.combatXp = 100000;
+      credits = 50000;
+      ownedGuns.ionBlaster = 0;
+      shipLoadouts.falcon = {
+        guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)],
+        attachments: []
+      };
+      buyGun("ionBlaster");
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+      selectEquippedLoadoutVaultItem("guns", 1);
+    })()`));
+
+    const ionCard = page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Ion Blaster" });
+    await expect(ionCard).toHaveCount(1);
+    await expect(ionCard).toContainText("x1 stored");
+    await ionCard.click();
+    await expect.poll(() => page.evaluate(() => ownedGuns.ionBlaster)).toBe(1);
+    await page.screenshot({ path: "artifacts/adaptive-loadout-vault-selection.png", fullPage: false });
+    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 02" }).click();
+    await expect.poll(() => page.evaluate(() => ({ stored: ownedGuns.ionBlaster, fitted: getEquipmentKey(shipLoadouts.falcon.guns[1]) }))).toEqual({ stored: 0, fitted: "ionBlaster" });
+
+    await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => ({ stored: ownedGuns.ionBlaster, fitted: shipLoadouts.falcon.guns.some(entry => getEquipmentKey(entry) === "ionBlaster") }))).toEqual({ stored: 1, fitted: false });
+    await page.reload();
+    await waitForGame(page);
+    await page.evaluate(() => window.eval(`(() => {
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+      setLoadoutSlotCategory("guns");
+    })()`));
+    await expect(page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Ion Blaster" })).toContainText("x1 stored");
   });
 });
