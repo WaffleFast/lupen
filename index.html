@@ -6,7 +6,7 @@
   <title>Lupen - Explore, Trade, Fight</title>
   <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
-  <link rel="stylesheet" href="loadout-redesign.css?v=20260719-comparison" />
+  <link rel="stylesheet" href="loadout-redesign.css?v=20260720-adaptive-library" />
 </head>
 <body>
   <div class="stars"></div>
@@ -381,28 +381,33 @@
                 </div>
               </header>
 
-              <div class="loadout-vault-controls loadout-vault-controls-hidden">
-                <div class="loadout-vault-filters">
-                  <button id="loadoutVaultFilterGuns" type="button" onclick="setLoadoutVaultFilter('guns')">Guns</button>
-                  <button id="loadoutVaultFilterAttachments" type="button" onclick="setLoadoutVaultFilter('attachments')">Attachments</button>
-                </div>
-                <div class="loadout-vault-search-row">
-                  <label class="loadout-vault-search">
-                    <span class="loadout-search-icon" aria-hidden="true"></span>
-                    <input id="loadoutVaultSearch" type="search" placeholder="Search equipment..." oninput="setLoadoutVaultSearch(this.value)" />
-                  </label>
-                  <select id="loadoutVaultSort" class="loadout-vault-sort" onchange="setLoadoutVaultSort(this.value)">
-                    <option value="quality">Sort: Quality</option>
-                    <option value="name">Sort: Name</option>
-                    <option value="quantity">Sort: Quantity</option>
-                  </select>
-                </div>
+              <div class="loadout-vault-controls" aria-label="Equipment library controls">
+                <label class="loadout-vault-search">
+                  <span class="loadout-search-icon" aria-hidden="true"></span>
+                  <input id="loadoutVaultSearch" type="search" placeholder="Search equipment..." aria-label="Search available equipment" oninput="setLoadoutVaultSearch(this.value)" />
+                </label>
+                <select id="loadoutVaultQuality" class="loadout-vault-quality" aria-label="Filter equipment quality" onchange="setLoadoutVaultQuality(this.value)">
+                  <option value="all">All qualities</option>
+                  <option value="standard">Standard</option>
+                  <option value="refined">Refined</option>
+                  <option value="advanced">Advanced</option>
+                  <option value="elite">Elite</option>
+                  <option value="legendary">Legendary</option>
+                  <option value="godlike">Godlike</option>
+                </select>
+                <select id="loadoutVaultSort" class="loadout-vault-sort" aria-label="Sort available equipment" onchange="setLoadoutVaultSort(this.value)">
+                  <option value="quality">Sort: Quality</option>
+                  <option value="name">Sort: Name</option>
+                  <option value="quantity">Sort: Quantity</option>
+                </select>
               </div>
 
               <div class="equipment-drawer adaptive-vault-drawer">
                 <div id="gunInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid loadout-vault-list"></div>
                 <div id="attachmentInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid hidden-loadout-inventory"></div>
               </div>
+
+              <div id="loadoutVaultResults" class="loadout-vault-results" aria-live="polite"></div>
 
               <div id="loadoutVaultSelectionAction" class="loadout-vault-selection-action" aria-live="polite"></div>
             </section>

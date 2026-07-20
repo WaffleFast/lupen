@@ -18,10 +18,15 @@ test.describe("Adaptive Hangar Loadout", () => {
       currentShipId = "falcon";
       selectedHangarShipId = "falcon";
       ownedShips = ["falcon"];
+      playerProgress.combatXp = 100000;
+      ownedGuns.heavyLance = 1;
+      ownedGuns.repeater = 1;
+      ownedGuns.meltCannon = 1;
       shipLoadouts.falcon = {
         guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1), makeLeveledLoadoutEntry("ionBlaster", "advanced", 3)],
         attachments: [makeLeveledLoadoutEntry("cargoPod", "standard", 1), makeLeveledLoadoutEntry("jumpDrive", "refined", 2)]
       };
+      applyShipStats(false);
       showScreen("gameScreen");
       openHangar();
       showHangarSection("overview");
@@ -44,6 +49,50 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.screenshot({ path: "artifacts/adaptive-loadout-hunter.png", fullPage: false });
   });
 
+  test("keeps damaged-hull service visible and repairs from the loadout screen", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await openAdaptiveLoadout(page, () => window.eval(`(() => {
+      localStorage.clear();
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      ownedShips = ["falcon"];
+      credits = 50000;
+      shipLoadouts.falcon = {
+        guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)],
+        attachments: []
+      };
+      shipConditions.falcon = { hull: 480, shield: 180 };
+      applyShipStats(false);
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+    })()`));
+
+    const service = page.locator("#overviewRepairPanel .prestige-repair-strip");
+    const repair = service.getByRole("button", { name: "Repair Hull" });
+    const expectedHullMax = await page.evaluate(() => hullMax);
+    await expect(service).toBeVisible();
+    await expect(service).toContainText(`480 / ${expectedHullMax} hull`);
+    await expect(repair).toBeVisible();
+    await expect(repair).toBeEnabled();
+
+    const serviceFits = await service.evaluate(card => {
+      const cardRect = card.getBoundingClientRect();
+      const panelRect = card.closest(".active-vessel-panel").getBoundingClientRect();
+      return cardRect.left >= panelRect.left - 1
+        && cardRect.right <= panelRect.right + 1
+        && cardRect.top >= panelRect.top - 1
+        && cardRect.bottom <= panelRect.bottom + 1
+        && cardRect.bottom <= window.innerHeight + 1;
+    });
+    expect(serviceFits).toBe(true);
+
+    await page.screenshot({ path: "artifacts/adaptive-loadout-repair.png", fullPage: false });
+    await repair.click();
+    await expect(page.locator("#overviewRepairPanel .loadout-repair-ready")).toHaveText(/Hull fully repaired/i);
+    await expect.poll(() => page.evaluate(() => ({ hull, savedHull: shipConditions.falcon.hull }))).toEqual({ hull: expectedHullMax, savedHull: expectedHullMax });
+  });
+
   test("fits the Moth's 15 weapon and 15 attachment slots without unsupported cells", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
@@ -56,6 +105,7 @@ test.describe("Adaptive Hangar Loadout", () => {
         guns: weaponKeys.map((key, index) => makeLeveledLoadoutEntry(key, index % 3 === 0 ? "advanced" : "standard", (index % 5) + 1)),
         attachments: Array.from({ length: 15 }, (_unused, index) => makeLeveledLoadoutEntry(index % 2 ? "jumpDrive" : "cargoPod", "standard", (index % 5) + 1))
       };
+      applyShipStats(false);
       showScreen("gameScreen");
       openHangar();
       showHangarSection("overview");
@@ -106,15 +156,14 @@ test.describe("Adaptive Hangar Loadout", () => {
         guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1), makeLeveledLoadoutEntry("ionBlaster", "advanced", 3)],
         attachments: [makeLeveledLoadoutEntry("cargoPod", "standard", 1), makeLeveledLoadoutEntry("jumpDrive", "refined", 2)]
       };
+      applyShipStats(false);
       showScreen("gameScreen");
       openHangar();
       showHangarSection("overview");
     })()`));
 
-    await page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Heavy Lance" }).click();
-    await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[1]))).toBe("ionBlaster");
-    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Heavy Lance");
-    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 02" }).click();
+    const heavyLanceCard = page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Heavy Lance" });
+    await heavyLanceCard.getByRole("button", { name: "Replace" }).click();
     await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[1]))).toBe("heavyLance");
     await expect(page.locator("#installedGuns .loadout-grid-slot").nth(1)).toContainText("Heavy Lance");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Heavy Lance");
@@ -139,6 +188,7 @@ test.describe("Adaptive Hangar Loadout", () => {
         guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)],
         attachments: []
       };
+      applyShipStats(false);
       buyGun("ionBlaster");
       showScreen("gameScreen");
       openHangar();
@@ -149,10 +199,9 @@ test.describe("Adaptive Hangar Loadout", () => {
     const ionCard = page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Ion Blaster" });
     await expect(ionCard).toHaveCount(1);
     await expect(ionCard).toContainText("x1 stored");
-    await ionCard.click();
     await expect.poll(() => page.evaluate(() => ownedGuns.ionBlaster)).toBe(1);
     await page.screenshot({ path: "artifacts/adaptive-loadout-vault-selection.png", fullPage: false });
-    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 02" }).click();
+    await ionCard.getByRole("button", { name: "Equip" }).click();
     await expect.poll(() => page.evaluate(() => ({ stored: ownedGuns.ionBlaster, fitted: getEquipmentKey(shipLoadouts.falcon.guns[1]) }))).toEqual({ stored: 0, fitted: "ionBlaster" });
 
     await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip", exact: true }).click();
@@ -166,5 +215,78 @@ test.describe("Adaptive Hangar Loadout", () => {
       setLoadoutSlotCategory("guns");
     })()`));
     await expect(page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Ion Blaster" })).toContainText("x1 stored");
+  });
+
+  test("uses the compact rack and library controls for an intermediate ship", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await openAdaptiveLoadout(page, () => window.eval(`(() => {
+      localStorage.clear();
+      SHIPS.zeusExplorer.gunSlots = 8;
+      SHIPS.zeusExplorer.attachmentSlots = 6;
+      currentShipId = "zeusExplorer";
+      selectedHangarShipId = "zeusExplorer";
+      ownedShips = ["zeusExplorer"];
+      playerProgress.combatXp = 100000;
+      const weaponKeys = ["pulseLaser", "ionBlaster", "heavyLance", "repeater", "meltCannon", "voidRail"];
+      shipLoadouts.zeusExplorer = {
+        guns: weaponKeys.map((key, index) => makeLeveledLoadoutEntry(key, index % 2 ? "advanced" : "standard", (index % 4) + 1)),
+        attachments: Array.from({ length: 4 }, (_unused, index) => makeLeveledLoadoutEntry(index % 2 ? "jumpDrive" : "cargoPod", "standard", index + 1))
+      };
+      ownedGuns = { ...ownedGuns, pulseLaser: 2, ionBlaster: 2, heavyLance: 2, repeater: 2, meltCannon: 2, voidRail: 2 };
+      applyShipStats(false);
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+    })()`));
+
+    await expect(page.locator("#installedGuns")).toHaveClass(/compact-slots/);
+    await expect(page.locator("#installedGuns .loadout-grid-slot")).toHaveCount(8);
+    await expect(page.locator("#hangarOverviewSection")).toHaveClass(/loadout-density-compact/);
+    await expect(page.locator(".loadout-vault-controls")).toHaveClass(/is-useful/);
+    await expect(page.locator("#gunInventory .loadout-vault-row")).toHaveCount(6);
+    await page.screenshot({ path: "artifacts/adaptive-loadout-destroyer.png", fullPage: false });
+  });
+
+  test("filters a thirty-variation weapon library without moving the page", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await openAdaptiveLoadout(page, () => window.eval(`(() => {
+      localStorage.clear();
+      currentShipId = "monolith";
+      selectedHangarShipId = "monolith";
+      ownedShips = ["monolith"];
+      playerProgress.combatXp = 100000;
+      const weaponKeys = ["pulseLaser", "ionBlaster", "heavyLance", "repeater", "meltCannon", "ripperGun", "voidRail"];
+      shipLoadouts.monolith = {
+        guns: Array.from({ length: 12 }, (_unused, index) => makeLeveledLoadoutEntry(weaponKeys[index % weaponKeys.length], "standard", (index % 5) + 1)),
+        attachments: Array.from({ length: 10 }, (_unused, index) => makeLeveledLoadoutEntry(index % 2 ? "jumpDrive" : "cargoPod", "standard", (index % 5) + 1))
+      };
+      inventoryItems = Array.from({ length: 30 }, (_unused, index) => ({
+        id: "stress-weapon-" + index,
+        key: weaponKeys[index % weaponKeys.length],
+        quality: "standard",
+        level: Math.floor(index / weaponKeys.length) + 1
+      }));
+      applyShipStats(false);
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+    })()`));
+
+    await expect(page.locator("#gunInventory .loadout-vault-row")).toHaveCount(30);
+    await expect(page.locator("#loadoutVaultResults")).toHaveText("30 weapon variations");
+    await expect(page.locator(".loadout-vault-controls")).toHaveClass(/is-useful/);
+    await page.locator("#loadoutVaultSearch").fill("Void Rail");
+    const filteredCount = await page.locator("#gunInventory .loadout-vault-row").count();
+    expect(filteredCount).toBeGreaterThan(0);
+    expect(filteredCount).toBeLessThan(30);
+    await expect(page.locator("#loadoutVaultResults")).toContainText("weapon variation");
+
+    const screenFits = await page.locator("#hangarScreen").evaluate(screen => {
+      const rect = screen.getBoundingClientRect();
+      return rect.top >= -1 && rect.bottom <= window.innerHeight + 1 && rect.left >= -1 && rect.right <= window.innerWidth + 1;
+    });
+    expect(screenFits).toBe(true);
+    await page.locator("#loadoutVaultSearch").fill("");
+    await page.screenshot({ path: "artifacts/adaptive-loadout-moth-library.png", fullPage: false });
   });
 });

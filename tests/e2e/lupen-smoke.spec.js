@@ -4875,7 +4875,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
 
     await expect(page.locator("#loadoutSelectedSlotBar")).toContainText("Weapon 02");
-    await expect(page.locator("#hangarScreen")).toContainText("Vault Weapons");
+    await expect(page.locator("#hangarScreen")).toContainText("Available Weapons");
     await expect(page.locator("#hangarScreen")).toContainText("Selected Slot · Weapon 02");
     await expect(page.locator("#hangarScreen")).toContainText("Weapons");
     await expect(page.locator("#hangarScreen")).toContainText("Attachments");
@@ -7387,8 +7387,8 @@ test.describe("Lupen browser smoke", () => {
     await page.locator("#loadoutCategoryWeapons").click();
     await expect(page.locator("#loadoutCategoryWeapons")).toHaveClass(/active/);
     await page.locator("#installedGuns .loadout-grid-slot.empty").first().click();
-    await expect(page.locator("#gunInventory .hangar-equipment-card")).toHaveCount(4);
-    await expect.poll(async () => page.locator("#gunInventory .hangar-equipment-card").evaluateAll((rows, selector) => {
+    await expect(page.locator("#gunInventory .loadout-vault-row")).toHaveCount(4);
+    await expect.poll(async () => page.locator("#gunInventory .loadout-vault-row").evaluateAll((rows, selector) => {
       const list = document.querySelector(selector);
       if (!list) return 0;
       const listRect = list.getBoundingClientRect();
@@ -7397,9 +7397,8 @@ test.describe("Lupen browser smoke", () => {
         return rect.top >= listRect.top && rect.bottom <= listRect.bottom;
       }).length;
     }, "#gunInventory")).toBeGreaterThanOrEqual(3);
-    await page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']").first().click();
-    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Pulse Laser");
-    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 01" }).click();
+    await page.screenshot({ path: "artifacts/adaptive-loadout-hunter-800.png", fullPage: false });
+    await page.locator("#gunInventory .loadout-vault-row[data-item-key='pulseLaser']").first().getByRole("button", { name: "Equip" }).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser");
 
@@ -7413,18 +7412,18 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" })).toBeEnabled();
     await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" }).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
-    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']")).toHaveCount(1);
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-item-key='pulseLaser']")).toHaveCount(1);
 
     await page.reload();
     await openHangar(page);
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(0);
-    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']")).toHaveCount(1);
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-item-key='pulseLaser']")).toHaveCount(1);
 
     await page.locator("#loadoutCategoryAttachments").click();
     await expect(page.locator("#loadoutCategoryAttachments")).toHaveClass(/active/);
     await page.locator("#installedAttachments .loadout-grid-slot.empty").first().click();
-    await expect(page.locator("#gunInventory .hangar-equipment-card")).toHaveCount(4);
-    await expect.poll(async () => page.locator("#gunInventory .hangar-equipment-card").evaluateAll((rows, selector) => {
+    await expect(page.locator("#gunInventory .loadout-vault-row")).toHaveCount(4);
+    await expect.poll(async () => page.locator("#gunInventory .loadout-vault-row").evaluateAll((rows, selector) => {
       const list = document.querySelector(selector);
       if (!list) return 0;
       const listRect = list.getBoundingClientRect();
@@ -7433,9 +7432,7 @@ test.describe("Lupen browser smoke", () => {
         return rect.top >= listRect.top && rect.bottom <= listRect.bottom;
       }).length;
     }, "#gunInventory")).toBeGreaterThanOrEqual(3);
-    await page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']").first().click();
-    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Cargo Pod");
-    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Attachment 01" }).click();
+    await page.locator("#gunInventory .loadout-vault-row[data-item-key='cargoPod']").first().getByRole("button", { name: "Equip" }).click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Cargo Pod");
 
@@ -7450,13 +7447,13 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" })).toBeEnabled();
     await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip" }).click();
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
-    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']")).toHaveCount(1);
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-item-key='cargoPod']")).toHaveCount(1);
 
     await page.reload();
     await openHangar(page);
     await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(0);
     await page.locator("#loadoutCategoryAttachments").click();
-    await expect(page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']")).toHaveCount(1);
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-item-key='cargoPod']")).toHaveCount(1);
 
     await page.evaluate(() => {
       window.eval(`

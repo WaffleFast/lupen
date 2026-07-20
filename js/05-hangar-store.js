@@ -46,6 +46,7 @@ let selectedLoadoutStatusMessage = "";
 let selectedLoadoutSlotCategory = "guns";
 let selectedLoadoutVaultFilter = "guns";
 let selectedLoadoutVaultSearch = "";
+let selectedLoadoutVaultQuality = "all";
 let selectedLoadoutVaultSort = "quality";
 let selectedVaultSearch = "";
 let selectedVaultSort = "quality";
@@ -1925,16 +1926,17 @@ function renderHangarOverview() {
   }
 
   if (overviewRepair) {
-    overviewRepair.innerHTML = `
-      <div class="repair-hero-card ${missingHull > 0 ? "needs-repair" : "ready"} unique-repair-card compact-repair-card prestige-repair-strip">
-        <div>
-          <span>Hull Service</span>
-          <strong>${missingHull > 0 ? `CR ${formatNumber(repairCost)}` : "Ready"}</strong>
-          <small>${formatNumber(Math.floor(repairState.hull))} / ${formatNumber(repairState.hullMax)} hull${repairState.source === "pvp" ? " - PvP session" : ""}</small>
+    overviewRepair.innerHTML = missingHull > 0
+      ? `
+        <div class="repair-hero-card needs-repair unique-repair-card compact-repair-card prestige-repair-strip">
+          <div>
+            <span>Hull Service</span>
+            <strong>${formatNumber(Math.floor(repairState.hull))} / ${formatNumber(repairState.hullMax)} hull · CR ${formatNumber(repairCost)}${repairState.source === "pvp" ? " · PvP" : ""}</strong>
+          </div>
+          <button onclick="repairCurrentShip()" ${repairDisabled ? "disabled" : ""}>Repair Hull</button>
         </div>
-        <button onclick="repairCurrentShip()" ${repairDisabled ? "disabled" : ""}>${missingHull > 0 ? "Repair" : "Repaired"}</button>
-      </div>
-    `;
+      `
+      : `<div class="loadout-repair-ready" role="status"><span aria-hidden="true">✓</span> Hull fully repaired</div>`;
   }
 
   renderInstalledGuns();
@@ -2331,6 +2333,17 @@ function updateLoadoutSlotSummaries() {
   const attachmentMirrorText = `${attachmentCount}/${attachmentLimit}`;
   const fittedTotal = gunCount + attachmentCount;
   const slotTotal = gunLimit + attachmentLimit;
+  const activeLimit = selectedLoadoutSlotCategory === "attachments" ? attachmentLimit : gunLimit;
+  const overviewSection = document.getElementById("hangarOverviewSection");
+  const loadoutWorkspace = overviewSection?.querySelector(".adaptive-loadout-workspace");
+  const density = activeLimit <= 4 ? "spacious" : activeLimit <= 10 ? "compact" : "dense";
+
+  [overviewSection, loadoutWorkspace].forEach(node => {
+    if (!node) return;
+    node.classList.remove("loadout-density-spacious", "loadout-density-compact", "loadout-density-dense");
+    node.classList.add(`loadout-density-${density}`);
+    node.dataset.activeSlotCount = String(activeLimit);
+  });
 
   const summaries = {
     gunSlotSummary: gunText,
@@ -2763,8 +2776,13 @@ function getFilteredLoadoutVaultEntries() {
       ? selectedCategory
       : selectedLoadoutSlotCategory === "attachments" ? "attachments" : "guns";
 
+  const search = selectedLoadoutVaultSearch.trim().toLowerCase();
+  const quality = selectedLoadoutVaultQuality;
+
   return getAllLoadoutVaultEntries()
     .filter(entry => entry.categoryKey === filter)
+    .filter(entry => quality === "all" || entry.quality === quality)
+    .filter(entry => !search || `${entry.name} ${entry.key} ${entry.quality} ${getHangarEquipmentTier(entry.level).label}`.toLowerCase().includes(search))
     .sort((a, b) => {
       if (selectedLoadoutVaultSort === "name") return a.name.localeCompare(b.name);
       if (selectedLoadoutVaultSort === "quantity") return Number(b.count || 0) - Number(a.count || 0) || a.name.localeCompare(b.name);
@@ -2799,24 +2817,22 @@ function updateLoadoutVaultChrome() {
   if (selectedSlotBar) selectedSlotBar.textContent = `Selected Slot · ${getSelectedLoadoutSlotLabel()}`;
   const isAttachmentSlot = selectedLoadoutItemContext?.categoryKey === "attachments";
   const vaultTitle = document.getElementById("loadoutVaultTitle");
-  if (vaultTitle) vaultTitle.textContent = isAttachmentSlot ? "Vault Attachments" : "Vault Weapons";
+  if (vaultTitle) vaultTitle.textContent = isAttachmentSlot ? "Available Attachments" : "Available Weapons";
   const vaultHint = document.getElementById("loadoutVaultHint");
-  if (vaultHint) vaultHint.textContent = `Choose stored gear for ${getSelectedLoadoutSlotLabel()}, then confirm Equip`;
+  if (vaultHint) vaultHint.textContent = `Choose stored gear for ${getSelectedLoadoutSlotLabel()}`;
 
   const search = document.getElementById("loadoutVaultSearch");
   if (search && search.value !== selectedLoadoutVaultSearch) search.value = selectedLoadoutVaultSearch;
 
+  const quality = document.getElementById("loadoutVaultQuality");
+  if (quality && quality.value !== selectedLoadoutVaultQuality) quality.value = selectedLoadoutVaultQuality;
+
   const sort = document.getElementById("loadoutVaultSort");
   if (sort && sort.value !== selectedLoadoutVaultSort) sort.value = selectedLoadoutVaultSort;
 
-  const filterIds = {
-    guns: "loadoutVaultFilterGuns",
-    attachments: "loadoutVaultFilterAttachments"
-  };
-  Object.entries(filterIds).forEach(([filter, id]) => {
-    const button = document.getElementById(id);
-    if (button) button.classList.toggle("active", selectedLoadoutVaultFilter === filter);
-  });
+  const categoryEntries = entries.filter(entry => entry.categoryKey === (isAttachmentSlot ? "attachments" : "guns"));
+  const controls = document.querySelector("#hangarOverviewSection .loadout-vault-controls");
+  if (controls) controls.classList.toggle("is-useful", categoryEntries.length > 4);
 }
 
 function setLoadoutVaultFilter(nextFilter) {
@@ -2825,6 +2841,11 @@ function setLoadoutVaultFilter(nextFilter) {
 
 function setLoadoutVaultSearch(query) {
   selectedLoadoutVaultSearch = String(query || "");
+  renderGunInventory();
+}
+
+function setLoadoutVaultQuality(nextQuality) {
+  selectedLoadoutVaultQuality = nextQuality === "all" || ITEM_QUALITY_ORDER.includes(nextQuality) ? nextQuality : "all";
   renderGunInventory();
 }
 
@@ -2983,6 +3004,13 @@ function renderLoadoutVaultSelectionAction() {
   `;
 }
 
+function equipLoadoutVaultEntryDirect(entry) {
+  if (!entry) return;
+  selectedLoadoutStatusMessage = "";
+  selectedLoadoutVaultFilter = entry.categoryKey;
+  equipLoadoutVaultEntry(entry);
+}
+
 function renderGunInventory() {
   const box = document.getElementById("gunInventory");
   if (!box) return;
@@ -2991,6 +3019,12 @@ function renderGunInventory() {
   const selectedCategory = selectedLoadoutItemContext?.categoryKey;
   box.innerHTML = "";
   updateLoadoutVaultChrome();
+
+  const results = document.getElementById("loadoutVaultResults");
+  if (results) {
+    const categoryLabel = selectedLoadoutSlotCategory === "attachments" ? "attachment" : "weapon";
+    results.textContent = `${formatNumber(entries.length)} ${categoryLabel} variation${entries.length === 1 ? "" : "s"}`;
+  }
 
   if (!entries.length) {
     const categoryLabel = selectedLoadoutItemContext?.categoryKey === "attachments" ? "attachments" : "weapons";
@@ -3014,7 +3048,7 @@ function renderGunInventory() {
     const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
     const level = Math.max(1, Number(entry.level || 1));
     const tier = getHangarEquipmentTier(level);
-    const btn = document.createElement("button");
+    const btn = document.createElement("article");
     const selected = selectedLoadoutItemContext?.source === "available" &&
       selectedLoadoutItemContext.categoryKey === entry.categoryKey &&
       selectedLoadoutItemContext.key === entry.key &&
@@ -3025,9 +3059,17 @@ function renderGunInventory() {
     btn.dataset.itemType = entry.categoryKey === "guns" ? "gun" : "attachment";
     btn.dataset.level = String(level);
     btn.dataset.tier = tier.key;
-    btn.disabled = entry.count <= 0 || !compatible;
-    btn.onclick = () => compatible && selectAvailableLoadoutItem(entry.categoryKey, entry);
-    btn.removeAttribute("title");
+    btn.tabIndex = compatible && entry.count > 0 ? 0 : -1;
+    btn.setAttribute("role", "group");
+    btn.setAttribute("aria-label", `${entry.name}, ${entry.count} stored`);
+    btn.classList.toggle("unavailable", entry.count <= 0 || !compatible);
+    btn.onclick = () => compatible && entry.count > 0 && selectAvailableLoadoutItem(entry.categoryKey, entry);
+    btn.onkeydown = event => {
+      if ((event.key === "Enter" || event.key === " ") && compatible && entry.count > 0) {
+        event.preventDefault();
+        selectAvailableLoadoutItem(entry.categoryKey, entry);
+      }
+    };
 
     btn.innerHTML = `
       ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "row" })}
@@ -3051,7 +3093,18 @@ function renderGunInventory() {
           : getAttachmentPurchaseStatRows({ key: entry.key }, entry.quality)
         ).slice(0, 3).map(row => `<span><small>${escapeHtml(row.label)}</small><strong>${escapeHtml(row.value)}</strong></span>`).join("")}
       </span>
+      <button type="button" class="loadout-vault-equip-action" ${entry.count <= 0 || !compatible || unlock.locked ? "disabled" : ""}>
+        ${getEquipmentKey((entry.categoryKey === "guns" ? getShipLoadout(selectedHangarShipId).guns : getShipLoadout(selectedHangarShipId).attachments)[Number(selectedLoadoutItemContext?.index || 0)]) ? "Replace" : "Equip"}
+      </button>
     `;
+
+    const equipButton = btn.querySelector(".loadout-vault-equip-action");
+    if (equipButton) {
+      equipButton.onclick = event => {
+        event.stopPropagation();
+        if (!unlock.locked) equipLoadoutVaultEntryDirect(entry);
+      };
+    }
 
     box.appendChild(btn);
   });
