@@ -347,8 +347,8 @@ function renderPilotProfile() {
   const loadout = hasActiveVessel ? getShipLoadout(currentShipId) : { guns: [], attachments: [] };
   const gunLimit = hasActiveVessel ? getGunSlotLimit(currentShipId) : 0;
   const attachmentLimit = hasActiveVessel ? getAttachmentSlotLimit(currentShipId) : 0;
-  const gunCount = Array.isArray(loadout.guns) ? loadout.guns.length : 0;
-  const attachmentCount = Array.isArray(loadout.attachments) ? loadout.attachments.length : 0;
+  const gunCount = hasActiveVessel ? countEquippedGuns(currentShipId) : 0;
+  const attachmentCount = hasActiveVessel ? countEquippedAttachments(currentShipId) : 0;
   const shipsOwnedCount = Array.isArray(ownedShips) ? ownedShips.filter(shipId => SHIPS[shipId]).length : 0;
   const journey = getPilotProfileJourneySnapshot();
   const xpRemaining = Math.max(0, Number(combat.next || 0) - Number(combat.current || 0));
@@ -551,11 +551,11 @@ function hasActiveShip() {
 }
 
 function countEquippedGuns(shipId = currentShipId) {
-  return getShipLoadout(shipId).guns.length;
+  return getShipLoadout(shipId).guns.filter(entry => getEquipmentKey(entry)).length;
 }
 
 function countEquippedAttachments(shipId = currentShipId) {
-  return getShipLoadout(shipId).attachments.length;
+  return getShipLoadout(shipId).attachments.filter(entry => getEquipmentKey(entry)).length;
 }
 
 function openPilotProfile() {
@@ -1086,10 +1086,14 @@ function normalizeShipLoadout(loadout, shipId) {
 
   const normalized = {
     attachments: Array.isArray(loadout?.attachments)
-      ? loadout.attachments.filter(isAttachmentEntry).map(entry => makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry)))
+      ? loadout.attachments.map(entry => isAttachmentEntry(entry)
+        ? makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry))
+        : null)
       : [],
     guns: Array.isArray(loadout?.guns)
-      ? loadout.guns.filter(isGunEntry).map(entry => makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry)))
+      ? loadout.guns.map(entry => isGunEntry(entry)
+        ? makeLeveledLoadoutEntry(getEquipmentKey(entry), getEquipmentQuality(entry), getEquipmentLevel(entry))
+        : null)
       : []
   };
 

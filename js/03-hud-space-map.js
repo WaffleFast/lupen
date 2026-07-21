@@ -1030,12 +1030,17 @@ function equipInventoryItemToCurrentShip(key, quality = "standard", source = "in
 
   if (!isAttachment && !isGun) return;
 
-  if (isAttachment && loadout.attachments.length >= getAttachmentSlotLimit(currentShipId)) {
+  const targetList = isAttachment ? loadout.attachments : loadout.guns;
+  const targetLimit = isAttachment ? getAttachmentSlotLimit(currentShipId) : getGunSlotLimit(currentShipId);
+  const emptyIndex = Array.from({ length: targetLimit }, (_unused, index) => index)
+    .find(index => !getEquipmentKey(targetList[index]));
+
+  if (isAttachment && !Number.isInteger(emptyIndex)) {
     alert("No empty attachment slots.");
     return;
   }
 
-  if (isGun && loadout.guns.length >= getGunSlotLimit(currentShipId)) {
+  if (isGun && !Number.isInteger(emptyIndex)) {
     alert("No empty gun slots.");
     return;
   }
@@ -1050,10 +1055,10 @@ function equipInventoryItemToCurrentShip(key, quality = "standard", source = "in
   }
 
   if (isAttachment) {
-    loadout.attachments.push(makeLoadoutEntry(key, quality));
+    loadout.attachments[emptyIndex] = makeLoadoutEntry(key, quality);
     applyShipStats(true);
   } else {
-    loadout.guns.push(makeLoadoutEntry(key, quality));
+    loadout.guns[emptyIndex] = makeLoadoutEntry(key, quality);
     if (engageTimer) {
       clearInterval(engageTimer);
       engageTimer = null;
@@ -1075,7 +1080,7 @@ function unequipCurrentShipItem(key, quality = "standard", kind = "attachment") 
   const index = list.findIndex(entry => getEquipmentKey(entry) === key && getEquipmentQuality(entry) === quality);
   if (index < 0) return;
 
-  if (kind === "gun" && list.length <= 1) {
+  if (kind === "gun" && list.filter(entry => getEquipmentKey(entry)).length <= 1) {
     alert("At least one gun must stay equipped.");
     return;
   }
@@ -1085,7 +1090,7 @@ function unequipCurrentShipItem(key, quality = "standard", kind = "attachment") 
     return;
   }
 
-  list.splice(index, 1);
+  list[index] = null;
 
   if (quality === "standard") {
     if (kind === "gun") ownedGuns[key] = (ownedGuns[key] || 0) + 1;

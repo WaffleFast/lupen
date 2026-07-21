@@ -7560,8 +7560,7 @@ test.describe("Lupen browser smoke", () => {
     const jumpDrive = page.locator("#gunInventory .hangar-equipment-card[data-item-key='jumpDrive']");
     await expect(jumpDrive).toHaveCount(1);
     await jumpDrive.click();
-    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Jump Drive");
-    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Attachment 01" }).click();
+    await jumpDrive.getByRole("button", { name: "Equip", exact: true }).click();
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Jump Drive");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText(/Unique\s*·\s*III/i);
 
@@ -7642,8 +7641,7 @@ test.describe("Lupen browser smoke", () => {
     const godlikeIon = page.locator("#gunInventory .hangar-equipment-card[data-item-key='ionBlaster']");
     await expect(godlikeIon).toHaveCount(1);
     await godlikeIon.click();
-    await expect(page.locator("#loadoutVaultSelectionAction")).toContainText("Ion Blaster");
-    await page.locator("#loadoutVaultSelectionAction").getByRole("button", { name: "Equip to Weapon 02" }).click();
+    await godlikeIon.getByRole("button", { name: "Equip", exact: true }).click();
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Ion Blaster");
     await expect(page.locator("#loadoutItemDetailPanel")).toContainText(/Godlike/i);
 

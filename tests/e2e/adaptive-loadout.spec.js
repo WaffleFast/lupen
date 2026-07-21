@@ -104,6 +104,50 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.screenshot({ path: "artifacts/adaptive-loadout-hunter.png", fullPage: false });
   });
 
+  test("keeps every Hangar destination on the same laptop-sized frame", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 768 });
+    await openAdaptiveLoadout(page, () => window.eval(`(() => {
+      localStorage.clear();
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      ownedShips = ["falcon"];
+      playerProgress.combatXp = 100000;
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+    })()`));
+
+    const sections = ["overview", "owned", "shipyard", "plans", "vault"];
+    const frames = [];
+    for (const section of sections) {
+      await page.evaluate(sectionName => showHangarSection(sectionName), section);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      frames.push(await page.locator("#hangarScreen").evaluate(frame => {
+        const rect = frame.getBoundingClientRect();
+        return {
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          left: Math.round(rect.left),
+          top: Math.round(rect.top),
+          right: Math.round(rect.right),
+          bottom: Math.round(rect.bottom),
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          documentWidth: document.documentElement.scrollWidth
+        };
+      }));
+    }
+
+    expect(new Set(frames.map(frame => `${frame.width}x${frame.height}`))).toEqual(new Set(["1200x700"]));
+    frames.forEach(frame => {
+      expect(frame.left).toBeGreaterThanOrEqual(0);
+      expect(frame.top).toBeGreaterThanOrEqual(0);
+      expect(frame.right).toBeLessThanOrEqual(frame.viewportWidth);
+      expect(frame.bottom).toBeLessThanOrEqual(frame.viewportHeight);
+      expect(frame.documentWidth).toBeLessThanOrEqual(frame.viewportWidth);
+    });
+  });
+
   test("keeps damaged-hull service visible and repairs from the loadout screen", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
@@ -198,7 +242,7 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.screenshot({ path: "artifacts/adaptive-loadout-moth-15-slots.png", fullPage: false });
   });
 
-  test("selects, explicitly replaces and unequips gear in a fully fitted slot", async ({ page }) => {
+  test("requires an occupied slot to be unequipped before fitting another weapon", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
       localStorage.clear();
@@ -217,16 +261,26 @@ test.describe("Adaptive Hangar Loadout", () => {
       showHangarSection("overview");
     })()`));
 
+    const firstSlot = page.locator("#installedGuns .loadout-grid-slot").nth(0);
+    const secondSlot = page.locator("#installedGuns .loadout-grid-slot").nth(1);
+    await firstSlot.click();
     const heavyLanceCard = page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Heavy Lance" });
-    await heavyLanceCard.getByRole("button", { name: "Replace" }).click();
-    await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[1]))).toBe("heavyLance");
-    await expect(page.locator("#installedGuns .loadout-grid-slot").nth(1)).toContainText("Heavy Lance");
-    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Heavy Lance");
-    await page.screenshot({ path: "artifacts/adaptive-loadout-direct-equip.png", fullPage: false });
+    await expect(heavyLanceCard.getByRole("button", { name: "Unequip First" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Replace", exact: true })).toHaveCount(0);
 
     await page.locator("#loadoutItemDetailPanel").getByRole("button", { name: "Unequip", exact: true }).click();
     await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
-    await expect.poll(() => page.evaluate(() => shipLoadouts.falcon.guns.some(entry => getEquipmentKey(entry) === "heavyLance"))).toBe(false);
+    await expect(firstSlot).toHaveClass(/empty/);
+    await expect(firstSlot).toContainText("Empty Weapon 01");
+    await expect(secondSlot).toContainText("Ion Blaster");
+    await expect(heavyLanceCard.getByRole("button", { name: "Equip", exact: true })).toBeEnabled();
+
+    await heavyLanceCard.getByRole("button", { name: "Equip", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => getEquipmentKey(shipLoadouts.falcon.guns[0]))).toBe("heavyLance");
+    await expect(firstSlot).toContainText("Heavy Lance");
+    await expect(secondSlot).toContainText("Ion Blaster");
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Heavy Lance");
+    await page.screenshot({ path: "artifacts/adaptive-loadout-two-step-equip.png", fullPage: false });
   });
 
   test("keeps a purchased weapon through selection, equip, unequip and reload", async ({ page }) => {
