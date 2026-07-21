@@ -1729,13 +1729,13 @@ function renderLoadoutItemDetail() {
         ${renderQualityFx(currentDetail.quality, { src: currentDetail.icon, alt: currentDetail.name, size: "small" })}
       </div>
       <div class="loadout-selected-item-copy">
-        <span>${escapeHtml(slotLabel)}</span>
+        <span>Selected · ${escapeHtml(slotLabel)}</span>
         <strong>${escapeHtml(currentDetail.name)}</strong>
         <small>${currentDetail.quality !== "standard" ? `${escapeHtml(titleCaseQuality(currentDetail.quality))} · ` : ""}${escapeHtml(tier.label)} · ${escapeHtml(formatRomanLevel(currentDetail.level))}</small>
       </div>
       <div class="loadout-selected-item-stats">
-        ${currentDetail.stats.slice(0, 3).map(row => `
-          <div><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></div>
+        ${currentDetail.stats.slice(0, 3).map((row, statIndex) => `
+          <div class="loadout-selected-stat loadout-selected-stat-${statIndex + 1}"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(row.value)}</strong></div>
         `).join("")}
       </div>
       <button type="button" class="loadout-unequip-action" onclick="unequipSelectedLoadoutSlotItem()">Unequip</button>

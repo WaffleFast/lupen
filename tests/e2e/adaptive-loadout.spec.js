@@ -39,6 +39,31 @@ test.describe("Adaptive Hangar Loadout", () => {
     await expect(page.locator("#loadoutFittedSummary")).toHaveText("4 / 4 slots fitted");
     await expect(page.locator("#overviewShipRole")).toHaveText("Attacker / Interceptor");
     await expect(page.locator("#installedGuns .loadout-slot-copy")).toHaveCount(2);
+    await expect(page.locator(".weapon-slot-bank .loadout-bank-title")).toBeVisible();
+    await expect(page.locator(".weapon-slot-bank .loadout-bank-title")).toContainText("Weapon Hardpoints");
+    await expect(page.locator("#gunSlotSummary")).toHaveText("2 / 2 EQUIPPED");
+    await expect(page.locator(".attachment-slot-bank")).not.toBeVisible();
+
+    const selectedStats = page.locator("#loadoutItemDetailPanel .loadout-selected-item-stats > div");
+    await expect(selectedStats).toHaveCount(3);
+    const selectedStatStyles = await selectedStats.evaluateAll(nodes => nodes.map(node => {
+      const value = node.querySelector("strong");
+      const style = getComputedStyle(value);
+      return { color: style.color, fontSize: Number.parseFloat(style.fontSize) };
+    }));
+    expect(selectedStatStyles.every(stat => stat.fontSize >= 14)).toBe(true);
+    expect(new Set(selectedStatStyles.map(stat => stat.color)).size).toBe(3);
+    await expect(page.locator(".compatible-vault-actions #loadoutVaultResults")).toHaveText("3 weapon variations");
+
+    await page.locator("#loadoutCategoryAttachments").click();
+    await expect(page.locator(".weapon-slot-bank")).not.toBeVisible();
+    await expect(page.locator(".attachment-slot-bank .loadout-bank-title")).toBeVisible();
+    await expect(page.locator(".attachment-slot-bank .loadout-bank-title")).toContainText("Equipment Mounts");
+    await expect(page.locator("#installedAttachments .loadout-grid-slot")).toHaveCount(2);
+    const attachmentNames = await page.locator("#installedAttachments img").evaluateAll(images => images.map(image => image.alt));
+    expect(attachmentNames).toEqual(["Cargo Pod", "Jump Drive"]);
+    await page.screenshot({ path: "artifacts/adaptive-loadout-hunter-attachments.png", fullPage: false });
+    await page.locator("#loadoutCategoryWeapons").click();
 
     const shellFits = await page.locator(".adaptive-loadout-shell").evaluate(shell => {
       const frame = shell.getBoundingClientRect();

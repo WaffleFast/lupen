@@ -276,15 +276,22 @@
 
 #hangarOverviewSection .loadout-category-toggle {
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 10px !important;
+  grid-template-columns: repeat(2, minmax(180px, 245px)) !important;
+  justify-content: start !important;
+  gap: 5px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  padding: 3px !important;
+  border: 1px solid rgba(70, 164, 202, 0.24) !important;
+  border-radius: 10px !important;
+  background: rgba(1, 11, 19, 0.7) !important;
 }
 
 #hangarOverviewSection .loadout-category-toggle button {
-  min-height: 39px !important;
-  border: 1px solid rgba(80, 184, 230, 0.42) !important;
-  border-radius: 8px !important;
-  background: rgba(2, 13, 25, 0.88) !important;
+  min-height: 33px !important;
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  background: transparent !important;
   color: #dceaf0 !important;
   font: inherit !important;
   font-size: 13px !important;
@@ -305,7 +312,8 @@
 
 #hangarOverviewSection .adaptive-slot-workspace .loadout-slot-bank {
   display: grid !important;
-  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-rows: 22px minmax(0, 1fr) !important;
+  gap: 5px !important;
   height: 100% !important;
   min-height: 0 !important;
   padding: 0 !important;
@@ -314,7 +322,41 @@
 }
 
 #hangarOverviewSection .adaptive-slot-workspace .loadout-slot-bank:not(.active) { display: none !important; }
-#hangarOverviewSection .adaptive-slot-workspace .loadout-bank-title { display: none !important; }
+#hangarOverviewSection .adaptive-slot-workspace .loadout-bank-title {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  justify-self: stretch !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 8px !important;
+  border-left: 3px solid #45d8f5 !important;
+  background: linear-gradient(90deg, rgba(31, 142, 179, 0.13), transparent 72%) !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace .loadout-bank-title span {
+  color: #8eeaff !important;
+  font-size: 9px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.13em !important;
+  text-transform: uppercase !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace .loadout-bank-title small {
+  color: #a8c0ca !important;
+  font-size: 8px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+#hangarOverviewSection .attachment-slot-bank .loadout-bank-title {
+  border-left-color: #48e2ad !important;
+  background: linear-gradient(90deg, rgba(32, 165, 119, 0.13), transparent 72%) !important;
+}
+
+#hangarOverviewSection .attachment-slot-bank .loadout-bank-title span { color: #82f0c8 !important; }
 
 #hangarScreen #hangarOverviewSection .adaptive-slot-workspace .scalable-loadout-grid {
   display: grid !important;
@@ -380,16 +422,20 @@
 #hangarOverviewSection .attachment-slot-bank .loadout-slot-number::before { content: "ATTACHMENT " !important; }
 
 #hangarOverviewSection .adaptive-slot-workspace .equipment-slot > .quality-fx {
-  position: relative !important;
-  inset: auto !important;
+  position: absolute !important;
+  inset: 22px 8px 6px !important;
   display: grid !important;
-  width: 100% !important;
-  height: 100% !important;
+  width: auto !important;
+  height: auto !important;
   min-height: 0 !important;
   max-width: none !important;
   max-height: none !important;
   place-items: center !important;
   pointer-events: none !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .equipment-slot > .quality-fx {
+  inset: 11px 4px 3px !important;
 }
 
 #hangarOverviewSection .adaptive-slot-workspace .equipment-slot > .quality-fx .quality-fx__item {
@@ -422,6 +468,38 @@
 #hangarOverviewSection .adaptive-slot-workspace .dense-slots .equipment-slot > .quality-fx .quality-fx__item {
   max-width: 82px !important;
   max-height: 48px !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .equipment-slot > .quality-fx > span {
+  opacity: 0.24 !important;
+}
+
+#hangarOverviewSection .adaptive-slot-workspace :is(.compact-slots, .dense-slots) .equipment-slot > .quality-fx .quality-fx__item {
+  z-index: 9 !important;
+  transform: scale(1.28) !important;
+  filter: brightness(1.28) contrast(1.06) drop-shadow(0 0 5px rgba(var(--forge-tier-rgb, 84, 202, 237), 0.62)) !important;
+}
+
+/* Dense racks trade the animated showcase treatment for instantly readable icons. */
+#hangarScreen #hangarOverviewSection .adaptive-slot-workspace .dense-slots .equipment-slot.loadout-grid-slot > .quality-fx.quality-fx--slot > span {
+  display: none !important;
+}
+
+#hangarScreen #hangarOverviewSection .adaptive-slot-workspace .dense-slots .equipment-slot.loadout-grid-slot > .quality-fx.quality-fx--slot .quality-fx__item {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  z-index: 12 !important;
+  display: block !important;
+  width: 92px !important;
+  height: 92px !important;
+  max-width: none !important;
+  max-height: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translate(-50%, -50%) scale(1.18) !important;
+  mix-blend-mode: normal !important;
+  filter: brightness(1.72) contrast(1.18) saturate(1.08) drop-shadow(0 0 6px rgba(var(--forge-tier-rgb, 84, 202, 237), 0.72)) !important;
 }
 
 #hangarOverviewSection .adaptive-slot-workspace .loadout-slot-copy {
@@ -480,8 +558,8 @@
 
 #hangarOverviewSection .loadout-selected-item-card {
   display: grid !important;
-  grid-template-columns: 72px minmax(135px, 0.72fr) minmax(210px, 1fr) auto !important;
-  gap: 10px !important;
+  grid-template-columns: 76px minmax(155px, 0.68fr) minmax(250px, 1fr) auto !important;
+  gap: 12px !important;
   align-items: center !important;
   min-height: 54px !important;
 }
@@ -500,8 +578,8 @@
 #hangarOverviewSection .loadout-selected-item-copy strong,
 #hangarOverviewSection .loadout-selected-item-copy small { display: block !important; }
 #hangarOverviewSection .loadout-selected-item-copy span { color: #72dff5 !important; font-size: 8px !important; font-weight: 900 !important; text-transform: uppercase !important; }
-#hangarOverviewSection .loadout-selected-item-copy strong { margin-top: 1px !important; color: #f5fbff !important; font-size: 14px !important; }
-#hangarOverviewSection .loadout-selected-item-copy small { margin-top: 1px !important; color: #ba83ff !important; font-size: 8px !important; font-weight: 900 !important; text-transform: uppercase !important; }
+#hangarOverviewSection .loadout-selected-item-copy strong { margin-top: 1px !important; color: #f5fbff !important; font-size: 15px !important; }
+#hangarOverviewSection .loadout-selected-item-copy small { margin-top: 2px !important; color: var(--forge-tier-color, #ba83ff) !important; font-size: 8px !important; font-weight: 900 !important; text-transform: uppercase !important; }
 
 #hangarOverviewSection .loadout-selected-item-stats {
   display: grid !important;
@@ -510,17 +588,35 @@
 }
 
 #hangarOverviewSection .loadout-selected-item-stats > div {
-  min-height: 40px !important;
-  padding: 5px 8px !important;
+  min-height: 42px !important;
+  padding: 6px 10px !important;
   border: 1px solid rgba(89, 164, 190, 0.26) !important;
   border-radius: 7px !important;
-  background: rgba(1, 10, 17, 0.62) !important;
+  background: linear-gradient(145deg, rgba(9, 30, 42, 0.82), rgba(1, 10, 17, 0.72)) !important;
+}
+
+#hangarOverviewSection .loadout-selected-item-stats > div:nth-child(1) {
+  border-color: rgba(255, 139, 88, 0.42) !important;
+  background: linear-gradient(145deg, rgba(74, 31, 20, 0.42), rgba(9, 14, 20, 0.84)) !important;
+}
+
+#hangarOverviewSection .loadout-selected-item-stats > div:nth-child(2) {
+  border-color: rgba(58, 203, 241, 0.42) !important;
+  background: linear-gradient(145deg, rgba(8, 59, 77, 0.48), rgba(6, 16, 24, 0.84)) !important;
+}
+
+#hangarOverviewSection .loadout-selected-item-stats > div:nth-child(3) {
+  border-color: rgba(74, 225, 166, 0.42) !important;
+  background: linear-gradient(145deg, rgba(7, 65, 51, 0.48), rgba(5, 17, 21, 0.84)) !important;
 }
 
 #hangarOverviewSection .loadout-selected-item-stats span,
 #hangarOverviewSection .loadout-selected-item-stats strong { display: block !important; }
-#hangarOverviewSection .loadout-selected-item-stats span { color: #849da8 !important; font-size: 7px !important; font-weight: 900 !important; text-transform: uppercase !important; }
-#hangarOverviewSection .loadout-selected-item-stats strong { margin-top: 2px !important; color: #f2fbff !important; font-size: 11px !important; }
+#hangarOverviewSection .loadout-selected-item-stats span { color: #a5bec8 !important; font-size: 8px !important; font-weight: 900 !important; letter-spacing: 0.05em !important; text-transform: uppercase !important; }
+#hangarOverviewSection .loadout-selected-item-stats strong { margin-top: 2px !important; color: #f7fcff !important; font-size: 14px !important; line-height: 1 !important; }
+#hangarOverviewSection .loadout-selected-item-stats > div:nth-child(1) strong { color: #ffad83 !important; }
+#hangarOverviewSection .loadout-selected-item-stats > div:nth-child(2) strong { color: #68ddfa !important; }
+#hangarOverviewSection .loadout-selected-item-stats > div:nth-child(3) strong { color: #69e6b1 !important; }
 
 #hangarOverviewSection .loadout-unequip-action {
   min-width: 130px !important;
@@ -745,7 +841,7 @@
   display: block !important;
   overflow: hidden !important;
   color: #f4fbff !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
@@ -755,7 +851,7 @@
   margin-top: 1px !important;
   overflow: hidden !important;
   color: var(--forge-tier-color, #a983e6) !important;
-  font-size: 7px !important;
+  font-size: 8px !important;
   font-weight: 900 !important;
   text-overflow: ellipsis !important;
   text-transform: uppercase !important;
@@ -813,15 +909,20 @@
 #hangarOverviewSection .loadout-vault-equip-action:disabled { opacity: 0.45 !important; cursor: default !important; }
 
 #hangarOverviewSection .loadout-vault-results {
-  position: absolute !important;
-  top: 17px !important;
-  right: 148px !important;
-  z-index: 4 !important;
-  color: #7f98a3 !important;
-  font-size: 8px !important;
+  position: static !important;
+  display: inline-flex !important;
+  min-height: 25px !important;
+  align-items: center !important;
+  padding: 0 9px !important;
+  border: 1px solid rgba(90, 174, 202, 0.28) !important;
+  border-radius: 999px !important;
+  background: rgba(3, 18, 27, 0.76) !important;
+  color: #91b2bf !important;
+  font-size: 7px !important;
+  font-weight: 900 !important;
   letter-spacing: 0.04em !important;
-  text-align: right !important;
   text-transform: uppercase !important;
+  white-space: nowrap !important;
 }
 
 #hangarOverviewSection .loadout-vault-selection-action { display: none !important; }

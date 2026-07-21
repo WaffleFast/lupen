@@ -6,7 +6,7 @@
   <title>Lupen - Explore, Trade, Fight</title>
   <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
-  <link rel="stylesheet" href="loadout-redesign.css?v=20260720-adaptive-library" />
+  <link rel="stylesheet" href="loadout-redesign.css?v=20260721-category-clarity" />
 </head>
 <body>
   <div class="stars"></div>
@@ -377,6 +377,7 @@
                 </div>
                 <div class="compatible-vault-actions">
                   <strong class="equipment-count-chip" id="equipmentInventoryCount">0 / 50</strong>
+                  <span id="loadoutVaultResults" class="loadout-vault-results" aria-live="polite"></span>
                   <button type="button" onclick="showHangarSection('vault')">View All in Vault</button>
                 </div>
               </header>
@@ -406,8 +407,6 @@
                 <div id="gunInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid loadout-vault-list"></div>
                 <div id="attachmentInventory" class="inventory-icon-grid compact-equipment-grid scalable-equipment-grid hidden-loadout-inventory"></div>
               </div>
-
-              <div id="loadoutVaultResults" class="loadout-vault-results" aria-live="polite"></div>
 
               <div id="loadoutVaultSelectionAction" class="loadout-vault-selection-action" aria-live="polite"></div>
             </section>
