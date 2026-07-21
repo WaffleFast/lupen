@@ -23,7 +23,7 @@ test.describe("Adaptive Hangar Loadout", () => {
       ownedGuns.repeater = 1;
       ownedGuns.meltCannon = 1;
       shipLoadouts.falcon = {
-        guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1), makeLeveledLoadoutEntry("ionBlaster", "advanced", 3)],
+        guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)],
         attachments: [makeLeveledLoadoutEntry("cargoPod", "standard", 1), makeLeveledLoadoutEntry("jumpDrive", "refined", 2)]
       };
       applyShipStats(false);
@@ -36,13 +36,34 @@ test.describe("Adaptive Hangar Loadout", () => {
     await expect(page.locator("#installedGuns .loadout-grid-slot")).toHaveCount(2);
     await expect(page.locator("#installedGuns")).toHaveClass(/spacious-slots/);
     await expect(page.locator("#installedGuns .loadout-grid-slot.locked")).toHaveCount(0);
-    await expect(page.locator("#loadoutFittedSummary")).toHaveText("4 / 4 slots fitted");
+    await expect(page.locator("#loadoutFittedSummary")).toHaveText("3 / 4 slots fitted");
     await expect(page.locator("#overviewShipRole")).toHaveText("Attacker / Interceptor");
-    await expect(page.locator("#installedGuns .loadout-slot-copy")).toHaveCount(2);
+    await expect(page.locator("#installedGuns .loadout-slot-copy")).toHaveCount(1);
     await expect(page.locator(".weapon-slot-bank .loadout-bank-title")).toBeVisible();
     await expect(page.locator(".weapon-slot-bank .loadout-bank-title")).toContainText("Weapon Hardpoints");
-    await expect(page.locator("#gunSlotSummary")).toHaveText("2 / 2 EQUIPPED");
+    await expect(page.locator("#gunSlotSummary")).toHaveText("1 / 2 EQUIPPED");
     await expect(page.locator(".attachment-slot-bank")).not.toBeVisible();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.empty .slot-empty-label")).toContainText("Empty Weapon 02");
+
+    const spaciousRack = await page.locator("#installedGuns").evaluate(grid => {
+      const rack = grid.getBoundingClientRect();
+      const workspace = grid.closest(".adaptive-slot-workspace").getBoundingClientRect();
+      const filledSlot = grid.querySelector(".loadout-grid-slot.filled").getBoundingClientRect();
+      const art = grid.querySelector(".loadout-grid-slot.filled .quality-fx__item").getBoundingClientRect();
+      return {
+        rackWidth: rack.width,
+        workspaceWidth: workspace.width,
+        artworkContained: art.left >= filledSlot.left - 1
+          && art.right <= filledSlot.right + 1
+          && art.top >= filledSlot.top - 1
+          && art.bottom <= filledSlot.bottom + 1
+      };
+    });
+    expect(spaciousRack.rackWidth).toBeLessThanOrEqual(540);
+    expect(spaciousRack.rackWidth).toBeLessThan(spaciousRack.workspaceWidth);
+    expect(spaciousRack.artworkContained).toBe(true);
+
+    await page.locator("#installedGuns .loadout-grid-slot").first().click();
 
     const selectedStats = page.locator("#loadoutItemDetailPanel .loadout-selected-item-stats > div");
     await expect(selectedStats).toHaveCount(3);
@@ -54,6 +75,15 @@ test.describe("Adaptive Hangar Loadout", () => {
     expect(selectedStatStyles.every(stat => stat.fontSize >= 14)).toBe(true);
     expect(new Set(selectedStatStyles.map(stat => stat.color)).size).toBe(3);
     await expect(page.locator(".compatible-vault-actions #loadoutVaultResults")).toHaveText("3 weapon variations");
+    const libraryGeometry = await page.locator("#gunInventory .loadout-vault-row").first().evaluate(card => {
+      const cardRect = card.getBoundingClientRect();
+      const buttonRect = card.querySelector(".loadout-vault-equip-action").getBoundingClientRect();
+      const copyRect = card.querySelector(".loadout-vault-row-copy").getBoundingClientRect();
+      return { cardTop: cardRect.top, cardBottom: cardRect.bottom, copyBottom: copyRect.bottom, buttonTop: buttonRect.top, buttonBottom: buttonRect.bottom };
+    });
+    expect(libraryGeometry.buttonTop).toBeGreaterThanOrEqual(libraryGeometry.cardTop);
+    expect(libraryGeometry.buttonBottom).toBeLessThanOrEqual(libraryGeometry.cardBottom + 1);
+    expect(libraryGeometry.copyBottom).toBeLessThanOrEqual(libraryGeometry.buttonTop + 1);
 
     await page.locator("#loadoutCategoryAttachments").click();
     await expect(page.locator(".weapon-slot-bank")).not.toBeVisible();
@@ -269,6 +299,15 @@ test.describe("Adaptive Hangar Loadout", () => {
     await expect(page.locator("#hangarOverviewSection")).toHaveClass(/loadout-density-compact/);
     await expect(page.locator(".loadout-vault-controls")).toHaveClass(/is-useful/);
     await expect(page.locator("#gunInventory .loadout-vault-row")).toHaveCount(6);
+    const compactGeometry = await page.locator("#installedGuns .loadout-grid-slot.filled").first().evaluate(slot => {
+      const slotRect = slot.getBoundingClientRect();
+      const artRect = slot.querySelector(".quality-fx__item").getBoundingClientRect();
+      return artRect.left >= slotRect.left - 1
+        && artRect.right <= slotRect.right + 1
+        && artRect.top >= slotRect.top - 1
+        && artRect.bottom <= slotRect.bottom + 1;
+    });
+    expect(compactGeometry).toBe(true);
     await page.screenshot({ path: "artifacts/adaptive-loadout-destroyer.png", fullPage: false });
   });
 

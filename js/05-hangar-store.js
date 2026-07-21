@@ -2305,14 +2305,21 @@ function renderHangarEditor() {
 
 function setSlotRailDensity(box, limit) {
   if (!box) return;
-  const spaciousColumns = Math.max(1, Math.min(3, limit <= 3 ? limit : Math.ceil(limit / 2)));
-  const columns = limit <= 6 ? spaciousColumns : 5;
+  const isSpacious = limit <= 4;
+  const columns = isSpacious
+    ? Math.max(1, limit)
+    : limit <= 6
+      ? 3
+      : 5;
   const rows = Math.max(1, Math.ceil(limit / columns));
+  const columnTemplate = isSpacious && limit <= 3
+    ? `repeat(${columns}, minmax(180px, 250px))`
+    : `repeat(${columns}, minmax(0, 1fr))`;
   box.style.setProperty("--loadout-slot-columns", String(columns));
-  box.style.setProperty("grid-template-columns", `repeat(${columns}, minmax(0, 1fr))`, "important");
+  box.style.setProperty("grid-template-columns", columnTemplate, "important");
   box.style.setProperty("grid-template-rows", `repeat(${rows}, minmax(0, 1fr))`, "important");
-  box.classList.toggle("spacious-slots", limit <= 6);
-  box.classList.toggle("compact-slots", limit >= 7 && limit <= 10);
+  box.classList.toggle("spacious-slots", isSpacious);
+  box.classList.toggle("compact-slots", limit >= 5 && limit <= 10);
   box.classList.toggle("dense-slots", limit >= 11);
   box.classList.toggle("many-slots", limit >= 8);
   box.classList.toggle("very-many-slots", limit >= 14);
@@ -2506,8 +2513,11 @@ function renderLoadoutSlotGrid(box, categoryKey) {
       slot.title = `Empty ${categoryKey === "guns" ? "weapon" : "attachment"} slot ${i + 1}`;
     }
 
+    const slotNumber = String(i + 1).padStart(2, "0");
+    const slotType = categoryKey === "guns" ? "Weapon" : "Attachment";
+    const slotHeading = limit <= 4 ? `${slotType} ${slotNumber}` : slotNumber;
     slot.innerHTML = item
-      ? `<span class="loadout-slot-number">${String(i + 1).padStart(2, "0")}</span>
+      ? `<span class="loadout-slot-number">${slotHeading}</span>
         ${renderQualityFx(quality, { src: item.image, alt: item.name, size: "slot" })}
         <span class="loadout-slot-copy">
           <strong>${escapeHtml(item.name)}</strong>
@@ -2516,9 +2526,9 @@ function renderLoadoutSlotGrid(box, categoryKey) {
             <b>${formatRomanLevel(level)}</b>
           </small>
         </span>`
-      : `<span class="loadout-slot-number">${String(i + 1).padStart(2, "0")}</span>
+      : `<span class="loadout-slot-number">${slotHeading}</span>
         <span class="slot-empty-plus" aria-hidden="true">+</span>
-        <span class="slot-empty-label" aria-hidden="true"><b>Empty</b><small>Available</small></span>`;
+        <span class="slot-empty-label"><b>Empty ${slotType} ${slotNumber}</b><small>Select to equip</small></span>`;
 
     box.appendChild(slot);
   }
