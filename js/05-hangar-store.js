@@ -2122,7 +2122,7 @@ function renderFleetDetail() {
     : `<button class="fleet-management-primary" onclick="equipShip('${shipId}'); showHangarSection('owned');">Set Active</button>`;
 
   panel.innerHTML = `
-    <div class="fleet-selected-vessel">
+    <div class="fleet-selected-vessel" data-ship-id="${escapeHtml(ship.id)}">
       <section class="fleet-selected-hero">
         <div class="fleet-selected-identity">
           <span>${isEquipped ? "Active Vessel" : "Selected Vessel"}</span>
@@ -3651,7 +3651,7 @@ function renderShipyardDetail() {
           : `Available for CR ${formatNumber(ship.price)}.`;
 
   panel.innerHTML = `
-    <div class="exchange-selected-vessel ${unlock.locked ? "is-locked" : "is-open"}">
+    <div class="exchange-selected-vessel ${unlock.locked ? "is-locked" : "is-open"}" data-ship-id="${escapeHtml(ship.id)}">
       <section class="exchange-detail-preview">
         <div class="exchange-selected-identity">
           <span>${equipped ? "Active Vessel" : owned ? "Owned Vessel" : "Selected Hull"}</span>

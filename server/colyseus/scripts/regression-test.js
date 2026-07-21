@@ -2094,6 +2094,7 @@ async function assertStagingStorePreviewHelpers() {
   const ionBlasterItem = items.find((item) => item.itemId === "gun:ionBlaster");
   const jumpDriveItem = items.find((item) => item.itemId === "attachment:jumpDrive");
   const bisonItem = items.find((item) => item.itemId === "ship:bison");
+  assert(items.filter((item) => item.localKind === "ship").every((item) => item.price === 0), "Pioneer staging hull prices diverged from the free client catalogue.");
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
   assert(patchPlan.creditsBefore === 1000 && patchPlan.creditsAfter === 780, "Cargo Pod Store patch did not subtract the server price.");
@@ -2133,7 +2134,7 @@ async function assertStagingStorePreviewHelpers() {
   const bisonSaveData = { ...validSaveData, credits: 15000 };
   const bisonPatch = buildStagingStorePurchasePatch(bisonSaveData, bisonItem, 1);
   assert(bisonPatch.ok === true, `Valid Bison Store patch was blocked: ${bisonPatch.blockReason}`);
-  assert(bisonPatch.creditsBefore === 15000 && bisonPatch.creditsAfter === 1000, "Pioneer Freighter Store patch did not subtract the server price.");
+  assert(bisonPatch.creditsBefore === 15000 && bisonPatch.creditsAfter === 15000, "Free Pioneer Freighter Store patch changed credits.");
   assert(bisonPatch.itemBefore === 1 && bisonPatch.itemAfter === 2, "Bison Store patch did not append ownedShips.");
   assert(bisonPatch.patchedSaveData.ownedShips.includes("bison"), "Bison Store patch did not add the ship.");
   assert(bisonPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Bison Store patch changed existing loadouts.");
@@ -2158,7 +2159,7 @@ async function assertStagingStorePreviewHelpers() {
   assert(insufficientPulseLaserCreditPatch.ok === false && insufficientPulseLaserCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Pulse Laser write was not blocked.");
 
   const insufficientBisonCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, bisonItem, 1);
-  assert(insufficientBisonCreditPatch.ok === false && insufficientBisonCreditPatch.blockReason === "insufficient_credits", "Insufficient-credit Bison write was not blocked.");
+  assert(insufficientBisonCreditPatch.ok === true && insufficientBisonCreditPatch.creditsAfter === 10, "Free Bison purchase was incorrectly credit-gated.");
 
   const defaultWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
@@ -2364,10 +2365,10 @@ async function assertStagingStorePreviewHelpers() {
     }
   });
   assert(appliedHaulerWrite.applied === true && appliedHaulerWrite.mode === "store_write", `Gated Bison Store write did not apply: ${appliedHaulerWrite.blockReason}`);
-  assert(appliedHaulerWrite.creditsBefore === 15000 && appliedHaulerWrite.creditsAfter === 1000, "Applied Pioneer Freighter Store write returned incorrect credits.");
+  assert(appliedHaulerWrite.creditsBefore === 15000 && appliedHaulerWrite.creditsAfter === 15000, "Applied free Pioneer Freighter Store write changed credits.");
   assert(appliedHaulerWrite.creditsWritten === true && appliedHaulerWrite.shipWritten === true && appliedHaulerWrite.saveWritten === true, "Applied Bison Store write did not report allowed writes.");
   assert(appliedHaulerWrite.inventoryWritten === false && appliedHaulerWrite.attachmentWritten === false && appliedHaulerWrite.weaponWritten === false, "Applied Bison Store write reported forbidden writes.");
-  assert(haulerSave.credits === 1000 && haulerSave.ownedShips.includes("bison"), "Applied Bison Store write did not update mocked save state.");
+  assert(haulerSave.credits === 15000 && haulerSave.ownedShips.includes("bison"), "Applied Bison Store write did not update mocked save state.");
   assert(haulerSave.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Applied Bison Store write changed existing loadout.");
   assert(haulerSave.shipLoadouts.bison.attachments.length === 0, "Applied Bison Store write did not initialise loadout.");
   assert(haulerSave.ownedAttachments.cargoPod === 1, "Applied Bison Store write changed attachments.");

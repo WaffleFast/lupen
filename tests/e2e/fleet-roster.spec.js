@@ -39,6 +39,8 @@ test.describe("Hangar Fleet roster", () => {
     await expect(page.locator("#fleetDetailPanel .fleet-repair-action")).toBeDisabled();
     await expect(page.locator("#fleetDetailPanel .fleet-management-primary")).toHaveText("Open Loadout");
 
+    const fleetPresentationHeight = await page.locator("#fleetDetailPanel .fleet-selected-presentation").evaluate(frame => frame.getBoundingClientRect().height);
+
     const presentationGeometry = await page.locator("#fleetDetailPanel .fleet-selected-presentation").evaluate(frame => {
       const image = frame.querySelector("img");
       if (!image) return { fits: false };
@@ -57,6 +59,10 @@ test.describe("Hangar Fleet roster", () => {
     await page.screenshot({ path: "artifacts/fleet-roster-single.png", fullPage: false });
     await page.locator("#fleetDetailPanel .fleet-management-primary").click();
     await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
+
+    await page.evaluate(() => window.eval(`selectedShipyardShipId = "falcon"; showHangarSection("shipyard");`));
+    const exchangePresentationHeight = await page.locator("#shipyardDetailPanel .exchange-selected-presentation").evaluate(frame => frame.getBoundingClientRect().height);
+    expect(Math.abs(fleetPresentationHeight - exchangePresentationHeight)).toBeLessThanOrEqual(1);
   });
 
   test("selects and activates vessels from a four-ship roster", async ({ page }) => {

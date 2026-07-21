@@ -56685,3 +56685,77 @@ input::placeholder {
     grid-row: auto !important;
   }
 }
+
+/* ===== Pioneer ship silhouette normalization across Fleet and Exchange ===== */
+#hangarOwnedSection [data-ship-id="falcon"],
+#hangarShipyardSection [data-ship-id="falcon"] {
+  --pioneer-ship-art-scale: 1;
+}
+
+#hangarOwnedSection [data-ship-id="zeusExplorer"],
+#hangarShipyardSection [data-ship-id="zeusExplorer"] {
+  --pioneer-ship-art-scale: 1.06;
+}
+
+#hangarOwnedSection [data-ship-id="bison"],
+#hangarShipyardSection [data-ship-id="bison"],
+#hangarOwnedSection [data-ship-id="monolith"],
+#hangarShipyardSection [data-ship-id="monolith"] {
+  --pioneer-ship-art-scale: 0.93;
+}
+
+#hangarOwnedSection .fleet-roster-card .fleet-roster-image img,
+#hangarShipyardSection .vessel-exchange-card.fleet-selector-card.exchange-vessel-card[data-ship-id] .fleet-card-image-wrap img,
+#hangarOwnedSection .fleet-selected-vessel .fleet-selected-presentation img,
+#hangarShipyardSection .exchange-selected-vessel .exchange-selected-presentation img {
+  transform: scale(var(--pioneer-ship-art-scale, 1)) !important;
+  transform-origin: center center !important;
+}
+
+#hangarShipyardSection .vessel-exchange-card.fleet-selector-card.exchange-vessel-card[data-ship-id] .fleet-card-image-wrap img {
+  transform: translateY(-4px) scale(var(--pioneer-ship-art-scale, 1)) !important;
+}
+
+@media (min-width: 821px) {
+  #hangarOwnedSection .fleet-selected-vessel {
+    grid-template-rows: 190px auto auto !important;
+  }
+
+  #hangarOwnedSection .fleet-selected-hero,
+  #hangarShipyardSection .exchange-detail-preview {
+    height: 190px !important;
+    min-height: 190px !important;
+    max-height: 190px !important;
+  }
+
+  #hangarShipyardSection .exchange-detail-preview {
+    flex: 0 0 190px !important;
+  }
+
+  #hangarOwnedSection .fleet-selected-presentation,
+  #hangarShipyardSection .exchange-selected-presentation {
+    inset: 48px 12% 4px !important;
+  }
+}
+
+@media (min-width: 1121px) and (max-height: 760px) {
+  #hangarOwnedSection .fleet-selected-vessel {
+    grid-template-rows: 158px auto auto !important;
+  }
+
+  #hangarOwnedSection .fleet-selected-hero,
+  #hangarShipyardSection .exchange-detail-preview {
+    height: 158px !important;
+    min-height: 158px !important;
+    max-height: 158px !important;
+  }
+
+  #hangarShipyardSection .exchange-detail-preview {
+    flex-basis: 158px !important;
+  }
+
+  #hangarOwnedSection .fleet-selected-presentation,
+  #hangarShipyardSection .exchange-selected-presentation {
+    inset: 44px 12% 4px !important;
+  }
+}

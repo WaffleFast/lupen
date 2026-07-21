@@ -23,6 +23,31 @@ async function openHangarSection(page, section, setup = "") {
   })()`), { section, setup });
 }
 
+async function getVisibleShipArtHeights(page, selector) {
+  return page.locator(selector).evaluateAll(async images => Promise.all(images.map(async image => {
+    if (!image.complete) await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let minY = canvas.height;
+    let maxY = -1;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        if (pixels[((y * canvas.width) + x) * 4 + 3] > 12) {
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    const style = getComputedStyle(image);
+    const matrix = new DOMMatrixReadOnly(style.transform);
+    return Number.parseFloat(style.height) * ((maxY - minY + 1) / image.naturalHeight) * matrix.a;
+  })));
+}
+
 test.describe("Hangar Exchange and Vault redesign", () => {
   test("presents the Vessel Exchange as a compact hull catalogue and purchase workspace", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
@@ -57,12 +82,128 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     });
     expect(layout).toEqual({ columns: true, cardsFit: true, artFits: true });
 
+    const visibleCardHeights = await getVisibleShipArtHeights(page, "#shipShop .vessel-exchange-card img");
+    expect(Math.max(...visibleCardHeights) - Math.min(...visibleCardHeights)).toBeLessThan(1.5);
+
     await page.mouse.move(10, 10);
     await page.screenshot({ path: "artifacts/vessel-exchange-redesign.png", fullPage: false });
     await page.locator("#shipyardDetailPanel .buy-ship-action").click();
     await expect(page.locator("#shipShop .vessel-exchange-card[data-ship-id='monolith']")).toHaveClass(/owned/);
     await expect(page.locator("#shipyardDetailPanel .set-active-ship-action")).toHaveText("Set Active");
     await expect.poll(() => page.evaluate(() => credits)).toBe(100000);
+  });
+
+  test("applies a free staging hull purchase from the Vessel Exchange", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGame(page);
+
+    await page.evaluate(() => window.eval(`(() => {
+      localStorage.clear();
+      currentNode = "Asteron Prime";
+      lastPlanetNode = "Asteron Prime";
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      selectedFleetShipId = "falcon";
+      ownedShips = ["falcon"];
+      credits = 6225;
+      ensureShipCondition("falcon");
+      applyShipStats(false);
+
+      const subscribers = [];
+      const status = {
+        enabled: true,
+        isConnected: true,
+        currentNode: "Asteron Prime",
+        playerServerNode: "Asteron Prime",
+        presenceStatus: "docked",
+        lastStagingStoreItems: {
+          ok: true,
+          items: [{
+            itemId: "ship:zeusExplorer",
+            name: "Pioneer Destroyer",
+            category: "ship",
+            localKind: "ship",
+            localKey: "zeusExplorer",
+            price: 0,
+            levelRequirement: 0,
+            stockType: "fixed"
+          }]
+        },
+        lastStagingStorePreview: null,
+        lastStagingStorePurchase: null
+      };
+
+      window.__stagingHullPurchasePayloads = [];
+      window.LupenMultiplayerClient = {
+        getStatus: () => status,
+        onServerState: callback => {
+          subscribers.push(callback);
+          return { unsubscribe: () => {} };
+        },
+        requestStagingStoreItems: () => true,
+        previewStagingStorePurchase: () => true,
+        sendMovementIntent: () => true,
+        purchaseStagingStoreItem: payload => {
+          window.__stagingHullPurchasePayloads.push({ ...payload });
+          setTimeout(() => {
+            status.lastStagingStorePurchase = {
+              ok: true,
+              mode: "store_write",
+              operation: "purchase",
+              applied: true,
+              dryRun: false,
+              itemId: "ship:zeusExplorer",
+              name: "Pioneer Destroyer",
+              category: "ship",
+              localKind: "ship",
+              localKey: "zeusExplorer",
+              quantity: 1,
+              unitPrice: 0,
+              totalCost: 0,
+              creditsBefore: 6225,
+              creditsAfter: 6225,
+              itemBefore: 0,
+              itemAfter: 1,
+              wouldPass: true,
+              validationMode: "trusted_save",
+              trustedStateAvailable: true,
+              snapshotUsed: false,
+              creditsWritten: true,
+              shipWritten: true,
+              saveWritten: true,
+              writes: { creditsWritten: true, shipWritten: true, saveWritten: true },
+              currentNode: "Asteron Prime",
+              requestedNode: "Asteron Prime",
+              presenceStatus: "docked",
+              receivedAt: Date.now()
+            };
+            subscribers.forEach(callback => callback({}));
+          }, 120);
+          return true;
+        }
+      };
+
+      showScreen("gameScreen");
+      openHangar();
+      selectedShipyardShipId = "zeusExplorer";
+      showHangarSection("shipyard");
+    })()`));
+
+    await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 0");
+    await page.locator("#shipyardDetailPanel .buy-ship-action").click();
+
+    await expect.poll(() => page.evaluate(() => ownedShips.includes("zeusExplorer"))).toBe(true);
+    await expect(page.locator("#shipShop .vessel-exchange-card[data-ship-id='zeusExplorer']")).toHaveClass(/owned/);
+    await expect(page.locator("#shipyardDetailPanel .set-active-ship-action")).toHaveText("Set Active");
+    await expect.poll(() => page.evaluate(() => credits)).toBe(6225);
+    await expect.poll(() => page.evaluate(() => window.__stagingHullPurchasePayloads[0])).toMatchObject({
+      itemId: "ship:zeusExplorer",
+      quantity: 1,
+      currentNode: "Asteron Prime",
+      presenceStatus: "docked"
+    });
   });
 
   test("presents the Vault as a searchable equipment library with focused detail", async ({ page }) => {
