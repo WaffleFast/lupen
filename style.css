@@ -57717,3 +57717,575 @@ input::placeholder {
   font-weight: 900;
   letter-spacing: 0.05em;
 }
+
+/* ===== Pilot Profile: modern command dossier ===== */
+#pilotProfileScreen.pilot-profile-screen.active {
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  gap: 10px !important;
+  padding: 18px 32px !important;
+}
+
+#pilotProfileScreen.pilot-profile-screen .pilot-profile-header {
+  min-height: 82px !important;
+}
+
+#pilotProfileScreen.pilot-profile-screen .pilot-profile-header p {
+  margin-bottom: 4px !important;
+  font-size: 0.74rem !important;
+}
+
+#pilotProfileScreen.pilot-profile-screen .pilot-profile-header h2 {
+  max-width: none !important;
+  font-size: clamp(34px, 3.5vw, 48px) !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+#pilotProfileScreen .pilot-profile-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: #a6b9ca;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+#pilotProfileScreen .pilot-profile-body {
+  display: block !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+#pilotProfileScreen .pilot-profile-workspace {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+#pilotProfileScreen .pilot-profile-panel,
+#pilotProfileScreen .pilot-subpanel {
+  border: 1px solid rgba(73, 187, 226, 0.42) !important;
+  border-radius: 10px !important;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(47, 190, 224, 0.1), transparent 38%),
+    linear-gradient(145deg, rgba(5, 22, 31, 0.96), rgba(1, 11, 22, 0.97)) !important;
+  box-shadow: inset 0 1px 0 rgba(175, 235, 255, 0.05) !important;
+}
+
+#pilotProfileScreen .pilot-dossier-panel {
+  display: grid;
+  grid-template-rows: auto 136px auto minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  overflow: hidden;
+}
+
+#pilotProfileScreen .pilot-workspace-heading,
+#pilotProfileScreen .pilot-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+}
+
+#pilotProfileScreen .pilot-workspace-heading > div,
+#pilotProfileScreen .pilot-panel-heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+#pilotProfileScreen .pilot-workspace-heading span,
+#pilotProfileScreen .pilot-panel-heading > div > span {
+  color: #64e1ff;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#pilotProfileScreen .pilot-workspace-heading small,
+#pilotProfileScreen .pilot-panel-heading > div > small {
+  color: #7997a5;
+  font-size: 0.6rem;
+}
+
+#pilotProfileScreen .pilot-workspace-heading em {
+  padding: 4px 8px;
+  border: 1px solid rgba(63, 225, 170, 0.48);
+  border-radius: 999px;
+  color: #63e6b0;
+  background: rgba(8, 76, 61, 0.42);
+  font-size: 0.52rem;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+#pilotProfileScreen .pilot-dossier-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-block: 1px solid rgba(67, 170, 210, 0.18);
+  background: radial-gradient(circle, rgba(29, 151, 211, 0.17), transparent 63%);
+}
+
+#pilotProfileScreen .pilot-dossier-badge::after {
+  content: "";
+  position: absolute;
+  width: 118px;
+  height: 118px;
+  border: 1px solid rgba(74, 201, 246, 0.16);
+  border-radius: 50%;
+  box-shadow: 0 0 28px rgba(33, 177, 233, 0.1);
+}
+
+#pilotProfileScreen .pilot-dossier-badge img {
+  position: relative;
+  z-index: 1;
+  width: 118px;
+  height: 118px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 13px rgba(47, 190, 246, 0.2));
+}
+
+#pilotProfileScreen .pilot-dossier-identity {
+  display: grid;
+  min-width: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(68, 166, 204, 0.24);
+}
+
+#pilotProfileScreen .pilot-dossier-identity > span,
+#pilotProfileScreen .pilot-dossier-vessel span {
+  color: #62dfff;
+  font-size: 0.58rem;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+#pilotProfileScreen .pilot-dossier-identity > strong {
+  max-width: 100%;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #f2f8ff;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#pilotProfileScreen .pilot-dossier-rank {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  color: #b8d9e8;
+  font-size: 0.74rem;
+}
+
+#pilotProfileScreen .pilot-dossier-rank img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+#pilotProfileScreen .pilot-dossier-vessel {
+  display: grid;
+  grid-template-rows: minmax(80px, 1fr) auto;
+  gap: 9px;
+  min-width: 0;
+  min-height: 0;
+  align-content: stretch;
+}
+
+#pilotProfileScreen .pilot-dossier-vessel-art {
+  display: grid;
+  min-height: 80px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(50, 166, 209, 0.18);
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 50% 72%, rgba(27, 187, 236, 0.16), transparent 48%),
+    rgba(0, 10, 19, 0.54);
+}
+
+#pilotProfileScreen .pilot-dossier-vessel-art img {
+  width: 82%;
+  height: 92%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 14px rgba(43, 205, 255, 0.24));
+}
+
+#pilotProfileScreen .pilot-dossier-vessel > div:last-child {
+  display: grid;
+  min-width: 0;
+}
+
+#pilotProfileScreen .pilot-dossier-vessel strong {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #f3f9ff;
+  font-size: 1.05rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#pilotProfileScreen .pilot-dossier-vessel small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #93aeb9;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#pilotProfileScreen .pilot-record-panel {
+  display: grid;
+  grid-template-rows: 84px 176px minmax(0, 1fr);
+  gap: 11px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  overflow: hidden;
+}
+
+#pilotProfileScreen .pilot-record-header {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.9fr) minmax(340px, 1.1fr);
+  gap: 18px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 2px 12px;
+  border-bottom: 1px solid rgba(68, 166, 204, 0.24);
+}
+
+#pilotProfileScreen .pilot-record-title {
+  display: grid;
+  min-width: 0;
+}
+
+#pilotProfileScreen .pilot-record-title h3 {
+  max-width: 100%;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #f4f8ff;
+  font-size: clamp(1.45rem, 2.25vw, 2.05rem);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#pilotProfileScreen .pilot-record-title small {
+  margin-top: 5px;
+  overflow: hidden;
+  color: #91acb8;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#pilotProfileScreen .pilot-level-block {
+  display: grid !important;
+  gap: 6px !important;
+  min-width: 0;
+  padding: 0 0 0 18px !important;
+  border-left: 1px solid rgba(68, 166, 204, 0.24) !important;
+}
+
+#pilotProfileScreen .pilot-xp-label {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+#pilotProfileScreen .pilot-xp-label span {
+  color: #64dfff;
+  font-size: 0.64rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+#pilotProfileScreen .pilot-xp-label b {
+  color: #f3f8ff;
+  font-size: 0.95rem;
+}
+
+#pilotProfileScreen .pilot-level-block p {
+  color: #8ca6b2 !important;
+  font-size: 0.6rem !important;
+  text-align: right;
+}
+
+#pilotProfileScreen .pilot-dashboard-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 8px !important;
+}
+
+#pilotProfileScreen .pilot-stat-card {
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  padding: 8px 11px !important;
+  border-color: color-mix(in srgb, var(--pilot-accent, #55d9ff) 45%, rgba(42, 121, 154, 0.24)) !important;
+  background:
+    radial-gradient(circle at 2% 50%, var(--pilot-accent-soft, rgba(63, 181, 225, 0.15)), transparent 43%),
+    linear-gradient(145deg, rgba(6, 25, 35, 0.96), rgba(1, 12, 23, 0.96)) !important;
+}
+
+#pilotProfileScreen .pilot-stat-card.fleet-stat { --pilot-accent: rgba(63, 171, 255, 0.92); --pilot-accent-soft: rgba(38, 134, 225, 0.18); }
+#pilotProfileScreen .pilot-stat-card.ship-stat { --pilot-accent: rgba(180, 101, 255, 0.92); --pilot-accent-soft: rgba(128, 55, 213, 0.18); }
+
+#pilotProfileScreen .pilot-stat-icon {
+  width: 42px !important;
+  height: 42px !important;
+}
+
+#pilotProfileScreen .pilot-stat-card span {
+  color: #83dfff !important;
+  font-size: 0.55rem !important;
+}
+
+#pilotProfileScreen .pilot-stat-card strong {
+  margin-top: 3px !important;
+  font-size: clamp(1.05rem, 1.55vw, 1.35rem) !important;
+}
+
+#pilotProfileScreen .pilot-stat-card small {
+  margin-top: 3px !important;
+  font-size: 0.55rem !important;
+}
+
+#pilotProfileScreen .pilot-record-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+#pilotProfileScreen .pilot-subpanel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 11px 12px !important;
+  overflow: hidden;
+}
+
+#pilotProfileScreen .pilot-open-journey {
+  width: auto !important;
+  min-width: 126px !important;
+  min-height: 28px !important;
+  padding: 3px 10px !important;
+  font-size: 0.58rem !important;
+}
+
+#pilotProfileScreen .pilot-journey-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+#pilotProfileScreen .pilot-journey-rows article {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+  padding: 7px 10px;
+  border-left: 1px solid rgba(66, 165, 203, 0.22);
+}
+
+#pilotProfileScreen .pilot-journey-rows article:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+#pilotProfileScreen .pilot-journey-rows article img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+#pilotProfileScreen .pilot-journey-rows article > div {
+  display: grid;
+  min-width: 0;
+}
+
+#pilotProfileScreen .pilot-journey-rows span,
+#pilotProfileScreen .pilot-fleet-item span,
+#pilotProfileScreen .pilot-loadout-readiness span {
+  color: #60dafc;
+  font-size: 0.55rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#pilotProfileScreen .pilot-journey-rows strong {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #eef7ff;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#pilotProfileScreen .pilot-journey-rows small {
+  margin-top: 4px;
+  color: #809ba7;
+  font-size: 0.56rem;
+}
+
+#pilotProfileScreen .pilot-journey-rows .pilot-progress-track {
+  height: 5px;
+  margin-top: 6px;
+}
+
+#pilotProfileScreen .pilot-fleet-readiness {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.85fr) minmax(190px, 1.15fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+#pilotProfileScreen .pilot-fleet-item {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+#pilotProfileScreen .pilot-fleet-item > img {
+  width: 52px !important;
+  height: 52px !important;
+  object-fit: contain;
+}
+
+#pilotProfileScreen .pilot-fleet-item > div {
+  display: grid;
+  min-width: 0;
+}
+
+#pilotProfileScreen .pilot-fleet-item strong {
+  margin-top: 4px;
+  font-size: 0.86rem;
+  line-height: 1.05;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+#pilotProfileScreen .pilot-fleet-item small {
+  margin-top: 3px;
+  color: #70d9a5;
+  font-size: 0.56rem;
+}
+
+#pilotProfileScreen .pilot-loadout-readiness {
+  display: grid;
+  align-content: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+#pilotProfileScreen .pilot-loadout-readiness > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 9px;
+  min-width: 0;
+}
+
+#pilotProfileScreen .pilot-loadout-readiness strong {
+  color: #eef9ff;
+  font-size: 0.75rem;
+}
+
+#pilotProfileScreen .pilot-loadout-readiness .pilot-progress-track {
+  grid-column: 1 / -1;
+  height: 5px;
+}
+
+#pilotProfileScreen .pilot-fleet-owned-note {
+  grid-column: 1 / -1;
+  padding-top: 6px;
+  border-top: 1px solid rgba(66, 165, 203, 0.18);
+  color: #7d98a4;
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 1120px) {
+  #pilotProfileScreen.pilot-profile-screen.active {
+    overflow-y: auto !important;
+  }
+
+  #pilotProfileScreen .pilot-profile-body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  #pilotProfileScreen .pilot-profile-workspace {
+    grid-template-columns: 230px minmax(0, 1fr);
+    min-height: 620px;
+  }
+
+  #pilotProfileScreen .pilot-record-panel {
+    grid-template-rows: auto auto auto;
+    overflow: visible;
+  }
+
+  #pilotProfileScreen .pilot-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(3, 72px);
+  }
+
+  #pilotProfileScreen .pilot-record-lower {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  #pilotProfileScreen .pilot-profile-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  #pilotProfileScreen .pilot-dossier-panel {
+    grid-template-rows: auto 110px auto 150px;
+  }
+
+  #pilotProfileScreen .pilot-record-header,
+  #pilotProfileScreen .pilot-record-lower {
+    grid-template-columns: 1fr;
+  }
+
+  #pilotProfileScreen .pilot-level-block {
+    padding: 10px 0 0 !important;
+    border-top: 1px solid rgba(68, 166, 204, 0.24);
+    border-left: 0 !important;
+  }
+}

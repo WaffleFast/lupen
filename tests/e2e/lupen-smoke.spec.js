@@ -1571,7 +1571,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("pilot profile presents a live, compact career record without duplicated dashboard panels", async ({ page }) => {
+  test("pilot profile presents a modern, live career and fleet record", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.setViewportSize({ width: 1366, height: 768 });
@@ -1630,62 +1630,54 @@ test.describe("Lupen browser smoke", () => {
 
     const profile = page.locator("#pilotProfileScreen");
     await expect(profile).toHaveClass(/active/);
-    await expect(page.locator("#profilePilotTitle")).toHaveText("WaffleFast");
+    await expect(page.locator("#profilePilotTitle")).toHaveText("PILOT PROFILE");
+    await expect(profile.locator(".pilot-dossier-identity")).toContainText("WaffleFast");
     await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Combat Level 3");
-    await expect(profile.locator('[data-profile-section="identity"]')).toContainText("700 / 2,500 XP to Level 4");
     await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Pioneer Hunter");
+    await expect(profile.locator(".pilot-record-header")).toContainText("700 / 2,500");
+    await expect(profile.locator(".pilot-record-header")).toContainText("XP to Level 4");
 
     const summaryCards = profile.locator('[data-profile-section="career-summary"] .pilot-stat-card');
-    await expect(summaryCards).toHaveCount(4);
+    await expect(summaryCards).toHaveCount(6);
     await expect(profile.locator('[data-profile-stat="bots-destroyed"]')).toContainText("3");
     await expect(profile.locator('[data-profile-stat="bounties-completed"]')).toContainText("2");
     await expect(profile.locator('[data-profile-stat="trade-profit"]')).toContainText("CR 8,550");
     await expect(profile.locator('[data-profile-stat="cargo-sold"]')).toContainText("403");
+    await expect(profile.locator('[data-profile-stat="ships-owned"]')).toContainText("1 / 4");
+    await expect(profile.locator('[data-profile-stat="galaxy-completion"]')).toContainText("16%");
 
     const career = profile.locator('[data-profile-section="career-progress"]');
     await expect(career).toContainText("Academy");
-    await expect(career.locator('[data-career-progress="academy"]')).toContainText("5 / 7");
+    await expect(career.locator('[data-career-progress="academy"]')).toContainText("5 / 7 assignments");
     await expect(career.locator('[data-career-progress="frontier"]')).toContainText("Pending");
-    await expect(career.locator('[data-career-progress="galaxy"]')).toContainText("Galaxy Completion");
 
     const fleet = profile.locator('[data-profile-section="fleet-record"]');
     await expect(fleet.locator('[data-fleet-record="current-vessel"]')).toContainText("Pioneer Hunter");
-    await expect(fleet.locator('[data-fleet-record="ships-owned"]')).toContainText("1");
+    await expect(fleet.locator('[data-fleet-record="ships-owned"]')).toContainText("1 of 4 Pioneer hulls owned");
     await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("2 / 2");
-    await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("Guns Equipped");
-    await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("Attachment Slots Used");
+    await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("Weapons");
+    await expect(fleet.locator('[data-fleet-record="loadout"]')).toContainText("Equipment");
 
-    const systems = profile.locator('[data-profile-section="pilot-systems"]');
-    await expect(systems.locator(".future-pilot-card")).toHaveCount(3);
-    await expect(systems).toContainText("Guilds");
-    await expect(systems).toContainText("Player Search");
-    await expect(systems).toContainText("Leaderboards");
-    await expect(systems).not.toContainText("Player Stats");
-    await expect(systems.locator('[data-pilot-system="player-search"]')).toHaveAttribute("aria-disabled", "true");
-    await expect(systems.locator("button, a, [tabindex]")).toHaveCount(0);
-    await systems.locator('[data-pilot-system="player-search"]').click();
-    await expect(profile).toHaveClass(/active/);
-
+    await expect(profile.locator('[data-profile-section="pilot-systems"]')).toHaveCount(0);
     await expect(profile.locator(".pilot-combat-progress-panel")).toHaveCount(0);
-    await expect(profile.locator('[data-profile-stat="current-vessel"]')).toHaveCount(0);
-    await expect(profile.locator('[data-profile-stat="ships-owned"]')).toHaveCount(0);
     await expect(profile).not.toContainText("Online Pilot Systems");
+    await expect(profile).not.toContainText("Coming Soon");
 
     const compactLayout = await profile.evaluate(screen => {
       const screenRect = screen.getBoundingClientRect();
-      const systemsPanel = screen.querySelector('[data-profile-section="pilot-systems"]');
-      const systemsRect = systemsPanel?.getBoundingClientRect();
+      const workspace = screen.querySelector(".pilot-profile-workspace");
+      const workspaceRect = workspace?.getBoundingClientRect();
       const backRect = screen.querySelector(".screen-back-btn")?.getBoundingClientRect();
       const cards = [...screen.querySelectorAll(".pilot-stat-card")].map(card => card.getBoundingClientRect());
       const fleetName = screen.querySelector('[data-fleet-record="current-vessel"] strong');
-      const loadoutLabels = [...screen.querySelectorAll('[data-fleet-record="loadout"] small')];
+      const loadoutLabels = [...screen.querySelectorAll('[data-fleet-record="loadout"] span')];
       return {
         documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         screenOverflowX: screen.scrollWidth - screen.clientWidth,
         screenOverflowY: screen.scrollHeight - screen.clientHeight,
         screenBottom: Math.round(screenRect.bottom),
         viewportBottom: window.innerHeight,
-        systemsBottom: systemsRect ? Math.round(systemsRect.bottom) : 9999,
+        workspaceBottom: workspaceRect ? Math.round(workspaceRect.bottom) : 9999,
         backRight: backRect ? Math.round(backRect.right) : 9999,
         screenRight: Math.round(screenRect.right),
         cardsFit: cards.every(rect => rect.left >= screenRect.left - 1 && rect.right <= screenRect.right + 1),
@@ -1697,35 +1689,39 @@ test.describe("Lupen browser smoke", () => {
     expect(compactLayout.screenOverflowX).toBeLessThanOrEqual(1);
     expect(compactLayout.screenOverflowY).toBeLessThanOrEqual(1);
     expect(compactLayout.screenBottom).toBeLessThanOrEqual(compactLayout.viewportBottom);
-    expect(compactLayout.systemsBottom).toBeLessThanOrEqual(compactLayout.screenBottom);
+    expect(compactLayout.workspaceBottom).toBeLessThanOrEqual(compactLayout.screenBottom);
     expect(compactLayout.backRight).toBeLessThanOrEqual(compactLayout.screenRight);
     expect(compactLayout.cardsFit).toBe(true);
     expect(compactLayout.standardShipNameFits).toBe(true);
     expect(compactLayout.loadoutLabelsFit).toBe(true);
 
     fs.mkdirSync("artifacts", { recursive: true });
-    await page.screenshot({ path: "artifacts/pilot-profile-redesign-1366x768.png" });
-    await profile.screenshot({ path: "artifacts/pilot-profile-azure-striker-1366x768.png" });
+    await page.screenshot({ path: "artifacts/pilot-profile-command-dossier-1366x768.png" });
+    await profile.screenshot({ path: "artifacts/pilot-profile-command-dossier-screen-1366x768.png" });
 
     await page.evaluate(() => {
       localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({ username: "WaffleFastTheOuterRimPathfinder" }));
       renderPilotProfile();
     });
-    await expect(page.locator("#profilePilotTitle")).toHaveText("WaffleFastTheOuterRimPathfinder");
+    await expect(page.locator("#profilePilotTitle")).toHaveText("PILOT PROFILE");
+    await expect(profile.locator(".pilot-dossier-identity")).toContainText("WaffleFastTheOuterRimPathfinder");
     const longNameLayout = await profile.evaluate(screen => {
       const title = screen.querySelector("#profilePilotTitle");
-      const identity = screen.querySelector(".pilot-identity-block > strong");
+      const identity = screen.querySelector(".pilot-dossier-identity > strong");
+      const recordName = screen.querySelector(".pilot-record-title h3");
       const back = screen.querySelector(".screen-back-btn");
       const titleRect = title?.getBoundingClientRect();
       const identityRect = identity?.getBoundingClientRect();
+      const recordNameRect = recordName?.getBoundingClientRect();
       const backRect = back?.getBoundingClientRect();
       return {
         titleBeforeBack: Boolean(titleRect && backRect && titleRect.right <= backRect.left),
         identityContained: Boolean(identityRect && identityRect.right <= screen.getBoundingClientRect().right),
+        recordNameContained: Boolean(recordNameRect && recordNameRect.right <= screen.getBoundingClientRect().right),
         noScreenOverflowX: screen.scrollWidth <= screen.clientWidth + 1
       };
     });
-    expect(longNameLayout).toEqual({ titleBeforeBack: true, identityContained: true, noScreenOverflowX: true });
+    expect(longNameLayout).toEqual({ titleBeforeBack: true, identityContained: true, recordNameContained: true, noScreenOverflowX: true });
     await page.screenshot({ path: "artifacts/pilot-profile-long-name-1366x768.png" });
 
     await page.setViewportSize({ width: 1680, height: 936 });
@@ -1733,7 +1729,7 @@ test.describe("Lupen browser smoke", () => {
       localStorage.setItem(STORAGE_ACCOUNT_KEY, JSON.stringify({ username: "WaffleFast" }));
       renderPilotProfile();
     });
-    await expect(page.locator("#profilePilotTitle")).toHaveText("WaffleFast");
+    await expect(page.locator("#profilePilotTitle")).toHaveText("PILOT PROFILE");
     await page.screenshot({ path: "artifacts/pilot-profile-large-desktop-1680x936.png" });
 
     await page.setViewportSize({ width: 1366, height: 768 });

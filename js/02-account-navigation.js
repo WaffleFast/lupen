@@ -350,6 +350,7 @@ function renderPilotProfile() {
   const gunCount = hasActiveVessel ? countEquippedGuns(currentShipId) : 0;
   const attachmentCount = hasActiveVessel ? countEquippedAttachments(currentShipId) : 0;
   const shipsOwnedCount = Array.isArray(ownedShips) ? ownedShips.filter(shipId => SHIPS[shipId]).length : 0;
+  const availableShipCount = SHIP_LINES?.[PIONEER_LINE_ID]?.shipIds?.filter(shipId => SHIPS[shipId]).length || 0;
   const journey = getPilotProfileJourneySnapshot();
   const xpRemaining = Math.max(0, Number(combat.next || 0) - Number(combat.current || 0));
   const loadoutUnavailable = !hasActiveVessel;
@@ -359,110 +360,94 @@ function renderPilotProfile() {
   const title = document.getElementById("profilePilotTitle");
   const body = document.getElementById("pilotProfileBody");
   if (title) {
-    title.textContent = pilotName;
-    title.title = pilotName;
+    title.textContent = "PILOT PROFILE";
+    title.title = "Pilot Profile";
   }
   if (!body) return;
 
   body.innerHTML = `
-    <section class="pilot-profile-panel pilot-dashboard-hero" data-profile-section="identity" aria-label="Pilot identity and combat experience">
-      <div class="pilot-badge-frame">
-        <img src="${PILOT_UI_ASSETS.pilotBadge}" alt="Combat Level ${formatNumber(combat.level)} pilot insignia" />
-      </div>
-
-      <div class="pilot-identity-block">
-        <strong title="${escapeHtml(pilotName)}">${escapeHtml(pilotName)}</strong>
-        <div class="pilot-identity-level">
-          <img src="${PILOT_UI_ASSETS.combatProgress}" alt="" />
-          <span>Combat Level ${formatNumber(combat.level)}</span>
-        </div>
-        <div class="pilot-current-vessel-compact">
-          ${shipImage ? `<img src="${escapeHtml(shipImage)}" alt="${escapeHtml(shipName)}" onerror="this.hidden=true" />` : ""}
-          <span><b title="${escapeHtml(shipName)}">${escapeHtml(shipName)}</b><small>Current Vessel</small></span>
-        </div>
-      </div>
-
-      <div class="pilot-level-block">
-        <span class="pilot-section-kicker">Combat XP</span>
-        <strong>${formatNumber(combat.current)} <em>/ ${formatNumber(combat.next)} XP to Level ${formatNumber(combat.level + 1)}</em></strong>
-        ${renderPilotProgressBar(combat.percent, `Combat XP progress to Level ${combat.level + 1}`)}
-        <p>${formatNumber(xpRemaining)} XP remaining to reach Level ${formatNumber(combat.level + 1)}</p>
-      </div>
-    </section>
-
-    <section class="pilot-dashboard-grid" data-profile-section="career-summary" aria-label="Career summary">
-      ${renderPilotStatCard("Bots Destroyed", formatNumber(totals.botsDestroyed || 0), "Career total", "combat-stat", PILOT_UI_ASSETS.botsDestroyed)}
-      ${renderPilotStatCard("Bounties Completed", formatNumber(totals.bountiesClaimed || 0), "Rewards claimed", "bounty-stat", PILOT_UI_ASSETS.bounties)}
-      ${renderPilotStatCard("Trade Profit", `CR ${formatNumber(totals.tradeProfit || 0)}`, `${formatNumber(totals.tradesCompleted || 0)} completed trades`, "profit-stat", PILOT_UI_ASSETS.tradeProfit)}
-      ${renderPilotStatCard("Cargo Sold", formatNumber(totals.cargoSold || 0), "Units sold", "cargo-stat", PILOT_UI_ASSETS.cargoSold)}
-    </section>
-
-    <section class="pilot-profile-main">
-      <section class="pilot-profile-panel pilot-career-panel" data-profile-section="career-progress" aria-labelledby="pilotCareerHeading">
-        <header class="pilot-panel-heading">
-          <h3 id="pilotCareerHeading">Career Progress</h3>
-          <button id="profileOpenJourneyButton" type="button" class="pilot-open-journey" onclick="openJourney()">Open Journey <span aria-hidden="true">›</span></button>
+    <section class="pilot-profile-workspace" aria-label="Pilot career record">
+      <aside class="pilot-profile-panel pilot-dossier-panel" data-profile-section="identity" aria-label="Pilot identity">
+        <header class="pilot-workspace-heading">
+          <div><span>PILOT DOSSIER</span><small>Active command record</small></div>
+          <em>ACTIVE</em>
         </header>
-        <div class="pilot-career-grid">
-          <article class="pilot-career-item" data-career-progress="academy">
-            <img src="assets/chapter-academy-icon.png" alt="" />
-            <div>
-              <span>Academy</span>
-              <strong>${formatNumber(journey.academy.complete)} / ${formatNumber(journey.academy.total)}</strong>
-              ${renderPilotProgressBar(journey.academy.percent, "Academy assignment progress")}
-              <small>Assignments Complete</small>
-            </div>
-          </article>
-          <article class="pilot-career-item" data-career-progress="frontier">
-            <img src="assets/chapter-frontier-icon.png" alt="" />
-            <div>
-              <span>Frontier</span>
-              <strong class="pilot-frontier-status pilot-frontier-status--${escapeHtml(journey.frontierState)}">${escapeHtml(journey.frontierLabel)}</strong>
-              <small>${escapeHtml(journey.frontierMeta)}</small>
-            </div>
-          </article>
-          <article class="pilot-career-item" data-career-progress="galaxy">
-            <span class="pilot-galaxy-mark" aria-hidden="true">◎</span>
-            <div>
-              <span>Galaxy Completion</span>
-              <strong>${formatNumber(journey.galaxyPercent)}%</strong>
-              ${renderPilotProgressBar(journey.galaxyPercent, "Overall galaxy completion")}
-              <small>Overall Progress</small>
-            </div>
-          </article>
-        </div>
-      </section>
 
-      <section class="pilot-profile-panel pilot-fleet-panel" data-profile-section="fleet-record" aria-labelledby="pilotFleetHeading">
-        <header class="pilot-panel-heading"><h3 id="pilotFleetHeading">Fleet Record</h3></header>
-        <div class="pilot-fleet-grid">
-          <article class="pilot-fleet-item pilot-fleet-vessel" data-fleet-record="current-vessel">
-            ${shipImage ? `<img src="${escapeHtml(shipImage)}" alt="${escapeHtml(shipName)}" onerror="this.hidden=true" />` : `<img src="${PILOT_UI_ASSETS.currentVessel}" alt="" />`}
-            <div><span>Current Vessel</span><strong title="${escapeHtml(shipName)}">${escapeHtml(shipName)}</strong><small>${hasActiveVessel ? "Active" : "Unassigned"}</small></div>
-          </article>
-          <article class="pilot-fleet-item" data-fleet-record="ships-owned">
-            ${renderPilotFleetIcon()}
-            <div><span>Ships Owned</span><strong>${formatNumber(shipsOwnedCount)}</strong><small>Fleet Size</small></div>
-          </article>
-          <article class="pilot-fleet-item pilot-loadout-record" data-fleet-record="loadout">
-            ${renderPilotLoadoutIcon()}
-            <div>
-              <span>Loadout</span>
-              <strong>${gunValue}</strong><small>Guns Equipped</small>
-              <strong>${attachmentValue}</strong><small>Attachment Slots Used</small>
-            </div>
-          </article>
+        <div class="pilot-dossier-badge">
+          <img src="${PILOT_UI_ASSETS.pilotBadge}" alt="Combat Level ${formatNumber(combat.level)} pilot insignia" />
         </div>
-      </section>
-    </section>
 
-    <section class="pilot-profile-panel pilot-future-card" data-profile-section="pilot-systems" aria-labelledby="pilotSystemsHeading">
-        <div class="profile-tree-head"><h3 id="pilotSystemsHeading">Pilot Systems</h3><strong>Coming Later</strong></div>
-        <div class="future-profile-grid">
-          ${renderFuturePilotCard("guilds", "Guilds", "Form alliances with other pilots", PILOT_UI_ASSETS.onlineGuilds)}
-          ${renderFuturePilotCard("player-search", "Player Search", "Find and inspect other pilots", PILOT_UI_ASSETS.playerSearch)}
-          ${renderFuturePilotCard("leaderboards", "Leaderboards", "Compare pilot rankings", PILOT_UI_ASSETS.leaderboards)}
+        <div class="pilot-dossier-identity">
+          <span>CALLSIGN</span>
+          <strong title="${escapeHtml(pilotName)}">${escapeHtml(pilotName)}</strong>
+          <div class="pilot-dossier-rank"><img src="${PILOT_UI_ASSETS.combatProgress}" alt="" /><b>Combat Level ${formatNumber(combat.level)}</b></div>
         </div>
+
+        <div class="pilot-dossier-vessel">
+          <div class="pilot-dossier-vessel-art">
+            ${shipImage ? `<img src="${escapeHtml(shipImage)}" alt="${escapeHtml(shipName)}" onerror="this.hidden=true" />` : ""}
+          </div>
+          <div><span>ACTIVE VESSEL</span><strong title="${escapeHtml(shipName)}">${escapeHtml(shipName)}</strong><small>${hasActiveVessel ? escapeHtml(ship.role || ship.roleSubtitle || "Operational hull") : "No vessel assigned"}</small></div>
+        </div>
+      </aside>
+
+      <main class="pilot-profile-panel pilot-record-panel">
+        <section class="pilot-record-header" aria-label="Combat experience">
+          <div class="pilot-record-title">
+            <span class="pilot-section-kicker">CAREER RECORD</span>
+            <h3 title="${escapeHtml(pilotName)}">${escapeHtml(pilotName)}</h3>
+            <small>Combat Level ${formatNumber(combat.level)} · ${hasActiveVessel ? escapeHtml(shipName) : "No active vessel"}</small>
+          </div>
+          <div class="pilot-level-block">
+            <div class="pilot-xp-label"><span>COMBAT XP</span><b>${formatNumber(combat.current)} / ${formatNumber(combat.next)}</b></div>
+            ${renderPilotProgressBar(combat.percent, `Combat XP progress to Level ${combat.level + 1}`)}
+            <p>${formatNumber(xpRemaining)} XP to Level ${formatNumber(combat.level + 1)}</p>
+          </div>
+        </section>
+
+        <section class="pilot-dashboard-grid" data-profile-section="career-summary" aria-label="Career summary">
+          ${renderPilotStatCard("Bots Destroyed", formatNumber(totals.botsDestroyed || 0), "Career total", "combat-stat", PILOT_UI_ASSETS.botsDestroyed)}
+          ${renderPilotStatCard("Bounties Completed", formatNumber(totals.bountiesClaimed || 0), "Rewards claimed", "bounty-stat", PILOT_UI_ASSETS.bounties)}
+          ${renderPilotStatCard("Trade Profit", `CR ${formatNumber(totals.tradeProfit || 0)}`, `${formatNumber(totals.tradesCompleted || 0)} completed trades`, "profit-stat", PILOT_UI_ASSETS.tradeProfit)}
+          ${renderPilotStatCard("Cargo Sold", formatNumber(totals.cargoSold || 0), "Units sold", "cargo-stat", PILOT_UI_ASSETS.cargoSold)}
+          ${renderPilotStatCard("Ships Owned", `${formatNumber(shipsOwnedCount)} / ${formatNumber(availableShipCount)}`, "Pioneer hulls", "fleet-stat", PILOT_UI_ASSETS.currentVessel)}
+          ${renderPilotStatCard("Galaxy Completion", `${formatNumber(journey.galaxyPercent)}%`, "Overall progress", "ship-stat", PILOT_UI_ASSETS.combatProgress)}
+        </section>
+
+        <section class="pilot-record-lower">
+          <section class="pilot-subpanel pilot-career-panel" data-profile-section="career-progress" aria-labelledby="pilotCareerHeading">
+            <header class="pilot-panel-heading">
+              <div><span>JOURNEY PROGRESS</span><small>Current campaign route</small></div>
+              <button id="profileOpenJourneyButton" type="button" class="pilot-open-journey" onclick="openJourney()">Open Journey <span aria-hidden="true">›</span></button>
+            </header>
+            <div class="pilot-journey-rows">
+              <article data-career-progress="academy">
+                <img src="assets/chapter-academy-icon.png" alt="" />
+                <div><span>Academy</span><strong>${formatNumber(journey.academy.complete)} / ${formatNumber(journey.academy.total)} assignments</strong>${renderPilotProgressBar(journey.academy.percent, "Academy assignment progress")}</div>
+              </article>
+              <article data-career-progress="frontier">
+                <img src="assets/chapter-frontier-icon.png" alt="" />
+                <div><span>Frontier</span><strong class="pilot-frontier-status pilot-frontier-status--${escapeHtml(journey.frontierState)}">${escapeHtml(journey.frontierLabel)}</strong><small>${escapeHtml(journey.frontierMeta)}</small></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="pilot-subpanel pilot-fleet-panel" data-profile-section="fleet-record" aria-labelledby="pilotFleetHeading">
+            <header class="pilot-panel-heading"><div><span id="pilotFleetHeading">FLEET READINESS</span><small>Active hull configuration</small></div></header>
+            <div class="pilot-fleet-readiness">
+              <article class="pilot-fleet-item pilot-fleet-vessel" data-fleet-record="current-vessel">
+                ${shipImage ? `<img src="${escapeHtml(shipImage)}" alt="${escapeHtml(shipName)}" onerror="this.hidden=true" />` : `<img src="${PILOT_UI_ASSETS.currentVessel}" alt="" />`}
+                <div><span>Current Vessel</span><strong title="${escapeHtml(shipName)}">${escapeHtml(shipName)}</strong><small>${hasActiveVessel ? "Ready for deployment" : "Unassigned"}</small></div>
+              </article>
+              <div class="pilot-loadout-readiness" data-fleet-record="loadout">
+                <div><span>Weapons</span><strong>${gunValue}</strong>${renderPilotProgressBar(gunLimit ? (gunCount / gunLimit) * 100 : 0, "Weapon slots fitted")}</div>
+                <div><span>Equipment</span><strong>${attachmentValue}</strong>${renderPilotProgressBar(attachmentLimit ? (attachmentCount / attachmentLimit) * 100 : 0, "Equipment slots fitted")}</div>
+              </div>
+              <span class="pilot-fleet-owned-note" data-fleet-record="ships-owned">${formatNumber(shipsOwnedCount)} of ${formatNumber(availableShipCount)} Pioneer hulls owned</span>
+            </div>
+          </section>
+        </section>
+      </main>
     </section>
   `;
 }
