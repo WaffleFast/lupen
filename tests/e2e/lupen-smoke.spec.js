@@ -8799,6 +8799,8 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator(".accept-bounty-button").click();
     await expect(page.locator(".bounty-cancel-btn")).toBeVisible();
+    await expect(page.locator(".bounty-contract-card.active")).toContainText("ACCEPTED");
+    await expect(page.locator("#bountyDetailPanel .selected-contract-active-badge")).toContainText("ACTIVE CONTRACT");
     const cancelGeometry = await measureSelectedPanelAction(".bounty-cancel-btn");
     expect(cancelGeometry).toMatchObject({
       actionVisible: true,
@@ -8896,6 +8898,29 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.eval(`
       (() => {
         window.__stagingBountyAccepted = true;
+        renderBountyBoard();
+      })()
+    `));
+    const activeStagingCard = page.locator(".bounty-contract-card", { hasText: "Erebus Patrol Sweep" });
+    const behemothBoardCard = page.locator(".bounty-contract-card", { hasText: "Behemoth Warning" });
+    await expect(activeStagingCard).toHaveClass(/bounty-card--active/);
+    await expect(activeStagingCard).toContainText("ACCEPTED");
+    await expect(behemothBoardCard).toHaveClass(/bounty-card--selected/);
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Behemoth Warning");
+
+    await page.locator(".bounty-contract-card", { hasText: "Hunter Clearance" }).click();
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter Clearance");
+    await page.evaluate(() => window.eval("renderBountyBoard()"));
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter Clearance");
+    await expect(page.locator(".bounty-contract-card", { hasText: "Hunter Clearance" })).toHaveClass(/bounty-card--selected/);
+    await expect(page.locator("#bountyDetailPanel .bounty-accept-btn")).toBeDisabled();
+    await expect(page.locator("#bountyDetailPanel .bounty-accept-btn")).toContainText("Finish Active Contract First");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Patrol Sweep is currently active.");
+    await expect(activeStagingCard).toContainText("ACCEPTED");
+    await page.locator("#bountyScreen").screenshot({ path: "artifacts/staging-bounty-selection-persistence.png" });
+
+    await page.evaluate(() => window.eval(`
+      (() => {
         showScreen("spaceScreen");
         openHudPanel("tactical");
         selectTacticalSection("bounties");
@@ -8905,6 +8930,9 @@ test.describe("Lupen browser smoke", () => {
     await expect(objectiveCard).toContainText("0 / 4");
     await expect(objectiveCard).toContainText("CR 900");
     await expect(objectiveCard).toContainText("25 Shards");
+    await expect(objectiveCard).toHaveClass(/is-active/);
+    await expect(objectiveCard).toContainText("ACTIVE CONTRACT");
+    await expect(objectiveCard).toContainText("TRACKING NOW");
     const objectiveIcon = objectiveCard.locator(".tactical-bounty-icon img");
     await expect(objectiveIcon).toHaveAttribute("src", "assets/bounties/erebus-patrol-sweep.png");
     await expect(objectiveIcon).toBeVisible();

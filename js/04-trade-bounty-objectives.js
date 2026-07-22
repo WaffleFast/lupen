@@ -163,15 +163,6 @@ function getMultiplayerStagingBounties() {
 
 function getSelectedMultiplayerStagingBounty() {
   const bounties = getMultiplayerStagingBounties();
-  const active = getMultiplayerStagingBountyActiveState();
-  const activeOwnsSelection = active?.id && (
-    active.accepted ||
-    active.completed ||
-    active.claimAvailable ||
-    active.claimed ||
-    active.failed
-  );
-  if (activeOwnsSelection) multiplayerStagingBountySelectedId = active.id;
   if (!multiplayerStagingBountySelectedId || !bounties.some((bounty) => bounty.id === multiplayerStagingBountySelectedId)) {
     multiplayerStagingBountySelectedId = bounties[0]?.id || "staging_erebus_patrol_2";
   }
@@ -2962,6 +2953,7 @@ function renderMultiplayerStagingBountyBoard() {
   const countdown = document.getElementById("bountyResetCountdown");
   const countLabel = document.querySelector(".bounty-list-count");
   const bounties = getMultiplayerStagingBounties();
+  const selectedBounty = getSelectedMultiplayerStagingBounty();
 
   if (title) title.textContent = "MP STAGING CONTRACTS";
   if (countdown) countdown.textContent = "SERVER DAILY";
@@ -2969,7 +2961,7 @@ function renderMultiplayerStagingBountyBoard() {
 
   if (grid) {
     grid.innerHTML = bounties.map((bounty) => {
-      const isSelected = multiplayerStagingBountySelectedId === bounty.id;
+      const isSelected = selectedBounty?.id === bounty.id;
       const statusKey = getMultiplayerStagingBountyStateKey(bounty);
       const status = getMultiplayerStagingBountyStatusLabel(bounty);
       const requiredKills = Number(bounty.requiredKills || 2);
@@ -2979,7 +2971,7 @@ function renderMultiplayerStagingBountyBoard() {
       const complete = statusKey === "claimed";
       const active = statusKey === "active";
       return `
-        <button class="bounty-card bounty-contract-card bounty-card--staging bounty-card--${statusKey} ${isSelected ? "selected bounty-card--selected" : ""} ${complete ? "completed" : ""} ${ready ? "ready-to-claim" : ""} ${active ? "active" : ""}" onclick="selectMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">
+        <button class="bounty-card bounty-contract-card bounty-card--staging bounty-card--${statusKey} ${isSelected ? "selected bounty-card--selected" : ""} ${complete ? "completed" : ""} ${ready ? "ready-to-claim" : ""} ${active ? "active" : ""}" data-bounty-contract-id="${escapeHtml(bounty.id)}" aria-pressed="${isSelected ? "true" : "false"}" onclick="selectMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">
           ${ready || complete ? `<span class="bounty-card__status-check" aria-hidden="true">✓</span>` : ""}
           <span class="bounty-card__icon-frame bounty-card-icon"><img src="${icon}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></span>
           <span class="bounty-card__body bounty-card-copy">
@@ -2989,12 +2981,13 @@ function renderMultiplayerStagingBountyBoard() {
               <span class="bounty-chip bounty-chip--special">STAGING</span>
               <span class="bounty-chip bounty-chip--target">${escapeHtml(bounty.targetBotLabel || bounty.target || "Erebus bots")}</span>
               <span class="bounty-chip bounty-card-threat">${escapeHtml(bounty.difficulty || "Combat")}</span>
+              ${active ? `<span class="bounty-chip bounty-chip--accepted">✓ ACCEPTED</span>` : ""}
             </span>
           </span>
           <span class="bounty-reward-box bounty-card-reward bounty-reward">
             <span class="bounty-reward-box__label">REWARD</span>
             <strong class="bounty-reward-box__value"><span>CR ${formatNumber(bounty.creditsReward)}</span><span><img class="bounty-reward-box__icon" src="assets/items/lupen-shard.png" alt=""> ${formatNumber(bounty.lupenShardsReward)} Lupen Shards</span></strong>
-            <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
+            <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${active ? "ACCEPTED" : status}</em>
             <small>Progress: ${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
           </span>
         </button>
@@ -3018,6 +3011,8 @@ function renderMultiplayerStagingBountyDetail() {
   const pendingAccept = isMultiplayerStagingBountyPending("accept", bounty.id);
   const pendingClaim = isMultiplayerStagingBountyPending("claim", bounty.id);
   const claimLine = getMultiplayerStagingBountyClaimLine();
+  const activeBounty = getActiveMultiplayerStagingBountyObjective();
+  const anotherContractActive = Boolean(activeBounty?.id && activeBounty.id !== bounty.id);
   const rewardText = formatBountyReward({ credits: bounty.creditsReward, lupenShards: bounty.lupenShardsReward });
   const shell = panel.closest(".selected-contract-panel");
   if (shell) {
@@ -3032,11 +3027,15 @@ function renderMultiplayerStagingBountyDetail() {
       : bounty.claimAvailable || bounty.completed
         ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claim Pending" : "Claim Reward"}</button>`
       : bounty.accepted
-        ? `<button class="selected-contract-action bounty-accept-btn" disabled>Active Contract</button>`
+        ? `<button class="selected-contract-action bounty-accept-btn bounty-active-state-btn" disabled>✓ Active Contract</button>`
+        : anotherContractActive
+          ? `<button class="selected-contract-action bounty-accept-btn bounty-active-blocked-btn" disabled>Finish Active Contract First</button>`
         : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accept Pending" : connected ? "Accept Contract" : "Waiting For Server"}</button>`;
 
   const connectionNote = connected
-    ? "Server-tracked staging bounty."
+    ? anotherContractActive
+      ? `${activeBounty.title || activeBounty.name || "Another contract"} is currently active.`
+      : "Server-tracked staging bounty."
     : "Waiting for Multiplayer Staging.";
 
   const infoRows = [
@@ -3053,6 +3052,7 @@ function renderMultiplayerStagingBountyDetail() {
       <div class="selected-contract-icon bounty-detail-icon"><img src="${getBountyIconSrc(bounty.icon || bounty.fallbackIcon)}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></div>
       <div class="selected-contract-copy">
         <span class="bounty-chip bounty-chip--special">MP STAGING</span>
+        ${statusKey === "active" ? `<span class="selected-contract-active-badge">✓ ACTIVE CONTRACT</span>` : ""}
         ${bounty.claimAvailable || bounty.completed || bounty.claimed ? `<span class="selected-contract-check" aria-hidden="true">✓</span>` : ""}
         <strong>${escapeHtml(bounty.title || "Erebus Patrol Sweep")}</strong>
         <span>${escapeHtml(bounty.description || "Destroy server-owned staging Erebus bots.")}</span>
@@ -3119,7 +3119,7 @@ function renderBountyBoard() {
       const icon = getBountyIconSrc(contract.icon || contract.fallbackIcon);
       const timerParts = getBountyTimerParts(contract);
       return `
-        <button class="bounty-card bounty-contract-card bounty-card--${escapeHtml(contract.type || "standard")} bounty-card--${statusKey} ${isSelected ? "selected bounty-card--selected" : ""} ${complete ? "completed" : ""} ${ready ? "ready-to-claim" : ""} ${failed ? "failed" : ""} ${active ? "active" : ""}" onclick="selectBountyContract('${escapeJsString(contract.id)}')">
+        <button class="bounty-card bounty-contract-card bounty-card--${escapeHtml(contract.type || "standard")} bounty-card--${statusKey} ${isSelected ? "selected bounty-card--selected" : ""} ${complete ? "completed" : ""} ${ready ? "ready-to-claim" : ""} ${failed ? "failed" : ""} ${active ? "active" : ""}" data-bounty-contract-id="${escapeHtml(contract.id)}" aria-pressed="${isSelected ? "true" : "false"}" onclick="selectBountyContract('${escapeJsString(contract.id)}')">
           ${ready || complete ? `<span class="bounty-card__status-check" aria-hidden="true">✓</span>` : ""}
           <span class="bounty-card__icon-frame bounty-card-icon"><img src="${icon}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></span>
           <span class="bounty-card__body bounty-card-copy">
@@ -3129,13 +3129,14 @@ function renderBountyBoard() {
               <span class="bounty-chip bounty-chip--${escapeHtml(contract.type || "standard")}">${contract.chipLabel || "STANDARD"}</span>
               <span class="bounty-chip bounty-chip--target">${escapeHtml(getBountyTargetLabel(contract))}</span>
               <span class="bounty-chip bounty-card-threat">${contract.threat || "Standard"}</span>
+              ${active ? `<span class="bounty-chip bounty-chip--accepted">✓ ACCEPTED</span>` : ""}
               ${timerParts ? `<span class="bounty-chip bounty-timer-chip"><small>${timerParts.label}</small><strong>${timerParts.value}</strong></span>` : ""}
             </span>
           </span>
           <span class="bounty-reward-box bounty-card-reward bounty-reward">
             <span class="bounty-reward-box__label">REWARD</span>
             <strong class="bounty-reward-box__value"><span>CR ${formatNumber(cloneBountyReward(contract.reward).credits)}</span><span><img class="bounty-reward-box__icon" src="assets/items/lupen-shard.png" alt=""> ${formatNumber(cloneBountyReward(contract.reward).lupenShards)} Lupen Shards</span></strong>
-            <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${status}</em>
+            <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${active ? "ACCEPTED" : status}</em>
           </span>
         </button>
       `;
@@ -3206,6 +3207,7 @@ function renderBountyDetail() {
       <div class="selected-contract-icon bounty-detail-icon"><img src="${icon}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></div>
       <div class="selected-contract-copy">
         <span class="bounty-chip bounty-chip--${escapeHtml(contract.type || "standard")}">${contract.chipLabel || stateText}</span>
+        ${active ? `<span class="selected-contract-active-badge">✓ ACTIVE CONTRACT</span>` : ""}
         ${readyToClaim || complete ? `<span class="selected-contract-check" aria-hidden="true">✓</span>` : ""}
         <strong>${contract.title || contract.name}</strong>
         <span>${readyToClaim ? "Contract complete. Claim your reward while docked." : complete ? "Reward claimed. This bounty is closed." : failed ? "This timed contract has expired." : getBountyObjectiveText(contract)}</span>
@@ -3226,7 +3228,7 @@ function renderBountyDetail() {
     </div>
 
     <div class="selected-contract-actions bounty-detail-actions">
-      ${readyToClaim ? `<button class="selected-contract-action bounty-claim-btn" onclick="claimBountyReward('${escapeJsString(contract.id)}')">Claim Reward</button>` : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${buttonDisabled ? "disabled" : ""} onclick="acceptBountyContract('${escapeJsString(contract.id)}')">${buttonText}</button>`}
+      ${readyToClaim ? `<button class="selected-contract-action bounty-claim-btn" onclick="claimBountyReward('${escapeJsString(contract.id)}')">Claim Reward</button>` : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button ${active ? "bounty-active-state-btn" : ""}" ${buttonDisabled ? "disabled" : ""} onclick="acceptBountyContract('${escapeJsString(contract.id)}')">${active ? "✓ Active Contract" : buttonText}</button>`}
       ${active && !readyToClaim ? `<button class="bounty-cancel-btn" onclick="cancelActiveBountyContract('${escapeJsString(contract.id)}')">Cancel Bounty</button>` : ""}
     </div>
     ${contract.bonus && !complete ? `<p class="bounty-detail-note compact">${escapeHtml(contract.bonus)}</p>` : ""}
@@ -3705,7 +3707,7 @@ function renderObjectiveHud() {
               <div class="objective-bounty-icon image objective-icon-large"><img src="${objectiveIcon}" alt="" onerror="this.src='assets/bounties/raider-sweep.png'; this.onerror=null;"></div>
               <div class="objective-copy objective-copy-large objective-orbit-copy">
               <div class="objective-title-line">
-                <span class="objective-type-pill bounty-pill">Bounty</span>
+                <span class="objective-type-pill bounty-pill">Active Bounty</span>
                 <strong>${objectiveTitle}</strong>
               </div>
               <span>${formatNumber(progress)} / ${formatNumber(required)} destroyed · ${routeText.replace(/^Target:\s*/, "")}</span>
@@ -3782,7 +3784,7 @@ function renderObjectiveHud() {
           <div class="objective-bounty-icon image"><img src="${icon}" alt=""></div>
           <div class="objective-copy objective-orbit-copy">
             <div class="objective-title-line">
-              <span class="objective-type-pill bounty-pill">Bounty</span>
+              <span class="objective-type-pill bounty-pill">Active Bounty</span>
               <strong>${objective.title}</strong>
             </div>
             <span>${objective.targetLabel}</span>

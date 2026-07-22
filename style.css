@@ -57597,3 +57597,123 @@ input::placeholder {
     grid-template-columns: 88px minmax(170px, 1fr) minmax(230px, 280px) !important;
   }
 }
+
+/* Accepted bounty state and selection independence. */
+#bountyScreen .bounty-card--active,
+#bountyScreen .bounty-contract-card.active {
+  border-color: rgba(65, 230, 255, 0.82) !important;
+  background:
+    radial-gradient(circle at 12% 50%, rgba(41, 215, 255, 0.17), transparent 42%),
+    linear-gradient(120deg, rgba(4, 43, 62, 0.96), rgba(0, 13, 26, 0.96)) !important;
+  box-shadow:
+    inset 5px 0 0 #3de4ff,
+    inset 0 0 24px rgba(44, 218, 255, 0.07),
+    0 0 22px rgba(30, 205, 255, 0.16) !important;
+}
+
+#bountyScreen .bounty-card--active.selected,
+#bountyScreen .bounty-card--active.bounty-card--selected {
+  border-color: #bff8ff !important;
+  box-shadow:
+    inset 5px 0 0 #43eaff,
+    0 0 0 1px rgba(191, 248, 255, 0.44),
+    0 0 28px rgba(37, 213, 255, 0.28) !important;
+}
+
+#bountyScreen .bounty-chip--accepted {
+  color: #d9fbff !important;
+  border-color: rgba(72, 230, 255, 0.68) !important;
+  background: rgba(4, 77, 94, 0.76) !important;
+  box-shadow: 0 0 12px rgba(52, 218, 255, 0.16);
+  font-weight: 950;
+  letter-spacing: 0.06em;
+}
+
+#bountyScreen .bounty-card--active .bounty-status-chip--active {
+  color: #dcfbff;
+  border-color: rgba(75, 230, 255, 0.76);
+  background: rgba(0, 68, 86, 0.86);
+  box-shadow: 0 0 12px rgba(53, 223, 255, 0.18);
+}
+
+#bountyScreen .selected-contract-panel--active .selected-contract-top,
+#bountyScreen .selected-contract-panel--active .selected-contract-progress {
+  border-color: rgba(68, 226, 255, 0.58) !important;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(47, 215, 255, 0.12), transparent 44%),
+    linear-gradient(135deg, rgba(3, 40, 60, 0.84), rgba(0, 10, 22, 0.94));
+  box-shadow: 0 0 20px rgba(42, 210, 255, 0.1);
+}
+
+#bountyScreen .selected-contract-active-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex !important;
+  width: max-content;
+  align-items: center;
+  padding: 5px 8px;
+  border: 1px solid rgba(71, 229, 255, 0.7);
+  border-radius: 999px;
+  color: #d8fbff !important;
+  background: rgba(0, 67, 87, 0.86);
+  box-shadow: 0 0 14px rgba(54, 221, 255, 0.18);
+  font-size: 0.55rem !important;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+#bountyScreen .bounty-active-state-btn:disabled,
+#bountyScreen .bounty-active-blocked-btn:disabled {
+  opacity: 1 !important;
+  cursor: default;
+}
+
+#bountyScreen .bounty-active-state-btn:disabled {
+  color: #d8fbff !important;
+  border-color: rgba(69, 229, 255, 0.72) !important;
+  background: linear-gradient(180deg, rgba(6, 105, 130, 0.94), rgba(3, 56, 76, 0.96)) !important;
+  box-shadow: inset 0 1px 0 rgba(202, 250, 255, 0.15), 0 0 16px rgba(45, 218, 255, 0.12) !important;
+}
+
+#bountyScreen .bounty-active-blocked-btn:disabled {
+  color: #d6eaf3 !important;
+  border-color: rgba(118, 183, 213, 0.44) !important;
+  background: linear-gradient(180deg, rgba(22, 63, 86, 0.96), rgba(8, 34, 53, 0.96)) !important;
+}
+
+.player-orbit-screen .tactical-bounty-card.is-active {
+  position: relative;
+  border-color: rgba(55, 222, 255, 0.72);
+  background:
+    radial-gradient(circle at 92% 12%, rgba(48, 216, 255, 0.17), transparent 43%),
+    linear-gradient(135deg, rgba(4, 43, 61, 0.94), rgba(2, 16, 29, 0.86));
+  box-shadow: inset 4px 0 0 #35ddff, inset 0 0 22px rgba(45, 215, 255, 0.05), 0 0 18px rgba(42, 207, 255, 0.1);
+}
+
+.player-orbit-screen .tactical-bounty-card.is-active .tactical-bounty-icon {
+  border-color: rgba(63, 226, 255, 0.72);
+  box-shadow: 0 0 15px rgba(54, 217, 255, 0.16);
+}
+
+.player-orbit-screen .tactical-bounty-card.is-active .tactical-status-chip {
+  color: #d9fbff;
+  border-color: rgba(57, 225, 255, 0.72);
+  background: rgba(0, 67, 87, 0.88);
+  box-shadow: 0 0 12px rgba(43, 213, 255, 0.16);
+}
+
+.player-orbit-screen .tactical-bounty-card.is-active .tactical-meter i {
+  background: linear-gradient(90deg, #09a8d8, #4be9ff);
+  box-shadow: 0 0 9px rgba(52, 221, 255, 0.5);
+}
+
+.player-orbit-screen .tactical-bounty-card.is-active footer {
+  border-top-color: rgba(54, 218, 255, 0.24);
+}
+
+.player-orbit-screen .tactical-bounty-card.is-active footer small {
+  color: #5ceaff;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}

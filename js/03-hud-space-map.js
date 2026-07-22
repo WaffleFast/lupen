@@ -353,15 +353,16 @@ function renderTacticalBounties() {
         ${rows.map(contract => {
           const percent = Math.max(0, Math.min(100, Math.round((contract.progress / Math.max(1, contract.required)) * 100)));
           const complete = isTacticalBountyComplete(contract.status);
-          const statusLabel = complete ? "✓ COMPLETE" : contract.status;
-          return `<article class="tactical-bounty-card status-${escapeTacticalHtml(contract.status.toLowerCase().replaceAll(" ", "-"))} ${complete ? "is-ready" : ""}">
+          const active = String(contract.status || "").toUpperCase() === "ACTIVE";
+          const statusLabel = complete ? "✓ COMPLETE" : active ? "✓ ACTIVE CONTRACT" : contract.status;
+          return `<article class="tactical-bounty-card status-${escapeTacticalHtml(contract.status.toLowerCase().replaceAll(" ", "-"))} ${complete ? "is-ready" : ""} ${active ? "is-active" : ""}">
             <div class="tactical-bounty-card-top">
               <span class="tactical-bounty-icon">${contract.icon ? `<img src="${escapeTacticalHtml(contract.icon)}" alt="">` : getTacticalIconSvg("bounties")}</span>
               <div><h4>${escapeTacticalHtml(contract.title)}</h4><p>${escapeTacticalHtml(contract.description || "Contract objective")}</p></div>
               <span class="tactical-status-chip">${escapeTacticalHtml(statusLabel)}</span>
             </div>
             <div class="tactical-bounty-progress"><div class="tactical-meter"><i style="width:${percent}%"></i></div><strong>${formatNumber(contract.progress)} / ${formatNumber(contract.required)}</strong></div>
-            <footer><span>CR ${formatNumber(contract.credits)} &nbsp;·&nbsp; ${formatNumber(contract.shards)} Shards</span>${complete ? `<small>CLAIM AT BOUNTY BOARD</small>` : contract.timer ? `<small>${escapeTacticalHtml(contract.timer)}</small>` : ""}</footer>
+            <footer><span>CR ${formatNumber(contract.credits)} &nbsp;·&nbsp; ${formatNumber(contract.shards)} Shards</span>${complete ? `<small>CLAIM AT BOUNTY BOARD</small>` : active ? `<small>TRACKING NOW</small>` : contract.timer ? `<small>${escapeTacticalHtml(contract.timer)}</small>` : ""}</footer>
           </article>`;
         }).join("") || `<div class="tactical-empty-state">No bounty contracts are currently available.</div>`}
       </div>
