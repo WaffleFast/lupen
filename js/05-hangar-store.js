@@ -1357,7 +1357,6 @@ function renderVaultCatalog() {
     bindHangarEquipmentTooltip(button);
 
     button.innerHTML = `
-      ${entry.stackable ? `<span class="vault-card-count">x${formatNumber(entry.count)}</span>` : ""}
       <div class="vault-storage-art quality-${entry.quality}">
         ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "small" })}
       </div>
@@ -1373,6 +1372,7 @@ function renderVaultCatalog() {
           <em>${formatRomanLevel(level)}</em>
         </span>
       `}
+      ${entry.stackable ? `<span class="vault-card-count">x${formatNumber(entry.count)}</span>` : ""}
     `;
 
     grid.appendChild(button);
@@ -1428,7 +1428,7 @@ function renderVaultDetail() {
     : "Not currently equipped";
 
   panel.innerHTML = `
-    <div class="vault-item-detail-shell quality-${entry.quality} ${tierClass}" ${entry.stackable ? "" : `data-level="${escapeHtml(level)}" data-tier="${escapeHtml(tier.key)}"`}>
+    <div class="vault-item-detail-shell ${entry.stackable ? "resource-detail" : "gear-detail"} quality-${entry.quality} ${tierClass}" ${entry.stackable ? "" : `data-level="${escapeHtml(level)}" data-tier="${escapeHtml(tier.key)}"`}>
       <div class="vault-item-preview">
         <div class="vault-item-preview-glow"></div>
         <div class="exchange-hero-ring"></div>
@@ -1458,6 +1458,14 @@ function renderVaultDetail() {
           ${locations.length ? `<button type="button" onclick="viewVaultEntryInLoadout('${escapeHtml(entry.groupKey)}')">View in Loadout</button>` : ""}
         </div>
       `}
+
+      ${entry.stackable ? `
+        <div class="vault-resource-use">
+          <span>Primary use</span>
+          <strong>${entry.key === "lupenShards" ? "Raise equipment levels" : "Advance item quality"}</strong>
+          <button type="button" onclick="openUpgradeForgeFromVault('${escapeHtml(entry.groupKey)}')">Open Forge</button>
+        </div>
+      ` : ""}
 
       <div class="vault-item-stat-grid">
         ${infoStats.map(stat => `

@@ -228,6 +228,28 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await expect(page.locator("#vaultCatalogGrid .vault-storage-card")).toHaveCount(5);
     await expect(page.locator("#vaultDetailPanel .vault-item-detail-shell")).toBeVisible();
 
+    const shardCard = page.locator("#vaultCatalogGrid .vault-storage-card.resource-entry").filter({ hasText: "Lupen Shard" });
+    await expect(shardCard).toHaveCount(1);
+    await expect(shardCard).toContainText("x210");
+    const shardLayout = await shardCard.evaluate(card => {
+      const art = card.querySelector(".vault-storage-art")?.getBoundingClientRect();
+      const copy = card.querySelector(".vault-storage-copy")?.getBoundingClientRect();
+      const count = card.querySelector(".vault-card-count")?.getBoundingClientRect();
+      const name = card.querySelector(".vault-storage-copy strong");
+      return {
+        ordered: Boolean(art && copy && count && art.right <= copy.left + 1 && copy.right <= count.left + 1),
+        nameFits: Boolean(name && name.scrollWidth <= name.clientWidth + 1)
+      };
+    });
+    expect(shardLayout).toEqual({ ordered: true, nameFits: true });
+
+    await shardCard.click();
+    await expect(shardCard).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#vaultDetailPanel .vault-resource-use")).toContainText("Raise equipment levels");
+    await expect(page.locator("#vaultDetailPanel .vault-resource-use button")).toHaveText("Open Forge");
+    await page.mouse.move(4, 4);
+    await page.screenshot({ path: "artifacts/vault-library-material-selected.png", fullPage: false });
+
     const layout = await page.locator("#hangarVaultSection .station-vault-layout").evaluate(shell => {
       const index = shell.querySelector(".vault-index-panel")?.getBoundingClientRect();
       const workspace = shell.querySelector(".vault-workspace-panel")?.getBoundingClientRect();
@@ -253,6 +275,10 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await page.locator("#vaultFilterAll").click();
     await expect(page.locator("#vaultCatalogGrid .vault-storage-card")).toHaveCount(5);
     await page.screenshot({ path: "artifacts/vault-library-redesign.png", fullPage: false });
+
+    await shardCard.click();
+    await page.locator("#vaultDetailPanel .vault-resource-use button").click();
+    await expect(page.locator("#upgradeForgeScreen")).toBeVisible();
   });
 
   test("keeps equipped-only gear visible in the owned equipment library", async ({ page }) => {

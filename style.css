@@ -57343,3 +57343,122 @@ input::placeholder {
     padding-block: 4px !important;
   }
 }
+
+/* Vault refinement: keep materials aligned and selection independent of rarity. */
+#hangarVaultSection .vault-storage-card {
+  grid-template-columns: 52px minmax(0, 1fr) max-content !important;
+}
+
+#hangarVaultSection .vault-storage-card .vault-storage-art {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+}
+
+#hangarVaultSection .vault-storage-card .vault-storage-copy {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+}
+
+#hangarVaultSection .vault-storage-card .vault-level-badge,
+#hangarVaultSection .vault-storage-card .vault-card-count {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  align-self: center !important;
+  justify-self: end !important;
+  transform: none !important;
+}
+
+#hangarVaultSection .vault-storage-card .vault-card-count {
+  min-width: 54px !important;
+  width: auto !important;
+  padding-inline: 7px !important;
+}
+
+#hangarVaultSection .vault-storage-card .vault-storage-copy strong {
+  font-size: 13px !important;
+  line-height: 1.1 !important;
+}
+
+#hangarVaultSection .vault-storage-card .vault-storage-copy span {
+  font-size: 8px !important;
+  line-height: 1.2 !important;
+}
+
+#hangarVaultSection .vault-storage-card .vault-storage-copy .vault-card-meta {
+  font-size: 8px !important;
+}
+
+#hangarVaultSection .vault-storage-card.selected,
+#hangarVaultSection .vault-storage-card.resource-entry.selected,
+#hangarVaultSection .vault-storage-card.gear-entry.forge-tier-scope.selected {
+  border-color: rgba(91, 229, 255, 0.96) !important;
+  background:
+    radial-gradient(circle at 12% 50%, rgba(49, 202, 235, 0.2), transparent 50%),
+    linear-gradient(145deg, rgba(15, 45, 58, 0.98), rgba(5, 16, 23, 0.98)) !important;
+  box-shadow: inset 0 0 0 1px rgba(91, 229, 255, 0.25), 0 0 18px rgba(24, 173, 208, 0.18) !important;
+}
+
+#hangarVaultSection .vault-storage-card.selected::before,
+#hangarVaultSection .vault-storage-card.resource-entry.selected::before {
+  width: 4px !important;
+  background: #61eaff !important;
+}
+
+#hangarVaultSection .vault-item-detail-shell.resource-detail {
+  grid-template-columns: 100px minmax(190px, 1fr) minmax(260px, 320px) !important;
+}
+
+#hangarVaultSection .vault-item-detail-shell.resource-detail .vault-item-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+#hangarVaultSection .vault-resource-use {
+  grid-column: 2 !important;
+  grid-row: 3 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto !important;
+  gap: 1px 8px !important;
+  min-width: 0 !important;
+  align-self: end !important;
+}
+
+#hangarVaultSection .vault-resource-use span {
+  grid-column: 1 !important;
+  color: #76939e !important;
+  font-size: 7px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.09em !important;
+  text-transform: uppercase !important;
+}
+
+#hangarVaultSection .vault-resource-use strong {
+  grid-column: 1 !important;
+  color: #e4f9ff !important;
+  font-size: 9px !important;
+}
+
+#hangarVaultSection .vault-resource-use button {
+  grid-column: 2 !important;
+  grid-row: 1 / 3 !important;
+  min-height: 30px !important;
+  align-self: center !important;
+  padding: 0 11px !important;
+  border: 1px solid rgba(91, 229, 255, 0.54) !important;
+  border-radius: 6px !important;
+  background: rgba(8, 52, 67, 0.88) !important;
+  color: #b9f3ff !important;
+  font-size: 8px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+@media (max-width: 1160px) and (min-width: 821px) {
+  #hangarVaultSection .vault-item-detail-shell.resource-detail {
+    grid-template-columns: 88px minmax(170px, 1fr) minmax(230px, 280px) !important;
+  }
+}
