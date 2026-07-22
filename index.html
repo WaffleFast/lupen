@@ -425,11 +425,12 @@
         </div>
 
         <div class="fleet-layout">
-          <aside class="fleet-roster-panel">
+          <aside class="fleet-roster-panel unified-vessel-catalog-panel">
             <div class="fleet-roster-header">
-              <span>Fleet Roster</span>
-              <small>Owned vessels</small>
+              <span>Vessel Catalogue</span>
+              <small>Owned hulls</small>
             </div>
+            <div id="fleetLineFilter" class="vessel-line-filter"></div>
             <div id="ownedShipsList" class="fleet-card-grid fleet-roster-list"></div>
           </aside>
 
@@ -450,16 +451,12 @@
         </div>
 
         <div class="shipyard-layout vessel-exchange-layout">
-          <aside class="shipyard-catalog-panel exchange-catalog-panel">
+          <aside class="shipyard-catalog-panel exchange-catalog-panel unified-vessel-catalog-panel">
             <div class="exchange-catalog-header">
-              <span>Hull Catalogue</span>
-              <small>Available vessels</small>
+              <span>Vessel Catalogue</span>
+              <small>Hull purchase options</small>
             </div>
-            <div class="vessel-filter-row" aria-label="Vessel filters">
-              <button id="shipyardFilterAll" type="button" onclick="setShipyardFilter('all')">All</button>
-              <button id="shipyardFilterOwned" type="button" onclick="setShipyardFilter('owned')">Owned</button>
-              <button id="shipyardFilterUnowned" type="button" onclick="setShipyardFilter('unowned')">Unowned</button>
-            </div>
+            <div id="shipyardLineFilter" class="vessel-line-filter"></div>
             <div id="shipShop" class="shipyard-grid vessel-card-grid"></div>
           </aside>
 

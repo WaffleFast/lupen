@@ -53,6 +53,8 @@ let selectedVaultSort = "quality";
 let selectedVaultQuality = "all";
 let selectedVaultStatus = "all";
 let selectedShipyardFilter = "all";
+let selectedFleetLineId = "all";
+let selectedShipyardLineId = "all";
 let selectedShipPlanLineId = typeof PIONEER_LINE_ID !== "undefined" ? PIONEER_LINE_ID : "pioneer";
 let selectedShipPlanShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
 const LOADOUT_VAULT_CAPACITY = 50;
@@ -2127,6 +2129,79 @@ function renderShipSlotSummary(shipId, mode = "capacity") {
   `;
 }
 
+function getVesselLineId(ship = {}) {
+  return ship.lineId || "independent";
+}
+
+function getVesselLineLabel(lineId) {
+  if (lineId === "independent") return "Independent Hulls";
+  return SHIP_LINES?.[lineId]?.name || String(lineId || "Unknown Line");
+}
+
+function filterVesselsByLine(ships = [], lineId = "all") {
+  return lineId === "all" ? ships : ships.filter(ship => getVesselLineId(ship) === lineId);
+}
+
+function renderVesselLineFilter(containerId, selectedLineId, changeHandler, ships = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const lineIds = Array.from(new Set(ships.map(getVesselLineId)));
+  const validSelection = selectedLineId === "all" || lineIds.includes(selectedLineId) ? selectedLineId : "all";
+  container.innerHTML = `
+    <label>
+      <span>Ship Line</span>
+      <select aria-label="Filter vessels by ship line" onchange="${changeHandler}(this.value)">
+        <option value="all" ${validSelection === "all" ? "selected" : ""}>All Ship Lines</option>
+        ${lineIds.map(lineId => `<option value="${escapeHtml(lineId)}" ${validSelection === lineId ? "selected" : ""}>${escapeHtml(getVesselLineLabel(lineId))}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+function setFleetLineFilter(lineId = "all") {
+  selectedFleetLineId = lineId === "all" || SHIP_LINES?.[lineId] || lineId === "independent" ? lineId : "all";
+  renderOwnedShips();
+}
+
+function setShipyardLineFilter(lineId = "all") {
+  selectedShipyardLineId = lineId === "all" || SHIP_LINES?.[lineId] || lineId === "independent" ? lineId : "all";
+  const visibleShips = getFilteredExchangeShips();
+  selectedShipyardShipId = visibleShips.some(ship => ship.id === selectedShipyardShipId)
+    ? selectedShipyardShipId
+    : (visibleShips[0]?.id || "");
+  renderShipShop();
+}
+
+function createVesselCatalogueCard(ship, { mode = "fleet", selected = false, active = false, unlock = null } = {}) {
+  const isExchange = mode === "exchange";
+  const card = document.createElement("button");
+  const statusLabel = active
+    ? "Active"
+    : isExchange
+      ? (unlock?.locked ? "Locked" : ship.price ? `CR ${formatNumber(ship.price)}` : "Available")
+      : "Owned";
+  const supportingLabel = active
+    ? "Current vessel"
+    : isExchange
+      ? (unlock?.locked ? unlock.requirementLines?.[0] || "Plan requirements incomplete" : "Available to purchase")
+      : getVesselExchangeClassLabel(ship);
+
+  card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card unified-vessel-card ${mode === "fleet" ? "fleet-roster-card owned" : ""} ${selected ? "selected" : ""} ${active ? "active" : ""} ${unlock?.locked ? "progression-locked" : ""}`;
+  card.dataset.shipId = ship.id;
+  card.setAttribute("aria-pressed", selected ? "true" : "false");
+  card.setAttribute("aria-label", `${ship.name}, ${getVesselExchangeClassLabel(ship)}, ${statusLabel}`);
+  card.innerHTML = `
+    <div class="fleet-card-badge">${escapeHtml(statusLabel)}</div>
+    <div class="fleet-card-image-wrap fleet-roster-image">
+      <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${escapeHtml(ship.name)}">
+    </div>
+    <div class="fleet-card-role">${escapeHtml(ship.className || "Vessel")}</div>
+    <div class="fleet-card-name">${escapeHtml(ship.name)}</div>
+    <div class="vessel-card-description">${escapeHtml(supportingLabel)}</div>
+  `;
+  return card;
+}
+
 
 function renderOwnedShips() {
   const box = document.getElementById("ownedShipsList");
@@ -2141,36 +2216,30 @@ function renderOwnedShips() {
   const fleetCountLabel = document.getElementById("fleetCountLabel");
   if (fleetCountLabel) fleetCountLabel.textContent = ownedShips.length === 1 ? "vessel owned" : "vessels owned";
 
-  if (!ownedShips.includes(selectedFleetShipId)) {
-    selectedFleetShipId = currentShipId || ownedShips[0];
-  }
-
   box.innerHTML = "";
 
-  ownedShips.forEach(shipId => {
-    const ship = SHIPS[shipId];
-    if (!ship) return;
+  const ownedVessels = ownedShips.map(shipId => SHIPS[shipId]).filter(Boolean);
+  renderVesselLineFilter("fleetLineFilter", selectedFleetLineId, "setFleetLineFilter", ownedVessels);
+  const visibleVessels = filterVesselsByLine(ownedVessels, selectedFleetLineId);
+
+  if (!visibleVessels.some(ship => ship.id === selectedFleetShipId)) {
+    selectedFleetShipId = visibleVessels.find(ship => ship.id === currentShipId)?.id || visibleVessels[0]?.id || "";
+  }
+
+  if (!visibleVessels.length) {
+    box.innerHTML = `<div class="vessel-empty-state"><strong>No owned hulls</strong><span>No vessels from this ship line are in your fleet.</span></div>`;
+    renderFleetDetail();
+    return;
+  }
+
+  visibleVessels.forEach(ship => {
+    const shipId = ship.id;
 
     const isEquipped = currentShipId === shipId;
     const isSelected = selectedFleetShipId === shipId;
 
-    const card = document.createElement("button");
-    card.className = `fleet-ship-card fleet-roster-card owned ${isSelected ? "selected" : ""} ${isEquipped ? "active" : ""}`;
-    card.dataset.shipId = shipId;
-    card.setAttribute("aria-pressed", isSelected ? "true" : "false");
-    card.setAttribute("aria-label", `${ship.name}, ${getVesselExchangeClassLabel(ship)}${isEquipped ? ", active vessel" : ""}`);
+    const card = createVesselCatalogueCard(ship, { mode: "fleet", selected: isSelected, active: isEquipped });
     card.onclick = () => selectFleetShip(shipId);
-    card.innerHTML = `
-      <div class="fleet-roster-image">
-        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
-      </div>
-      <div class="fleet-roster-copy">
-        <span>${escapeHtml(ship.className || "Vessel")}</span>
-        <strong>${escapeHtml(ship.name)}</strong>
-        <small>${isEquipped ? "Current vessel" : getVesselExchangeClassLabel(ship)}</small>
-      </div>
-      ${isEquipped ? `<div class="fleet-roster-badge">Active</div>` : ""}
-    `;
 
     box.appendChild(card);
   });
@@ -2216,40 +2285,33 @@ function renderFleetDetail() {
     : `<button class="fleet-management-primary" onclick="equipShip('${shipId}'); showHangarSection('owned');">Set Active</button>`;
 
   panel.innerHTML = `
-    <div class="fleet-selected-vessel" data-ship-id="${escapeHtml(ship.id)}">
-      <section class="fleet-selected-hero">
-        <div class="fleet-selected-identity">
+    <div class="exchange-selected-vessel fleet-selected-vessel is-open" data-ship-id="${escapeHtml(ship.id)}">
+      <section class="exchange-detail-preview fleet-selected-hero">
+        <div class="exchange-selected-identity fleet-selected-identity">
           <span>${isEquipped ? "Active Vessel" : "Selected Vessel"}</span>
           <h4>${escapeHtml(ship.name)}</h4>
           <p>${getVesselExchangeClassLabel(ship)}</p>
         </div>
-        <div class="fleet-selected-status ${isEquipped ? "active" : "owned"}">
-          <strong>${statusLabel}</strong>
-          <small>${statusMessage}</small>
-        </div>
-        <div class="fleet-selected-presentation">
-          <div class="fleet-selected-glow"></div>
-          <div class="fleet-selected-ring"></div>
+        <div class="exchange-detail-status-chip fleet-selected-status ${isEquipped ? "active" : "owned"}">${statusLabel}</div>
+        <div class="exchange-selected-presentation fleet-selected-presentation">
+          <div class="exchange-detail-glow fleet-selected-glow"></div>
+          <div class="exchange-hero-ring fleet-selected-ring"></div>
           <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "large") : ship.image}" alt="${ship.name}">
         </div>
       </section>
 
-      <div class="fleet-selected-stats">
-        ${renderFleetStatChip("Hull", `${formatNumber(Math.floor(hullState.hull))} / ${formatNumber(hullState.hullMax)}`, "hull-stat")}
-        ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
-        ${renderFleetStatChip("Armor", formatNumber(stats.armor), "armor-stat")}
-        ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
-        ${renderFleetStatChip("Jump", `${formatNumber(stats.jumpRecharge)} LY`, "jump-stat")}
-        ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
-      </div>
+      ${renderExchangeShipStatsSection(shipId, stats, {
+        hullValue: `${formatNumber(Math.floor(hullState.hull))} / ${formatNumber(hullState.hullMax)}`,
+        slotsMode: "usage"
+      })}
 
-      <footer class="fleet-management-bar ${needsRepair ? "needs-repair" : "ready"}">
-        <div class="fleet-condition-summary">
+      <footer class="exchange-purchase-bar fleet-management-bar ${needsRepair ? "needs-repair" : "ready"}">
+        <div class="exchange-purchase-summary fleet-condition-summary">
           <span>Hull Condition</span>
           <strong>${conditionLabel}</strong>
           <small>${formatNumber(Math.floor(hullState.hull))} / ${formatNumber(hullState.hullMax)} hull</small>
         </div>
-        <div class="fleet-management-actions">
+        <div class="exchange-detail-footer fleet-management-actions">
           <button class="fleet-repair-action" onclick="repairCurrentShip()" ${repairDisabled ? "disabled" : ""}>${repairButtonLabel}</button>
           ${managementAction}
         </div>
@@ -3512,14 +3574,17 @@ function getExchangeShips() {
   const plannedOrder = Object.values(SHIP_LINES || {}).flatMap(line => line.shipIds || []);
   const plannedShips = plannedOrder.map(shipId => SHIPS[shipId]).filter(Boolean);
   const unplannedShips = Object.values(SHIPS).filter(ship => !ship.lineId && !ship.hiddenFromExchange);
-  return [...plannedShips, ...unplannedShips].filter(ship => !ship.hiddenFromExchange);
+  return [...plannedShips, ...unplannedShips].filter(ship =>
+    !ship.hiddenFromExchange && (!ship.lineId || isShipLineUnlocked(ship.lineId))
+  );
 }
 
 function getShipyardSelectedShip() {
-  if (!SHIPS[selectedShipyardShipId] || SHIPS[selectedShipyardShipId].hiddenFromExchange) {
-    selectedShipyardShipId = getExchangeShips().find(ship => !ownedShips.includes(ship.id))?.id || currentShipId || (typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon");
+  const visibleShips = getFilteredExchangeShips();
+  if (!visibleShips.some(ship => ship.id === selectedShipyardShipId)) {
+    selectedShipyardShipId = visibleShips[0]?.id || "";
   }
-  return SHIPS[selectedShipyardShipId] || getCurrentShip();
+  return visibleShips.find(ship => ship.id === selectedShipyardShipId) || null;
 }
 
 function selectShipyardShip(shipId) {
@@ -3566,7 +3631,7 @@ function getShipyardClassMark(ship = {}) {
 }
 
 function setShipyardFilter(filter = "all") {
-  selectedShipyardFilter = ["owned", "unowned"].includes(filter) ? filter : "all";
+  selectedShipyardFilter = "unowned";
   const visibleShips = getFilteredExchangeShips();
   if (visibleShips.length && !visibleShips.some(ship => ship.id === selectedShipyardShipId)) {
     selectedShipyardShipId = visibleShips[0].id;
@@ -3575,12 +3640,8 @@ function setShipyardFilter(filter = "all") {
 }
 
 function getFilteredExchangeShips() {
-  return getExchangeShips().filter(ship => {
-    const owned = ownedShips.includes(ship.id);
-    if (selectedShipyardFilter === "owned") return owned;
-    if (selectedShipyardFilter === "unowned") return !owned;
-    return true;
-  });
+  const purchasableShips = getExchangeShips().filter(ship => !ownedShips.includes(ship.id));
+  return filterVesselsByLine(purchasableShips, selectedShipyardLineId);
 }
 
 function updateShipyardFilterButtons() {
@@ -3620,26 +3681,28 @@ function renderExchangeSlotPips(count) {
   return Array.from({ length: visibleCount }).map(() => `<span class="exchange-slot-pip filled"></span>`).join("");
 }
 
-function renderExchangeHardpointRail(shipId) {
+function renderExchangeHardpointRail(shipId, mode = "capacity") {
   const guns = getGunSlotLimit(shipId);
   const equip = getAttachmentSlotLimit(shipId);
+  const gunsEquipped = mode === "usage" ? countEquippedGuns(shipId) : guns;
+  const equipEquipped = mode === "usage" ? countEquippedAttachments(shipId) : equip;
   return `
     <div class="exchange-capacity-card weapon-capacity">
       <div class="exchange-slot-summary-head">
         <span>Weapon Slots</span>
-        <strong>${guns}</strong>
+        <strong>${mode === "usage" ? `${gunsEquipped} / ${guns}` : guns}</strong>
       </div>
       <div class="exchange-slot-pips">
-        ${renderExchangeSlotPips(guns)}
+        ${renderSlotPips(guns, gunsEquipped)}
       </div>
     </div>
     <div class="exchange-capacity-card equip-capacity">
       <div class="exchange-slot-summary-head">
         <span>Equipment Slots</span>
-        <strong>${equip}</strong>
+        <strong>${mode === "usage" ? `${equipEquipped} / ${equip}` : equip}</strong>
       </div>
       <div class="exchange-slot-pips">
-        ${renderExchangeSlotPips(equip)}
+        ${renderSlotPips(equip, equipEquipped)}
       </div>
     </div>
   `;
@@ -3680,14 +3743,16 @@ function renderExchangeRequirementRows(unlock) {
   `;
 }
 
-function renderExchangeShipStatsSection(shipId, stats) {
+function renderExchangeShipStatsSection(shipId, stats, options = {}) {
+  const hullValue = options.hullValue || formatNumber(stats.hull);
+  const slotsMode = options.slotsMode || "capacity";
   return `
     <section class="exchange-detail-section exchange-stat-section">
       <div class="exchange-section-heading">
         <span>Ship Stats</span>
       </div>
       <div class="exchange-detail-stat-grid">
-        ${renderFleetStatChip("Hull", formatNumber(stats.hull), "hull-stat")}
+        ${renderFleetStatChip("Hull", hullValue, "hull-stat")}
         ${renderFleetStatChip("Shield", formatNumber(stats.shield), "shield-stat")}
         ${renderFleetStatChip("Armor", formatNumber(stats.armor), "armor-stat")}
         ${renderFleetStatChip("Cargo", formatNumber(stats.cargo), "cargo-stat")}
@@ -3695,7 +3760,7 @@ function renderExchangeShipStatsSection(shipId, stats) {
         ${renderFleetStatChip("Evasion", formatEvasion(stats.evasion), "evasion-stat")}
       </div>
       <div class="exchange-detail-loadout">
-        ${renderExchangeHardpointRail(shipId)}
+        ${renderExchangeHardpointRail(shipId, slotsMode)}
       </div>
     </section>
   `;
@@ -3706,6 +3771,20 @@ function renderShipyardDetail() {
   if (!panel) return;
 
   const ship = getShipyardSelectedShip();
+  if (!ship) {
+    const lineLabel = selectedShipyardLineId === "all" ? "the current catalogue" : getVesselLineLabel(selectedShipyardLineId);
+    const status = document.getElementById("shipyardDetailStatus");
+    if (status) status.textContent = "No hulls available";
+    panel.innerHTML = `
+      <div class="exchange-empty-workspace">
+        <span>CATALOGUE COMPLETE</span>
+        <strong>No hulls available</strong>
+        <p>Every purchaseable vessel in ${escapeHtml(lineLabel)} is already in your fleet.</p>
+        <button type="button" onclick="showHangarSection('owned')">View Fleet</button>
+      </div>
+    `;
+    return;
+  }
   const owned = ownedShips.includes(ship.id);
   const equipped = currentShipId === ship.id;
   const canAfford = credits >= ship.price;
@@ -3788,11 +3867,7 @@ function renderShipShop() {
 
   const creditText = document.getElementById("shipyardCreditText");
   if (creditText) creditText.textContent = formatNumber(credits);
-  updateShipyardFilterButtons();
-
-  if (!SHIPS[selectedShipyardShipId] || SHIPS[selectedShipyardShipId].hiddenFromExchange) {
-    selectedShipyardShipId = getExchangeShips().find(ship => !ownedShips.includes(ship.id))?.id || currentShipId || (typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon");
-  }
+  renderVesselLineFilter("shipyardLineFilter", selectedShipyardLineId, "setShipyardLineFilter", getExchangeShips());
 
   box.innerHTML = "";
 
@@ -3800,8 +3875,8 @@ function renderShipShop() {
   if (!visibleShips.length) {
     box.innerHTML = `
       <div class="vessel-empty-state">
-        <strong>No vessels found</strong>
-        <span>Try another ownership filter.</span>
+        <strong>No hulls available</strong>
+        <span>Owned vessels have moved to your Fleet.</span>
       </div>
     `;
     renderShipyardDetail();
@@ -3813,27 +3888,16 @@ function renderShipShop() {
   }
 
   visibleShips.forEach(ship => {
-    const owned = ownedShips.includes(ship.id);
-    const equipped = currentShipId === ship.id;
     const selected = selectedShipyardShipId === ship.id;
     const unlock = getShipUnlockStatus(ship.id);
 
-    const card = document.createElement("button");
+    const card = createVesselCatalogueCard(ship, { mode: "exchange", selected, active: false, unlock });
     const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
     const isTutorialRequiredShip = tutorialState?.active && getCurrentTutorialStep()?.id === "buy-first-ship" && ship.id === starterShipId;
-    card.className = `fleet-ship-card fleet-selector-card vessel-exchange-card exchange-vessel-card ${selected ? "selected" : ""} ${equipped ? "active" : ""} ${owned ? "owned" : ""} ${unlock.locked ? "progression-locked" : ""} ${unlock.state === "available" ? "challenge-complete" : ""} ${isTutorialRequiredShip ? "tutorial-required-ship" : ""}`;
-    card.dataset.shipId = ship.id;
+    card.classList.toggle("challenge-complete", unlock.state === "available");
+    card.classList.toggle("tutorial-required-ship", isTutorialRequiredShip);
     if (ship.id === starterShipId) card.dataset.tutorialTarget = "firstShipCard";
     card.onclick = () => selectShipyardShip(ship.id);
-    card.innerHTML = `
-      <div class="fleet-card-badge">${equipped ? "Active" : owned ? "Owned" : unlock.locked ? "LOCKED" : ship.price ? `CR ${formatNumber(ship.price)}` : "Available"}</div>
-      <div class="fleet-card-image-wrap">
-        <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${ship.name}">
-      </div>
-      <div class="fleet-card-name">${ship.name}</div>
-      <div class="fleet-card-role">${getVesselExchangeClassLabel(ship)}</div>
-      ${unlock.requirementLines.length ? `<div class="vessel-card-description">${escapeHtml(unlock.locked ? unlock.requirementLines[0] : "Challenge complete / available to buy")}</div>` : ""}
-    `;
     box.appendChild(card);
   });
 

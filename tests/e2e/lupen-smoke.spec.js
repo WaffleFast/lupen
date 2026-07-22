@@ -1741,6 +1741,124 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("Fleet and Vessel Exchange share one vessel browser and purchased hulls leave the Exchange", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        credits = 5000;
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        selectedShipyardShipId = "zeusExplorer";
+        selectedFleetLineId = "all";
+        selectedShipyardLineId = "all";
+        ownedShips = [STARTER_SHIP_ID];
+        shipLoadouts = {
+          [STARTER_SHIP_ID]: normalizeShipLoadout({ guns: [], attachments: [] }, STARTER_SHIP_ID)
+        };
+        shipConditions = { [STARTER_SHIP_ID]: normalizeShipCondition(STARTER_SHIP_ID) };
+        tutorialState = { active: false, completed: true, stepIndex: 0 };
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("owned");
+      })()
+    `));
+
+    const fleet = page.locator("#hangarOwnedSection");
+    const exchange = page.locator("#hangarShipyardSection");
+    await expect(fleet).toHaveClass(/active/);
+    await expect(fleet.locator("#fleetLineFilter select")).toHaveValue("all");
+    await expect(fleet.locator("#fleetLineFilter select option")).toHaveCount(2);
+    await expect(fleet.locator(".unified-vessel-card")).toHaveCount(1);
+    await expect(fleet.locator(".exchange-detail-preview")).toHaveCount(1);
+    await expect(fleet.locator(".exchange-stat-section")).toHaveCount(1);
+    await expect(fleet.locator(".exchange-purchase-bar")).toHaveCount(1);
+
+    const fleetStyle = await fleet.evaluate(section => {
+      const cardName = section.querySelector(".unified-vessel-card .fleet-card-name");
+      const cardRole = section.querySelector(".unified-vessel-card .fleet-card-role");
+      const catalogue = section.querySelector(".unified-vessel-catalog-panel");
+      const preview = section.querySelector(".exchange-detail-preview");
+      const workspace = section.querySelector(".fleet-layout");
+      return {
+        nameFont: getComputedStyle(cardName).fontSize,
+        nameWeight: getComputedStyle(cardName).fontWeight,
+        roleFont: getComputedStyle(cardRole).fontSize,
+        cardHeight: Math.round(cardName.closest(".unified-vessel-card").getBoundingClientRect().height),
+        catalogueWidth: Math.round(catalogue.getBoundingClientRect().width),
+        previewHeight: Math.round(preview.getBoundingClientRect().height),
+        workspaceHeight: Math.round(workspace.getBoundingClientRect().height)
+      };
+    });
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.screenshot({ path: "artifacts/fleet-unified-vessel-browser-1366x768.png" });
+
+    await page.evaluate(() => window.eval("showHangarSection('shipyard')"));
+    await expect(exchange).toHaveClass(/active/);
+    await expect(exchange.locator("#shipyardLineFilter select")).toHaveValue("all");
+    await expect(exchange.locator("#shipyardLineFilter select option")).toHaveCount(2);
+    await expect(exchange.locator(".unified-vessel-card")).toHaveCount(3);
+    await expect(exchange.locator(".unified-vessel-card[data-ship-id='falcon']")).toHaveCount(0);
+    await expect(exchange.locator(".unified-vessel-card[data-ship-id='zeusExplorer']")).toHaveCount(1);
+
+    const exchangeStyle = await exchange.evaluate(section => {
+      const cardName = section.querySelector(".unified-vessel-card .fleet-card-name");
+      const cardRole = section.querySelector(".unified-vessel-card .fleet-card-role");
+      const catalogue = section.querySelector(".unified-vessel-catalog-panel");
+      const preview = section.querySelector(".exchange-detail-preview");
+      const workspace = section.querySelector(".vessel-exchange-layout");
+      return {
+        nameFont: getComputedStyle(cardName).fontSize,
+        nameWeight: getComputedStyle(cardName).fontWeight,
+        roleFont: getComputedStyle(cardRole).fontSize,
+        cardHeight: Math.round(cardName.closest(".unified-vessel-card").getBoundingClientRect().height),
+        catalogueWidth: Math.round(catalogue.getBoundingClientRect().width),
+        previewHeight: Math.round(preview.getBoundingClientRect().height),
+        workspaceHeight: Math.round(workspace.getBoundingClientRect().height)
+      };
+    });
+    expect(exchangeStyle).toEqual(fleetStyle);
+    await page.screenshot({ path: "artifacts/vessel-exchange-unified-browser-1366x768.png" });
+
+    await exchange.locator(".unified-vessel-card[data-ship-id='zeusExplorer']").click();
+    await expect(exchange.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
+    await exchange.locator("#shipyardDetailPanel .buy-ship-action").click();
+    await expect(exchange.locator(".unified-vessel-card[data-ship-id='zeusExplorer']")).toHaveCount(0);
+    await expect(exchange.locator(".unified-vessel-card")).toHaveCount(2);
+    await expect.poll(() => page.evaluate(() => window.eval("ownedShips.includes('zeusExplorer')"))).toBe(true);
+
+    await page.evaluate(() => window.eval("showHangarSection('owned')"));
+    await expect(fleet.locator(".unified-vessel-card[data-ship-id='zeusExplorer']")).toHaveCount(1);
+
+    await page.evaluate(() => window.eval(`
+      ownedShips = SHIP_LINES[PIONEER_LINE_ID].shipIds.slice();
+      selectedShipyardShipId = "";
+      showHangarSection("shipyard");
+    `));
+    await expect(exchange.locator(".unified-vessel-card")).toHaveCount(0);
+    await expect(exchange.locator("#shipyardDetailPanel")).toContainText("No hulls available");
+    await expect(exchange.locator("#shipyardDetailPanel")).toContainText("already in your fleet");
+
+    const fit = await exchange.evaluate(section => ({
+      documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      sectionOverflowX: section.scrollWidth - section.clientWidth,
+      sectionOverflowY: section.scrollHeight - section.clientHeight,
+      bottom: Math.round(section.getBoundingClientRect().bottom),
+      viewportBottom: window.innerHeight
+    }));
+    expect(fit.documentOverflowX).toBeLessThanOrEqual(0);
+    expect(fit.sectionOverflowX).toBeLessThanOrEqual(1);
+    expect(fit.sectionOverflowY).toBeLessThanOrEqual(1);
+    expect(fit.bottom).toBeLessThanOrEqual(fit.viewportBottom);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging mode exposes staging UI without using real trade buttons", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
