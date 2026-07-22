@@ -50,6 +50,8 @@ let selectedLoadoutVaultQuality = "all";
 let selectedLoadoutVaultSort = "quality";
 let selectedVaultSearch = "";
 let selectedVaultSort = "quality";
+let selectedVaultQuality = "all";
+let selectedVaultStatus = "all";
 let selectedShipyardFilter = "all";
 let selectedShipPlanLineId = typeof PIONEER_LINE_ID !== "undefined" ? PIONEER_LINE_ID : "pioneer";
 let selectedShipPlanShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
@@ -771,8 +773,7 @@ function getEquippedVaultCounts() {
 
 function buildVaultEntries() {
   ensureInventoryObjects();
-  const entries = [];
-  const storedCounts = new Map();
+  const gearGroups = new Map();
   const resourceGroups = new Map();
   const equippedCounts = getEquippedVaultCounts();
 
@@ -780,14 +781,14 @@ function buildVaultEntries() {
     return `${key}__${quality}__${Math.max(1, Number(level || 1))}`;
   }
 
-  function makeEntry({ key, quality = "standard", level = 1, source = "owned", index = 0, storedCount = 1, count = 1, resource = false, inventoryId = "" }) {
+  function makeEntry({ key, quality = "standard", level = 1, source = "owned", storedCount = 1, count = 1, resource = false, inventoryId = "" }) {
     const definition = itemDefinitions[key];
     if (!definition) return null;
     const safeLevel = Math.max(1, Number(level || 1));
     const signature = getSignature(key, quality, safeLevel);
     const safeInventoryId = String(inventoryId || "");
     return {
-      groupKey: resource ? `${signature}__resource` : `${signature}__${source}__${safeInventoryId || (source === "owned" ? "stored" : index)}`,
+      groupKey: resource ? `${signature}__resource` : `${signature}__gear`,
       signature,
       key,
       quality,
@@ -803,15 +804,22 @@ function buildVaultEntries() {
       stackable: resource,
       source,
       inventoryId: safeInventoryId,
+      inventoryIds: safeInventoryId ? [safeInventoryId] : [],
       baseId: key
     };
   }
 
-  function addStoredGear(key, quality = "standard", level = 1, source = "owned", index = 0, inventoryId = "") {
+  function addStoredGear(key, quality = "standard", level = 1, source = "owned", inventoryId = "") {
     const signature = getSignature(key, quality, level);
-    storedCounts.set(signature, (storedCounts.get(signature) || 0) + 1);
-    const entry = makeEntry({ key, quality, level, source, index, storedCount: 1, count: 1, inventoryId });
-    if (entry && !entries.some(existing => existing.groupKey === entry.groupKey)) entries.push(entry);
+    if (!gearGroups.has(signature)) {
+      const entry = makeEntry({ key, quality, level, source, storedCount: 0, count: 0, inventoryId });
+      if (entry) gearGroups.set(signature, entry);
+    }
+    const entry = gearGroups.get(signature);
+    if (!entry) return;
+    entry.storedCount += 1;
+    entry.count += 1;
+    if (inventoryId && !entry.inventoryIds.includes(String(inventoryId))) entry.inventoryIds.push(String(inventoryId));
   }
 
   function addResource(key, quality, quantity = 1, override = {}) {
@@ -846,12 +854,12 @@ function buildVaultEntries() {
 
   Object.entries(ownedAttachments || {}).forEach(([key, count]) => {
     const total = Math.max(0, Number(count || 0));
-    for (let index = 0; index < total; index += 1) addStoredGear(key, "standard", 1, "owned", index);
+    for (let index = 0; index < total; index += 1) addStoredGear(key, "standard", 1, "owned");
   });
 
   Object.entries(ownedGuns || {}).forEach(([key, count]) => {
     const total = Math.max(0, Number(count || 0));
-    for (let index = 0; index < total; index += 1) addStoredGear(key, "standard", 1, "owned", index);
+    for (let index = 0; index < total; index += 1) addStoredGear(key, "standard", 1, "owned");
   });
 
   (inventoryItems || []).forEach(item => {
@@ -860,7 +868,7 @@ function buildVaultEntries() {
       addResource(item.key, LUPEN_CORE_QUALITY, 1);
       return;
     }
-    addStoredGear(item.key, item.quality || "standard", item.level || 1, "inventory", item.id || entries.length, item.id || "");
+    addStoredGear(item.key, item.quality || "standard", item.level || 1, "inventory", item.id || "");
   });
 
   const shardCount = Math.max(0, Number(upgradeMaterials?.lupenShards || 0));
@@ -874,9 +882,14 @@ function buildVaultEntries() {
     });
   }
 
-  const representedSignatures = new Set(entries.map(entry => entry.signature));
   equippedCounts.forEach((equippedCount, signature) => {
-    if (representedSignatures.has(signature) || equippedCount <= 0) return;
+    if (equippedCount <= 0) return;
+    if (gearGroups.has(signature)) {
+      const existing = gearGroups.get(signature);
+      existing.equippedCount = equippedCount;
+      existing.count = existing.storedCount + equippedCount;
+      return;
+    }
     const [key, quality = "standard", rawLevel = "1"] = signature.split("__");
     const entry = makeEntry({
       key,
@@ -886,15 +899,20 @@ function buildVaultEntries() {
       storedCount: 0,
       count: equippedCount
     });
-    if (entry) entries.push(entry);
+    if (entry) {
+      entry.storedCount = 0;
+      entry.equippedCount = equippedCount;
+      entry.count = equippedCount;
+      gearGroups.set(signature, entry);
+    }
   });
 
-  entries.forEach(entry => {
-    entry.storedCount = storedCounts.get(entry.signature) || entry.storedCount || 0;
-    entry.count = entry.storedCount + (equippedCounts.get(entry.signature) || 0);
+  gearGroups.forEach(entry => {
+    entry.equippedCount = equippedCounts.get(entry.signature) || entry.equippedCount || 0;
+    entry.count = entry.storedCount + entry.equippedCount;
   });
 
-  return [...entries, ...Array.from(resourceGroups.values())].sort(sortVaultEntries);
+  return [...Array.from(gearGroups.values()), ...Array.from(resourceGroups.values())].sort(sortVaultEntries);
 }
 
 function getVaultCapacityUsage() {
@@ -905,6 +923,7 @@ function getVaultCapacityUsage() {
 function sortVaultEntries(a, b) {
   if (selectedVaultSort === "name") return a.name.localeCompare(b.name) || a.quality.localeCompare(b.quality);
   if (selectedVaultSort === "level") return Number(b.level || 1) - Number(a.level || 1) || a.name.localeCompare(b.name);
+  if (selectedVaultSort === "quantity") return Number(b.count || 0) - Number(a.count || 0) || a.name.localeCompare(b.name);
   const qualityDelta = ITEM_QUALITY_ORDER.indexOf(b.quality) - ITEM_QUALITY_ORDER.indexOf(a.quality);
   if (qualityDelta !== 0) return qualityDelta;
   if (a.categoryKey !== b.categoryKey) return a.categoryKey.localeCompare(b.categoryKey);
@@ -916,6 +935,11 @@ function getVaultFilteredEntries() {
   const query = selectedVaultSearch.trim().toLowerCase();
   return entries.filter(entry => {
     if (hangarVaultFilter !== "all" && entry.categoryKey !== hangarVaultFilter) return false;
+    const filterQuality = entry.categoryKey === "cores" ? "legendary" : entry.quality;
+    const storedQuantity = entry.stackable ? Number(entry.count || 0) : Number(entry.storedCount || 0);
+    if (selectedVaultQuality !== "all" && filterQuality !== selectedVaultQuality) return false;
+    if (selectedVaultStatus === "stored" && storedQuantity <= 0) return false;
+    if (selectedVaultStatus === "equipped" && Number(entry.equippedCount || 0) <= 0) return false;
     if (query) {
       const haystack = [
         entry.name,
@@ -959,7 +983,19 @@ function setHangarVaultSearch(query) {
 }
 
 function setHangarVaultSort(nextSort) {
-  selectedVaultSort = ["quality", "name", "level"].includes(nextSort) ? nextSort : "quality";
+  selectedVaultSort = ["quality", "name", "level", "quantity"].includes(nextSort) ? nextSort : "quality";
+  ensureVaultSelection();
+  renderHangarVault();
+}
+
+function setHangarVaultQuality(nextQuality) {
+  selectedVaultQuality = nextQuality === "all" || ITEM_QUALITY_ORDER.includes(nextQuality) ? nextQuality : "all";
+  ensureVaultSelection();
+  renderHangarVault();
+}
+
+function setHangarVaultStatus(nextStatus) {
+  selectedVaultStatus = ["all", "stored", "equipped"].includes(nextStatus) ? nextStatus : "all";
   ensureVaultSelection();
   renderHangarVault();
 }
@@ -1150,8 +1186,15 @@ function renderVaultFilters() {
   if (search && search.value !== selectedVaultSearch) search.value = selectedVaultSearch;
   const sort = document.getElementById("vaultSortSelect");
   if (sort && sort.value !== selectedVaultSort) sort.value = selectedVaultSort;
+  const quality = document.getElementById("vaultQualitySelect");
+  if (quality) {
+    quality.innerHTML = `<option value="all">All qualities</option>${ITEM_QUALITY_ORDER.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(titleCaseQuality(value))}</option>`).join("")}`;
+    quality.value = selectedVaultQuality;
+  }
+  const status = document.getElementById("vaultStatusSelect");
+  if (status && status.value !== selectedVaultStatus) status.value = selectedVaultStatus;
   const count = document.getElementById("vaultCapacityText");
-  if (count) count.textContent = `${formatNumber(getVaultCapacityUsage())} / ${formatNumber(LOADOUT_VAULT_CAPACITY)}`;
+  if (count) count.innerHTML = `<span>Gear Storage</span><b>${formatNumber(getVaultCapacityUsage())} / ${formatNumber(LOADOUT_VAULT_CAPACITY)}</b>`;
 }
 
 function getVaultQualityLabel(entry) {
@@ -1216,8 +1259,7 @@ function getVaultEntryStats(entry) {
     const gun = GUNS[item.key];
     if (gun) {
       return [
-        { label: "Damage", value: formatNumber(getWeaponPurchaseDamage(gun, entry.quality)) },
-        { label: "Fire Rate", value: getVaultFireRateLabel(gun) },
+        ...getWeaponPurchaseStatRows(gun, entry.quality),
         { label: "Stored", value: formatNumber(entry.storedCount || 0) },
         { label: "Equipped", value: formatNumber(entry.equippedCount || 0) }
       ];
@@ -1225,7 +1267,7 @@ function getVaultEntryStats(entry) {
   } else if (item.kind === "attachment") {
     const effectStats = getAttachmentPurchaseStatRows(item, entry.quality);
     return [
-      ...(effectStats.length ? [effectStats[0]] : []),
+      ...effectStats,
       { label: "Stored", value: formatNumber(entry.storedCount || 0) },
       { label: "Equipped", value: formatNumber(entry.equippedCount || 0) }
     ];
@@ -1303,6 +1345,8 @@ function renderVaultCatalog() {
     const tier = getHangarEquipmentTier(level);
     const tierClass = entry.stackable ? "" : `forge-tier-scope ${getHangarEquipmentTierClass(level)}`;
     button.className = `vault-storage-card ${selected ? "selected" : ""} ${entry.stackable ? "resource-entry" : "gear-entry"} quality-${entry.quality} ${tierClass}`;
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+    button.setAttribute("aria-label", `${entry.name}, ${getVaultQualityLabel(entry)}, Level ${formatRomanLevel(level)}, ${entry.storedCount || 0} stored, ${entry.equippedCount || 0} equipped`);
     if (!entry.stackable) {
       button.dataset.level = String(level);
       button.dataset.tier = tier.key;
@@ -1319,12 +1363,13 @@ function renderVaultCatalog() {
       </div>
       <div class="vault-storage-copy">
         <strong>${entry.name}</strong>
-        ${entry.stackable ? "" : `<span>${formatNumber(entry.storedCount || 0)} stored · ${formatNumber(entry.equippedCount || 0)} equipped</span>`}
+        <span class="vault-card-meta">${escapeHtml(entry.category)} · ${escapeHtml(getVaultQualityLabel(entry))}</span>
+        ${entry.stackable ? `<span>${formatNumber(entry.count || 0)} available</span>` : `<span>${formatNumber(entry.storedCount || 0)} stored · ${formatNumber(entry.equippedCount || 0)} equipped</span>`}
       </div>
       ${entry.stackable ? "" : `
         <span class="vault-level-badge hangar-tier-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
           ${renderHangarEquipmentTierPips(level, "compact")}
-          <b>${escapeHtml(tier.label)}</b>
+          <b>LV</b>
           <em>${formatRomanLevel(level)}</em>
         </span>
       `}
@@ -1332,6 +1377,35 @@ function renderVaultCatalog() {
 
     grid.appendChild(button);
   });
+}
+
+function getVaultEntryEquippedLocations(entry) {
+  if (!entry || !["guns", "attachments"].includes(entry.categoryKey)) return [];
+  const locations = [];
+  Object.entries(shipLoadouts || {}).forEach(([shipId, loadout]) => {
+    const list = loadout?.[entry.categoryKey] || [];
+    list.forEach((item, index) => {
+      if (getEquipmentKey(item) !== entry.key || getEquipmentQuality(item) !== entry.quality || getEquipmentLevel(item) !== entry.level) return;
+      locations.push({
+        shipId,
+        categoryKey: entry.categoryKey,
+        index,
+        shipName: SHIPS[shipId]?.name || shipId,
+        slotLabel: `${entry.categoryKey === "guns" ? "Weapon" : "Attachment"} ${String(index + 1).padStart(2, "0")}`
+      });
+    });
+  });
+  return locations;
+}
+
+function viewVaultEntryInLoadout(groupKey) {
+  const entry = buildVaultEntries().find(item => item.groupKey === groupKey);
+  const location = getVaultEntryEquippedLocations(entry)[0];
+  if (!location) return;
+  selectedHangarShipId = location.shipId;
+  selectedFleetShipId = location.shipId;
+  showHangarSection("overview");
+  selectEquippedLoadoutVaultItem(location.categoryKey, location.index);
 }
 
 function renderVaultDetail() {
@@ -1348,6 +1422,10 @@ function renderVaultDetail() {
   const level = Math.max(1, Number(entry.level || 1));
   const tier = getHangarEquipmentTier(level);
   const tierClass = entry.stackable ? "" : `forge-tier-scope ${getHangarEquipmentTierClass(level)}`;
+  const locations = getVaultEntryEquippedLocations(entry);
+  const locationSummary = locations.length
+    ? `${locations[0].shipName} · ${locations[0].slotLabel}${locations.length > 1 ? ` · +${locations.length - 1} more` : ""}`
+    : "Not currently equipped";
 
   panel.innerHTML = `
     <div class="vault-item-detail-shell quality-${entry.quality} ${tierClass}" ${entry.stackable ? "" : `data-level="${escapeHtml(level)}" data-tier="${escapeHtml(tier.key)}"`}>
@@ -1373,6 +1451,14 @@ function renderVaultDetail() {
 
       <div class="vault-item-description">${getVaultEntryDescription(entry)}</div>
 
+      ${entry.stackable ? "" : `
+        <div class="vault-equipped-location">
+          <span>Equipped location</span>
+          <strong>${escapeHtml(locationSummary)}</strong>
+          ${locations.length ? `<button type="button" onclick="viewVaultEntryInLoadout('${escapeHtml(entry.groupKey)}')">View in Loadout</button>` : ""}
+        </div>
+      `}
+
       <div class="vault-item-stat-grid">
         ${infoStats.map(stat => `
           <div class="vault-item-stat-card ${stat.label.toLowerCase().replace(/\s+/g, "-")}-stat">
@@ -1382,7 +1468,7 @@ function renderVaultDetail() {
         `).join("")}
       </div>
 
-      <div class="vault-item-note">Items of different quality or level are stored separately.</div>
+      <div class="vault-item-note">Grouped by item, quality and level.</div>
 
       <div class="vault-item-note vault-passive-note">Manage equipment from Loadout, Store, or Forge.</div>
     </div>

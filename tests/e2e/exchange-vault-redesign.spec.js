@@ -272,5 +272,82 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await pulseCard.click();
     await expect(page.locator("#vaultDetailPanel")).toContainText("Stored");
     await expect(page.locator("#vaultDetailPanel")).toContainText("Equipped");
+    await page.locator("#vaultStatusSelect").selectOption("stored");
+    await expect(page.locator("#vaultCatalogGrid .vault-storage-card")).toHaveCount(0);
+  });
+
+  test("keeps a thirty-variant Vault browsable, grouped, and connected to Loadout", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 768 });
+    await openHangarSection(page, "vault", `
+      ownedGuns = {};
+      ownedAttachments = {};
+      upgradeMaterials = { lupenShards: 0 };
+      const vaultKeys = ["pulseLaser", "ionBlaster", "heavyLance", "meltCannon", "repeater", "ripperGun", "voidRail", "cargoPod", "hullBooster", "jumpDrive", "shieldBooster", "evasionMatrix"];
+      const vaultQualities = ["standard", "refined", "advanced"];
+      inventoryItems = Array.from({ length: 30 }, (_, index) => ({
+        id: \`vault-populated-\${index}\`,
+        key: vaultKeys[index % vaultKeys.length],
+        quality: vaultQualities[Math.floor(index / vaultKeys.length)],
+        level: (index % 5) + 1
+      }));
+      inventoryItems.push(
+        { id: "vault-pulse-copy-a", key: "pulseLaser", quality: "standard", level: 1 },
+        { id: "vault-pulse-copy-b", key: "pulseLaser", quality: "standard", level: 1 }
+      );
+      shipLoadouts.falcon = { guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)], attachments: [] };
+      hangarVaultFilter = "all";
+      selectedVaultSearch = "";
+      selectedVaultSort = "quality";
+      selectedVaultQuality = "all";
+      selectedVaultStatus = "all";
+      selectedVaultGroupKey = null;
+    `);
+
+    const cards = page.locator("#vaultCatalogGrid .vault-storage-card");
+    await expect(cards).toHaveCount(30);
+    await expect(page.locator("#vaultCapacityText")).toContainText("Gear Storage");
+    await expect(page.locator("#vaultCapacityText")).toContainText("32 / 50");
+
+    const grid = await cards.evaluateAll(items => {
+      const rects = items.slice(0, 4).map(item => item.getBoundingClientRect());
+      const catalog = items[0]?.parentElement?.getBoundingClientRect();
+      const visible = items.filter(item => {
+        const rect = item.getBoundingClientRect();
+        return catalog && rect.top >= catalog.top - 1 && rect.bottom <= catalog.bottom + 1;
+      }).length;
+      return {
+        firstRowAligned: Math.max(...rects.slice(0, 3).map(rect => rect.top)) - Math.min(...rects.slice(0, 3).map(rect => rect.top)) < 2,
+        fourthStartsNextRow: rects[3].top > rects[0].top + 20,
+        visible
+      };
+    });
+    expect(grid.firstRowAligned).toBe(true);
+    expect(grid.fourthStartsNextRow).toBe(true);
+    expect(grid.visible).toBeGreaterThanOrEqual(6);
+    await page.mouse.move(4, 4);
+    await page.screenshot({ path: "artifacts/vault-library-populated.png", fullPage: false });
+
+    await page.locator("#vaultSearchInput").fill("Pulse Laser");
+    await expect(cards).toHaveCount(3);
+    const standardPulse = cards.filter({ hasText: "Standard" });
+    await expect(standardPulse).toHaveCount(1);
+    await expect(standardPulse).toContainText("3 stored · 1 equipped");
+    await standardPulse.click();
+    await expect(page.locator("#vaultDetailPanel")).toContainText("Fire Rate");
+    await expect(page.locator("#vaultDetailPanel")).toContainText("DPS");
+    await expect(page.locator("#vaultDetailPanel")).toContainText("Pioneer Hunter · Weapon 01");
+
+    await page.locator("#vaultSearchInput").fill("");
+    await page.locator("#vaultQualitySelect").selectOption("refined");
+    await expect(cards).toHaveCount(12);
+    await page.locator("#vaultQualitySelect").selectOption("all");
+    await page.locator("#vaultStatusSelect").selectOption("equipped");
+    await expect(cards).toHaveCount(1);
+    await page.mouse.move(4, 4);
+    await page.screenshot({ path: "artifacts/vault-library-equipped-filter.png", fullPage: false });
+
+    await page.locator("#vaultDetailPanel .vault-equipped-location button").click();
+    await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
+    await expect(page.locator("#hangarOverviewSection")).toContainText("Pulse Laser");
   });
 });

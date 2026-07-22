@@ -513,6 +513,15 @@
                   <option value="quality">Sort: Quality</option>
                   <option value="name">Sort: Name</option>
                   <option value="level">Sort: Level</option>
+                  <option value="quantity">Sort: Quantity</option>
+                </select>
+                <select id="vaultQualitySelect" class="vault-sort-select" onchange="setHangarVaultQuality(this.value)" aria-label="Filter Vault by quality">
+                  <option value="all">All qualities</option>
+                </select>
+                <select id="vaultStatusSelect" class="vault-sort-select" onchange="setHangarVaultStatus(this.value)" aria-label="Filter Vault by storage status">
+                  <option value="all">Stored + equipped</option>
+                  <option value="stored">Stored only</option>
+                  <option value="equipped">Equipped only</option>
                 </select>
               </div>
             </header>
