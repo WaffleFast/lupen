@@ -49704,6 +49704,141 @@ input::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+/* Journey usability and Oracle presentation refinement. */
+.journey-briefing__inner {
+  width: min(790px, 68%);
+  min-width: 660px;
+  gap: 20px;
+}
+
+.journey-briefing__portrait {
+  flex-basis: 132px;
+  width: 132px;
+  height: 108px;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.journey-briefing__portrait-img.journey-morgan-portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transform: scale(1.48);
+  transform-origin: 50% 25%;
+}
+
+.journey-briefing__content .journey-briefing__name {
+  font-size: 1.42rem;
+  letter-spacing: 0.14em;
+}
+
+.journey-assignment-head {
+  min-height: 31px;
+  margin-bottom: 7px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(127, 214, 255, 0.14);
+}
+
+.journey-assignment-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.journey-assignment-head small {
+  color: rgba(173, 202, 217, 0.72);
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+.journey-assignment-head span {
+  color: #eaf7ff;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+}
+
+.journey-assignment-head strong {
+  color: #77e7ff;
+  font-size: 0.67rem;
+  letter-spacing: 0.1em;
+}
+
+.journey-assignment-grid {
+  max-height: calc(100% - 45px);
+  scroll-padding-top: 8px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.journey-chapter-route__status {
+  display: inline-flex;
+  width: max-content;
+  min-height: 16px;
+  align-items: center;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgba(107, 215, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(3, 16, 28, 0.68);
+  font-size: 0.52rem;
+  line-height: 1;
+}
+
+.journey-chapter-route__item--active .journey-chapter-route__status {
+  border-color: rgba(94, 228, 255, 0.42);
+  background: rgba(49, 207, 255, 0.1);
+}
+
+.journey-chapter-route__item--complete .journey-chapter-route__status {
+  border-color: rgba(101, 245, 152, 0.4);
+  background: rgba(78, 235, 137, 0.1);
+}
+
+.journey-chapter-route__item--locked .journey-chapter-route__status {
+  border-color: rgba(185, 156, 255, 0.34);
+  background: rgba(147, 122, 255, 0.09);
+}
+
+.journey-summary-next,
+.journey-summary-unlock {
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid rgba(127, 214, 255, 0.14);
+  border-radius: 7px;
+  background: rgba(2, 13, 23, 0.52);
+}
+
+.journey-summary-next {
+  border-left: 3px solid #ff8a5c;
+}
+
+.journey-summary-unlock {
+  border-left: 3px solid #947aff;
+}
+
+.journey-summary-next strong,
+.journey-summary-unlock strong {
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journey-summary-next small {
+  color: #ffb090;
+  font-size: 0.62rem;
+}
+
+@media (max-width: 980px) {
+  .journey-briefing__inner {
+    width: 100%;
+    min-width: 0;
+  }
+}
 /* ===== Map 1 simple Lupen Forge ===== */
 .upgrade-forge-screen {
   position: relative;

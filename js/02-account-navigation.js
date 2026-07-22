@@ -568,7 +568,7 @@ function openJourney() {
   if (!sectorNodes[currentNode] || sectorNodes[currentNode].type !== "planet") {
     currentNode = lastPlanetNode || "Asteron Prime";
   }
-  if (typeof renderJourneyScreen === "function") renderJourneyScreen();
+  if (typeof renderJourneyScreen === "function") renderJourneyScreen({ resetAssignments: true });
   showScreen("journeyScreen");
 }
 

@@ -855,30 +855,46 @@ function getGalaxyCompletionPercent() {
   return Math.min(100, Math.round((completedUnits / assignments.length) * journeyContentWeight));
 }
 
-function renderJourneyScreen() {
+function renderJourneyScreen(options = {}) {
   reconcileMissionProgressFromGameplayState({ source: "journey_render", refresh: false, notify: false });
   const body = document.getElementById("journeyBody");
   const title = document.getElementById("journeyLocationTitle");
   if (title) title.textContent = String(currentNode || "Asteron Prime").toUpperCase();
   if (!body) return;
+  const previousChapterId = body.dataset.journeyActiveChapter || "";
+  const previousAssignmentScroll = Number(body.querySelector(".journey-assignment-grid")?.scrollTop || 0);
   syncSelectedJourneyChapter();
   const activeChapterId = getJourneyActiveChapterId();
+  const resetAssignmentScroll = Boolean(options?.resetAssignments) || previousChapterId !== activeChapterId;
   const activeAssignments = getJourneyAssignments(activeChapterId)
     .filter(assignment => assignment.mission?.objective?.type !== "complete_missions");
+  const requirements = getJourneyChapterRequirementSummary(activeChapterId);
 
   body.innerHTML = `
     ${renderJourneyMorganBriefing()}
     ${renderJourneyChapterPath()}
     <section class="journey-objectives-panel journey-current-path">
-      <div class="journey-panel-head">
-        <span>CURRENT PATH</span>
-        <strong>${escapeHtml(getJourneyChapterAssignmentTitle(activeChapterId))}</strong>
+      <div class="journey-panel-head journey-assignment-head">
+        <div>
+          <small>CURRENT PATH</small>
+          <span>${escapeHtml(getJourneyChapterAssignmentTitle(activeChapterId))}</span>
+        </div>
+        <strong>${formatNumber(requirements.complete)} / ${formatNumber(requirements.total)} COMPLETE</strong>
       </div>
       ${renderJourneyAssignments(activeAssignments)}
     </section>
     <aside class="journey-side-panel">${renderJourneyFrontierStatus()}</aside>
     ${renderJourneyGalaxyCompletion()}
   `;
+  body.dataset.journeyActiveChapter = activeChapterId;
+  requestAnimationFrame(() => {
+    const assignmentGrid = body.querySelector(".journey-assignment-grid");
+    if (assignmentGrid) {
+      const maximumScroll = Math.max(0, assignmentGrid.scrollHeight - assignmentGrid.clientHeight);
+      assignmentGrid.scrollTop = resetAssignmentScroll ? 0 : Math.min(previousAssignmentScroll, maximumScroll);
+    }
+    updateJourneyChapterRouteScroll();
+  });
 }
 
 function renderMissionJournal() {
@@ -1006,7 +1022,6 @@ function renderJourneyChapterNode(chapter) {
       <span class="journey-chapter-route__copy journey-chapter-main">
         <strong class="journey-chapter-route__label">${escapeHtml(routeLabel)}</strong>
         ${routeTitle ? `<b class="journey-chapter-route__detail">${escapeHtml(routeTitle)}</b>` : ""}
-        <span class="journey-chapter-route__subtitle">${escapeHtml(getJourneyChapterRouteSubtitle(chapter))}</span>
         <em class="journey-chapter-route__status">${escapeHtml(getJourneyChapterStatusLabel(chapter))}</em>
       </span>
     </button>
@@ -1030,7 +1045,7 @@ function selectJourneyChapterRoute(id) {
     selectedJourneyChapterId = id;
     journeyChapterRouteMessage = "";
   }
-  renderJourneyScreen();
+  renderJourneyScreen({ resetAssignments: true });
   requestAnimationFrame(() => {
     document.querySelector(`[data-journey-chapter-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", inline: "center" });
     updateJourneyChapterRouteScroll();
@@ -1161,6 +1176,7 @@ function renderJourneyAssignmentStatePill(state, hasReward = true) {
     return renderJourneyStatusPill("completed");
   }
   if (normalized === "claimed") return renderJourneyStatusPill("completed");
+  if (normalized === "in-progress") return renderJourneyStatusPill("in-progress");
   if (normalized === "locked") return renderJourneyStatusPill("locked");
   return "";
 }
@@ -1205,6 +1221,24 @@ function renderJourneyFrontierStatus() {
   const activeChapterId = activeChapter?.id || "academy";
   const requirements = getJourneyChapterRequirementSummary(activeChapterId);
   const label = activeChapterId === "frontier" ? "Frontier Progress" : "Academy Progress";
+  const assignments = getJourneyAssignments(activeChapterId)
+    .filter(assignment => assignment.mission?.objective?.type !== "complete_missions")
+    .map(assignment => {
+      const mission = assignment.mission || MISSIONS_BY_ID[assignment.id];
+      const state = missionProgress.missions[mission.id];
+      const progress = getMissionProgressAmount(mission, state);
+      const required = getMissionRequiredAmount(mission);
+      return { assignment, progress, required, remaining: Math.max(0, required - progress) };
+    })
+    .filter(entry => entry.remaining > 0)
+    .sort((left, right) => {
+      const leftStarted = left.progress > 0 ? 1 : 0;
+      const rightStarted = right.progress > 0 ? 1 : 0;
+      if (leftStarted !== rightStarted) return rightStarted - leftStarted;
+      return left.remaining - right.remaining;
+    });
+  const recommended = assignments[0] || null;
+  const nextUnlock = activeChapterId === "academy" ? "Chapter I · Frontier" : "Chapter II Route";
   return `
     <section class="journey-summary-panel journey-frontier-status">
       <div class="journey-panel-head"><span>CHAPTER PROGRESS</span></div>
@@ -1218,7 +1252,15 @@ function renderJourneyFrontierStatus() {
           <span>Requirements Complete</span>
           <strong>${formatNumber(requirements.complete)} / ${formatNumber(requirements.total)}</strong>
         </div>
-        <p>Complete all chapter assignments to progress.</p>
+        <div class="journey-summary-next">
+          <span>NEXT OBJECTIVE</span>
+          <strong>${escapeHtml(recommended?.assignment?.journeyTitle || "Chapter complete")}</strong>
+          <small>${recommended ? `${formatNumber(recommended.remaining)} remaining` : "All assignments complete"}</small>
+        </div>
+        <div class="journey-summary-unlock">
+          <span>NEXT UNLOCK</span>
+          <strong>${escapeHtml(nextUnlock)}</strong>
+        </div>
       </div>
     </section>
   `;

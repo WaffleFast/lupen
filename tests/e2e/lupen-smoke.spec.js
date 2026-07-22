@@ -7887,6 +7887,18 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
     await expect(page.locator("#journeyScreen")).not.toContainText("STATION AI");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier is active, Pilot.");
+    const morganPortraitCrop = await page.locator("#journeyScreen .journey-briefing__portrait").evaluate(portrait => {
+      const image = portrait.querySelector("img");
+      const portraitRect = portrait.getBoundingClientRect();
+      const imageRect = image?.getBoundingClientRect();
+      return {
+        overflow: getComputedStyle(portrait).overflow,
+        portraitHeight: portraitRect.height,
+        imageHeight: imageRect?.height || 0
+      };
+    });
+    expect(morganPortraitCrop.overflow).toBe("hidden");
+    expect(morganPortraitCrop.imageHeight).toBeGreaterThan(morganPortraitCrop.portraitHeight);
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER ROUTE");
     await expect(page.locator("#journeyScreen")).toContainText("Academy");
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toContainText("ACTIVE");
@@ -7962,7 +7974,11 @@ test.describe("Lupen browser smoke", () => {
     expect(["auto", "scroll"]).toContain(academyAssignmentScroll.overflowY);
     expect(academyAssignmentScroll.scrollHeight).toBeGreaterThanOrEqual(academyAssignmentScroll.clientHeight);
     expect(academyAssignmentScroll.firstCardHeight).toBeLessThan(105);
-    await page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => { grid.scrollTop = grid.scrollHeight; });
+    const scrolledAssignmentTop = await page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => {
+      grid.scrollTop = grid.scrollHeight;
+      return grid.scrollTop;
+    });
+    expect(scrolledAssignmentTop).toBeGreaterThan(0);
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_repair_ship']")).toBeVisible();
     await page.evaluate(() => {
       missionProgress = normalizeMissionProgress(missionProgress);
@@ -7976,6 +7992,9 @@ test.describe("Lupen browser smoke", () => {
       });
       renderJourneyScreen();
     });
+    await expect.poll(() => page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => grid.scrollTop)).toBeGreaterThan(0);
+    await page.evaluate(() => openJourney());
+    await expect.poll(() => page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => grid.scrollTop)).toBe(0);
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Academy Progress");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("29%");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("2 / 7");
