@@ -40,13 +40,12 @@ async function prepareTerminal(page, viewport = { width: 1366, height: 768 }) {
 async function getPageGeometry(page) {
   return page.evaluate(() => {
     const screen = document.getElementById("marketScreen").getBoundingClientRect();
-    const panels = [...document.querySelectorAll(".trade-v2-primary-grid > .trade-v2-primary-panel")].map((panel) => {
-      const rect = panel.getBoundingClientRect();
-      return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
-    });
+    const market = document.querySelector(".trade-v2-market-overview").getBoundingClientRect();
+    const strip = document.querySelector(".trade-v2-contract-strip").getBoundingClientRect();
     return {
       screen: { left: screen.left, top: screen.top, right: screen.right, bottom: screen.bottom },
-      panels,
+      market: { top: market.top, bottom: market.bottom, left: market.left, right: market.right },
+      strip: { top: strip.top, bottom: strip.bottom, left: strip.left, right: strip.right },
       viewport: { width: innerWidth, height: innerHeight },
       document: {
         scrollWidth: document.documentElement.scrollWidth,
@@ -67,19 +66,22 @@ function expectPageFits(geometry) {
   expect(geometry.document.scrollWidth).toBeLessThanOrEqual(geometry.document.clientWidth + 1);
   expect(geometry.document.scrollHeight).toBeLessThanOrEqual(geometry.document.clientHeight + 1);
   expect(geometry.document.scrollY).toBe(0);
-  expect(geometry.panels).toHaveLength(2);
-  expect(Math.abs(geometry.panels[0].top - geometry.panels[1].top)).toBeLessThanOrEqual(1);
-  expect(Math.abs(geometry.panels[0].bottom - geometry.panels[1].bottom)).toBeLessThanOrEqual(1);
-  expect(geometry.panels[1].right).toBeLessThanOrEqual(geometry.viewport.width + 1);
+  expect(geometry.strip.left).toBeGreaterThanOrEqual(geometry.screen.left);
+  expect(geometry.strip.right).toBeLessThanOrEqual(geometry.screen.right + 1);
+  expect(geometry.strip.bottom).toBeLessThanOrEqual(geometry.market.top);
+  expect(geometry.market.left).toBeGreaterThanOrEqual(geometry.screen.left);
+  expect(geometry.market.right).toBeLessThanOrEqual(geometry.screen.right + 1);
+  expect(geometry.market.bottom).toBeLessThanOrEqual(geometry.screen.bottom + 1);
 }
 
 test.describe("Trade Terminal final quick actions", () => {
   test("single workspace fits at 1366x768 and exposes only Map 1 commodities", async ({ page }) => {
     await prepareTerminal(page);
 
-    await expect(page.locator(".trade-v2-primary-grid > .trade-v2-primary-panel")).toHaveCount(2);
-    await expect(page.locator(".trade-v2-contract-preview")).toHaveCount(4);
-    await expect(page.locator(".trade-v2-contract-preview [data-contract-action='accept']")).toHaveCount(4);
+    await expect(page.locator(".trade-v2-summary-item:visible")).toHaveCount(3);
+    await expect(page.locator(".trade-v2-market-overview")).toHaveCount(1);
+    await expect(page.locator(".trade-v2-contract-strip")).toBeVisible();
+    await expect(page.locator(".trade-v2-contract-preview")).toHaveCount(0);
     await expect(page.locator(".trade-v2-market-table tbody tr")).toHaveCount(3);
     await expect(page.locator(".trade-v2-market-table")).toContainText("Iron");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Copper");
@@ -89,6 +91,14 @@ test.describe("Trade Terminal final quick actions", () => {
     expectPageFits(await getPageGeometry(page));
     await page.screenshot({ path: "artifacts/trade-terminal-quick-default-1366x768.png" });
 
+    await page.getByRole("button", { name: "View Contracts" }).click();
+    await expect(page.locator(".trade-v2-contract-drawer")).toBeVisible();
+    await expect(page.locator(".trade-v2-contract-preview")).toHaveCount(4);
+    await expect(page.locator(".trade-v2-contract-preview [data-contract-action='accept']")).toHaveCount(4);
+    await page.screenshot({ path: "artifacts/trade-terminal-contract-drawer-1366x768.png" });
+    await page.getByRole("button", { name: "Close Daily Contracts" }).click();
+    await expect(page.locator(".trade-v2-contract-drawer")).toHaveCount(0);
+
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.evaluate(() => renderMarketplace());
     expectPageFits(await getPageGeometry(page));
@@ -97,6 +107,7 @@ test.describe("Trade Terminal final quick actions", () => {
 
   test("contracts accept inline, auto-load where possible, lock, persist, complete once, and reset", async ({ page }) => {
     await prepareTerminal(page);
+    await page.getByRole("button", { name: "View Contracts" }).click();
     const firstRow = page.locator("[data-contract-id='safe-delivery']");
     const secondRow = page.locator("[data-contract-id='bulk-freight']");
 
@@ -140,6 +151,7 @@ test.describe("Trade Terminal final quick actions", () => {
       lastPlanetNode = "Virella";
       openMarketplace();
     });
+    await page.getByRole("button", { name: "View Contracts" }).click();
     await expect(page.locator("[data-contract-id='safe-delivery']")).toHaveClass(/is-active/);
     await page.locator("[data-contract-id='safe-delivery']").getByRole("button", { name: "Complete Delivery" }).click();
     await expect(page.locator("[data-contract-id='safe-delivery']")).toHaveClass(/is-complete/);

@@ -912,6 +912,7 @@ let selectedMarketTargetPlanet = "";
 let selectedMarketQuantity = 1;
 let selectedMarketMode = "buy";
 let tradeTerminalStatusMessage = "";
+let tradeContractsExpanded = false;
 let dailyTradeDate = null;
 let dailyTradeContracts = [];
 let selectedDailyTradeContractId = null;

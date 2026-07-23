@@ -353,13 +353,27 @@ function selectDailyTradeContract(id) {
 
 function openDailyTradeContracts() {
   activeTradeTerminalTab = "overview";
+  tradeContractsExpanded = true;
   ensureDailyTradeContracts();
   selectedDailyTradeContractId = activeDailyTradeContractId || selectedDailyTradeContractId || dailyTradeContracts[0]?.id || null;
   renderMarketplace();
 }
 
+function toggleDailyTradeContracts() {
+  tradeContractsExpanded = !tradeContractsExpanded;
+  if (tradeContractsExpanded) {
+    ensureDailyTradeContracts();
+    selectedDailyTradeContractId = activeDailyTradeContractId || selectedDailyTradeContractId || dailyTradeContracts[0]?.id || null;
+  }
+  renderMarketplace();
+  requestAnimationFrame(() => {
+    document.querySelector(tradeContractsExpanded ? ".trade-v2-contract-drawer-close" : ".trade-v2-contract-strip-button")?.focus();
+  });
+}
+
 function openLiveMarket() {
   activeTradeTerminalTab = "overview";
+  tradeContractsExpanded = false;
   if (!MAP_ONE_TRADE_RESOURCES.includes(selectedMarketResource)) selectedMarketResource = "Iron";
   selectedMarketMode = "buy";
   selectedMarketQuantity = Math.max(1, Number(selectedMarketQuantity || 1));
@@ -368,6 +382,7 @@ function openLiveMarket() {
 
 function returnFromTradeTerminal() {
   activeTradeTerminalTab = "overview";
+  tradeContractsExpanded = false;
   stopTradeTerminalTimer();
   returnToHub();
 }
@@ -936,32 +951,70 @@ function renderLiveMarketQuickActions() {
   `;
 }
 
-function renderTradeOverview() {
+function renderDailyContractsStrip() {
+  const completed = getDailyTradeProgress();
+  const active = getDailyTradeContract(activeDailyTradeContractId);
+  const supportingText = active
+    ? `Tracking ${escapeHtml(active.name)} &middot; ${escapeHtml(active.origin)} &rarr; ${escapeHtml(active.destination)}`
+    : "Optional routes refresh each UTC day";
+  return `
+    <section class="trade-v2-contract-strip ${active ? "has-active-contract" : ""}" aria-label="Daily contract progress">
+      <span class="trade-v2-contract-strip-icon" aria-hidden="true">&#9776;</span>
+      <strong>Daily Contracts</strong>
+      <span class="trade-v2-contract-strip-progress">${completed} / 4 Complete</span>
+      <span class="trade-v2-contract-strip-copy">${supportingText}</span>
+      <button type="button" class="trade-v2-contract-strip-button" aria-expanded="${tradeContractsExpanded}" onclick="toggleDailyTradeContracts()">${tradeContractsExpanded ? "Close Contracts" : "View Contracts"}</button>
+    </section>
+  `;
+}
+
+function renderDailyContractsDrawer() {
+  if (!tradeContractsExpanded) return "";
   const completed = getDailyTradeProgress();
   return `
-    <div class="trade-v2-view trade-v2-overview" data-trade-view="quick-actions">
-      ${getTradeSummaryMarkup()}
-      <div class="trade-v2-primary-grid">
-        <section class="trade-v2-primary-panel trade-v2-contracts-overview" aria-labelledby="dailyContractsTitle">
-          <header class="trade-v2-panel-heading">
-            <span class="trade-v2-panel-icon" aria-hidden="true">&#9776;</span>
-            <div><h3 id="dailyContractsTitle">Daily Contracts</h3><p>4 fixed contracts available each UTC day</p></div>
-          </header>
-          <div class="trade-v2-progress-line"><strong>${completed} / 4 Complete</strong><span>${DAILY_TRADE_CONTRACT_DEFINITIONS.map((_, index) => `<i class="${index < completed ? "is-complete" : ""}"></i>`).join("")}</span></div>
-          <div class="trade-v2-contract-previews">${dailyTradeContracts.map(renderDailyTradePreviewRow).join("")}</div>
-          <div class="trade-v2-risk-legend" aria-label="Route risk guide"><span><i class="risk-safe"></i><b>Safe</b><small>Protected route</small></span><span><i class="risk-moderate"></i><b>Moderate</b><small>Some risk</small></span><span><i class="risk-high"></i><b>High</b><small>Contested route</small></span></div>
-        </section>
-        <section class="trade-v2-primary-panel trade-v2-market-overview" aria-labelledby="liveMarketTitle">
-          <header class="trade-v2-panel-heading">
-            <span class="trade-v2-panel-icon" aria-hidden="true">&#8599;</span>
-            <div><h3 id="liveMarketTitle">Live Market</h3><p>Buy low. Sell high. Prices change fast.</p></div>
-            <div class="trade-v2-panel-countdown"><span>Refresh in</span><strong data-market-countdown>${getTradeCountdownLabel()}</strong></div>
-          </header>
-          ${renderLiveMarketPriceTable({ interactive: true })}
-          ${renderLiveMarketQuickActions()}
-        </section>
+    <section class="trade-v2-contract-drawer" role="dialog" aria-label="Daily Contracts">
+      <header>
+        <div>
+          <span>Optional Trade Routes</span>
+          <h3>Daily Contracts</h3>
+          <p>Fixed terms and guaranteed returns. Complete one contract before accepting another.</p>
+        </div>
+        <div class="trade-v2-contract-drawer-meta">
+          <strong>${completed} / 4 Complete</strong>
+          <small>Reset ${formatBountyResetCountdown(getDailyResetSeconds())}</small>
+        </div>
+        <button type="button" class="trade-v2-contract-drawer-close" aria-label="Close Daily Contracts" onclick="toggleDailyTradeContracts()">&times;</button>
+      </header>
+      <div class="trade-v2-contract-drawer-list">
+        ${dailyTradeContracts.map(renderDailyTradePreviewRow).join("")}
       </div>
+      <footer>
+        <span>Safe routes offer lower returns. Contested routes pay more.</span>
+        <strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong>
+      </footer>
+    </section>
+  `;
+}
+
+function renderTradeOverview() {
+  return `
+    <div class="trade-v2-view trade-v2-overview ${tradeContractsExpanded ? "contracts-expanded" : ""}" data-trade-view="market-first">
+      ${getTradeSummaryMarkup()}
+      ${renderDailyContractsStrip()}
+      <section class="trade-v2-primary-panel trade-v2-market-overview" aria-labelledby="liveMarketTitle">
+        <header class="trade-v2-panel-heading">
+          <span class="trade-v2-panel-icon" aria-hidden="true">&#8599;</span>
+          <div><h3 id="liveMarketTitle">Live Market</h3><p>Buy low. Sell high. Prices change fast.</p></div>
+        </header>
+        <div class="trade-v2-market-first-content">
+          <section class="trade-v2-market-board">
+            ${renderLiveMarketPriceTable({ interactive: true })}
+          </section>
+          ${renderLiveMarketQuickActions()}
+        </div>
+      </section>
       <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 90 seconds. Check back often for new opportunities.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
+      ${renderDailyContractsDrawer()}
     </div>
   `;
 }

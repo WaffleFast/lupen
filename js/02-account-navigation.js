@@ -1467,6 +1467,7 @@ function openMarketplace() {
     "sell-cargo"
   ].includes(tutorialTradeStep);
   activeTradeTerminalTab = tutorialNeedsMarket ? "market" : "overview";
+  tradeContractsExpanded = false;
   if (["open-trade-to-sell", "sell-cargo"].includes(tutorialTradeStep)) {
     selectedMarketMode = "sell";
     selectedMarketResource = "Iron";
