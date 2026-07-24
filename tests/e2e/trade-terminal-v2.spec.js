@@ -22,6 +22,7 @@ async function prepareTerminal(page, viewport = { width: 1366, height: 768 }) {
     dailyTradeContracts = [];
     activeDailyTradeContractId = null;
     selectedDailyTradeContractId = null;
+    dailyTradeContractCargo = null;
     selectedMarketResource = "Iron";
     selectedMarketMode = "buy";
     selectedMarketQuantity = 1;
@@ -105,15 +106,15 @@ test.describe("Trade Terminal final quick actions", () => {
     await page.screenshot({ path: "artifacts/trade-terminal-quick-large-desktop.png" });
   });
 
-  test("contracts accept inline, auto-load where possible, lock, persist, complete once, and reset", async ({ page }) => {
+  test("contract packages load at their origin, persist, deliver once, and reset", async ({ page }) => {
     await prepareTerminal(page);
     await page.getByRole("button", { name: "View Contracts" }).click();
     const firstRow = page.locator("[data-contract-id='safe-delivery']");
     const secondRow = page.locator("[data-contract-id='bulk-freight']");
 
-    await firstRow.getByRole("button", { name: "Accept Contract" }).click();
+    await firstRow.getByRole("button", { name: "Accept & Load" }).click();
     await expect(firstRow).toHaveClass(/is-active/);
-    await expect(firstRow).toContainText(/Active · Virella/i);
+    await expect(firstRow).toContainText(/Deliver to Virella/i);
     await expect(secondRow).toHaveClass(/is-locked/);
     await expect(secondRow.getByRole("button", { name: "Locked" })).toBeDisabled();
 
@@ -121,22 +122,47 @@ test.describe("Trade Terminal final quick actions", () => {
       credits,
       cargoIron: cargo.Iron || 0,
       purchasedIron: cargoPurchased.Iron || 0,
+      cargoUsed: cargoUsed(),
+      packageCargo: dailyTradeContractCargo,
+      inventoryPackage: buildInventoryDrawerEntries().find((entry) => entry.source === "contract"),
+      tacticalCargoMarkup: renderTacticalCargo(),
       activeId: activeDailyTradeContractId,
       activeObjective: activeTradeRoute && {
         contractId: activeTradeRoute.contractId,
         destination: activeTradeRoute.destination,
+        packageName: activeTradeRoute.packageName,
         daily: activeTradeRoute.dailyTradeContract
       },
-      purchaseCost: DAILY_TRADE_CONTRACT_DEFINITIONS[0].purchaseCost,
-      contractQuantity: DAILY_TRADE_CONTRACT_DEFINITIONS[0].quantity,
+      cargoSpace: DAILY_TRADE_CONTRACT_DEFINITIONS[0].cargoSpace,
       saved: buildSaveState()
     }));
-    expect(accepted.credits).toBe(50000 - accepted.purchaseCost);
-    expect(accepted.cargoIron).toBe(accepted.contractQuantity);
-    expect(accepted.purchasedIron).toBe(accepted.contractQuantity);
+    expect(accepted.credits).toBe(50000);
+    expect(accepted.cargoIron).toBe(0);
+    expect(accepted.purchasedIron).toBe(0);
+    expect(accepted.cargoUsed).toBe(accepted.cargoSpace);
+    expect(accepted.packageCargo).toMatchObject({
+      contractId: "safe-delivery",
+      packageId: "cryo-seed-vault",
+      name: "Cryogenic Seed Vault",
+      destination: "Virella"
+    });
+    expect(accepted.inventoryPackage).toMatchObject({
+      name: "Cryogenic Seed Vault",
+      cargoSpace: 20,
+      source: "contract",
+      destination: "Virella"
+    });
+    expect(accepted.tacticalCargoMarkup).toContain("Cryogenic Seed Vault");
+    expect(accepted.tacticalCargoMarkup).toContain("Sealed contract package");
     expect(accepted.activeId).toBe("safe-delivery");
-    expect(accepted.activeObjective).toEqual({ contractId: "safe-delivery", destination: "Virella", daily: true });
+    expect(accepted.activeObjective).toEqual({
+      contractId: "safe-delivery",
+      destination: "Virella",
+      packageName: "Cryogenic Seed Vault",
+      daily: true
+    });
     expect(accepted.saved.activeDailyTradeContractId).toBe("safe-delivery");
+    expect(accepted.saved.dailyTradeContractCargo).toMatchObject({ contractId: "safe-delivery" });
     await page.screenshot({ path: "artifacts/trade-terminal-quick-contract-active.png" });
     await page.screenshot({ path: "artifacts/trade-terminal-quick-contract-locked.png" });
 
@@ -146,6 +172,7 @@ test.describe("Trade Terminal final quick actions", () => {
       dailyTradeContracts = [];
       activeTradeRoute = null;
       activeObjective = null;
+      dailyTradeContractCargo = null;
       applyLoadedGameState(saved);
       currentNode = "Virella";
       lastPlanetNode = "Virella";
@@ -161,13 +188,13 @@ test.describe("Trade Terminal final quick actions", () => {
     const completion = await page.evaluate(() => {
       const completed = dailyTradeContracts[0];
       const creditsAfterFirst = credits;
+      const packageAfterFirst = dailyTradeContractCargo;
       const duplicateBlocked = completeDailyTradeContract(completed.id, completed.completionEventId) === false;
       const creditsAfterDuplicate = credits;
       for (const contract of dailyTradeContracts.filter((entry) => entry.status !== "complete")) {
         currentNode = contract.origin;
         lastPlanetNode = contract.origin;
         if (!acceptDailyTradeContract(contract.id)) throw new Error("Could not accept " + contract.id);
-        if (getDailyTradeContract(contract.id).loadedQuantity <= 0 && !loadDailyTradeContractCargo(contract.id)) throw new Error("Could not load " + contract.id);
         currentNode = contract.destination;
         lastPlanetNode = contract.destination;
         if (!completeDailyTradeContract(contract.id)) throw new Error("Could not complete " + contract.id);
@@ -179,16 +206,94 @@ test.describe("Trade Terminal final quick actions", () => {
         duplicateBlocked,
         creditsAfterFirst,
         creditsAfterDuplicate,
+        packageAfterFirst,
         completedBeforeReset,
         savedStatuses: saved.dailyTradeContracts.map((entry) => entry.status),
+        savedPackage: saved.dailyTradeContractCargo,
         resetStatuses: dailyTradeContracts.map((entry) => entry.status)
       };
     });
     expect(completion.duplicateBlocked).toBe(true);
     expect(completion.creditsAfterDuplicate).toBe(completion.creditsAfterFirst);
+    expect(completion.packageAfterFirst).toBeNull();
     expect(completion.completedBeforeReset).toBe(4);
     expect(completion.savedStatuses).toEqual(["complete", "complete", "complete", "complete"]);
+    expect(completion.savedPackage).toBeNull();
     expect(completion.resetStatuses).toEqual(["available", "available", "available", "available"]);
+  });
+
+  test("contracts cannot start away from origin or without enough free cargo space", async ({ page }) => {
+    await prepareTerminal(page);
+    const result = await page.evaluate(() => {
+      currentNode = "Virella";
+      lastPlanetNode = "Virella";
+      const wrongOrigin = acceptDailyTradeContract("safe-delivery");
+      currentNode = "Asteron Prime";
+      lastPlanetNode = "Asteron Prime";
+      cargo.Iron = getShipStats().cargo - 10;
+      const insufficientSpace = acceptDailyTradeContract("safe-delivery");
+      return {
+        wrongOrigin,
+        insufficientSpace,
+        activeId: activeDailyTradeContractId,
+        packageCargo: dailyTradeContractCargo,
+        credits,
+        iron: cargo.Iron
+      };
+    });
+    expect(result).toEqual({
+      wrongOrigin: false,
+      insufficientSpace: false,
+      activeId: null,
+      packageCargo: null,
+      credits: 50000,
+      iron: 140
+    });
+  });
+
+  test("legacy commodity contracts migrate to sealed package cargo", async ({ page }) => {
+    await prepareTerminal(page);
+    const migrated = await page.evaluate(() => {
+      dailyTradeDate = getDailyTradeDateKey();
+      dailyTradeContracts = DAILY_TRADE_CONTRACT_DEFINITIONS.map(createDailyTradeContract);
+      dailyTradeContracts[0] = {
+        id: "safe-delivery",
+        status: "active",
+        good: "Iron",
+        quantity: 40,
+        loadedQuantity: 40,
+        acceptedAt: Date.now() - 1000,
+        loadedAt: Date.now() - 500,
+        dateKey: dailyTradeDate
+      };
+      activeDailyTradeContractId = "safe-delivery";
+      dailyTradeContractCargo = null;
+      activeTradeRoute = null;
+      activeObjective = null;
+      cargo.Iron = 40;
+      cargoPurchased.Iron = 40;
+      cargoCostBasis.Iron = 18;
+      ensureDailyTradeContracts();
+      return {
+        cargoIron: cargo.Iron,
+        purchasedIron: cargoPurchased.Iron || 0,
+        cargoUsed: cargoUsed(),
+        packageCargo: dailyTradeContractCargo,
+        activeRoute: activeTradeRoute
+      };
+    });
+    expect(migrated.cargoIron).toBe(0);
+    expect(migrated.purchasedIron).toBe(0);
+    expect(migrated.cargoUsed).toBe(20);
+    expect(migrated.packageCargo).toMatchObject({
+      contractId: "safe-delivery",
+      packageId: "cryo-seed-vault"
+    });
+    expect(migrated.activeRoute).toMatchObject({
+      dailyTradeContract: true,
+      contractId: "safe-delivery",
+      packageId: "cryo-seed-vault"
+    });
   });
 
   test("commodity selection, quantity, MAX, buy, sell-all, ledgers, and progression work inline", async ({ page }) => {

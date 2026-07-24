@@ -11,13 +11,14 @@ const DAILY_TRADE_CONTRACT_DEFINITIONS = Object.freeze([
   Object.freeze({
     id: "safe-delivery",
     name: "Safe Delivery",
-    good: "Iron",
+    packageId: "cryo-seed-vault",
+    packageName: "Cryogenic Seed Vault",
+    packageImage: "assets/trade-contracts/cryo-seed-vault.png",
+    packageDescription: "A sealed botanical archive kept below freezing for frontier restoration work.",
     origin: "Asteron Prime",
     destination: "Virella",
-    quantity: 40,
-    purchaseCost: 720,
-    payout: 2200,
-    profit: 1480,
+    cargoSpace: 20,
+    reward: 1480,
     risk: "SAFE",
     riskTone: "safe",
     jumps: 1
@@ -25,13 +26,14 @@ const DAILY_TRADE_CONTRACT_DEFINITIONS = Object.freeze([
   Object.freeze({
     id: "bulk-freight",
     name: "Bulk Freight",
-    good: "Copper",
+    packageId: "quantum-relay-core",
+    packageName: "Quantum Relay Core",
+    packageImage: "assets/trade-contracts/quantum-relay-core.png",
+    packageDescription: "A calibrated relay assembly for restoring a long-range communications array.",
     origin: "Asteron Prime",
     destination: "Virella",
-    quantity: 80,
-    purchaseCost: 3040,
-    payout: 5600,
-    profit: 2560,
+    cargoSpace: 35,
+    reward: 2560,
     risk: "SAFE",
     riskTone: "safe",
     jumps: 1
@@ -39,13 +41,14 @@ const DAILY_TRADE_CONTRACT_DEFINITIONS = Object.freeze([
   Object.freeze({
     id: "priority-shipment",
     name: "Priority Shipment",
-    good: "Cobalt",
+    packageId: "diplomatic-cipher-case",
+    packageName: "Diplomatic Cipher Case",
+    packageImage: "assets/trade-contracts/diplomatic-cipher-case.png",
+    packageDescription: "A tamper-proof diplomatic archive carrying time-sensitive encrypted records.",
     origin: "Virella",
     destination: "Nyxara",
-    quantity: 50,
-    purchaseCost: 3700,
-    payout: 7000,
-    profit: 3300,
+    cargoSpace: 15,
+    reward: 3300,
     risk: "MODERATE",
     riskTone: "moderate",
     jumps: 2
@@ -53,13 +56,14 @@ const DAILY_TRADE_CONTRACT_DEFINITIONS = Object.freeze([
   Object.freeze({
     id: "contested-run",
     name: "Contested Run",
-    good: "Cobalt",
+    packageId: "voidglass-specimen",
+    packageName: "Voidglass Specimen",
+    packageImage: "assets/trade-contracts/voidglass-specimen.png",
+    packageDescription: "An unstable deep-space specimen secured inside a reinforced containment capsule.",
     origin: "Nyxara",
     destination: "Virella",
-    quantity: 60,
-    purchaseCost: 7680,
-    payout: 12600,
-    profit: 4920,
+    cargoSpace: 30,
+    reward: 4920,
     risk: "HIGH",
     riskTone: "high",
     jumps: 2
@@ -136,7 +140,7 @@ function createDailyTradeContract(definition) {
     status: "available",
     acceptedAt: 0,
     loadedAt: 0,
-    loadedQuantity: 0,
+    packageLoaded: false,
     completedAt: 0,
     completionEventId: "",
     dateKey: dailyTradeDate
@@ -147,13 +151,84 @@ function normalizeDailyTradeContract(contract = {}) {
   const definition = DAILY_TRADE_CONTRACT_DEFINITIONS.find((entry) => entry.id === contract.id);
   if (!definition) return null;
   const status = ["available", "active", "complete"].includes(contract.status) ? contract.status : "available";
+  const legacyLoadedQuantity = Math.max(0, Math.round(Number(contract.loadedQuantity || 0)));
+  const legacyGood = MAP_ONE_TRADE_RESOURCES.includes(contract.good) ? contract.good : "";
   return {
     ...definition,
-    ...contract,
     status,
-    loadedQuantity: Math.max(0, Math.min(definition.quantity, Math.round(Number(contract.loadedQuantity || 0)))),
+    acceptedAt: Math.max(0, Number(contract.acceptedAt || 0)),
+    loadedAt: Math.max(0, Number(contract.loadedAt || 0)),
+    packageLoaded: status === "active" && Boolean(contract.packageLoaded || legacyLoadedQuantity > 0 || dailyTradeContractCargo?.contractId === contract.id),
+    completedAt: Math.max(0, Number(contract.completedAt || 0)),
+    dateKey: String(contract.dateKey || dailyTradeDate || ""),
+    legacyGood,
+    legacyLoadedQuantity,
     completionEventId: String(contract.completionEventId || "")
   };
+}
+
+function createDailyTradeContractCargo(contract) {
+  if (!contract) return null;
+  return {
+    contractId: contract.id,
+    packageId: contract.packageId,
+    name: contract.packageName,
+    image: contract.packageImage,
+    description: contract.packageDescription,
+    cargoSpace: Math.max(0, Number(contract.cargoSpace || 0)),
+    origin: contract.origin,
+    destination: contract.destination,
+    loadedAt: Math.max(0, Number(contract.loadedAt || Date.now()))
+  };
+}
+
+function createDailyTradeObjectivePayload(contract) {
+  return {
+    id: "daily-trade-" + dailyTradeDate + "-" + contract.id,
+    type: "trade",
+    title: contract.name,
+    dailyTradeContract: true,
+    contractId: contract.id,
+    packageId: contract.packageId,
+    packageName: contract.packageName,
+    packageImage: contract.packageImage,
+    cargoSpace: contract.cargoSpace,
+    origin: contract.origin,
+    destination: contract.destination,
+    reward: contract.reward,
+    maxUnits: 1,
+    purchasedUnits: 1,
+    realizedProfit: 0,
+    status: "loaded"
+  };
+}
+
+function normalizeDailyTradeContractCargo(value = dailyTradeContractCargo) {
+  if (!value || typeof value !== "object") return null;
+  const contract = dailyTradeContracts.find((entry) => entry.id === value.contractId && entry.status === "active");
+  if (!contract) return null;
+  return createDailyTradeContractCargo({ ...contract, loadedAt: value.loadedAt || contract.loadedAt });
+}
+
+function getDailyTradeContractCargo() {
+  if (dailyTradeDate && dailyTradeDate !== getDailyTradeDateKey()) ensureDailyTradeContracts();
+  dailyTradeContractCargo = normalizeDailyTradeContractCargo();
+  return dailyTradeContractCargo;
+}
+
+function getDailyTradeContractCargoUsed() {
+  return Math.max(0, Number(getDailyTradeContractCargo()?.cargoSpace || 0));
+}
+
+function removeLegacyDailyTradeCommodity(contract) {
+  const good = contract?.legacyGood;
+  const quantity = Math.max(0, Number(contract?.legacyLoadedQuantity || 0));
+  if (!good || !quantity) return;
+  const amount = Math.min(quantity, Math.max(0, Number(cargo[good] || 0)));
+  if (!amount) return;
+  if (typeof consumePurchasedCargoQuantity === "function") consumePurchasedCargoQuantity(good, amount);
+  cargo[good] = Math.max(0, Number(cargo[good] || 0) - amount);
+  if (typeof getPurchasedCargoQuantity === "function" && getPurchasedCargoQuantity(good) <= 0) delete cargoCostBasis[good];
 }
 
 function ensureDailyTradeContracts(now = new Date()) {
@@ -164,6 +239,7 @@ function ensureDailyTradeContracts(now = new Date()) {
     dailyTradeDate = dateKey;
     dailyTradeContracts = DAILY_TRADE_CONTRACT_DEFINITIONS.map(createDailyTradeContract);
     activeDailyTradeContractId = null;
+    dailyTradeContractCargo = null;
     selectedDailyTradeContractId = dailyTradeContracts[0]?.id || null;
     if (previousActive && activeTradeRoute?.dailyTradeContract) clearActiveObjective("trade");
     return dailyTradeContracts;
@@ -172,6 +248,22 @@ function ensureDailyTradeContracts(now = new Date()) {
   dailyTradeContracts = dailyTradeContracts.map(normalizeDailyTradeContract).filter(Boolean);
   const active = dailyTradeContracts.find((contract) => contract.status === "active");
   activeDailyTradeContractId = active?.id || null;
+  if (active?.packageLoaded) {
+    if (!dailyTradeContractCargo) {
+      removeLegacyDailyTradeCommodity(active);
+      dailyTradeContractCargo = createDailyTradeContractCargo(active);
+    }
+    dailyTradeContractCargo = normalizeDailyTradeContractCargo();
+    if (!activeTradeRoute?.dailyTradeContract || activeTradeRoute.contractId !== active.id || activeTradeRoute.packageId !== active.packageId) {
+      setActiveTradeObjective(createDailyTradeObjectivePayload(active));
+    }
+  } else {
+    dailyTradeContractCargo = null;
+  }
+  dailyTradeContracts.forEach((contract) => {
+    delete contract.legacyGood;
+    delete contract.legacyLoadedQuantity;
+  });
   if (!selectedDailyTradeContractId || !dailyTradeContracts.some((contract) => contract.id === selectedDailyTradeContractId)) {
     selectedDailyTradeContractId = active?.id || dailyTradeContracts[0]?.id || null;
   }
@@ -191,12 +283,6 @@ function getDailyTradeContract(id) {
 function getSelectedDailyTradeContract() {
   ensureDailyTradeContracts();
   return getDailyTradeContract(selectedDailyTradeContractId) || dailyTradeContracts[0] || null;
-}
-
-function getReservedDailyContractCargo(good) {
-  const contract = getDailyTradeContract(activeDailyTradeContractId);
-  if (!contract || contract.status !== "active" || contract.good !== good) return 0;
-  return Math.max(0, Number(contract.loadedQuantity || 0));
 }
 
 function getPurchasedCargoQuantity(good = "") {
@@ -235,66 +321,29 @@ function acceptDailyTradeContract(id) {
     renderMarketplace();
     return false;
   }
-  contract.status = "active";
-  contract.acceptedAt = Date.now();
-  contract.dateKey = dailyTradeDate;
-  activeDailyTradeContractId = contract.id;
-  selectedDailyTradeContractId = contract.id;
-  setActiveTradeObjective({
-    id: "daily-trade-" + dailyTradeDate + "-" + contract.id,
-    type: "trade",
-    title: contract.name,
-    dailyTradeContract: true,
-    contractId: contract.id,
-    good: contract.good,
-    origin: contract.origin,
-    destination: contract.destination,
-    buyPrice: Math.round(contract.purchaseCost / contract.quantity),
-    sellPrice: Math.round(contract.payout / contract.quantity),
-    profitPerUnit: contract.profit / contract.quantity,
-    maxUnits: contract.quantity,
-    purchasedUnits: 0,
-    realizedProfit: 0,
-    status: "active"
-  });
-  addActivityLog("Daily contract accepted: " + contract.name + " / " + contract.origin + " -> " + contract.destination + ".");
-  setTradeTerminalStatus("Contract accepted. Load the fixed cargo at " + contract.origin + ".");
-  saveGame();
-  renderMarketplace();
-  updateSpaceHUD();
-  renderObjectiveHud();
-  const atOrigin = getCurrentMarketPlanet() === contract.origin;
-  const hasCredits = credits >= contract.purchaseCost;
-  const hasCargoSpace = Math.max(0, getShipStats().cargo - cargoUsed()) >= contract.quantity;
-  if (atOrigin && hasCredits && hasCargoSpace) loadDailyTradeContractCargo(contract.id);
-  return true;
-}
-
-function loadDailyTradeContractCargo(id) {
-  const contract = getDailyTradeContract(id);
-  if (!contract || contract.status !== "active" || activeDailyTradeContractId !== id || contract.loadedQuantity > 0) return false;
   const planet = getCurrentMarketPlanet();
   const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
   if (planet !== contract.origin) {
-    setTradeTerminalStatus("Travel to " + contract.origin + " to load this contract.");
+    setTradeTerminalStatus("This package can only be collected at " + contract.origin + ".");
     renderMarketplace();
     return false;
   }
-  if (credits < contract.purchaseCost || freeCargo < contract.quantity) {
-    setTradeTerminalStatus(credits < contract.purchaseCost ? "Not enough credits for the fixed contract cost." : "Not enough cargo capacity for this contract.");
+  if (freeCargo < contract.cargoSpace) {
+    setTradeTerminalStatus("Free " + formatNumber(contract.cargoSpace) + " cargo space before accepting this contract.");
     renderMarketplace();
     return false;
   }
-  credits -= contract.purchaseCost;
-  cargo[contract.good] = Number(cargo[contract.good] || 0) + contract.quantity;
-  addPurchasedCargoQuantity(contract.good, contract.quantity);
-  updatePurchasedCargoCostBasis(contract.good, contract.quantity, contract.purchaseCost / contract.quantity);
-  contract.loadedQuantity = contract.quantity;
+  contract.status = "active";
+  contract.acceptedAt = Date.now();
   contract.loadedAt = Date.now();
-  updateActiveTradeProgress({ purchasedUnits: contract.quantity, status: "loaded" });
-  tutorialEvent("boughtTradeCargo");
-  addActivityLog("Loaded " + formatNumber(contract.quantity) + " " + contract.good + " for " + contract.name + ".");
-  setTradeTerminalStatus("Cargo loaded. Deliver it to " + contract.destination + " for the guaranteed payout.");
+  contract.packageLoaded = true;
+  contract.dateKey = dailyTradeDate;
+  activeDailyTradeContractId = contract.id;
+  selectedDailyTradeContractId = contract.id;
+  dailyTradeContractCargo = createDailyTradeContractCargo(contract);
+  setActiveTradeObjective(createDailyTradeObjectivePayload(contract));
+  addActivityLog("Contract package collected: " + contract.packageName + " / " + contract.origin + " -> " + contract.destination + ".");
+  setTradeTerminalStatus(contract.packageName + " loaded. Deliver it to " + contract.destination + ".");
   saveGame();
   renderMarketplace();
   updateCargoSummary();
@@ -303,13 +352,20 @@ function loadDailyTradeContractCargo(id) {
   return true;
 }
 
+function loadDailyTradeContractCargo(id) {
+  const contract = getDailyTradeContract(id);
+  if (!contract) return false;
+  if (contract.status === "available") return acceptDailyTradeContract(id);
+  return contract.status === "active" && contract.packageLoaded && dailyTradeContractCargo?.contractId === id;
+}
+
 function completeDailyTradeContract(id, eventId = "") {
   const contract = getDailyTradeContract(id);
   if (!contract || contract.status !== "active" || activeDailyTradeContractId !== id || contract.completionEventId) return false;
   const planet = getCurrentMarketPlanet();
-  const purchased = getPurchasedCargoQuantity(contract.good);
-  if (planet !== contract.destination || contract.loadedQuantity < contract.quantity || purchased < contract.quantity || Number(cargo[contract.good] || 0) < contract.quantity) {
-    setTradeTerminalStatus(planet !== contract.destination ? "Travel to " + contract.destination + " to complete this delivery." : "The required contract cargo is not in your hold.");
+  const packageCargo = getDailyTradeContractCargo();
+  if (planet !== contract.destination || !contract.packageLoaded || packageCargo?.contractId !== contract.id) {
+    setTradeTerminalStatus(planet !== contract.destination ? "Travel to " + contract.destination + " to complete this delivery." : "The sealed contract package is not in your hold.");
     renderMarketplace();
     return false;
   }
@@ -317,24 +373,20 @@ function completeDailyTradeContract(id, eventId = "") {
   contract.completionEventId = completionKey;
   contract.status = "complete";
   contract.completedAt = Date.now();
-  contract.loadedQuantity = 0;
-  consumePurchasedCargoQuantity(contract.good, contract.quantity);
-  cargo[contract.good] = Math.max(0, Number(cargo[contract.good] || 0) - contract.quantity);
-  if (getPurchasedCargoQuantity(contract.good) <= 0) delete cargoCostBasis[contract.good];
-  credits += contract.payout;
-  playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + contract.quantity;
-  awardTradingXpFromProfit(contract.profit);
+  contract.packageLoaded = false;
+  dailyTradeContractCargo = null;
+  credits += contract.reward;
+  awardTradingXpFromProfit(contract.reward);
   activeDailyTradeContractId = null;
   clearActiveObjective("trade");
-  tutorialEvent("soldTradeCargo");
-  addActivityLog("Daily contract complete: " + contract.name + ". Guaranteed profit +CR " + formatNumber(contract.profit) + ".");
+  addActivityLog("Daily contract complete: " + contract.name + ". Courier reward +CR " + formatNumber(contract.reward) + ".");
   showTradeResultBurst({
-    good: contract.good,
-    quantity: contract.quantity,
-    profit: contract.profit,
-    revenue: contract.payout,
+    good: contract.packageName,
+    quantity: 1,
+    profit: contract.reward,
+    revenue: contract.reward,
     title: "Contract Complete",
-    detail: contract.name
+    detail: contract.packageName
   });
   setTradeTerminalStatus(contract.name + " complete. Another daily contract is now available.");
   saveGame();
@@ -415,8 +467,7 @@ function setMarketResource(good) {
 }
 
 function getLiveMarketSellableQuantity(good = selectedMarketResource) {
-  const held = Math.max(0, Number(cargo[good] || 0));
-  return Math.max(0, held - getReservedDailyContractCargo(good));
+  return Math.max(0, Number(cargo[good] || 0));
 }
 
 function getMarketQuantityLimit(operation = "buy") {
@@ -641,10 +692,10 @@ function renderDailyTradePreviewRow(contract, index) {
   return `
     <article class="trade-v2-contract-preview is-${state}">
       <span class="trade-v2-contract-index">${index + 1}</span>
-      <img src="${escapeHtml(getCommodityImage(contract.good))}" alt="">
+      <img src="${escapeHtml(contract.packageImage)}" alt="">
       <div><strong>${escapeHtml(contract.name)}</strong><span>${escapeHtml(contract.origin)} <b>→</b> ${escapeHtml(contract.destination)}</span></div>
       <em class="risk-${contract.riskTone}">${stateLabel}</em>
-      <strong class="trade-v2-profit">+${formatNumber(contract.profit)} CR</strong>
+      <strong class="trade-v2-profit">+${formatNumber(contract.reward)} CR</strong>
     </article>
   `;
 }
@@ -684,12 +735,11 @@ function getDailyContractActionMarkup(contract) {
   const state = getTradeContractState(contract);
   if (state === "complete") return `<button type="button" class="trade-v2-contract-action is-complete" disabled>Contract Complete</button>`;
   if (state === "locked") return `<button type="button" class="trade-v2-contract-action" disabled title="Complete the active contract before accepting another.">Complete Active Contract First</button>`;
-  if (state === "available") return `<button type="button" class="trade-v2-contract-action" onclick="acceptDailyTradeContract('${escapeJsString(contract.id)}')">Accept Contract</button>`;
-  if (contract.loadedQuantity <= 0) {
+  if (state === "available") {
     const atOrigin = getCurrentMarketPlanet() === contract.origin;
-    const canLoad = atOrigin && credits >= contract.purchaseCost && Math.max(0, getShipStats().cargo - cargoUsed()) >= contract.quantity;
-    const label = !atOrigin ? "Travel to " + contract.origin : credits < contract.purchaseCost ? "More Credits Required" : Math.max(0, getShipStats().cargo - cargoUsed()) < contract.quantity ? "More Cargo Space Required" : "Load Contract Cargo";
-    return `<button type="button" class="trade-v2-contract-action" onclick="loadDailyTradeContractCargo('${escapeJsString(contract.id)}')" ${canLoad ? "" : "disabled"}>${escapeHtml(label)}</button>`;
+    const hasSpace = Math.max(0, getShipStats().cargo - cargoUsed()) >= contract.cargoSpace;
+    const label = !atOrigin ? "Start at " + contract.origin : !hasSpace ? "Need " + formatNumber(contract.cargoSpace) + " Cargo Space" : "Accept & Load";
+    return `<button type="button" class="trade-v2-contract-action" onclick="acceptDailyTradeContract('${escapeJsString(contract.id)}')" ${atOrigin && hasSpace ? "" : "disabled"}>${escapeHtml(label)}</button>`;
   }
   const atDestination = getCurrentMarketPlanet() === contract.destination;
   return `<button type="button" class="trade-v2-contract-action" onclick="completeDailyTradeContract('${escapeJsString(contract.id)}')" ${atDestination ? "" : "disabled"}>${atDestination ? "Complete Delivery" : "Travel to " + escapeHtml(contract.destination)}</button>`;
@@ -700,10 +750,10 @@ function renderDailyContractCard(contract) {
   const selected = selectedDailyTradeContractId === contract.id;
   return `
     <button type="button" class="trade-v2-contract-card is-${state} ${selected ? "is-selected" : ""}" onclick="selectDailyTradeContract('${escapeJsString(contract.id)}')" aria-pressed="${selected}">
-      <img src="${escapeHtml(getCommodityImage(contract.good))}" alt="">
-      <div><strong>${escapeHtml(contract.name)}</strong><span>${escapeHtml(contract.origin)} → ${escapeHtml(contract.destination)}</span><small>${formatNumber(contract.quantity)} ${escapeHtml(contract.good)} · ${contract.jumps} ${contract.jumps === 1 ? "jump" : "jumps"}</small></div>
+      <img src="${escapeHtml(contract.packageImage)}" alt="">
+      <div><strong>${escapeHtml(contract.name)}</strong><span>${escapeHtml(contract.origin)} → ${escapeHtml(contract.destination)}</span><small>${escapeHtml(contract.packageName)} · ${formatNumber(contract.cargoSpace)} cargo</small></div>
       <em class="risk-${contract.riskTone}">${state === "locked" ? "LOCKED" : state.toUpperCase()}</em>
-      <b>+${formatNumber(contract.profit)} CR</b>
+      <b>+${formatNumber(contract.reward)} CR</b>
     </button>
   `;
 }
@@ -720,16 +770,16 @@ function renderDailyContractsView() {
         <section class="trade-v2-contract-list">${dailyTradeContracts.map(renderDailyContractCard).join("")}</section>
         <aside class="trade-v2-contract-detail">
           ${selected ? `
-            <header><img src="${escapeHtml(getCommodityImage(selected.good))}" alt=""><div><span class="risk-${selected.riskTone}">${state.toUpperCase()}</span><h3>${escapeHtml(selected.name)}</h3><p>${escapeHtml(selected.origin)} → ${escapeHtml(selected.destination)}</p></div></header>
+            <header><img src="${escapeHtml(selected.packageImage)}" alt=""><div><span class="risk-${selected.riskTone}">${state.toUpperCase()}</span><h3>${escapeHtml(selected.name)}</h3><p>${escapeHtml(selected.origin)} → ${escapeHtml(selected.destination)}</p></div></header>
             <div class="trade-v2-detail-grid">
-              <div><span>Cargo</span><strong>${escapeHtml(selected.good)}</strong></div>
-              <div><span>Quantity</span><strong>${formatNumber(selected.quantity)}</strong></div>
-              <div><span>Purchase Cost</span><strong>CR ${formatNumber(selected.purchaseCost)}</strong></div>
-              <div><span>Delivery Payout</span><strong>CR ${formatNumber(selected.payout)}</strong></div>
-              <div><span>Guaranteed Profit</span><strong class="profit-good">+CR ${formatNumber(selected.profit)}</strong></div>
+              <div><span>Package</span><strong>${escapeHtml(selected.packageName)}</strong></div>
+              <div><span>Cargo Space</span><strong>${formatNumber(selected.cargoSpace)}</strong></div>
+              <div><span>Collection</span><strong>${escapeHtml(selected.origin)}</strong></div>
+              <div><span>Delivery</span><strong>${escapeHtml(selected.destination)}</strong></div>
+              <div><span>Courier Reward</span><strong class="profit-good">+CR ${formatNumber(selected.reward)}</strong></div>
               <div><span>Route</span><strong>${selected.jumps} ${selected.jumps === 1 ? "jump" : "jumps"} · ${escapeHtml(selected.risk)}</strong></div>
             </div>
-            <p class="trade-v2-contract-guidance">${state === "locked" ? "Complete the active contract before accepting another." : state === "complete" ? "This contract has been completed for the current UTC day." : state === "active" && selected.loadedQuantity > 0 ? "Cargo loaded. Deliver the reserved shipment to " + escapeHtml(selected.destination) + "." : state === "active" ? "Load the complete fixed shipment at " + escapeHtml(selected.origin) + "." : "Accept to lock these terms for the current delivery."}</p>
+            <p class="trade-v2-contract-guidance">${state === "locked" ? "Complete the active contract before accepting another." : state === "complete" ? "This contract has been completed for the current UTC day." : state === "active" ? escapeHtml(selected.packageName) + " is secured in your hold. Deliver it to " + escapeHtml(selected.destination) + "." : getCurrentMarketPlanet() === selected.origin ? "Accepting immediately loads the sealed package into your cargo hold." : "Travel to " + escapeHtml(selected.origin) + " to accept and collect this package."}</p>
             ${getDailyContractActionMarkup(selected)}
           ` : `<div class="trade-v2-empty">No daily contracts available.</div>`}
         </aside>
@@ -745,7 +795,6 @@ function renderLiveMarketTransactionPanel() {
   const info = commodityInfo[good] || {};
   const purchased = getPurchasedCargoQuantity(good);
   const recovered = getRecoveredCargoQuantity(good);
-  const reserved = getReservedDailyContractCargo(good);
   const sellable = getLiveMarketSellableQuantity(good);
   const price = getLiveMarketPrice(good, planet);
   const limit = getMarketQuantityLimit();
@@ -766,7 +815,6 @@ function renderLiveMarketTransactionPanel() {
         <div><span>Recovered</span><strong>${formatNumber(recovered)}</strong></div>
         <div><span>${buying ? "Cargo Space" : "Sellable Total"}</span><strong>${buying ? formatNumber(Math.max(0, getShipStats().cargo - cargoUsed())) : formatNumber(sellable)}</strong></div>
       </div>
-      ${reserved > 0 ? `<p class="trade-v2-reserved-note">${formatNumber(reserved)} ${escapeHtml(good)} reserved for the active Daily Contract.</p>` : ""}
       <div class="trade-v2-quantity">
         <div><span>Quantity</span><small>Maximum ${formatNumber(limit)}</small></div>
         <div class="trade-v2-stepper">
@@ -868,16 +916,15 @@ function getDailyContractActionMarkup(contract) {
   const state = getTradeContractState(contract);
   if (state === "complete") return `<button type="button" class="trade-v2-contract-action is-complete" disabled aria-disabled="true">Complete</button>`;
   if (state === "locked") return `<button type="button" class="trade-v2-contract-action" disabled aria-disabled="true" title="Complete the active contract before accepting another.">Locked</button>`;
-  if (state === "available") return `<button type="button" class="trade-v2-contract-action" data-contract-action="accept" onclick="acceptDailyTradeContract('${escapeJsString(contract.id)}')">Accept Contract</button>`;
-  if (contract.loadedQuantity <= 0) {
+  if (state === "available") {
     const atOrigin = getCurrentMarketPlanet() === contract.origin;
     const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
-    const canLoad = atOrigin && credits >= contract.purchaseCost && freeCargo >= contract.quantity;
-    const label = !atOrigin ? "Active · " + contract.origin : credits < contract.purchaseCost ? "More Credits" : freeCargo < contract.quantity ? "Need Cargo Space" : "Load Cargo";
-    return `<button type="button" class="trade-v2-contract-action is-active" data-contract-action="load" onclick="loadDailyTradeContractCargo('${escapeJsString(contract.id)}')" ${canLoad ? "" : "disabled aria-disabled=\"true\""}>${escapeHtml(label)}</button>`;
+    const canAccept = atOrigin && freeCargo >= contract.cargoSpace;
+    const label = !atOrigin ? "Start at " + contract.origin : freeCargo < contract.cargoSpace ? "Need " + formatNumber(contract.cargoSpace) + " Space" : "Accept & Load";
+    return `<button type="button" class="trade-v2-contract-action" data-contract-action="accept" onclick="acceptDailyTradeContract('${escapeJsString(contract.id)}')" ${canAccept ? "" : "disabled aria-disabled=\"true\""}>${escapeHtml(label)}</button>`;
   }
   const atDestination = getCurrentMarketPlanet() === contract.destination;
-  return `<button type="button" class="trade-v2-contract-action is-active" data-contract-action="complete" onclick="completeDailyTradeContract('${escapeJsString(contract.id)}')" ${atDestination ? "" : "disabled aria-disabled=\"true\""}>${atDestination ? "Complete Delivery" : "Active · " + escapeHtml(contract.destination)}</button>`;
+  return `<button type="button" class="trade-v2-contract-action is-active" data-contract-action="complete" onclick="completeDailyTradeContract('${escapeJsString(contract.id)}')" ${atDestination ? "" : "disabled aria-disabled=\"true\""}>${atDestination ? "Complete Delivery" : "Deliver to " + escapeHtml(contract.destination)}</button>`;
 }
 
 function renderDailyTradePreviewRow(contract, index) {
@@ -885,10 +932,10 @@ function renderDailyTradePreviewRow(contract, index) {
   return `
     <article class="trade-v2-contract-preview is-${state}" data-contract-id="${escapeHtml(contract.id)}">
       <span class="trade-v2-contract-index">${index + 1}</span>
-      <img src="${escapeHtml(getCommodityImage(contract.good))}" alt="">
-      <div class="trade-v2-contract-copy"><strong>${escapeHtml(contract.name)}</strong><span>${escapeHtml(contract.origin)} <b>&rarr;</b> ${escapeHtml(contract.destination)}</span><small>${escapeHtml(contract.good)} &middot; ${formatNumber(contract.quantity)} units</small></div>
+      <img src="${escapeHtml(contract.packageImage)}" alt="">
+      <div class="trade-v2-contract-copy"><strong>${escapeHtml(contract.name)}</strong><span>${escapeHtml(contract.origin)} <b>&rarr;</b> ${escapeHtml(contract.destination)}</span><small>${escapeHtml(contract.packageName)} &middot; ${formatNumber(contract.cargoSpace)} cargo</small></div>
       <em class="risk-${contract.riskTone}">${escapeHtml(contract.risk)}</em>
-      <strong class="trade-v2-profit">+${formatNumber(contract.profit)} CR</strong>
+      <strong class="trade-v2-profit">+${formatNumber(contract.reward)} CR</strong>
       <div class="trade-v2-contract-inline-action">${getDailyContractActionMarkup(contract)}</div>
     </article>
   `;

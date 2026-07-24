@@ -493,6 +493,7 @@ function resetToNoShipStarterState() {
   dailyTradeContracts = [];
   selectedDailyTradeContractId = null;
   activeDailyTradeContractId = null;
+  dailyTradeContractCargo = null;
 
   dailyBountyDate = null;
   dailyBountyContracts = [];
@@ -1351,7 +1352,11 @@ function showHangarSection(sectionName) {
 }
 
 function cargoUsed() {
-  return mineralKeys.reduce((total, mineral) => total + (cargo[mineral] || 0), 0);
+  const marketCargo = mineralKeys.reduce((total, mineral) => total + (cargo[mineral] || 0), 0);
+  const contractCargo = typeof getDailyTradeContractCargoUsed === "function"
+    ? getDailyTradeContractCargoUsed()
+    : 0;
+  return marketCargo + contractCargo;
 }
 
 function applyShipStats(refill = false) {

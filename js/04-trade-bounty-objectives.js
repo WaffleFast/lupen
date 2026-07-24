@@ -2295,6 +2295,26 @@ function acceptTradeRoute(good, origin, destination) {
 
 function abandonTradeRoute(force = false) {
   const trade = getActiveObjective();
+  if (trade?.dailyTradeContract) {
+    if (!force && !window.confirm(`Abandon ${trade.title}?\n\nThe sealed package will be removed from your cargo hold and no reward will be paid.`)) return;
+    const contract = typeof getDailyTradeContract === "function" ? getDailyTradeContract(trade.contractId) : null;
+    if (contract?.status === "active") {
+      contract.status = "available";
+      contract.acceptedAt = 0;
+      contract.loadedAt = 0;
+      contract.packageLoaded = false;
+    }
+    activeDailyTradeContractId = null;
+    dailyTradeContractCargo = null;
+    clearActiveObjective("trade");
+    addActivityLog("Courier contract abandoned. The sealed package was returned.");
+    saveGame();
+    renderMarketplace();
+    updateCargoSummary();
+    updateSpaceHUD();
+    renderObjectiveHud();
+    return;
+  }
   const carriedGood = activeTradeRoute?.good || activeObjective?.good;
   const held = carriedGood ? (cargo[carriedGood] || 0) : 0;
 
@@ -3510,7 +3530,31 @@ function trackBountyBotKill(bot) {
 }
 
 function normalizeTradeRoute(route) {
-  if (!route || !route.good || !sectorNodes[route.origin] || !sectorNodes[route.destination]) return null;
+  if (!route || !sectorNodes[route.origin] || !sectorNodes[route.destination]) return null;
+
+  if (route.dailyTradeContract) {
+    if (!route.contractId || !route.packageId) return null;
+    return {
+      ...route,
+      id: route.id || `daily-trade-${route.contractId}`,
+      type: "trade",
+      title: route.title || route.packageName || "Courier Contract",
+      packageId: route.packageId,
+      packageName: route.packageName || "Sealed Contract Package",
+      packageImage: route.packageImage || "",
+      origin: route.origin,
+      destination: route.destination,
+      cargoSpace: Math.max(0, Number(route.cargoSpace || 0)),
+      reward: Math.max(0, Number(route.reward || 0)),
+      maxUnits: 1,
+      purchasedUnits: 1,
+      realizedProfit: Math.max(0, Number(route.realizedProfit || 0)),
+      createdAt: Number(route.createdAt || route.acceptedAt || Date.now()),
+      status: route.status || "loaded"
+    };
+  }
+
+  if (!route.good) return null;
 
   const buyPrice = Math.max(1, Number(route.buyPrice || getCommodityBuyPrice(route.good, route.origin) || 1));
   const sellPrice = Math.max(buyPrice, Number(route.sellPrice || buyPrice));
@@ -3540,7 +3584,9 @@ function createTradeObjective(route) {
   return {
     ...normalized,
     type: "trade",
-    title: `${normalized.good} Trade`
+    title: normalized.dailyTradeContract
+      ? (normalized.title || normalized.packageName || "Courier Contract")
+      : `${normalized.good} Trade`
   };
 }
 
@@ -3620,6 +3666,7 @@ function clearActiveObjective(type = null) {
 
 function getTradeObjectiveTargetNode(objective = getActiveObjective()) {
   if (!objective || objective.type !== "trade") return null;
+  if (objective.dailyTradeContract) return objective.destination;
   const held = cargo[objective.good] || 0;
 
   if (currentNode === objective.destination) return objective.destination;
@@ -3646,6 +3693,7 @@ function getObjectiveRoutePath(objective = getActiveObjective()) {
 
 function getTradeObjectiveStage(objective = getActiveObjective()) {
   if (!objective || objective.type !== "trade") return "none";
+  if (objective.dailyTradeContract) return currentNode === objective.destination ? "deliver" : "travel";
   const held = cargo[objective.good] || 0;
   if (currentNode === objective.destination) return held > 0 ? "sell" : "arrived";
   if (currentNode === objective.origin) return held > 0 ? "launch" : "buy";
@@ -3654,6 +3702,7 @@ function getTradeObjectiveStage(objective = getActiveObjective()) {
 
 function getTradeObjectiveActionText(objective = getActiveObjective()) {
   const stage = getTradeObjectiveStage(objective);
+  if (stage === "deliver") return "Complete delivery";
   if (stage === "buy") return "Buy stock";
   if (stage === "launch") return "Launch";
   if (stage === "sell") return "Sell cargo";
@@ -3731,6 +3780,40 @@ function renderObjectiveHud() {
   }
 
   if (objective.type === "trade") {
+    if (objective.dailyTradeContract) {
+      const targetNode = objective.destination;
+      const path = getObjectiveRoutePath(objective);
+      const nextHop = path.length > 1 ? path[1] : targetNode;
+      const atDestination = currentNode === targetNode;
+      panel.innerHTML = `
+        <div class="objective-list compact-objective-list">
+          <div class="objective-hud-card objective-trade-card contract-package-objective compact-objective-card orbit-objective-card">
+            <div class="objective-main-row compact-objective-main objective-orbit-row">
+              <div class="commodity-icon objective-icon objective-icon-large">
+                <img src="${objective.packageImage}" alt="${objective.packageName}" class="commodity-icon-img">
+              </div>
+              <div class="objective-copy objective-copy-large objective-orbit-copy">
+                <div class="objective-title-line">
+                  <span class="objective-type-pill">Courier Contract</span>
+                  <strong>${objective.packageName}</strong>
+                </div>
+                <span>${objective.origin} -> ${objective.destination}</span>
+                <em>${atDestination ? "Complete delivery at the Trade Terminal" : `Next: ${nextHop || objective.destination}`}</em>
+              </div>
+              <div class="objective-orbit-meta">
+                <span>${formatNumber(objective.cargoSpace)} cargo used</span>
+                <strong class="profit-good">+CR ${formatNumber(objective.reward)}</strong>
+              </div>
+              <div class="objective-compact-actions objective-orbit-actions">
+                <button class="objective-map-btn" onclick="openSectorMap()">Jump</button>
+                <button class="objective-abandon-btn" onclick="abandonTradeRoute()">Abandon</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
     const held = cargo[objective.good] || 0;
     const margin = objective.sellPrice - objective.buyPrice;
     const info = commodityInfo[objective.good] || {};
@@ -3851,6 +3934,15 @@ function getActiveTradeHudMarkup() {
   // Legacy shim retained for older UI references. Active objectives are now rendered by renderObjectiveHud().
   const objective = getActiveObjective();
   if (!objective || objective.type !== "trade") return "";
+  if (objective.dailyTradeContract) {
+    return `
+      <div class="active-trade-hud-card contract-package-objective">
+        <span class="active-trade-kicker">Courier Contract</span>
+        <strong>${objective.packageName}</strong>
+        <em>${getTradeObjectiveActionText(objective)}</em>
+      </div>
+    `;
+  }
   return `
     <div class="active-trade-hud-card ${getCommodityRarityClass(objective.good)}">
       <span class="active-trade-kicker">Active Trade</span>

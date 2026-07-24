@@ -54843,6 +54843,48 @@ input::placeholder {
   }
 }
 
+/* ===== Sealed daily-contract cargo ===== */
+.trade-v2-contract-preview > img,
+.trade-v2-contract-card > img {
+  object-fit: contain;
+  filter: drop-shadow(0 0 7px rgba(64, 218, 255, 0.28));
+}
+
+.trade-v2-contract-drawer .trade-v2-contract-preview > img {
+  width: 36px;
+  height: 36px;
+}
+
+.player-orbit-screen .tactical-cargo-item.is-contract-cargo {
+  border: 1px solid rgba(118, 244, 83, 0.4);
+  background: linear-gradient(90deg, rgba(10, 55, 39, 0.8), rgba(4, 27, 42, 0.72));
+  box-shadow: inset 3px 0 0 rgba(105, 244, 76, 0.72);
+}
+
+.player-orbit-screen .tactical-cargo-item.is-contract-cargo > img {
+  filter: drop-shadow(0 0 6px rgba(67, 221, 255, 0.34));
+}
+
+.inventory-contract-cargo-note {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(95, 231, 183, 0.24);
+  border-radius: 9px;
+  color: #b9dfd5;
+  background: rgba(6, 47, 37, 0.46);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.contract-package-objective {
+  border-color: rgba(101, 236, 174, 0.45) !important;
+  background: linear-gradient(110deg, rgba(5, 42, 34, 0.9), rgba(3, 22, 40, 0.92)) !important;
+}
+
+.contract-package-objective .objective-icon img {
+  filter: drop-shadow(0 0 8px rgba(65, 220, 255, 0.38));
+}
+
 /* ===== Trade Terminal: market-first pilot layout ===== */
 #marketScreen .trade-v2-view[data-trade-view="market-first"] {
   position: relative;

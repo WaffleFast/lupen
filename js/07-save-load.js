@@ -243,6 +243,7 @@ function buildSaveState(options = {}) {
     dailyTradeContracts,
     selectedDailyTradeContractId,
     activeDailyTradeContractId,
+    dailyTradeContractCargo,
     activeBountyId,
     dailyBountyDate,
     dailyBountyContracts,
@@ -959,6 +960,9 @@ function applyLoadedGameState(rawSaved) {
   dailyTradeContracts = Array.isArray(saved.dailyTradeContracts) ? saved.dailyTradeContracts : dailyTradeContracts;
   selectedDailyTradeContractId = saved.selectedDailyTradeContractId || selectedDailyTradeContractId;
   activeDailyTradeContractId = saved.activeDailyTradeContractId || activeDailyTradeContractId;
+  dailyTradeContractCargo = saved.dailyTradeContractCargo && typeof saved.dailyTradeContractCargo === "object"
+    ? saved.dailyTradeContractCargo
+    : null;
 
   dailyBountyDate = saved.dailyBountyDate || dailyBountyDate;
   dailyBountyContracts = Array.isArray(saved.dailyBountyContracts) ? saved.dailyBountyContracts : dailyBountyContracts;

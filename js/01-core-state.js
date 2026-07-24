@@ -917,6 +917,7 @@ let dailyTradeDate = null;
 let dailyTradeContracts = [];
 let selectedDailyTradeContractId = null;
 let activeDailyTradeContractId = null;
+let dailyTradeContractCargo = null;
 
 const XP_CONFIG = {
   combatZoneKey: "sector-one",

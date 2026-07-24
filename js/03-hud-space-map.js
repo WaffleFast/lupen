@@ -372,6 +372,14 @@ function renderTacticalBounties() {
 
 function renderTacticalCargo() {
   const state = getTacticalCargoState();
+  const contractPackage = typeof getDailyTradeContractCargo === "function"
+    ? getDailyTradeContractCargo()
+    : null;
+  const contractRow = contractPackage ? `<article class="tactical-cargo-item is-contract-cargo">
+      <img src="${escapeTacticalHtml(contractPackage.image)}" alt="">
+      <div><strong>${escapeTacticalHtml(contractPackage.name)}</strong><span>Sealed contract package</span></div>
+      <dl><div><dt>Cargo</dt><dd>${formatNumber(contractPackage.cargoSpace)}</dd></div><div><dt>Deliver To</dt><dd>${escapeTacticalHtml(contractPackage.destination)}</dd></div></dl>
+    </article>` : "";
   const mineralRows = mineralKeys.map(mineral => {
     const total = Math.max(0, Number(cargo[mineral] || 0));
     if (!total) return "";
@@ -391,12 +399,12 @@ function renderTacticalCargo() {
     <div class="tactical-full-view tactical-cargo-view" data-tactical-section="cargo">
       <div class="tactical-content-heading">
         <span class="tactical-heading-icon">${getTacticalIconSvg("cargo")}</span>
-        <div><h3>Cargo Hold</h3><p>Purchased cargo, recovered resources, and found equipment remain separate.</p></div>
+        <div><h3>Cargo Hold</h3><p>Market resources, sealed contract packages, and found equipment remain separate.</p></div>
         <span class="tactical-heading-chip">${formatNumber(state.used)} / ${formatNumber(state.capacity)}</span>
       </div>
       <div class="tactical-cargo-capacity"><div><strong>${state.percent}% CAPACITY</strong><span>${formatNumber(Math.max(0, state.capacity - state.used))} units available</span></div><div class="tactical-meter"><i style="width:${state.percent}%"></i></div></div>
       <div class="tactical-cargo-ledgers">
-        <section><h4>Resource Ledger</h4><div class="tactical-ledger-list">${mineralRows || `<div class="tactical-empty-state">No resources in the hold.</div>`}</div></section>
+        <section><h4>Cargo Manifest</h4><div class="tactical-ledger-list">${contractRow}${mineralRows || (!contractRow ? `<div class="tactical-empty-state">No cargo in the hold.</div>` : "")}</div></section>
         <section><h4>Found Equipment</h4><div class="tactical-found-grid">${itemRows || `<div class="tactical-empty-state">No found equipment carried.</div>`}</div></section>
       </div>
     </div>
@@ -621,6 +629,26 @@ function getCurrentLoadoutEquippedCounts() {
 function buildInventoryDrawerEntries() {
   const entries = [];
   const equippedCounts = getCurrentLoadoutEquippedCounts();
+  const contractPackage = typeof getDailyTradeContractCargo === "function"
+    ? getDailyTradeContractCargo()
+    : null;
+
+  if (contractPackage) {
+    entries.push({
+      type: "cargo",
+      key: contractPackage.packageId,
+      name: contractPackage.name,
+      quantity: 1,
+      cargoSpace: contractPackage.cargoSpace,
+      quality: "contract",
+      rarity: "Contract Package",
+      icon: contractPackage.image,
+      category: "Contract Cargo",
+      source: "contract",
+      destination: contractPackage.destination,
+      description: contractPackage.description
+    });
+  }
 
   mineralKeys.forEach(mineral => {
     const quantity = cargo[mineral] || 0;
@@ -978,6 +1006,21 @@ function renderInventoryDrawerDetail(entry) {
   if (!detail || !entry) return;
 
   if (entry.type === "cargo") {
+    if (entry.source === "contract") {
+      detail.innerHTML = `
+        <div class="inventory-detail-title">
+          <img src="${entry.icon}" alt="${entry.name}">
+          <div><strong>${entry.name}</strong><span>Sealed contract package</span></div>
+        </div>
+        <div class="inventory-detail-stats">
+          <span>Cargo Space <strong>${formatNumber(entry.cargoSpace)}</strong></span>
+          <span>Destination <strong>${entry.destination}</strong></span>
+          <span>Status <strong>In Transit</strong></span>
+        </div>
+        <p class="inventory-contract-cargo-note">${entry.description || "Deliver this sealed package to its destination."}</p>
+      `;
+      return;
+    }
     const unitBasis = cargoCostBasis[entry.key] || 0;
     const recoveredQuantity = typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity(entry.key) : (!unitBasis ? Number(entry.quantity || 0) : 0);
     const heldQuantity = Number(entry.quantity || 0);
