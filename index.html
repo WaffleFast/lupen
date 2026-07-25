@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
   <link rel="stylesheet" href="loadout-redesign.css?v=20260721-unified-hangar" />
-  <link rel="stylesheet" href="ui-system.css?v=20260725-step-two" />
+  <link rel="stylesheet" href="ui-system.css?v=20260725-shared-back-button" />
 </head>
 <body>
   <div class="stars"></div>
@@ -106,7 +106,7 @@
           <p>JOURNEY</p>
           <h2 id="journeyLocationTitle">ASTERON PRIME</h2>
         </div>
-        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+        <button class="screen-back-btn lupen-back-button" onclick="returnToHub()">Back</button>
       </div>
 
       <div id="journeyBody" class="journey-body">
@@ -121,7 +121,7 @@
           <h2 id="marketLocationTitle">ASTERON PRIME</h2>
           <span id="marketFlavorText" class="trade-terminal-station-copy">A stable central exchange with reliable shipping lanes.</span>
         </div>
-        <button id="tradeTerminalBackBtn" class="screen-back-btn" onclick="returnFromTradeTerminal()">Back</button>
+        <button id="tradeTerminalBackBtn" class="screen-back-btn lupen-back-button" onclick="returnFromTradeTerminal()">Back</button>
       </div>
 
       <div class="market-terminal trade-terminal-layout-v2">
@@ -135,7 +135,7 @@
           <p>BOUNTY BOARD</p>
           <h2 id="bountyLocationTitle">SECTOR CONTRACTS</h2>
         </div>
-        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+        <button class="screen-back-btn lupen-back-button" onclick="returnToHub()">Back</button>
       </div>
 
       <div class="bounty-status-strip bounty-top-strip">
@@ -172,7 +172,7 @@
           <h2 id="profilePilotTitle">PILOT PROFILE</h2>
           <span class="pilot-profile-subtitle">CAREER RECORD AND FLEET OVERVIEW</span>
         </div>
-        <button type="button" class="screen-back-btn" onclick="returnToHub()" aria-label="Return to Asteron Prime hub">Back</button>
+        <button type="button" class="screen-back-btn lupen-back-button" onclick="returnToHub()" aria-label="Return to Asteron Prime hub">Back</button>
       </div>
 
       <div id="pilotProfileBody" class="pilot-profile-body">
@@ -187,7 +187,7 @@
           <p>LUPEN FORGE</p>
           <h2 id="forgeStationText">ASTERON PRIME</h2>
         </div>
-        <button class="screen-back-btn forge-map1-close" onclick="returnToHub()">Back</button>
+        <button class="screen-back-btn lupen-back-button forge-map1-close" onclick="returnToHub()">Back</button>
       </div>
 
       <div class="forge-lupen-info">
@@ -273,7 +273,7 @@
             <span>Credits</span>
             <strong><span class="credit-icon">CR</span><span id="storeCreditsText">1,000</span></strong>
           </div>
-          <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+          <button class="screen-back-btn lupen-back-button" onclick="returnToHub()">Back</button>
         </div>
       </div>
 
@@ -307,7 +307,7 @@
           <h2 id="hangarShipTitle">Loadout</h2>
           <span id="hangarShipSubtitle" class="hangar-subtitle">Pioneer Hunter · Attacker / Interceptor</span>
         </div>
-        <button class="screen-back-btn" onclick="returnToHub()">Back</button>
+        <button class="screen-back-btn lupen-back-button" onclick="returnToHub()">Back</button>
       </div>
 
       <div class="hangar-tabs prestige-tabs simplified-hangar-tabs">

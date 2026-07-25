@@ -18,6 +18,15 @@ into the same information layout.
 3. Muted uppercase subtitle supplies only necessary context.
 4. The Back action occupies the upper-right position and has a consistent size.
 
+## Shared controls
+
+- Full-screen Back actions use both `.screen-back-btn` and
+  `.lupen-back-button`.
+- The shared Back component is 92 x 44 pixels, contains the single label
+  `Back`, and never adds a screen-specific arrow or icon.
+- Screen styles may position the component but must not change its dimensions,
+  typography, border, or interaction treatment.
+
 ## Shared colours
 
 - Cyan: navigation, selection, focus, and system information.

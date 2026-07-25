@@ -180,6 +180,8 @@ test.describe("Lupen browser smoke", () => {
       }]
     ];
 
+    let sharedBackAppearance = null;
+
     for (const [label, selector, openScreen] of checks) {
       await page.evaluate(seedDockedPilot);
       await page.evaluate(openScreen);
@@ -191,7 +193,34 @@ test.describe("Lupen browser smoke", () => {
       if (selector !== "#spaceScreen") {
         await expect(page.locator(selector), `${label} shared app frame`).toHaveClass(/lupen-app-screen/);
         await expect(page.locator(`${selector} .lupen-screen-header`), `${label} shared page header`).toHaveCount(1);
-        await expect(page.locator(`${selector} .screen-back-btn`), `${label} shared Back action`).toBeVisible();
+        const backButton = page.locator(`${selector} .lupen-back-button`);
+        await expect(backButton, `${label} shared Back action`).toBeVisible();
+        await expect(backButton, `${label} Back label`).toHaveText("Back");
+        const backAppearance = await backButton.evaluate(button => {
+          const rect = button.getBoundingClientRect();
+          const style = getComputedStyle(button);
+          return {
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+            borderRadius: style.borderRadius,
+            fontFamily: style.fontFamily,
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            lineHeight: style.lineHeight,
+            padding: style.padding,
+            beforeContent: getComputedStyle(button, "::before").content,
+            afterContent: getComputedStyle(button, "::after").content
+          };
+        });
+        expect(backAppearance.width, `${label} Back width`).toBe(92);
+        expect(backAppearance.height, `${label} Back height`).toBe(44);
+        expect(["none", '""'], `${label} Back leading decoration`).toContain(backAppearance.beforeContent);
+        expect(["none", '""'], `${label} Back trailing decoration`).toContain(backAppearance.afterContent);
+        if (!sharedBackAppearance) {
+          sharedBackAppearance = backAppearance;
+        } else {
+          expect(backAppearance, `${label} shared Back appearance`).toEqual(sharedBackAppearance);
+        }
         expect(geometry.width, label).toBe(1200);
         expect(geometry.height, label).toBe(700);
       }
