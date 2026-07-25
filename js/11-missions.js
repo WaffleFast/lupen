@@ -521,12 +521,18 @@ function getVisibleChapterMissions(chapterId = "frontier") {
 
 function getPrimaryActiveMission() {
   missionProgress = normalizeMissionProgress(missionProgress);
-  return CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_COMPLETED) ||
+  const completedWithReward = CHAPTER_MISSIONS.find(mission => {
+    if (missionProgress.missions[mission.id]?.state !== MISSION_STATE_COMPLETED) return false;
+    const assignmentReward = getJourneyAssignmentConfig(mission)?.rewards || mission.reward || {};
+    return Number(assignmentReward.xp || 0) > 0 || Number(assignmentReward.credits || 0) > 0;
+  });
+  return completedWithReward ||
     CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_ACTIVE) ||
     CHAPTER_MISSIONS.find(mission => {
       const state = missionProgress.missions[mission.id];
       return state?.state === MISSION_STATE_AVAILABLE && isJourneyChapterAssignment(mission) && isMissionAvailable(mission.id, missionProgress);
     }) ||
+    CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_COMPLETED) ||
     null;
 }
 

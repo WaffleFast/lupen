@@ -2023,12 +2023,12 @@ function renderHangarOverview() {
   if (overviewStats) {
     const hullPercent = repairState.hullMax > 0 ? Math.max(0, Math.min(100, (repairState.hull / repairState.hullMax) * 100)) : 0;
     overviewStats.innerHTML = `
-      <div class="hangar-stat-card hull-stat featured-stat"><span>Hull</span><strong>${formatNumber(Math.floor(repairState.hull))} / ${formatNumber(repairState.hullMax)}</strong><i style="--hull-fill:${hullPercent}%"></i></div>
-      <div class="hangar-stat-card shield-stat"><span>Shield</span><strong>${formatNumber(stats.shield)}</strong></div>
-      <div class="hangar-stat-card hull-stat"><span>Armor</span><strong>${formatNumber(stats.armor)}</strong></div>
-      <div class="hangar-stat-card cargo-stat"><span>Cargo</span><strong>${formatNumber(stats.cargo)}</strong></div>
-      <div class="hangar-stat-card jump-stat"><span>Jump</span><strong>${formatNumber(stats.jumpRecharge)} LY</strong></div>
-      <div class="hangar-stat-card evasion-stat"><span>Evasion</span><strong>${formatEvasion(stats.evasion)}</strong></div>
+      <div class="hangar-stat-card hull-stat featured-stat" data-stat="hull"><span>Hull</span><strong>${formatNumber(Math.floor(repairState.hull))} / ${formatNumber(repairState.hullMax)}</strong><i style="--hull-fill:${hullPercent}%"></i></div>
+      <div class="hangar-stat-card shield-stat" data-stat="shield"><span>Shield</span><strong>${formatNumber(stats.shield)}</strong></div>
+      <div class="hangar-stat-card armor-stat" data-stat="armor"><span>Armor</span><strong>${formatNumber(stats.armor)}</strong></div>
+      <div class="hangar-stat-card cargo-stat" data-stat="cargo"><span>Cargo</span><strong>${formatNumber(stats.cargo)}</strong></div>
+      <div class="hangar-stat-card jump-stat" data-stat="jump"><span>Jump</span><strong>${formatNumber(stats.jumpRecharge)} LY</strong></div>
+      <div class="hangar-stat-card evasion-stat" data-stat="evasion"><span>Evasion</span><strong>${formatEvasion(stats.evasion)}</strong></div>
     `;
   }
 
@@ -2062,7 +2062,10 @@ function selectFleetShip(shipId) {
 }
 
 function renderFleetStatChip(label, value, statClass = "") {
-  return `<div class="fleet-stat-chip ${statClass}"><span>${label}</span><strong>${value}</strong></div>`;
+  const statKey = String(label || "").toLowerCase() === "armour"
+    ? "armor"
+    : String(label || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return `<div class="fleet-stat-chip ${statClass}" data-stat="${statKey}"><span>${label}</span><strong>${value}</strong></div>`;
 }
 
 

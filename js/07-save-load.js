@@ -261,6 +261,60 @@ function saveGame(options = {}) {
   queueSupabaseSave(state);
 }
 
+const cloudSaveCoordinator = {
+  enabled: false,
+  userId: "",
+  reason: "account_not_resolved",
+  generation: 0,
+  revision: 0,
+  completedRevision: 0,
+  inFlight: false,
+  pending: null
+};
+
+function getCloudSaveSyncStatus() {
+  return {
+    enabled: cloudSaveCoordinator.enabled,
+    userId: cloudSaveCoordinator.userId,
+    reason: cloudSaveCoordinator.reason,
+    generation: cloudSaveCoordinator.generation,
+    revision: cloudSaveCoordinator.revision,
+    completedRevision: cloudSaveCoordinator.completedRevision,
+    inFlight: cloudSaveCoordinator.inFlight,
+    hasPendingSave: Boolean(cloudSaveCoordinator.pending)
+  };
+}
+
+function disableCloudSaveSync(reason = "account_not_resolved") {
+  cloudSaveCoordinator.generation += 1;
+  cloudSaveCoordinator.enabled = false;
+  cloudSaveCoordinator.userId = "";
+  cloudSaveCoordinator.reason = reason;
+  cloudSaveCoordinator.pending = null;
+  setSaveStatus("local");
+  return getCloudSaveSyncStatus();
+}
+
+function enableCloudSaveSync(userId, reason = "account_save_resolved") {
+  const safeUserId = String(userId || "").trim();
+  if (!safeUserId) return disableCloudSaveSync("missing_authenticated_user");
+
+  if (cloudSaveCoordinator.enabled && cloudSaveCoordinator.userId === safeUserId) {
+    cloudSaveCoordinator.reason = reason;
+    flushQueuedCloudSave();
+    return getCloudSaveSyncStatus();
+  }
+  if (cloudSaveCoordinator.userId && cloudSaveCoordinator.userId !== safeUserId) {
+    cloudSaveCoordinator.pending = null;
+  }
+  cloudSaveCoordinator.generation += 1;
+  cloudSaveCoordinator.enabled = true;
+  cloudSaveCoordinator.userId = safeUserId;
+  cloudSaveCoordinator.reason = reason;
+  flushQueuedCloudSave();
+  return getCloudSaveSyncStatus();
+}
+
 function setSaveStatus(state) {
   const indicator = document.getElementById("saveStatusIndicator");
   if (!indicator) return;
@@ -282,19 +336,88 @@ async function getAuthenticatedSupabaseUser() {
   );
 }
 
-function queueSupabaseSave(state) {
-  if (!state || !window.lupenSupabase) {
-    setSaveStatus("local");
-    return;
+async function flushQueuedCloudSave() {
+  if (
+    cloudSaveCoordinator.inFlight ||
+    !cloudSaveCoordinator.enabled ||
+    !cloudSaveCoordinator.pending
+  ) {
+    return false;
   }
 
+  const queued = cloudSaveCoordinator.pending;
+  cloudSaveCoordinator.pending = null;
+  cloudSaveCoordinator.inFlight = true;
+  const flushGeneration = queued.generation;
   setSaveStatus("saving");
-  saveGameToSupabase(state).then(saved => {
-    setSaveStatus(saved ? "cloud" : "local");
-  }).catch(error => {
+
+  try {
+    const auth = await getAuthenticatedSupabaseUser();
+    if (
+      flushGeneration !== cloudSaveCoordinator.generation ||
+      !cloudSaveCoordinator.enabled
+    ) {
+      return false;
+    }
+    if (!auth?.user?.id) throw new Error("cloud_save_auth_unavailable");
+    if (String(auth.user.id) !== cloudSaveCoordinator.userId) {
+      disableCloudSaveSync("authenticated_user_changed");
+      throw new Error("cloud_save_user_mismatch");
+    }
+
+    await saveGameStateToSupabaseForUser(auth.client, auth.user, queued.state);
+    if (
+      flushGeneration !== cloudSaveCoordinator.generation ||
+      !cloudSaveCoordinator.enabled
+    ) {
+      return false;
+    }
+    cloudSaveCoordinator.completedRevision = Math.max(
+      cloudSaveCoordinator.completedRevision,
+      queued.revision
+    );
+    setSaveStatus("cloud");
+    return true;
+  } catch (error) {
     console.warn("Supabase save failed. Local save is still intact.", error);
-    setSaveStatus("cloud-failed");
-  });
+    if (flushGeneration === cloudSaveCoordinator.generation) {
+      setSaveStatus("cloud-failed");
+    }
+    return false;
+  } finally {
+    cloudSaveCoordinator.inFlight = false;
+    if (cloudSaveCoordinator.enabled && cloudSaveCoordinator.pending) {
+      queueMicrotask(() => flushQueuedCloudSave());
+    }
+  }
+}
+
+function queueSupabaseSave(state) {
+  if (!state || !window.lupenSupabase || !cloudSaveCoordinator.enabled) {
+    setSaveStatus("local");
+    return false;
+  }
+
+  cloudSaveCoordinator.revision += 1;
+  cloudSaveCoordinator.pending = {
+    generation: cloudSaveCoordinator.generation,
+    revision: cloudSaveCoordinator.revision,
+    state: cloneCloudSaveState(state)
+  };
+  setSaveStatus("saving");
+  flushQueuedCloudSave();
+  return true;
+}
+
+function cloneCloudSaveState(state) {
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(state);
+    } catch (error) {
+      console.warn("Cloud save snapshot clone fell back to JSON serialization.", error);
+    }
+  }
+  return JSON.parse(JSON.stringify(state));
 }
 
 async function saveGameToSupabase(state = buildSaveState()) {
@@ -328,6 +451,11 @@ async function loadGameFromSupabase() {
     staleStagingXpRefresh: window.lupenLastStagingXpRefresh?.stale === true
   };
 }
+
+window.getCloudSaveSyncStatus = getCloudSaveSyncStatus;
+window.enableCloudSaveSync = enableCloudSaveSync;
+window.disableCloudSaveSync = disableCloudSaveSync;
+window.flushQueuedCloudSave = flushQueuedCloudSave;
 
 function redrawProgressAfterStagingXp() {
   if (typeof updateProgressDisplays === "function") updateProgressDisplays();

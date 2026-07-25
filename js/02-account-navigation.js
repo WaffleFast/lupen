@@ -665,6 +665,7 @@ async function touchSupabaseProfile(client, user) {
 }
 
 async function createAccount() {
+  if (typeof disableCloudSaveSync === "function") disableCloudSaveSync("account_creation_started");
   const email = document.getElementById("createEmail")?.value.trim() || "";
   const pilotName = document.getElementById("createUsername")?.value.trim() || "";
   const password = document.getElementById("createPassword")?.value || "";
@@ -754,6 +755,7 @@ async function createAccount() {
   rememberSupabaseAccount(sessionUser, profile);
 
   resetToNoShipStarterState();
+  if (typeof enableCloudSaveSync === "function") enableCloudSaveSync(sessionUser.id, "new_account_ready");
   saveGame();
   enterHubFromLogin();
   if (typeof clearStarterTutorialState === "function") clearStarterTutorialState();
@@ -773,6 +775,7 @@ function prepareFreshLocalStateAfterMissingCloudSave() {
 }
 
 async function login() {
+  if (typeof disableCloudSaveSync === "function") disableCloudSaveSync("login_started");
   const email = document.getElementById("loginUser")?.value.trim() || "";
   const password = document.getElementById("loginPassword")?.value || "";
   const message = document.getElementById("loginMessage");
@@ -841,10 +844,12 @@ async function login() {
   rememberSupabaseAccount(user, profile);
 
   let cloudSaveResult = { loaded: false, exists: false, reason: "unavailable" };
+  let cloudSaveResolutionComplete = false;
   try {
     cloudSaveResult = typeof loadGameFromSupabase === "function" ? await loadGameFromSupabase() : cloudSaveResult;
     if (cloudSaveResult.loaded) console.info("Loaded Supabase player save.");
     if (!cloudSaveResult.exists) console.info("No Supabase player save found for this account.");
+    cloudSaveResolutionComplete = cloudSaveResult.loaded === true;
   } catch (error) {
     console.warn("Unable to load Supabase player save. Continuing with local save.", error);
     cloudSaveResult = { loaded: false, exists: false, reason: "error" };
@@ -886,11 +891,14 @@ async function login() {
         try {
           await uploadLocalSavePayloadToSupabase(localSavePayload);
           console.info("Uploaded local save payload to Supabase.");
+          cloudSaveResolutionComplete = true;
         } catch (error) {
           console.warn("Unable to upload local save payload to Supabase. Continuing locally.", error);
+          cloudSaveResolutionComplete = false;
         }
       } else {
         prepareFreshLocalStateAfterMissingCloudSave();
+        cloudSaveResolutionComplete = true;
         if (typeof logStagingLocalSaveMigration === "function") {
           logStagingLocalSaveMigration("Started fresh because local save migration was declined.", {
             decision,
@@ -901,6 +909,7 @@ async function login() {
       }
     } else {
       prepareFreshLocalStateAfterMissingCloudSave();
+      cloudSaveResolutionComplete = true;
       if (typeof logStagingLocalSaveMigration === "function") {
         logStagingLocalSaveMigration("Started fresh because no meaningful local save was available.", {
           hasPrompt: typeof promptUploadLocalSaveToSupabase === "function",
@@ -916,10 +925,14 @@ async function login() {
   tutorialState.active = false;
   saveTutorialState();
   clearTutorialOverlayOnly();
+  if (cloudSaveResolutionComplete && typeof enableCloudSaveSync === "function") {
+    enableCloudSaveSync(user.id, cloudSaveResult.loaded ? "cloud_save_loaded" : "new_cloud_save_ready");
+  }
   enterHubFromLogin();
 }
 
 async function logout() {
+  if (typeof disableCloudSaveSync === "function") disableCloudSaveSync("logout");
   const client = getSupabaseClient();
   if (client) {
     const { error } = await client.auth.signOut();

@@ -163,6 +163,18 @@ test.describe("Lupen browser smoke", () => {
         window.showScreen("gameScreen");
         window.openBountyBoard();
       }],
+      ["Journey", "#journeyScreen", () => {
+        window.showScreen("gameScreen");
+        window.openJourney();
+      }],
+      ["Station Store", "#storeScreen", () => {
+        window.showScreen("gameScreen");
+        window.openStore();
+      }],
+      ["Pilot Profile", "#pilotProfileScreen", () => {
+        window.showScreen("gameScreen");
+        window.openPilotProfile();
+      }],
       ["Sector / multiplayer staging overlay", "#spaceScreen", () => {
         window.showScreen("spaceScreen");
       }]
@@ -176,6 +188,13 @@ test.describe("Lupen browser smoke", () => {
       expectShellFitsViewport(geometry, label);
       expect(geometry.width, label).toBeLessThanOrEqual(1200);
       expect(geometry.height, label).toBeLessThanOrEqual(700);
+      if (selector !== "#spaceScreen") {
+        await expect(page.locator(selector), `${label} shared app frame`).toHaveClass(/lupen-app-screen/);
+        await expect(page.locator(`${selector} .lupen-screen-header`), `${label} shared page header`).toHaveCount(1);
+        await expect(page.locator(`${selector} .screen-back-btn`), `${label} shared Back action`).toBeVisible();
+        expect(geometry.width, label).toBe(1200);
+        expect(geometry.height, label).toBe(700);
+      }
     }
 
     await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText(/Staging/, { timeout: 15000 });
@@ -430,6 +449,165 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#loginMessage")).toContainText("Login succeeded, but profile setup failed. Please refresh or contact support.");
     await expect(page.evaluate(() => window.__migrationPromptCount)).resolves.toBe(0);
     await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("cloud saves stay locked until account state is resolved and then write in order", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    const result = await page.evaluate(async () => {
+      localStorage.clear();
+      const user = {
+        id: "88888888-8888-4888-8888-888888888888",
+        email: "stable-save@example.test"
+      };
+      let activeUser = user;
+      window.__cloudSaveWrites = [];
+      window.__cloudSaveWriteRecords = [];
+      window.__cloudSaveWritesInFlight = 0;
+      window.__cloudSaveMaxConcurrency = 0;
+      const fakeClient = {
+        auth: {
+          getUser: async () => ({ data: { user: activeUser }, error: null })
+        },
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null })
+            })
+          }),
+          upsert: async (payload) => {
+            window.__cloudSaveWritesInFlight += 1;
+            window.__cloudSaveMaxConcurrency = Math.max(
+              window.__cloudSaveMaxConcurrency,
+              window.__cloudSaveWritesInFlight
+            );
+            await new Promise(resolve => setTimeout(resolve, 35));
+            window.__cloudSaveWrites.push(payload.save_data.credits);
+            window.__cloudSaveWriteRecords.push({
+              userId: payload.user_id,
+              credits: payload.save_data.credits
+            });
+            window.__cloudSaveWritesInFlight -= 1;
+            return { data: payload, error: null };
+          }
+        })
+      };
+      window.lupenSupabase = fakeClient;
+      window.eval("getSupabaseClient = () => window.lupenSupabase;");
+
+      window.eval("credits = 11001;");
+      saveGame();
+      await new Promise(resolve => setTimeout(resolve, 60));
+      const beforeResolution = {
+        writes: window.__cloudSaveWrites.slice(),
+        status: getCloudSaveSyncStatus(),
+        localCredits: JSON.parse(localStorage.getItem(STORAGE_GAME_KEY)).credits
+      };
+
+      enableCloudSaveSync(user.id, "test_account_resolved");
+      window.eval("credits = 12001;");
+      saveGame();
+      window.eval("credits = 12002;");
+      saveGame();
+      window.eval("credits = 12003;");
+      saveGame();
+
+      await new Promise(resolve => setTimeout(resolve, 180));
+      window.eval("credits = 13001;");
+      saveGame();
+      await new Promise(resolve => setTimeout(resolve, 5));
+      disableCloudSaveSync("test_account_switch");
+      activeUser = {
+        id: "99999999-9999-4999-8999-999999999999",
+        email: "second-save@example.test"
+      };
+      enableCloudSaveSync(activeUser.id, "test_second_account_resolved");
+      window.eval("credits = 14001;");
+      saveGame();
+      await new Promise(resolve => setTimeout(resolve, 120));
+
+      return {
+        beforeResolution,
+        writes: window.__cloudSaveWrites.slice(),
+        writeRecords: window.__cloudSaveWriteRecords.slice(),
+        maxConcurrency: window.__cloudSaveMaxConcurrency,
+        status: getCloudSaveSyncStatus(),
+        localCredits: JSON.parse(localStorage.getItem(STORAGE_GAME_KEY)).credits,
+        secondUserId: activeUser.id
+      };
+    });
+
+    expect(result.beforeResolution.writes).toEqual([]);
+    expect(result.beforeResolution.status.enabled).toBe(false);
+    expect(result.beforeResolution.localCredits).toBe(11001);
+    expect(result.writes).toContain(12003);
+    expect(result.writes).not.toContain(11001);
+    expect(result.maxConcurrency).toBe(1);
+    expect(result.status.enabled).toBe(true);
+    expect(result.status.userId).toBe(result.secondUserId);
+    expect(result.status.hasPendingSave).toBe(false);
+    expect(result.localCredits).toBe(14001);
+    expect(result.writeRecords.at(-1)).toEqual({
+      userId: result.secondUserId,
+      credits: 14001
+    });
+    expect(result.writeRecords.find(record => record.credits === 13001)?.userId).not.toBe(result.secondUserId);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("local pilot progression round-trips without account bootstrap rewriting it", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    const seeded = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        const secondShipId = Object.keys(SHIPS).find(id => id !== STARTER_SHIP_ID);
+        credits = 7777;
+        currentShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID, secondShipId];
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = secondShipId;
+        missionProgress = createDefaultMissionProgress();
+        missionProgress.missions.academy_first_trade = {
+          state: "completed",
+          progress: 1,
+          completedAt: "2026-07-25T12:00:00.000Z"
+        };
+        playerProgress = {
+          ...createDefaultPlayerProgress(),
+          academyCompleted: false
+        };
+        saveGame();
+        return { starterShipId: STARTER_SHIP_ID, secondShipId };
+      })()
+    `));
+
+    await page.reload();
+    await waitForGameGlobals(page);
+    const restored = await page.evaluate(() => window.eval(`
+      ({
+        credits,
+        currentShipId,
+        ownedShips: ownedShips.slice(),
+        selectedFleetShipId,
+        firstTrade: { ...missionProgress.missions.academy_first_trade },
+        sync: getCloudSaveSyncStatus()
+      })
+    `));
+
+    expect(restored.credits).toBe(7777);
+    expect(restored.currentShipId).toBe(seeded.starterShipId);
+    expect(restored.ownedShips).toEqual([seeded.starterShipId, seeded.secondShipId]);
+    expect(restored.selectedFleetShipId).toBe(seeded.secondShipId);
+    expect(restored.firstTrade).toMatchObject({ state: "completed", progress: 1 });
+    expect(restored.sync.enabled).toBe(false);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -8030,7 +8208,9 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER PROGRESS");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Academy Progress");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Requirements Complete");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 7");
+    // The seeded pilot already owns the starter hull, so the Journey model
+    // correctly reconciles that durable account fact into one completed task.
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 7");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Chapter Unlock");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Next Route");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Completion Unlocks");
@@ -8075,7 +8255,7 @@ test.describe("Lupen browser smoke", () => {
     expect(initialGalaxyFooter.visible).toBe(true);
     expect(initialGalaxyFooter.singleLine).toBe(true);
     expect(initialGalaxyFooter.height).toBeLessThan(34);
-    expect(initialGalaxyFooter.percentText).toBe("2%");
+    expect(initialGalaxyFooter.percentText).toBe("5%");
     const academyAssignmentScroll = await page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => {
       const firstCard = grid.querySelector(".journey-assignment-card")?.getBoundingClientRect();
       return {
@@ -8265,7 +8445,7 @@ test.describe("Lupen browser smoke", () => {
       renderJourneyScreen();
     });
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 7");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 7");
     await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(7);
     await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(7);
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Claim Starter Ship");
@@ -8283,8 +8463,8 @@ test.describe("Lupen browser smoke", () => {
 
     await page.evaluate(() => window.launchShip());
     await expect(page.locator("#spaceScreen")).toHaveClass(/active/);
-    await expect(page.locator("#activeMissionSummary")).toContainText("Launch Ship");
-    await expect(page.locator("#activeMissionSummary")).toContainText("COMPLETE");
+    await expect(page.locator("#activeMissionSummary")).toContainText("Equip Two Guns");
+    await expect(page.locator("#activeMissionSummary")).toContainText("IN PROGRESS");
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.academy_launch_ship.state`))).resolves.toBe("completed");
 
     await page.evaluate(() => window.landOnPlanet());

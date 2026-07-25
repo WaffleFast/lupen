@@ -1,0 +1,225 @@
+/*
+ * Lupen interface foundation
+ * --------------------------
+ * Shared tokens and interaction rules live here. Individual screens retain
+ * their own layout while consuming the same frame, type, colour and control
+ * language. This file loads last so new screens can adopt the system without
+ * reopening the historical stylesheet.
+ */
+
+:root {
+  --lupen-screen-width: 1200px;
+  --lupen-screen-height: 700px;
+  --lupen-screen-gutter: 12px;
+  --lupen-screen-radius: 18px;
+  --lupen-panel-radius: 12px;
+  --lupen-control-radius: 10px;
+
+  --lupen-cyan: #56dcf5;
+  --lupen-cyan-bright: #77edff;
+  --lupen-blue: #2784d7;
+  --lupen-blue-deep: #155da7;
+  --lupen-text: #f3f8fc;
+  --lupen-text-soft: #c2d1dd;
+  --lupen-text-muted: #8fa6b7;
+  --lupen-line: rgba(75, 174, 220, 0.42);
+  --lupen-line-soft: rgba(83, 170, 208, 0.22);
+  --lupen-panel: rgba(2, 15, 27, 0.93);
+  --lupen-panel-raised: rgba(6, 27, 40, 0.94);
+
+  --lupen-stat-hull: #557fa0;
+  --lupen-stat-shield: #18cceb;
+  --lupen-stat-armor: #7695ad;
+  --lupen-stat-cargo: #d9bd00;
+  --lupen-stat-jump: #3a90c5;
+  --lupen-stat-evasion: #13cda9;
+  --lupen-success: #46e99b;
+  --lupen-warning: #ffd45f;
+  --lupen-danger: #ff765f;
+
+  --lupen-title-size: clamp(38px, 4vw, 52px);
+  --lupen-section-title-size: 22px;
+  --lupen-body-size: 14px;
+  --lupen-label-size: 11px;
+}
+
+.lupen-app-screen {
+  width: min(var(--lupen-screen-width), calc(100vw - (var(--lupen-screen-gutter) * 2))) !important;
+  max-width: var(--lupen-screen-width) !important;
+  height: min(var(--lupen-screen-height), calc(100dvh - (var(--lupen-screen-gutter) * 2))) !important;
+  max-height: var(--lupen-screen-height) !important;
+  border-radius: var(--lupen-screen-radius) !important;
+  border-color: var(--lupen-line) !important;
+  color: var(--lupen-text);
+}
+
+/* Historical screen rules use ID selectors, so the shared frame needs an
+   equally specific final guard while those screens are migrated. */
+:is(
+  #journeyScreen,
+  #marketScreen,
+  #bountyScreen,
+  #pilotProfileScreen,
+  #upgradeForgeScreen,
+  #storeScreen,
+  #hangarScreen
+).lupen-app-screen.active {
+  width: min(var(--lupen-screen-width), calc(100vw - (var(--lupen-screen-gutter) * 2))) !important;
+  max-width: var(--lupen-screen-width) !important;
+  height: min(var(--lupen-screen-height), calc(100dvh - (var(--lupen-screen-gutter) * 2))) !important;
+  max-height: var(--lupen-screen-height) !important;
+  box-sizing: border-box !important;
+}
+
+.lupen-app-screen .lupen-screen-header {
+  min-width: 0;
+}
+
+.lupen-app-screen .lupen-screen-header p,
+.lupen-app-screen .lupen-screen-header .forge-lupen-heading > p {
+  margin: 0 0 4px;
+  color: var(--lupen-cyan-bright);
+  font-size: 0.86rem;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.lupen-app-screen .lupen-screen-header h2,
+.lupen-app-screen .lupen-screen-header .forge-lupen-heading > h2 {
+  margin: 0;
+  color: var(--lupen-text);
+  font-size: var(--lupen-title-size);
+  font-weight: 950;
+  line-height: 0.98;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lupen-app-screen .hangar-subtitle,
+.lupen-app-screen .pilot-profile-subtitle,
+.lupen-app-screen .trade-terminal-station-copy {
+  display: block;
+  margin-top: 5px;
+  color: var(--lupen-text-soft);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lupen-app-screen .screen-back-btn {
+  width: auto;
+  min-width: 76px;
+  min-height: 44px;
+  padding: 9px 18px;
+  border: 1px solid rgba(72, 184, 239, 0.74);
+  border-radius: var(--lupen-control-radius);
+  background: rgba(3, 17, 33, 0.9);
+  color: var(--lupen-text);
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.lupen-app-screen .screen-back-btn:hover {
+  border-color: var(--lupen-cyan-bright);
+  background: rgba(13, 55, 91, 0.94);
+}
+
+.lupen-app-screen button,
+.lupen-app-screen input,
+.lupen-app-screen select {
+  font-family: inherit;
+}
+
+.lupen-app-screen button,
+.lupen-app-screen input,
+.lupen-app-screen select,
+.lupen-app-screen [tabindex] {
+  outline: none;
+}
+
+.lupen-app-screen button:focus-visible,
+.lupen-app-screen input:focus-visible,
+.lupen-app-screen select:focus-visible,
+.lupen-app-screen [tabindex]:focus-visible {
+  outline: 2px solid var(--lupen-cyan-bright);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(86, 220, 245, 0.16);
+}
+
+.lupen-app-screen button:disabled {
+  filter: saturate(0.55);
+}
+
+.lupen-app-screen ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.lupen-app-screen ::-webkit-scrollbar-track {
+  background: rgba(1, 10, 18, 0.78);
+  border-radius: 999px;
+}
+
+.lupen-app-screen ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #69c9e3, #287fa7);
+  border: 2px solid rgba(1, 10, 18, 0.88);
+  border-radius: 999px;
+}
+
+.lupen-app-screen .modern-store-panel-header,
+.lupen-app-screen .panel-kicker,
+.lupen-app-screen .hangar-section-title h3,
+.lupen-app-screen .fleet-roster-header > span,
+.lupen-app-screen .compatible-vault-panel > header span {
+  color: var(--lupen-cyan-bright);
+}
+
+/* One stat colour language across Loadout, Fleet, Exchange, Vault and Profile. */
+.lupen-app-screen [class*="stat"][data-stat="hull"],
+.lupen-app-screen .hull-stat {
+  --stat-accent: var(--lupen-stat-hull);
+}
+
+.lupen-app-screen [class*="stat"][data-stat="shield"],
+.lupen-app-screen .shield-stat {
+  --stat-accent: var(--lupen-stat-shield);
+}
+
+.lupen-app-screen [class*="stat"][data-stat="armor"],
+.lupen-app-screen [class*="stat"][data-stat="armour"],
+.lupen-app-screen .armor-stat {
+  --stat-accent: var(--lupen-stat-armor);
+}
+
+.lupen-app-screen [class*="stat"][data-stat="cargo"],
+.lupen-app-screen .cargo-stat {
+  --stat-accent: var(--lupen-stat-cargo);
+}
+
+.lupen-app-screen [class*="stat"][data-stat="jump"],
+.lupen-app-screen .jump-stat {
+  --stat-accent: var(--lupen-stat-jump);
+}
+
+.lupen-app-screen [class*="stat"][data-stat="evasion"],
+.lupen-app-screen .evasion-stat {
+  --stat-accent: var(--lupen-stat-evasion);
+}
+
+@media (max-height: 740px), (max-width: 1240px) {
+  :root {
+    --lupen-screen-gutter: 8px;
+    --lupen-title-size: clamp(34px, 3.7vw, 46px);
+  }
+}
+
+@media (max-width: 900px) {
+  .lupen-app-screen {
+    overflow-y: auto !important;
+  }
+}
