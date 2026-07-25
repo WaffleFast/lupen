@@ -636,6 +636,17 @@ function getCurrentMissionLoadoutCounts(shipId = "") {
   };
 }
 
+function hasClaimedStarterShipForMission() {
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const safeOwnedShips = Array.isArray(ownedShips) ? ownedShips : [];
+  return Boolean(
+    starterShipId &&
+    currentShipId === starterShipId &&
+    safeOwnedShips.includes(starterShipId) &&
+    SHIPS?.[starterShipId]
+  );
+}
+
 function setMissionProgressAbsolute(id, amount, options = {}) {
   const mission = MISSIONS_BY_ID[id];
   const state = missionProgress?.missions?.[id];
@@ -660,6 +671,9 @@ function setMissionProgressAbsolute(id, amount, options = {}) {
 function reconcileMissionProgressFromGameplayState(options = {}) {
   missionProgress = reconcileMissionAvailability(normalizeMissionProgress(missionProgress));
   const currentCounts = getCurrentMissionLoadoutCounts(options.shipId);
+  const starterShipClaimed = options.starterShipClaimed === undefined
+    ? hasClaimedStarterShipForMission()
+    : Boolean(options.starterShipClaimed);
   const weaponCount = Number.isFinite(Number(options.weaponCount))
     ? Number(options.weaponCount)
     : currentCounts.weaponCount;
@@ -668,6 +682,7 @@ function reconcileMissionProgressFromGameplayState(options = {}) {
     : currentCounts.attachmentCount;
   let changed = false;
 
+  changed = setMissionProgressAbsolute("academy_starter_ship", starterShipClaimed ? 1 : 0, options) || changed;
   changed = setMissionProgressAbsolute("academy_two_guns", weaponCount, options) || changed;
   changed = setMissionProgressAbsolute("academy_attachment", attachmentCount, options) || changed;
 
@@ -679,6 +694,7 @@ function reconcileMissionProgressFromGameplayState(options = {}) {
   return {
     changed,
     shipId: currentCounts.shipId,
+    starterShipClaimed,
     weaponCount,
     attachmentCount
   };
@@ -1232,9 +1248,9 @@ function renderJourneyFrontierStatus() {
     })
     .filter(entry => entry.remaining > 0)
     .sort((left, right) => {
-      const leftStarted = left.progress > 0 ? 1 : 0;
-      const rightStarted = right.progress > 0 ? 1 : 0;
-      if (leftStarted !== rightStarted) return rightStarted - leftStarted;
+      const leftOrder = Number(left.assignment?.order || 0);
+      const rightOrder = Number(right.assignment?.order || 0);
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
       return left.remaining - right.remaining;
     });
   const recommended = assignments[0] || null;

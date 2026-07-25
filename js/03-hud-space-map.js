@@ -2655,7 +2655,7 @@ function jumpToNode(destination) {
       ? getMultiplayerStagingBountyTargetNode()
       : null;
     if (stagingTarget && destination === stagingTarget && typeof addActivityLog === "function") {
-      addActivityLog(`Staging bounty route plotted to ${destination}. Jump through connected nodes to reach it.`);
+      addActivityLog(`Bounty route plotted to ${destination}. Jump through connected nodes to reach it.`);
     }
     return;
   }

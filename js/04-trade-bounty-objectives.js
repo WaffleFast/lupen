@@ -276,11 +276,11 @@ function getMultiplayerStagingBountyClaimLine() {
   const credits = Math.round(Number(result.creditsDelta || result.bounty?.creditsReward || 0));
   const shards = Math.round(Number(result.lupenShardDelta || result.bounty?.lupenShardsReward || 0));
   if (result.applied || result.playerSavePatchResult?.applied || result.playerSave?.written) {
-    return `Reward applied: +${formatNumber(credits)} CR and +${formatNumber(shards)} Lupen Shards. Save refreshed from server.`;
+    return `Reward claimed: +${formatNumber(credits)} CR and +${formatNumber(shards)} Lupen Shards.`;
   }
   if (result.reason === "staging_bounty_already_claimed") return "Already claimed. Duplicate reward blocked.";
-  if (result.mode === "blocked" || result.ok === false) return `Blocked: ${result.debugReason || result.reason || "server validation failed"}.`;
-  return `Preview only: +${formatNumber(credits)} CR and +${formatNumber(shards)} Lupen Shards. No bounty XP.`;
+  if (result.mode === "blocked" || result.ok === false) return "The reward could not be claimed. Please try again.";
+  return "The reward is not available yet.";
 }
 
 function selectMultiplayerStagingBounty(bountyId) {
@@ -290,24 +290,24 @@ function selectMultiplayerStagingBounty(bountyId) {
 
 function acceptMultiplayerStagingBounty(bountyId) {
   if (!isMultiplayerStagingBountyReady()) {
-    if (typeof addHudToast === "function") addHudToast("MP staging bounty is waiting for the multiplayer server.");
+    if (typeof addHudToast === "function") addHudToast("The bounty network is still connecting.");
     return;
   }
   multiplayerStagingBountyPending = { action: "accept", bountyId, startedAt: Date.now() };
   window.LupenMultiplayerClient?.acceptStagingBounty?.({ bountyId });
-  if (typeof addHudToast === "function") addHudToast("Staging bounty accept sent to server.");
+  if (typeof addHudToast === "function") addHudToast("Accepting contract.");
   refreshMultiplayerStagingBountyStatusSoon();
   renderBountyBoard();
 }
 
 function claimMultiplayerStagingBounty(bountyId) {
   if (!isMultiplayerStagingBountyReady()) {
-    if (typeof addHudToast === "function") addHudToast("MP staging bounty is waiting for the multiplayer server.");
+    if (typeof addHudToast === "function") addHudToast("The bounty network is still connecting.");
     return;
   }
   multiplayerStagingBountyPending = { action: "claim", bountyId, startedAt: Date.now() };
   window.LupenMultiplayerClient?.claimStagingBounty?.({ bountyId });
-  if (typeof addHudToast === "function") addHudToast("Staging bounty claim sent to server.");
+  if (typeof addHudToast === "function") addHudToast("Claiming contract reward.");
   refreshMultiplayerStagingBountyStatusSoon();
   renderBountyBoard();
 }
@@ -337,7 +337,7 @@ function reconcileMultiplayerStagingBountyResult() {
   multiplayerStagingBountyLastHandledAt = receivedAt;
   multiplayerStagingBountyPending = null;
   const claimLine = getMultiplayerStagingBountyClaimLine();
-  if (claimLine && typeof addActivityLog === "function") addActivityLog(`MP staging bounty: ${claimLine}`);
+  if (claimLine && typeof addActivityLog === "function") addActivityLog(`Bounty contract: ${claimLine}`);
 }
 
 function setupMultiplayerStagingBountyBoardSubscription() {
@@ -357,7 +357,7 @@ function setupMultiplayerStagingBountyBoardSubscription() {
 function blockRealTradeMutationInMultiplayerStaging() {
   if (!isMultiplayerStagingActive()) return false;
 
-  const message = "Local trade writes are disabled in multiplayer staging. Server staging trade handles validation.";
+  const message = "Trading is temporarily unavailable. Please try again shortly.";
   if (typeof addHudToast === "function") addHudToast(message);
   if (typeof addActivityLog === "function") addActivityLog(message);
   if (typeof console !== "undefined" && typeof console.info === "function") {
@@ -557,7 +557,7 @@ function getMultiplayerStagingMarketPrice(good, planet, currentPlanet = getCurre
 }
 
 function getMultiplayerStagingTradeSourceLabel(result) {
-  if (!result) return "Server preview pending";
+  if (!result) return "Checking route availability";
   if (result.validationMode === "trusted_save") {
     return result.snapshotUsed ? "Validated from trusted save + capacity snapshot" : "Validated from trusted save";
   }
@@ -629,7 +629,7 @@ function getMultiplayerStagingTradeSyncLine(result) {
   if (multiplayerStagingTradeSyncStatus?.receivedAt !== result.receivedAt) {
     return "Cloud save refresh pending.";
   }
-  if (multiplayerStagingTradeSyncStatus.status === "synced") return "Cloud save refreshed; UI synced from server save.";
+  if (multiplayerStagingTradeSyncStatus.status === "synced") return "Trade complete and progress saved.";
   if (multiplayerStagingTradeSyncStatus.status === "syncing") return "Refreshing cloud save...";
   return `${actionLabel}. Reload or reopen to sync full save display.`;
 }
@@ -831,14 +831,14 @@ function renderMultiplayerStagingTradePreviewResult(offerId, { operation = "buy"
 function requestMultiplayerStagingTradeDryRun({ operation = "buy", offerId = "", quantity = 1 } = {}) {
   if (!isMultiplayerStagingActive()) return false;
   if (!isMultiplayerStagingTradeReady()) {
-    const message = "MP staging trade preview is waiting for the multiplayer server connection.";
+    const message = "The trade network is still connecting.";
     if (typeof addHudToast === "function") addHudToast(message);
     if (typeof addActivityLog === "function") addActivityLog(message);
     requestMultiplayerStagingTradeOffersIfNeeded();
     return true;
   }
   if (!offerId) {
-    const message = "Server staging preview not available for this route yet.";
+    const message = "This route is not available yet.";
     if (typeof addHudToast === "function") addHudToast(message);
     if (typeof addActivityLog === "function") addActivityLog(message);
     return true;
@@ -864,10 +864,10 @@ function requestMultiplayerStagingTradeDryRun({ operation = "buy", offerId = "",
   }
   if (!sent || sent.ok === false) {
     multiplayerStagingTradePending = null;
-    if (typeof addHudToast === "function") addHudToast("MP staging trade request could not be sent.");
+    if (typeof addHudToast === "function") addHudToast("The trade request could not be sent.");
     return true;
   }
-  if (typeof addHudToast === "function") addHudToast(`Requested MP staging ${operation} server validation.`);
+  if (typeof addHudToast === "function") addHudToast(operation === "sell" ? "Processing sale." : "Processing purchase.");
   window.setTimeout(() => {
     if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
   }, 350);
@@ -1547,7 +1547,7 @@ function renderMapOneMarketTerminal(goodsBox) {
 function setMarketResource(good) {
   if (!MAP_ONE_TRADE_RESOURCES.includes(good)) return;
   if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && !canSelectMultiplayerStagingMarketResource(good, getCurrentMarketPlanet())) {
-    if (typeof addHudToast === "function") addHudToast("No server-backed staging route for that resource at this planet.");
+    if (typeof addHudToast === "function") addHudToast("That resource is not available on a supported route from this planet.");
     return;
   }
   selectedMarketResource = good;
@@ -1574,7 +1574,7 @@ function setMarketTargetPlanet(planet) {
   if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && getMultiplayerStagingTradeOffers().length) {
     const targets = getMultiplayerStagingTargetPlanetsForResource(selectedMarketResource, getCurrentMarketPlanet());
     if (targets.length && !targets.includes(planet)) {
-      if (typeof addHudToast === "function") addHudToast("That target is not part of the server-backed staging route.");
+      if (typeof addHudToast === "function") addHudToast("That destination is not part of this trade route.");
       return;
     }
   }
@@ -2975,9 +2975,9 @@ function renderMultiplayerStagingBountyBoard() {
   const bounties = getMultiplayerStagingBounties();
   const selectedBounty = getSelectedMultiplayerStagingBounty();
 
-  if (title) title.textContent = "MP STAGING CONTRACTS";
-  if (countdown) countdown.textContent = "SERVER DAILY";
-  if (countLabel) countLabel.textContent = `${formatNumber(bounties.length)} / ${formatNumber(bounties.length)} SERVER CONTRACT${bounties.length === 1 ? "" : "S"}`;
+  if (title) title.textContent = "FRONTIER CONTRACTS";
+  if (countdown) countdown.textContent = "DAILY BOARD";
+  if (countLabel) countLabel.textContent = `${formatNumber(bounties.length)} CONTRACT${bounties.length === 1 ? "" : "S"} AVAILABLE`;
 
   if (grid) {
     grid.innerHTML = bounties.map((bounty) => {
@@ -2996,9 +2996,9 @@ function renderMultiplayerStagingBountyBoard() {
           <span class="bounty-card__icon-frame bounty-card-icon"><img src="${icon}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></span>
           <span class="bounty-card__body bounty-card-copy">
             <strong class="bounty-card__title">${escapeHtml(bounty.title || "Erebus Patrol Sweep")}</strong>
-            <span class="bounty-card__subtitle">${escapeHtml(bounty.description || "Destroy server-owned staging Erebus bots.")}</span>
+            <span class="bounty-card__subtitle">${escapeHtml(bounty.description || "Destroy Erebus bots operating in the Frontier.")}</span>
             <span class="bounty-card__chips">
-              <span class="bounty-chip bounty-chip--special">STAGING</span>
+              <span class="bounty-chip bounty-chip--special">DAILY</span>
               <span class="bounty-chip bounty-chip--target">${escapeHtml(bounty.targetBotLabel || bounty.target || "Erebus bots")}</span>
               <span class="bounty-chip bounty-card-threat">${escapeHtml(bounty.difficulty || "Combat")}</span>
               ${active ? `<span class="bounty-chip bounty-chip--accepted">✓ ACCEPTED</span>` : ""}
@@ -3045,18 +3045,18 @@ function renderMultiplayerStagingBountyDetail() {
     : bounty.claimed
     ? `<button class="selected-contract-action bounty-accept-btn" disabled>Claimed</button>`
       : bounty.claimAvailable || bounty.completed
-        ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claim Pending" : "Claim Reward"}</button>`
+        ? `<button class="selected-contract-action bounty-claim-btn" ${!connected || pendingClaim ? "disabled" : ""} onclick="claimMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingClaim ? "Claiming..." : "Claim Reward"}</button>`
       : bounty.accepted
         ? `<button class="selected-contract-action bounty-accept-btn bounty-active-state-btn" disabled>✓ Active Contract</button>`
         : anotherContractActive
           ? `<button class="selected-contract-action bounty-accept-btn bounty-active-blocked-btn" disabled>Finish Active Contract First</button>`
-        : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accept Pending" : connected ? "Accept Contract" : "Waiting For Server"}</button>`;
+        : `<button class="selected-contract-action bounty-accept-btn accept-bounty-button" ${!connected || pendingAccept ? "disabled" : ""} onclick="acceptMultiplayerStagingBounty('${escapeJsString(bounty.id)}')">${pendingAccept ? "Accepting..." : connected ? "Accept Contract" : "Connecting..."}</button>`;
 
   const connectionNote = connected
     ? anotherContractActive
       ? `${activeBounty.title || activeBounty.name || "Another contract"} is currently active.`
-      : "Server-tracked staging bounty."
-    : "Waiting for Multiplayer Staging.";
+      : "Contract progress is tracked automatically."
+    : "Connecting to the bounty network.";
 
   const infoRows = [
     ["TYPE", bounty.contractType || "Kill Contract"],
@@ -3071,11 +3071,11 @@ function renderMultiplayerStagingBountyDetail() {
     <div class="selected-contract-top bounty-detail-hero selected-bounty-header selected-contract-top--${statusKey} ${bounty.claimAvailable || bounty.completed ? "reward-ready" : ""} ${bounty.claimed ? "completed" : ""}">
       <div class="selected-contract-icon bounty-detail-icon"><img src="${getBountyIconSrc(bounty.icon || bounty.fallbackIcon)}" alt="" onerror="this.remove(); this.parentElement.classList.add('missing-image');"></div>
       <div class="selected-contract-copy">
-        <span class="bounty-chip bounty-chip--special">MP STAGING</span>
+        <span class="bounty-chip bounty-chip--special">DAILY BOUNTY</span>
         ${statusKey === "active" ? `<span class="selected-contract-active-badge">✓ ACTIVE CONTRACT</span>` : ""}
         ${bounty.claimAvailable || bounty.completed || bounty.claimed ? `<span class="selected-contract-check" aria-hidden="true">✓</span>` : ""}
         <strong>${escapeHtml(bounty.title || "Erebus Patrol Sweep")}</strong>
-        <span>${escapeHtml(bounty.description || "Destroy server-owned staging Erebus bots.")}</span>
+        <span>${escapeHtml(bounty.description || "Destroy Erebus bots operating in the Frontier.")}</span>
       </div>
     </div>
 

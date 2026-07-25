@@ -1297,6 +1297,11 @@ function debugGrantStarter() {
   shipLoadouts[starterShipId] = normalizeShipLoadout(shipLoadouts[starterShipId], starterShipId);
   if (typeof grantStarterShipKit === "function") grantStarterShipKit();
   if (typeof applyShipStats === "function") applyShipStats(true);
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("starter_ship_claimed", { shipId: starterShipId, mode: "debug_grant" });
+  } else if (typeof reconcileMissionProgressFromGameplayState === "function") {
+    reconcileMissionProgressFromGameplayState({ source: "debug_starter_grant", notify: false });
+  }
   jumpCharge = jumpMax;
   credits = Math.max(credits, 10000);
   if (typeof addHudToast === "function") addHudToast("Debug starter ship ready.");

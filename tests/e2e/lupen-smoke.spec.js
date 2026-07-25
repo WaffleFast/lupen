@@ -1151,16 +1151,16 @@ test.describe("Lupen browser smoke", () => {
     expect(progression.shieldOwned).toBe(0);
     expect(progression.ionOwned).toBe(1);
     expect(progression.equippedGuns).toBe(0);
-    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy);
+    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
     expect(progression.ownedAfterLockedBuy).toEqual(["falcon", "zeusExplorer", "bison"]);
     expect(progression.nightshadeAvailable.locked).toBe(false);
     expect(progression.nightshadeAvailable.state).toBe("owned");
     expect(progression.haulerAvailable.locked).toBe(false);
     expect(progression.haulerAvailable.state).toBe("owned");
     expect(progression.ownedAfterNightshadeBuy).toContain("zeusExplorer");
-    expect(progression.creditsAfterNightshadeBuy).toBe(progression.creditsBeforeLockedBuy);
+    expect(progression.creditsAfterNightshadeBuy).toBe(progression.creditsAfterLockedBuy);
     expect(progression.ownedAfterHaulerBuy).toContain("bison");
-    expect(progression.creditsAfterHaulerBuy).toBe(progression.creditsBeforeLockedBuy);
+    expect(progression.creditsAfterHaulerBuy).toBe(progression.creditsAfterLockedBuy);
     expect(progression.feedbackText).not.toContain("Unlocked:");
     expect(progression.savedProgress).toMatchObject({
       erebusBotsDestroyed: 25,
@@ -1192,7 +1192,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).not.toHaveClass(/progression-locked/);
     await expect(page.locator("#shipyardDetailPanel")).not.toContainText("Unlock Requirements");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 0");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 48,000");
 
     await page.reload();
     await waitForGameGlobals(page);
@@ -4742,7 +4742,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("multiplayer staging store shows server-backed purchase wording", async ({ page }) => {
+  test("multiplayer store keeps infrastructure language out of the player interface", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -4759,8 +4759,8 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#storeScreen")).toContainText(/Cargo Pod/i);
     await expect(page.locator("#storeScreen")).toContainText(/Jump Drive/i);
     await expect(page.locator("#storeScreen")).not.toContainText(/Repeater|Ripper Gun|Melt Cannon|Void Rail|Shield Booster|Lupen Shard|Lupen Core|Materials/i);
-    await expect(page.locator("#storeScreen")).toContainText(/Apply Cargo Pod|Cargo Pod equip preview|server-backed validation/i);
-    await expect(page.locator("#storeScreen")).toContainText(/server-backed purchase validation|Purchase unavailable|Server-backed purchase/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Cargo Pod|Purchase unavailable|Purchase/i);
+    await expect(page.locator("#storeScreen")).not.toContainText(/server-backed|preview pending|validation is ready|dry run|MP staging/i);
     await expect(page.locator("#storeScreen")).not.toContainText("Buy / CR");
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -8657,12 +8657,16 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator("#hangarScreen .screen-back-btn").click();
     await page.locator("#journeyHubBtn").click();
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_starter_ship']")).toContainText("1 / 1");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_starter_ship']")).toContainText("COMPLETE");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("2 / 2");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("COMPLETE");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("1 / 1");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("COMPLETE");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Launch Ship");
 
     const savedAfterJourneyOpen = await page.evaluate(() => JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions);
+    expect(savedAfterJourneyOpen.academy_starter_ship).toMatchObject({ state: "completed", progress: 1 });
     expect(savedAfterJourneyOpen.academy_two_guns).toMatchObject({ state: "completed", progress: 2 });
     expect(savedAfterJourneyOpen.academy_attachment).toMatchObject({ state: "completed", progress: 1 });
 
@@ -8976,13 +8980,14 @@ test.describe("Lupen browser smoke", () => {
 
     await openBountyBoard(page);
 
-    await expect(page.locator("#bountyScreen")).toContainText("MP STAGING CONTRACTS");
+    await expect(page.locator("#bountyScreen")).toContainText("FRONTIER CONTRACTS");
     await expect(page.locator(".bounty-contract-card")).toHaveCount(4);
     await expect(page.locator("#bountyScreen")).toContainText("Erebus Patrol Sweep");
     await expect(page.locator("#bountyScreen")).toContainText("Hunter Clearance");
     await expect(page.locator("#bountyScreen")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyScreen")).toContainText("Behemoth Warning");
-    await expect(page.locator("#bountyScreen")).toContainText(/Server-tracked staging bounty|Waiting for Multiplayer Staging/);
+    await expect(page.locator("#bountyScreen")).toContainText(/Contract progress is tracked automatically|Connecting to the bounty network/);
+    await expect(page.locator("#bountyScreen")).not.toContainText(/MP staging|server-tracked staging|multiplayer staging/i);
     await expect(page.locator("#bountyScreen")).toContainText("CR 900");
     await expect(page.locator("#bountyScreen")).toContainText("XP REWARD");
 

@@ -196,6 +196,8 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
       localStorage.clear();
+      SHIPS.monolith.gunSlots = 15;
+      SHIPS.monolith.attachmentSlots = 15;
       currentShipId = "monolith";
       selectedHangarShipId = "monolith";
       ownedShips = ["monolith"];
@@ -369,6 +371,8 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
       localStorage.clear();
+      SHIPS.monolith.gunSlots = 15;
+      SHIPS.monolith.attachmentSlots = 15;
       currentShipId = "monolith";
       selectedHangarShipId = "monolith";
       ownedShips = ["monolith"];
