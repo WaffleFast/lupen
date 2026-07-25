@@ -1878,6 +1878,7 @@ test.describe("Lupen browser smoke", () => {
       const cards = [...screen.querySelectorAll(".pilot-stat-card")].map(card => card.getBoundingClientRect());
       const fleetName = screen.querySelector('[data-fleet-record="current-vessel"] strong');
       const loadoutLabels = [...screen.querySelectorAll('[data-fleet-record="loadout"] span')];
+      const outerDecoration = getComputedStyle(screen, "::before");
       return {
         documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         screenOverflowX: screen.scrollWidth - screen.clientWidth,
@@ -1889,7 +1890,8 @@ test.describe("Lupen browser smoke", () => {
         screenRight: Math.round(screenRect.right),
         cardsFit: cards.every(rect => rect.left >= screenRect.left - 1 && rect.right <= screenRect.right + 1),
         standardShipNameFits: Boolean(fleetName && fleetName.scrollWidth <= fleetName.clientWidth + 1),
-        loadoutLabelsFit: loadoutLabels.every(label => label.scrollWidth <= label.clientWidth + 1 && label.scrollHeight <= label.clientHeight + 1)
+        loadoutLabelsFit: loadoutLabels.every(label => label.scrollWidth <= label.clientWidth + 1 && label.scrollHeight <= label.clientHeight + 1),
+        hasLegacyInsetFrame: outerDecoration.display !== "none" && !["none", '""'].includes(outerDecoration.content)
       };
     });
     expect(compactLayout.documentOverflowX).toBeLessThanOrEqual(0);
@@ -1901,6 +1903,7 @@ test.describe("Lupen browser smoke", () => {
     expect(compactLayout.cardsFit).toBe(true);
     expect(compactLayout.standardShipNameFits).toBe(true);
     expect(compactLayout.loadoutLabelsFit).toBe(true);
+    expect(compactLayout.hasLegacyInsetFrame).toBe(false);
 
     fs.mkdirSync("artifacts", { recursive: true });
     await page.screenshot({ path: "artifacts/pilot-profile-command-dossier-1366x768.png" });

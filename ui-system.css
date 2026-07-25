@@ -71,6 +71,17 @@
   box-sizing: border-box !important;
 }
 
+/* The shared screen border replaces the Pilot Profile's older inset frame. */
+#pilotProfileScreen.pilot-profile-screen.lupen-app-screen::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Crop the frame painted into the Pilot artwork behind the shared outer border. */
+#pilotProfileScreen.pilot-profile-screen.lupen-app-screen {
+  background-size: cover, cover, cover, calc(100% + 48px) calc(100% + 48px) !important;
+}
+
 .lupen-app-screen .lupen-screen-header {
   min-width: 0;
 }
