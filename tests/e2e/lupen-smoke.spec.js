@@ -286,6 +286,89 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("successful signup opens Morgan's Academy orientation for a fresh pilot", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      const user = {
+        id: "12121212-1212-4212-8212-121212121212",
+        email: "firstpilot@example.test",
+        user_metadata: { pilot_name: "First Pilot" }
+      };
+      const profile = {
+        id: user.id,
+        pilot_name: "First Pilot",
+        last_seen: "2026-07-26T12:00:00.000Z"
+      };
+      window.__freshSignupUser = user;
+      window.__fakeGetSupabaseClient = () => ({
+        auth: {
+          signUp: async () => ({
+            data: { user, session: { user } },
+            error: null
+          }),
+          getUser: async () => ({ data: { user }, error: null })
+        },
+        from: table => {
+          if (table === "profiles") {
+            return {
+              upsert: () => ({
+                select: () => ({
+                  single: async () => ({ data: profile, error: null })
+                })
+              })
+            };
+          }
+          return {
+            upsert: async payload => ({ data: payload, error: null })
+          };
+        }
+      });
+      window.eval("getSupabaseClient = window.__fakeGetSupabaseClient;");
+      window.showScreen("createScreen");
+      document.getElementById("createEmail").value = "firstpilot@example.test";
+      document.getElementById("createUsername").value = "First Pilot";
+      document.getElementById("createPassword").value = "password123";
+      document.getElementById("createConfirm").value = "password123";
+    });
+
+    await page.evaluate(() => window.createAccount());
+
+    const overlay = page.locator("#tutorialOverlay");
+    await expect(page.locator("#gameScreen")).toHaveClass(/active/);
+    await expect(overlay).toHaveClass(/active/);
+    await expect(page.locator("#tutorialStepLabel")).toContainText("Morgan / Academy Orientation");
+    await expect(page.locator(".tutorial-morgan-portrait")).toBeVisible();
+    await expect(page.locator(".tutorial-morgan-portrait")).toHaveAttribute("src", /morgan-command-liaison\.png$/);
+    await expect(page.locator("#tutorialTitle")).toHaveText("Welcome to Lupen, First Pilot");
+    await expect(page.locator("#tutorialText")).toContainText("Command Liaison");
+    await page.screenshot({ path: "artifacts/morgan-academy-orientation-1366x768.png", fullPage: false });
+
+    const initialState = await page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")));
+    expect(initialState).toMatchObject({
+      active: true,
+      completed: false,
+      stepIndex: 0,
+      pilotId: "12121212-1212-4212-8212-121212121212"
+    });
+    expect(initialState.lastStartedAt).toBeTruthy();
+
+    await page.locator("#tutorialNextBtn").click();
+    await expect(page.locator("#tutorialTitle")).toHaveText("Your first flight plan");
+    await expect(page.locator("#tutorialText")).toContainText("trade for credits");
+    await page.locator("#tutorialNextBtn").click();
+    await expect(page.locator("#tutorialTitle")).toHaveText("The Academy is your compass");
+    await expect(page.locator("#tutorialText")).toContainText("open Frontier operations");
+    await page.locator("#tutorialNextBtn").click();
+    await expect(page.locator("#tutorialTitle")).toHaveText("Open Hangar Bay");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("signup profile RLS failure shows a friendly setup message and does not continue", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -419,6 +502,91 @@ test.describe("Lupen browser smoke", () => {
     });
     await expect(page.evaluate(() => JSON.parse(localStorage.getItem("sectorOneAccount"))?.pilot_name)).resolves.toBe("Pilot");
     await expect(page.locator("#localSaveMigrationOverlay")).toHaveCount(0);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("login resumes Morgan's unfinished orientation but leaves completed pilots uninterrupted", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      const user = {
+        id: "56565656-5656-4656-8656-565656565656",
+        email: "returning@example.test",
+        user_metadata: { pilot_name: "Returning Pilot" }
+      };
+      const profile = {
+        id: user.id,
+        pilot_name: "Returning Pilot",
+        last_seen: "2026-07-26T12:00:00.000Z"
+      };
+      window.__returningUser = user;
+      window.__fakeGetSupabaseClient = () => ({
+        auth: {
+          signInWithPassword: async () => ({ data: { user }, error: null }),
+          getUser: async () => ({ data: { user }, error: null })
+        },
+        from: () => ({
+          upsert: async payload => ({ data: payload, error: null }),
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: profile, error: null })
+            })
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: async () => ({ data: profile, error: null })
+              })
+            })
+          })
+        })
+      });
+      window.eval(`
+        getSupabaseClient = window.__fakeGetSupabaseClient;
+        loadGameFromSupabase = async () => ({ loaded: true, exists: true, reason: "loaded" });
+        tutorialState = {
+          active: false,
+          completed: false,
+          stepIndex: STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "welcome-academy"),
+          lastStartedAt: "2026-07-26T11:00:00.000Z",
+          pilotId: window.__returningUser.id
+        };
+        saveTutorialState();
+      `);
+      window.showScreen("loginScreen");
+      document.getElementById("loginUser").value = "returning@example.test";
+      document.getElementById("loginPassword").value = "password123";
+    });
+
+    await page.evaluate(() => window.login());
+
+    await expect(page.locator("#tutorialOverlay")).toHaveClass(/active/);
+    await expect(page.locator("#tutorialTitle")).toHaveText("The Academy is your compass");
+    await expect(page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")))).resolves.toMatchObject({
+      active: true,
+      completed: false,
+      pilotId: "56565656-5656-4656-8656-565656565656"
+    });
+
+    await page.evaluate(() => window.eval(`
+      finishStarterTutorial();
+      showScreen("loginScreen");
+      document.getElementById("loginUser").value = "returning@example.test";
+      document.getElementById("loginPassword").value = "password123";
+    `));
+    await page.evaluate(() => window.login());
+
+    await expect(page.locator("#gameScreen")).toHaveClass(/active/);
+    await expect(page.locator("#tutorialOverlay")).not.toHaveClass(/active/);
+    await expect(page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")))).resolves.toMatchObject({
+      active: false,
+      completed: true,
+      pilotId: "56565656-5656-4656-8656-565656565656"
+    });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -1060,7 +1228,10 @@ test.describe("Lupen browser smoke", () => {
       uploadCount: window.__uploadCount,
       supabaseAuth: localStorage.getItem("sb-ylzglwiehkypetcdkqxd-auth-token"),
       saved: JSON.parse(localStorage.getItem("lupenGameState")),
-      tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial"))
+      tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")),
+      overlayActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false,
+      tutorialLabel: document.getElementById("tutorialStepLabel")?.textContent || "",
+      tutorialTitle: document.getElementById("tutorialTitle")?.textContent || ""
     }));
 
     expect(state.promptCount).toBe(1);
@@ -1069,8 +1240,12 @@ test.describe("Lupen browser smoke", () => {
     expect(state.saved.credits).toBe(10000);
     expect(state.saved.currentShipId).toBe("");
     expect(state.saved.ownedShips).toEqual([]);
-    expect(state.tutorial.active).toBe(false);
+    expect(state.tutorial.active).toBe(true);
     expect(state.tutorial.completed).toBe(false);
+    expect(state.tutorial.pilotId).toBe("66666666-6666-4666-8666-666666666666");
+    expect(state.overlayActive).toBe(true);
+    expect(state.tutorialLabel).toContain("Morgan / Academy Orientation");
+    expect(state.tutorialTitle).toBe("Welcome to Lupen, Fresh Pilot");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -5508,11 +5683,18 @@ test.describe("Lupen browser smoke", () => {
     expect(tutorial.hasActiveShip).toBe(false);
     expect(tutorial.ownedShips).toEqual([]);
     expect(tutorial.currentShipId).toBe("");
-    expect(tutorial.firstTitle).toBe("Welcome, Pilot");
-    expect(tutorial.label).toContain("Station AI / Starter Pilot Programme");
+    expect(tutorial.firstTitle).toBe("Welcome to Lupen, Pilot");
+    expect(tutorial.label).toContain("Morgan / Academy Orientation");
     expect(tutorial.label).not.toMatch(/\d+\s*\/\s*\d+/);
 
     const stepById = Object.fromEntries(tutorial.steps.map(step => [step.id, step]));
+    expect(stepById["welcome-new-pilot"]).toMatchObject({
+      title: "Welcome to Lupen, {pilot}",
+      speaker: "Morgan",
+      target: "#tutorialNextBtn"
+    });
+    expect(stepById["welcome-core-loop"].text).toContain("trade for credits");
+    expect(stepById["welcome-academy"].text).toContain("Academy assignments");
     expect(stepById["buy-first-ship"]).toMatchObject({
       title: "Claim Pioneer Hunter",
       target: "tutorial:firstShipBuy",
@@ -5552,6 +5734,7 @@ test.describe("Lupen browser smoke", () => {
     expect(stepById.complete.text).toContain("Destroyer");
     expect(stepById.complete.text).toContain("Moth");
     expect(stepById.complete.voiceCue).toBe("tutorial_outro_complete");
+    expect(stepById.complete.text).toContain("Good luck");
 
     const allCopy = tutorial.steps.map(step => `${step.title} ${step.text} ${step.target} ${step.event}`).join("\n");
     expect(allCopy).not.toMatch(/Falcon|LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix/);
@@ -6122,7 +6305,7 @@ test.describe("Lupen browser smoke", () => {
     expect(urlStart.tutorial.active).toBe(true);
     expect(urlStart.tutorial.completed).toBe(false);
     expect(urlStart.tutorial.stepIndex).toBe(0);
-    expect(urlStart.title).toBe("Welcome, Pilot");
+    expect(urlStart.title).toBe("Welcome to Lupen, Pilot");
     expect(urlStart.overlayActive).toBe(true);
 
     const helperReset = await page.evaluate(() => {

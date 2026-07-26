@@ -2937,7 +2937,7 @@ function applyTutorialBountyFallbackContract() {
     name: "Erebus Patrol Sweep",
     title: "Erebus Patrol Sweep",
     subtitle: "Destroy 2 Erebus bots",
-    description: "Clear a short Erebus patrol so Station AI can certify your first combat route.",
+    description: "Clear a short Erebus patrol so Morgan can certify your first combat route.",
     type: "standard",
     chipLabel: "TUTORIAL",
     contractType: "Tutorial Bounty",

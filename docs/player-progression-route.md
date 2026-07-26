@@ -2,9 +2,11 @@
 
 Step 5 establishes one dependable route from a new profile into Chapter I: Frontier.
 
-## Starter Pilot Programme
+## Morgan's Academy Orientation
 
-The guided first session teaches the immediate controls and economy:
+After a successful account creation or a first login with no existing progress, Morgan welcomes the pilot and introduces the Academy as their progression compass. The orientation resumes for the same account if it is left unfinished, but it does not interrupt a pilot whose orientation is complete or whose cloud save already contains established progress.
+
+Morgan then guides the first session through the immediate controls and economy:
 
 1. Claim the Pioneer Hunter.
 2. Inspect its Loadout.

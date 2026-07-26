@@ -774,10 +774,15 @@ async function createAccount() {
   resetToNoShipStarterState();
   if (typeof enableCloudSaveSync === "function") enableCloudSaveSync(sessionUser.id, "new_account_ready");
   saveGame();
-  enterHubFromLogin();
   if (typeof clearStarterTutorialState === "function") clearStarterTutorialState();
   if (typeof saveTutorialState === "function") saveTutorialState();
   if (typeof clearTutorialOverlayOnly === "function") clearTutorialOverlayOnly();
+  enterHubFromLogin();
+  if (typeof startMorganAcademyOrientation === "function") {
+    startMorganAcademyOrientation(sessionUser.id);
+  } else if (typeof startStarterTutorial === "function") {
+    startStarterTutorial(true, { pilotId: sessionUser.id });
+  }
 }
 
 function prepareFreshLocalStateAfterMissingCloudSave() {
@@ -797,6 +802,7 @@ async function login() {
   const password = document.getElementById("loginPassword")?.value || "";
   const message = document.getElementById("loginMessage");
   const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  let shouldStartMorganOrientation = false;
 
   if (!emailLooksValid) {
     setAccountMessage(message, "Enter a valid email address.");
@@ -915,6 +921,7 @@ async function login() {
         }
       } else {
         prepareFreshLocalStateAfterMissingCloudSave();
+        shouldStartMorganOrientation = true;
         cloudSaveResolutionComplete = true;
         if (typeof logStagingLocalSaveMigration === "function") {
           logStagingLocalSaveMigration("Started fresh because local save migration was declined.", {
@@ -926,6 +933,7 @@ async function login() {
       }
     } else {
       prepareFreshLocalStateAfterMissingCloudSave();
+      shouldStartMorganOrientation = true;
       cloudSaveResolutionComplete = true;
       if (typeof logStagingLocalSaveMigration === "function") {
         logStagingLocalSaveMigration("Started fresh because no meaningful local save was available.", {
@@ -939,13 +947,22 @@ async function login() {
 
   setAccountMessage(message, "");
 
-  tutorialState.active = false;
-  saveTutorialState();
-  clearTutorialOverlayOnly();
   if (cloudSaveResolutionComplete && typeof enableCloudSaveSync === "function") {
     enableCloudSaveSync(user.id, cloudSaveResult.loaded ? "cloud_save_loaded" : "new_cloud_save_ready");
   }
   enterHubFromLogin();
+  if (shouldStartMorganOrientation && typeof startMorganAcademyOrientation === "function") {
+    startMorganAcademyOrientation(user.id);
+  } else if (typeof resumeMorganAcademyOrientation === "function") {
+    const resumeResult = resumeMorganAcademyOrientation(user.id);
+    if (!resumeResult.started && typeof deactivateMorganAcademyOrientation === "function") {
+      deactivateMorganAcademyOrientation();
+    }
+  } else {
+    tutorialState.active = false;
+    saveTutorialState();
+    clearTutorialOverlayOnly();
+  }
 }
 
 async function logout() {

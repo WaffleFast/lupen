@@ -1,6 +1,7 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
-const TUTORIAL_NARRATOR_LABEL = "Station AI";
+const TUTORIAL_NARRATOR_LABEL = "Morgan";
+const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
 const TUTORIAL_TRADE_ROUTE = Object.freeze({
   origin: "Asteron Prime",
   good: "Iron",
@@ -12,13 +13,35 @@ let tutorialAdvanceTimeout = null;
 const STARTER_TUTORIAL_STEPS = [
   {
     id: "welcome-new-pilot",
-    title: "Welcome, Pilot",
+    title: "Welcome to Lupen, {pilot}",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_intro_welcome",
-    text: "Welcome, Pilot. Your path through Lupen starts here. Trade when you need credits, fight when you are ready to prove yourself, upgrade your gear, and keep moving until the stars begin to feel within reach.",
+    text: "I'm Morgan, your Command Liaison. I'll help you find your feet, claim your first ship, and understand the choices that shape your journey.",
     target: "#tutorialNextBtn",
     event: null,
-    actionLabel: "Begin",
+    actionLabel: "Continue",
+    manualOnly: true,
+    intro: true
+  },
+  {
+    id: "welcome-core-loop",
+    title: "Your first flight plan",
+    speaker: TUTORIAL_NARRATOR_LABEL,
+    text: "Life in Lupen has a simple rhythm: trade for credits, equip your ship, take contracts, survive combat, and improve what you own. We will walk through each part together.",
+    target: "#tutorialNextBtn",
+    event: null,
+    actionLabel: "Continue",
+    manualOnly: true,
+    intro: true
+  },
+  {
+    id: "welcome-academy",
+    title: "The Academy is your compass",
+    speaker: TUTORIAL_NARRATOR_LABEL,
+    text: "Your Academy assignments record the same actions you perform in the world. Complete them to open Frontier operations. I will always point you toward the next useful step.",
+    target: "#tutorialNextBtn",
+    event: null,
+    actionLabel: "Begin orientation",
     manualOnly: true,
     intro: true
   },
@@ -336,13 +359,13 @@ const STARTER_TUTORIAL_STEPS = [
   },
   {
     id: "complete",
-    title: "Programme Complete",
+    title: "Orientation Complete",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_outro_complete",
-    text: "Starter route complete. Open Journey and finish Morgan's Academy route through the Pioneer Line. Earn and purchase another Pioneer hull—the Freighter or Destroyer are natural next steps, with the Moth beyond them—to unlock Chapter I: Frontier and begin the route toward the next ship-plan family.",
+    text: "You have the fundamentals, {pilot}. Open Journey and finish the remaining Academy assignments. Across the Pioneer Line, the Freighter or Destroyer are natural next hulls, with the Moth farther ahead. Earn a second Pioneer hull to unlock Frontier. Good luck out there—I will be with you for the road ahead.",
     target: "#tutorialNextBtn",
     event: null,
-    actionLabel: "Begin your journey",
+    actionLabel: "Continue my journey",
     manualOnly: true,
     outro: true
   }
@@ -354,7 +377,8 @@ function loadTutorialState() {
     active: Boolean(parsed.active),
     completed: Boolean(parsed.completed),
     stepIndex: Math.max(0, Number(parsed.stepIndex || 0)),
-    lastStartedAt: parsed.lastStartedAt || null
+    lastStartedAt: parsed.lastStartedAt || null,
+    pilotId: String(parsed.pilotId || "")
   };
 }
 
@@ -364,6 +388,19 @@ function saveTutorialState() {
 
 function getCurrentTutorialStep() {
   return STARTER_TUTORIAL_STEPS[Math.min(tutorialState.stepIndex, STARTER_TUTORIAL_STEPS.length - 1)];
+}
+
+function getTutorialPilotIdentity() {
+  const accountKey = typeof STORAGE_ACCOUNT_KEY !== "undefined" ? STORAGE_ACCOUNT_KEY : "sectorOneAccount";
+  const account = safeParseLocalStorage(accountKey, {});
+  return {
+    id: String(account?.id || ""),
+    name: String(account?.pilot_name || account?.username || "Pilot").trim() || "Pilot"
+  };
+}
+
+function formatTutorialCopy(value) {
+  return String(value || "").replaceAll("{pilot}", getTutorialPilotIdentity().name);
 }
 
 function getStarterShipId() {
@@ -623,21 +660,48 @@ function setTutorialStepById(stepId) {
   return true;
 }
 
-function startStarterTutorial(reset = true) {
+function startStarterTutorial(reset = true, options = {}) {
   const firstStep = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "welcome-new-pilot");
+  const pilotId = String(options.pilotId || getTutorialPilotIdentity().id || tutorialState.pilotId || "");
   tutorialState = {
     active: true,
     completed: false,
     stepIndex: reset ? Math.max(0, firstStep) : Math.min(tutorialState.stepIndex || 0, STARTER_TUTORIAL_STEPS.length - 1),
-    lastStartedAt: new Date().toISOString()
+    lastStartedAt: reset ? new Date().toISOString() : (tutorialState.lastStartedAt || new Date().toISOString()),
+    pilotId
   };
   saveTutorialState();
   renderStarterTutorial();
-  addActivityLog("Starter Pilot Programme started.");
+  addActivityLog(`Morgan: Welcome, ${getTutorialPilotIdentity().name}. Academy orientation is now active.`);
 }
 
 function replayStarterTutorial() {
   startStarterTutorial(true);
+}
+
+function startMorganAcademyOrientation(pilotId = "") {
+  clearStarterTutorialState();
+  startStarterTutorial(true, { pilotId });
+  return { started: true, resumed: false, step: getCurrentTutorialStep()?.id || "" };
+}
+
+function resumeMorganAcademyOrientation(pilotId = "") {
+  const safePilotId = String(pilotId || getTutorialPilotIdentity().id || "");
+  const canResume = Boolean(
+    safePilotId &&
+    tutorialState.pilotId === safePilotId &&
+    tutorialState.completed === false &&
+    tutorialState.lastStartedAt
+  );
+  if (!canResume) return { started: false, resumed: false, step: getCurrentTutorialStep()?.id || "" };
+  startStarterTutorial(false, { pilotId: safePilotId });
+  return { started: true, resumed: true, step: getCurrentTutorialStep()?.id || "" };
+}
+
+function deactivateMorganAcademyOrientation() {
+  tutorialState.active = false;
+  saveTutorialState();
+  clearTutorialOverlayOnly();
 }
 
 function resetStarterTutorialState() {
@@ -655,7 +719,8 @@ function clearStarterTutorialState() {
     active: false,
     completed: false,
     stepIndex: 0,
-    lastStartedAt: null
+    lastStartedAt: null,
+    pilotId: ""
   };
 }
 
@@ -672,12 +737,14 @@ function lupenResetTutorial(options = {}) {
     started: shouldStart,
     resetProgress
   };
-  console.info("[Lupen staging] Starter Pilot Programme reset.", response);
+  console.info("[Lupen staging] Morgan Academy Orientation reset.", response);
   return response;
 }
 
 window.lupenResetTutorial = lupenResetTutorial;
 window.lupenResetStarterPilotProgramme = lupenResetTutorial;
+window.startMorganAcademyOrientation = startMorganAcademyOrientation;
+window.resumeMorganAcademyOrientation = resumeMorganAcademyOrientation;
 window.lupenStartTutorial = () => {
   startStarterTutorial(true);
   return { started: true, step: getCurrentTutorialStep()?.id || "" };
@@ -719,7 +786,7 @@ function handleStagingStartTutorialParam() {
 }
 
 function skipStarterTutorial() {
-  addHudToast("Complete the starter tutorial to continue.");
+  addHudToast("Complete Morgan's Academy orientation to continue.");
   renderStarterTutorial();
 }
 
@@ -731,8 +798,8 @@ function finishStarterTutorial() {
   clearTutorialHighlight();
   const overlay = document.getElementById("tutorialOverlay");
   if (overlay) overlay.classList.remove("active");
-  addHudToast("Starter Pilot Programme complete.");
-  addActivityLog("Starter Pilot Programme complete.");
+  addHudToast("Morgan's Academy orientation complete.");
+  addActivityLog("Morgan: Orientation complete. Good luck on your journey, Pilot.");
   renderPilotProfileIfActive();
 }
 
@@ -1360,7 +1427,7 @@ function renderStarterTutorial() {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
       if (tutorialState.active && getCurrentTutorialStep()?.id === "buy-first-ship") {
-        addHudToast("Pioneer Hunter is already active. Continuing the Starter Pilot Programme.");
+        addHudToast("Pioneer Hunter is already active. Morgan is continuing your orientation.");
         tutorialEvent("boughtFirstShip");
       }
     }, 120);
@@ -1378,11 +1445,11 @@ function renderStarterTutorial() {
   overlay.classList.toggle("tutorial-outro-active", Boolean(step.outro));
   overlay.classList.toggle("tutorial-left-card", step.place === "left");
   overlay.classList.toggle("tutorial-bottom-card", step.place === "bottom");
-  if (title) title.textContent = step.title;
-  if (text) text.textContent = step.text;
+  if (title) title.textContent = formatTutorialCopy(step.title);
+  if (text) text.textContent = formatTutorialCopy(step.text);
   if (label) {
     const speaker = step.speaker || TUTORIAL_NARRATOR_LABEL;
-    label.textContent = `${speaker} / Starter Pilot Programme`;
+    label.textContent = `${speaker} / ${TUTORIAL_PROGRAMME_LABEL}`;
   }
   if (progress) {
     progress.innerHTML = STARTER_TUTORIAL_STEPS.map((item, index) => `<i class="${index < tutorialState.stepIndex ? "done" : index === tutorialState.stepIndex ? "active" : ""}"></i>`).join("");

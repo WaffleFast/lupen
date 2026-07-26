@@ -22929,17 +22929,41 @@ input::placeholder {
 
 .tutorial-card-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
 }
 
-.tutorial-card-top span {
+.tutorial-morgan-portrait {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  object-fit: cover;
+  border: 1px solid rgba(127, 223, 255, 0.72);
+  border-radius: 12px;
+  box-shadow: 0 0 18px rgba(47, 151, 255, 0.18);
+}
+
+.tutorial-morgan-identity {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tutorial-morgan-identity span {
   color: #7fdfff;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1.3px;
+  text-transform: uppercase;
+}
+
+.tutorial-morgan-identity small {
+  color: rgba(205, 226, 241, 0.64);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
@@ -23235,7 +23259,7 @@ input::placeholder {
 
 
 /* ===== New-player-only tutorial + intro card polish ===== */
-/* Tutorial is now only auto-started from Create Account. Existing-player Pilot access is hidden/removed. */
+/* Morgan's orientation auto-starts for fresh accounts and first logins. Existing-player Pilot access stays hidden. */
 .starter-tutorial-profile-card,
 .starter-tutorial-actions {
   display: none !important;
@@ -23265,6 +23289,30 @@ input::placeholder {
   letter-spacing: 0.6px;
 }
 
+.tutorial-overlay.tutorial-intro-active .tutorial-card-top {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tutorial-overlay.tutorial-intro-active .tutorial-morgan-portrait {
+  width: 104px;
+  height: 104px;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 3px rgba(127, 223, 255, 0.08),
+    0 0 28px rgba(47, 151, 255, 0.24);
+}
+
+.tutorial-overlay.tutorial-intro-active .tutorial-morgan-identity span {
+  font-size: 12px;
+}
+
+.tutorial-overlay.tutorial-intro-active .tutorial-morgan-identity small {
+  font-size: 10px;
+}
+
 .tutorial-overlay.tutorial-intro-active .tutorial-card p {
   font-size: 14px;
   line-height: 1.55;
@@ -23281,6 +23329,16 @@ input::placeholder {
     right: 14px !important;
     top: 12px !important;
     width: auto !important;
+  }
+
+  .tutorial-overlay.tutorial-intro-active .tutorial-card-top {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .tutorial-overlay.tutorial-intro-active .tutorial-morgan-portrait {
+    width: 76px;
+    height: 76px;
   }
 }
 
