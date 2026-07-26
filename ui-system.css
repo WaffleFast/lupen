@@ -1109,3 +1109,83 @@
     min-width: 70px !important;
   }
 }
+
+/* Journey alignment: state-aware guidance and reward claim clarity. */
+#journeyScreen .journey-body {
+  height: min(574px, calc(100vh - 174px));
+}
+
+#journeyScreen .journey-header {
+  min-height: 88px;
+}
+
+#journeyScreen .journey-subtitle {
+  display: block;
+  max-width: 560px;
+  margin-top: 5px;
+  color: var(--lupen-text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+#journeyScreen .journey-briefing,
+#journeyScreen .journey-chapters-panel,
+#journeyScreen .journey-current-path,
+#journeyScreen .journey-frontier-status,
+#journeyScreen .journey-galaxy-strip {
+  border-radius: var(--lupen-panel-radius);
+}
+
+#journeyScreen .journey-chapter-route__item,
+#journeyScreen .journey-summary-compact,
+#journeyScreen .journey-assignment-card {
+  border-radius: var(--lupen-control-radius);
+}
+
+#journeyScreen .journey-chapter-route__item--pending .journey-chapter-route__status {
+  color: var(--lupen-warning);
+}
+
+#journeyScreen .journey-assignment-card.mission-state-claimable {
+  border-color: rgba(70, 233, 155, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(70, 233, 155, 0.12),
+    0 0 20px rgba(70, 233, 155, 0.12),
+    inset 0 0 18px rgba(70, 233, 155, 0.04);
+}
+
+#journeyScreen .journey-assignment-card.mission-state-claimed {
+  border-color: rgba(70, 233, 155, 0.34);
+  opacity: 0.8;
+}
+
+#journeyScreen .journey-status-pill--claimable {
+  border-color: rgba(70, 233, 155, 0.72);
+  background: rgba(70, 233, 155, 0.18);
+  color: #a8ffd0;
+  box-shadow: 0 0 12px rgba(70, 233, 155, 0.14);
+}
+
+#journeyScreen .journey-status-pill--claimed {
+  border-color: rgba(70, 233, 155, 0.36);
+  background: rgba(70, 233, 155, 0.08);
+  color: rgba(168, 255, 208, 0.74);
+}
+
+#journeyScreen .journey-objective-action button {
+  min-height: 32px;
+  border-radius: var(--lupen-control-radius);
+}
+
+@media (max-height: 740px) {
+  #journeyScreen .journey-header {
+    min-height: 76px;
+  }
+
+  #journeyScreen .journey-subtitle {
+    font-size: 0.7rem;
+  }
+}

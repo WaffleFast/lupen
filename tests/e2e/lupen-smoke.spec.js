@@ -8267,6 +8267,7 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator("#journeyHubBtn").click();
     await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
+    await expect(page.locator("#journeyScreen .journey-subtitle")).toHaveText("Your chapter route, assignments, and next unlock.");
     const journeyScreenBackground = await page.locator("#journeyScreen").evaluate(screen => {
       const styles = getComputedStyle(screen);
       return {
@@ -8316,6 +8317,7 @@ test.describe("Lupen browser smoke", () => {
     expect(morganBriefingLayout.contentWidth).toBeGreaterThan(360);
     expect(morganBriefingLayout.bgWidth).toBeGreaterThan(morganBriefingLayout.panelWidth * 0.45);
     const journeyFrameLayout = await page.locator("#journeyScreen").evaluate(screen => {
+      const screenRect = screen.getBoundingClientRect();
       const headerRect = screen.querySelector(".market-header")?.getBoundingClientRect();
       const panels = [
         ".journey-briefing",
@@ -8328,19 +8330,27 @@ test.describe("Lupen browser smoke", () => {
         return {
           selector,
           left: rect?.left || 0,
-          right: rect?.right || 0
+          right: rect?.right || 0,
+          top: rect?.top || 0,
+          bottom: rect?.bottom || 0
         };
       });
       return {
+        screenTop: screenRect.top,
+        screenBottom: screenRect.bottom,
         headerLeft: headerRect?.left || 0,
         headerRight: headerRect?.right || 0,
+        pageOverflow: document.documentElement.scrollHeight > window.innerHeight + 1,
         panels
       };
     });
     for (const panel of journeyFrameLayout.panels) {
       expect(panel.left).toBeGreaterThanOrEqual(journeyFrameLayout.headerLeft - 1);
       expect(panel.right).toBeLessThanOrEqual(journeyFrameLayout.headerRight + 1);
+      expect(panel.top).toBeGreaterThanOrEqual(journeyFrameLayout.screenTop - 1);
+      expect(panel.bottom).toBeLessThanOrEqual(journeyFrameLayout.screenBottom + 1);
     }
+    expect(journeyFrameLayout.pageOverflow).toBe(false);
     const fullWidthPanels = journeyFrameLayout.panels.filter(panel => (
       panel.selector === ".journey-briefing" ||
       panel.selector === ".journey-chapters-panel" ||
@@ -8352,9 +8362,9 @@ test.describe("Lupen browser smoke", () => {
     }
     await expect(page.locator("#journeyScreen")).toContainText("MORGAN");
     await expect(page.locator("#journeyScreen")).toContainText("COMMAND LIAISON");
-    await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
+    await expect(page.locator("#journeyScreen")).toContainText("ACADEMY BRIEFING");
     await expect(page.locator("#journeyScreen")).not.toContainText("STATION AI");
-    await expect(page.locator("#journeyScreen")).toContainText("Frontier is active, Pilot.");
+    await expect(page.locator("#journeyScreen")).toContainText("Academy training is active, Pilot.");
     const morganPortraitCrop = await page.locator("#journeyScreen .journey-briefing__portrait").evaluate(portrait => {
       const image = portrait.querySelector("img");
       const portraitRect = portrait.getBoundingClientRect();
@@ -8372,7 +8382,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toContainText("ACTIVE");
     await expect(page.locator("#journeyScreen")).toContainText("Chapter I");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier");
-    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toContainText("PENDING");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toContainText("ACADEMY REQUIRED");
     await expect(page.locator("#journeyScreen")).toContainText("Chapter II");
     await expect(page.locator("#journeyScreen")).toContainText("Locked Route");
     await expect(page.locator("#journeyScreen")).toContainText("LOCKED");
@@ -8411,6 +8421,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Claim Reward");
     await expect(page.locator("#journeyScreen .journey-assignment-icon img")).toHaveCount(7);
     await expect(page.locator("#journeyScreen .journey-assignment-grid .journey-reward-chips")).toHaveCount(0);
+    await page.locator("#journeyScreen").screenshot({ path: "artifacts/journey-player-facing-academy-1366x768.png" });
     const initialGalaxyFooter = await page.locator("#journeyScreen .journey-galaxy-strip").evaluate(footer => {
       const rect = footer.getBoundingClientRect();
       const text = footer.querySelector("span")?.getBoundingClientRect();
@@ -8487,8 +8498,8 @@ test.describe("Lupen browser smoke", () => {
     expect(completedAcademyCard.badgeText).toContain("COMPLETE");
     expect(completedAcademyCard.badgeCheck).toContain("✓");
     expect(completedAcademyCard.progressWidth).toBe("100%");
-    expect(completedAcademyCard.borderColor).toMatch(/70, 230, 164|54, 242, 143|109, 255, 173/);
-    expect(completedAcademyCard.boxShadow).toMatch(/70, 230, 164|54, 242, 143|109, 255, 173/);
+    expect(completedAcademyCard.borderColor).toMatch(/70, 233, 155|70, 230, 164|54, 242, 143|109, 255, 173/);
+    expect(completedAcademyCard.boxShadow).toMatch(/70, 233, 155|70, 230, 164|54, 242, 143|109, 255, 173/);
     expect(completedAcademyCard.progressBackground).toMatch(/54, 242, 143|141, 255, 196|linear-gradient/);
     const partialGalaxyFooter = await page.locator("#journeyScreen .journey-galaxy-strip").evaluate(footer => {
       const rect = footer.getBoundingClientRect();
@@ -8607,6 +8618,8 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy'] .journey-chapter-route__check")).toBeVisible();
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("data-journey-chapter-state", "active");
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
+    await expect(page.locator("#journeyScreen")).toContainText("Frontier operations are active, Pilot.");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Progress");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 4");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier Assignments");
@@ -8691,11 +8704,28 @@ test.describe("Lupen browser smoke", () => {
     expect(haulProgress.runtime).toMatchObject({ state: "completed", progress: 1 });
     expect(haulProgress.saved).toMatchObject({ state: "completed", progress: 1 });
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("1 / 1");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("COMPLETE");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("CLAIM READY");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("Claim Reward");
+    const claimReadyLayout = await page.locator("#journeyScreen [data-journey-assignment-id='first_haul']").evaluate(card => {
+      const cardRect = card.getBoundingClientRect();
+      const buttonRect = card.querySelector("button")?.getBoundingClientRect();
+      return {
+        buttonFits: Boolean(buttonRect) &&
+          buttonRect.left >= cardRect.left - 1 &&
+          buttonRect.right <= cardRect.right + 1 &&
+          buttonRect.top >= cardRect.top - 1 &&
+          buttonRect.bottom <= cardRect.bottom + 1
+      };
+    });
+    expect(claimReadyLayout.buttonFits).toBe(true);
+    await expect(page.locator("#journeyScreen .journey-briefing__portrait-img")).toBeVisible();
+    await expect(page.locator("#journeyScreen .journey-briefing__name")).toBeVisible();
+    await page.waitForTimeout(150);
+    await page.locator("#journeyScreen").screenshot({ path: "artifacts/journey-player-facing-claim-ready-1366x768.png" });
     await page.locator("#journeyScreen [data-journey-assignment-id='first_haul'] button", { hasText: "Claim Reward" }).click();
     await expect(page.evaluate(() => window.eval(`missionProgress.missions.first_haul.state`))).resolves.toBe("claimed");
     await expect(page.evaluate(() => window.eval(`credits`))).resolves.toBe(10250);
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='first_haul']")).toContainText("CLAIMED");
 
     const resetState = await page.evaluate(async () => {
       await window.lupenResetPilotProgress({ reload: false });

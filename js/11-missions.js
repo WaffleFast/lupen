@@ -924,6 +924,11 @@ function renderMissionJournal() {
 }
 
 function renderJourneyMorganBriefing() {
+  const academyActive = getJourneyActiveChapterId() === "academy";
+  const briefingLabel = academyActive ? "ACADEMY BRIEFING" : "FRONTIER BRIEFING";
+  const briefingMessage = academyActive
+    ? "Academy training is active, Pilot. Finish these assignments to unlock Chapter I: Frontier."
+    : "Frontier operations are active, Pilot. Complete these assignments to reveal the next route.";
   return `
     <section class="journey-morgan-panel journey-briefing">
       <div class="journey-briefing__bg" aria-hidden="true"></div>
@@ -935,10 +940,10 @@ function renderJourneyMorganBriefing() {
           <strong class="journey-briefing__name">MORGAN</strong>
           <em class="journey-briefing__role">COMMAND LIAISON</em>
           <div class="journey-briefing__signal">
-            <span class="journey-briefing__eyebrow"><i aria-hidden="true"></i>FRONTIER BRIEFING</span>
+            <span class="journey-briefing__eyebrow"><i aria-hidden="true"></i>${escapeHtml(briefingLabel)}</span>
             <div class="journey-briefing__waveform journey-waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
           </div>
-          <p class="journey-briefing__message">Frontier is active, Pilot. Complete these assignments and we'll open the next path.</p>
+          <p class="journey-briefing__message">${escapeHtml(briefingMessage)}</p>
         </div>
       </div>
     </section>
@@ -985,6 +990,7 @@ function getJourneyChapterStatusLabel(chapter) {
   if (state === "complete") return "COMPLETE";
   if (state === "active") return "ACTIVE";
   if (state === "locked") return "LOCKED";
+  if (state === "pending" && chapter.id === "frontier") return "ACADEMY REQUIRED";
   if (state === "pending") return "PENDING";
   return String(chapter.status || "PENDING").toUpperCase();
 }
@@ -1195,9 +1201,9 @@ function getJourneyAssignmentIconSrc(assignment) {
 function renderJourneyAssignmentStatePill(state, hasReward = true) {
   const normalized = String(state || "").toLowerCase();
   if (normalized === "claimable") {
-    return renderJourneyStatusPill("completed");
+    return renderJourneyStatusPill(hasReward ? "claimable" : "completed");
   }
-  if (normalized === "claimed") return renderJourneyStatusPill("completed");
+  if (normalized === "claimed") return renderJourneyStatusPill(hasReward ? "claimed" : "completed");
   if (normalized === "in-progress") return renderJourneyStatusPill("in-progress");
   if (normalized === "locked") return renderJourneyStatusPill("locked");
   return "";
@@ -1260,7 +1266,7 @@ function renderJourneyFrontierStatus() {
       return left.remaining - right.remaining;
     });
   const recommended = assignments[0] || null;
-  const nextUnlock = activeChapterId === "academy" ? "Chapter I · Frontier" : "Chapter II Route";
+  const nextUnlock = activeChapterId === "academy" ? "Chapter I: Frontier" : "Chapter II Route";
   return `
     <section class="journey-summary-panel journey-frontier-status">
       <div class="journey-panel-head"><span>CHAPTER PROGRESS</span></div>
@@ -1277,7 +1283,7 @@ function renderJourneyFrontierStatus() {
         <div class="journey-summary-next">
           <span>NEXT OBJECTIVE</span>
           <strong>${escapeHtml(recommended?.assignment?.journeyTitle || "Chapter complete")}</strong>
-          <small>${recommended ? `${formatNumber(recommended.remaining)} remaining` : "All assignments complete"}</small>
+          <small>${recommended ? `${formatNumber(recommended.remaining)} of ${formatNumber(recommended.required)} remaining` : "All assignments complete"}</small>
         </div>
         <div class="journey-summary-unlock">
           <span>NEXT UNLOCK</span>
