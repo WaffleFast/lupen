@@ -599,6 +599,207 @@
   }
 }
 
+/* Forge: concise upgrade decisions and shared screen hierarchy. */
+#upgradeForgeScreen .forge-lupen-header {
+  min-height: 88px;
+}
+
+#upgradeForgeScreen .forge-lupen-heading .hangar-subtitle {
+  max-width: 640px;
+}
+
+#upgradeForgeScreen .forge-lupen-info {
+  border-radius: var(--lupen-control-radius);
+}
+
+#upgradeForgeScreen .forge-shard-pill,
+#upgradeForgeScreen .forge-panel,
+#upgradeForgeScreen .forge-showcase,
+#upgradeForgeScreen .forge-owned-item,
+#upgradeForgeScreen .forge-level-node,
+#upgradeForgeScreen .forge-preview-cost,
+#upgradeForgeScreen .forge-start-btn {
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#upgradeForgeScreen .modern-store-panel-header span {
+  font-size: 0.74rem !important;
+  letter-spacing: 0.14em !important;
+}
+
+#upgradeForgeScreen .modern-store-panel-header em {
+  color: var(--lupen-text-soft);
+  font-size: 0.62rem;
+}
+
+#upgradeForgeScreen .forge-owned-copy > strong {
+  font-size: 1rem !important;
+}
+
+#upgradeForgeScreen .forge-owned-tags > span.vault {
+  color: var(--lupen-text-soft) !important;
+  border-color: rgba(143, 166, 183, 0.38) !important;
+}
+
+#upgradeForgeScreen .forge-state-preview {
+  color: var(--lupen-text-soft) !important;
+  font-size: 0.66rem !important;
+}
+
+#upgradeForgeScreen .forge-map1-preview h3 {
+  font-size: 0.72rem !important;
+}
+
+#upgradeForgeScreen .forge-level-node > small {
+  color: var(--forge-tier-color);
+}
+
+#upgradeForgeScreen .forge-level-flow--maximum {
+  grid-template-columns: 1fr !important;
+}
+
+#upgradeForgeScreen .forge-level-flow--maximum > .forge-level-node--maximum {
+  width: 100%;
+  min-height: 52px !important;
+  box-sizing: border-box;
+}
+
+#upgradeForgeScreen .forge-preview-stat--maximum {
+  grid-template-columns: minmax(110px, 1fr) 84px 94px !important;
+}
+
+#upgradeForgeScreen .forge-preview-stat--maximum em {
+  color: var(--forge-tier-color) !important;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#upgradeForgeScreen .forge-upgrade-action-row {
+  grid-template-columns: minmax(220px, 0.92fr) minmax(280px, 1.08fr);
+}
+
+#upgradeForgeScreen .forge-preview-cost {
+  gap: 3px;
+  min-height: 72px !important;
+}
+
+#upgradeForgeScreen .forge-cost-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#upgradeForgeScreen .forge-cost-heading > span {
+  color: var(--lupen-cyan-bright);
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+#upgradeForgeScreen .forge-cost-heading > em {
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 212, 95, 0.34);
+  border-radius: 999px;
+  color: var(--lupen-warning);
+  font-size: 0.52rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#upgradeForgeScreen .forge-preview-cost.ready .forge-cost-heading > em {
+  border-color: rgba(70, 233, 155, 0.42);
+  color: var(--lupen-success);
+}
+
+#upgradeForgeScreen .forge-preview-cost.maximum .forge-cost-heading > em {
+  border-color: rgba(var(--forge-tier-rgb), 0.5);
+  color: var(--forge-tier-color);
+}
+
+#upgradeForgeScreen .forge-cost-balance {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--lupen-text-muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#upgradeForgeScreen .forge-cost-balance b {
+  margin-left: 3px;
+  color: var(--lupen-text);
+}
+
+#upgradeForgeScreen .forge-preview-cost.blocked .forge-cost-balance span:last-child b {
+  color: var(--lupen-warning);
+}
+
+#upgradeForgeScreen .forge-preview-cost strong.forge-maximum-label {
+  display: block !important;
+  margin-top: 4px !important;
+  color: var(--forge-tier-color) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.1 !important;
+  text-transform: uppercase;
+}
+
+#upgradeForgeScreen .forge-start-btn {
+  min-height: 72px !important;
+  font-size: 0.86rem !important;
+}
+
+#upgradeForgeScreen .forge-bounty-help {
+  color: var(--lupen-text-soft) !important;
+}
+
+#upgradeForgeScreen .terminal-empty-state {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--lupen-text-soft);
+  text-align: center;
+}
+
+#upgradeForgeScreen .terminal-empty-state strong {
+  color: var(--lupen-text);
+  font-size: 0.86rem;
+}
+
+#upgradeForgeScreen .terminal-empty-state span {
+  max-width: 310px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+@media (max-height: 780px) and (min-width: 901px) {
+  #upgradeForgeScreen .forge-lupen-header {
+    min-height: 82px;
+  }
+
+  #upgradeForgeScreen .forge-lupen-heading > h2 {
+    font-size: 2.55rem;
+  }
+
+  #upgradeForgeScreen .forge-lupen-heading .hangar-subtitle {
+    margin-top: 3px;
+    font-size: 0.68rem;
+  }
+
+  #upgradeForgeScreen .forge-preview-cost,
+  #upgradeForgeScreen .forge-start-btn {
+    min-height: 66px !important;
+  }
+}
+
 /* Bounty Board: shared hierarchy and contract-state presentation. */
 #bountyScreen.bounty-board-screen.lupen-app-screen {
   padding: 18px !important;

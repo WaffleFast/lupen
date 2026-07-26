@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
   <link rel="stylesheet" href="loadout-redesign.css?v=20260721-unified-hangar" />
-  <link rel="stylesheet" href="ui-system.css?v=20260726-bounty-alignment" />
+  <link rel="stylesheet" href="ui-system.css?v=20260726-forge-alignment" />
 </head>
 <body>
   <div class="stars"></div>
@@ -187,13 +187,14 @@
         <div class="forge-lupen-heading">
           <p>LUPEN FORGE</p>
           <h2 id="forgeStationText">ASTERON PRIME</h2>
+          <span class="hangar-subtitle">Improve owned weapons and modules with Lupen Shards.</span>
         </div>
         <button class="screen-back-btn lupen-back-button forge-map1-close" onclick="returnToHub()">Back</button>
       </div>
 
       <div class="forge-lupen-info">
         <span class="forge-info-icon" aria-hidden="true">i</span>
-        <p>Select owned gear, compare the next level, and commit Lupen Shards.</p>
+        <p>Choose gear, review the next level, then upgrade when you have enough shards.</p>
         <div class="forge-shard-pill" aria-label="Current Lupen Shards">
           <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
           <strong id="forgeShardCountText">0</strong>
@@ -204,7 +205,7 @@
       <div class="upgrade-forge-layout">
         <aside class="forge-panel forge-selected-panel forge-owned-panel">
           <div class="modern-store-panel-header">
-            <span>Upgradeable Gear</span>
+            <span>Owned Gear</span>
             <em id="forgeOwnedCount">0 Owned Items</em>
           </div>
           <div class="forge-inventory-scroll">
@@ -226,7 +227,7 @@
 
         <main class="forge-panel forge-detail-panel forge-preview-panel">
           <div class="modern-store-panel-header">
-            <span>Selected Upgrade</span>
+            <span>Upgrade Preview</span>
           </div>
           <div class="forge-detail-body">
             <section class="forge-showcase" aria-label="Selected gear">
@@ -803,7 +804,7 @@
   <script src="js/07-save-load.js?v=20260718-pioneer-line"></script>
   <script src="js/08-tutorial.js?v=20260718-pioneer-line"></script>
   <script src="js/09-audio.js"></script>
-  <script src="js/10-upgrade-forge.js?v=20260716-forge-tiers"></script>
+  <script src="js/10-upgrade-forge.js?v=20260726-forge-alignment"></script>
   <script src="js/11-missions.js?v=20260715-tactical-hud"></script>
 
     <div id="tutorialOverlay" class="tutorial-overlay" aria-live="polite">

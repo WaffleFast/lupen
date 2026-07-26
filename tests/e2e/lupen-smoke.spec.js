@@ -5496,10 +5496,15 @@ test.describe("Lupen browser smoke", () => {
 
     await expect(page.locator("#upgradeForgeScreen")).toHaveClass(/active/);
     await expect(page.locator("#upgradeForgeScreen")).toContainText("LUPEN FORGE");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgradeable Gear");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Selected Upgrade");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Improve owned weapons and modules with Lupen Shards.");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Choose gear, review the next level, then upgrade when you have enough shards.");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Owned Gear");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade Preview");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Lupen Shards");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Need 15 More Shards");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Balance 10");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Still needed 15");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Next-Level Comparison");
     await expect(page.locator("#forgeTierLegend")).toContainText("Common");
     await expect(page.locator("#forgeTierLegend")).toContainText("Refined");
     await expect(page.locator("#forgeTierLegend")).toContainText("Unique");
@@ -5587,8 +5592,7 @@ test.describe("Lupen browser smoke", () => {
       list.scrollTop = 0;
     });
     await page.locator("#forgeSelectedPanel .forge-owned-item").first().click();
-    await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-ui-final.png" });
-    await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-style-aligned.png" });
+    await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-player-facing-blocked-1366x768.png" });
 
     await page.evaluate(() => window.eval(`
       shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 1);
@@ -5597,6 +5601,28 @@ test.describe("Lupen browser smoke", () => {
       renderUpgradeForge();
     `));
     await expect(page.locator("#forgeStartBtn")).toBeEnabled();
+    await expect(page.locator("#forgeStartBtn")).toContainText("Upgrade to Refined · Level II");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("After upgrade 0");
+    const forgeGeometry = await page.evaluate(() => {
+      const screen = document.getElementById("upgradeForgeScreen")?.getBoundingClientRect();
+      const listPanel = document.querySelector("#upgradeForgeScreen .forge-owned-panel")?.getBoundingClientRect();
+      const detailPanel = document.querySelector("#upgradeForgeScreen .forge-detail-panel")?.getBoundingClientRect();
+      const action = document.getElementById("forgeStartBtn")?.getBoundingClientRect();
+      if (!screen || !listPanel || !detailPanel || !action) return null;
+      return {
+        listFits: listPanel.top >= screen.top && listPanel.bottom <= screen.bottom + 1,
+        detailFits: detailPanel.top >= screen.top && detailPanel.bottom <= screen.bottom + 1,
+        actionFits: action.top >= detailPanel.top && action.bottom <= detailPanel.bottom + 1,
+        pageOverflow: document.documentElement.scrollHeight > window.innerHeight + 1
+      };
+    });
+    expect(forgeGeometry).toEqual({
+      listFits: true,
+      detailFits: true,
+      actionFits: true,
+      pageOverflow: false
+    });
+    await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-player-facing-ready-1366x768.png" });
     await page.locator("#forgeStartBtn").click();
     await page.waitForFunction(() => window.eval(`getEquipmentLevel(shipLoadouts.falcon.guns[0]) === 2 && upgradeMaterials.lupenShards === 0`), null, { timeout: 5000 });
 
@@ -5627,17 +5653,37 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#forgeMaterialsList")).toContainText("Elite");
     await expect(page.locator("#forgeMaterialsList")).toContainText("Level IV");
     await expect(page.locator("#forgeStartBtn")).toBeEnabled();
+    await expect(page.locator("#forgeStartBtn")).toContainText("Upgrade to Elite · Level IV");
 
     await page.evaluate(() => window.eval(`
       shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 5);
       upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 1000 });
       renderUpgradeForge();
     `));
-    await expect(page.locator("#forgeStatePreview")).toContainText("Item has reached Super tier, the maximum Forge level.");
+    await expect(page.locator("#gameRewardBurst")).not.toHaveClass(/active/);
+    await expect(page.locator("#forgeStatePreview")).toContainText("Maximum Forge level reached.");
     await expect(page.locator("#forgeSelectedTier")).toContainText("Super · Level V");
     await expect(page.locator("#forgeSelectedPanel .forge-owned-item.selected")).toHaveClass(/forge-tier-super/);
     await expect(page.locator("#forgeSelectedPanel .forge-owned-item.selected .forge-tier-pips i")).toHaveCount(5);
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
+    await expect(page.locator("#forgeStartBtn")).toContainText("Maximum Level");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Upgrade Status");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("No further upgrades");
+    await expect(page.locator("#forgeMaterialsList")).not.toContainText("Upgrade Cost");
+    await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-player-facing-maximum-1366x768.png" });
+
+    await page.evaluate(() => window.eval(`
+      ownedGuns = {};
+      ownedAttachments = {};
+      inventoryItems = [];
+      shipLoadouts = {};
+      selectedForgeItemId = null;
+      renderUpgradeForge();
+    `));
+    await expect(page.locator("#forgeSelectedPanel")).toContainText("No gear available");
+    await expect(page.locator("#forgeSelectedPanel")).toContainText("Buy a weapon or module at the Station Store");
+    await expect(page.locator("#forgeStartBtn")).toBeDisabled();
+    await expect(page.locator("#forgeStartBtn")).toContainText("Select Item");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
