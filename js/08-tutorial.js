@@ -168,10 +168,17 @@ const STARTER_TUTORIAL_STEPS = [
   },
   {
     id: "equip-item",
-    title: "Equip weapon",
-    text: "Fit the Pulse Laser into an open weapon slot if needed. If your starter weapons are already online, we continue.",
+    title: "Equip second weapon",
+    text: "Fit the Pulse Laser into the Hunter's open weapon slot. Two mounted weapons give your first combat run a complete volley.",
     target: "tutorial:spareWeapon",
     event: "equippedItem"
+  },
+  {
+    id: "equip-attachment",
+    title: "Equip Cargo Pod",
+    text: "Fit the issued Cargo Pod into an equipment slot. Attachments shape a ship beyond its weapons, and this one expands your trade capacity.",
+    target: "tutorial:spareAttachment",
+    event: "equippedAttachment"
   },
   {
     id: "return-after-equip",
@@ -316,16 +323,23 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "repair-reminder",
     title: "Repair check",
-    text: "Open Hangar after combat and check hull and shield condition. Repair before risky launches if your hull took damage.",
+    text: "Open Hangar after combat and check hull condition. Morgan will guide the repair or confirm that no hull service is needed.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
+  },
+  {
+    id: "repair-ship",
+    title: "Service the Hunter",
+    text: "Run Hull Service if combat reached the hull. If condition is already 100%, Morgan will confirm the inspection automatically.",
+    target: "tutorial:repairShip",
+    event: "repairedShip"
   },
   {
     id: "complete",
     title: "Programme Complete",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_outro_complete",
-    text: "Starter route complete. The full Pioneer Line is already available in Ship Plans. Run trades and bounties to afford the Freighter, Destroyer and, eventually, the Moth.",
+    text: "Starter route complete. Open Journey and finish Morgan's Academy route through the Pioneer Line. Earn and purchase another Pioneer hull—the Freighter or Destroyer are natural next steps, with the Moth beyond them—to unlock Chapter I: Frontier and begin the route toward the next ship-plan family.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin your journey",
@@ -380,6 +394,25 @@ function hasTutorialPulseLaserAvailable() {
 
 function hasTutorialCombatWeaponEquipped() {
   return Object.values(shipLoadouts || {}).some(loadout => (loadout?.guns || []).length > 0);
+}
+
+function getTutorialEquippedGunCount() {
+  const shipId = currentShipId || getStarterShipId();
+  return (getTutorialShipLoadout(shipId).guns || []).filter(entry => tutorialEntryKey(entry)).length;
+}
+
+function hasTutorialTwoGunsEquipped() {
+  return getTutorialEquippedGunCount() >= 2;
+}
+
+function hasTutorialSpareWeaponAvailable() {
+  return Number(ownedGuns?.pulseLaser || 0) > 0 ||
+    (Array.isArray(inventoryItems) && inventoryItems.some(item => item?.key === "pulseLaser"));
+}
+
+function hasTutorialAttachmentEquipped() {
+  const shipId = currentShipId || getStarterShipId();
+  return (getTutorialShipLoadout(shipId).attachments || []).some(entry => tutorialEntryKey(entry));
 }
 
 function hasOpenTutorialWeaponSlot() {
@@ -512,13 +545,16 @@ function getTutorialStateCompletionReason(step) {
     case "open-store":
     case "buy-equipment":
     case "return-after-store":
-      return hasTutorialPulseLaserAvailable() || hasTutorialCombatWeaponEquipped() ? "starter_weapon_available" : "";
+      if (hasTutorialTwoGunsEquipped()) return "two_guns_equipped";
+      return hasTutorialSpareWeaponAvailable() ? "spare_weapon_available" : "";
     case "open-hangar-equip":
     case "equip-item":
-    case "return-after-equip":
-      if (hasTutorialPulseLaserEquipped()) return "pulse_laser_equipped";
-      if (!hasOpenTutorialWeaponSlot() && hasTutorialCombatWeaponEquipped()) return "weapon_slots_already_filled";
+      if (hasTutorialTwoGunsEquipped()) return "two_guns_equipped";
+      if (!hasOpenTutorialWeaponSlot() && hasTutorialCombatWeaponEquipped()) return "weapon_slots_filled";
       return "";
+    case "equip-attachment":
+    case "return-after-equip":
+      return hasTutorialAttachmentEquipped() ? "attachment_equipped" : "";
     case "accept-bounty":
       return isTutorialBountyAccepted() ? "bounty_already_active" : "";
     case "jump-to-bounty-zone":
@@ -533,6 +569,8 @@ function getTutorialStateCompletionReason(step) {
       return !activeObjective && Number(playerProgress?.totals?.bountiesClaimed || 0) > 0 ? "bounty_already_claimed" : "";
     case "forge-upgrade-weapon":
       return isTutorialForgeComplete() ? "pulse_laser_already_upgraded" : "";
+    case "repair-ship":
+      return typeof getRepairCost === "function" && getRepairCost() <= 0 ? "hull_service_not_needed" : "";
     default:
       return "";
   }
@@ -544,6 +582,9 @@ function advanceTutorialStepFromState(reason) {
     step: step?.id,
     reason
   });
+  if (step?.id === "repair-ship" && reason === "hull_service_not_needed" && typeof recordMissionEvent === "function") {
+    recordMissionEvent("repair_ship", { shipId: currentShipId, inspectionOnly: true, cost: 0 });
+  }
   tutorialState.stepIndex = Math.min(STARTER_TUTORIAL_STEPS.length - 1, tutorialState.stepIndex + 1);
   saveTutorialState();
 }
@@ -996,6 +1037,16 @@ function getDynamicTutorialTarget(step) {
   if (step.target === "tutorial:spareWeapon") {
     return document.querySelector("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']:not(:disabled)") ||
            document.querySelector("#gunInventory .hangar-equipment-card:not(:disabled)");
+  }
+
+  if (step.target === "tutorial:spareAttachment") {
+    return document.querySelector("#attachmentInventory .hangar-equipment-card[data-item-key='cargoPod']:not(:disabled)") ||
+           document.querySelector("#attachmentInventory .hangar-equipment-card:not(:disabled)");
+  }
+
+  if (step.target === "tutorial:repairShip") {
+    return document.querySelector("#hangarScreen button[onclick='repairCurrentShip()']:not(:disabled)") ||
+           document.querySelector("#hangarScreen .loadout-repair-ready");
   }
 
   if (step.target === "tutorial:forgeUpgradeButton") {

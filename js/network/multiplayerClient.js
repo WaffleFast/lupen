@@ -3396,6 +3396,7 @@
         const claim = connection.lastStagingBountyClaimResult;
         const creditsText = Math.round(Number(claim.creditsDelta || 0));
         const shardText = Math.round(Number(claim.lupenShardDelta || 0));
+        global.recordBountyClaimProgress?.(claim.bounty || { id: claim.id || "staging-bounty" });
         addStagingActivityLogOnce(
           `bounty-claimed:${claim.bounty?.id || claim.id}:${claim.creditsAfter || claim.lupenShardsAfter || claim.receivedAt}`,
           `Bounty reward claimed: +${creditsText} CR${shardText > 0 ? `, +${shardText} Lupen Shard${shardText === 1 ? "" : "s"}` : ""}.`

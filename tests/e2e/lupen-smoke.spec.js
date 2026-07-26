@@ -1895,11 +1895,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(profile.locator('[data-profile-stat="trade-profit"]')).toContainText("CR 8,550");
     await expect(profile.locator('[data-profile-stat="cargo-sold"]')).toContainText("403");
     await expect(profile.locator('[data-profile-stat="ships-owned"]')).toContainText("1 / 4");
-    await expect(profile.locator('[data-profile-stat="galaxy-completion"]')).toContainText("16%");
+    await expect(profile.locator('[data-profile-stat="galaxy-completion"]')).toContainText("13%");
 
     const career = profile.locator('[data-profile-section="career-progress"]');
     await expect(career).toContainText("Academy");
-    await expect(career.locator('[data-career-progress="academy"]')).toContainText("5 / 7 assignments");
+    await expect(career.locator('[data-career-progress="academy"]')).toContainText("5 / 9 assignments");
     await expect(career.locator('[data-career-progress="frontier"]')).toContainText("Pending");
 
     const fleet = profile.locator('[data-profile-section="fleet-record"]');
@@ -5524,9 +5524,14 @@ test.describe("Lupen browser smoke", () => {
       event: "boughtStoreGun"
     });
     expect(stepById["equip-item"]).toMatchObject({
-      title: "Equip weapon",
+      title: "Equip second weapon",
       target: "tutorial:spareWeapon",
       event: "equippedItem"
+    });
+    expect(stepById["equip-attachment"]).toMatchObject({
+      title: "Equip Cargo Pod",
+      target: "tutorial:spareAttachment",
+      event: "equippedAttachment"
     });
     expect(stepById["open-forge"]).toMatchObject({
       title: "Open Forge",
@@ -5537,6 +5542,11 @@ test.describe("Lupen browser smoke", () => {
       target: "tutorial:forgeUpgradeButton",
       event: "upgradedTutorialWeapon"
     });
+    expect(stepById["repair-ship"]).toMatchObject({
+      title: "Service the Hunter",
+      target: "tutorial:repairShip",
+      event: "repairedShip"
+    });
     expect(stepById.complete.text).toContain("Pioneer Line");
     expect(stepById.complete.text).toContain("Freighter");
     expect(stepById.complete.text).toContain("Destroyer");
@@ -5544,7 +5554,7 @@ test.describe("Lupen browser smoke", () => {
     expect(stepById.complete.voiceCue).toBe("tutorial_outro_complete");
 
     const allCopy = tutorial.steps.map(step => `${step.title} ${step.text} ${step.target} ${step.event}`).join("\n");
-    expect(allCopy).not.toMatch(/Falcon|LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix|tutorial:spareAttachment/);
+    expect(allCopy).not.toMatch(/Falcon|LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix/);
     expect(allCopy).toMatch(/Pioneer Hunter|Pioneer Line|Freighter|Destroyer|Moth|credits|XP|bounties|Forge/i);
 
     await expectNoUnexpectedBrowserErrors(failures);
@@ -5943,6 +5953,8 @@ test.describe("Lupen browser smoke", () => {
           creditsDelta: credits - creditsBeforeClaim,
           shardDelta: upgradeMaterials.lupenShards - shardsBeforeClaim,
           xpDelta: playerProgress.combatXp - xpBeforeClaim,
+          bountiesClaimed: playerProgress.totals.bountiesClaimed,
+          academyBounty: missionProgress.missions.academy_bounty,
           forgeText,
           claimedStatus,
           resetStatuses,
@@ -5972,6 +5984,8 @@ test.describe("Lupen browser smoke", () => {
     expect(state.creditsDelta).toBe(2500);
     expect(state.shardDelta).toBe(75);
     expect(state.xpDelta).toBe(0);
+    expect(state.bountiesClaimed).toBe(1);
+    expect(state.academyBounty).toMatchObject({ state: "completed", progress: 1 });
     expect(state.claimedStatus).toBe("claimed");
     expect(state.resetStatuses.every(status => status === "available")).toBe(true);
     expect(state.timedLimitSeconds).toBe(240);
@@ -6241,7 +6255,10 @@ test.describe("Lupen browser smoke", () => {
 
     expect(claim.currentShipId).toBe("falcon");
     expect(claim.ownsStarter).toBe(true);
-    expect(claim.loadout).toMatchObject({ guns: [], attachments: [] });
+    expect(claim.loadout).toMatchObject({
+      guns: [{ key: "pulseLaser", quality: "standard", level: 1 }],
+      attachments: []
+    });
     expect(claim.condition.hull).toBeGreaterThan(0);
     expect(claim.condition.shield).toBeGreaterThan(0);
     expect(claim.hull).toBeGreaterThan(0);
@@ -6289,7 +6306,10 @@ test.describe("Lupen browser smoke", () => {
 
     expect(claim.currentShipId).toBe("falcon");
     expect(claim.ownedShips).toEqual(["falcon"]);
-    expect(claim.loadout).toMatchObject({ guns: [], attachments: [] });
+    expect(claim.loadout).toMatchObject({
+      guns: [{ key: "pulseLaser", quality: "standard", level: 1 }],
+      attachments: []
+    });
     expect(claim.condition.hull).toBeGreaterThan(0);
     expect(claim.stepId).toBe("open-first-loadout");
 
@@ -6322,7 +6342,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("tutorial replay skips weapon purchase and equip when Pulse Laser is already mounted", async ({ page }) => {
+  test("tutorial replay skips completed weapon and attachment loadout steps", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -6333,7 +6353,7 @@ test.describe("Lupen browser smoke", () => {
       selectedHangarShipId = STARTER_SHIP_ID;
       selectedFleetShipId = STARTER_SHIP_ID;
       ownedShips = [STARTER_SHIP_ID];
-      shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: ["pulseLaser", "pulseLaser"] }, STARTER_SHIP_ID) };
+      shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: ["cargoPod"], guns: ["pulseLaser", "pulseLaser"] }, STARTER_SHIP_ID) };
       ownedGuns.pulseLaser = 0;
       showScreen("gameScreen");
       startStarterTutorial(true);
@@ -6512,7 +6532,7 @@ test.describe("Lupen browser smoke", () => {
         };
       })()
     `));
-    await page.waitForFunction(() => ["return-after-trade", "open-bounty"].includes(window.eval("getCurrentTutorialStep().id")));
+    await page.waitForFunction(() => ["return-after-trade", "open-store", "open-bounty"].includes(window.eval("getCurrentTutorialStep().id")));
     const finalStep = await page.evaluate(() => window.eval("getCurrentTutorialStep().id"));
 
     expect(tradeBuy.resourceTargetExists).toBe(true);
@@ -6558,7 +6578,7 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeSell.activeTradeCleared).toBe(true);
     expect(tradeSell.tradeProfit).toBeGreaterThan(0);
     expect(tradeSell.tradesCompleted).toBe(1);
-    expect(["return-after-trade", "open-bounty"]).toContain(finalStep);
+    expect(["return-after-trade", "open-store", "open-bounty"]).toContain(finalStep);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -8492,7 +8512,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Requirements Complete");
     // The seeded pilot already owns the starter hull, so the Journey model
     // correctly reconciles that durable account fact into one completed task.
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 7");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 9");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Chapter Unlock");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Next Route");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).not.toContainText("Completion Unlocks");
@@ -8504,18 +8524,20 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("Equip Two Guns");
     await expect(page.locator("#journeyScreen")).toContainText("Equip Attachment");
     await expect(page.locator("#journeyScreen")).toContainText("Destroy 3 Erebus Bots");
+    await expect(page.locator("#journeyScreen")).toContainText("Complete a Bounty");
     await expect(page.locator("#journeyScreen")).toContainText("Repair Ship");
+    await expect(page.locator("#journeyScreen")).toContainText("Purchase a Pioneer Hull");
     await expect(page.locator("#journeyScreen")).toContainText("Claim or activate the starter ship");
     await expect(page.locator("#journeyScreen")).toContainText("0 / 1");
     await expect(page.locator("#journeyScreen .journey-chapter-path")).toHaveAttribute("data-journey-source", "JOURNEY_CHAPTERS");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).toHaveAttribute("data-journey-source", "JOURNEY_ASSIGNMENTS");
-    await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(7);
-    await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(7);
+    await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(9);
+    await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(9);
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("TRACKING");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("NOT STARTED");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Accept Mission");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Claim Reward");
-    await expect(page.locator("#journeyScreen .journey-assignment-icon img")).toHaveCount(7);
+    await expect(page.locator("#journeyScreen .journey-assignment-icon img")).toHaveCount(9);
     await expect(page.locator("#journeyScreen .journey-assignment-grid .journey-reward-chips")).toHaveCount(0);
     await page.locator("#journeyScreen").screenshot({ path: "artifacts/journey-player-facing-academy-1366x768.png" });
     const initialGalaxyFooter = await page.locator("#journeyScreen .journey-galaxy-strip").evaluate(footer => {
@@ -8538,7 +8560,7 @@ test.describe("Lupen browser smoke", () => {
     expect(initialGalaxyFooter.visible).toBe(true);
     expect(initialGalaxyFooter.singleLine).toBe(true);
     expect(initialGalaxyFooter.height).toBeLessThan(34);
-    expect(initialGalaxyFooter.percentText).toBe("5%");
+    expect(initialGalaxyFooter.percentText).toBe("4%");
     const academyAssignmentScroll = await page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => {
       const firstCard = grid.querySelector(".journey-assignment-card")?.getBoundingClientRect();
       return {
@@ -8573,8 +8595,8 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => openJourney());
     await expect.poll(() => page.locator("#journeyScreen .journey-assignment-grid").evaluate(grid => grid.scrollTop)).toBe(0);
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Academy Progress");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("29%");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("2 / 7");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("22%");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("2 / 9");
     const completedAcademyCard = await page.locator("#journeyScreen [data-journey-assignment-id='academy_launch_ship']").evaluate(card => {
       const styles = getComputedStyle(card);
       const pill = card.querySelector(".journey-status-pill");
@@ -8730,15 +8752,15 @@ test.describe("Lupen browser smoke", () => {
       renderJourneyScreen();
     });
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 7");
-    await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(7);
-    await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(7);
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 9");
+    await expect(page.locator("#journeyScreen .journey-objective-row")).toHaveCount(9);
+    await expect(page.locator("#journeyScreen .journey-assignment-card")).toHaveCount(9);
     await expect(page.locator("#journeyScreen .journey-assignment-card").first()).toContainText("Claim Starter Ship");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("TRACKING");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("NOT STARTED");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Accept Mission");
     await expect(page.locator("#journeyScreen .journey-assignment-grid")).not.toContainText("Claim Reward");
-    await expect(page.locator("#journeyScreen .journey-assignment-icon img")).toHaveCount(7);
+    await expect(page.locator("#journeyScreen .journey-assignment-icon img")).toHaveCount(9);
 
     await page.locator("#journeyScreen .screen-back-btn").click();
     await expect(page.locator("#gameScreen")).toHaveClass(/active/);
@@ -8765,15 +8787,20 @@ test.describe("Lupen browser smoke", () => {
       recordMissionEvent("destroy_bot", { target: "erebus" });
       recordMissionEvent("destroy_bot", { target: "erebus" });
       recordMissionEvent("destroy_bot", { target: "erebus" });
+      recordMissionEvent("claim_bounty", { contractId: "academy-test-bounty" });
       recordMissionEvent("repair_ship", { shipId: currentShipId || "falcon" });
       recordMissionEvent("starter_ship_claimed", { shipId: currentShipId || "falcon" });
+      ownedShips.push("bison");
+      reconcileMissionProgressFromGameplayState({ source: "academy_test", notify: false });
       ({
         starter: missionProgress.missions.academy_starter_ship,
         trade: missionProgress.missions.academy_first_trade,
         guns: missionProgress.missions.academy_two_guns,
         attachment: missionProgress.missions.academy_attachment,
         bots: missionProgress.missions.academy_erebus_bots,
+        bounty: missionProgress.missions.academy_bounty,
         repair: missionProgress.missions.academy_repair_ship,
+        pioneerHull: missionProgress.missions.academy_pioneer_hull,
         savedTrade: JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions?.academy_first_trade,
         frontierHaul: missionProgress.missions.first_haul
       })
@@ -8783,7 +8810,9 @@ test.describe("Lupen browser smoke", () => {
     expect(academyProgress.guns).toMatchObject({ state: "completed", progress: 2 });
     expect(academyProgress.attachment).toMatchObject({ state: "completed", progress: 1 });
     expect(academyProgress.bots).toMatchObject({ state: "completed", progress: 3 });
+    expect(academyProgress.bounty).toMatchObject({ state: "completed", progress: 1 });
     expect(academyProgress.repair).toMatchObject({ state: "completed", progress: 1 });
+    expect(academyProgress.pioneerHull).toMatchObject({ state: "completed", progress: 1 });
     expect(academyProgress.savedTrade).toMatchObject({ state: "completed", progress: 1 });
     expect(academyProgress.frontierHaul).toMatchObject({ state: "available", progress: 0 });
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "complete");
@@ -8847,7 +8876,7 @@ test.describe("Lupen browser smoke", () => {
       openJourney();
     });
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 7");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 9");
     await expect(page.locator("#journeyScreen")).toContainText("Academy Assignments");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_launch_ship']")).toContainText("0 / 1");
 

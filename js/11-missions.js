@@ -92,6 +92,26 @@ const CHAPTER_MISSIONS = Object.freeze([
     reward: Object.freeze({ xp: 0, credits: 0 })
   }),
   Object.freeze({
+    id: "academy_bounty",
+    title: "Complete a Bounty",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Claim one completed bounty from the Bounty Board.",
+    completeText: "Bounty payout confirmed. You can now turn combat work into credits and Forge materials.",
+    objective: Object.freeze({ type: "claim_bounty", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
+    id: "academy_pioneer_hull",
+    title: "Purchase a Pioneer Hull",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Earn enough credits to purchase a second Pioneer vessel.",
+    completeText: "Second Pioneer hull confirmed. Academy certification is complete and Frontier operations are now open.",
+    objective: Object.freeze({ type: "purchase_pioneer_hull", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
     id: "sector_orientation",
     title: "Sector Orientation",
     chapter: "frontier",
@@ -191,7 +211,7 @@ const JOURNEY_CHAPTERS = Object.freeze([
     icon: "locked",
     progressMode: "static",
     progress: 0,
-    unlockText: "Complete Frontier"
+    unlockText: "Complete Frontier to reveal the next ship-plan family"
   })
 ]);
 
@@ -287,6 +307,21 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     order: 60
   }),
   Object.freeze({
+    id: "academy_bounty",
+    chapterId: "academy",
+    journeyTitle: "Complete a Bounty",
+    journeyShortDescription: "Claim one completed bounty from the Bounty Board.",
+    journeyObjectiveLabel: "Claim one completed bounty",
+    assignmentType: "combat",
+    journeyTheme: "orange",
+    icon: "combat",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 70
+  }),
+  Object.freeze({
     id: "academy_repair_ship",
     chapterId: "academy",
     journeyTitle: "Repair Ship",
@@ -299,7 +334,22 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     requiresAccept: false,
     autoActive: true,
     rewards: Object.freeze({ xp: 0, credits: 0 }),
-    order: 70
+    order: 80
+  }),
+  Object.freeze({
+    id: "academy_pioneer_hull",
+    chapterId: "academy",
+    journeyTitle: "Purchase a Pioneer Hull",
+    journeyShortDescription: "Earn and purchase a second Pioneer vessel.",
+    journeyObjectiveLabel: "Own a second Pioneer hull",
+    assignmentType: "certification",
+    journeyTheme: "purple",
+    icon: "certification",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 90
   }),
   Object.freeze({
     id: "sector_orientation",
@@ -500,6 +550,8 @@ function getMissionObjectiveLabel(mission) {
   if (mission.objective.type === "equip_guns") return `Equip ${formatNumber(required)} gun${required === 1 ? "" : "s"}`;
   if (mission.objective.type === "equip_attachment") return `Equip ${formatNumber(required)} attachment${required === 1 ? "" : "s"}`;
   if (mission.objective.type === "repair_ship") return "Repair your ship once";
+  if (mission.objective.type === "claim_bounty") return "Claim one completed bounty";
+  if (mission.objective.type === "purchase_pioneer_hull") return "Own a second Pioneer hull";
   if (mission.objective.type === "complete_missions") return `Complete ${formatNumber(required)} Frontier readiness missions`;
   if (mission.objective.type === "credits_milestone") return `Reach CR ${formatNumber(required)}`;
   if (mission.objective.type === "upgrade_item") return `Upgrade ${formatNumber(required)} weapon or item`;
@@ -653,6 +705,21 @@ function hasClaimedStarterShipForMission() {
   );
 }
 
+function hasClaimedBountyForMission() {
+  const claimedTotal = Math.max(0, Number(playerProgress?.totals?.bountiesClaimed || 0));
+  const localClaim = Array.isArray(dailyBountyContracts) && dailyBountyContracts.some(contract => contract?.status === "claimed");
+  return claimedTotal > 0 || localClaim;
+}
+
+function hasPurchasedPioneerHullForMission() {
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const pioneerLineId = typeof PIONEER_LINE_ID !== "undefined" ? PIONEER_LINE_ID : "pioneer";
+  return (Array.isArray(ownedShips) ? ownedShips : []).some(shipId => (
+    shipId !== starterShipId &&
+    SHIPS?.[shipId]?.lineId === pioneerLineId
+  ));
+}
+
 function setMissionProgressAbsolute(id, amount, options = {}) {
   const mission = MISSIONS_BY_ID[id];
   const state = missionProgress?.missions?.[id];
@@ -686,11 +753,19 @@ function reconcileMissionProgressFromGameplayState(options = {}) {
   const attachmentCount = Number.isFinite(Number(options.attachmentCount))
     ? Number(options.attachmentCount)
     : currentCounts.attachmentCount;
+  const bountyClaimed = options.bountyClaimed === undefined
+    ? hasClaimedBountyForMission()
+    : Boolean(options.bountyClaimed);
+  const pioneerHullPurchased = options.pioneerHullPurchased === undefined
+    ? hasPurchasedPioneerHullForMission()
+    : Boolean(options.pioneerHullPurchased);
   let changed = false;
 
   changed = setMissionProgressAbsolute("academy_starter_ship", starterShipClaimed ? 1 : 0, options) || changed;
   changed = setMissionProgressAbsolute("academy_two_guns", weaponCount, options) || changed;
   changed = setMissionProgressAbsolute("academy_attachment", attachmentCount, options) || changed;
+  changed = setMissionProgressAbsolute("academy_bounty", bountyClaimed ? 1 : 0, options) || changed;
+  changed = setMissionProgressAbsolute("academy_pioneer_hull", pioneerHullPurchased ? 1 : 0, options) || changed;
 
   if (changed) {
     reconcileMissionAvailability(missionProgress);
@@ -702,7 +777,9 @@ function reconcileMissionProgressFromGameplayState(options = {}) {
     shipId: currentCounts.shipId,
     starterShipClaimed,
     weaponCount,
-    attachmentCount
+    attachmentCount,
+    bountyClaimed,
+    pioneerHullPurchased
   };
 }
 
@@ -926,9 +1003,20 @@ function renderMissionJournal() {
 function renderJourneyMorganBriefing() {
   const academyActive = getJourneyActiveChapterId() === "academy";
   const briefingLabel = academyActive ? "ACADEMY BRIEFING" : "FRONTIER BRIEFING";
+  const activeChapterId = academyActive ? "academy" : "frontier";
+  const nextAssignment = getJourneyAssignments(activeChapterId).find(assignment => {
+    const state = missionProgress?.missions?.[assignment.id]?.state;
+    return assignment.mission?.objective?.type !== "complete_missions" &&
+      state !== MISSION_STATE_COMPLETED &&
+      state !== MISSION_STATE_CLAIMED;
+  });
   const briefingMessage = academyActive
-    ? "Academy training is active, Pilot. Finish these assignments to unlock Chapter I: Frontier."
-    : "Frontier operations are active, Pilot. Complete these assignments to reveal the next route.";
+    ? nextAssignment
+      ? `Academy training is active, Pilot. Next: ${nextAssignment.journeyTitle}. ${nextAssignment.journeyShortDescription}`
+      : "Academy training is complete, Pilot. Chapter I: Frontier is opening."
+    : nextAssignment
+      ? `Frontier operations are active, Pilot. Next: ${nextAssignment.journeyTitle}. ${nextAssignment.journeyShortDescription}`
+      : "Frontier operations are complete, Pilot. The next ship-plan route is ready to be revealed.";
   return `
     <section class="journey-morgan-panel journey-briefing">
       <div class="journey-briefing__bg" aria-hidden="true"></div>

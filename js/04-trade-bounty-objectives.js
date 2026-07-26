@@ -3445,6 +3445,11 @@ function claimBountyReward(contractId) {
   contract.status = "claimed";
   contract.progress = getBountyRequiredKills(contract);
   contract.expiresAt = null;
+  if (typeof recordBountyClaimProgress === "function") {
+    recordBountyClaimProgress(contract);
+  } else if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("claim_bounty", { contractId: contract.id, title: contract.title || contract.name || "Bounty" });
+  }
 
   if (activeObjective?.type === "bounty" && activeObjective.contractId === contract.id) {
     activeObjective = null;

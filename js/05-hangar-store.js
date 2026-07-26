@@ -308,6 +308,9 @@ function applyStagingStorePurchaseResultToLocalState(result) {
     shipLoadouts[key] = normalizeShipLoadout(shipLoadouts[key] || { attachments: [], guns: [] }, key);
     recordStorePurchase(storeItem);
     tutorialEvent("boughtShip");
+    if (typeof recordMissionEvent === "function" && SHIPS[key]?.lineId === PIONEER_LINE_ID && key !== STARTER_SHIP_ID) {
+      recordMissionEvent("purchase_pioneer_hull", { shipId: key, lineId: SHIPS[key].lineId, source: "staging_store" });
+    }
   }
 
   if (typeof updateSpaceHUD === "function") updateSpaceHUD();
@@ -2444,6 +2447,7 @@ function repairCurrentShip() {
 
   addHudToast(`Hull repaired in Hangar for CR ${formatNumber(repairCost)}.`);
   if (typeof recordMissionEvent === "function") recordMissionEvent("repair_ship", { shipId: currentShipId, cost: repairCost });
+  tutorialEvent("repairedShip");
   updateSpaceHUD();
   renderHangar();
   saveGame();
@@ -5166,6 +5170,8 @@ function buyShip(shipId, storeItemOverride = null) {
 
   if (starterClaim && typeof recordMissionEvent === "function") {
     recordMissionEvent("starter_ship_claimed", { shipId, mode: "claim" });
+  } else if (!starterClaim && typeof recordMissionEvent === "function" && ship.lineId === PIONEER_LINE_ID) {
+    recordMissionEvent("purchase_pioneer_hull", { shipId, lineId: ship.lineId, source: "vessel_exchange" });
   }
 
   renderHangar();

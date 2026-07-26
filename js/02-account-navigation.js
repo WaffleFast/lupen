@@ -4,7 +4,18 @@
     addActivityLog(`Bounty XP earned: +${formatNumber(result.gained)} Combat XP.`);
     addHudToast(`Bounty complete: +${formatNumber(result.gained)} Combat XP`);
   }
+  recordBountyClaimProgress(contract);
+}
+
+function recordBountyClaimProgress(contract = {}) {
+  playerProgress = normalizePlayerProgress(playerProgress);
   playerProgress.totals.bountiesClaimed = Math.max(0, Number(playerProgress.totals.bountiesClaimed || 0)) + 1;
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("claim_bounty", {
+      contractId: contract.id || contract.contractId || "",
+      title: contract.title || contract.name || "Bounty"
+    });
+  }
   updateProgressDisplays();
 }
 
@@ -530,6 +541,12 @@ function resetToNoShipStarterState() {
 function grantStarterShipKit() {
   ownedAttachments.cargoPod = Math.max(ownedAttachments.cargoPod || 0, 1);
   ownedAttachments.jumpDrive = Math.max(ownedAttachments.jumpDrive || 0, 1);
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  if (shipLoadouts && starterShipId) {
+    const loadout = normalizeShipLoadout(shipLoadouts[starterShipId] || { attachments: [], guns: [] }, starterShipId);
+    if (!loadout.guns.some(entry => getEquipmentKey(entry))) loadout.guns[0] = "pulseLaser";
+    shipLoadouts[starterShipId] = normalizeShipLoadout(loadout, starterShipId);
+  }
 }
 
 function hasActiveShip() {
