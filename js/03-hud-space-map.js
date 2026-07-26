@@ -116,6 +116,18 @@ document.addEventListener("keydown", event => {
   if (event.key === "Escape" && tacticalPanelOpen) {
     event.preventDefault();
     closeTacticalPanel();
+    return;
+  }
+
+  if (event.key === "Escape" && document.getElementById("sectorMap")?.classList.contains("active")) {
+    event.preventDefault();
+    closeSectorMap();
+    return;
+  }
+
+  if (event.key === "Escape" && document.getElementById("inventoryDrawer")?.classList.contains("active")) {
+    event.preventDefault();
+    closeShipInventoryDrawer();
   }
 });
 
@@ -524,9 +536,20 @@ function refreshTacticalPanel(force = false) {
 
 function closeShipInventoryDrawer() {
   const drawer = document.getElementById("inventoryDrawer");
-  const button = document.getElementById("shipInventoryBtn");
-  if (drawer) drawer.classList.remove("active");
-  if (button) button.classList.remove("active");
+  const inventoryButton = document.getElementById("shipInventoryBtn");
+  const cargoButton = document.getElementById("hudCargoSummary");
+  if (drawer) {
+    drawer.classList.remove("active");
+    drawer.setAttribute("aria-hidden", "true");
+  }
+  if (inventoryButton) inventoryButton.classList.remove("active");
+  if (cargoButton) {
+    cargoButton.classList.remove("active");
+    cargoButton.setAttribute("aria-expanded", "false");
+    if (document.getElementById("spaceScreen")?.classList.contains("active")) {
+      requestAnimationFrame(() => cargoButton.focus({ preventScroll: true }));
+    }
+  }
 }
 
 function toggleShipInventoryDrawer(event = null) {
@@ -534,10 +557,16 @@ function toggleShipInventoryDrawer(event = null) {
 
   const drawer = document.getElementById("inventoryDrawer");
   const button = document.getElementById("shipInventoryBtn");
+  const cargoButton = document.getElementById("hudCargoSummary");
   if (!drawer) return;
 
   drawer.classList.toggle("active");
   if (button) button.classList.toggle("active", drawer.classList.contains("active"));
+  if (cargoButton) {
+    cargoButton.classList.toggle("active", drawer.classList.contains("active") && inventoryDrawerFilter === "cargo");
+    cargoButton.setAttribute("aria-expanded", drawer.classList.contains("active") ? "true" : "false");
+  }
+  drawer.setAttribute("aria-hidden", drawer.classList.contains("active") ? "false" : "true");
 
   if (drawer.classList.contains("active")) {
     tutorialEvent("openedLoadout");
@@ -567,6 +596,7 @@ function openShipStorageDrawer(filter = "equipment", event = null) {
   }
 
   drawer.classList.add("active");
+  drawer.setAttribute("aria-hidden", "false");
   renderInventoryDrawer();
   updateShipStorageHud();
 }
@@ -577,7 +607,7 @@ document.addEventListener("click", event => {
 
   const eventPath = typeof event.composedPath === "function" ? event.composedPath() : [];
   const clickedDrawer = drawer.contains(event.target) || eventPath.includes(drawer);
-  const clickedInventoryButton = event.target.closest?.("#shipInventoryBtn");
+  const clickedInventoryButton = event.target.closest?.("#shipInventoryBtn, #hudCargoSummary");
   const clickedModal = event.target.closest?.(".sector-map, .market-screen, .hangar-screen, .store-screen, .bounty-screen, .pilot-profile-screen");
 
   if (!clickedDrawer && !clickedInventoryButton && !clickedModal) {
@@ -591,6 +621,7 @@ function closeHudPanel() {
 
 function updateShipStorageHud() {
   const inventoryButton = document.getElementById("shipInventoryBtn");
+  const cargoButton = document.getElementById("hudCargoSummary");
   const inventorySlots = document.getElementById("hudInventorySlots");
   const drawer = document.getElementById("inventoryDrawer");
   const groupedItems = groupInventoryItems(inventoryItems);
@@ -606,6 +637,11 @@ function updateShipStorageHud() {
     inventoryButton.classList.toggle("active", drawerActive && inventoryDrawerFilter === "equipment");
     inventoryButton.classList.toggle("has-alert", totalInventoryItems > 0 || groupedItems.length > 0);
   }
+  if (cargoButton) {
+    cargoButton.classList.toggle("active", drawerActive && inventoryDrawerFilter === "cargo");
+    cargoButton.setAttribute("aria-expanded", drawerActive ? "true" : "false");
+  }
+  if (drawer) drawer.setAttribute("aria-hidden", drawerActive ? "false" : "true");
 }
 
 function getInventoryEntryId(entry) {
@@ -2046,9 +2082,12 @@ function toggleShield() {
 
 function openSectorMap() {
   if (!LupenMovementRules.canOpenSectorMap(jumpCharge, jumpMax)) return;
-  document.getElementById("sectorMap").classList.add("active");
+  const map = document.getElementById("sectorMap");
+  map.classList.add("active");
+  map.setAttribute("aria-hidden", "false");
   renderSectorMap();
   tutorialEvent("openedSectorMap");
+  requestAnimationFrame(() => map.querySelector(".close-map-btn")?.focus({ preventScroll: true }));
   if (tutorialState.active && [
     "make-jump",
     "scan-for-bots",
@@ -2060,7 +2099,12 @@ function openSectorMap() {
 }
 
 function closeSectorMap() {
-  document.getElementById("sectorMap").classList.remove("active");
+  const map = document.getElementById("sectorMap");
+  map.classList.remove("active");
+  map.setAttribute("aria-hidden", "true");
+  if (document.getElementById("spaceScreen")?.classList.contains("active")) {
+    requestAnimationFrame(() => document.getElementById("jumpBtn")?.focus({ preventScroll: true }));
+  }
 }
 
 function renderSectorMap() {

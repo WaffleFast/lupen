@@ -3353,6 +3353,53 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.documentWidth).toBeLessThanOrEqual(centerHud.viewportWidth);
     expect(centerHud.documentHeight).toBeLessThanOrEqual(centerHud.viewportHeight);
 
+    await expect(page.locator(".hull-action")).toHaveAttribute("role", "status");
+    await expect(page.locator(".shield-action")).toHaveAttribute("role", "status");
+    await expect(page.locator("button.hull-action, button.shield-action")).toHaveCount(0);
+
+    const cargoControl = page.locator("#hudCargoSummary");
+    await expect(cargoControl).toHaveAttribute("aria-expanded", "false");
+    await cargoControl.click();
+    await expect(page.locator("#inventoryDrawer")).toHaveClass(/active/);
+    await expect(page.locator("#inventoryDrawer")).toHaveAttribute("aria-hidden", "false");
+    await expect(cargoControl).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#inventoryFilterCargo")).toHaveClass(/active/);
+    await expect(page.locator("#inventoryDrawerClose")).toBeVisible();
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/orbit-cargo-drawer-1366x768.png" });
+    await page.locator("#inventoryDrawerClose").click();
+    await expect(page.locator("#inventoryDrawer")).not.toHaveClass(/active/);
+    await expect(cargoControl).toHaveAttribute("aria-expanded", "false");
+    await expect(cargoControl).toBeFocused();
+    await cargoControl.click();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#inventoryDrawer")).not.toHaveClass(/active/);
+    await expect(cargoControl).toBeFocused();
+
+    await page.locator("#jumpBtn").click();
+    await expect(page.locator("#sectorMap")).toHaveClass(/active/);
+    await expect(page.locator("#sectorMap")).toHaveAttribute("aria-hidden", "false");
+    await expect(page.locator(".close-map-btn")).toBeFocused();
+    const mapFit = await page.locator("#sectorMap").evaluate(map => {
+      const rect = map.getBoundingClientRect();
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight
+      };
+    });
+    expect(mapFit.left).toBeGreaterThanOrEqual(0);
+    expect(mapFit.top).toBeGreaterThanOrEqual(0);
+    expect(mapFit.right).toBeLessThanOrEqual(mapFit.viewportWidth);
+    expect(mapFit.bottom).toBeLessThanOrEqual(mapFit.viewportHeight);
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/orbit-sector-map-1366x768.png" });
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#sectorMap")).not.toHaveClass(/active/);
+    await expect(page.locator("#sectorMap")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("#jumpBtn")).toBeFocused();
+
     await page.locator("#spaceScreen").screenshot({ path: "artifacts/tactical-hud-closed-1366x768.png" });
     await page.locator(".player-bottom-hud").screenshot({ path: "artifacts/tactical-hud-centre-layout.png" });
 

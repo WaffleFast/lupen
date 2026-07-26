@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
   <link rel="stylesheet" href="loadout-redesign.css?v=20260721-unified-hangar" />
-  <link rel="stylesheet" href="ui-system.css?v=20260726-hangar-alignment" />
+  <link rel="stylesheet" href="ui-system.css?v=20260726-orbit-alignment" />
 </head>
 <body>
   <div class="stars"></div>
@@ -564,15 +564,18 @@
         <img class="bottom-hud-divider" src="assets/ui/player-ui/bottom-divider.png" alt="" />
       </div>
 
-      <div id="inventoryDrawer" class="inventory-drawer" aria-label="Inventory drawer">
+      <div id="inventoryDrawer" class="inventory-drawer" aria-label="Ship storage" aria-hidden="true">
         <div class="inventory-drawer-head">
           <div>
             <span class="drawer-kicker">Inventory</span>
             <strong id="inventoryDrawerCount">0 items</strong>
           </div>
-          <div id="inventoryDrawerFilters" class="inventory-drawer-filters">
-            <button id="inventoryFilterCargo" onclick="setInventoryDrawerFilter('cargo')">Cargo</button>
-            <button id="inventoryFilterEquipment" onclick="setInventoryDrawerFilter('equipment')">Inventory</button>
+          <div class="inventory-drawer-actions">
+            <div id="inventoryDrawerFilters" class="inventory-drawer-filters">
+              <button id="inventoryFilterCargo" type="button" onclick="setInventoryDrawerFilter('cargo')">Cargo</button>
+              <button id="inventoryFilterEquipment" type="button" onclick="setInventoryDrawerFilter('equipment')">Equipment</button>
+            </div>
+            <button id="inventoryDrawerClose" class="inventory-drawer-close" type="button" onclick="closeShipInventoryDrawer()" aria-label="Close ship storage">&times;</button>
           </div>
         </div>
         <div class="inventory-drawer-body">
@@ -581,8 +584,8 @@
         </div>
       </div>
 
-      <div id="sectorMap" class="sector-map">
-        <div class="map-title">SECTOR MAP</div>
+      <div id="sectorMap" class="sector-map" role="dialog" aria-modal="true" aria-labelledby="sectorMapTitle" aria-hidden="true">
+        <div id="sectorMapTitle" class="map-title">SECTOR MAP</div>
         <div class="sector-scan-panel">
           <div class="sector-scan-title">SCAN</div>
           <div class="sector-scan-actions">
@@ -592,7 +595,7 @@
           </div>
           <div id="sectorScanStatus" class="sector-scan-status">Scanners ready</div>
         </div>
-        <button class="close-map-btn" onclick="closeSectorMap()">×</button>
+        <button class="close-map-btn" type="button" onclick="closeSectorMap()" aria-label="Close sector map">&times;</button>
         <svg id="sectorSvg" class="sector-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
 
@@ -659,19 +662,19 @@
           <div class="stat-col">
             <div id="hullValue" class="stat-value">800</div>
             <div class="stat-meter"><div id="hullFill" class="stat-fill hull-fill"></div></div>
-            <button class="stat-btn stat-label static-btn hull-action" type="button">
+            <div class="stat-label static-status hull-action" role="status" aria-label="Hull integrity">
               <img src="assets/ui/player-ui/icon-hull.png" alt="" />
               <span>HULL</span>
-            </button>
+            </div>
           </div>
 
           <div class="stat-col">
             <div id="shieldValue" class="stat-value">0</div>
             <div class="stat-meter"><div id="shieldFill" class="stat-fill shield-fill"></div></div>
-            <button id="shieldBtn" class="stat-btn stat-label static-btn shield-action" type="button">
+            <div id="shieldBtn" class="stat-label static-status shield-action" role="status" aria-label="Shield strength">
               <img src="assets/ui/player-ui/icon-shield.png" alt="" />
               <span>SHIELD</span>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -683,7 +686,7 @@
           <div class="ship-hud-info-column">
             <div id="hudProgressStrip" class="ship-mini-progress" aria-label="Pilot progression"></div>
             <div class="ship-hud-cargo-row">
-              <div id="hudCargoSummary" class="hud-cargo-summary" aria-label="Cargo hold">
+              <button id="hudCargoSummary" class="hud-cargo-summary" type="button" onclick="openShipStorageDrawer('cargo', event)" aria-label="Open cargo hold" aria-controls="inventoryDrawer" aria-expanded="false">
                 <svg class="hud-cargo-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4 8-4V7M12 11v10"/></svg>
                 <div class="hud-cargo-copy">
                   <span>Cargo</span>
@@ -692,7 +695,7 @@
                   <div class="hud-cargo-meter" aria-hidden="true"><i id="hudCargoCapacityFill"></i></div>
                 </div>
                 <em id="hudCargoFullBadge" hidden>FULL</em>
-              </div>
+              </button>
             </div>
           </div>
           <div class="ship-storage-strip ship-action-strip ship-hud-action-row" aria-label="Ship action">
@@ -796,7 +799,7 @@
   <script src="js/network/multiplayerClient.js?v=20260716-bounty-complete"></script>
   <script src="js/01-core-state.js?v=20260719-destroyer-colour-match"></script>
   <script src="js/02-account-navigation.js?v=20260721-stable-slots"></script>
-  <script src="js/03-hud-space-map.js?v=20260721-stable-slots"></script>
+  <script src="js/03-hud-space-map.js?v=20260726-orbit-alignment"></script>
   <script src="js/network/multiplayerOverlay.js?v=20260718-pioneer-line"></script>
   <script src="js/04-trade-bounty-objectives.js?v=20260726-bounty-alignment"></script>
   <script src="js/04b-trade-terminal-v2.js?v=20260726-trade-alignment"></script>

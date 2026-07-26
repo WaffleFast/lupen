@@ -1352,3 +1352,88 @@
   outline: 2px solid var(--lupen-cyan-bright);
   outline-offset: 2px;
 }
+
+/* Planet hub and orbit alignment: honest affordances and accessible overlays. */
+.planet-home-screen .hub-logout-button,
+.planet-home-screen .hub-launch-btn {
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+.planet-home-screen .hub-actions {
+  border-radius: var(--lupen-panel-radius) !important;
+}
+
+.planet-home-screen .hub-logout-button:focus-visible,
+.planet-home-screen .hub-launch-btn:focus-visible,
+.planet-home-screen .hub-action-button:focus-visible,
+.player-orbit-screen button:focus-visible,
+.player-orbit-screen [role="tab"]:focus-visible {
+  outline: 2px solid var(--lupen-cyan-bright) !important;
+  outline-offset: 2px !important;
+}
+
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud > .status-panel,
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud > .ship-panel,
+.player-orbit-screen .player-bottom-hud.command-hud.space-combat-hud > .info-panel,
+.player-orbit-screen .inventory-drawer,
+.player-orbit-screen .tactical-panel {
+  border-radius: var(--lupen-panel-radius) !important;
+}
+
+.player-orbit-screen .stat-label.static-status,
+.player-orbit-screen .stat-label.static-status:hover {
+  cursor: default !important;
+  filter: none !important;
+}
+
+.player-orbit-screen button#hudCargoSummary {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  color: inherit !important;
+  font: inherit !important;
+  text-align: inherit !important;
+  appearance: none !important;
+  cursor: pointer !important;
+}
+
+.player-orbit-screen button#hudCargoSummary:hover,
+.player-orbit-screen button#hudCargoSummary.active {
+  border-color: rgba(119, 237, 255, 0.88) !important;
+  background: rgba(12, 49, 72, 0.92) !important;
+  box-shadow:
+    0 0 14px rgba(86, 220, 245, 0.16),
+    inset 0 0 12px rgba(86, 220, 245, 0.07) !important;
+}
+
+.player-orbit-screen .inventory-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-orbit-screen .inventory-drawer-close,
+.player-orbit-screen .close-map-btn,
+.player-orbit-screen .tactical-panel-close,
+.player-orbit-screen .inventory-drawer-filters button,
+.player-orbit-screen .sector-scan-btn,
+.player-orbit-screen .tactical-panel-nav button,
+.player-orbit-screen .tactical-chat-input-row input,
+.player-orbit-screen .tactical-chat-input-row button {
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+.player-orbit-screen .inventory-drawer-close {
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(90, 190, 255, 0.58);
+  background: rgba(5, 18, 34, 0.9);
+  color: var(--lupen-text);
+  font-size: 1.25rem;
+  line-height: 1;
+}
