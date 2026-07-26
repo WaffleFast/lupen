@@ -295,3 +295,306 @@
     overflow-y: auto !important;
   }
 }
+
+/* Station Store: shared hierarchy and player-facing purchase states. */
+#storeScreen.lupen-app-screen {
+  padding: 18px !important;
+}
+
+#storeScreen .store-header-row {
+  min-height: 76px;
+  margin: 0 0 10px;
+  padding: 0 2px;
+  align-items: center;
+}
+
+#storeScreen .store-header-actions {
+  align-self: center;
+}
+
+#storeScreen .store-credits-inline {
+  min-height: 44px;
+  box-sizing: border-box;
+  border-radius: var(--lupen-control-radius);
+}
+
+#storeScreen .modern-store-topbar {
+  min-height: 40px;
+  margin: 0 0 10px;
+}
+
+#storeScreen #storeFilterBar {
+  gap: 8px;
+}
+
+#storeScreen #storeFilterBar .store-filter-btn {
+  min-height: 40px;
+  border-radius: var(--lupen-control-radius);
+  color: var(--lupen-text-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+}
+
+#storeScreen #storeFilterBar .store-filter-btn.active {
+  border-color: rgba(93, 211, 255, 0.82);
+  color: var(--lupen-text);
+}
+
+#storeScreen .modern-store-layout {
+  grid-template-columns: minmax(0, 1.45fr) minmax(380px, 0.8fr);
+  gap: 12px;
+}
+
+#storeScreen .modern-store-catalog-panel,
+#storeScreen .modern-store-detail-panel {
+  border-radius: var(--lupen-panel-radius);
+  padding: 12px;
+}
+
+#storeScreen .modern-store-panel-header {
+  min-height: 28px;
+  margin: 0 0 8px;
+  align-items: center;
+}
+
+#storeScreen .modern-store-panel-header > span {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+}
+
+#storeScreen .store-catalog-count {
+  color: var(--lupen-text-soft);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#storeScreen .store-catalog-grid {
+  gap: 8px;
+  padding: 0 8px 8px 0;
+}
+
+#storeScreen .store-catalog-card {
+  min-height: 154px;
+  height: 154px;
+  max-height: 154px;
+  border-radius: var(--lupen-control-radius);
+}
+
+#storeScreen .store-catalog-card:hover {
+  transform: translateY(-1px);
+}
+
+#storeScreen .store-catalog-card:focus-visible {
+  outline-offset: -2px;
+}
+
+#storeScreen .modern-store-detail-panel .modern-store-panel-header {
+  margin-bottom: 8px;
+}
+
+#storeScreen .store-detail-content {
+  gap: 6px;
+  padding: 0 3px 6px 0;
+  overflow-y: auto;
+}
+
+#storeScreen .store-detail-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+}
+
+#storeScreen .simplified-store-detail .store-detail-visual {
+  min-height: 124px !important;
+  max-height: 124px !important;
+  flex: 0 0 124px;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#storeScreen .store-detail-visual .quality-fx__item {
+  max-height: 110px !important;
+}
+
+#storeScreen .store-detail-heading {
+  display: grid;
+  gap: 3px;
+}
+
+#storeScreen .store-detail-kicker {
+  margin: 0;
+  color: var(--lupen-cyan-bright);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+}
+
+#storeScreen .store-detail-title {
+  margin: 0;
+  color: var(--lupen-text);
+  font-size: 1.34rem;
+  line-height: 1.05;
+  letter-spacing: 0.035em;
+}
+
+#storeScreen .store-detail-desc {
+  color: var(--lupen-text-soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+#storeScreen .store-item-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+#storeScreen .store-summary-cell {
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border: 1px solid rgba(91, 187, 255, 0.2);
+  border-radius: var(--lupen-control-radius);
+  background: rgba(3, 12, 23, 0.78);
+}
+
+#storeScreen .store-summary-cell > span,
+#storeScreen .store-detail-section-heading,
+#storeScreen .compact-detail-stat-card > span {
+  display: block;
+  color: var(--lupen-text-muted);
+  font-size: 0.56rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+#storeScreen .store-summary-cell > strong {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--lupen-text);
+  font-size: 0.78rem;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#storeScreen .store-summary-availability {
+  grid-column: 1 / -1;
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: auto minmax(86px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+#storeScreen .store-summary-availability > strong {
+  margin: 0;
+}
+
+#storeScreen .store-summary-availability > small {
+  overflow: hidden;
+  color: var(--lupen-text-soft);
+  font-size: 0.62rem;
+  line-height: 1.15;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#storeScreen .store-summary-availability.is-available > strong,
+#storeScreen .store-summary-availability.is-owned > strong {
+  color: #76ffc6;
+}
+
+#storeScreen .store-summary-availability.is-credits > strong,
+#storeScreen .store-summary-availability.is-locked > strong,
+#storeScreen .store-summary-availability.is-sold-out > strong {
+  color: #ffb36f;
+}
+
+#storeScreen .store-detail-section-heading {
+  margin-top: 1px;
+}
+
+#storeScreen .compact-detail-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+#storeScreen .compact-detail-stat-card {
+  min-height: 42px;
+  padding: 6px 8px;
+  border-radius: var(--lupen-control-radius);
+}
+
+#storeScreen .compact-detail-stat-card > strong {
+  margin-top: 4px;
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+#storeScreen .store-transaction-status {
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid rgba(91, 187, 255, 0.28);
+  border-radius: var(--lupen-control-radius);
+  background: rgba(5, 21, 35, 0.88);
+  color: var(--lupen-text-soft);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+#storeScreen .store-transaction-status.is-success,
+#storeScreen .store-transaction-status.is-available {
+  border-color: rgba(85, 235, 173, 0.38);
+  color: #9fffd2;
+}
+
+#storeScreen .store-transaction-status.is-unavailable {
+  border-color: rgba(255, 157, 100, 0.34);
+  color: #ffc296;
+}
+
+#storeScreen .store-buy-footer {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+#storeScreen .simplified-store-actions button {
+  min-height: 42px;
+  border-radius: var(--lupen-control-radius);
+  font-size: 0.78rem;
+}
+
+@media (max-height: 740px) {
+  #storeScreen.lupen-app-screen {
+    padding: 14px !important;
+  }
+
+  #storeScreen .store-header-row {
+    min-height: 68px;
+  }
+
+  #storeScreen .simplified-store-detail .store-detail-visual {
+    min-height: 146px !important;
+    max-height: 146px !important;
+    flex-basis: 146px;
+  }
+
+  #storeScreen .store-detail-visual .quality-fx__item {
+    max-height: 132px !important;
+  }
+
+  #storeScreen .store-detail-title {
+    font-size: 1.26rem;
+  }
+}

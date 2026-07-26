@@ -34,6 +34,7 @@ const MAP_ONE_STORE_ATTACHMENT_KEYS = Object.freeze(["cargoPod", "jumpDrive"]);
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
 let multiplayerStagingStoreStatusMessage = "";
+let storeTransactionNotice = null;
 let multiplayerStagingCargoPodEquipPending = false;
 let multiplayerStagingShieldBoosterEquipPending = false;
 let multiplayerStagingPulseLaserEquipPending = false;
@@ -210,27 +211,42 @@ function renderStagingStorePreviewNote(item) {
   if (!isMultiplayerStagingStoreActive()) return "";
   const itemId = getStagingStoreItemId(item);
   const result = itemId ? getLastMatchingStagingStorePreview(itemId) : null;
-  const statusLine = multiplayerStagingStoreStatusMessage
-    ? `<div><strong>${escapeHtml(multiplayerStagingStoreStatusMessage)}</strong></div>`
-    : "";
   if (!itemId) {
-    return `<div class="store-detail-owned-line">${statusLine}This item is unavailable from the current station.</div>`;
+    return `<div class="store-transaction-status is-unavailable" role="status">This item is unavailable at this station.</div>`;
   }
   if (!result) {
-    return statusLine ? `<div class="store-detail-owned-line">${statusLine}</div>` : "";
+    if (!multiplayerStagingStoreStatusMessage) return "";
+    const message = multiplayerStagingStorePurchasePending
+      ? "Processing purchase..."
+      : "Checking purchase availability.";
+    return `<div class="store-transaction-status is-pending" role="status">${message}</div>`;
   }
-  const afterCredits = result.creditsAfter ?? result.creditsAfterPreview;
-  const creditLine = result.creditsBefore === null
-    ? "CR unknown"
-    : `CR ${formatNumber(result.creditsBefore)} -> ${formatNumber(afterCredits)}`;
-  const ownedLine = result.itemBefore === null || result.itemAfter === null
-    ? ""
-    : ` / Owned ${formatNumber(result.itemBefore)} -> ${formatNumber(result.itemAfter)}`;
+  const message = getStagingStorePreviewLine(result);
+  const tone = result.applied
+    ? "is-success"
+    : result.wouldPass
+      ? "is-available"
+      : "is-unavailable";
   return `
-    <div class="store-detail-owned-line">
-      ${statusLine}
-      <strong>${escapeHtml(getStagingStorePreviewLine(result))}</strong>
-      ${escapeHtml(` / ${creditLine}${ownedLine}`)}
+    <div class="store-transaction-status ${tone}" role="status">
+      ${escapeHtml(message)}
+    </div>`;
+}
+
+function setStoreTransactionNotice(item, message, tone = "success") {
+  if (!item?.id || !message) return;
+  storeTransactionNotice = {
+    itemId: item.id,
+    message: String(message),
+    tone: String(tone || "success")
+  };
+}
+
+function renderStoreTransactionNotice(item) {
+  if (!item?.id || storeTransactionNotice?.itemId !== item.id) return "";
+  return `
+    <div class="store-transaction-status is-${escapeHtml(storeTransactionNotice.tone)}" role="status">
+      ${escapeHtml(storeTransactionNotice.message)}
     </div>`;
 }
 
@@ -4264,7 +4280,7 @@ function getStoreDetailStats(item, quality = "standard") {
   if (item.kind === "gun") {
     const gun = GUNS[item.key];
     if (!gun) return [];
-    return getWeaponPurchaseStatRows(gun, quality).filter(stat => stat.label !== "DPS");
+    return getWeaponPurchaseStatRows(gun, quality);
   }
 
   if (item.kind === "attachment") {
@@ -4390,7 +4406,7 @@ function renderStoreFilters() {
   ];
 
   bar.innerHTML = filters.map(filter => `
-    <button class="store-filter-btn ${storeFilter === filter.key ? "active" : ""}" onclick="setStoreFilter('${filter.key}')">${filter.label}</button>
+    <button type="button" class="store-filter-btn ${storeFilter === filter.key ? "active" : ""}" aria-pressed="${storeFilter === filter.key}" onclick="setStoreFilter('${filter.key}')">${filter.label}</button>
   `).join("");
 }
 
@@ -4400,8 +4416,8 @@ function renderStoreQualityFilters() {
   if (!bar) return;
 
   selectedStoreQuality = "standard";
-  bar.innerHTML = `<div class="store-daily-status"><span id="storeResetTimerText">Store items refresh in 24:00:00</span></div>`;
-  updateStoreResetTimer();
+  const itemCount = getStoreFilteredItems().length;
+  bar.innerHTML = `<span class="store-catalog-count">${formatNumber(itemCount)} ${itemCount === 1 ? "item" : "items"}</span>`;
 }
 
 function renderStoreCatalog() {
@@ -4444,7 +4460,7 @@ function renderStoreCatalog() {
     const locked = Boolean(unlock?.locked);
 
     return `
-      <button class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} ${locked ? "progression-locked" : ""} quality-${quality} store-kind-${item.kind}" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="selectStoreItem('${item.id}')">
+      <button type="button" class="store-catalog-card ${selectedStoreItemId === item.id ? "selected" : ""} ${item.dailyStock ? "daily-stock-card" : ""} ${soldOut ? "sold-out" : ""} ${locked ? "progression-locked" : ""} quality-${quality} store-kind-${item.kind}" data-item-key="${item.key}" data-item-kind="${item.kind}" aria-pressed="${selectedStoreItemId === item.id}" aria-label="${escapeHtml(`${item.name}, ${categoryLabel}, ${priceLabel}`)}" onclick="selectStoreItem('${item.id}')">
         ${locked ? `<span class="store-card-status">LOCKED</span>` : status ? `<span class="store-card-status">${status}</span>` : ""}
         <div class="store-card-art quality-${quality} store-art-${item.kind} store-art-${item.key}">
           ${renderQualityFx(quality, { src: item.kind === "ship" && typeof getShipAsset === "function" ? getShipAsset(item.key, "large") : item.image, alt: item.name, size: "card" })}
@@ -4471,7 +4487,22 @@ function getStoreDetailKicker(item, quality = "standard") {
   if (!item) return "";
   if (item.kind === "material") return "Forge Material";
   if (item.kind === "core") return "Rare Catalyst";
-  return `${getStoreCardCategoryLabel(item, quality)} / ${titleCaseQuality(quality)}`;
+  return getStoreCardCategoryLabel(item, quality);
+}
+
+function getStoreItemLevelLabel(item) {
+  if (!item) return "—";
+  if (item.kind === "gun" || item.kind === "attachment") return "1";
+  return "—";
+}
+
+function getStoreAvailabilityState({ item, progressionLocked, hasStock, buyPrice }) {
+  if (progressionLocked) return { label: "Locked", tone: "locked" };
+  if (!hasStock) return { label: "Sold out", tone: "sold-out" };
+  if (item?.kind === "ship" && currentShipId === item.key) return { label: "Equipped", tone: "owned" };
+  if (item?.kind === "ship" && ownedShips.includes(item.key)) return { label: "In Hangar", tone: "owned" };
+  if (credits < buyPrice) return { label: "Insufficient CR", tone: "credits" };
+  return { label: "Available", tone: "available" };
 }
 
 function renderStoreDetail() {
@@ -4510,6 +4541,7 @@ function renderStoreDetail() {
 
   const detailStats = getStoreDetailStats(item, quality);
   const detailStatsHtml = detailStats.length ? `
+    <div class="store-detail-section-heading">Specifications</div>
     <div class="store-detail-stat-grid compact-detail-stats">
       ${detailStats.map(stat => `
         <div class="store-detail-stat-card compact-detail-stat-card">
@@ -4549,14 +4581,14 @@ function renderStoreDetail() {
     } else {
       buyButton = stagingStoreLocked
         ? stagingPreviewButton
-        : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
+        : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? (credits >= buyPrice ? `Purchase · CR ${formatNumber(buyPrice)}` : "Insufficient credits") : "Sold Out"}</button>`;
     }
   } else {
     buyButton = stagingStoreLocked
       ? stagingPreviewButton
       : progressionLocked
         ? `<button class="store-detail-buy-action locked-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()">Locked</button>`
-        : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? `Buy / CR ${formatNumber(buyPrice)}` : "Sold Out"}</button>`;
+        : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? (credits >= buyPrice ? `Purchase · CR ${formatNumber(buyPrice)}` : "Insufficient credits") : "Sold Out"}</button>`;
     if (sellPrice > 0) {
       const sellHandler = (item.kind === "attachment" || item.kind === "gun") && quality === "standard" && ownedReady > 0
         ? 'storeSellSelectedOwned()'
@@ -4567,9 +4599,11 @@ function renderStoreDetail() {
     }
   }
 
-  const ownershipLine = item.kind === "ship"
-    ? (ownedShips.includes(item.key) ? (currentShipId === item.key ? "Currently equipped" : "Owned in hangar") : "Not owned")
-    : (totalOwned > 0 ? `Owned / x${formatNumber(totalOwned)}` : "Not owned");
+  const availability = getStoreAvailabilityState({ item, progressionLocked, hasStock, buyPrice });
+  const qualityLabel = titleCaseQuality(quality);
+  const ownedLabel = item.kind === "ship"
+    ? (ownedShips.includes(item.key) ? "1" : "0")
+    : formatNumber(totalOwned);
 
   panel.innerHTML = `
     <div class="store-detail-shell store-quality-${quality} compact-store-detail simplified-store-detail store-kind-${item.kind}" data-item-key="${item.key}" data-item-kind="${item.kind}">
@@ -4578,10 +4612,35 @@ function renderStoreDetail() {
           ${renderQualityFx(quality, { src: item.image, alt: item.name, size: "feature" })}
         </div>
 
-        <div class="store-detail-kicker">${getStoreDetailKicker(item, quality)}</div>
-        <div class="store-detail-title">${item.name}</div>
-        <div class="store-detail-desc">${item.description}</div>
-        <div class="store-detail-owned-line">${ownershipLine} / ${progressionLocked ? escapeHtml(unlock.requirementLines.join(" / ") || unlock.message) : getStoreStockLabel(item)}</div>
+        <div class="store-detail-heading">
+          <div class="store-detail-kicker">${getStoreDetailKicker(item, quality)}</div>
+          <div class="store-detail-title">${item.name}</div>
+          <div class="store-detail-desc">${item.description}</div>
+        </div>
+        <div class="store-item-summary" aria-label="Item purchase summary">
+          <div class="store-summary-cell">
+            <span>Quality</span>
+            <strong>${escapeHtml(qualityLabel)}</strong>
+          </div>
+          <div class="store-summary-cell">
+            <span>Level</span>
+            <strong>${escapeHtml(getStoreItemLevelLabel(item))}</strong>
+          </div>
+          <div class="store-summary-cell">
+            <span>Owned</span>
+            <strong>x${escapeHtml(ownedLabel)}</strong>
+          </div>
+          <div class="store-summary-cell">
+            <span>Price</span>
+            <strong>CR ${formatNumber(buyPrice)}</strong>
+          </div>
+          <div class="store-summary-cell store-summary-availability is-${availability.tone}">
+            <span>Availability</span>
+            <strong>${escapeHtml(availability.label)}</strong>
+            <small>${progressionLocked ? escapeHtml(unlock.requirementLines.join(" · ") || unlock.message) : escapeHtml(getStoreStockLabel(item))}</small>
+          </div>
+        </div>
+        ${renderStoreTransactionNotice(item)}
         ${renderStagingStorePreviewNote(item)}
         ${renderStagingCargoPodEquipNote(item)}
         ${renderStagingShieldBoosterEquipNote(item)}
@@ -4659,6 +4718,7 @@ function storeBuySelected() {
       credits -= price;
       addInventoryItem({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
       recordStorePurchase(item);
+      setStoreTransactionNotice(item, `${item.name} purchased. Ready in Hangar.`);
       renderStore();
       saveGame();
       tutorialEvent("boughtEquipment");
@@ -4682,6 +4742,7 @@ function storeBuySelected() {
       credits -= price;
       addInventoryItem({ id: `item-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`, key: item.key, quality });
       recordStorePurchase(item);
+      setStoreTransactionNotice(item, `${item.name} purchased. Ready in Hangar.`);
       renderStore();
       saveGame();
       tutorialEvent("boughtEquipment");
@@ -4728,8 +4789,11 @@ function sellOwnedAttachment(key) {
 
   const item = attachments[key];
   if (!item || (ownedAttachments[key] || 0) <= 0) return;
+  const sellValue = Math.max(1, Math.floor(item.price * 0.7));
   ownedAttachments[key] -= 1;
-  credits += Math.max(1, Math.floor(item.price * 0.7));
+  credits += sellValue;
+  const storeItem = getStoreCatalogItem("attachment", key);
+  if (storeItem) setStoreTransactionNotice(storeItem, `${item.name} sold for CR ${formatNumber(sellValue)}.`, "success");
   renderStore();
   saveGame();
 }
@@ -4738,8 +4802,11 @@ function sellOwnedGun(key) {
   if (blockStoreMutationInMultiplayerStaging()) return;
   const item = GUNS[key];
   if (!item || (ownedGuns[key] || 0) <= 0) return;
+  const sellValue = Math.max(1, Math.floor(item.price * 0.7));
   ownedGuns[key] -= 1;
-  credits += Math.max(1, Math.floor(item.price * 0.7));
+  credits += sellValue;
+  const storeItem = getStoreCatalogItem("gun", key);
+  if (storeItem) setStoreTransactionNotice(storeItem, `${item.name} sold for CR ${formatNumber(sellValue)}.`, "success");
   renderStore();
   saveGame();
 }
@@ -4783,6 +4850,7 @@ function buyAttachment(key, storeItemOverride = null) {
   credits -= purchaseCheck.price;
   ownedAttachments[key] = (ownedAttachments[key] || 0) + 1;
   if (storeItem) recordStorePurchase(storeItem);
+  if (storeItem) setStoreTransactionNotice(storeItem, `${item.name} purchased. Ready in Hangar.`);
 
   if (key === "evasionMatrix") tutorialEvent("boughtStoreEvasionMatrix");
   tutorialEvent("boughtStoreAttachment");
@@ -4820,6 +4888,7 @@ function buyGun(key, storeItemOverride = null) {
   credits -= purchaseCheck.price;
   ownedGuns[key] = (ownedGuns[key] || 0) + 1;
   if (storeItem) recordStorePurchase(storeItem);
+  if (storeItem) setStoreTransactionNotice(storeItem, `${item.name} purchased. Ready in Hangar.`);
 
   tutorialEvent("boughtStoreGun");
   tutorialEvent("boughtEquipment");

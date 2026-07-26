@@ -5208,6 +5208,104 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("station store presents a player-facing purchase summary at laptop size", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        credits = 10000;
+        inventoryItems = [];
+        ownedGuns.pulseLaser = 0;
+        playerProgress = normalizePlayerProgress({ combatXp: 2500, totals: {} });
+        showScreen("gameScreen");
+        openStore();
+        selectStoreItem("gun:pulseLaser");
+      })()
+    `));
+
+    const store = page.locator("#storeScreen");
+    const detail = page.locator("#storeDetailPanel");
+    await expect(store).toHaveClass(/active/);
+    await expect(store).toContainText("Core weapons and ship attachments for new pilots.");
+    await expect(detail).toContainText("Pulse Laser");
+    await expect(detail).toContainText("Quality");
+    await expect(detail).toContainText("Standard");
+    await expect(detail).toContainText("Level");
+    await expect(detail).toContainText("Owned");
+    await expect(detail).toContainText("Price");
+    await expect(detail).toContainText("Availability");
+    await expect(detail).toContainText("Specifications");
+    await expect(detail).not.toContainText(/server-backed|preview pending|validation is ready|dry run|credits before|credits after|owned before|owned after/i);
+
+    const layout = await store.evaluate(screen => {
+      const screenRect = screen.getBoundingClientRect();
+      const catalogRect = screen.querySelector(".modern-store-catalog-panel")?.getBoundingClientRect();
+      const detailRect = screen.querySelector(".modern-store-detail-panel")?.getBoundingClientRect();
+      const actionRect = screen.querySelector(".store-detail-actions")?.getBoundingClientRect();
+      const summaryRect = screen.querySelector(".store-item-summary")?.getBoundingClientRect();
+      const selectedCard = screen.querySelector(".store-catalog-card.selected");
+      return {
+        documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        screenOverflowX: screen.scrollWidth - screen.clientWidth,
+        screenOverflowY: screen.scrollHeight - screen.clientHeight,
+        screenBottom: Math.round(screenRect.bottom),
+        viewportBottom: window.innerHeight,
+        catalogContained: Boolean(catalogRect && catalogRect.bottom <= screenRect.bottom + 1),
+        detailContained: Boolean(detailRect && detailRect.bottom <= screenRect.bottom + 1),
+        actionVisible: Boolean(actionRect && detailRect && actionRect.bottom <= detailRect.bottom + 1),
+        summaryVisible: Boolean(summaryRect && detailRect && summaryRect.bottom <= detailRect.bottom + 1),
+        selectedCardVisible: Boolean(selectedCard && selectedCard.getBoundingClientRect().top >= catalogRect.top)
+      };
+    });
+    expect(layout.documentOverflowX).toBeLessThanOrEqual(0);
+    expect(layout.screenOverflowX).toBeLessThanOrEqual(1);
+    expect(layout.screenOverflowY).toBeLessThanOrEqual(1);
+    expect(layout.screenBottom).toBeLessThanOrEqual(layout.viewportBottom);
+    expect(layout.catalogContained).toBe(true);
+    expect(layout.detailContained).toBe(true);
+    expect(layout.actionVisible).toBe(true);
+    expect(layout.summaryVisible).toBe(true);
+    expect(layout.selectedCardVisible).toBe(true);
+
+    const purchaseButton = page.locator(".store-detail-buy-action[data-item-key='pulseLaser']");
+    await expect(purchaseButton).toBeEnabled();
+    await expect(purchaseButton).toContainText("Purchase");
+    await purchaseButton.click();
+    await expect(detail.locator(".store-transaction-status")).toContainText("Pulse Laser purchased. Ready in Hangar.");
+    await expect(detail.locator(".store-item-summary")).toContainText("x1");
+    await expect(page.locator("#storeCreditsText")).not.toHaveText("10,000");
+    const postPurchaseLayout = await detail.evaluate(panel => {
+      const content = panel.querySelector(".store-detail-content")?.getBoundingClientRect();
+      const stats = panel.querySelector(".store-detail-stat-grid")?.getBoundingClientRect();
+      const confirmation = panel.querySelector(".store-transaction-status")?.getBoundingClientRect();
+      const actions = panel.querySelector(".store-detail-actions")?.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      return {
+        confirmationVisible: Boolean(content && confirmation && confirmation.top >= content.top && confirmation.bottom <= content.bottom + 1),
+        statsVisible: Boolean(content && stats && stats.top >= content.top && stats.bottom <= content.bottom + 1),
+        actionsVisible: Boolean(actions && actions.top >= panelRect.top && actions.bottom <= panelRect.bottom + 1)
+      };
+    });
+    expect(postPurchaseLayout.confirmationVisible).toBe(true);
+    expect(postPurchaseLayout.statsVisible).toBe(true);
+    expect(postPurchaseLayout.actionsVisible).toBe(true);
+
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.screenshot({ path: "artifacts/station-store-player-facing-1366x768.png" });
+
+    const sellButton = detail.getByRole("button", { name: /Sell/ });
+    await expect(sellButton).toBeEnabled();
+    await sellButton.click();
+    await expect(detail.locator(".store-transaction-status")).toContainText(/Pulse Laser sold for CR [\d,]+\./);
+    await expect(detail.locator(".store-item-summary")).toContainText("x0");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("hangar loadout and vault mirror all five Forge level tiers", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
