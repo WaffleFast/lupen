@@ -1960,7 +1960,7 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.eval(`
       (() => {
         localStorage.clear();
-        credits = 5000;
+        credits = 50000;
         currentShipId = STARTER_SHIP_ID;
         selectedHangarShipId = STARTER_SHIP_ID;
         selectedFleetShipId = STARTER_SHIP_ID;
@@ -2037,6 +2037,7 @@ test.describe("Lupen browser smoke", () => {
 
     await exchange.locator(".unified-vessel-card[data-ship-id='zeusExplorer']").click();
     await expect(exchange.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
+    await expect(exchange.locator("#shipyardDetailPanel .buy-ship-action")).toBeEnabled();
     await exchange.locator("#shipyardDetailPanel .buy-ship-action").click();
     await expect(exchange.locator(".unified-vessel-card[data-ship-id='zeusExplorer']")).toHaveCount(0);
     await expect(exchange.locator(".unified-vessel-card")).toHaveCount(2);
@@ -7934,9 +7935,13 @@ test.describe("Lupen browser smoke", () => {
         showHangarSection("overview");
       `);
     });
-    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(15);
+    const mothSlotLimits = await page.evaluate(() => window.eval(`({
+      guns: getGunSlotLimit("monolith"),
+      attachments: getAttachmentSlotLimit("monolith")
+    })`));
+    await expect(page.locator("#installedGuns .loadout-grid-slot.empty")).toHaveCount(mothSlotLimits.guns);
     await page.locator("#loadoutCategoryAttachments").click();
-    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(15);
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.empty")).toHaveCount(mothSlotLimits.attachments);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

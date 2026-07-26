@@ -1298,3 +1298,57 @@
   color: var(--lupen-success);
   background: rgba(70, 233, 155, 0.1);
 }
+
+/* Hangar alignment: shared vessel browser fit and consistent interaction states. */
+#hangarOwnedSection #ownedShipsList.fleet-roster-list,
+#hangarShipyardSection #shipShop.vessel-card-grid {
+  grid-auto-rows: 74px !important;
+  gap: 8px !important;
+}
+
+#hangarOwnedSection .unified-vessel-card.vessel-exchange-card.fleet-selector-card.exchange-vessel-card.fleet-roster-card,
+#hangarShipyardSection .unified-vessel-card.vessel-exchange-card.fleet-selector-card.exchange-vessel-card {
+  grid-template-columns: 58px minmax(0, 1fr) !important;
+  grid-template-rows: 14px 20px 14px !important;
+  column-gap: 9px !important;
+  row-gap: 3px !important;
+  min-height: 74px !important;
+  height: 74px !important;
+  padding: 8px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#hangarOwnedSection .unified-vessel-card.vessel-exchange-card.fleet-selector-card.exchange-vessel-card.fleet-roster-card .fleet-card-image-wrap,
+#hangarShipyardSection .unified-vessel-card.vessel-exchange-card.fleet-selector-card.exchange-vessel-card .fleet-card-image-wrap {
+  width: 58px !important;
+  height: 58px !important;
+}
+
+#hangarOwnedSection .unified-vessel-card.vessel-exchange-card.fleet-selector-card.exchange-vessel-card.fleet-roster-card .fleet-card-image-wrap img,
+#hangarShipyardSection .unified-vessel-card.vessel-exchange-card.fleet-selector-card.exchange-vessel-card .fleet-card-image-wrap img {
+  width: 54px !important;
+  height: 54px !important;
+  max-width: 54px !important;
+  max-height: 54px !important;
+}
+
+#hangarScreen .hangar-tabs button,
+#hangarScreen .vessel-line-filter select,
+#hangarScreen .exchange-detail-footer button,
+#hangarScreen .loadout-category-toggle button,
+#hangarScreen .loadout-vault-controls input,
+#hangarScreen .loadout-vault-controls select,
+#hangarScreen .vault-utility-row input,
+#hangarScreen .vault-utility-row select {
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#hangarScreen .hangar-tabs button:focus-visible,
+#hangarScreen .unified-vessel-card:focus-visible,
+#hangarScreen .exchange-detail-footer button:focus-visible,
+#hangarScreen .loadout-category-toggle button:focus-visible,
+#hangarScreen .ship-plan-card:focus-visible,
+#hangarScreen .vault-storage-card:focus-visible {
+  outline: 2px solid var(--lupen-cyan-bright);
+  outline-offset: 2px;
+}

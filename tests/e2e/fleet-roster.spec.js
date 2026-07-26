@@ -35,7 +35,7 @@ test.describe("Hangar Fleet roster", () => {
     await expect(page.locator("#ownedShipsList .fleet-roster-card")).toHaveClass(/selected/);
     await expect(page.locator("#fleetDetailPanel .fleet-selected-identity")).toContainText("Pioneer Hunter");
     await expect(page.locator("#fleetDetailPanel .fleet-selected-status")).toContainText("Active");
-    await expect(page.locator("#fleetDetailPanel .fleet-selected-stats .fleet-stat-chip")).toHaveCount(6);
+    await expect(page.locator("#fleetDetailPanel .exchange-detail-stat-grid .fleet-stat-chip")).toHaveCount(6);
     await expect(page.locator("#fleetDetailPanel .fleet-repair-action")).toBeDisabled();
     await expect(page.locator("#fleetDetailPanel .fleet-management-primary")).toHaveText("Open Loadout");
 
