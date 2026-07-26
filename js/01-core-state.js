@@ -765,7 +765,8 @@ const EQUIPMENT_UNLOCK_REQUIREMENTS = Object.freeze({
 let currentNode = "Asteron Prime";
 let lastPlanetNode = "Asteron Prime";
 let homePlanet = "Asteron Prime";
-let credits = 10000;
+const MAP_ONE_STARTING_CREDITS = 10000;
+let credits = MAP_ONE_STARTING_CREDITS;
 let currentShipId = STARTER_SHIP_ID;
 let ownedShips = [STARTER_SHIP_ID];
 let selectedHangarShipId = STARTER_SHIP_ID;
@@ -1633,8 +1634,9 @@ let engagedTarget = null;
 let engageTimer = null;
 const ASTEROID_RESPAWN_MS = 10000;
 const ASTEROID_BASE_HP = 294;
-// Temporary high-yield value for Forge economy testing. Lower this when balancing is complete.
-const ASTEROID_LUPEN_SHARD_REWARD = 50;
+// Map 1 player-testing baseline: mining supplements Forge progress while
+// higher-risk daily bounties remain the primary source of Lupen Shards.
+const ASTEROID_LUPEN_SHARD_REWARD = 10;
 const ASTEROID_ASSET_PATH = "assets/asteroids/";
 const MAP_ONE_ASTEROID_COUNT = 15;
 const MAP_ONE_ASTEROID_SPAWN_PLAN = [

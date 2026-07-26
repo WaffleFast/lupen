@@ -22,7 +22,7 @@ export const STAGING_TRADE_PRICE_TABLE = Object.freeze({
   Nyxara: Object.freeze({
     Iron: 30,
     Copper: 32,
-    Cobalt: 128
+    Cobalt: 102
   })
 });
 

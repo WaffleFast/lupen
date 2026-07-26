@@ -368,8 +368,9 @@ const STAGING_RESOURCE_DEFINITIONS = [
   { id: "staging-resource-crystal-lower-apex", resourceName: "Crystal Shards", startNode: "Lower Apex", x: 50, y: 84, hp: 38, yield: 5 }
 ];
 
-// Temporary high-yield value for Forge economy testing. Lower this when balancing is complete.
-const STAGING_ASTEROID_LUPEN_SHARD_REWARD = 50;
+// Keep the authoritative staging payout aligned with the Map 1
+// player-testing economy used by the local combat loop.
+const STAGING_ASTEROID_LUPEN_SHARD_REWARD = 10;
 
 function rollStagingResourceShardReward(resourceName = "") {
   return STAGING_ASTEROID_LUPEN_SHARD_REWARD;

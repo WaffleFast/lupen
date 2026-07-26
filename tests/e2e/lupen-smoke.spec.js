@@ -1703,6 +1703,16 @@ test.describe("Lupen browser smoke", () => {
         const forgeCosts = Object.values(FORGE_LEVEL_COSTS);
         const forgeCumulativeCosts = forgeCosts.map((_, index) => forgeCosts.slice(0, index + 1).reduce((sum, cost) => sum + cost, 0));
         const bountyShardRewards = DAILY_BOUNTY_CONTRACTS.map(contract => contract.reward.lupenShards);
+        const bountyCreditRewards = DAILY_BOUNTY_CONTRACTS.map(contract => contract.reward.credits);
+        const dailyTradeRewards = DAILY_TRADE_CONTRACT_DEFINITIONS.map(contract => contract.reward);
+        const shipPrices = Object.fromEntries(
+          ["falcon", "bison", "zeusExplorer", "monolith"].map(shipId => [shipId, SHIPS[shipId].price])
+        );
+        const baseMarketFullHoldProfit = Object.fromEntries(MAP_ONE_TRADE_RESOURCES.map(resource => {
+          const prices = MAP_ONE_MARKET_PLANETS.map(planet => LIVE_MARKET_BASE_PRICES[planet][resource]);
+          return [resource, (Math.max(...prices) - Math.min(...prices)) * starterShip.cargo];
+        }));
+        const asteroidClearsForForgeTiers = forgeCumulativeCosts.map(cost => Math.ceil(cost / ASTEROID_LUPEN_SHARD_REWARD));
 
         return {
           attackTickMs: HOSTILE_BOT_ATTACK_TICK_MS,
@@ -1715,10 +1725,19 @@ test.describe("Lupen browser smoke", () => {
           spawnConflicts,
           busiestNodeTargetCount,
           economy: {
+            startingCredits: MAP_ONE_STARTING_CREDITS,
+            shipPrices,
             asteroidShardReward: ASTEROID_LUPEN_SHARD_REWARD,
             bountyShardRewards,
+            bountyCreditRewards,
             dailyBountyShardTotal: bountyShardRewards.reduce((sum, reward) => sum + reward, 0),
+            dailyBountyCreditTotal: bountyCreditRewards.reduce((sum, reward) => sum + reward, 0),
+            dailyTradeRewards,
+            dailyTradeCreditTotal: dailyTradeRewards.reduce((sum, reward) => sum + reward, 0),
+            marketRefreshMs: TRADE_MARKET_REFRESH_MS,
+            baseMarketFullHoldProfit,
             forgeCumulativeCosts,
+            asteroidClearsForForgeTiers,
             projectedXpAt25Kills,
             combatLevelTwoXp: XP_CONFIG.combatLevelXp
           },
@@ -1750,12 +1769,37 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.weaponPairs.pulseHeavy.speed).toBe(1644);
     expect(metrics.spawnConflicts).toBe(0);
     expect(metrics.economy).toMatchObject({
-      asteroidShardReward: 50,
+      startingCredits: 10000,
+      shipPrices: { falcon: 0, bison: 14000, zeusExplorer: 22000, monolith: 48000 },
+      asteroidShardReward: 10,
       bountyShardRewards: [25, 35, 50, 75],
+      bountyCreditRewards: [900, 1100, 1500, 2500],
       dailyBountyShardTotal: 185,
+      dailyBountyCreditTotal: 6000,
+      dailyTradeRewards: [1480, 2560, 3300, 4920],
+      dailyTradeCreditTotal: 12260,
+      marketRefreshMs: 90000,
+      baseMarketFullHoldProfit: { Iron: 1800, Copper: 2700, Cobalt: 4200 },
       forgeCumulativeCosts: [25, 100, 250, 550],
+      asteroidClearsForForgeTiers: [3, 10, 25, 55],
       combatLevelTwoXp: 2500
     });
+    expect(metrics.economy.startingCredits + metrics.economy.dailyBountyCreditTotal)
+      .toBeGreaterThanOrEqual(metrics.economy.shipPrices.bison);
+    expect(metrics.economy.startingCredits + metrics.economy.dailyBountyCreditTotal)
+      .toBeLessThan(metrics.economy.shipPrices.zeusExplorer);
+    expect(metrics.economy.startingCredits + metrics.economy.dailyTradeCreditTotal)
+      .toBeGreaterThanOrEqual(metrics.economy.shipPrices.zeusExplorer);
+    expect(metrics.economy.startingCredits + metrics.economy.dailyTradeCreditTotal)
+      .toBeLessThan(metrics.economy.shipPrices.monolith);
+    expect(metrics.economy.startingCredits + metrics.economy.dailyBountyCreditTotal + metrics.economy.dailyTradeCreditTotal)
+      .toBeLessThan(metrics.economy.shipPrices.monolith);
+    expect(Math.min(...metrics.economy.bountyShardRewards))
+      .toBeGreaterThanOrEqual(metrics.economy.asteroidShardReward * 2);
+    expect(metrics.economy.dailyBountyShardTotal)
+      .toBeGreaterThanOrEqual(metrics.economy.forgeCumulativeCosts[1]);
+    expect(metrics.economy.dailyBountyShardTotal)
+      .toBeLessThan(metrics.economy.forgeCumulativeCosts[2]);
     expect(metrics.economy.projectedXpAt25Kills).toBeGreaterThanOrEqual(metrics.economy.combatLevelTwoXp);
     expect(metrics.progression).toMatchObject({
       nextMapUnlockLevel: 5,
@@ -5736,7 +5780,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("asteroid depletion keeps resource cargo and awards 50 Lupen Shards", async ({ page }) => {
+  test("asteroid depletion keeps resource cargo and awards 10 Lupen Shards", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/");
@@ -5758,7 +5802,7 @@ test.describe("Lupen browser smoke", () => {
           resourceId: "staging-resource-test",
           resourceName: "Copper",
           cargoDelta: 4,
-          lupenShardDelta: 50,
+          lupenShardDelta: 10,
           resourceRewardId: "staging-resource-test:1",
           depletedUntil: Date.now() + 1000,
           receivedAt: Date.now()
@@ -5773,7 +5817,7 @@ test.describe("Lupen browser smoke", () => {
           resourceId: "staging-resource-full-cargo-test",
           resourceName: "Copper",
           cargoDelta: 4,
-          lupenShardDelta: 50,
+          lupenShardDelta: 10,
           resourceRewardId: "staging-resource-full-cargo-test:1",
           depletedUntil: Date.now() + 1000,
           receivedAt: Date.now()
@@ -5798,13 +5842,13 @@ test.describe("Lupen browser smoke", () => {
       iron: 3,
       copper: 4,
       cargoCollected: 3,
-      localShardDelta: 50,
+      localShardDelta: 10,
       stagingApplied: true,
-      stagingShardDelta: 50,
+      stagingShardDelta: 10,
       fullCargoApplied: false,
       fullCargoReason: "cargo_full_no_resource_recovered",
-      fullCargoShardDelta: 50,
-      shards: 150
+      fullCargoShardDelta: 10,
+      shards: 30
     });
 
     await expectNoUnexpectedBrowserErrors(failures);

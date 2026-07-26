@@ -4,7 +4,7 @@ const TRADE_MARKET_REFRESH_MS = 90000;
 const LIVE_MARKET_BASE_PRICES = Object.freeze({
   "Asteron Prime": Object.freeze({ Iron: 18, Copper: 38, Cobalt: 90 }),
   Virella: Object.freeze({ Iron: 20, Copper: 50, Cobalt: 74 }),
-  Nyxara: Object.freeze({ Iron: 30, Copper: 32, Cobalt: 128 })
+  Nyxara: Object.freeze({ Iron: 30, Copper: 32, Cobalt: 102 })
 });
 
 const DAILY_TRADE_CONTRACT_DEFINITIONS = Object.freeze([
