@@ -361,10 +361,20 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#tutorialTitle")).toHaveText("Your first flight plan");
     await expect(page.locator("#tutorialText")).toContainText("trade for credits");
     await page.locator("#tutorialNextBtn").click();
-    await expect(page.locator("#tutorialTitle")).toHaveText("The Academy is your compass");
-    await expect(page.locator("#tutorialText")).toContainText("open Frontier operations");
+    await expect(page.locator("#tutorialTitle")).toHaveText("Your first Academy assignments");
+    await expect(page.locator("#tutorialText")).toContainText("claim a bounty");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("First Academy Route");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Hunter");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Complete Trade");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Equip Guns");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Bounty");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Repair");
+    await page.screenshot({ path: "artifacts/morgan-first-academy-route-1366x768.png", fullPage: false });
     await page.locator("#tutorialNextBtn").click();
     await expect(page.locator("#tutorialTitle")).toHaveText("Open Hangar Bay");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Academy Assignment");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Starter Ship");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("0 / 1");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -565,7 +575,7 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.login());
 
     await expect(page.locator("#tutorialOverlay")).toHaveClass(/active/);
-    await expect(page.locator("#tutorialTitle")).toHaveText("The Academy is your compass");
+    await expect(page.locator("#tutorialTitle")).toHaveText("Your first Academy assignments");
     await expect(page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")))).resolves.toMatchObject({
       active: true,
       completed: false,
@@ -5675,6 +5685,11 @@ test.describe("Lupen browser smoke", () => {
           currentShipId,
           firstTitle: document.getElementById("tutorialTitle")?.textContent || "",
           label: document.getElementById("tutorialStepLabel")?.textContent || "",
+          academyMilestones: TUTORIAL_ACADEMY_MILESTONES.map(milestone => ({
+            missionId: milestone.missionId,
+            shortLabel: milestone.shortLabel,
+            stepIds: [...milestone.stepIds]
+          })),
           steps
         };
       })()
@@ -5686,6 +5701,16 @@ test.describe("Lupen browser smoke", () => {
     expect(tutorial.firstTitle).toBe("Welcome to Lupen, Pilot");
     expect(tutorial.label).toContain("Morgan / Academy Orientation");
     expect(tutorial.label).not.toMatch(/\d+\s*\/\s*\d+/);
+    expect(tutorial.academyMilestones.map(milestone => milestone.missionId)).toEqual([
+      "academy_starter_ship",
+      "academy_first_trade",
+      "academy_launch_ship",
+      "academy_two_guns",
+      "academy_attachment",
+      "academy_erebus_bots",
+      "academy_bounty",
+      "academy_repair_ship"
+    ]);
 
     const stepById = Object.fromEntries(tutorial.steps.map(step => [step.id, step]));
     expect(stepById["welcome-new-pilot"]).toMatchObject({
@@ -6450,6 +6475,8 @@ test.describe("Lupen browser smoke", () => {
     expect(claim.stepId).toBe("open-first-loadout");
     expect(claim.saved.currentShipId).toBe("falcon");
     expect(claim.saved.ownedShips).toContain("falcon");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Starter Ship");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Complete");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

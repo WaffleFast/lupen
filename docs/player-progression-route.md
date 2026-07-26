@@ -20,6 +20,8 @@ Morgan then guides the first session through the immediate controls and economy:
 
 The Hunter is issued with one mounted Pulse Laser, plus an unfitted Cargo Pod and Jump Drive. This makes the Store, second weapon, and first attachment meaningful without leaving the pilot unarmed.
 
+The orientation card names the active Academy assignment and shows its live completion state. Its opening route summary covers the starter ship, first trade and launch, two-gun loadout, attachment, Erebus combat, bounty claim, and repair check so players understand that tutorial actions are also real Academy progress.
+
 ## Academy route
 
 Morgan tracks nine durable Academy milestones:

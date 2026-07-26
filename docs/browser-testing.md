@@ -67,6 +67,10 @@ These tests do not validate CSS polish, authenticated cloud saves, or live stagi
 
 ## Pilot Website Checks
 
+Public players and external playtesters should use `https://www.lupen.io/`. The clean root URL is the real player-facing game and must not expose staging chips, dry-run language, diagnostics, or test-loop guidance.
+
+`https://www.lupen.io/?mp=staging` remains an internal multiplayer QA route. Do not distribute it as the normal game URL, and do not silently make its server-backed behavior the production default while trade, Store, bounty, loot, inventory, and broad progression writes are still gated, partial, allow-listed, or dry-run only.
+
 After a browser/client deploy, manually verify:
 
 - `https://www.lupen.io` loads normally with no multiplayer staging chip or guide.

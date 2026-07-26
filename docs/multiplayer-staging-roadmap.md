@@ -6,6 +6,13 @@ This note captures the current path from local single-player gameplay to hosted,
 
 Lupen is currently being prepared as a browser-first website game. The pilot focus is the desktop/web experience on `https://www.lupen.io` and `https://www.lupen.io/?mp=staging`: clear login/start flow, reliable navigation between hub screens, visible staging status, and repeatable online test paths. Mobile/PWA/app wrapping remains out of scope for this phase.
 
+### Production URL policy
+
+- `https://www.lupen.io/` is the public player and external-playtest URL now.
+- `https://www.lupen.io/?mp=staging` is an internal multiplayer QA route, not a public game link.
+- Player-facing releases should use normal game language and keep staging, dry-run, allow-list, preview, and diagnostic wording behind the staging/debug routes.
+- Multiplayer should become the clean-root default only after the complete new-player route can persist safely through server-authoritative trade, Store/loadout, combat rewards, bounty claims, repair/state recovery, and Academy progression without allow-list-only or dry-run gaps.
+
 ## Current Staging State
 
 Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Colyseus `lupen_sector` room. It currently supports:

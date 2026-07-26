@@ -7,6 +7,48 @@ const TUTORIAL_TRADE_ROUTE = Object.freeze({
   good: "Iron",
   destination: "Virella"
 });
+const TUTORIAL_ACADEMY_MILESTONES = Object.freeze([
+  Object.freeze({
+    missionId: "academy_starter_ship",
+    shortLabel: "Claim Hunter",
+    stepIds: Object.freeze(["open-hangar-first-ship", "buy-first-ship", "open-first-loadout"])
+  }),
+  Object.freeze({
+    missionId: "academy_first_trade",
+    shortLabel: "Complete Trade",
+    stepIds: Object.freeze(["return-after-first-loadout", "open-trade", "select-market-resource", "select-market-target", "buy-cargo", "return-to-station-for-launch", "map-route", "make-jump", "land-destination", "open-trade-to-sell", "sell-cargo"])
+  }),
+  Object.freeze({
+    missionId: "academy_launch_ship",
+    shortLabel: "Launch",
+    stepIds: Object.freeze(["launch"])
+  }),
+  Object.freeze({
+    missionId: "academy_two_guns",
+    shortLabel: "Equip Guns",
+    stepIds: Object.freeze(["return-after-trade", "open-store", "buy-equipment", "return-after-store", "open-hangar-equip", "equip-item"])
+  }),
+  Object.freeze({
+    missionId: "academy_attachment",
+    shortLabel: "Fit Equipment",
+    stepIds: Object.freeze(["equip-attachment", "return-after-equip"])
+  }),
+  Object.freeze({
+    missionId: "academy_erebus_bots",
+    shortLabel: "Defeat Erebus",
+    stepIds: Object.freeze(["launch-for-combat", "open-map-for-bounty", "scan-for-bots", "jump-to-bounty-zone", "destroy-bot"])
+  }),
+  Object.freeze({
+    missionId: "academy_bounty",
+    shortLabel: "Claim Bounty",
+    stepIds: Object.freeze(["open-bounty", "accept-bounty", "return-for-combat-launch", "open-map-return-bounty", "return-to-planet-after-bounty", "land-after-bounty", "open-bounty-to-claim", "claim-bounty", "continue-after-bounty-reward", "return-after-bounty-claim"])
+  }),
+  Object.freeze({
+    missionId: "academy_repair_ship",
+    shortLabel: "Repair",
+    stepIds: Object.freeze(["return-after-forge", "repair-reminder", "repair-ship"])
+  })
+]);
 let tutorialState = loadTutorialState();
 let tutorialAdvanceTimeout = null;
 
@@ -36,9 +78,9 @@ const STARTER_TUTORIAL_STEPS = [
   },
   {
     id: "welcome-academy",
-    title: "The Academy is your compass",
+    title: "Your first Academy assignments",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Your Academy assignments record the same actions you perform in the world. Complete them to open Frontier operations. I will always point you toward the next useful step.",
+    text: "Claim your Hunter, complete a trade, launch, equip two guns and an attachment, defeat Erebus, claim a bounty, and check your repairs. These same actions complete Academy assignments and move you toward Frontier.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Begin orientation",
@@ -401,6 +443,64 @@ function getTutorialPilotIdentity() {
 
 function formatTutorialCopy(value) {
   return String(value || "").replaceAll("{pilot}", getTutorialPilotIdentity().name);
+}
+
+function getTutorialAcademyMilestone(stepId = getCurrentTutorialStep()?.id) {
+  return TUTORIAL_ACADEMY_MILESTONES.find(milestone => milestone.stepIds.includes(stepId)) || null;
+}
+
+function getTutorialAcademyMission(missionId) {
+  if (typeof MISSIONS_BY_ID === "undefined") return null;
+  return MISSIONS_BY_ID?.[missionId] || null;
+}
+
+function getTutorialAcademyMissionState(missionId) {
+  return missionProgress?.missions?.[missionId] || { state: "available", progress: 0 };
+}
+
+function isTutorialAcademyMissionComplete(state) {
+  return ["completed", "claimed"].includes(String(state?.state || ""));
+}
+
+function renderTutorialAcademyTracker(step) {
+  const tracker = document.getElementById("tutorialAcademyTracker");
+  if (!tracker) return;
+
+  if (step?.id === "welcome-academy") {
+    tracker.hidden = false;
+    tracker.classList.add("is-overview");
+    tracker.innerHTML = `
+      <span class="tutorial-academy-kicker">First Academy Route</span>
+      <div class="tutorial-academy-route">
+        ${TUTORIAL_ACADEMY_MILESTONES.map(milestone => {
+          const state = getTutorialAcademyMissionState(milestone.missionId);
+          return `<span class="${isTutorialAcademyMissionComplete(state) ? "is-complete" : ""}">${milestone.shortLabel}</span>`;
+        }).join("")}
+      </div>
+    `;
+    return;
+  }
+
+  const milestone = getTutorialAcademyMilestone(step?.id);
+  if (!milestone) {
+    tracker.hidden = true;
+    tracker.classList.remove("is-overview");
+    tracker.innerHTML = "";
+    return;
+  }
+
+  const mission = getTutorialAcademyMission(milestone.missionId);
+  const state = getTutorialAcademyMissionState(milestone.missionId);
+  const required = Math.max(1, Number(mission?.objective?.required || 1));
+  const progress = Math.min(required, Math.max(0, Number(state?.progress || 0)));
+  const complete = isTutorialAcademyMissionComplete(state);
+  tracker.hidden = false;
+  tracker.classList.remove("is-overview");
+  tracker.innerHTML = `
+    <span class="tutorial-academy-kicker">Academy Assignment</span>
+    <strong>${escapeHtml(mission?.title || milestone.shortLabel)}</strong>
+    <span class="tutorial-academy-status ${complete ? "is-complete" : ""}">${complete ? "Complete" : `${formatNumber(progress)} / ${formatNumber(required)}`}</span>
+  `;
 }
 
 function getStarterShipId() {
@@ -1397,6 +1497,8 @@ function clearTutorialOverlayOnly() {
     overlay.classList.remove("active");
     overlay.classList.remove("tutorial-intro-active");
   }
+  const academyTracker = document.getElementById("tutorialAcademyTracker");
+  if (academyTracker) academyTracker.hidden = true;
 }
 
 
@@ -1451,6 +1553,7 @@ function renderStarterTutorial() {
     const speaker = step.speaker || TUTORIAL_NARRATOR_LABEL;
     label.textContent = `${speaker} / ${TUTORIAL_PROGRAMME_LABEL}`;
   }
+  renderTutorialAcademyTracker(step);
   if (progress) {
     progress.innerHTML = STARTER_TUTORIAL_STEPS.map((item, index) => `<i class="${index < tutorialState.stepIndex ? "done" : index === tutorialState.stepIndex ? "active" : ""}"></i>`).join("");
   }
