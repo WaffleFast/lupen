@@ -598,3 +598,313 @@
     font-size: 1.26rem;
   }
 }
+
+/* Bounty Board: shared hierarchy and contract-state presentation. */
+#bountyScreen.bounty-board-screen.lupen-app-screen {
+  padding: 18px !important;
+}
+
+#bountyScreen .bounty-board-header {
+  min-height: 78px;
+  align-items: center;
+}
+
+#bountyScreen .bounty-board-header .hangar-subtitle {
+  max-width: 640px;
+}
+
+#bountyScreen .bounty-status-strip {
+  min-height: 42px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .bounty-status-message {
+  color: var(--lupen-text-soft);
+  font-size: 0.76rem;
+}
+
+#bountyScreen .bounty-reset-chip {
+  border-radius: var(--lupen-control-radius);
+}
+
+#bountyScreen .bounty-main-grid {
+  grid-template-columns: minmax(0, 1.72fr) minmax(380px, 0.98fr) !important;
+  gap: 12px !important;
+}
+
+#bountyScreen .bounty-list-panel,
+#bountyScreen .selected-contract-panel {
+  border-radius: var(--lupen-panel-radius) !important;
+}
+
+#bountyScreen .bounty-list-header,
+#bountyScreen .selected-contract-heading {
+  min-height: 40px !important;
+  padding: 0 14px !important;
+}
+
+#bountyScreen .bounty-list-header > span,
+#bountyScreen .selected-contract-heading > span {
+  font-size: 0.7rem !important;
+  letter-spacing: 0.14em !important;
+}
+
+#bountyScreen .bounty-list-count {
+  color: var(--lupen-text-soft) !important;
+  font-size: 0.6rem !important;
+}
+
+#bountyScreen .bounty-board-layout-refined .bounty-contract-grid.bounty-list {
+  gap: 8px !important;
+  padding: 10px !important;
+}
+
+#bountyScreen .bounty-board-layout-refined .bounty-contract-card.bounty-card {
+  grid-template-columns: 88px minmax(0, 1fr) 156px !important;
+  gap: 12px !important;
+  padding: 10px 12px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .bounty-board-layout-refined .bounty-card-icon.bounty-card__icon-frame {
+  width: 80px !important;
+  height: 80px !important;
+  min-width: 80px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .bounty-card__body {
+  gap: 5px !important;
+}
+
+#bountyScreen .bounty-card__title {
+  font-size: 0.98rem !important;
+}
+
+#bountyScreen .bounty-card__subtitle {
+  color: var(--lupen-text-soft) !important;
+  font-size: 0.7rem !important;
+}
+
+#bountyScreen .bounty-card__chips {
+  gap: 5px;
+}
+
+#bountyScreen .bounty-chip {
+  min-height: 18px;
+  padding: 3px 6px;
+  font-size: 0.48rem !important;
+}
+
+#bountyScreen .bounty-card-threat {
+  color: #ffd79f;
+}
+
+#bountyScreen .bounty-reward-box,
+#bountyScreen .bounty-board-layout-refined .bounty-card-reward.bounty-reward-box {
+  width: 156px !important;
+  min-height: 62px !important;
+  padding: 6px 9px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .bounty-reward-box__label {
+  color: var(--lupen-cyan-bright);
+  font-size: 0.52rem;
+}
+
+#bountyScreen .bounty-reward-box__value {
+  font-size: 0.7rem !important;
+}
+
+#bountyScreen .bounty-status-chip {
+  padding: 3px 7px;
+  font-size: 0.5rem;
+}
+
+#bountyScreen .selected-contract-body.bounty-detail-body {
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto !important;
+  gap: 6px !important;
+  padding: 10px !important;
+}
+
+#bountyScreen .selected-bounty-header.selected-contract-top {
+  min-height: 94px !important;
+  padding: 10px !important;
+  grid-template-columns: 78px minmax(0, 1fr) !important;
+  gap: 10px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .bounty-board-layout-refined .selected-contract-icon.bounty-detail-icon {
+  width: 72px !important;
+  height: 72px !important;
+  min-width: 72px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .selected-contract-copy {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 5px 6px;
+}
+
+#bountyScreen .selected-contract-copy > .bounty-chip {
+  grid-column: 1;
+}
+
+#bountyScreen .selected-contract-state {
+  grid-column: 2;
+  width: max-content;
+}
+
+#bountyScreen .selected-contract-active-badge,
+#bountyScreen .selected-contract-check {
+  grid-column: 3;
+}
+
+#bountyScreen .selected-contract-copy > strong,
+#bountyScreen .selected-contract-copy > span:last-child {
+  grid-column: 1 / -1;
+}
+
+#bountyScreen .selected-contract-copy > strong {
+  margin: 2px 0 0;
+  font-size: 1.12rem !important;
+}
+
+#bountyScreen .selected-contract-copy > span:last-child {
+  color: var(--lupen-text-soft);
+  font-size: 0.7rem;
+}
+
+#bountyScreen .selected-contract-progress {
+  padding: 7px 9px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .selected-contract-timer {
+  min-height: 40px !important;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  padding: 6px 9px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .selected-contract-timer strong {
+  font-size: 1.05rem !important;
+}
+
+#bountyScreen .selected-contract-rows {
+  align-content: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px !important;
+  overflow-y: auto;
+}
+
+#bountyScreen .selected-contract-row {
+  min-height: 34px !important;
+  padding: 6px 8px !important;
+  border-radius: var(--lupen-control-radius) !important;
+}
+
+#bountyScreen .selected-contract-row > span {
+  color: var(--lupen-text-muted) !important;
+  font-size: 0.52rem !important;
+  letter-spacing: 0.08em;
+}
+
+#bountyScreen .selected-contract-row > strong {
+  font-size: 0.68rem !important;
+}
+
+#bountyScreen .selected-bounty-info-row--wide {
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+#bountyScreen .bounty-payout-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+#bountyScreen .bounty-payout-summary > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(91, 213, 255, 0.2);
+}
+
+#bountyScreen .bounty-payout-summary small {
+  color: var(--lupen-text-muted);
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#bountyScreen .bounty-payout-summary b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--lupen-text);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#bountyScreen .bounty-payout-summary img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 7px rgba(91, 213, 255, 0.54));
+}
+
+#bountyScreen .selected-contract-actions {
+  gap: 6px !important;
+}
+
+#bountyScreen .selected-contract-action,
+#bountyScreen .selected-contract-actions button {
+  min-height: 42px !important;
+  border-radius: var(--lupen-control-radius) !important;
+  font-size: 0.78rem !important;
+}
+
+#bountyScreen .bounty-detail-note.compact {
+  color: var(--lupen-text-soft);
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
+
+#bountyScreen .bounty-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--lupen-text-soft);
+  font-size: 0.76rem;
+}
+
+@media (max-height: 740px) {
+  #bountyScreen.bounty-board-screen.lupen-app-screen {
+    padding: 14px !important;
+  }
+
+  #bountyScreen .bounty-board-header {
+    min-height: 70px;
+  }
+
+  #bountyScreen .bounty-board-layout-refined .bounty-card-icon.bounty-card__icon-frame {
+    width: 70px !important;
+    height: 70px !important;
+    min-width: 70px !important;
+  }
+}

@@ -9179,9 +9179,11 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".selected-contract-panel")).toBeVisible();
     await expect(page.locator(".accept-bounty-button")).toBeVisible();
     await expect(page.locator(".bounty-contract-card")).toHaveCount(4);
-    await expect(page.locator("#bountyScreen")).toContainText("Complete daily Erebus contracts to earn credits and Lupen Shards for Forge upgrades.");
+    await expect(page.locator("#bountyScreen")).toContainText("Daily Erebus contracts and Forge-material rewards.");
+    await expect(page.locator("#bountyScreen")).toContainText("Accept one contract at a time. Return here after completion to claim the payout.");
     await expect(page.locator("#bountyScreen")).toContainText("DAILY CONTRACTS");
-    await expect(page.locator("#bountyScreen")).toContainText("4 / 4 DAILY CONTRACTS");
+    await expect(page.locator("#bountyScreen")).toContainText("4 CONTRACTS");
+    await expect(page.locator("#bountyScreen")).toContainText("CONTRACT BRIEF");
     await expect(page.locator("#bountyResetCountdown")).toContainText("DAILY RESET");
     await expect(page.locator("#bountyScreen")).toContainText("Erebus Patrol Sweep");
     await expect(page.locator("#bountyScreen")).toContainText("Hunter Clearance");
@@ -9215,15 +9217,18 @@ test.describe("Lupen browser smoke", () => {
     await page.locator(".bounty-contract-card", { hasText: "Hunter Clearance" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter Clearance");
     await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,100 / 35 Lupen Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,100");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("35 Shards");
     await page.locator(".bounty-contract-card", { hasText: "Timed Suppression" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyDetailPanel")).toContainText("04:00");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("XP REWARD");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("None");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Timed Elimination");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Threat");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Medium");
+    await expect(page.locator("#bountyDetailPanel")).not.toContainText("XP REWARD");
 
     fs.mkdirSync("artifacts", { recursive: true });
-    await page.locator("#bountyScreen").screenshot({ path: "artifacts/bounty-board-daily-refresh.png" });
+    await page.locator("#bountyScreen").screenshot({ path: "artifacts/bounty-board-player-facing-1366x768.png" });
 
     await page.locator(".accept-bounty-button").click();
     await expect(page.locator(".bounty-cancel-btn")).toBeVisible();
@@ -9236,6 +9241,48 @@ test.describe("Lupen browser smoke", () => {
       actionsFitPanel: true,
       buttonFitsPanel: true
     });
+    await page.locator("#bountyScreen").screenshot({ path: "artifacts/bounty-board-active-contract-1366x768.png" });
+
+    await page.evaluate(() => window.eval(`
+      completeActiveBountyObjective();
+      renderBountyBoard();
+    `));
+    await expect(page.locator("#bountyDetailPanel .bounty-claim-btn")).toBeVisible();
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Contract complete");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Return to the board and claim this payout.");
+    await expect(page.locator("#gameRewardBurst")).not.toHaveClass(/active/);
+    const claimGeometry = await measureSelectedPanelAction(".bounty-claim-btn");
+    expect(claimGeometry).toMatchObject({
+      actionVisible: true,
+      panelFitsScreen: true,
+      actionsFitPanel: true,
+      buttonFitsPanel: true
+    });
+    await page.locator("#bountyScreen").screenshot({ path: "artifacts/bounty-board-ready-to-claim-1366x768.png" });
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        const contract = getBountyContract(selectedBountyContractId);
+        contract.status = "claimed";
+        activeObjective = null;
+        activeBountyId = null;
+        renderBountyBoard();
+      })()
+    `));
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Reward claimed");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("This contract has been paid out.");
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        const contract = dailyBountyContracts.find((item) => item.title === "Behemoth Warning");
+        contract.status = "failed";
+        selectedBountyContractId = contract.id;
+        renderBountyBoard();
+      })()
+    `));
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Expired");
+    await expect(page.locator("#bountyDetailPanel .accept-bounty-button")).toBeDisabled();
+    await expect(page.locator("#bountyDetailPanel .accept-bounty-button")).toContainText("Failed");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -9296,10 +9343,10 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toContainText("Hunter Clearance");
     await expect(page.locator("#bountyScreen")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyScreen")).toContainText("Behemoth Warning");
-    await expect(page.locator("#bountyScreen")).toContainText(/Contract progress is tracked automatically|Connecting to the bounty network/);
+    await expect(page.locator("#bountyScreen")).toContainText(/Progress updates automatically while this contract is active|Connecting to the contract network/);
     await expect(page.locator("#bountyScreen")).not.toContainText(/MP staging|server-tracked staging|multiplayer staging/i);
     await expect(page.locator("#bountyScreen")).toContainText("CR 900");
-    await expect(page.locator("#bountyScreen")).toContainText("XP REWARD");
+    await expect(page.locator("#bountyScreen")).not.toContainText("XP REWARD");
 
     const stagingContractCards = page.locator(".bounty-contract-card");
     await expect(stagingContractCards.filter({ hasText: "Hunter Clearance" })).toContainText("35 Lupen Shards");
@@ -9319,10 +9366,12 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator(".bounty-contract-card", { hasText: "Behemoth Warning" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Behemoth");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 75 Lupen Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("75 Shards");
     await page.evaluate(() => window.eval("renderBountyBoard()"));
     await expect(page.locator("#bountyDetailPanel")).toContainText("Behemoth Warning");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500 / 75 Lupen Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("75 Shards");
 
     await page.evaluate(() => window.eval(`
       (() => {

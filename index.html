@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css?v=20260719-exchange-vault" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260715-tactical-refine" />
   <link rel="stylesheet" href="loadout-redesign.css?v=20260721-unified-hangar" />
-  <link rel="stylesheet" href="ui-system.css?v=20260725-pilot-frame" />
+  <link rel="stylesheet" href="ui-system.css?v=20260726-bounty-alignment" />
 </head>
 <body>
   <div class="stars"></div>
@@ -134,6 +134,7 @@
         <div>
           <p>BOUNTY BOARD</p>
           <h2 id="bountyLocationTitle">SECTOR CONTRACTS</h2>
+          <span class="hangar-subtitle">Daily Erebus contracts and Forge-material rewards.</span>
         </div>
         <button class="screen-back-btn lupen-back-button" onclick="returnToHub()">Back</button>
       </div>
@@ -141,7 +142,7 @@
       <div class="bounty-status-strip bounty-top-strip">
         <div class="bounty-status-message">
           <span class="bounty-status-icon" aria-hidden="true">i</span>
-          <span>Complete daily Erebus contracts to earn credits and Lupen Shards for Forge upgrades.</span>
+          <span>Accept one contract at a time. Return here after completion to claim the payout.</span>
         </div>
         <em id="bountyResetCountdown" class="bounty-reset-chip">DAILY RESET --:--:--</em>
       </div>
@@ -149,15 +150,15 @@
       <div class="bounty-main-grid bounty-board-layout bounty-board-layout-refined">
         <section class="bounty-list-panel bounty-contract-panel">
           <div class="bounty-list-header modern-store-panel-header bounty-panel-header">
-            <span>AVAILABLE CONTRACTS</span>
-            <span class="bounty-list-count">4 / 4 DAILY CONTRACTS</span>
+            <span>DAILY CONTRACTS</span>
+            <span class="bounty-list-count">4 CONTRACTS</span>
           </div>
           <div id="bountyContractGrid" class="bounty-list bounty-contract-grid"></div>
         </section>
 
         <aside class="selected-contract-panel bounty-detail-panel selected-bounty-panel">
           <div class="selected-contract-heading modern-store-panel-header">
-            <span>SELECTED CONTRACT</span>
+            <span>CONTRACT BRIEF</span>
           </div>
           <div id="bountyDetailPanel" class="selected-contract-body bounty-detail-body"></div>
         </aside>
@@ -795,7 +796,7 @@
   <script src="js/02-account-navigation.js?v=20260721-stable-slots"></script>
   <script src="js/03-hud-space-map.js?v=20260721-stable-slots"></script>
   <script src="js/network/multiplayerOverlay.js?v=20260718-pioneer-line"></script>
-  <script src="js/04-trade-bounty-objectives.js?v=20260716-bounty-complete"></script>
+  <script src="js/04-trade-bounty-objectives.js?v=20260726-bounty-alignment"></script>
   <script src="js/04b-trade-terminal-v2.js?v=20260717-trade-quick-actions"></script>
   <script src="js/05-hangar-store.js?v=20260726-store-alignment"></script>
   <script src="js/06-combat.js?v=20260715-space-volley"></script>
