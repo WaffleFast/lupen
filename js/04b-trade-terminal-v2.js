@@ -929,12 +929,14 @@ function getDailyContractActionMarkup(contract) {
 
 function renderDailyTradePreviewRow(contract, index) {
   const state = getTradeContractState(contract);
+  const stateLabel = state === "available" ? contract.risk : state.toUpperCase();
+  const stateClass = state === "available" ? `risk-${contract.riskTone}` : `trade-v2-contract-state trade-v2-contract-state--${state}`;
   return `
     <article class="trade-v2-contract-preview is-${state}" data-contract-id="${escapeHtml(contract.id)}">
       <span class="trade-v2-contract-index">${index + 1}</span>
       <img src="${escapeHtml(contract.packageImage)}" alt="">
       <div class="trade-v2-contract-copy"><strong>${escapeHtml(contract.name)}</strong><span>${escapeHtml(contract.origin)} <b>&rarr;</b> ${escapeHtml(contract.destination)}</span><small>${escapeHtml(contract.packageName)} &middot; ${formatNumber(contract.cargoSpace)} cargo</small></div>
-      <em class="risk-${contract.riskTone}">${escapeHtml(contract.risk)}</em>
+      <em class="${stateClass}">${escapeHtml(stateLabel)}</em>
       <strong class="trade-v2-profit">+${formatNumber(contract.reward)} CR</strong>
       <div class="trade-v2-contract-inline-action">${getDailyContractActionMarkup(contract)}</div>
     </article>
@@ -972,6 +974,20 @@ function renderLiveMarketQuickActions() {
   const buyDisabled = quantity <= 0 || price <= 0 || !buyWrite.enabled;
   const sellDisabled = sellable <= 0 || price <= 0 || !sellWrite.enabled;
   const saleValue = price * sellable;
+  const purchased = getPurchasedCargoQuantity(good);
+  const recovered = getRecoveredCargoQuantity(good);
+  const unitBasis = purchased > 0 ? Number(getCargoCostBasisForResource(good) || price) : 0;
+  const projectedResult = Math.round((purchased * (price - unitBasis)) + (recovered * price));
+  const projectedResultLabel = projectedResult === 0
+    ? "Break even"
+    : `Projected result: ${projectedResult > 0 ? "+" : "-"}CR ${formatNumber(Math.abs(projectedResult))}`;
+  const buyButtonLabel = freeCargo <= 0
+    ? "Cargo Hold Full"
+    : credits < price
+      ? "Insufficient Credits"
+      : buyWrite.reason
+        ? "Market Unavailable"
+        : `Buy ${good}`;
   return `
     <section class="trade-v2-quick-action" aria-label="${escapeHtml(good)} quick actions">
       <div class="trade-v2-quick-resource">
@@ -987,12 +1003,12 @@ function renderLiveMarketQuickActions() {
           <button type="button" aria-label="Increase quantity" onclick="adjustMarketQuantity(1)" ${quantity >= buyLimit ? "disabled" : ""}>+</button>
           <button type="button" class="trade-v2-max" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyLimit <= 0 ? "disabled" : ""}>Max</button>
         </div>
-        <small>Total cost: <strong>CR ${formatNumber(price * quantity)}</strong></small>
+        <small>${buyDisabled ? escapeHtml(buyReason) : `Total cost: <strong>CR ${formatNumber(price * quantity)}</strong>`}</small>
       </div>
       <div class="trade-v2-quick-buttons">
-        <button type="button" class="trade-v2-transaction-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${buyDisabled ? "disabled aria-disabled=\"true\"" : ""}>Buy ${escapeHtml(good)}</button>
+        <button type="button" class="trade-v2-transaction-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${buyDisabled ? "disabled aria-disabled=\"true\"" : ""}>${escapeHtml(buyButtonLabel)}</button>
         <button type="button" class="trade-v2-sell-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${sellDisabled ? "disabled aria-disabled=\"true\"" : ""}>${sellable > 0 ? "Sell " + formatNumber(sellable) + " " : "Sell "}${escapeHtml(good)}</button>
-        <small>${sellable > 0 ? "Sale value: CR " + formatNumber(saleValue) : buyDisabled ? escapeHtml(buyReason) : "No " + escapeHtml(good) + " carried"}</small>
+        <small>${sellable > 0 ? `Sale value: CR ${formatNumber(saleValue)} &middot; ${escapeHtml(projectedResultLabel)}` : "No " + escapeHtml(good) + " carried"}</small>
       </div>
     </section>
   `;
@@ -1002,7 +1018,7 @@ function renderDailyContractsStrip() {
   const completed = getDailyTradeProgress();
   const active = getDailyTradeContract(activeDailyTradeContractId);
   const supportingText = active
-    ? `Tracking ${escapeHtml(active.name)} &middot; ${escapeHtml(active.origin)} &rarr; ${escapeHtml(active.destination)}`
+    ? `Deliver ${escapeHtml(active.name)} to ${escapeHtml(active.destination)} &middot; ${formatNumber(active.cargoSpace)} cargo reserved`
     : "Optional routes refresh each UTC day";
   return `
     <section class="trade-v2-contract-strip ${active ? "has-active-contract" : ""}" aria-label="Daily contract progress">
@@ -1024,7 +1040,7 @@ function renderDailyContractsDrawer() {
         <div>
           <span>Optional Trade Routes</span>
           <h3>Daily Contracts</h3>
-          <p>Fixed terms and guaranteed returns. Complete one contract before accepting another.</p>
+          <p>Accept at the listed origin; the sealed package loads automatically. One active delivery at a time.</p>
         </div>
         <div class="trade-v2-contract-drawer-meta">
           <strong>${completed} / 4 Complete</strong>
@@ -1051,7 +1067,7 @@ function renderTradeOverview() {
       <section class="trade-v2-primary-panel trade-v2-market-overview" aria-labelledby="liveMarketTitle">
         <header class="trade-v2-panel-heading">
           <span class="trade-v2-panel-icon" aria-hidden="true">&#8599;</span>
-          <div><h3 id="liveMarketTitle">Live Market</h3><p>Buy low. Sell high. Prices change fast.</p></div>
+          <div><h3 id="liveMarketTitle">Live Market</h3><p>Select a commodity, compare stations, then buy or sell.</p></div>
         </header>
         <div class="trade-v2-market-first-content">
           <section class="trade-v2-market-board">
@@ -1060,7 +1076,7 @@ function renderTradeOverview() {
           ${renderLiveMarketQuickActions()}
         </div>
       </section>
-      <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 90 seconds. Check back often for new opportunities.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
+      <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 90 seconds. Sell carried cargo at the current station.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
       ${renderDailyContractsDrawer()}
     </div>
   `;

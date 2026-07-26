@@ -1189,3 +1189,112 @@
     font-size: 0.7rem;
   }
 }
+
+/* Trade Terminal alignment: clearer decisions, contract states, and compact fit. */
+#marketScreen .trade-v2-summary,
+#marketScreen .trade-v2-contract-strip,
+#marketScreen .trade-v2-market-overview,
+#marketScreen .trade-v2-market-board,
+#marketScreen .trade-v2-quick-action,
+#marketScreen .trade-v2-footer,
+#marketScreen .trade-v2-contract-drawer {
+  border-radius: var(--lupen-panel-radius);
+}
+
+#marketScreen .trade-v2-summary-item:first-child {
+  border-radius: var(--lupen-panel-radius) 0 0 var(--lupen-panel-radius);
+}
+
+#marketScreen .trade-v2-summary-item:last-child {
+  border-radius: 0 var(--lupen-panel-radius) var(--lupen-panel-radius) 0;
+}
+
+#marketScreen .trade-v2-contract-strip-button,
+#marketScreen .trade-v2-contract-drawer-close,
+#marketScreen .trade-v2-contract-action,
+#marketScreen .trade-v2-stepper button,
+#marketScreen .trade-v2-stepper input,
+#marketScreen .trade-v2-quick-buttons button {
+  border-radius: var(--lupen-control-radius);
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
+  grid-template-rows: 48px 42px minmax(78px, 1fr) 90px;
+  gap: 6px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource {
+  grid-template-columns: 40px minmax(0, 1fr);
+  padding-bottom: 4px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource img {
+  width: 38px;
+  height: 38px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control {
+  grid-template-rows: 10px 38px 12px;
+  gap: 4px;
+  padding-top: 3px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control > span,
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control > small {
+  margin: 0;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-stepper button,
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-stepper input {
+  height: 38px;
+  min-height: 38px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons {
+  grid-template-rows: 34px 34px 12px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons button {
+  height: 34px;
+  min-height: 34px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control > small,
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons > small {
+  min-height: 12px;
+  overflow: hidden;
+  color: var(--lupen-text-soft);
+  font-size: 0.54rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#marketScreen .trade-v2-contract-state {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+}
+
+#marketScreen .trade-v2-contract-state--active {
+  color: var(--lupen-warning);
+  background: rgba(255, 212, 95, 0.1);
+}
+
+#marketScreen .trade-v2-contract-state--locked {
+  color: var(--lupen-text-muted);
+  background: rgba(143, 166, 183, 0.08);
+}
+
+#marketScreen .trade-v2-contract-state--complete {
+  color: var(--lupen-success);
+  background: rgba(70, 233, 155, 0.1);
+}

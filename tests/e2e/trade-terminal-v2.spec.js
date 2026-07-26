@@ -88,7 +88,33 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-market-table")).toContainText("Copper");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Cobalt");
     await expect(page.locator(".trade-v2-quick-action")).toBeVisible();
+    await expect(page.locator(".trade-v2-market-overview")).toContainText("Select a commodity, compare stations, then buy or sell.");
     await expect(page.locator("#marketScreen")).not.toContainText(/Open Contracts|Open Market|Best Opportunity|Titanium|Nickel|Crystal Shards|Lupen Shards/i);
+    const quickActionLayout = await page.locator(".trade-v2-quick-action").evaluate(panel => {
+      const panelRect = panel.getBoundingClientRect();
+      const buySummary = panel.querySelector(".trade-v2-buy-control > small")?.getBoundingClientRect();
+      const buyButton = panel.querySelector(".trade-v2-transaction-action")?.getBoundingClientRect();
+      const sellButton = panel.querySelector(".trade-v2-sell-action")?.getBoundingClientRect();
+      const sellSummary = panel.querySelector(".trade-v2-quick-buttons > small")?.getBoundingClientRect();
+      const elements = [buySummary, buyButton, sellButton, sellSummary].filter(Boolean);
+      return {
+        allFit: elements.every(rect => (
+          rect.left >= panelRect.left - 1 &&
+          rect.right <= panelRect.right + 1 &&
+          rect.top >= panelRect.top - 1 &&
+          rect.bottom <= panelRect.bottom + 1
+        )),
+        buySummaryAboveButton: Boolean(buySummary && buyButton && buySummary.bottom <= buyButton.top + 1),
+        buttonsSeparated: Boolean(buyButton && sellButton && buyButton.bottom <= sellButton.top + 1),
+        sellSummaryBelowButton: Boolean(sellButton && sellSummary && sellButton.bottom <= sellSummary.top + 1)
+      };
+    });
+    expect(quickActionLayout).toEqual({
+      allFit: true,
+      buySummaryAboveButton: true,
+      buttonsSeparated: true,
+      sellSummaryBelowButton: true
+    });
     expectPageFits(await getPageGeometry(page));
     await page.screenshot({ path: "artifacts/trade-terminal-quick-default-1366x768.png" });
 
@@ -114,9 +140,13 @@ test.describe("Trade Terminal final quick actions", () => {
 
     await firstRow.getByRole("button", { name: "Accept & Load" }).click();
     await expect(firstRow).toHaveClass(/is-active/);
+    await expect(firstRow.locator(".trade-v2-contract-state--active")).toHaveText("ACTIVE");
     await expect(firstRow).toContainText(/Deliver to Virella/i);
     await expect(secondRow).toHaveClass(/is-locked/);
+    await expect(secondRow.locator(".trade-v2-contract-state--locked")).toHaveText("LOCKED");
     await expect(secondRow.getByRole("button", { name: "Locked" })).toBeDisabled();
+    await expect(page.locator(".trade-v2-contract-strip")).toContainText("Deliver Safe Delivery to Virella");
+    await expect(page.locator(".trade-v2-contract-strip")).toContainText("20 cargo reserved");
 
     const accepted = await page.evaluate(() => ({
       credits,
@@ -336,6 +366,9 @@ test.describe("Trade Terminal final quick actions", () => {
     expect(afterBuy.recovered).toBe(0);
     expect(afterBuy.objective).toBeNull();
     await expect(page.getByRole("button", { name: new RegExp(`Sell ${beforeBuy.quantity} Copper`, "i") })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Cargo Hold Full" })).toBeDisabled();
+    await expect(page.locator(".trade-v2-buy-control")).toContainText("Cargo hold full.");
+    await expect(page.locator(".trade-v2-quick-buttons")).toContainText("Break even");
     await page.screenshot({ path: "artifacts/trade-terminal-quick-sell-enabled.png" });
 
     await page.evaluate(() => {
@@ -343,6 +376,7 @@ test.describe("Trade Terminal final quick actions", () => {
       lastPlanetNode = "Virella";
       renderMarketplace();
     });
+    await expect(page.locator(".trade-v2-quick-buttons")).toContainText("Projected result:");
     const beforeSale = await page.evaluate(() => ({ credits, cargoSold: playerProgress.totals.cargoSold || 0 }));
     await page.getByRole("button", { name: /Sell .* Copper/i }).click();
     const afterSale = await page.evaluate(() => ({
