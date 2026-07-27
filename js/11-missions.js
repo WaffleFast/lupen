@@ -684,9 +684,11 @@ function countMissionLoadoutEntries(entries, catalog = null) {
 
 function getCurrentMissionLoadoutCounts(shipId = "") {
   const activeShipId = String(shipId || currentShipId || "").trim();
-  const loadout = activeShipId && typeof getShipLoadout === "function"
-    ? getShipLoadout(activeShipId)
-    : shipLoadouts?.[activeShipId] || { guns: [], attachments: [] };
+  const loadout = !activeShipId
+    ? { guns: [], attachments: [] }
+    : typeof getShipLoadout === "function"
+      ? getShipLoadout(activeShipId)
+      : shipLoadouts?.[activeShipId] || { guns: [], attachments: [] };
   return {
     shipId: activeShipId,
     weaponCount: countMissionLoadoutEntries(loadout?.guns, typeof GUNS !== "undefined" ? GUNS : null),

@@ -137,6 +137,7 @@ async function lupenResetPilotProgress(options = {}) {
     localReset,
     cloudSaved,
     cloudReason,
+    pilotId: String(auth?.user?.id || ""),
     resetState: "no_ship_starter_claim",
     reloaded: options.reload === true
   };
@@ -148,12 +149,12 @@ window.lupenResetPilotProgress = lupenResetPilotProgress;
 
 async function handleStagingResetPilotParam() {
   const params = new URLSearchParams(window.location.search || "");
-  if (params.get("mp") !== "staging" || params.get("resetPilot") !== "1") return false;
+  if (params.get("mp") !== "staging" || params.get("resetPilot") !== "1") return null;
 
   const result = await lupenResetPilotProgress();
   removeResetParamFromUrl("resetPilot");
   console.info("[Lupen staging] Applied resetPilot=1.", result);
-  return true;
+  return result;
 }
 
 window.addEventListener("pageshow", event => {
@@ -1135,7 +1136,7 @@ function applyLoadedGameState(rawSaved) {
     shipLoadouts[shipId] = normalizeShipLoadout(shipLoadouts[shipId], shipId);
   });
 
-  if (!shipLoadouts[currentShipId]) {
+  if (currentShipId && !shipLoadouts[currentShipId]) {
     shipLoadouts[currentShipId] = normalizeShipLoadout(undefined, currentShipId);
   }
   if (typeof reconcileMissionProgressFromGameplayState === "function") {
@@ -1489,10 +1490,10 @@ function debugResetSave() {
 }
 
 window.onload = async function () {
-  const pilotResetApplied = typeof handleStagingResetPilotParam === "function"
+  const pilotResetResult = typeof handleStagingResetPilotParam === "function"
     ? await handleStagingResetPilotParam()
-    : false;
-  if (!pilotResetApplied) {
+    : null;
+  if (!pilotResetResult?.ok) {
     if (typeof handleStagingClearLocalSaveParam === "function") handleStagingClearLocalSaveParam();
     if (typeof handleStagingResetTutorialParam === "function") handleStagingResetTutorialParam();
   }
@@ -1515,7 +1516,16 @@ window.onload = async function () {
   if (stationVaultWasClearedThisSession) saveGame();
   showScreen("startScreen");
   ensureDebugToolsPanel();
-  if (typeof handleStagingStartTutorialParam === "function") handleStagingStartTutorialParam();
+  if (pilotResetResult?.ok && pilotResetResult.pilotId && typeof enterHubFromLogin === "function") {
+    enterHubFromLogin();
+    if (typeof startMorganAcademyOrientation === "function") {
+      startMorganAcademyOrientation(pilotResetResult.pilotId);
+    } else if (typeof startStarterTutorial === "function") {
+      startStarterTutorial(true, { pilotId: pilotResetResult.pilotId });
+    }
+  } else if (typeof handleStagingStartTutorialParam === "function") {
+    handleStagingStartTutorialParam();
+  }
 };
 
 window.addEventListener("pagehide", saveGameBeforeLeave);

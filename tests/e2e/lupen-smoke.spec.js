@@ -907,7 +907,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("staging resetPilot clears progress, preserves Supabase auth, and writes a clean cloud save", async ({ page }) => {
+  test("staging resetPilot clears all progress, preserves auth, and starts Morgan's first-login route", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.addInitScript(() => {
@@ -962,7 +962,13 @@ test.describe("Lupen browser smoke", () => {
       saved: JSON.parse(localStorage.getItem("lupenGameState")),
       tutorial: JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")),
       cloudUpserts: window.__pilotResetCloudUpserts,
-      overlayActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false
+      overlayActive: document.getElementById("tutorialOverlay")?.classList.contains("active") || false,
+      gameActive: document.getElementById("gameScreen")?.classList.contains("active") || false,
+      tutorialTitle: document.getElementById("tutorialTitle")?.textContent || "",
+      missionStates: Object.fromEntries(Object.entries(window.eval("missionProgress.missions")).map(([id, state]) => [
+        id,
+        { state: state.state, progress: state.progress }
+      ]))
     }));
 
     expect(reset.href).toContain("mp=staging");
@@ -980,10 +986,17 @@ test.describe("Lupen browser smoke", () => {
     expect(reset.saved.playerProgress.totals.botsDestroyed).toBe(0);
     expect(reset.saved.playerProgress.totals.erebusBotsDestroyed).toBe(0);
     expect(reset.saved.playerProgress.totals.tradeProfit).toBe(0);
-    expect(reset.tutorial.active).toBe(false);
+    expect(reset.tutorial.active).toBe(true);
     expect(reset.tutorial.completed).toBe(false);
     expect(reset.tutorial.stepIndex).toBe(0);
-    expect(reset.overlayActive).toBe(false);
+    expect(reset.overlayActive).toBe(true);
+    expect(reset.gameActive).toBe(true);
+    expect(reset.tutorialTitle).toBe("Welcome to Lupen, Pilot");
+    expect(Object.values(reset.missionStates)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ state: "available", progress: 0 })])
+    );
+    expect(Object.values(reset.missionStates).every(state => state.state === "available" && state.progress === 0)).toBe(true);
+    await page.screenshot({ path: "artifacts/profile-reset-morgan-intro-1366x768.png", fullPage: false });
     expect(reset.cloudUpserts).toHaveLength(1);
     expect(reset.cloudUpserts[0].table).toBe("player_saves");
     expect(reset.cloudUpserts[0].payload.user_id).toBe("77777777-7777-4777-8777-777777777777");
@@ -9086,9 +9099,12 @@ test.describe("Lupen browser smoke", () => {
       openJourney();
     });
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "active");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("1 / 9");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 9");
     await expect(page.locator("#journeyScreen")).toContainText("Academy Assignments");
     await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_launch_ship']")).toContainText("0 / 1");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("0 / 2");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).not.toContainText("COMPLETE");
+    await page.locator("#journeyScreen").screenshot({ path: "artifacts/journey-profile-reset-blank-1366x768.png" });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

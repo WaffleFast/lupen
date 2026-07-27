@@ -71,6 +71,8 @@ Public players and external playtesters should use `https://www.lupen.io/`. The 
 
 `https://www.lupen.io/?mp=staging` remains an internal multiplayer QA route. Do not distribute it as the normal game URL, and do not silently make its server-backed behavior the production default while trade, Store, bounty, loot, inventory, and broad progression writes are still gated, partial, allow-listed, or dry-run only.
 
+`https://www.lupen.io/?mp=staging&resetPilot=1` is the destructive full-profile reset route for an authenticated staging pilot. It preserves authentication, clears local and cloud gameplay state including all Journey/Academy assignments, restores the no-ship starter claim, removes the reset parameter, enters the hub, and opens Morgan's first-login Academy orientation. Use `resetTutorial=1` only when Journey and gameplay progress must remain intact.
+
 After a browser/client deploy, manually verify:
 
 - `https://www.lupen.io` loads normally with no multiplayer staging chip or guide.
