@@ -49,16 +49,52 @@ const TUTORIAL_ACADEMY_MILESTONES = Object.freeze([
     stepIds: Object.freeze(["return-after-forge", "repair-reminder", "repair-ship"])
   })
 ]);
+const TUTORIAL_MORGAN_PORTRAITS = Object.freeze({
+  command: "assets/morgan-command-liaison.png",
+  trade: "assets/morgan-trade-advisor.png",
+  tactical: "assets/morgan-tactical-liaison.png",
+  journey: "assets/morgan-journey-guide.png"
+});
+const TUTORIAL_TRADE_PORTRAIT_STEPS = new Set(
+  TUTORIAL_ACADEMY_MILESTONES
+    .filter(milestone => ["academy_first_trade", "academy_launch_ship"].includes(milestone.missionId))
+    .flatMap(milestone => [...milestone.stepIds])
+);
+const TUTORIAL_TACTICAL_PORTRAIT_STEPS = new Set(
+  TUTORIAL_ACADEMY_MILESTONES
+    .filter(milestone => ["academy_two_guns", "academy_attachment", "academy_erebus_bots", "academy_bounty"].includes(milestone.missionId))
+    .flatMap(milestone => [...milestone.stepIds])
+);
+const TUTORIAL_JOURNEY_PORTRAIT_STEPS = new Set([
+  "open-forge",
+  "forge-upgrade-weapon",
+  "return-after-forge",
+  "repair-reminder",
+  "repair-ship",
+  "complete"
+]);
 let tutorialState = loadTutorialState();
 let tutorialAdvanceTimeout = null;
 
 const STARTER_TUTORIAL_STEPS = [
   {
-    id: "welcome-new-pilot",
+    id: "cinematic-welcome",
     title: "Welcome to Lupen, {pilot}",
     speaker: TUTORIAL_NARRATOR_LABEL,
+    text: "Trade across living markets. Explore distant systems. Destroy those who stand against you. Build your fleet—and create your own path through the universe.",
+    target: "#tutorialCinematicContinue",
+    event: null,
+    actionLabel: "Begin your journey",
+    manualOnly: true,
+    intro: true,
+    cinematic: true
+  },
+  {
+    id: "welcome-new-pilot",
+    title: "I'm Morgan, your Command Liaison",
+    speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_intro_welcome",
-    text: "I'm Morgan, your Command Liaison. I'll help you find your feet, claim your first ship, and understand the choices that shape your journey.",
+    text: "I'll help you find your feet, claim your first ship, and understand the choices that shape your journey.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Continue",
@@ -449,6 +485,14 @@ function getTutorialAcademyMilestone(stepId = getCurrentTutorialStep()?.id) {
   return TUTORIAL_ACADEMY_MILESTONES.find(milestone => milestone.stepIds.includes(stepId)) || null;
 }
 
+function getTutorialMorganPortrait(step = getCurrentTutorialStep()) {
+  const stepId = String(step?.id || "");
+  if (TUTORIAL_TRADE_PORTRAIT_STEPS.has(stepId)) return TUTORIAL_MORGAN_PORTRAITS.trade;
+  if (TUTORIAL_TACTICAL_PORTRAIT_STEPS.has(stepId)) return TUTORIAL_MORGAN_PORTRAITS.tactical;
+  if (TUTORIAL_JOURNEY_PORTRAIT_STEPS.has(stepId)) return TUTORIAL_MORGAN_PORTRAITS.journey;
+  return TUTORIAL_MORGAN_PORTRAITS.command;
+}
+
 function getTutorialAcademyMission(missionId) {
   if (typeof MISSIONS_BY_ID === "undefined") return null;
   return MISSIONS_BY_ID?.[missionId] || null;
@@ -761,7 +805,7 @@ function setTutorialStepById(stepId) {
 }
 
 function startStarterTutorial(reset = true, options = {}) {
-  const firstStep = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "welcome-new-pilot");
+  const firstStep = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "cinematic-welcome");
   const pilotId = String(options.pilotId || getTutorialPilotIdentity().id || tutorialState.pilotId || "");
   tutorialState = {
     active: true,
@@ -1496,7 +1540,12 @@ function clearTutorialOverlayOnly() {
   if (overlay) {
     overlay.classList.remove("active");
     overlay.classList.remove("tutorial-intro-active");
+    overlay.classList.remove("tutorial-cinematic-active");
   }
+  const cinematic = document.getElementById("tutorialCinematic");
+  if (cinematic) cinematic.hidden = true;
+  const card = overlay?.querySelector(".tutorial-card");
+  if (card) card.hidden = false;
   const academyTracker = document.getElementById("tutorialAcademyTracker");
   if (academyTracker) academyTracker.hidden = true;
 }
@@ -1541,19 +1590,50 @@ function renderStarterTutorial() {
   const progress = document.getElementById("tutorialProgress");
   const next = document.getElementById("tutorialNextBtn");
   const back = document.getElementById("tutorialBackBtn");
+  const portrait = overlay.querySelector(".tutorial-morgan-portrait");
+  const cinematic = document.getElementById("tutorialCinematic");
+  const cinematicTitle = document.getElementById("tutorialCinematicTitle");
+  const cinematicText = document.getElementById("tutorialCinematicText");
+  const cinematicContinue = document.getElementById("tutorialCinematicContinue");
+  const cinematicImage = cinematic?.querySelector(".tutorial-cinematic__image");
+  const card = overlay.querySelector(".tutorial-card");
+  const isCinematic = Boolean(step.cinematic);
 
   overlay.classList.add("active");
-  overlay.classList.toggle("tutorial-intro-active", Boolean(step.intro));
+  overlay.classList.toggle("tutorial-intro-active", Boolean(step.intro && !isCinematic));
+  overlay.classList.toggle("tutorial-cinematic-active", isCinematic);
   overlay.classList.toggle("tutorial-outro-active", Boolean(step.outro));
   overlay.classList.toggle("tutorial-left-card", step.place === "left");
   overlay.classList.toggle("tutorial-bottom-card", step.place === "bottom");
   if (title) title.textContent = formatTutorialCopy(step.title);
   if (text) text.textContent = formatTutorialCopy(step.text);
+  if (cinematic) cinematic.hidden = !isCinematic;
+  if (card) card.hidden = isCinematic;
+  if (isCinematic && cinematicImage && !cinematicImage.getAttribute("src")) {
+    cinematicImage.src = cinematicImage.dataset.src || "assets/morgan-cinematic-welcome.png";
+  }
+  if (cinematicTitle) cinematicTitle.textContent = formatTutorialCopy(step.title);
+  if (cinematicText) cinematicText.textContent = formatTutorialCopy(step.text);
+  if (cinematicContinue) cinematicContinue.textContent = step.actionLabel || "Begin your journey";
+  if (portrait) {
+    portrait.src = getTutorialMorganPortrait(step);
+    portrait.dataset.morganContext = TUTORIAL_TRADE_PORTRAIT_STEPS.has(step.id)
+      ? "trade"
+      : TUTORIAL_TACTICAL_PORTRAIT_STEPS.has(step.id)
+        ? "tactical"
+        : TUTORIAL_JOURNEY_PORTRAIT_STEPS.has(step.id)
+          ? "journey"
+          : "command";
+  }
   if (label) {
     const speaker = step.speaker || TUTORIAL_NARRATOR_LABEL;
     label.textContent = `${speaker} / ${TUTORIAL_PROGRAMME_LABEL}`;
   }
   renderTutorialAcademyTracker(step);
+  if (isCinematic) {
+    clearTutorialHighlight();
+    return;
+  }
   if (progress) {
     progress.innerHTML = STARTER_TUTORIAL_STEPS.map((item, index) => `<i class="${index < tutorialState.stepIndex ? "done" : index === tutorialState.stepIndex ? "active" : ""}"></i>`).join("");
   }

@@ -6,6 +6,8 @@ Step 5 establishes one dependable route from a new profile into Chapter I: Front
 
 After a successful account creation or a first login with no existing progress, Morgan welcomes the pilot and introduces the Academy as their progression compass. The orientation resumes for the same account if it is left unfinished, but it does not interrupt a pilot whose orientation is complete or whose cloud save already contains established progress.
 
+The first step is a short cinematic transmission set aboard the Lupen command deck. Morgan welcomes the pilot to a universe of trade, exploration, combat, fleet building, and self-directed progression before formally introducing herself as Command Liaison. The cinematic is one interaction long and flows directly into the guided orientation.
+
 Morgan then guides the first session through the immediate controls and economy:
 
 1. Claim the Pioneer Hunter.
@@ -21,6 +23,8 @@ Morgan then guides the first session through the immediate controls and economy:
 The Hunter is issued with one mounted Pulse Laser, plus an unfitted Cargo Pod and Jump Drive. This makes the Store, second weapon, and first attachment meaningful without leaving the pilot unarmed.
 
 The orientation card names the active Academy assignment and shows its live completion state. Its opening route summary covers the starter ship, first trade and launch, two-gun loadout, attachment, Erebus combat, bounty claim, and repair check so players understand that tutorial actions are also real Academy progress.
+
+Morgan's portrait changes with context: the command portrait handles formal orientation, the trade portrait covers market and navigation steps, the tactical portrait covers loadout, bounties, and Erebus combat, and the Journey portrait anchors Academy/Frontier progression plus Forge and repair guidance.
 
 ## Academy route
 

@@ -839,7 +839,7 @@ function renderMorganCard(mission, state) {
   const text = isComplete ? mission.completeText : mission.briefing;
   return `
     <div class="morgan-card">
-      <img class="morgan-card-portrait" src="assets/morgan-thumbnail.png" alt="Morgan">
+      <img class="morgan-card-portrait" src="assets/morgan-journey-guide.png" alt="Morgan">
       <div><span>Morgan / Command Liaison</span><p>${escapeHtml(text)}</p></div>
     </div>
   `;
@@ -1024,7 +1024,7 @@ function renderJourneyMorganBriefing() {
       <div class="journey-briefing__bg" aria-hidden="true"></div>
       <div class="journey-briefing__inner">
         <div class="journey-briefing__portrait">
-          <img class="journey-briefing__portrait-img journey-morgan-portrait" src="assets/morgan-command-liaison.png" alt="Morgan">
+          <img class="journey-briefing__portrait-img journey-morgan-portrait" src="assets/morgan-journey-guide.png" alt="Morgan">
         </div>
         <div class="journey-briefing__content journey-morgan-copy">
           <strong class="journey-briefing__name">MORGAN</strong>
