@@ -5864,10 +5864,45 @@ test.describe("Lupen browser smoke", () => {
       target: "tutorial:storePulseLaser",
       event: "boughtStoreGun"
     });
+    expect(stepById["buy-second-weapon"]).toMatchObject({
+      title: "Buy second weapon",
+      target: "tutorial:storePulseLaser",
+      event: "boughtStoreGun"
+    });
+    expect(stepById["buy-store-attachment"]).toMatchObject({
+      title: "Buy Cargo Pod",
+      target: "tutorial:storeCargoPod",
+      event: "boughtStoreAttachment"
+    });
+    expect(stepById["open-vessel-exchange-equip"]).toMatchObject({
+      title: "Open Vessel Exchange",
+      target: "tutorial:vesselExchangeTab",
+      event: "openedVesselExchange"
+    });
+    expect(stepById["open-loadout-equip"]).toMatchObject({
+      title: "Open Loadout",
+      target: "tutorial:hangarLoadoutTab",
+      event: "openedHangarLoadout"
+    });
     expect(stepById["equip-item"]).toMatchObject({
+      title: "Equip first weapon",
+      target: "tutorial:spareWeapon",
+      event: "equippedItem"
+    });
+    expect(stepById["equip-second-item"]).toMatchObject({
       title: "Equip second weapon",
       target: "tutorial:spareWeapon",
       event: "equippedItem"
+    });
+    expect(stepById["select-second-weapon-slot"]).toMatchObject({
+      title: "Select second weapon slot",
+      target: "tutorial:emptyWeaponSlot",
+      event: "selectedWeaponSlot"
+    });
+    expect(stepById["open-attachment-loadout"]).toMatchObject({
+      title: "Open Attachments",
+      target: "#loadoutCategoryAttachments",
+      event: "openedAttachmentLoadout"
     });
     expect(stepById["equip-attachment"]).toMatchObject({
       title: "Equip Cargo Pod",
@@ -6613,9 +6648,11 @@ test.describe("Lupen browser smoke", () => {
     expect(claim.currentShipId).toBe("falcon");
     expect(claim.ownsStarter).toBe(true);
     expect(claim.loadout).toMatchObject({
-      guns: [{ key: "pulseLaser", quality: "standard", level: 1 }],
+      guns: [],
       attachments: []
     });
+    expect(claim.loadout.guns.filter(Boolean)).toHaveLength(0);
+    expect(claim.loadout.attachments.filter(Boolean)).toHaveLength(0);
     expect(claim.condition.hull).toBeGreaterThan(0);
     expect(claim.condition.shield).toBeGreaterThan(0);
     expect(claim.hull).toBeGreaterThan(0);
@@ -6666,9 +6703,11 @@ test.describe("Lupen browser smoke", () => {
     expect(claim.currentShipId).toBe("falcon");
     expect(claim.ownedShips).toEqual(["falcon"]);
     expect(claim.loadout).toMatchObject({
-      guns: [{ key: "pulseLaser", quality: "standard", level: 1 }],
+      guns: [],
       attachments: []
     });
+    expect(claim.loadout.guns.filter(Boolean)).toHaveLength(0);
+    expect(claim.loadout.attachments.filter(Boolean)).toHaveLength(0);
     expect(claim.condition.hull).toBeGreaterThan(0);
     expect(claim.stepId).toBe("open-first-loadout");
 
@@ -6721,6 +6760,114 @@ test.describe("Lupen browser smoke", () => {
 
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-bounty");
     await expect(page.evaluate(() => window.eval("getCurrentTutorialStep().id"))).resolves.toBe("open-bounty");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("Academy loadout tutorial buys two weapons and an attachment before fitting an empty Hunter", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        resetToNoShipStarterState();
+        currentShipId = STARTER_SHIP_ID;
+        selectedHangarShipId = STARTER_SHIP_ID;
+        selectedFleetShipId = STARTER_SHIP_ID;
+        selectedShipyardShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        shipLoadouts = { [STARTER_SHIP_ID]: normalizeShipLoadout({ attachments: [], guns: [] }, STARTER_SHIP_ID) };
+        ownedGuns.pulseLaser = 0;
+        ownedAttachments.cargoPod = 0;
+        credits = 10000;
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Asteron Prime";
+        showScreen("gameScreen");
+        startStarterTutorial(true);
+        setTutorialStepById("open-store");
+      })()
+    `));
+
+    await page.locator(".hub-actions button[onclick='openStore()']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "buy-equipment");
+    await expect(page.locator(".store-detail-buy-action[data-item-key='pulseLaser']")).toBeVisible();
+
+    const tutorialLayout = await page.evaluate(() => {
+      const card = document.querySelector(".tutorial-card");
+      const target = document.querySelector(".store-detail-buy-action[data-item-key='pulseLaser']");
+      const frame = document.querySelector("#storeScreen.active");
+      const cardRect = card?.getBoundingClientRect();
+      const targetRect = target?.getBoundingClientRect();
+      const frameRect = frame?.getBoundingClientRect();
+      const overlap = cardRect && targetRect
+        ? Math.max(0, Math.min(cardRect.right, targetRect.right) - Math.max(cardRect.left, targetRect.left)) *
+          Math.max(0, Math.min(cardRect.bottom, targetRect.bottom) - Math.max(cardRect.top, targetRect.top))
+        : -1;
+      return {
+        width: cardRect?.width || 0,
+        overlap,
+        insideFrame: Boolean(cardRect && frameRect &&
+          cardRect.left >= frameRect.left &&
+          cardRect.right <= frameRect.right &&
+          cardRect.top >= frameRect.top &&
+          cardRect.bottom <= frameRect.bottom)
+      };
+    });
+    expect(tutorialLayout.width).toBeGreaterThanOrEqual(380);
+    expect(tutorialLayout.overlap).toBe(0);
+    expect(tutorialLayout.insideFrame).toBe(true);
+
+    await page.locator(".store-detail-buy-action[data-item-key='pulseLaser']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "buy-second-weapon");
+    await page.locator(".store-detail-buy-action[data-item-key='pulseLaser']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "buy-store-attachment");
+    await expect(page.locator(".store-detail-buy-action[data-item-key='cargoPod']")).toBeVisible();
+    await expect(page.locator("#storeDetailPanel")).not.toContainText(/Apply Cargo Pod/i);
+
+    await page.locator(".store-detail-buy-action[data-item-key='cargoPod']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-after-store");
+    await page.locator("#storeScreen .screen-back-btn").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-hangar-equip");
+
+    await page.locator(".hub-actions button[onclick='openHangar()']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-vessel-exchange-equip");
+    await page.locator("#hangarShipyardTab").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-loadout-equip");
+    await page.locator("#hangarOverviewTab").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "equip-item");
+
+    const pulseEquip = page.locator("#gunInventory .loadout-vault-row[data-item-key='pulseLaser'] .loadout-vault-equip-action");
+    await expect(pulseEquip).toBeVisible();
+    await pulseEquip.click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "select-second-weapon-slot");
+    await page.locator("#installedGuns .loadout-grid-slot.empty").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "equip-second-item");
+    await page.locator("#gunInventory .loadout-vault-row[data-item-key='pulseLaser'] .loadout-vault-equip-action").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-attachment-loadout");
+
+    await page.locator("#loadoutCategoryAttachments").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "equip-attachment");
+    await expect(page.locator("#gunInventory .loadout-vault-row[data-item-key='cargoPod'] .loadout-vault-equip-action")).toBeVisible();
+    await page.locator("#gunInventory .loadout-vault-row[data-item-key='cargoPod'] .loadout-vault-equip-action").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-after-equip");
+
+    const fitted = await page.evaluate(() => window.eval(`({
+      stepId: getCurrentTutorialStep().id,
+      guns: getShipLoadout(STARTER_SHIP_ID).guns.filter(entry => getEquipmentKey(entry)).map(entry => getEquipmentKey(entry)),
+      attachments: getShipLoadout(STARTER_SHIP_ID).attachments.filter(entry => getEquipmentKey(entry)).map(entry => getEquipmentKey(entry)),
+      storedGuns: ownedGuns.pulseLaser || 0,
+      storedCargoPods: ownedAttachments.cargoPod || 0
+    })`));
+    expect(fitted).toEqual({
+      stepId: "return-after-equip",
+      guns: ["pulseLaser", "pulseLaser"],
+      attachments: ["cargoPod"],
+      storedGuns: 0,
+      storedCargoPods: 0
+    });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

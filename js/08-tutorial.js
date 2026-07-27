@@ -1,5 +1,6 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
+const TUTORIAL_FLOW_VERSION = 2;
 const TUTORIAL_NARRATOR_LABEL = "Morgan";
 const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
 const TUTORIAL_TRADE_ROUTE = Object.freeze({
@@ -26,12 +27,25 @@ const TUTORIAL_ACADEMY_MILESTONES = Object.freeze([
   Object.freeze({
     missionId: "academy_two_guns",
     shortLabel: "Equip Guns",
-    stepIds: Object.freeze(["return-after-trade", "open-store", "buy-equipment", "return-after-store", "open-hangar-equip", "equip-item"])
+    stepIds: Object.freeze([
+      "return-after-trade",
+      "open-store",
+      "buy-equipment",
+      "buy-second-weapon",
+      "buy-store-attachment",
+      "return-after-store",
+      "open-hangar-equip",
+      "open-vessel-exchange-equip",
+      "open-loadout-equip",
+      "equip-item",
+      "select-second-weapon-slot",
+      "equip-second-item"
+    ])
   }),
   Object.freeze({
     missionId: "academy_attachment",
     shortLabel: "Fit Equipment",
-    stepIds: Object.freeze(["equip-attachment", "return-after-equip"])
+    stepIds: Object.freeze(["open-attachment-loadout", "equip-attachment", "return-after-equip"])
   }),
   Object.freeze({
     missionId: "academy_erebus_bots",
@@ -238,7 +252,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-store",
     title: "Open Store",
-    text: "Open the Store if you still need a starter weapon. Better weapons let you take greater risks and survive the contracts that follow.",
+    text: "Open the Store. We will collect the two weapons and one attachment needed for the Hunter's first complete loadout.",
     target: ".hub-actions button[onclick='openStore()']",
     event: "openedStore"
   },
@@ -250,9 +264,23 @@ const STARTER_TUTORIAL_STEPS = [
     event: "boughtStoreGun"
   },
   {
+    id: "buy-second-weapon",
+    title: "Buy second weapon",
+    text: "Buy a second Pulse Laser. Two mounted weapons will give the Hunter a complete opening volley.",
+    target: "tutorial:storePulseLaser",
+    event: "boughtStoreGun"
+  },
+  {
+    id: "buy-store-attachment",
+    title: "Buy Cargo Pod",
+    text: "Switching to Attachments now. Buy one Cargo Pod to expand the Hunter's trade capacity.",
+    target: "tutorial:storeCargoPod",
+    event: "boughtStoreAttachment"
+  },
+  {
     id: "return-after-store",
     title: "Return to station",
-    text: "Return to the station hub, then open Hangar Bay to fit your new weapon.",
+    text: "Your two Pulse Lasers and Cargo Pod are stored. Use Back to return to the station, then we will fit them in Hangar Bay.",
     target: "#storeScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -265,16 +293,51 @@ const STARTER_TUTORIAL_STEPS = [
     event: "openedHangar"
   },
   {
+    id: "open-vessel-exchange-equip",
+    title: "Open Vessel Exchange",
+    text: "Open Vessel Exchange. This is where new hulls are claimed and purchased; your Pioneer Hunter should now be shown as owned.",
+    target: "tutorial:vesselExchangeTab",
+    event: "openedVesselExchange"
+  },
+  {
+    id: "open-loadout-equip",
+    title: "Open Loadout",
+    text: "Now open Loadout. Purchased equipment remains in the vault until you choose the ship and slot that will carry it.",
+    target: "tutorial:hangarLoadoutTab",
+    event: "openedHangarLoadout"
+  },
+  {
     id: "equip-item",
-    title: "Equip second weapon",
-    text: "Fit the Pulse Laser into the Hunter's open weapon slot. Two mounted weapons give your first combat run a complete volley.",
+    title: "Equip first weapon",
+    text: "Fit the first Pulse Laser into the Hunter's highlighted weapon slot.",
     target: "tutorial:spareWeapon",
     event: "equippedItem"
   },
   {
+    id: "select-second-weapon-slot",
+    title: "Select second weapon slot",
+    text: "Select the Hunter's remaining empty weapon slot before fitting the second Pulse Laser.",
+    target: "tutorial:emptyWeaponSlot",
+    event: "selectedWeaponSlot"
+  },
+  {
+    id: "equip-second-item",
+    title: "Equip second weapon",
+    text: "Fit the second Pulse Laser into the remaining weapon slot. The Hunter can now fire a complete volley.",
+    target: "tutorial:spareWeapon",
+    event: "equippedItem"
+  },
+  {
+    id: "open-attachment-loadout",
+    title: "Open Attachments",
+    text: "Switch the Loadout vault to Attachments so we can fit the Cargo Pod you purchased.",
+    target: "#loadoutCategoryAttachments",
+    event: "openedAttachmentLoadout"
+  },
+  {
     id: "equip-attachment",
     title: "Equip Cargo Pod",
-    text: "Fit the issued Cargo Pod into an equipment slot. Attachments shape a ship beyond its weapons, and this one expands your trade capacity.",
+    text: "Fit the Cargo Pod into an equipment slot. Attachments shape a ship beyond its weapons, and this one expands your trade capacity.",
     target: "tutorial:spareAttachment",
     event: "equippedAttachment"
   },
@@ -446,6 +509,37 @@ const STARTER_TUTORIAL_STEPS = [
   }
 ];
 
+const TUTORIAL_FLOW_V2_ADDED_STEP_IDS = new Set([
+  "buy-second-weapon",
+  "buy-store-attachment",
+  "open-vessel-exchange-equip",
+  "open-loadout-equip",
+  "equip-second-item",
+  "select-second-weapon-slot",
+  "open-attachment-loadout"
+]);
+
+function migrateTutorialStateToCurrentFlow() {
+  const savedStepId = String(tutorialState.stepId || "");
+  let nextIndex = savedStepId
+    ? STARTER_TUTORIAL_STEPS.findIndex(step => step.id === savedStepId)
+    : -1;
+
+  if (nextIndex < 0 && Number(tutorialState.flowVersion || 0) < TUTORIAL_FLOW_VERSION) {
+    const legacySteps = STARTER_TUTORIAL_STEPS.filter(step => !TUTORIAL_FLOW_V2_ADDED_STEP_IDS.has(step.id));
+    const legacyStep = legacySteps[Math.min(Math.max(0, tutorialState.stepIndex), legacySteps.length - 1)];
+    nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === legacyStep?.id);
+  }
+
+  tutorialState.stepIndex = nextIndex >= 0
+    ? nextIndex
+    : Math.min(Math.max(0, tutorialState.stepIndex), STARTER_TUTORIAL_STEPS.length - 1);
+  tutorialState.stepId = STARTER_TUTORIAL_STEPS[tutorialState.stepIndex]?.id || "";
+  tutorialState.flowVersion = TUTORIAL_FLOW_VERSION;
+}
+
+migrateTutorialStateToCurrentFlow();
+
 const TUTORIAL_PROGRESS_PHASES = Object.freeze([
   Object.freeze({
     label: "Briefing",
@@ -498,11 +592,16 @@ function loadTutorialState() {
     stepIndex: Math.max(0, Number(parsed.stepIndex || 0)),
     lastStartedAt: parsed.lastStartedAt || null,
     pilotId: String(parsed.pilotId || ""),
-    journeyIntroduced: Boolean(parsed.journeyIntroduced)
+    journeyIntroduced: Boolean(parsed.journeyIntroduced),
+    stepId: String(parsed.stepId || ""),
+    flowVersion: Math.max(0, Number(parsed.flowVersion || 0))
   };
 }
 
 function saveTutorialState() {
+  tutorialState.stepIndex = Math.min(Math.max(0, Number(tutorialState.stepIndex || 0)), STARTER_TUTORIAL_STEPS.length - 1);
+  tutorialState.stepId = STARTER_TUTORIAL_STEPS[tutorialState.stepIndex]?.id || "";
+  tutorialState.flowVersion = TUTORIAL_FLOW_VERSION;
   localStorage.setItem(TUTORIAL_STORAGE_KEY, JSON.stringify(tutorialState));
 }
 
@@ -632,6 +731,32 @@ function hasTutorialTwoGunsEquipped() {
 function hasTutorialSpareWeaponAvailable() {
   return Number(ownedGuns?.pulseLaser || 0) > 0 ||
     (Array.isArray(inventoryItems) && inventoryItems.some(item => item?.key === "pulseLaser"));
+}
+
+function getTutorialStoredGunCount() {
+  const ownedCount = Object.values(ownedGuns || {}).reduce((total, count) => total + Math.max(0, Number(count || 0)), 0);
+  const inventoryCount = Array.isArray(inventoryItems)
+    ? inventoryItems.filter(item => GUNS?.[item?.key]).length
+    : 0;
+  return ownedCount + inventoryCount;
+}
+
+function getTutorialTotalGunCount() {
+  return getTutorialEquippedGunCount() + getTutorialStoredGunCount();
+}
+
+function getTutorialCargoPodCount() {
+  const equippedCount = (getTutorialShipLoadout().attachments || [])
+    .filter(entry => tutorialEntryKey(entry) === "cargoPod").length;
+  const ownedCount = Math.max(0, Number(ownedAttachments?.cargoPod || 0));
+  const inventoryCount = Array.isArray(inventoryItems)
+    ? inventoryItems.filter(item => item?.key === "cargoPod").length
+    : 0;
+  return equippedCount + ownedCount + inventoryCount;
+}
+
+function hasTutorialPurchasedLoadoutKit() {
+  return getTutorialTotalGunCount() >= 2 && getTutorialCargoPodCount() >= 1;
 }
 
 function hasTutorialAttachmentEquipped() {
@@ -768,17 +893,43 @@ function getTutorialStateCompletionReason(step) {
     case "sell-cargo":
       return hasCompletedTutorialTrade() ? "trade_already_completed" : "";
     case "open-store":
+      return hasTutorialPurchasedLoadoutKit() ? "starter_loadout_kit_ready" : "";
     case "buy-equipment":
+      return getTutorialTotalGunCount() >= 1 ? "first_weapon_owned" : "";
+    case "buy-second-weapon":
+      return getTutorialTotalGunCount() >= 2 ? "second_weapon_owned" : "";
+    case "buy-store-attachment":
+      return getTutorialCargoPodCount() >= 1 ? "cargo_pod_owned" : "";
     case "return-after-store":
-      if (hasTutorialTwoGunsEquipped()) return "two_guns_equipped";
-      return hasTutorialSpareWeaponAvailable() ? "spare_weapon_available" : "";
+      return hasTutorialTwoGunsEquipped() && hasTutorialAttachmentEquipped() ? "starter_loadout_already_fitted" : "";
     case "open-hangar-equip":
+      return hasTutorialTwoGunsEquipped() && hasTutorialAttachmentEquipped() ? "starter_loadout_already_fitted" : "";
+    case "open-vessel-exchange-equip":
+      if (hasTutorialTwoGunsEquipped() && hasTutorialAttachmentEquipped()) return "starter_loadout_already_fitted";
+      return document.getElementById("hangarShipyardSection")?.classList.contains("active") ? "vessel_exchange_open" : "";
+    case "open-loadout-equip":
+      if (hasTutorialTwoGunsEquipped() && hasTutorialAttachmentEquipped()) return "starter_loadout_already_fitted";
+      return document.getElementById("hangarOverviewSection")?.classList.contains("active") ? "loadout_open" : "";
     case "equip-item":
+      if (document.getElementById("hangarScreen")?.classList.contains("active")) return "";
+      return getTutorialEquippedGunCount() >= 1 ? "first_weapon_equipped" : "";
+    case "select-second-weapon-slot":
+      return hasTutorialTwoGunsEquipped() ? "second_weapon_already_equipped" : "";
+    case "equip-second-item":
+      if (document.getElementById("hangarScreen")?.classList.contains("active")) return "";
       if (hasTutorialTwoGunsEquipped()) return "two_guns_equipped";
       if (!hasOpenTutorialWeaponSlot() && hasTutorialCombatWeaponEquipped()) return "weapon_slots_filled";
       return "";
+    case "open-attachment-loadout":
+      if (hasTutorialAttachmentEquipped()) return "attachment_already_equipped";
+      return typeof selectedLoadoutSlotCategory !== "undefined" && selectedLoadoutSlotCategory === "attachments"
+        ? "attachment_loadout_open"
+        : "";
     case "equip-attachment":
+      if (document.getElementById("hangarScreen")?.classList.contains("active")) return "";
+      return hasTutorialAttachmentEquipped() ? "attachment_equipped" : "";
     case "return-after-equip":
+      if (document.getElementById("hangarScreen")?.classList.contains("active")) return "";
       return hasTutorialAttachmentEquipped() ? "attachment_equipped" : "";
     case "accept-bounty":
       return isTutorialBountyAccepted() ? "bounty_already_active" : "";
@@ -812,12 +963,65 @@ function advanceTutorialStepFromState(reason) {
   }
   tutorialState.stepIndex = Math.min(STARTER_TUTORIAL_STEPS.length - 1, tutorialState.stepIndex + 1);
   saveTutorialState();
+  if (
+    document.getElementById("storeScreen")?.classList.contains("active") &&
+    ["buy-equipment", "buy-second-weapon", "buy-store-attachment"].includes(getCurrentTutorialStep()?.id) &&
+    typeof renderStore === "function"
+  ) {
+    setTimeout(renderStore, 0);
+  }
 }
 
 function reconcileTutorialStepWithCurrentState() {
   if (!tutorialState.active) return;
   for (let guard = 0; guard < STARTER_TUTORIAL_STEPS.length; guard += 1) {
     const step = getCurrentTutorialStep();
+    const loadoutSequence = [
+      "return-after-store",
+      "open-hangar-equip",
+      "open-vessel-exchange-equip",
+      "open-loadout-equip",
+      "equip-item",
+      "select-second-weapon-slot",
+      "equip-second-item",
+      "open-attachment-loadout",
+      "equip-attachment"
+    ];
+    if (loadoutSequence.includes(step?.id) && !hasTutorialPurchasedLoadoutKit()) {
+      const targetStepId = getTutorialTotalGunCount() < 1
+        ? "buy-equipment"
+        : getTutorialTotalGunCount() < 2
+          ? "buy-second-weapon"
+          : "buy-store-attachment";
+      const nextStepId = document.getElementById("storeScreen")?.classList.contains("active")
+        ? targetStepId
+        : "open-store";
+      const nextIndex = STARTER_TUTORIAL_STEPS.findIndex(item => item.id === nextStepId);
+      if (nextIndex >= 0) {
+        tutorialState.stepIndex = nextIndex;
+        saveTutorialState();
+        return;
+      }
+    }
+    if (
+      ["equip-item", "select-second-weapon-slot", "equip-second-item", "open-attachment-loadout", "equip-attachment"].includes(step?.id) &&
+      !(hasTutorialTwoGunsEquipped() && hasTutorialAttachmentEquipped())
+    ) {
+      const storeOpen = document.getElementById("storeScreen")?.classList.contains("active");
+      const hangarOpen = document.getElementById("hangarScreen")?.classList.contains("active");
+      if (storeOpen) {
+        const returnIndex = STARTER_TUTORIAL_STEPS.findIndex(item => item.id === "return-after-store");
+        tutorialState.stepIndex = returnIndex;
+        saveTutorialState();
+        return;
+      }
+      if (!hangarOpen) {
+        const hangarIndex = STARTER_TUTORIAL_STEPS.findIndex(item => item.id === "open-hangar-equip");
+        tutorialState.stepIndex = hangarIndex;
+        saveTutorialState();
+        return;
+      }
+    }
     if (
       step?.id === "welcome-academy" &&
       !tutorialState.journeyIntroduced &&
@@ -870,7 +1074,9 @@ function startStarterTutorial(reset = true, options = {}) {
     stepIndex: reset ? Math.max(0, firstStep) : Math.min(tutorialState.stepIndex || 0, STARTER_TUTORIAL_STEPS.length - 1),
     lastStartedAt: reset ? new Date().toISOString() : (tutorialState.lastStartedAt || new Date().toISOString()),
     pilotId,
-    journeyIntroduced: reset ? false : Boolean(tutorialState.journeyIntroduced)
+    journeyIntroduced: reset ? false : Boolean(tutorialState.journeyIntroduced),
+    stepId: reset ? STARTER_TUTORIAL_STEPS[Math.max(0, firstStep)]?.id || "" : String(tutorialState.stepId || ""),
+    flowVersion: TUTORIAL_FLOW_VERSION
   };
   saveTutorialState();
   renderStarterTutorial();
@@ -923,7 +1129,9 @@ function clearStarterTutorialState() {
     stepIndex: 0,
     lastStartedAt: null,
     pilotId: "",
-    journeyIntroduced: false
+    journeyIntroduced: false,
+    stepId: "",
+    flowVersion: TUTORIAL_FLOW_VERSION
   };
 }
 
@@ -1037,6 +1245,7 @@ function tutorialEvent(eventName, detail = {}) {
 
   const step = getCurrentTutorialStep();
   if (!step) return;
+  const originatingStepId = step.id;
 
   const acceptedEvents = Array.isArray(step.event) ? step.event : [step.event];
   if (!acceptedEvents.includes(eventName)) return;
@@ -1102,9 +1311,18 @@ function tutorialEvent(eventName, detail = {}) {
   if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
   tutorialAdvanceTimeout = setTimeout(() => {
     if (!tutorialState.active) return;
+    if (getCurrentTutorialStep()?.id !== originatingStepId) return;
     tutorialState.stepIndex = Math.min(STARTER_TUTORIAL_STEPS.length - 1, tutorialState.stepIndex + 1);
     saveTutorialState();
-    renderStarterTutorial();
+    if (
+      document.getElementById("storeScreen")?.classList.contains("active") &&
+      ["buy-equipment", "buy-second-weapon", "buy-store-attachment"].includes(getCurrentTutorialStep()?.id) &&
+      typeof renderStore === "function"
+    ) {
+      renderStore();
+    } else {
+      renderStarterTutorial();
+    }
   }, 180);
 }
 
@@ -1196,6 +1414,10 @@ function getDynamicTutorialTarget(step) {
   if (step.target === "tutorial:marketTarget") {
     return document.querySelector("[data-tutorial-target='marketRouteCard']") ||
            document.querySelector(".trade-route-card:not(.is-loss)");
+  }
+
+  if (step.target === "tutorial:vesselExchangeTab") {
+    return document.querySelector("#hangarShipyardTab") || document.querySelector("[data-tutorial-target='vesselExchange']");
   }
 
   if (step.target === "tutorial:marketMaxAmount") {
@@ -1314,9 +1536,25 @@ function getDynamicTutorialTarget(step) {
            document.querySelector("#gunInventory .hangar-equipment-card:not(:disabled)");
   }
 
+  if (step.target === "tutorial:emptyWeaponSlot") {
+    return document.querySelector("#installedGuns .loadout-grid-slot.empty");
+  }
+
+  if (step.target === "tutorial:storeCargoPod") {
+    const selected = typeof getStoreSelectedItem === "function" ? getStoreSelectedItem() : null;
+    const cargoBuy = document.querySelector(".store-detail-buy-action[data-item-key='cargoPod']:not(:disabled)");
+    const cargoCard = document.querySelector(".store-catalog-card[data-item-key='cargoPod']:not(.sold-out)");
+
+    if (selected?.key === "cargoPod" && cargoBuy) {
+      return cargoBuy;
+    }
+
+    return cargoCard || cargoBuy || document.querySelector(".store-detail-actions button:not(:disabled)");
+  }
+
   if (step.target === "tutorial:spareAttachment") {
-    return document.querySelector("#attachmentInventory .hangar-equipment-card[data-item-key='cargoPod']:not(:disabled)") ||
-           document.querySelector("#attachmentInventory .hangar-equipment-card:not(:disabled)");
+    return document.querySelector("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']:not(.unavailable)") ||
+           document.querySelector("#gunInventory .hangar-equipment-card[data-item-type='attachment']:not(.unavailable)");
   }
 
   if (step.target === "tutorial:repairShip") {
@@ -1356,7 +1594,7 @@ function highlightTutorialTarget(step) {
   const spotlight = document.getElementById("tutorialSpotlight");
   if (!target || !spotlight) return;
 
-  if (step?.target === "tutorial:storePulseLaser") {
+  if (["tutorial:storePulseLaser", "tutorial:storeCargoPod"].includes(step?.target)) {
     target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }
 
@@ -1536,12 +1774,13 @@ function isTutorialClickAllowed(event) {
     return true;
   }
 
-  if (step?.id === "buy-equipment") {
-    const pulseCard = event.target.closest?.(".store-catalog-card[data-item-key='pulseLaser']");
-    const pulseBuy = event.target.closest?.(".store-detail-buy-action[data-item-key='pulseLaser']");
+  if (["buy-equipment", "buy-second-weapon", "buy-store-attachment"].includes(step?.id)) {
+    const requiredItemKey = step.id === "buy-store-attachment" ? "cargoPod" : "pulseLaser";
+    const requiredCard = event.target.closest?.(`.store-catalog-card[data-item-key='${requiredItemKey}']`);
+    const requiredBuy = event.target.closest?.(`.store-detail-buy-action[data-item-key='${requiredItemKey}']`);
     const selected = typeof getStoreSelectedItem === "function" ? getStoreSelectedItem() : null;
-    const selectedBuy = selected?.key === "pulseLaser" && event.target.closest?.(".store-detail-actions button");
-    if (pulseCard || pulseBuy || selectedBuy) return true;
+    const selectedBuy = selected?.key === requiredItemKey && event.target.closest?.(".store-detail-actions button");
+    if (requiredCard || requiredBuy || selectedBuy) return true;
   }
 
   if (step?.id === "forge-upgrade-weapon") {

@@ -1054,6 +1054,7 @@ function selectEquippedLoadoutVaultItem(categoryKey, index) {
   renderGunInventory();
   renderAttachmentInventory();
   renderLoadoutItemDetail();
+  if (categoryKey === "guns" && !key) tutorialEvent("selectedWeaponSlot");
 }
 
 function getSelectedVaultEntry() {
@@ -2670,6 +2671,7 @@ function setLoadoutSlotCategory(categoryKey) {
   renderInstalledAttachments();
   renderGunInventory();
   renderLoadoutItemDetail();
+  if (selectedLoadoutSlotCategory === "attachments") tutorialEvent("openedAttachmentLoadout");
 }
 
 function renderLoadoutSlotGrid(box, categoryKey) {
@@ -4350,9 +4352,9 @@ function selectStoreItem(itemId) {
   }
   renderStore();
 
-  // The weapon purchase step is two-part: select Pulse Laser, then buy it.
-  // Refresh the tutorial after selection so the highlight moves onto the Buy button.
-  if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
+  // Tutorial purchases are two-part: select the required item, then buy it.
+  // Refresh after selection so the highlight moves onto the Purchase button.
+  if (tutorialState?.active && ["buy-equipment", "buy-second-weapon", "buy-store-attachment"].includes(getCurrentTutorialStep()?.id)) {
     setTimeout(renderStarterTutorial, 40);
   }
 }
@@ -4366,11 +4368,16 @@ function renderStore() {
   setupMultiplayerStagingStoreSubscription();
   requestMultiplayerStagingStoreItemsIfNeeded();
 
-  if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
-    storeFilter = "guns";
+  const tutorialStoreStepId = tutorialState?.active ? getCurrentTutorialStep()?.id : "";
+  const tutorialStoreGunStep = ["buy-equipment", "buy-second-weapon"].includes(tutorialStoreStepId);
+  const tutorialStoreAttachmentStep = tutorialStoreStepId === "buy-store-attachment";
+  if (tutorialStoreGunStep || tutorialStoreAttachmentStep) {
+    storeFilter = tutorialStoreAttachmentStep ? "attachments" : "guns";
     selectedStoreQuality = "standard";
-    const pulseItem = getStoreCatalogItems().find(item => item.key === "pulseLaser" && item.kind === "gun");
-    if (pulseItem) selectedStoreItemId = pulseItem.id;
+    const requiredItemKey = tutorialStoreAttachmentStep ? "cargoPod" : "pulseLaser";
+    const requiredItemKind = tutorialStoreAttachmentStep ? "attachment" : "gun";
+    const requiredItem = getStoreCatalogItems().find(item => item.key === requiredItemKey && item.kind === requiredItemKind);
+    if (requiredItem) selectedStoreItemId = requiredItem.id;
   }
 
   const stagingNodeName = getMultiplayerStagingStoreNodeName();
@@ -4388,10 +4395,11 @@ function renderStore() {
   renderStoreCatalog();
   renderStoreDetail();
 
-  if (tutorialState?.active && getCurrentTutorialStep()?.id === "buy-equipment") {
+  if (tutorialStoreGunStep || tutorialStoreAttachmentStep) {
     setTimeout(() => {
-      const target = document.querySelector(".store-detail-buy-action[data-item-key='pulseLaser']:not(:disabled)") ||
-        document.querySelector(".store-catalog-card[data-item-key='pulseLaser']:not(.sold-out)");
+      const requiredItemKey = tutorialStoreAttachmentStep ? "cargoPod" : "pulseLaser";
+      const target = document.querySelector(`.store-detail-buy-action[data-item-key='${requiredItemKey}']:not(:disabled)`) ||
+        document.querySelector(`.store-catalog-card[data-item-key='${requiredItemKey}']:not(.sold-out)`);
       target?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
       if (typeof renderStarterTutorial === "function") renderStarterTutorial();
     }, 40);
@@ -4560,11 +4568,6 @@ function renderStoreDetail() {
   const stagingStoreLocked = isMultiplayerStagingStoreActive();
   const stagingStoreItemId = getStagingStoreItemId(item);
   const stagingWritableItem = isStagingStoreWritableItem(item);
-  const stagingEquipPending = multiplayerStagingLoadoutEquipPendingItemId === stagingStoreItemId;
-  const stagingEquippableItem = stagingStoreLocked &&
-    stagingWritableItem &&
-    (item.kind === "gun" || item.kind === "attachment") &&
-    totalOwned > 0;
   const stagingPreviewButton = stagingStoreItemId
     ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Purchase") : "Validate") : "Sold Out"}</button>`
     : `<button class="store-detail-buy-action" disabled>Purchase unavailable</button>`;
@@ -4655,7 +4658,6 @@ function renderStoreDetail() {
 
       <div class="store-buy-footer store-detail-actions compact-store-actions simplified-store-actions ${sellButton ? 'two-buttons' : 'one-button'}">
         ${buyButton}
-        ${stagingEquippableItem ? `<button class="store-detail-buy-action" onclick="requestStagingLoadoutEquip(getStoreSelectedItem())" ${stagingEquipPending ? "disabled" : ""}>${stagingEquipPending ? "Applying..." : `Apply ${escapeHtml(item.name)}`}</button>` : ""}
         ${stagingStoreLocked && item.kind === "ship" && stagingStoreItemId && totalOwned > 0 && currentShipId !== item.key ? `<button class="store-detail-buy-action" onclick="requestStagingShipEquip(getStoreSelectedItem())" ${multiplayerStagingShipEquipPending ? "disabled" : ""}>${multiplayerStagingShipEquipPending ? "Applying..." : `Fly ${escapeHtml(item.name)}`}</button>` : ""}
         ${sellButton}
       </div>
@@ -5123,6 +5125,7 @@ function buyShip(shipId, storeItemOverride = null) {
 
   if (ownedShips.includes(shipId)) {
     if (starterClaim) {
+      shipLoadouts[shipId] = normalizeShipLoadout(shipLoadouts[shipId] || { attachments: [], guns: [] }, shipId);
       currentShipId = shipId;
       selectedHangarShipId = shipId;
       selectedFleetShipId = shipId;
@@ -5164,7 +5167,7 @@ function buyShip(shipId, storeItemOverride = null) {
 
   if (hadNoShip) {
     currentShipId = shipId;
-    grantStarterShipKit();
+    if (starterClaim) initializeStarterShipEmptyLoadout();
     applyShipStats(true);
   }
 

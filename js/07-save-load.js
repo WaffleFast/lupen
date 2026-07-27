@@ -1423,8 +1423,10 @@ function debugGrantStarter() {
   selectedHangarShipId = starterShipId;
   selectedFleetShipId = starterShipId;
   selectedShipyardShipId = starterShipId;
-  shipLoadouts[starterShipId] = normalizeShipLoadout(shipLoadouts[starterShipId], starterShipId);
-  if (typeof grantStarterShipKit === "function") grantStarterShipKit();
+  shipLoadouts[starterShipId] = normalizeShipLoadout(
+    shipLoadouts[starterShipId] || { attachments: [], guns: [] },
+    starterShipId
+  );
   if (typeof applyShipStats === "function") applyShipStats(true);
   if (typeof recordMissionEvent === "function") {
     recordMissionEvent("starter_ship_claimed", { shipId: starterShipId, mode: "debug_grant" });

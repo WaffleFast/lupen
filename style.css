@@ -28121,7 +28121,8 @@ input::placeholder {
 }
 
 .tutorial-card.tutorial-card-positioned {
-  width: min(342px, calc(100vw - 44px)) !important;
+  width: min(390px, calc(100vw - 44px)) !important;
+  max-width: 390px !important;
   max-height: calc(100vh - 44px) !important;
   overflow-y: auto;
 }

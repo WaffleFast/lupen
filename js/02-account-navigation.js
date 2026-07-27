@@ -538,14 +538,10 @@ function resetToNoShipStarterState() {
   }
 }
 
-function grantStarterShipKit() {
-  ownedAttachments.cargoPod = Math.max(ownedAttachments.cargoPod || 0, 1);
-  ownedAttachments.jumpDrive = Math.max(ownedAttachments.jumpDrive || 0, 1);
+function initializeStarterShipEmptyLoadout() {
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   if (shipLoadouts && starterShipId) {
-    const loadout = normalizeShipLoadout(shipLoadouts[starterShipId] || { attachments: [], guns: [] }, starterShipId);
-    if (!loadout.guns.some(entry => getEquipmentKey(entry))) loadout.guns[0] = "pulseLaser";
-    shipLoadouts[starterShipId] = normalizeShipLoadout(loadout, starterShipId);
+    shipLoadouts[starterShipId] = normalizeShipLoadout({ attachments: [], guns: [] }, starterShipId);
   }
 }
 
