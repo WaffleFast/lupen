@@ -23372,6 +23372,10 @@ input::placeholder {
   gap: 8px;
 }
 
+.tutorial-actions[hidden] {
+  display: none !important;
+}
+
 .tutorial-actions button {
   min-height: 36px;
   border-radius: 10px;

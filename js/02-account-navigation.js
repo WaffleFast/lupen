@@ -573,6 +573,7 @@ function openJourney() {
   }
   if (typeof renderJourneyScreen === "function") renderJourneyScreen({ resetAssignments: true });
   showScreen("journeyScreen");
+  tutorialEvent("openedJourney");
 }
 
 

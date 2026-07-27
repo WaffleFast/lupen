@@ -50,7 +50,7 @@ const TUTORIAL_ACADEMY_MILESTONES = Object.freeze([
   })
 ]);
 const TUTORIAL_MORGAN_PORTRAITS = Object.freeze({
-  command: "assets/morgan-command-liaison.png",
+  command: "assets/morgan-journey-guide.png",
   trade: "assets/morgan-trade-advisor.png",
   tactical: "assets/morgan-tactical-liaison.png",
   journey: "assets/morgan-journey-guide.png"
@@ -104,25 +104,21 @@ const STARTER_TUTORIAL_STEPS = [
   },
   {
     id: "welcome-core-loop",
-    title: "Your first flight plan",
+    title: "Open Journey",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Life in Lupen has a simple rhythm: trade for credits, equip your ship, take contracts, survive combat, and improve what you own. We will walk through each part together.",
-    target: "#tutorialNextBtn",
-    event: null,
-    actionLabel: "Continue",
-    manualOnly: true,
-    intro: true
+    text: "Journey is where your Academy route and next objective live. Open it now and I’ll show you where to begin.",
+    target: "#journeyHubBtn",
+    event: "openedJourney",
+    actionLabel: "Open highlighted Journey"
   },
   {
     id: "welcome-academy",
-    title: "Your first Academy assignments",
+    title: "Your Academy route",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Claim your Hunter, complete a trade, launch, equip two guns and an attachment, defeat Erebus, claim a bounty, and check your repairs. These same actions complete Academy assignments and move you toward Frontier.",
-    target: "#tutorialNextBtn",
-    event: null,
-    actionLabel: "Begin orientation",
-    manualOnly: true,
-    intro: true
+    text: "Your first objective is Claim Starter Ship. Journey will update as you complete each Academy assignment. Return to the station and I’ll guide you to the Hangar.",
+    target: "#journeyScreen .screen-back-btn",
+    event: "returnedToHub",
+    actionLabel: "Use highlighted Back"
   },
   {
     id: "open-hangar-first-ship",
@@ -501,7 +497,8 @@ function loadTutorialState() {
     completed: Boolean(parsed.completed),
     stepIndex: Math.max(0, Number(parsed.stepIndex || 0)),
     lastStartedAt: parsed.lastStartedAt || null,
-    pilotId: String(parsed.pilotId || "")
+    pilotId: String(parsed.pilotId || ""),
+    journeyIntroduced: Boolean(parsed.journeyIntroduced)
   };
 }
 
@@ -556,16 +553,17 @@ function renderTutorialAcademyTracker(step) {
   if (!tracker) return;
 
   if (step?.id === "welcome-academy") {
+    const mission = getTutorialAcademyMission("academy_starter_ship");
+    const state = getTutorialAcademyMissionState("academy_starter_ship");
+    const required = Math.max(1, Number(mission?.objective?.required || 1));
+    const missionProgressValue = Math.min(required, Math.max(0, Number(state?.progress || 0)));
+    const complete = isTutorialAcademyMissionComplete(state);
     tracker.hidden = false;
-    tracker.classList.add("is-overview");
+    tracker.classList.remove("is-overview");
     tracker.innerHTML = `
-      <span class="tutorial-academy-kicker">First Academy Route</span>
-      <div class="tutorial-academy-route">
-        ${TUTORIAL_ACADEMY_MILESTONES.map(milestone => {
-          const state = getTutorialAcademyMissionState(milestone.missionId);
-          return `<span class="${isTutorialAcademyMissionComplete(state) ? "is-complete" : ""}">${milestone.shortLabel}</span>`;
-        }).join("")}
-      </div>
+      <span class="tutorial-academy-kicker">Next Academy Assignment</span>
+      <strong>${escapeHtml(mission?.title || "Claim Starter Ship")}</strong>
+      <span class="tutorial-academy-status ${complete ? "is-complete" : ""}">${complete ? "Complete" : `${formatNumber(missionProgressValue)} / ${formatNumber(required)}`}</span>
     `;
     return;
   }
@@ -820,6 +818,19 @@ function reconcileTutorialStepWithCurrentState() {
   if (!tutorialState.active) return;
   for (let guard = 0; guard < STARTER_TUTORIAL_STEPS.length; guard += 1) {
     const step = getCurrentTutorialStep();
+    if (
+      step?.id === "welcome-academy" &&
+      !tutorialState.journeyIntroduced &&
+      document.getElementById("gameScreen")?.classList.contains("active") &&
+      !document.getElementById("journeyScreen")?.classList.contains("active")
+    ) {
+      const journeyStep = STARTER_TUTORIAL_STEPS.findIndex(item => item.id === "welcome-core-loop");
+      if (journeyStep >= 0) {
+        tutorialState.stepIndex = journeyStep;
+        saveTutorialState();
+        return;
+      }
+    }
     if (["open-trade-to-sell", "sell-cargo"].includes(step?.id) && isAtActiveTradeDestination() && !isLandedAtActiveTradeDestination()) {
       const landingStep = STARTER_TUTORIAL_STEPS.findIndex(item => item.id === "land-destination");
       if (landingStep >= 0) {
@@ -858,7 +869,8 @@ function startStarterTutorial(reset = true, options = {}) {
     completed: false,
     stepIndex: reset ? Math.max(0, firstStep) : Math.min(tutorialState.stepIndex || 0, STARTER_TUTORIAL_STEPS.length - 1),
     lastStartedAt: reset ? new Date().toISOString() : (tutorialState.lastStartedAt || new Date().toISOString()),
-    pilotId
+    pilotId,
+    journeyIntroduced: reset ? false : Boolean(tutorialState.journeyIntroduced)
   };
   saveTutorialState();
   renderStarterTutorial();
@@ -910,7 +922,8 @@ function clearStarterTutorialState() {
     completed: false,
     stepIndex: 0,
     lastStartedAt: null,
-    pilotId: ""
+    pilotId: "",
+    journeyIntroduced: false
   };
 }
 
@@ -1027,6 +1040,11 @@ function tutorialEvent(eventName, detail = {}) {
 
   const acceptedEvents = Array.isArray(step.event) ? step.event : [step.event];
   if (!acceptedEvents.includes(eventName)) return;
+
+  if (step.id === "welcome-core-loop" && eventName === "openedJourney") {
+    tutorialState.journeyIntroduced = true;
+    saveTutorialState();
+  }
 
   if (step.id === "make-jump" && eventName === "jumpedNode" && !isAtActiveTradeDestination()) {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
@@ -1384,23 +1402,37 @@ function positionTutorialCard(step, target) {
 
   card.classList.add("tutorial-card-positioned");
   const margin = 22;
+  const activeFrame = document.querySelector(
+    "#gameScreen.active, #journeyScreen.active, #marketScreen.active, #hangarScreen.active, #spaceScreen.active, #bountyScreen.active, #storeScreen.active, #forgeScreen.active"
+  );
+  const frameRect = activeFrame?.getBoundingClientRect();
+  const hasFrame = Boolean(frameRect && frameRect.width > margin * 2 && frameRect.height > margin * 2);
+  const bounds = {
+    left: hasFrame ? frameRect.left + margin : margin,
+    top: hasFrame ? frameRect.top + margin : margin,
+    right: hasFrame ? frameRect.right - margin : window.innerWidth - margin,
+    bottom: hasFrame ? frameRect.bottom - margin : window.innerHeight - margin
+  };
   const cardRect = card.getBoundingClientRect();
-  const width = Math.min(cardRect.width || 342, window.innerWidth - (margin * 2));
-  const height = Math.min(cardRect.height || 220, window.innerHeight - (margin * 2));
-  let left = window.innerWidth - width - margin;
-  let top = margin;
+  const width = Math.min(cardRect.width || 342, bounds.right - bounds.left);
+  const height = Math.min(cardRect.height || 220, bounds.bottom - bounds.top);
+  let left = bounds.right - width;
+  let top = bounds.top;
 
   if (step.place === "left") {
-    left = margin;
+    left = bounds.left;
   } else if (step.place === "bottom") {
-    left = (window.innerWidth - width) / 2;
-    top = window.innerHeight - height - margin;
+    left = bounds.left + ((bounds.right - bounds.left - width) / 2);
+    top = bounds.bottom - height;
   } else if (target) {
     const rect = target.getBoundingClientRect();
-    const targetIsLarge = rect.width > window.innerWidth * 0.5 || rect.height > window.innerHeight * 0.45;
+    const frameWidth = bounds.right - bounds.left;
+    const frameHeight = bounds.bottom - bounds.top;
+    const frameCenter = bounds.left + frameWidth / 2;
+    const targetIsLarge = rect.width > frameWidth * 0.5 || rect.height > frameHeight * 0.45;
     if (!targetIsLarge) {
-      left = rect.left < window.innerWidth / 2 ? window.innerWidth - width - margin : margin;
-      top = rect.top < window.innerHeight / 2 ? margin : window.innerHeight - height - margin;
+      left = rect.left < frameCenter ? bounds.right - width : bounds.left;
+      top = rect.top < bounds.top + frameHeight / 2 ? bounds.top : bounds.bottom - height;
 
       const overlapsTarget = () => {
         const right = left + width;
@@ -1411,18 +1443,18 @@ function positionTutorialCard(step, target) {
       if (overlapsTarget()) {
         const below = rect.bottom + 16;
         const above = rect.top - height - 16;
-        top = below + height <= window.innerHeight - margin ? below : Math.max(margin, above);
+        top = below + height <= bounds.bottom ? below : Math.max(bounds.top, above);
       }
     }
   }
 
-  left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
-  top = Math.max(margin, Math.min(top, window.innerHeight - height - margin));
-  card.style.left = `${Math.round(left)}px`;
-  card.style.right = "auto";
-  card.style.top = `${Math.round(top)}px`;
-  card.style.bottom = "auto";
-  card.style.transform = "none";
+  left = Math.max(bounds.left, Math.min(left, bounds.right - width));
+  top = Math.max(bounds.top, Math.min(top, bounds.bottom - height));
+  card.style.setProperty("left", `${Math.round(left)}px`, "important");
+  card.style.setProperty("right", "auto", "important");
+  card.style.setProperty("top", `${Math.round(top)}px`, "important");
+  card.style.setProperty("bottom", "auto", "important");
+  card.style.setProperty("transform", "none", "important");
 }
 
 function isTutorialClickAllowed(event) {
@@ -1639,6 +1671,7 @@ function renderStarterTutorial() {
   const progress = document.getElementById("tutorialProgress");
   const next = document.getElementById("tutorialNextBtn");
   const back = document.getElementById("tutorialBackBtn");
+  const actions = overlay.querySelector(".tutorial-actions");
   const portrait = overlay.querySelector(".tutorial-morgan-portrait");
   const cinematic = document.getElementById("tutorialCinematic");
   const cinematicTitle = document.getElementById("tutorialCinematicTitle");
@@ -1672,7 +1705,7 @@ function renderStarterTutorial() {
         ? "tactical"
         : TUTORIAL_JOURNEY_PORTRAIT_STEPS.has(step.id)
           ? "journey"
-          : "command";
+          : "journey";
   }
   if (label) {
     const speaker = step.speaker || TUTORIAL_NARRATOR_LABEL;
@@ -1703,6 +1736,7 @@ function renderStarterTutorial() {
     next.disabled = !step.manualOnly;
     next.classList.toggle("waiting", !step.manualOnly);
   }
+  if (actions) actions.hidden = !step.manualOnly;
   if (back) back.disabled = tutorialState.stepIndex <= 0;
 
   highlightTutorialTarget(step);

@@ -393,6 +393,7 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(tallViewportLayout).toEqual({ height: 700, centered: true, matchesGameFrame: true });
     await page.screenshot({ path: "artifacts/morgan-cinematic-welcome-1230x862.png", fullPage: false });
+    await page.setViewportSize({ width: 1366, height: 768 });
 
     const initialState = await page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")));
     expect(initialState).toMatchObject({
@@ -407,21 +408,44 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#tutorialCinematic")).toBeHidden();
     await expect(page.locator("#tutorialStepLabel")).toContainText("Morgan / Academy Orientation");
     await expect(page.locator(".tutorial-morgan-portrait")).toBeVisible();
-    await expect(page.locator(".tutorial-morgan-portrait")).toHaveAttribute("src", /morgan-command-liaison\.png$/);
-    await expect(page.locator("#tutorialTitle")).toHaveText("Your first flight plan");
-    await expect(page.locator("#tutorialText")).toContainText("trade for credits");
+    await expect(page.locator(".tutorial-morgan-portrait")).toHaveAttribute("src", /morgan-journey-guide\.png$/);
+    await expect(page.locator(".tutorial-morgan-portrait")).toHaveAttribute("data-morgan-context", "journey");
+    await expect(page.locator("#tutorialTitle")).toHaveText("Open Journey");
+    await expect(page.locator("#tutorialText")).toContainText("Academy route");
+    await expect(page.locator("#journeyHubBtn")).toHaveClass(/tutorial-highlight-target/);
+    await expect(page.locator(".tutorial-actions")).toBeHidden();
+    await expect(page.locator(".tutorial-card")).toBeInViewport();
+    expect(await page.locator(".tutorial-card").evaluate(card => {
+      const cardRect = card.getBoundingClientRect();
+      const frameRect = document.getElementById("gameScreen")?.getBoundingClientRect();
+      return Boolean(frameRect) &&
+        cardRect.left >= frameRect.left &&
+        cardRect.top >= frameRect.top &&
+        cardRect.right <= frameRect.right &&
+        cardRect.bottom <= frameRect.bottom;
+    })).toBe(true);
     await page.screenshot({ path: "artifacts/morgan-academy-orientation-1366x768.png", fullPage: false });
-    await page.locator("#tutorialNextBtn").click();
-    await expect(page.locator("#tutorialTitle")).toHaveText("Your first Academy assignments");
-    await expect(page.locator("#tutorialText")).toContainText("claim a bounty");
-    await expect(page.locator("#tutorialAcademyTracker")).toContainText("First Academy Route");
-    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Hunter");
-    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Complete Trade");
-    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Equip Guns");
-    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Bounty");
-    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Repair");
+    await page.locator("#journeyHubBtn").click();
+    await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
+    await expect(page.locator("#tutorialTitle")).toHaveText("Your Academy route");
+    await expect(page.locator("#tutorialText")).toContainText("first objective is Claim Starter Ship");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Next Academy Assignment");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Starter Ship");
+    await expect(page.locator("#tutorialAcademyTracker")).toContainText("0 / 1");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_starter_ship']")).toBeVisible();
+    await expect(page.locator(".tutorial-actions")).toBeHidden();
+    expect(await page.locator(".tutorial-card").evaluate(card => {
+      const cardRect = card.getBoundingClientRect();
+      const frameRect = document.getElementById("journeyScreen")?.getBoundingClientRect();
+      return Boolean(frameRect) &&
+        cardRect.left >= frameRect.left &&
+        cardRect.top >= frameRect.top &&
+        cardRect.right <= frameRect.right &&
+        cardRect.bottom <= frameRect.bottom;
+    })).toBe(true);
     await page.screenshot({ path: "artifacts/morgan-first-academy-route-1366x768.png", fullPage: false });
-    await page.locator("#tutorialNextBtn").click();
+    await page.locator("#journeyScreen .screen-back-btn").click();
+    await expect(page.locator("#gameScreen")).toHaveClass(/active/);
     await expect(page.locator("#tutorialTitle")).toHaveText("Open Hangar Bay");
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("Academy Assignment");
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Starter Ship");
@@ -626,7 +650,7 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.login());
 
     await expect(page.locator("#tutorialOverlay")).toHaveClass(/active/);
-    await expect(page.locator("#tutorialTitle")).toHaveText("Your first Academy assignments");
+    await expect(page.locator("#tutorialTitle")).toHaveText("Open Journey");
     await expect(page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")))).resolves.toMatchObject({
       active: true,
       completed: false,
@@ -5798,7 +5822,7 @@ test.describe("Lupen browser smoke", () => {
       "academy_repair_ship"
     ]);
     expect(tutorial.portraitSamples).toEqual({
-      command: "assets/morgan-command-liaison.png",
+      command: "assets/morgan-journey-guide.png",
       trade: "assets/morgan-trade-advisor.png",
       tactical: "assets/morgan-tactical-liaison.png",
       journey: "assets/morgan-journey-guide.png"
@@ -5819,8 +5843,17 @@ test.describe("Lupen browser smoke", () => {
       title: "Academy link established",
       autoSkip: true
     });
-    expect(stepById["welcome-core-loop"].text).toContain("trade for credits");
-    expect(stepById["welcome-academy"].text).toContain("Academy assignments");
+    expect(stepById["welcome-core-loop"]).toMatchObject({
+      title: "Open Journey",
+      target: "#journeyHubBtn",
+      event: "openedJourney"
+    });
+    expect(stepById["welcome-academy"]).toMatchObject({
+      title: "Your Academy route",
+      target: "#journeyScreen .screen-back-btn",
+      event: "returnedToHub"
+    });
+    expect(stepById["welcome-academy"].text).toContain("first objective is Claim Starter Ship");
     expect(stepById["buy-first-ship"]).toMatchObject({
       title: "Claim Pioneer Hunter",
       target: "tutorial:firstShipBuy",
