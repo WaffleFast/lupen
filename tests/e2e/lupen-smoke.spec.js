@@ -5567,9 +5567,9 @@ test.describe("Lupen browser smoke", () => {
     await openHangar(page);
     await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
 
-    await expect(page.locator("#loadoutSelectedSlotBar")).toContainText("Weapon 02");
+    await expect(page.locator("#loadoutSelectedSlotBar")).toContainText("Auto Equip · First Empty Slot");
     await expect(page.locator("#hangarScreen")).toContainText("Available Weapons");
-    await expect(page.locator("#hangarScreen")).toContainText("Selected Slot · Weapon 02");
+    await expect(page.locator("#hangarScreen")).toContainText("Equip fills the first empty slot");
     await expect(page.locator("#hangarScreen")).toContainText("Weapons");
     await expect(page.locator("#hangarScreen")).toContainText("Attachments");
     await expect(page.locator("#hangarScreen")).not.toContainText("Total Slots");
@@ -5859,6 +5859,17 @@ test.describe("Lupen browser smoke", () => {
       target: "tutorial:firstShipBuy",
       event: "boughtFirstShip"
     });
+    expect(stepById["review-market-buy-price"]).toMatchObject({
+      title: "Check your buy price",
+      target: "tutorial:marketBuyPrice",
+      event: "reviewedTutorialBuyPrice"
+    });
+    expect(stepById["review-market-sell-price"]).toMatchObject({
+      title: "Compare the sell price",
+      target: "tutorial:marketSellPrice",
+      event: "reviewedTutorialSellPrice"
+    });
+    expect(stepById["select-market-target"].text).toContain("{tradeProjectedProfit}");
     expect(stepById["buy-equipment"]).toMatchObject({
       title: "Buy first weapon",
       target: "tutorial:storePulseLaser",
@@ -5893,11 +5904,6 @@ test.describe("Lupen browser smoke", () => {
       title: "Equip second weapon",
       target: "tutorial:spareWeapon",
       event: "equippedItem"
-    });
-    expect(stepById["select-second-weapon-slot"]).toMatchObject({
-      title: "Select second weapon slot",
-      target: "tutorial:emptyWeaponSlot",
-      event: "selectedWeaponSlot"
     });
     expect(stepById["open-attachment-loadout"]).toMatchObject({
       title: "Open Attachments",
@@ -6842,8 +6848,6 @@ test.describe("Lupen browser smoke", () => {
     const pulseEquip = page.locator("#gunInventory .loadout-vault-row[data-item-key='pulseLaser'] .loadout-vault-equip-action");
     await expect(pulseEquip).toBeVisible();
     await pulseEquip.click();
-    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "select-second-weapon-slot");
-    await page.locator("#installedGuns .loadout-grid-slot.empty").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "equip-second-item");
     await page.locator("#gunInventory .loadout-vault-row[data-item-key='pulseLaser'] .loadout-vault-equip-action").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-attachment-loadout");
@@ -6878,7 +6882,7 @@ test.describe("Lupen browser smoke", () => {
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await waitForGameGlobals(page);
 
-    const tradeBuy = await page.evaluate(() => window.eval(`
+    await page.evaluate(() => window.eval(`
       (() => {
         localStorage.clear();
         currentShipId = STARTER_SHIP_ID;
@@ -6898,19 +6902,43 @@ test.describe("Lupen browser smoke", () => {
         openMarketplace();
         startStarterTutorial(true);
         setTutorialStepById("select-market-resource");
-        const resourceTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketResourceIron']"));
-        setMarketResource("Iron");
-        setTutorialStepById("select-market-target");
-        const targetTargetExists = Boolean(document.querySelector("[data-tutorial-target='marketMaxAmount']"));
-        setMarketQuantityMax();
-        const maxQuantity = selectedMarketQuantity;
-        setTutorialStepById("buy-cargo");
-        buyMarketCargo();
+      })()
+    `));
+
+    await expect(page.locator("[data-tutorial-target='marketResourceIron']")).toBeVisible();
+    await page.locator("[data-tutorial-target='marketResourceIron'] > th").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "review-market-buy-price");
+    await expect(page.locator("[data-tutorial-target='marketBuyPrice']")).toBeVisible();
+
+    const tutorialQuote = await page.evaluate(() => window.eval("getTutorialTradeQuote()"));
+    expect(tutorialQuote.sellPrice).toBeGreaterThan(tutorialQuote.buyPrice);
+    expect(tutorialQuote.profitPerUnit).toBeGreaterThan(0);
+    expect(tutorialQuote.projectedProfit).toBeGreaterThan(0);
+    const quoteNumber = (value) => Number(value).toLocaleString("en-GB");
+    await expect(page.locator("#tutorialText")).toContainText(`CR ${quoteNumber(tutorialQuote.buyPrice)}`);
+
+    await page.locator("[data-tutorial-target='marketBuyPrice']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "review-market-sell-price");
+    await expect(page.locator("[data-tutorial-target='marketSellPrice']")).toBeVisible();
+    await expect(page.locator("#tutorialText")).toContainText(`CR ${quoteNumber(tutorialQuote.sellPrice)}`);
+    await expect(page.locator("#tutorialText")).toContainText(`+CR ${quoteNumber(tutorialQuote.profitPerUnit)}`);
+
+    await page.locator("[data-tutorial-target='marketSellPrice']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "select-market-target");
+    await expect(page.locator("#tutorialText")).toContainText(`+CR ${quoteNumber(tutorialQuote.projectedProfit)}`);
+    await page.locator("[data-tutorial-target='marketMaxAmount']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "buy-cargo");
+    await page.locator("[data-tutorial-target='buyCargo']").click();
+
+    const tradeBuy = await page.evaluate(() => window.eval(`
+      (() => {
         const route = { ...activeTradeRoute };
         return {
-          resourceTargetExists,
-          targetTargetExists,
-          maxQuantity,
+          resourceTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketResourceIron']")),
+          buyPriceTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketBuyPrice']")),
+          sellPriceTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketSellPrice']")),
+          targetTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketMaxAmount']")),
+          maxQuantity: route.purchasedUnits,
           route,
           creditsAfterBuy: credits,
           cargoAfterBuy: cargo[route.good] || 0,
@@ -7042,6 +7070,8 @@ test.describe("Lupen browser smoke", () => {
     const finalStep = await page.evaluate(() => window.eval("getCurrentTutorialStep().id"));
 
     expect(tradeBuy.resourceTargetExists).toBe(true);
+    expect(tradeBuy.buyPriceTargetExists).toBe(true);
+    expect(tradeBuy.sellPriceTargetExists).toBe(true);
     expect(tradeBuy.targetTargetExists).toBe(true);
     expect(tradeBuy.maxQuantity).toBeGreaterThan(0);
     expect(tradeBuy.cargoAfterBuy).toBeGreaterThan(0);
@@ -8646,7 +8676,6 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     await page.locator("#loadoutCategoryAttachments").click();
-    await page.locator("#installedAttachments .loadout-grid-slot.empty").first().click();
     const jumpDrive = page.locator("#gunInventory .hangar-equipment-card[data-item-key='jumpDrive']");
     await expect(jumpDrive).toHaveCount(1);
     await jumpDrive.click();

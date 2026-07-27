@@ -285,6 +285,38 @@ test.describe("Adaptive Hangar Loadout", () => {
     await page.screenshot({ path: "artifacts/adaptive-loadout-two-step-equip.png", fullPage: false });
   });
 
+  test("Equip fills the first empty slot when no slot was deliberately selected", async ({ page }) => {
+    await page.setViewportSize({ width: 1365, height: 822 });
+    await openAdaptiveLoadout(page, () => window.eval(`(() => {
+      localStorage.clear();
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      ownedShips = ["falcon"];
+      playerProgress.combatXp = 100000;
+      ownedGuns.heavyLance = 1;
+      shipLoadouts.falcon = {
+        guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1), null],
+        attachments: []
+      };
+      applyShipStats(false);
+      showScreen("gameScreen");
+      openHangar();
+      showHangarSection("overview");
+    })()`));
+
+    await expect(page.locator("#loadoutSelectedSlotBar")).toContainText("Auto Equip · First Empty Slot");
+    const heavyLance = page.locator("#gunInventory .loadout-vault-row").filter({ hasText: "Heavy Lance" });
+    await expect(heavyLance.getByRole("button", { name: "Equip", exact: true })).toBeEnabled();
+    await heavyLance.getByRole("button", { name: "Equip", exact: true }).click();
+
+    await expect.poll(() => page.evaluate(() => shipLoadouts.falcon.guns.map(entry => getEquipmentKey(entry)))).toEqual([
+      "pulseLaser",
+      "heavyLance"
+    ]);
+    await expect(page.locator("#installedGuns .loadout-grid-slot").nth(0)).toContainText("Pulse Laser");
+    await expect(page.locator("#installedGuns .loadout-grid-slot").nth(1)).toContainText("Heavy Lance");
+  });
+
   test("keeps a purchased weapon through selection, equip, unequip and reload", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {

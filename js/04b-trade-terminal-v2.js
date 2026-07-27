@@ -89,6 +89,21 @@ function getMapOneMarketPrice(good, planet) {
   return getLiveMarketPriceForCycle(good, planet, getMarketCycle());
 }
 
+function getTutorialGuaranteedTradeSellPrice() {
+  const buyPrice = getLiveMarketPriceForCycle(
+    TUTORIAL_TRADE_ROUTE.good,
+    TUTORIAL_TRADE_ROUTE.origin,
+    getMarketCycle()
+  );
+  const liveSellPrice = getLiveMarketPriceForCycle(
+    TUTORIAL_TRADE_ROUTE.good,
+    TUTORIAL_TRADE_ROUTE.destination,
+    getMarketCycle()
+  );
+  const minimumMargin = Math.max(4, Math.ceil(buyPrice * 0.2));
+  return Math.max(liveSellPrice, buyPrice + minimumMargin);
+}
+
 function getLiveMarketPrice(good, planet) {
   if (
     activeTradeRoute?.tutorialTrade &&
@@ -99,6 +114,13 @@ function getLiveMarketPrice(good, planet) {
       getLiveMarketPriceForCycle(good, planet, getMarketCycle()),
       Number(activeTradeRoute.sellPrice || 0)
     );
+  }
+  if (
+    isLocalTutorialTradeActive() &&
+    good === TUTORIAL_TRADE_ROUTE.good &&
+    planet === TUTORIAL_TRADE_ROUTE.destination
+  ) {
+    return getTutorialGuaranteedTradeSellPrice();
   }
   if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive()) {
     const serverPrice = getMultiplayerStagingMarketPrice(good, planet, getCurrentMarketPlanet());
@@ -466,6 +488,17 @@ function setMarketResource(good) {
   renderMarketplace();
 }
 
+function reviewTutorialMarketPrice(priceKind, event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  const expectedStepId = priceKind === "sell" ? "review-market-sell-price" : "review-market-buy-price";
+  if (tutorialState?.active && getCurrentTutorialStep?.()?.id === expectedStepId) {
+    tutorialEvent(priceKind === "sell" ? "reviewedTutorialSellPrice" : "reviewedTutorialBuyPrice");
+    return;
+  }
+  setMarketResource(TUTORIAL_TRADE_ROUTE.good);
+}
+
 function getLiveMarketSellableQuantity(good = selectedMarketResource) {
   return Math.max(0, Number(cargo[good] || 0));
 }
@@ -662,6 +695,20 @@ function getTradeSummaryMarkup() {
   `;
 }
 
+function renderLiveMarketPriceCell(good, planet, currentPlanet, interactive = false) {
+  const priceMarkup = `<span>CR ${formatNumber(getLiveMarketPrice(good, planet))}</span>${getTradeTrendMarkup(good, planet)}`;
+  const tutorialPriceKind = good === TUTORIAL_TRADE_ROUTE.good && planet === TUTORIAL_TRADE_ROUTE.origin
+    ? "buy"
+    : good === TUTORIAL_TRADE_ROUTE.good && planet === TUTORIAL_TRADE_ROUTE.destination
+      ? "sell"
+      : "";
+  const tutorialTarget = tutorialPriceKind === "buy" ? "marketBuyPrice" : "marketSellPrice";
+  const content = interactive && tutorialPriceKind
+    ? `<button type="button" class="trade-v2-tutorial-price" data-tutorial-target="${tutorialTarget}" aria-label="Review ${escapeHtml(planet)} ${escapeHtml(good)} ${tutorialPriceKind} price" onclick="reviewTutorialMarketPrice('${tutorialPriceKind}', event)">${priceMarkup}</button>`
+    : priceMarkup;
+  return `<td class="${planet === currentPlanet ? "is-current" : ""}">${content}</td>`;
+}
+
 function renderLiveMarketPriceTable({ interactive = false } = {}) {
   const currentPlanet = getCurrentMarketPlanet();
   return `
@@ -677,7 +724,7 @@ function renderLiveMarketPriceTable({ interactive = false } = {}) {
               ${good === "Iron" ? 'data-tutorial-target="marketResourceIron"' : ""}
               ${interactive ? `tabindex="0" role="button" aria-label="Select ${escapeHtml(good)}" onclick="setMarketResource('${escapeJsString(good)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setMarketResource('${escapeJsString(good)}');}"` : ""}>
               <th scope="row"><span class="trade-v2-commodity"><img src="${escapeHtml(info.icon || getCommodityImage(good))}" alt=""><strong>${escapeHtml(good)}</strong></span></th>
-              ${MAP_ONE_MARKET_PLANETS.map((planet) => `<td class="${planet === currentPlanet ? "is-current" : ""}"><span>CR ${formatNumber(getLiveMarketPrice(good, planet))}</span>${getTradeTrendMarkup(good, planet)}</td>`).join("")}
+              ${MAP_ONE_MARKET_PLANETS.map((planet) => renderLiveMarketPriceCell(good, planet, currentPlanet, interactive)).join("")}
             </tr>`;
           }).join("")}
         </tbody>
@@ -903,7 +950,7 @@ function renderLiveMarketPriceTable({ interactive = true } = {}) {
               ${good === "Iron" ? 'data-tutorial-target="marketResourceIron"' : ""}
               ${interactive ? `tabindex="0" role="button" aria-selected="${selected}" aria-label="Select ${escapeHtml(good)}" onclick="setMarketResource('${escapeJsString(good)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setMarketResource('${escapeJsString(good)}');}"` : ""}>
               <th scope="row"><span class="trade-v2-commodity"><img src="${escapeHtml(info.icon || getCommodityImage(good))}" alt=""><strong>${escapeHtml(good)}</strong></span></th>
-              ${MAP_ONE_MARKET_PLANETS.map((planet) => `<td class="${planet === currentPlanet ? "is-current" : ""}"><span>CR ${formatNumber(getLiveMarketPrice(good, planet))}</span>${getTradeTrendMarkup(good, planet)}</td>`).join("")}
+              ${MAP_ONE_MARKET_PLANETS.map((planet) => renderLiveMarketPriceCell(good, planet, currentPlanet, interactive)).join("")}
             </tr>`;
           }).join("")}
         </tbody>

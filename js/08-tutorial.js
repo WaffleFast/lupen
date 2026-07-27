@@ -1,6 +1,6 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
-const TUTORIAL_FLOW_VERSION = 2;
+const TUTORIAL_FLOW_VERSION = 3;
 const TUTORIAL_NARRATOR_LABEL = "Morgan";
 const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
 const TUTORIAL_TRADE_ROUTE = Object.freeze({
@@ -17,7 +17,21 @@ const TUTORIAL_ACADEMY_MILESTONES = Object.freeze([
   Object.freeze({
     missionId: "academy_first_trade",
     shortLabel: "Complete Trade",
-    stepIds: Object.freeze(["return-after-first-loadout", "open-trade", "select-market-resource", "select-market-target", "buy-cargo", "return-to-station-for-launch", "map-route", "make-jump", "land-destination", "open-trade-to-sell", "sell-cargo"])
+    stepIds: Object.freeze([
+      "return-after-first-loadout",
+      "open-trade",
+      "select-market-resource",
+      "review-market-buy-price",
+      "review-market-sell-price",
+      "select-market-target",
+      "buy-cargo",
+      "return-to-station-for-launch",
+      "map-route",
+      "make-jump",
+      "land-destination",
+      "open-trade-to-sell",
+      "sell-cargo"
+    ])
   }),
   Object.freeze({
     missionId: "academy_launch_ship",
@@ -38,7 +52,6 @@ const TUTORIAL_ACADEMY_MILESTONES = Object.freeze([
       "open-vessel-exchange-equip",
       "open-loadout-equip",
       "equip-item",
-      "select-second-weapon-slot",
       "equip-second-item"
     ])
   }),
@@ -178,9 +191,23 @@ const STARTER_TUTORIAL_STEPS = [
     event: "selectedMarketResource"
   },
   {
+    id: "review-market-buy-price",
+    title: "Check your buy price",
+    text: "Asteron is selling Iron for CR {tradeBuyPrice} per unit. This is your investment price. Select the highlighted Asteron price.",
+    target: "tutorial:marketBuyPrice",
+    event: "reviewedTutorialBuyPrice"
+  },
+  {
+    id: "review-market-sell-price",
+    title: "Compare the sell price",
+    text: "Virella will pay CR {tradeSellPrice} per unit: a return of +CR {tradeProfitPerUnit} on every unit. Select the highlighted Virella price.",
+    target: "tutorial:marketSellPrice",
+    event: "reviewedTutorialSellPrice"
+  },
+  {
     id: "select-market-target",
     title: "Set cargo amount",
-    text: "Load as much Iron as your credits and cargo hold allow. The live market does not lock a destination; Virella currently offers a useful first route.",
+    text: "Use Max to invest CR {tradeInvestment} in {tradeUnits} Iron. Selling at Virella should return CR {tradeRevenue}, including +CR {tradeProjectedProfit} profit. This Academy quote remains protected while you travel.",
     target: "tutorial:marketMaxAmount",
     event: "selectedBuyAmount"
   },
@@ -314,16 +341,9 @@ const STARTER_TUTORIAL_STEPS = [
     event: "equippedItem"
   },
   {
-    id: "select-second-weapon-slot",
-    title: "Select second weapon slot",
-    text: "Select the Hunter's remaining empty weapon slot before fitting the second Pulse Laser.",
-    target: "tutorial:emptyWeaponSlot",
-    event: "selectedWeaponSlot"
-  },
-  {
     id: "equip-second-item",
     title: "Equip second weapon",
-    text: "Fit the second Pulse Laser into the remaining weapon slot. The Hunter can now fire a complete volley.",
+    text: "Equip the second Pulse Laser. Loadout fills the first empty weapon slot automatically, giving the Hunter a complete volley.",
     target: "tutorial:spareWeapon",
     event: "equippedItem"
   },
@@ -510,6 +530,8 @@ const STARTER_TUTORIAL_STEPS = [
 ];
 
 const TUTORIAL_FLOW_V2_ADDED_STEP_IDS = new Set([
+  "review-market-buy-price",
+  "review-market-sell-price",
   "buy-second-weapon",
   "buy-store-attachment",
   "open-vessel-exchange-equip",
@@ -521,9 +543,18 @@ const TUTORIAL_FLOW_V2_ADDED_STEP_IDS = new Set([
 
 function migrateTutorialStateToCurrentFlow() {
   const savedStepId = String(tutorialState.stepId || "");
-  let nextIndex = savedStepId
+  let nextIndex = savedStepId === "select-second-weapon-slot"
+    ? STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "equip-second-item")
+    : savedStepId
     ? STARTER_TUTORIAL_STEPS.findIndex(step => step.id === savedStepId)
     : -1;
+
+  if (
+    Number(tutorialState.flowVersion || 0) === 2 &&
+    ["select-market-target", "buy-cargo"].includes(savedStepId)
+  ) {
+    nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "review-market-buy-price");
+  }
 
   if (nextIndex < 0 && Number(tutorialState.flowVersion || 0) < TUTORIAL_FLOW_VERSION) {
     const legacySteps = STARTER_TUTORIAL_STEPS.filter(step => !TUTORIAL_FLOW_V2_ADDED_STEP_IDS.has(step.id));
@@ -619,7 +650,21 @@ function getTutorialPilotIdentity() {
 }
 
 function formatTutorialCopy(value) {
-  return String(value || "").replaceAll("{pilot}", getTutorialPilotIdentity().name);
+  const quote = getTutorialTradeQuote();
+  const replacements = {
+    "{pilot}": getTutorialPilotIdentity().name,
+    "{tradeBuyPrice}": formatNumber(quote.buyPrice),
+    "{tradeSellPrice}": formatNumber(quote.sellPrice),
+    "{tradeProfitPerUnit}": formatNumber(quote.profitPerUnit),
+    "{tradeUnits}": formatNumber(quote.units),
+    "{tradeInvestment}": formatNumber(quote.investment),
+    "{tradeRevenue}": formatNumber(quote.revenue),
+    "{tradeProjectedProfit}": formatNumber(quote.projectedProfit)
+  };
+  return Object.entries(replacements).reduce(
+    (copy, [token, replacement]) => copy.replaceAll(token, replacement),
+    String(value || "")
+  );
 }
 
 function getTutorialAcademyMilestone(stepId = getCurrentTutorialStep()?.id) {
@@ -786,6 +831,32 @@ function hasTutorialTradeCargo() {
   );
 }
 
+function getTutorialTradeQuote() {
+  const priceGetter = typeof getLiveMarketPrice === "function"
+    ? getLiveMarketPrice
+    : typeof getMapOneMarketPrice === "function"
+      ? getMapOneMarketPrice
+      : () => 0;
+  const buyPrice = Math.max(0, Number(priceGetter(TUTORIAL_TRADE_ROUTE.good, TUTORIAL_TRADE_ROUTE.origin) || 0));
+  const sellPrice = Math.max(buyPrice + 1, Number(priceGetter(TUTORIAL_TRADE_ROUTE.good, TUTORIAL_TRADE_ROUTE.destination) || 0));
+  const limit = typeof getMarketMaxBuyQuantity === "function"
+    ? getMarketMaxBuyQuantity(TUTORIAL_TRADE_ROUTE.good, TUTORIAL_TRADE_ROUTE.origin)
+    : typeof getMarketQuantityLimit === "function"
+      ? getMarketQuantityLimit("buy")
+      : 1;
+  const units = Math.max(1, Number(limit || 1));
+  const profitPerUnit = Math.max(1, sellPrice - buyPrice);
+  return {
+    buyPrice,
+    sellPrice,
+    profitPerUnit,
+    units,
+    investment: buyPrice * units,
+    revenue: sellPrice * units,
+    projectedProfit: profitPerUnit * units
+  };
+}
+
 function isTutorialTradeSelectionReady() {
   const currentPlanet = typeof getCurrentMarketPlanet === "function" ? getCurrentMarketPlanet() : currentNode;
   return selectedMarketResource === TUTORIAL_TRADE_ROUTE.good &&
@@ -797,6 +868,8 @@ function isTutorialTradeSelectionReady() {
 function isTutorialGuaranteedTradeStep(stepId = getCurrentTutorialStep()?.id) {
   return [
     "select-market-resource",
+    "review-market-buy-price",
+    "review-market-sell-price",
     "select-market-target",
     "select-buy-amount",
     "buy-cargo",
@@ -822,8 +895,9 @@ function prepareTutorialTradeSelection() {
   if (hasTutorialTradeCargo() || hasCompletedTutorialTrade()) return;
   const currentPlanet = typeof getCurrentMarketPlanet === "function" ? getCurrentMarketPlanet() : currentNode;
   if (currentPlanet !== TUTORIAL_TRADE_ROUTE.origin) return;
-  const buy = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(TUTORIAL_TRADE_ROUTE.good, currentPlanet) : 0;
-  const sell = typeof getMapOneMarketPrice === "function" ? getMapOneMarketPrice(TUTORIAL_TRADE_ROUTE.good, TUTORIAL_TRADE_ROUTE.destination) : 0;
+  const quote = getTutorialTradeQuote();
+  const buy = quote.buyPrice;
+  const sell = quote.sellPrice;
   if (buy <= 0 || sell <= buy || Number(credits || 0) < buy) return;
   selectedMarketResource = TUTORIAL_TRADE_ROUTE.good;
   selectedMarketTargetPlanet = TUTORIAL_TRADE_ROUTE.destination;
@@ -879,6 +953,8 @@ function getTutorialStateCompletionReason(step) {
     case "buy-first-ship":
       return currentShipId === starterShipId && ownedShips.includes(starterShipId) ? "starter_ship_active" : "";
     case "select-market-resource":
+    case "review-market-buy-price":
+    case "review-market-sell-price":
     case "select-market-target":
     case "select-buy-amount":
       return hasTutorialTradeCargo() || hasCompletedTutorialTrade() ? "trade_cargo_already_loaded" : "";
@@ -913,8 +989,6 @@ function getTutorialStateCompletionReason(step) {
     case "equip-item":
       if (document.getElementById("hangarScreen")?.classList.contains("active")) return "";
       return getTutorialEquippedGunCount() >= 1 ? "first_weapon_equipped" : "";
-    case "select-second-weapon-slot":
-      return hasTutorialTwoGunsEquipped() ? "second_weapon_already_equipped" : "";
     case "equip-second-item":
       if (document.getElementById("hangarScreen")?.classList.contains("active")) return "";
       if (hasTutorialTwoGunsEquipped()) return "two_guns_equipped";
@@ -982,7 +1056,6 @@ function reconcileTutorialStepWithCurrentState() {
       "open-vessel-exchange-equip",
       "open-loadout-equip",
       "equip-item",
-      "select-second-weapon-slot",
       "equip-second-item",
       "open-attachment-loadout",
       "equip-attachment"
@@ -1004,7 +1077,7 @@ function reconcileTutorialStepWithCurrentState() {
       }
     }
     if (
-      ["equip-item", "select-second-weapon-slot", "equip-second-item", "open-attachment-loadout", "equip-attachment"].includes(step?.id) &&
+      ["equip-item", "equip-second-item", "open-attachment-loadout", "equip-attachment"].includes(step?.id) &&
       !(hasTutorialTwoGunsEquipped() && hasTutorialAttachmentEquipped())
     ) {
       const storeOpen = document.getElementById("storeScreen")?.classList.contains("active");
@@ -1536,8 +1609,12 @@ function getDynamicTutorialTarget(step) {
            document.querySelector("#gunInventory .hangar-equipment-card:not(:disabled)");
   }
 
-  if (step.target === "tutorial:emptyWeaponSlot") {
-    return document.querySelector("#installedGuns .loadout-grid-slot.empty");
+  if (step.target === "tutorial:marketBuyPrice") {
+    return document.querySelector("[data-tutorial-target='marketBuyPrice']");
+  }
+
+  if (step.target === "tutorial:marketSellPrice") {
+    return document.querySelector("[data-tutorial-target='marketSellPrice']");
   }
 
   if (step.target === "tutorial:storeCargoPod") {

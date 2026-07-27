@@ -1555,6 +1555,7 @@ function openStore() {
 
 function openHangar() {
   tutorialEvent("openedHangar");
+  if (typeof selectedLoadoutSlotExplicitlyChosen !== "undefined") selectedLoadoutSlotExplicitlyChosen = false;
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   selectedHangarShipId = currentShipId || starterShipId;
   selectedShipyardShipId = currentShipId || selectedShipyardShipId || starterShipId;

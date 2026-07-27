@@ -45,6 +45,7 @@ let selectedVaultActionContext = null;
 let selectedLoadoutItemContext = null;
 let selectedLoadoutStatusMessage = "";
 let selectedLoadoutSlotCategory = "guns";
+let selectedLoadoutSlotExplicitlyChosen = false;
 let selectedLoadoutVaultFilter = "guns";
 let selectedLoadoutVaultSearch = "";
 let selectedLoadoutVaultQuality = "all";
@@ -1049,12 +1050,12 @@ function selectEquippedLoadoutVaultItem(categoryKey, index) {
     quality,
     level
   };
+  selectedLoadoutSlotExplicitlyChosen = true;
   renderInstalledGuns();
   renderInstalledAttachments();
   renderGunInventory();
   renderAttachmentInventory();
   renderLoadoutItemDetail();
-  if (categoryKey === "guns" && !key) tutorialEvent("selectedWeaponSlot");
 }
 
 function getSelectedVaultEntry() {
@@ -2600,11 +2601,15 @@ function getEquippedTooltipEntry(key, quality, categoryKey, level = 1) {
 
 function getSelectedLoadoutSlotLabel() {
   const categoryKey = selectedLoadoutItemContext?.categoryKey === "attachments" ? "attachments" : "guns";
+  if (!selectedLoadoutSlotExplicitlyChosen && selectedLoadoutItemContext?.source !== "equipped") {
+    return categoryKey === "guns" ? "Next Empty Weapon Slot" : "Next Empty Attachment Slot";
+  }
   const index = Math.max(0, Number(selectedLoadoutItemContext?.index || 0));
   return `${categoryKey === "guns" ? "Weapon" : "Attachment"} ${String(index + 1).padStart(2, "0")}`;
 }
 
 function isSelectedLoadoutSlotOccupied(categoryKey = selectedLoadoutItemContext?.categoryKey) {
+  if (!selectedLoadoutSlotExplicitlyChosen) return false;
   const normalizedCategory = categoryKey === "attachments" ? "attachments" : "guns";
   if (selectedLoadoutItemContext?.categoryKey !== normalizedCategory) return false;
   const index = Number(selectedLoadoutItemContext?.index);
@@ -2641,14 +2646,14 @@ function ensureSelectedLoadoutSlot() {
   }
 
   const categoryKey = selectedLoadoutSlotCategory === "attachments" ? "attachments" : "guns";
-  const slotLimit = categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
   selectedLoadoutItemContext = {
     source: "slot",
     categoryKey,
-    index: Math.min(categoryKey === "guns" ? 1 : 0, Math.max(0, slotLimit - 1)),
+    index: 0,
     key: "",
     quality: "standard"
   };
+  selectedLoadoutSlotExplicitlyChosen = false;
 }
 
 function setLoadoutSlotCategory(categoryKey) {
@@ -2667,6 +2672,7 @@ function setLoadoutSlotCategory(categoryKey) {
     quality: "standard"
   };
   selectedVaultActionContext = null;
+  selectedLoadoutSlotExplicitlyChosen = false;
   renderInstalledGuns();
   renderInstalledAttachments();
   renderGunInventory();
@@ -2693,7 +2699,8 @@ function renderLoadoutSlotGrid(box, categoryKey) {
     const level = getEquipmentLevel(entry);
     const tier = getHangarEquipmentTier(level);
     const item = definitionMap[key];
-    const selected = selectedLoadoutItemContext?.categoryKey === categoryKey &&
+    const selected = selectedLoadoutSlotExplicitlyChosen &&
+      selectedLoadoutItemContext?.categoryKey === categoryKey &&
       selectedLoadoutItemContext.index === i;
 
     const slot = document.createElement("button");
@@ -3026,12 +3033,20 @@ function updateLoadoutVaultChrome() {
   if (countEl) countEl.textContent = `${formatNumber(total)} / ${formatNumber(LOADOUT_VAULT_CAPACITY)}`;
 
   const selectedSlotBar = document.getElementById("loadoutSelectedSlotBar");
-  if (selectedSlotBar) selectedSlotBar.textContent = `Selected Slot · ${getSelectedLoadoutSlotLabel()}`;
+  if (selectedSlotBar) {
+    selectedSlotBar.textContent = selectedLoadoutSlotExplicitlyChosen
+      ? `Selected Slot · ${getSelectedLoadoutSlotLabel()}`
+      : "Auto Equip · First Empty Slot";
+  }
   const isAttachmentSlot = selectedLoadoutItemContext?.categoryKey === "attachments";
   const vaultTitle = document.getElementById("loadoutVaultTitle");
   if (vaultTitle) vaultTitle.textContent = isAttachmentSlot ? "Available Attachments" : "Available Weapons";
   const vaultHint = document.getElementById("loadoutVaultHint");
-  if (vaultHint) vaultHint.textContent = `Choose stored gear for ${getSelectedLoadoutSlotLabel()}`;
+  if (vaultHint) {
+    vaultHint.textContent = selectedLoadoutSlotExplicitlyChosen
+      ? `Choose stored gear for ${getSelectedLoadoutSlotLabel()}`
+      : "Equip fills the first empty slot, or select a slot above";
+  }
 
   const search = document.getElementById("loadoutVaultSearch");
   if (search && search.value !== selectedLoadoutVaultSearch) search.value = selectedLoadoutVaultSearch;
@@ -3126,13 +3141,19 @@ function equipLoadoutVaultEntry(entry) {
   const selected = selectedLoadoutItemContext || {};
   const categoryKey = entry.categoryKey;
   const limit = categoryKey === "guns" ? getGunSlotLimit(selectedHangarShipId) : getAttachmentSlotLimit(selectedHangarShipId);
-  let index = selected.categoryKey === categoryKey ? Number(selected.index) : -1;
   const loadout = getShipLoadout(selectedHangarShipId);
   const list = categoryKey === "guns" ? loadout.guns : loadout.attachments;
+  const explicitSlotSelected = selectedLoadoutSlotExplicitlyChosen &&
+    selected.categoryKey === categoryKey &&
+    Number.isInteger(Number(selected.index)) &&
+    Number(selected.index) >= 0 &&
+    Number(selected.index) < limit;
+  let index = explicitSlotSelected ? Number(selected.index) : -1;
 
-  if (!Number.isInteger(index) || index < 0 || index >= limit) {
-    index = list.findIndex(slot => !getEquipmentKey(slot));
-    if (index < 0) index = list.length < limit ? list.length : -1;
+  if (!explicitSlotSelected) {
+    const firstEmptyIndex = Array.from({ length: limit }, (_unused, slotIndex) => slotIndex)
+      .find(slotIndex => !getEquipmentKey(list[slotIndex]));
+    index = Number.isInteger(firstEmptyIndex) ? firstEmptyIndex : -1;
   }
   if (index < 0 || index >= limit) {
     showLoadoutEquipValidationMessage(categoryKey === "guns" ? "weapon_slot_unsupported" : "attachment_slot_unsupported", {
@@ -3146,6 +3167,8 @@ function equipLoadoutVaultEntry(entry) {
     showLoadoutEquipValidationMessage("slot_occupied", entry);
     return;
   }
+
+  selectedLoadoutSlotExplicitlyChosen = false;
 
   if (isMultiplayerStagingStoreActive()) {
     if (getStagingStoreItemId({ kind: categoryKey === "guns" ? "gun" : "attachment", key: entry.key })) {
