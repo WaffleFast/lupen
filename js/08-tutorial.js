@@ -81,7 +81,8 @@ const STARTER_TUTORIAL_STEPS = [
     id: "cinematic-welcome",
     title: "Welcome to Lupen, {pilot}",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Trade across living markets. Explore distant systems. Destroy those who stand against you. Build your fleet—and create your own path through the universe.",
+    voiceCue: "tutorial_intro_welcome",
+    text: "I'm Morgan, your Command Liaison. Trade across living markets, explore distant systems, destroy those who stand against you, or build a fleet entirely your own. I'll guide your first steps—after that, the path is yours.",
     target: "#tutorialCinematicContinue",
     event: null,
     actionLabel: "Begin your journey",
@@ -91,15 +92,15 @@ const STARTER_TUTORIAL_STEPS = [
   },
   {
     id: "welcome-new-pilot",
-    title: "I'm Morgan, your Command Liaison",
+    title: "Academy link established",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    voiceCue: "tutorial_intro_welcome",
-    text: "I'll help you find your feet, claim your first ship, and understand the choices that shape your journey.",
+    text: "Morgan's introductory transmission has been received.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Continue",
     manualOnly: true,
-    intro: true
+    intro: true,
+    autoSkip: true
   },
   {
     id: "welcome-core-loop",
@@ -449,6 +450,50 @@ const STARTER_TUTORIAL_STEPS = [
   }
 ];
 
+const TUTORIAL_PROGRESS_PHASES = Object.freeze([
+  Object.freeze({
+    label: "Briefing",
+    stepIds: Object.freeze(["cinematic-welcome", "welcome-new-pilot", "welcome-core-loop", "welcome-academy"])
+  }),
+  Object.freeze({
+    label: "Ship",
+    stepIds: TUTORIAL_ACADEMY_MILESTONES[0].stepIds
+  }),
+  Object.freeze({
+    label: "Trade",
+    stepIds: Object.freeze([
+      ...TUTORIAL_ACADEMY_MILESTONES[1].stepIds,
+      ...TUTORIAL_ACADEMY_MILESTONES[2].stepIds
+    ])
+  }),
+  Object.freeze({
+    label: "Loadout",
+    stepIds: Object.freeze([
+      ...TUTORIAL_ACADEMY_MILESTONES[3].stepIds,
+      ...TUTORIAL_ACADEMY_MILESTONES[4].stepIds
+    ])
+  }),
+  Object.freeze({
+    label: "Bounty",
+    stepIds: Object.freeze([
+      ...TUTORIAL_ACADEMY_MILESTONES[5].stepIds,
+      ...TUTORIAL_ACADEMY_MILESTONES[6].stepIds
+    ])
+  }),
+  Object.freeze({
+    label: "Forge",
+    stepIds: Object.freeze(["open-forge", "forge-upgrade-weapon", "return-after-forge"])
+  }),
+  Object.freeze({
+    label: "Repair",
+    stepIds: TUTORIAL_ACADEMY_MILESTONES[7].stepIds
+  }),
+  Object.freeze({
+    label: "Journey",
+    stepIds: Object.freeze(["complete"])
+  })
+]);
+
 function loadTutorialState() {
   const parsed = safeParseLocalStorage(TUTORIAL_STORAGE_KEY, {});
   return {
@@ -705,6 +750,7 @@ function isTutorialForgeComplete() {
 
 function getTutorialStateCompletionReason(step) {
   if (!step) return "";
+  if (step.autoSkip) return "superseded_intro_step";
   const starterShipId = getStarterShipId();
   switch (step.id) {
     case "buy-first-ship":
@@ -1385,6 +1431,9 @@ function isTutorialClickAllowed(event) {
   // Account/start screens are outside the tutorial. Never block Create Account/Login navigation.
   if (isAccountScreenActive()) return true;
 
+  // Orientation persists safely across sessions, so pilots must always be able to log out.
+  if (event.target.closest?.(".hub-logout-button, button[onclick='logout()']")) return true;
+
   const card = document.querySelector(".tutorial-card");
   if (card?.contains(event.target)) {
     return Boolean(event.target.closest?.("#tutorialNextBtn, #tutorialBackBtn"));
@@ -1635,7 +1684,19 @@ function renderStarterTutorial() {
     return;
   }
   if (progress) {
-    progress.innerHTML = STARTER_TUTORIAL_STEPS.map((item, index) => `<i class="${index < tutorialState.stepIndex ? "done" : index === tutorialState.stepIndex ? "active" : ""}"></i>`).join("");
+    const phaseIndex = Math.max(
+      0,
+      TUTORIAL_PROGRESS_PHASES.findIndex(phase => phase.stepIds.includes(step.id))
+    );
+    progress.setAttribute(
+      "aria-label",
+      `Orientation progress: ${TUTORIAL_PROGRESS_PHASES[phaseIndex].label}, phase ${phaseIndex + 1} of ${TUTORIAL_PROGRESS_PHASES.length}`
+    );
+    progress.innerHTML = TUTORIAL_PROGRESS_PHASES.map((phase, index) => {
+      const stateClass = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "";
+      const current = index === phaseIndex ? ' aria-current="step"' : "";
+      return `<i class="${stateClass}" title="${phase.label}"${current}></i>`;
+    }).join("");
   }
   if (next) {
     next.textContent = step.actionLabel || "Waiting for action";

@@ -22890,10 +22890,13 @@ input::placeholder {
 
 .tutorial-cinematic {
   position: fixed;
-  top: 14px;
-  right: max(14px, calc((100vw - 1200px) / 2));
-  bottom: 34px;
-  left: max(14px, calc((100vw - 1200px) / 2));
+  top: 50%;
+  left: 50%;
+  width: var(--game-shell-width);
+  max-width: 1200px;
+  height: var(--game-shell-height);
+  max-height: 700px;
+  transform: translate(-50%, -50%);
   z-index: 1004;
   overflow: hidden;
   border: 1px solid rgba(127, 223, 255, 0.62);
@@ -23102,13 +23105,6 @@ input::placeholder {
 }
 
 @media (max-width: 900px) {
-  .tutorial-cinematic {
-    top: 10px;
-    right: 10px;
-    bottom: 10px;
-    left: 10px;
-  }
-
   .tutorial-cinematic__image {
     object-position: 66% center;
   }
@@ -23350,13 +23346,13 @@ input::placeholder {
 
 .tutorial-progress {
   display: grid;
-  grid-template-columns: repeat(20, 1fr);
-  gap: 3px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
   margin: 14px 0;
 }
 
 .tutorial-progress i {
-  height: 4px;
+  height: 5px;
   border-radius: 999px;
   background: rgba(127, 223, 255, 0.16);
 }

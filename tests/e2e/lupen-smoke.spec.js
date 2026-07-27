@@ -345,7 +345,8 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#tutorialCinematic")).toBeVisible();
     await expect(page.locator(".tutorial-cinematic__image")).toHaveAttribute("src", /morgan-cinematic-welcome\.png$/);
     await expect(page.locator("#tutorialCinematicTitle")).toHaveText("Welcome to Lupen, First Pilot");
-    await expect(page.locator("#tutorialCinematicText")).toContainText("create your own path through the universe");
+    await expect(page.locator("#tutorialCinematicText")).toContainText("I'm Morgan, your Command Liaison");
+    await expect(page.locator("#tutorialCinematicText")).toContainText("the path is yours");
     await expect(page.locator(".tutorial-cinematic__paths")).toContainText("Trade");
     await expect(page.locator(".tutorial-cinematic__paths")).toContainText("Explore");
     await expect(page.locator(".tutorial-cinematic__paths")).toContainText("Destroy");
@@ -357,6 +358,14 @@ test.describe("Lupen browser smoke", () => {
       const buttonRect = button?.getBoundingClientRect();
       return {
         fitsViewport: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight,
+        matchesGameFrame: (() => {
+          const gameRect = document.getElementById("gameScreen")?.getBoundingClientRect();
+          return Boolean(gameRect) &&
+            Math.abs(rect.left - gameRect.left) < 1 &&
+            Math.abs(rect.top - gameRect.top) < 1 &&
+            Math.abs(rect.width - gameRect.width) < 1 &&
+            Math.abs(rect.height - gameRect.height) < 1;
+        })(),
         imageLoaded: Boolean(image?.complete && image.naturalWidth > 0),
         buttonFits: Boolean(buttonRect) &&
           buttonRect.left >= rect.left &&
@@ -365,8 +374,25 @@ test.describe("Lupen browser smoke", () => {
           buttonRect.bottom <= rect.bottom
       };
     });
-    expect(cinematicLayout).toEqual({ fitsViewport: true, imageLoaded: true, buttonFits: true });
+    expect(cinematicLayout).toEqual({ fitsViewport: true, matchesGameFrame: true, imageLoaded: true, buttonFits: true });
     await page.screenshot({ path: "artifacts/morgan-cinematic-welcome-1366x768.png", fullPage: false });
+
+    await page.setViewportSize({ width: 1230, height: 862 });
+    const tallViewportLayout = await page.locator("#tutorialCinematic").evaluate(stage => {
+      const rect = stage.getBoundingClientRect();
+      const gameRect = document.getElementById("gameScreen")?.getBoundingClientRect();
+      return {
+        height: Math.round(rect.height),
+        centered: Math.abs(rect.top - ((innerHeight - rect.height) / 2)) < 1,
+        matchesGameFrame: Boolean(gameRect) &&
+          Math.abs(rect.left - gameRect.left) < 1 &&
+          Math.abs(rect.top - gameRect.top) < 1 &&
+          Math.abs(rect.width - gameRect.width) < 1 &&
+          Math.abs(rect.height - gameRect.height) < 1
+      };
+    });
+    expect(tallViewportLayout).toEqual({ height: 700, centered: true, matchesGameFrame: true });
+    await page.screenshot({ path: "artifacts/morgan-cinematic-welcome-1230x862.png", fullPage: false });
 
     const initialState = await page.evaluate(() => JSON.parse(localStorage.getItem("lupenStarterPilotTutorial")));
     expect(initialState).toMatchObject({
@@ -382,13 +408,9 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#tutorialStepLabel")).toContainText("Morgan / Academy Orientation");
     await expect(page.locator(".tutorial-morgan-portrait")).toBeVisible();
     await expect(page.locator(".tutorial-morgan-portrait")).toHaveAttribute("src", /morgan-command-liaison\.png$/);
-    await expect(page.locator("#tutorialTitle")).toHaveText("I'm Morgan, your Command Liaison");
-    await expect(page.locator("#tutorialText")).toContainText("help you find your feet");
-    await page.screenshot({ path: "artifacts/morgan-academy-orientation-1366x768.png", fullPage: false });
-
-    await page.locator("#tutorialNextBtn").click();
     await expect(page.locator("#tutorialTitle")).toHaveText("Your first flight plan");
     await expect(page.locator("#tutorialText")).toContainText("trade for credits");
+    await page.screenshot({ path: "artifacts/morgan-academy-orientation-1366x768.png", fullPage: false });
     await page.locator("#tutorialNextBtn").click();
     await expect(page.locator("#tutorialTitle")).toHaveText("Your first Academy assignments");
     await expect(page.locator("#tutorialText")).toContainText("claim a bounty");
@@ -5723,25 +5745,37 @@ test.describe("Lupen browser smoke", () => {
           target: step.target,
           event: step.event,
           speaker: step.speaker || "",
-          voiceCue: step.voiceCue || ""
+          voiceCue: step.voiceCue || "",
+          autoSkip: Boolean(step.autoSkip)
         }));
+        const firstTitle = document.getElementById("tutorialTitle")?.textContent || "";
+        const firstLabel = document.getElementById("tutorialStepLabel")?.textContent || "";
+        tutorialState.stepIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "welcome-new-pilot");
+        tutorialState.active = true;
+        renderStarterTutorial();
         return {
           hasActiveShip: hasActiveShip(),
           ownedShips: ownedShips.slice(),
           currentShipId,
-          firstTitle: document.getElementById("tutorialTitle")?.textContent || "",
-          label: document.getElementById("tutorialStepLabel")?.textContent || "",
+          firstTitle,
+          label: firstLabel,
           academyMilestones: TUTORIAL_ACADEMY_MILESTONES.map(milestone => ({
             missionId: milestone.missionId,
             shortLabel: milestone.shortLabel,
             stepIds: [...milestone.stepIds]
           })),
           portraitSamples: {
-            command: getTutorialMorganPortrait(STARTER_TUTORIAL_STEPS.find(step => step.id === "welcome-new-pilot")),
+            command: getTutorialMorganPortrait(STARTER_TUTORIAL_STEPS.find(step => step.id === "cinematic-welcome")),
             trade: getTutorialMorganPortrait(STARTER_TUTORIAL_STEPS.find(step => step.id === "open-trade")),
             tactical: getTutorialMorganPortrait(STARTER_TUTORIAL_STEPS.find(step => step.id === "open-bounty")),
             journey: getTutorialMorganPortrait(STARTER_TUTORIAL_STEPS.find(step => step.id === "open-forge"))
           },
+          legacyIntroResumeStep: getCurrentTutorialStep()?.id || "",
+          progressSegmentCount: document.querySelectorAll("#tutorialProgress i").length,
+          progressLabel: document.getElementById("tutorialProgress")?.getAttribute("aria-label") || "",
+          logoutAllowed: isTutorialClickAllowed({
+            target: document.querySelector(".hub-logout-button")
+          }),
           steps
         };
       })()
@@ -5769,17 +5803,21 @@ test.describe("Lupen browser smoke", () => {
       tactical: "assets/morgan-tactical-liaison.png",
       journey: "assets/morgan-journey-guide.png"
     });
+    expect(tutorial.legacyIntroResumeStep).toBe("welcome-core-loop");
+    expect(tutorial.progressSegmentCount).toBe(8);
+    expect(tutorial.progressLabel).toContain("Briefing, phase 1 of 8");
+    expect(tutorial.logoutAllowed).toBe(true);
 
     const stepById = Object.fromEntries(tutorial.steps.map(step => [step.id, step]));
     expect(stepById["cinematic-welcome"]).toMatchObject({
       title: "Welcome to Lupen, {pilot}",
       target: "#tutorialCinematicContinue"
     });
-    expect(stepById["cinematic-welcome"].text).toContain("create your own path through the universe");
+    expect(stepById["cinematic-welcome"].text).toContain("I'm Morgan, your Command Liaison");
+    expect(stepById["cinematic-welcome"].text).toContain("the path is yours");
     expect(stepById["welcome-new-pilot"]).toMatchObject({
-      title: "I'm Morgan, your Command Liaison",
-      speaker: "Morgan",
-      target: "#tutorialNextBtn"
+      title: "Academy link established",
+      autoSkip: true
     });
     expect(stepById["welcome-core-loop"].text).toContain("trade for credits");
     expect(stepById["welcome-academy"].text).toContain("Academy assignments");
