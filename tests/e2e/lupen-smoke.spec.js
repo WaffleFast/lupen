@@ -3602,6 +3602,10 @@ test.describe("Lupen browser smoke", () => {
           xpBar: rectFor("#hudProgressStrip .xp-bar"),
           cargo: rectFor("#hudCargoSummary"),
           cargoRow: rectFor(".ship-hud-cargo-row"),
+          cargoLabel: rectFor("#hudCargoSummary .hud-cargo-copy > span"),
+          cargoAmount: rectFor("#hudCargoCapacityText"),
+          cargoMeter: rectFor("#hudCargoSummary .hud-cargo-meter"),
+          cargoPercentCount: document.querySelectorAll("#hudCargoPercentText").length,
           engage: rectFor("#objectEngageBtn"),
           actionRow: rectFor(".ship-hud-action-row"),
           panel: rectFor(".ship-display-panel-action"),
@@ -3632,6 +3636,9 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.xpRow).not.toBeNull();
     expect(centerHud.xpBar).not.toBeNull();
     expect(centerHud.cargo).not.toBeNull();
+    expect(centerHud.cargoLabel).not.toBeNull();
+    expect(centerHud.cargoAmount).not.toBeNull();
+    expect(centerHud.cargoMeter).not.toBeNull();
     expect(centerHud.engage).not.toBeNull();
     expect(centerHud.actionText).toBe("ENGAGE");
     expect(centerHud.actionDisabled).toBe(true);
@@ -3654,6 +3661,8 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.cargoRow.right).toBeLessThanOrEqual(centerHud.infoColumn.right);
     expect(centerHud.cargoRow.bottom).toBeLessThanOrEqual(centerHud.infoColumn.bottom + 2);
     expect(centerHud.cargo.left).toBeGreaterThanOrEqual(centerHud.shipBay.right);
+    expect(centerHud.cargoMeter.right).toBeLessThanOrEqual(centerHud.cargo.right);
+    expect(centerHud.cargoPercentCount).toBe(0);
     expect(centerHud.actionRow.top).toBeGreaterThanOrEqual(Math.max(centerHud.shipBay.bottom, centerHud.infoColumn.bottom) + 4);
     expect(centerHud.actionRow.left).toBeLessThanOrEqual(centerHud.shipBay.left + 2);
     expect(centerHud.actionRow.right).toBeGreaterThanOrEqual(centerHud.infoColumn.right - 2);
@@ -3691,6 +3700,38 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#inventoryDrawer")).not.toHaveClass(/active/);
     await expect(cargoControl).toHaveAttribute("aria-expanded", "false");
     await expect(cargoControl).toBeFocused();
+
+    await page.setViewportSize({ width: 1230, height: 734 });
+    await page.evaluate(() => {
+      cargo.Iron = getShipStats().cargo;
+      updateSpaceHUD();
+    });
+    const compactCargoLayout = await page.evaluate(() => {
+      const rect = selector => {
+        const bounds = document.querySelector(selector).getBoundingClientRect();
+        return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
+      };
+      return {
+        label: rect("#hudCargoSummary .hud-cargo-copy > span"),
+        amount: rect("#hudCargoCapacityText"),
+        meter: rect("#hudCargoSummary .hud-cargo-meter"),
+        badge: rect("#hudCargoFullBadge"),
+        text: document.getElementById("hudCargoSummary").innerText
+      };
+    });
+    expect(compactCargoLayout.amount.top).toBeGreaterThanOrEqual(compactCargoLayout.label.bottom);
+    expect(compactCargoLayout.meter.top).toBeGreaterThanOrEqual(compactCargoLayout.amount.bottom);
+    expect(compactCargoLayout.amount.right).toBeLessThanOrEqual(compactCargoLayout.badge.left);
+    expect(compactCargoLayout.text.toUpperCase()).toContain("CARGO HOLD");
+    expect(compactCargoLayout.text).toContain("150 / 150");
+    expect(compactCargoLayout.text).toContain("FULL");
+    await page.locator("#spaceScreen").screenshot({ path: "artifacts/tutorial-cargo-hud-1230x734.png" });
+    await page.evaluate(() => {
+      cargo.Iron = 0;
+      updateSpaceHUD();
+    });
+    await page.setViewportSize({ width: 1366, height: 768 });
+
     await cargoControl.click();
     await page.keyboard.press("Escape");
     await expect(page.locator("#inventoryDrawer")).not.toHaveClass(/active/);
@@ -8593,6 +8634,96 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("tutorial loadout waits for a fresh staging result and shows equip progress", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        ownedShips = ["falcon"];
+        ownedGuns.pulseLaser = 2;
+        ownedAttachments.cargoPod = 1;
+        shipLoadouts.falcon = { attachments: [], guns: [] };
+        window.history.replaceState({}, "", "/?mp=staging");
+
+        const staleReceivedAt = Date.now() - 5000;
+        const stagingStatus = {
+          enabled: true,
+          isConnected: true,
+          lastStagingLoadoutEquip: {
+            ok: false,
+            applied: false,
+            operation: "equip",
+            itemId: "gun:pulseLaser",
+            name: "Pulse Laser",
+            blockReason: "stale_result",
+            receivedAt: staleReceivedAt
+          },
+          lastStagingStoreItems: { items: [] }
+        };
+        window.__tutorialEquipPayload = null;
+        window.LupenMultiplayerClient = {
+          getStatus: () => stagingStatus,
+          equipStagingLoadoutItem: payload => {
+            window.__tutorialEquipPayload = { ...payload };
+            setTimeout(() => {
+              stagingStatus.lastStagingLoadoutEquip = {
+                ok: true,
+                applied: true,
+                operation: "equip",
+                itemId: payload.itemId,
+                name: "Pulse Laser",
+                ownedBefore: 2,
+                ownedAfter: 1,
+                equippedBefore: 0,
+                equippedAfter: 1,
+                receivedAt: Date.now()
+              };
+            }, 350);
+            return true;
+          }
+        };
+        window.loadGameFromSupabase = async () => {
+          ownedGuns.pulseLaser = 1;
+          shipLoadouts.falcon.guns = [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)];
+          applyShipStats(true);
+          return { loaded: true };
+        };
+
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("overview");
+        tutorialState.active = true;
+        tutorialState.completed = false;
+        setTutorialStepById("equip-item");
+        renderStarterTutorial();
+      })()
+    `));
+
+    await expect(page.locator("#loadoutSelectedSlotBar")).toContainText("Auto Equip");
+    const pulseLaser = page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']");
+    await expect(pulseLaser).toHaveCount(1);
+    await pulseLaser.getByRole("button", { name: "Equip", exact: true }).click();
+
+    await expect(pulseLaser.getByRole("button", { name: "Equipping...", exact: true })).toBeDisabled();
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Equipping Pulse Laser");
+    await expect.poll(async () => page.evaluate(() => window.__tutorialEquipPayload)).toMatchObject({
+      itemId: "gun:pulseLaser",
+      slotIndex: 0
+    });
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toContainText("Pulse Laser");
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "equip-second-item");
+    await expect(page.locator("#tutorialTitle")).toContainText("Equip second weapon");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging equips a selected forged attachment and refreshes the loadout", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -8638,7 +8769,8 @@ test.describe("Lupen browser smoke", () => {
               inventoryItemId: payload.inventoryItemId,
               inventoryWritten: true,
               equippedBefore: 0,
-              equippedAfter: 1
+              equippedAfter: 1,
+              receivedAt: Date.now()
             };
             return true;
           },
@@ -8654,7 +8786,8 @@ test.describe("Lupen browser smoke", () => {
               level: payload.level,
               inventoryWritten: true,
               equippedBefore: 1,
-              equippedAfter: 0
+              equippedAfter: 0,
+              receivedAt: Date.now()
             };
             return true;
           }

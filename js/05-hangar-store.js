@@ -118,7 +118,7 @@ function setupMultiplayerStagingStoreSubscription() {
   multiplayerStagingStoreSubscribed = Boolean(subscription?.unsubscribe);
 }
 
-function waitForMultiplayerStagingResult(getResult, predicate, timeoutMs = 2200) {
+function waitForMultiplayerStagingResult(getResult, predicate, timeoutMs = 12000) {
   const startedAt = Date.now();
   return new Promise(resolve => {
     const check = () => {
@@ -588,11 +588,14 @@ async function requestStagingLoadoutEquip(item) {
     return true;
   }
   if (multiplayerStagingLoadoutEquipPendingItemId) return true;
+  const previousResultAt = Number(status.lastStagingLoadoutEquip?.receivedAt || 0);
   multiplayerStagingLoadoutEquipPendingItemId = itemId;
   if (itemId === "attachment:cargoPod") multiplayerStagingCargoPodEquipPending = true;
   if (itemId === "attachment:shieldBooster") multiplayerStagingShieldBoosterEquipPending = true;
   if (itemId === "gun:pulseLaser") multiplayerStagingPulseLaserEquipPending = true;
-  renderStore();
+  selectedLoadoutStatusMessage = `Equipping ${item.name || "item"}...`;
+  if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
+  else renderStore();
   client.equipStagingLoadoutItem({
     itemId,
     inventorySource: item.inventorySource || item.source || "owned",
@@ -605,7 +608,9 @@ async function requestStagingLoadoutEquip(item) {
   (async () => {
     const latest = await waitForMultiplayerStagingResult(
       () => client.getStatus?.().lastStagingLoadoutEquip,
-      result => result?.itemId === itemId && result?.operation !== "unequip"
+      result => result?.itemId === itemId &&
+        result?.operation !== "unequip" &&
+        Number(result?.receivedAt || 0) > previousResultAt
     );
     multiplayerStagingLoadoutEquipPendingItemId = "";
     multiplayerStagingCargoPodEquipPending = false;
@@ -618,6 +623,7 @@ async function requestStagingLoadoutEquip(item) {
           ? ` Shield ${formatNumber(latest.shieldBefore)} -> ${formatNumber(latest.shieldAfter)}.`
           : "";
       const message = `${latest.name || item.name || "Item"} equipped.${statChange}`;
+      selectedLoadoutStatusMessage = message;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
       reconcileMissionProgressAfterStagingLoadoutResult(latest);
@@ -633,10 +639,21 @@ async function requestStagingLoadoutEquip(item) {
           if (typeof addHudToast === "function") addHudToast("Item equipped. Reload if loadout values look stale.");
         }
       }
+      tutorialEvent(itemId.startsWith("gun:") ? "equippedItem" : "equippedAttachment");
     } else if (latest?.itemId === itemId) {
       const reason = latest.userReason || latest.blockReason || latest.reason || "loadout unavailable";
-      if (typeof addHudToast === "function") addHudToast(`Equip blocked: ${reason}`);
+      selectedLoadoutStatusMessage = itemId === "gun:pulseLaser"
+        ? getStagingPulseLaserEquipLine(latest)
+        : itemId === "attachment:cargoPod"
+          ? getStagingCargoPodEquipLine(latest)
+          : itemId === "attachment:shieldBooster"
+            ? getStagingShieldBoosterEquipLine(latest)
+            : `${latest.name || item.name || "Item"} could not be equipped.`;
+      if (typeof addHudToast === "function") addHudToast(selectedLoadoutStatusMessage);
       if (typeof addActivityLog === "function") addActivityLog(`Equipment change blocked: ${reason}`);
+    } else {
+      selectedLoadoutStatusMessage = "Equip request timed out. Please try again.";
+      if (typeof addHudToast === "function") addHudToast(selectedLoadoutStatusMessage);
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
@@ -1826,6 +1843,7 @@ function renderLoadoutItemDetail() {
       <div class="loadout-selected-empty">
         <strong>Empty ${escapeHtml(slotLabel)}</strong>
         <span>Choose an item from your Vault below.</span>
+        ${selectedLoadoutStatusMessage ? `<small class="loadout-detail-inline-status">${escapeHtml(selectedLoadoutStatusMessage)}</small>` : ""}
       </div>
     `;
     updateLoadoutVaultChrome();
@@ -3172,6 +3190,14 @@ function equipLoadoutVaultEntry(entry) {
 
   if (isMultiplayerStagingStoreActive()) {
     if (getStagingStoreItemId({ kind: categoryKey === "guns" ? "gun" : "attachment", key: entry.key })) {
+      selectedLoadoutItemContext = {
+        source: "slot",
+        categoryKey,
+        index,
+        key: "",
+        quality: "standard",
+        level: 1
+      };
       requestStagingLoadoutEquip({
         kind: categoryKey === "guns" ? "gun" : "attachment",
         key: entry.key,
@@ -3286,6 +3312,11 @@ function renderGunInventory() {
     const compatible = selectedCategory === entry.categoryKey || !["guns", "attachments"].includes(selectedCategory);
     const unlock = getEquipmentUnlockStatus(entry.categoryKey, entry.key);
     const selectedSlotOccupied = isSelectedLoadoutSlotOccupied(entry.categoryKey);
+    const stagingItemId = getStagingStoreItemId({
+      kind: entry.categoryKey === "guns" ? "gun" : "attachment",
+      key: entry.key
+    });
+    const equipPending = Boolean(stagingItemId && multiplayerStagingLoadoutEquipPendingItemId === stagingItemId);
     const level = Math.max(1, Number(entry.level || 1));
     const tier = getHangarEquipmentTier(level);
     const btn = document.createElement("article");
@@ -3333,8 +3364,8 @@ function renderGunInventory() {
           : getAttachmentPurchaseStatRows({ key: entry.key }, entry.quality)
         ).slice(0, 3).map(row => `<span><small>${escapeHtml(row.label)}</small><strong>${escapeHtml(row.value)}</strong></span>`).join("")}
       </span>
-      <button type="button" class="loadout-vault-equip-action" ${entry.count <= 0 || !compatible || unlock.locked || selectedSlotOccupied ? "disabled" : ""}>
-        ${selectedSlotOccupied ? "Unequip First" : "Equip"}
+      <button type="button" class="loadout-vault-equip-action" ${entry.count <= 0 || !compatible || unlock.locked || selectedSlotOccupied || equipPending ? "disabled" : ""}>
+        ${equipPending ? "Equipping..." : selectedSlotOccupied ? "Unequip First" : "Equip"}
       </button>
     `;
 

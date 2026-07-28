@@ -52728,16 +52728,16 @@ input::placeholder {
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-copy {
   display: grid !important;
-  grid-template-columns: auto 1fr !important;
-  grid-template-rows: 12px 8px !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: 9px 12px 3px !important;
   align-items: center !important;
-  column-gap: 7px !important;
+  column-gap: 0 !important;
+  row-gap: 2px !important;
   min-width: 0 !important;
 }
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span,
-.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong,
-.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > small {
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong {
   position: static !important;
   grid-column: auto !important;
   grid-row: auto !important;
@@ -52748,27 +52748,26 @@ input::placeholder {
 }
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
   color: #35d9ff !important;
   font-size: 9px !important;
   letter-spacing: 0.1em !important;
-}
-
-.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong {
-  color: #f4fbff !important;
-  font-size: 12px !important;
-  justify-self: end !important;
   white-space: nowrap !important;
 }
 
-.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > small {
-  grid-column: 1 / -1 !important;
-  color: rgba(188, 219, 235, 0.7) !important;
-  font-size: 7px !important;
-  letter-spacing: 0.04em !important;
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  color: #f4fbff !important;
+  font-size: 12px !important;
+  justify-self: start !important;
+  white-space: nowrap !important;
 }
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-meter {
   grid-column: 1 / -1 !important;
+  grid-row: 3 !important;
   height: 3px !important;
   overflow: hidden !important;
   border-radius: 999px !important;

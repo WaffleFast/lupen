@@ -160,16 +160,16 @@
 
   .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-copy {
     display: grid !important;
-    grid-template-columns: auto 1fr !important;
-    grid-template-rows: 12px 8px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 9px 12px 3px !important;
     align-items: center !important;
-    column-gap: 7px !important;
+    column-gap: 0 !important;
+    row-gap: 2px !important;
     min-width: 0 !important;
   }
 
   .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-copy > span,
-  .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-copy > strong,
-  .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-copy > small {
+  .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-copy > strong {
     position: static !important;
     min-width: 0 !important;
     margin: 0 !important;
@@ -181,24 +181,20 @@
     grid-column: 1 !important;
     grid-row: 1 !important;
     font-size: 9px !important;
+    white-space: nowrap !important;
   }
 
   .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-copy > strong {
-    grid-column: 2 !important;
-    grid-row: 1 !important;
-    justify-self: end !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
     font-size: 12px !important;
     white-space: nowrap !important;
   }
 
-  .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-copy > small {
-    grid-column: 1 / -1 !important;
-    grid-row: 2 !important;
-    font-size: 7px !important;
-  }
-
   .player-orbit-screen .player-bottom-hud .ship-hud-info-column .hud-cargo-meter {
     grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
     height: 3px !important;
   }
 
