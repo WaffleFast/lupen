@@ -8724,6 +8724,86 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("tutorial loadout recovers locally when the staging service blocks an otherwise valid equip", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        ownedShips = ["falcon"];
+        ownedGuns.pulseLaser = 2;
+        ownedAttachments.cargoPod = 1;
+        shipLoadouts.falcon = { attachments: [], guns: [] };
+        window.history.replaceState({}, "", "/?mp=staging");
+
+        const stagingStatus = {
+          enabled: true,
+          isConnected: true,
+          lastStagingLoadoutEquip: null,
+          lastStagingStoreItems: { items: [] }
+        };
+        window.LupenMultiplayerClient = {
+          getStatus: () => stagingStatus,
+          equipStagingLoadoutItem: payload => {
+            setTimeout(() => {
+              stagingStatus.lastStagingLoadoutEquip = {
+                ok: false,
+                applied: false,
+                mode: "blocked",
+                operation: "equip",
+                itemId: payload.itemId,
+                name: "Pulse Laser",
+                blockReason: "current_ship_loadout_missing_or_invalid",
+                userReason: "Current ship loadout path is missing or invalid.",
+                receivedAt: Date.now()
+              };
+            }, 150);
+            return true;
+          }
+        };
+
+        showScreen("gameScreen");
+        openHangar();
+        showHangarSection("overview");
+        tutorialState.active = true;
+        tutorialState.completed = false;
+        setTutorialStepById("equip-item");
+        renderStarterTutorial();
+      })()
+    `));
+
+    const pulseLaser = page.locator("#gunInventory .hangar-equipment-card[data-item-key='pulseLaser']");
+    await pulseLaser.getByRole("button", { name: "Equip", exact: true }).click();
+
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(1);
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toContainText("Pulse Laser");
+    await expect.poll(async () => page.evaluate(() => window.eval("ownedGuns.pulseLaser"))).toBe(1);
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "equip-second-item");
+    await expect(page.locator("#tutorialTitle")).toContainText("Equip second weapon");
+    await expect(page.locator("#loadoutItemDetailPanel")).toContainText("Pulse Laser equipped");
+
+    await pulseLaser.getByRole("button", { name: "Equip", exact: true }).click();
+    await expect(page.locator("#installedGuns .loadout-grid-slot.filled")).toHaveCount(2);
+    await expect.poll(async () => page.evaluate(() => window.eval("ownedGuns.pulseLaser"))).toBe(0);
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-attachment-loadout");
+
+    await page.locator("#loadoutCategoryAttachments").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "equip-attachment");
+    const cargoPod = page.locator("#gunInventory .hangar-equipment-card[data-item-key='cargoPod']");
+    await cargoPod.getByRole("button", { name: "Equip", exact: true }).click();
+    await expect(page.locator("#installedAttachments .loadout-grid-slot.filled")).toHaveCount(1);
+    await expect.poll(async () => page.evaluate(() => window.eval("ownedAttachments.cargoPod"))).toBe(0);
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-after-equip");
+    await expect(page.locator("#tutorialTitle")).toContainText("Return to station");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer staging equips a selected forged attachment and refreshes the loadout", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

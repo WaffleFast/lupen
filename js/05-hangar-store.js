@@ -338,6 +338,77 @@ function reconcileMissionProgressAfterStagingLoadoutResult(result) {
   return reconcileMissionProgressFromGameplayState(options);
 }
 
+function isTutorialLoadoutEquipStepActive() {
+  if (!tutorialState?.active || tutorialState?.completed) return false;
+  const stepId = typeof getCurrentTutorialStep === "function"
+    ? String(getCurrentTutorialStep()?.id || "")
+    : "";
+  return ["equip-item", "equip-second-item", "equip-attachment"].includes(stepId);
+}
+
+function recoverTutorialLoadoutEquipLocally(item, result = null) {
+  if (!isTutorialLoadoutEquipStepActive() || result?.applied) return false;
+
+  const itemId = getStagingStoreItemId(item);
+  const categoryKey = itemId?.startsWith("gun:")
+    ? "guns"
+    : itemId?.startsWith("attachment:")
+      ? "attachments"
+      : "";
+  const key = String(item?.key || itemId?.split(":")[1] || "");
+  if (!categoryKey || !key) return false;
+
+  const shipId = String(selectedHangarShipId || currentShipId || "");
+  if (!shipId || shipId !== currentShipId) return false;
+  const limit = categoryKey === "guns" ? getGunSlotLimit(shipId) : getAttachmentSlotLimit(shipId);
+  const loadout = getShipLoadout(shipId);
+  const list = categoryKey === "guns" ? loadout.guns : loadout.attachments;
+  const requestedIndex = Number(item?.slotIndex);
+  let index = Number.isInteger(requestedIndex) &&
+    requestedIndex >= 0 &&
+    requestedIndex < limit &&
+    !getEquipmentKey(list[requestedIndex])
+    ? requestedIndex
+    : Array.from({ length: limit }, (_unused, slotIndex) => slotIndex)
+      .find(slotIndex => !getEquipmentKey(list[slotIndex]));
+  if (!Number.isInteger(index) || index < 0 || index >= limit) return false;
+
+  const entry = {
+    categoryKey,
+    key,
+    name: item?.name || (categoryKey === "guns" ? GUNS[key]?.name : attachments[key]?.name) || "Equipment",
+    source: item?.inventorySource || item?.source || "owned",
+    inventoryId: item?.inventoryItemId || item?.inventoryId || "",
+    quality: item?.quality || "standard",
+    level: Math.max(1, Number(item?.level || 1)),
+    storedCount: categoryKey === "guns"
+      ? Math.max(0, Number(ownedGuns?.[key] || 0))
+      : Math.max(0, Number(ownedAttachments?.[key] || 0))
+  };
+  const equippedEntry = consumeLoadoutVaultEntry(entry);
+  if (!equippedEntry) return false;
+
+  list[index] = equippedEntry;
+  selectedLoadoutSlotExplicitlyChosen = false;
+  selectedLoadoutItemContext = {
+    source: "equipped",
+    categoryKey,
+    index,
+    key,
+    quality: entry.quality,
+    level: entry.level
+  };
+  selectedLoadoutStatusMessage = `${entry.name} equipped.`;
+  applyShipStats(true);
+  tutorialEvent(categoryKey === "guns" ? "equippedItem" : "equippedAttachment");
+  saveGame();
+  if (typeof addHudToast === "function") addHudToast(selectedLoadoutStatusMessage);
+  if (typeof addActivityLog === "function") {
+    addActivityLog(`${selectedLoadoutStatusMessage} Tutorial save synchronized.`);
+  }
+  return true;
+}
+
 function getStagingCargoPodEquipLine(result) {
   if (!result) return "";
   if (result.applied) return "Cargo Pod equipped.";
@@ -640,6 +711,10 @@ async function requestStagingLoadoutEquip(item) {
         }
       }
       tutorialEvent(itemId.startsWith("gun:") ? "equippedItem" : "equippedAttachment");
+    } else if (latest?.itemId === itemId && recoverTutorialLoadoutEquipLocally(item, latest)) {
+      // The Academy must remain playable if the staging write gate rejects an
+      // otherwise valid tutorial fit. The player's own save is synchronized
+      // by the narrow recovery path above.
     } else if (latest?.itemId === itemId) {
       const reason = latest.userReason || latest.blockReason || latest.reason || "loadout unavailable";
       selectedLoadoutStatusMessage = itemId === "gun:pulseLaser"
