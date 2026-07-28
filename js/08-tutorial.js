@@ -1026,9 +1026,32 @@ function getTutorialStateCompletionReason(step) {
     case "return-to-planet-after-bounty":
     case "land-after-bounty":
       return isTutorialBountyReadyToClaim() ? "bounty_ready_to_claim" : "";
-    case "claim-bounty":
-    case "continue-after-bounty-reward":
-      return !activeObjective && Number(playerProgress?.totals?.bountiesClaimed || 0) > 0 ? "bounty_already_claimed" : "";
+    case "claim-bounty": {
+      const stagingClaim = typeof getMultiplayerStagingBountyStatus === "function"
+        ? getMultiplayerStagingBountyStatus()?.lastStagingBountyClaimResult
+        : null;
+      const tutorialStartedAt = Date.parse(tutorialState?.lastStartedAt || "") || 0;
+      const stagingClaimReceivedAt = Number(stagingClaim?.receivedAt || 0);
+      const stagingClaimIsCurrent = Boolean(stagingClaim) &&
+        (!stagingClaimReceivedAt || !tutorialStartedAt || stagingClaimReceivedAt >= tutorialStartedAt);
+      const bountyClaimed = !activeObjective && Number(playerProgress?.totals?.bountiesClaimed || 0) > 0 ||
+        stagingClaimIsCurrent && Boolean(stagingClaim?.applied || stagingClaim?.playerSavePatchResult?.applied || stagingClaim?.playerSave?.written || stagingClaim?.bounty?.claimed);
+      return bountyClaimed ? "bounty_already_claimed" : "";
+    }
+    case "continue-after-bounty-reward": {
+      const rewardOverlayPending = document.getElementById("bountyRewardOverlay")?.dataset?.rewardPending === "true";
+      if (rewardOverlayPending) return "";
+      const stagingClaim = typeof getMultiplayerStagingBountyStatus === "function"
+        ? getMultiplayerStagingBountyStatus()?.lastStagingBountyClaimResult
+        : null;
+      const tutorialStartedAt = Date.parse(tutorialState?.lastStartedAt || "") || 0;
+      const stagingClaimReceivedAt = Number(stagingClaim?.receivedAt || 0);
+      const stagingClaimIsCurrent = Boolean(stagingClaim) &&
+        (!stagingClaimReceivedAt || !tutorialStartedAt || stagingClaimReceivedAt >= tutorialStartedAt);
+      const bountyClaimed = !activeObjective && Number(playerProgress?.totals?.bountiesClaimed || 0) > 0 ||
+        stagingClaimIsCurrent && Boolean(stagingClaim?.applied || stagingClaim?.playerSavePatchResult?.applied || stagingClaim?.playerSave?.written || stagingClaim?.bounty?.claimed);
+      return bountyClaimed ? "reward_overlay_already_closed" : "";
+    }
     case "forge-upgrade-weapon":
       return isTutorialForgeComplete() ? "pulse_laser_already_upgraded" : "";
     case "repair-ship":

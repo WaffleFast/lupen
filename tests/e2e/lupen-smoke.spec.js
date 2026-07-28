@@ -8146,6 +8146,185 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("multiplayer bounty confirmations advance the tutorial and show the claimed reward", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        const bounty = {
+          id: "staging_erebus_patrol_2",
+          title: "Erebus Patrol Sweep",
+          description: "Destroy 4 Erebus bots.",
+          contractType: "Kill Contract",
+          targetBotType: "any",
+          targetBotLabel: "Any Erebus",
+          difficulty: "Easy",
+          requiredKills: 4,
+          progress: 0,
+          creditsReward: 900,
+          lupenShardsReward: 25,
+          accepted: false,
+          completed: false,
+          claimAvailable: false,
+          claimed: false,
+          failed: false
+        };
+        const status = {
+          enabled: true,
+          isConnected: true,
+          lastStagingBountyStatus: { ok: true, reason: "available", active: null, receivedAt: Date.now() },
+          lastStagingBountyClaimResult: null,
+          lastStagingBountyList: { active: null, bounties: [bounty], receivedAt: Date.now() }
+        };
+        const publish = () => window.__tutorialBountyStateListener?.();
+        window.__tutorialBounty = bounty;
+        window.__tutorialBountyStatus = status;
+        window.LupenMultiplayerClient = {
+          ...(window.LupenMultiplayerClient || {}),
+          getStatus: () => status,
+          requestStagingBounties: () => true,
+          requestStagingBountyStatus: () => true,
+          onServerState: (listener) => {
+            window.__tutorialBountyStateListener = listener;
+            return { unsubscribe() {} };
+          },
+          acceptStagingBounty: ({ bountyId }) => {
+            bounty.accepted = true;
+            bounty.acceptedAt = Date.now();
+            status.lastStagingBountyStatus = {
+              ok: true,
+              reason: "accepted",
+              active: { ...bounty },
+              receivedAt: Date.now()
+            };
+            status.lastStagingBountyList = {
+              active: { ...bounty },
+              bounties: [{ ...bounty }],
+              receivedAt: Date.now()
+            };
+            publish();
+            return true;
+          },
+          claimStagingBounty: ({ bountyId }) => {
+            bounty.progress = bounty.requiredKills;
+            bounty.accepted = false;
+            bounty.completed = true;
+            bounty.claimAvailable = false;
+            bounty.claimed = true;
+            const receivedAt = Date.now();
+            status.lastStagingBountyClaimResult = {
+              ok: true,
+              applied: true,
+              reason: "claimed",
+              bounty: { ...bounty },
+              creditsDelta: 900,
+              lupenShardDelta: 25,
+              creditsAfter: 10900,
+              lupenShardsAfter: 25,
+              receivedAt
+            };
+            status.lastStagingBountyStatus = {
+              ok: true,
+              reason: "claimed",
+              active: { ...bounty },
+              receivedAt
+            };
+            status.lastStagingBountyList = {
+              active: { ...bounty },
+              bounties: [{ ...bounty }],
+              receivedAt
+            };
+            publish();
+            return true;
+          }
+        };
+        multiplayerStagingBountySubscribed = false;
+        multiplayerStagingBountyPending = null;
+        multiplayerStagingBountyLastHandledAt = 0;
+        multiplayerStagingBountyLastTutorialAcceptKey = "";
+        multiplayerStagingBountyLastTutorialClaimKey = "";
+        tutorialState = {
+          active: true,
+          completed: false,
+          stepIndex: STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "accept-bounty"),
+          lastStartedAt: new Date().toISOString()
+        };
+        saveTutorialState();
+        showScreen("gameScreen");
+        openBountyBoard();
+        renderStarterTutorial();
+      })()
+    `));
+
+    const acceptButton = page.locator("#bountyDetailPanel .accept-bounty-button");
+    await expect(acceptButton).toBeVisible();
+    await expect(acceptButton).toHaveClass(/tutorial-highlight-target/);
+    await acceptButton.click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-for-combat-launch");
+    await expect(page.locator("#bountyScreen .screen-back-btn")).toHaveClass(/tutorial-highlight-target/);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        const bounty = window.__tutorialBounty;
+        const status = window.__tutorialBountyStatus;
+        bounty.accepted = true;
+        bounty.completed = true;
+        bounty.claimAvailable = true;
+        bounty.claimed = false;
+        bounty.progress = bounty.requiredKills;
+        status.lastStagingBountyStatus = {
+          ok: true,
+          reason: "completed",
+          active: { ...bounty },
+          receivedAt: Date.now()
+        };
+        status.lastStagingBountyList = {
+          active: { ...bounty },
+          bounties: [{ ...bounty }],
+          receivedAt: Date.now()
+        };
+        setTutorialStepById("claim-bounty");
+        renderBountyBoard();
+        renderStarterTutorial();
+      })()
+    `));
+
+    const claimButton = page.locator("#bountyDetailPanel .bounty-claim-btn");
+    await expect(claimButton).toBeVisible();
+    await expect(claimButton).toHaveClass(/tutorial-highlight-target/);
+    await claimButton.click();
+
+    await expect(page.locator("#bountyRewardOverlay")).toHaveClass(/active/);
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "continue-after-bounty-reward");
+    await expect(page.locator("#bountyRewardOverlay")).toContainText("Bounty Reward Claimed");
+    await expect(page.locator("#bountyRewardOverlay")).toContainText("Erebus Patrol Sweep");
+    await expect(page.locator("#bountyRewardOverlay")).toContainText("CR 900");
+    await expect(page.locator("#bountyRewardOverlay")).toContainText("25 Lupen Shards");
+    await expect(page.locator("#bountyRewardOverlay button")).toHaveClass(/tutorial-highlight-target/);
+    await expect(page.locator("#bountyRewardOverlay")).toHaveClass(/tutorial-reward-active/);
+    await expect(page.locator(".tutorial-card")).toBeVisible();
+    await expect(page.locator(".tutorial-card")).toContainText("Reward claimed");
+    const rewardLayering = await page.evaluate(() => ({
+      reward: Number(getComputedStyle(document.getElementById("bountyRewardOverlay")).zIndex),
+      tutorial: Number(getComputedStyle(document.getElementById("tutorialOverlay")).zIndex)
+    }));
+    expect(rewardLayering.reward).toBeLessThan(rewardLayering.tutorial);
+
+    await page.locator("#bountyRewardOverlay button").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-after-bounty-claim");
+    await expect(page.locator("#bountyScreen .screen-back-btn")).toHaveClass(/tutorial-highlight-target/);
+
+    await page.locator("#bountyScreen .screen-back-btn").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-forge");
+    await expect(page.locator(".hub-actions button[onclick='openUpgradeForge()']")).toHaveClass(/tutorial-highlight-target/);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("staging bot kill fallback awards XP once, refreshes UI, and persists", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

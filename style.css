@@ -11772,6 +11772,10 @@ input::placeholder {
   pointer-events: auto;
 }
 
+.reward-overlay.tutorial-reward-active {
+  z-index: 999;
+}
+
 .reward-modal {
   width: min(460px, calc(100vw - 32px));
   background: rgba(4, 12, 24, 0.96);

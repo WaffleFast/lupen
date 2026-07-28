@@ -27,6 +27,8 @@ let multiplayerStagingBountyPending = null;
 let multiplayerStagingBountySubscribed = false;
 let multiplayerStagingBountyLastRefreshAt = 0;
 let multiplayerStagingBountyLastCompletionBurstKey = "";
+let multiplayerStagingBountyLastTutorialAcceptKey = "";
+let multiplayerStagingBountyLastTutorialClaimKey = "";
 // Mirrors the current Colyseus STAGING_TRADE_WRITE_MAX_QUANTITY gate so the
 // Trade Builder never asks staging to write more than the server will accept.
 const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 1000;
@@ -331,13 +333,64 @@ function isMultiplayerStagingBountyPending(action = "", bountyId = "") {
 
 function reconcileMultiplayerStagingBountyResult() {
   const status = getMultiplayerStagingBountyStatus();
-  const result = status.lastStagingBountyClaimResult || status.lastStagingBountyStatus;
+  const pending = multiplayerStagingBountyPending ? { ...multiplayerStagingBountyPending } : null;
+  const pendingAction = pending?.action || "";
+  const result = pendingAction === "accept"
+    ? status.lastStagingBountyStatus
+    : pendingAction === "claim"
+      ? status.lastStagingBountyClaimResult
+      : status.lastStagingBountyClaimResult || status.lastStagingBountyStatus;
   const receivedAt = Number(result?.receivedAt || 0);
-  if (!receivedAt || multiplayerStagingBountyLastHandledAt >= receivedAt) return;
-  multiplayerStagingBountyLastHandledAt = receivedAt;
-  multiplayerStagingBountyPending = null;
-  const claimLine = getMultiplayerStagingBountyClaimLine();
-  if (claimLine && typeof addActivityLog === "function") addActivityLog(`Bounty contract: ${claimLine}`);
+  if (receivedAt && multiplayerStagingBountyLastHandledAt < receivedAt) {
+    multiplayerStagingBountyLastHandledAt = receivedAt;
+    multiplayerStagingBountyPending = null;
+    const claimLine = getMultiplayerStagingBountyClaimLine();
+    if (claimLine && typeof addActivityLog === "function") addActivityLog(`Bounty contract: ${claimLine}`);
+  }
+
+  if (!tutorialState?.active || typeof getCurrentTutorialStep !== "function") return;
+  const stepId = getCurrentTutorialStep()?.id || "";
+  const active = status.lastStagingBountyStatus?.active || status.lastStagingBountyList?.active;
+
+  if (stepId === "accept-bounty" && active?.accepted && !active?.claimed) {
+    const acceptKey = `${active.id || "staging-bounty"}:${active.acceptedAt || active.receivedAt || status.lastStagingBountyStatus?.receivedAt || "accepted"}`;
+    if (acceptKey !== multiplayerStagingBountyLastTutorialAcceptKey) {
+      multiplayerStagingBountyLastTutorialAcceptKey = acceptKey;
+      tutorialEvent("acceptedBounty");
+    }
+  }
+
+  const claim = status.lastStagingBountyClaimResult;
+  const claimApplied = Boolean(
+    claim?.applied ||
+    claim?.playerSavePatchResult?.applied ||
+    claim?.playerSave?.written ||
+    claim?.bounty?.claimed ||
+    claim?.reason === "staging_bounty_already_claimed"
+  );
+  const claimReceivedAt = Number(claim?.receivedAt || 0);
+  const tutorialStartedAt = Date.parse(tutorialState?.lastStartedAt || "") || 0;
+  const claimBountyId = String(claim?.bounty?.id || claim?.id || "");
+  const claimMatchesPending = pendingAction === "claim" &&
+    (!pending?.bountyId || !claimBountyId || String(pending.bountyId) === claimBountyId) &&
+    (!claimReceivedAt || claimReceivedAt >= Number(pending?.startedAt || 0));
+  const claimBelongsToTutorial = !pending &&
+    (!claimReceivedAt || !tutorialStartedAt || claimReceivedAt >= tutorialStartedAt);
+  if (stepId === "claim-bounty" && claimApplied && (claimMatchesPending || claimBelongsToTutorial)) {
+    const claimKey = `${claim?.bounty?.id || claim?.id || "staging-bounty"}:${claim?.receivedAt || claim?.creditsAfter || claim?.lupenShardsAfter || "claimed"}`;
+    if (claimKey !== multiplayerStagingBountyLastTutorialClaimKey) {
+      multiplayerStagingBountyLastTutorialClaimKey = claimKey;
+      const reward = {
+        credits: Math.max(0, Number(claim?.creditsDelta || claim?.bounty?.creditsReward || 0)),
+        xp: 0,
+        lupenCores: 0,
+        lupenShards: Math.max(0, Number(claim?.lupenShardDelta || claim?.bounty?.lupenShardsReward || 0))
+      };
+      if (typeof playRewardClaimSound === "function") playRewardClaimSound();
+      showBountyRewardOverlay(claim?.bounty?.title || claim?.bounty?.name || "Bounty Contract", reward);
+      tutorialEvent("claimedBountyReward");
+    }
+  }
 }
 
 function setupMultiplayerStagingBountyBoardSubscription() {
@@ -350,6 +403,9 @@ function setupMultiplayerStagingBountyBoardSubscription() {
     if (typeof renderObjectiveHud === "function") renderObjectiveHud();
     if (document.getElementById("bountyScreen")?.classList.contains("active")) {
       renderBountyBoard();
+    }
+    if (tutorialState?.active && typeof renderStarterTutorial === "function") {
+      window.setTimeout(renderStarterTutorial, 0);
     }
   });
 }
@@ -3507,6 +3563,8 @@ function showBountyRewardOverlay(title, reward, bonusDrops = []) {
       <button onclick="closeBountyRewardOverlay()">Continue</button>
     </div>
   `;
+  overlay.dataset.rewardPending = "true";
+  overlay.classList.toggle("tutorial-reward-active", Boolean(tutorialState?.active));
 
   requestAnimationFrame(() => overlay.classList.add("active"));
 }
@@ -3516,6 +3574,8 @@ function closeBountyRewardOverlay() {
   if (overlay) {
     overlay.classList.remove("active");
     overlay.classList.remove("tutorial-intro-active");
+    overlay.classList.remove("tutorial-reward-active");
+    delete overlay.dataset.rewardPending;
   }
   tutorialEvent("closedBountyReward");
 }
