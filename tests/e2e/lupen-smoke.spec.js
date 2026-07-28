@@ -7252,6 +7252,94 @@ test.describe("Lupen browser smoke", () => {
     expect(offlineFallbackAccepted.killsRequired).toBe(2);
     expect(offlineFallbackAccepted.localCombatGuardActive).toBe(false);
 
+    const returnGuidance = await page.evaluate(() => window.eval(`
+      (() => {
+        renderStarterTutorial();
+        const backButton = document.querySelector("#bountyScreen .screen-back-btn");
+        return {
+          step: getCurrentTutorialStep().id,
+          highlighted: backButton?.classList.contains("tutorial-highlight-target") || false,
+          visible: Boolean(backButton?.offsetWidth || backButton?.offsetHeight)
+        };
+      })()
+    `));
+    expect(returnGuidance.step).toBe("return-for-combat-launch");
+    expect(returnGuidance.highlighted).toBe(true);
+    expect(returnGuidance.visible).toBe(true);
+
+    // Reproduce the reported stale-card state: the hub is visible but the
+    // returnedToHub event was missed. Rendering must recover to Launch.
+    await page.evaluate(() => window.eval(`
+      (() => {
+        showScreen("gameScreen");
+        renderStarterTutorial();
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "launch-for-combat");
+    const launchGuidance = await page.evaluate(() => window.eval(`
+      (() => {
+        renderStarterTutorial();
+        const launchButton = document.querySelector(".hub-launch-btn");
+        return {
+          step: getCurrentTutorialStep().id,
+          screen: document.getElementById("gameScreen")?.classList.contains("active") ? "gameScreen" : "",
+          highlighted: launchButton?.classList.contains("tutorial-highlight-target") || false,
+          visible: Boolean(launchButton?.offsetWidth || launchButton?.offsetHeight)
+        };
+      })()
+    `));
+    expect(launchGuidance.step).toBe("launch-for-combat");
+    expect(launchGuidance.screen).toBe("gameScreen");
+    expect(launchGuidance.highlighted).toBe(true);
+    expect(launchGuidance.visible).toBe(true);
+
+    await page.locator(".hub-launch-btn").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-map-for-bounty");
+    await page.evaluate(() => window.eval(`
+      (() => {
+        jumpCharge = jumpMax;
+        updateSpaceHUD();
+        renderStarterTutorial();
+      })()
+    `));
+    const mapGuidance = await page.evaluate(() => window.eval(`
+      (() => {
+        const jumpButton = document.getElementById("jumpBtn");
+        return {
+          step: getCurrentTutorialStep().id,
+          screen: document.getElementById("spaceScreen")?.classList.contains("active") ? "spaceScreen" : "",
+          highlighted: jumpButton?.classList.contains("tutorial-highlight-target") || false,
+          disabled: Boolean(jumpButton?.disabled)
+        };
+      })()
+    `));
+    expect(mapGuidance.step).toBe("open-map-for-bounty");
+    expect(mapGuidance.screen).toBe("spaceScreen");
+    expect(mapGuidance.highlighted).toBe(true);
+    expect(mapGuidance.disabled).toBe(false);
+
+    await page.locator("#jumpBtn").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "scan-for-bots");
+    const scanGuidance = await page.evaluate(() => window.eval(`
+      (() => {
+        renderStarterTutorial();
+        const scanButton = document.getElementById("sectorScanBotsBtn");
+        return {
+          step: getCurrentTutorialStep().id,
+          mapOpen: document.getElementById("sectorMap")?.classList.contains("active") || false,
+          highlighted: scanButton?.classList.contains("tutorial-highlight-target") || false,
+          disabled: Boolean(scanButton?.disabled)
+        };
+      })()
+    `));
+    expect(scanGuidance.step).toBe("scan-for-bots");
+    expect(scanGuidance.mapOpen).toBe(true);
+    expect(scanGuidance.highlighted).toBe(true);
+    expect(scanGuidance.disabled).toBe(false);
+
+    await page.locator("#sectorScanBotsBtn").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "jump-to-bounty-zone");
+
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await waitForGameGlobals(page);
 

@@ -386,7 +386,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "return-for-combat-launch",
     title: "Back to station",
-    text: "Return to the station hub. From there, you will launch and move toward hostile space.",
+    text: "Use Back to return to the station hub. From there, launch the Hunter into orbit and prepare to scan for hostile signals.",
     target: "#bountyScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -394,21 +394,21 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "launch-for-combat",
     title: "Launch for combat",
-    text: "Launch your ship. Your bounty objective will stay active in orbit.",
+    text: "Launch the Hunter. Your bounty stays active in orbit, and Morgan will guide you through a Bots scan before you choose a route.",
     target: ".hub-launch-btn",
     event: "launched"
   },
   {
     id: "open-map-for-bounty",
     title: "Open sector map",
-    text: "Wait for your Jump bar, then click Jump to open the sector map.",
+    text: "Wait for the Jump bar to charge, then open Jump. We will scan the sector for hostile bot signals before moving.",
     target: "#jumpBtn",
     event: "openedSectorMap"
   },
   {
     id: "scan-for-bots",
     title: "Scan for bots",
-    text: "Use the Bots scan. Hostile signals are easier to face when you see them first.",
+    text: "Select Bots to reveal hostile signals on the map. Scanning first shows you where the contract targets are before you commit to a route.",
     target: "#sectorScanBotsBtn",
     event: "scannedBots",
     place: "left"
@@ -1007,6 +1007,18 @@ function getTutorialStateCompletionReason(step) {
       return hasTutorialAttachmentEquipped() ? "attachment_equipped" : "";
     case "accept-bounty":
       return isTutorialBountyAccepted() ? "bounty_already_active" : "";
+    case "return-for-combat-launch":
+      return document.getElementById("gameScreen")?.classList.contains("active")
+        ? "station_hub_open"
+        : "";
+    case "launch-for-combat":
+      return document.getElementById("spaceScreen")?.classList.contains("active")
+        ? "already_in_orbit"
+        : "";
+    case "open-map-for-bounty":
+      return document.getElementById("sectorMap")?.classList.contains("active")
+        ? "sector_map_open"
+        : "";
     case "jump-to-bounty-zone":
       return isAtTutorialBountyCombatTarget() ? "bounty_target_reached" : "";
     case "destroy-bot":
