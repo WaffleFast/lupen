@@ -706,6 +706,7 @@ function startForgeUpgrade() {
       chamber.classList.remove("forging");
       chamber.classList.add("forge-complete");
     }
+    forgeCelebrationUntil = Date.now() + 2400;
     const upgradedName = getForgeItemDefinition(item.key)?.name || getForgeItemDisplayName(item);
     const upgradedTier = getForgeLevelTier(requirements.targetLevel);
     addActivityLog(`${upgradedName} upgraded to ${upgradedTier.label} tier, Level ${getForgeItemLevelRoman(requirements.targetLevel)}.`);
@@ -836,6 +837,11 @@ function renderForgeChamber(item, requirements) {
   const selectedType = document.getElementById("forgeSelectedType");
   const selectedTier = document.getElementById("forgeSelectedTier");
   const selectedDescription = document.getElementById("forgeSelectedDescription");
+  const previewOutput = document.getElementById("forgePreviewOutput");
+  const powerSignature = document.getElementById("forgePowerSignature");
+  const powerFill = document.getElementById("forgePowerFill");
+  const powerText = document.getElementById("forgePowerText");
+  const energyBadge = document.getElementById("forgeEnergyBadge");
   const showcase = chamber?.closest(".forge-showcase");
   if (!image || !state || !chamber) return;
   if (!item) {
@@ -845,6 +851,13 @@ function renderForgeChamber(item, requirements) {
     if (selectedType) selectedType.textContent = "No Selection";
     if (selectedTier) selectedTier.textContent = "Common · Level I";
     if (selectedDescription) selectedDescription.textContent = "Choose an owned item to inspect its next upgrade.";
+    if (previewOutput) previewOutput.textContent = "Awaiting Selection";
+    if (powerSignature) powerSignature.setAttribute("aria-label", "Forge energy level 1 of 5");
+    if (powerFill) powerFill.style.width = "20%";
+    if (powerText) powerText.textContent = "1 / 5";
+    if (energyBadge) {
+      energyBadge.querySelector("strong").textContent = "Base";
+    }
     state.textContent = "Select an item to upgrade.";
     return;
   }
@@ -862,8 +875,21 @@ function renderForgeChamber(item, requirements) {
     selectedTier.innerHTML = `${renderForgeTierPips(level, "compact")}<strong>${escapeHtml(tier.label)} · Level ${escapeHtml(getForgeItemLevelRoman(level))}</strong>`;
   }
   if (selectedDescription) selectedDescription.textContent = definition.description || "Upgradeable ship equipment.";
+  if (previewOutput) {
+    previewOutput.textContent = level >= FORGE_MAX_LEVEL
+      ? `${tier.label} · Maximum`
+      : `${tier.label} to ${targetTier.label}`;
+  }
+  if (powerSignature) powerSignature.setAttribute("aria-label", `Forge energy level ${level} of ${FORGE_MAX_LEVEL}`);
+  if (powerFill) powerFill.style.width = `${(level / FORGE_MAX_LEVEL) * 100}%`;
+  if (powerText) powerText.textContent = `${level} / ${FORGE_MAX_LEVEL}`;
+  if (energyBadge) {
+    const badgeLevel = energyBadge.querySelector("strong");
+    if (badgeLevel) badgeLevel.textContent = level === 1 ? "Base" : `${tier.label} · ${getForgeItemLevelRoman(level)}`;
+  }
   const chamberStateClass = forgeAnimating ? "upgrading forging" : requirements.canUpgrade ? "ready" : "missing-materials";
-  chamber.className = `forge-chamber forge-chamber-visual level-active ${chamberStateClass} quality-fx-host quality-fx--standard forge-tier-scope ${getForgeTierClass(level)}`;
+  const celebrationClass = Date.now() < Number(forgeCelebrationUntil || 0) ? "forge-complete" : "";
+  chamber.className = `forge-chamber forge-chamber-visual level-active ${chamberStateClass} ${celebrationClass} quality-fx-host quality-fx--standard forge-tier-scope ${getForgeTierClass(level)}`;
   if (showcase) showcase.className = `forge-showcase forge-tier-scope ${getForgeTierClass(level)}`;
   chamber.dataset.qualityTier = "standard";
   chamber.style.setProperty("--forge-before", tier.color);

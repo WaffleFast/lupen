@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lupen - Explore, Trade, Fight</title>
-  <link rel="stylesheet" href="style.css?v=20260728-bounty-reward-guidance" />
+  <link rel="stylesheet" href="style.css?v=20260729-forge-energy-signature" />
   <link rel="stylesheet" href="orbit-reference.css?v=20260728-cargo-clarity" />
   <link rel="stylesheet" href="loadout-redesign.css?v=20260721-unified-hangar" />
   <link rel="stylesheet" href="ui-system.css?v=20260726-orbit-alignment" />
@@ -229,6 +229,7 @@
         <main class="forge-panel forge-detail-panel forge-preview-panel">
           <div class="modern-store-panel-header">
             <span>Upgrade Preview</span>
+            <em id="forgePreviewOutput">Common to Refined</em>
           </div>
           <div class="forge-detail-body">
             <section class="forge-showcase" aria-label="Selected gear">
@@ -241,7 +242,13 @@
                   <div class="forge-beam"></div>
                   <div class="forge-scanline"></div>
                   <div class="forge-particles"></div>
+                  <div class="forge-energy-orbit orbit-a" aria-hidden="true"></div>
+                  <div class="forge-energy-orbit orbit-b" aria-hidden="true"></div>
                   <img id="forgePreviewImage" class="forge-chamber-item" src="assets/weapons/pulse-laser.png" alt="Selected item">
+                  <span id="forgeEnergyBadge" class="forge-energy-badge" aria-hidden="true">
+                    <small>Energy Signature</small>
+                    <strong>Base</strong>
+                  </span>
                 </div>
               </div>
               <div class="forge-selected-copy">
@@ -251,6 +258,11 @@
                 </div>
                 <h3 id="forgeSelectedName">Pulse Laser</h3>
                 <p id="forgeSelectedDescription">Rapid-fire energy weapon.</p>
+                <div id="forgePowerSignature" class="forge-power-signature" aria-label="Forge energy level 1 of 5">
+                  <span>Forge Energy</span>
+                  <div class="forge-power-track" aria-hidden="true"><i id="forgePowerFill"></i></div>
+                  <strong id="forgePowerText">1 / 5</strong>
+                </div>
               </div>
             </section>
 
@@ -807,7 +819,7 @@
   <script src="js/07-save-load.js?v=20260727-full-profile-reset"></script>
   <script src="js/08-tutorial.js?v=20260729-academy-forge-guidance"></script>
   <script src="js/09-audio.js"></script>
-  <script src="js/10-upgrade-forge.js?v=20260729-academy-forge-allowance"></script>
+  <script src="js/10-upgrade-forge.js?v=20260729-forge-energy-signature"></script>
   <script src="js/11-missions.js?v=20260727-morgan-cinematic"></script>
 
     <div id="tutorialOverlay" class="tutorial-overlay" aria-live="polite">

@@ -1282,6 +1282,7 @@ let forgeUpgradeMode = "level";
 let forgeMaterialAllocations = {};
 let forgeUseLupenCore = false;
 let forgeAnimating = false;
+let forgeCelebrationUntil = 0;
 let forgeInventoryPickerOpen = false;
 let forgeInventoryPickerFilter = "all";
 
