@@ -190,13 +190,19 @@ function showItemFoundBurst(items = []) {
 }
 
 function renderShipMiniProgress(combat) {
+  const xpLabel = combat.capped
+    ? "MAP 1 MAX"
+    : `${formatNumber(combat.current)} / ${formatNumber(combat.next)}`;
+  const xpTitle = combat.capped
+    ? `Combat Level ${combat.level}: Map 1 maximum reached`
+    : `Combat Level ${combat.level}: ${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP to next level`;
   return `
     <div class="level-badge ship-mini-level"><span>LEVEL</span><strong>${combat.level}</strong></div>
     <div class="xp-row">
       <span>XP</span>
-      <span>${formatNumber(combat.current)} / ${formatNumber(combat.next)}</span>
+      <span>${xpLabel}</span>
     </div>
-    <div class="xp-bar" title="Combat Level ${combat.level}: ${formatNumber(combat.current)} / ${formatNumber(combat.next)} XP to next level">
+    <div class="xp-bar" title="${xpTitle}">
       <div class="xp-fill" style="width:${combat.percent}%"></div>
     </div>
   `;
@@ -364,6 +370,15 @@ function renderPilotProfile() {
   const availableShipCount = SHIP_LINES?.[PIONEER_LINE_ID]?.shipIds?.filter(shipId => SHIPS[shipId]).length || 0;
   const journey = getPilotProfileJourneySnapshot();
   const xpRemaining = Math.max(0, Number(combat.next || 0) - Number(combat.current || 0));
+  const combatXpLabel = combat.capped
+    ? `${formatNumber(combat.total)} XP · MAP 1 MAX`
+    : `${formatNumber(combat.current)} / ${formatNumber(combat.next)}`;
+  const combatProgressLabel = combat.capped
+    ? `Combat Level ${combat.level}, Map 1 maximum reached`
+    : `Combat XP progress to Level ${combat.level + 1}`;
+  const combatProgressCopy = combat.capped
+    ? "Map 1 combat certification complete"
+    : `${formatNumber(xpRemaining)} XP to Level ${formatNumber(combat.level + 1)}`;
   const loadoutUnavailable = !hasActiveVessel;
   const gunValue = loadoutUnavailable ? "—" : `${formatNumber(gunCount)} / ${formatNumber(gunLimit)}`;
   const attachmentValue = loadoutUnavailable ? "—" : `${formatNumber(attachmentCount)} / ${formatNumber(attachmentLimit)}`;
@@ -410,9 +425,9 @@ function renderPilotProfile() {
             <small>Combat Level ${formatNumber(combat.level)} · ${hasActiveVessel ? escapeHtml(shipName) : "No active vessel"}</small>
           </div>
           <div class="pilot-level-block">
-            <div class="pilot-xp-label"><span>COMBAT XP</span><b>${formatNumber(combat.current)} / ${formatNumber(combat.next)}</b></div>
-            ${renderPilotProgressBar(combat.percent, `Combat XP progress to Level ${combat.level + 1}`)}
-            <p>${formatNumber(xpRemaining)} XP to Level ${formatNumber(combat.level + 1)}</p>
+            <div class="pilot-xp-label"><span>COMBAT XP</span><b>${combatXpLabel}</b></div>
+            ${renderPilotProgressBar(combat.percent, combatProgressLabel)}
+            <p>${combatProgressCopy}</p>
           </div>
         </section>
 

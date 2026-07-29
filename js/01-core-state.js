@@ -478,7 +478,7 @@ const SHIPS = {
     description: "A cargo-focused branch hull with generous equipment capacity, durable plating and enough armament to survive contested routes.",
     image: getShipAsset("bison", "medium"),
     assets: SHIP_ASSET_MANIFEST.bison,
-    price: 14000,
+    price: 9000,
     hull: 1300,
     shield: 135,
     armor: 18,
@@ -499,7 +499,7 @@ const SHIPS = {
     description: "The Pioneer Line flagship: a command hull with immense defences and extensive weapon and equipment capacity.",
     image: getShipAsset("monolith", "medium"),
     assets: SHIP_ASSET_MANIFEST.monolith,
-    price: 48000,
+    price: 30000,
     hull: 1800,
     shield: 360,
     armor: 28,
@@ -674,7 +674,7 @@ const SHIPS = {
     description: "An armoured combat step beyond the Hunter, trading some speed and evasion for stronger shields, hull and hardpoint capacity.",
     image: getShipAsset("zeusExplorer", "medium"),
     assets: SHIP_ASSET_MANIFEST.zeusExplorer,
-    price: 22000,
+    price: 15000,
     hull: 1250,
     shield: 240,
     armor: 20,
@@ -924,13 +924,14 @@ let dailyTradeContractCargo = null;
 
 const XP_CONFIG = {
   combatZoneKey: "sector-one",
-  combatZoneCap: 2500,
+  combatZoneCap: 5500,
   combatLevelXp: 2500,
   combatBotXp: 100,
   bountyClaimXp: 100,
-  combatLevelThresholds: Object.freeze([0, 2500, 5000, 7500, 10000]),
-  nextMapUnlockLevel: 5,
-  maxStarterCombatLevel: 99
+  combatLevelThresholds: Object.freeze([0, 2500, 5500]),
+  nextMapUnlockLevel: 3,
+  maxStarterCombatLevel: 3,
+  postLevelTwoBotXpMultiplier: 0.8
 };
 
 let playerProgress = createDefaultPlayerProgress();
@@ -1800,7 +1801,7 @@ const EREBUS_BOT_TYPES = {
     hull: 110,
     shield: 60,
     armor: 6,
-    damage: 8,
+    damage: 10,
     fireRateMs: 1400,
     accuracy: 0.72,
     moveIntervalMs: 14000,
@@ -1817,7 +1818,7 @@ const EREBUS_BOT_TYPES = {
     hull: 165,
     shield: 95,
     armor: 12,
-    damage: 13,
+    damage: 16,
     fireRateMs: 1700,
     accuracy: 0.75,
     moveIntervalMs: 18000,
@@ -1834,7 +1835,7 @@ const EREBUS_BOT_TYPES = {
     hull: 260,
     shield: 150,
     armor: 22,
-    damage: 20,
+    damage: 24,
     fireRateMs: 2300,
     accuracy: 0.78,
     moveIntervalMs: 24000,
@@ -1851,7 +1852,7 @@ const EREBUS_BOT_TYPES = {
     hull: 420,
     shield: 240,
     armor: 32,
-    damage: 28,
+    damage: 34,
     fireRateMs: 3200,
     accuracy: 0.8,
     moveIntervalMs: 32000,
@@ -2442,37 +2443,44 @@ function normalizePlayerProgress(progress) {
 }
 
 function getCombatLevelInfo() {
-  const total = Math.max(0, Number(playerProgress.combatXp || 0));
+  const rawTotal = Math.max(0, Number(playerProgress.combatXp || 0));
   const perLevel = Math.max(1, Number(XP_CONFIG.combatLevelXp || 500));
   const thresholds = Array.isArray(XP_CONFIG.combatLevelThresholds)
     ? XP_CONFIG.combatLevelThresholds
       .map(value => Math.max(0, Number(value || 0)))
       .filter((value, index, values) => index === 0 || value > values[index - 1])
     : [];
+  const maxLevel = Math.max(1, Number(XP_CONFIG.maxStarterCombatLevel || thresholds.length || 1));
+  const capXp = thresholds[Math.min(thresholds.length - 1, maxLevel - 1)] ?? null;
+  const total = Number.isFinite(capXp) ? Math.min(rawTotal, capXp) : rawTotal;
   const configuredLevelIndex = thresholds.reduce((latest, threshold, index) => total >= threshold ? index : latest, 0);
   const levelsPastConfiguredCurve = thresholds.length && total >= thresholds[thresholds.length - 1]
     ? Math.floor((total - thresholds[thresholds.length - 1]) / perLevel)
     : 0;
-  const level = thresholds.length
+  const calculatedLevel = thresholds.length
     ? configuredLevelIndex + 1 + levelsPastConfiguredCurve
     : Math.floor(total / perLevel) + 1;
+  const level = Math.min(maxLevel, calculatedLevel);
+  const capped = level >= maxLevel && Number.isFinite(capXp) && total >= capXp;
   const levelBase = thresholds.length && configuredLevelIndex < thresholds.length
     ? thresholds[configuredLevelIndex] + (levelsPastConfiguredCurve * perLevel)
     : (level - 1) * perLevel;
   const nextThreshold = thresholds[level];
-  const current = total - levelBase;
-  const next = Number.isFinite(nextThreshold) ? Math.max(1, nextThreshold - levelBase) : perLevel;
+  const current = capped ? 0 : total - levelBase;
+  const next = capped ? 0 : Number.isFinite(nextThreshold) ? Math.max(1, nextThreshold - levelBase) : perLevel;
 
   return {
     level,
     current,
     next,
     total,
+    rawTotal,
     levelBase,
-    percent: Math.min(100, Math.round((current / next) * 100)),
-    capped: false,
-    nextMapUnlockLevel: Number(XP_CONFIG.nextMapUnlockLevel || 5),
-    nextMapUnlockXp: thresholds[Math.max(0, Number(XP_CONFIG.nextMapUnlockLevel || 5) - 1)] || null
+    percent: capped ? 100 : Math.min(100, Math.round((current / next) * 100)),
+    capped,
+    capXp,
+    nextMapUnlockLevel: Number(XP_CONFIG.nextMapUnlockLevel || maxLevel),
+    nextMapUnlockXp: thresholds[Math.max(0, Number(XP_CONFIG.nextMapUnlockLevel || maxLevel) - 1)] || null
   };
 }
 
@@ -2647,21 +2655,45 @@ function getCombatXpPerBot() {
 }
 
 function addCombatXp(amount, source = "") {
-  const xp = Math.max(0, Math.round(Number(amount || 0)));
-  if (!xp) return { gained: 0, levelled: false, source };
+  const requestedXp = Math.max(0, Math.round(Number(amount || 0)));
+  if (!requestedXp) return { gained: 0, levelled: false, source };
 
-  const beforeLevel = getCombatLevelInfo().level;
+  const before = getCombatLevelInfo();
+  const isBotReward = source === "bot" || source === "stagingBotKill";
+  const multiplier = isBotReward && before.level >= 2
+    ? Math.max(0, Number(XP_CONFIG.postLevelTwoBotXpMultiplier || 1))
+    : 1;
+  const scaledXp = Math.max(0, Math.round(requestedXp * multiplier));
+  const remaining = Number.isFinite(before.capXp)
+    ? Math.max(0, before.capXp - before.total)
+    : scaledXp;
+  const xp = Math.min(scaledXp, remaining);
+  if (!xp) return { gained: 0, levelled: false, capped: before.capped, source };
+
+  const beforeLevel = before.level;
   const zoneKey = getCurrentCombatZoneKey();
   playerProgress.zoneCombatXp[zoneKey] = Math.max(0, getCombatZoneEarned() + xp);
   playerProgress.combatXp = Math.max(0, Number(playerProgress.combatXp || 0)) + xp;
-  const afterLevel = getCombatLevelInfo().level;
+  const after = getCombatLevelInfo();
+  const afterLevel = after.level;
 
   if (afterLevel > beforeLevel) {
     showLevelUpOverlay(`Combat Level ${afterLevel}`);
-    addActivityLog(`Combat Level ${afterLevel} reached. Your XP bar has reset toward the next level.`);
+    addActivityLog(after.capped
+      ? `Combat Level ${afterLevel} reached. Map 1 combat certification is complete.`
+      : `Combat Level ${afterLevel} reached. Your XP bar has reset toward the next level.`);
   }
 
-  return { gained: xp, levelled: afterLevel > beforeLevel, before: beforeLevel, after: afterLevel, source };
+  return {
+    gained: xp,
+    requested: requestedXp,
+    multiplier,
+    levelled: afterLevel > beforeLevel,
+    capped: after.capped,
+    before: beforeLevel,
+    after: afterLevel,
+    source
+  };
 }
 
 function awardCombatXpFromBot(bot) {

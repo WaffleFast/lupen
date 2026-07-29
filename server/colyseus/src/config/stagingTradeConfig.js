@@ -10,19 +10,19 @@ export const STAGING_TRADE_RESOURCES = Object.freeze([
 
 export const STAGING_TRADE_PRICE_TABLE = Object.freeze({
   "Asteron Prime": Object.freeze({
-    Iron: 18,
-    Copper: 38,
-    Cobalt: 90
+    Iron: 16,
+    Copper: 34,
+    Cobalt: 84
   }),
   Virella: Object.freeze({
-    Iron: 20,
-    Copper: 50,
-    Cobalt: 74
+    Iron: 23,
+    Copper: 52,
+    Cobalt: 70
   }),
   Nyxara: Object.freeze({
-    Iron: 30,
-    Copper: 32,
-    Cobalt: 102
+    Iron: 33,
+    Copper: 30,
+    Cobalt: 108
   })
 });
 

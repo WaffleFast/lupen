@@ -64,9 +64,9 @@ test.describe("Hangar Exchange and Vault redesign", () => {
       monolith: SHIPS.monolith.price
     }))).toEqual({
       falcon: 0,
-      bison: 14000,
-      zeusExplorer: 22000,
-      monolith: 48000
+      bison: 9000,
+      zeusExplorer: 15000,
+      monolith: 30000
     });
     await page.locator("#shipShop .vessel-exchange-card[data-ship-id='monolith']").click();
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Pioneer Moth");
@@ -74,7 +74,7 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Weapon Slots");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Equipment Slots");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 48,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 30,000");
 
     const layout = await page.locator("#hangarShipyardSection .vessel-exchange-layout").evaluate(shell => {
       const catalogue = shell.querySelector(".exchange-catalog-panel")?.getBoundingClientRect();
@@ -98,7 +98,7 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await page.locator("#shipyardDetailPanel .buy-ship-action").click();
     await expect(page.locator("#shipShop .vessel-exchange-card[data-ship-id='monolith']")).toHaveCount(0);
     await expect(page.locator("#shipShop .vessel-exchange-card")).toHaveCount(2);
-    await expect.poll(() => page.evaluate(() => credits)).toBe(52000);
+    await expect.poll(() => page.evaluate(() => credits)).toBe(70000);
   });
 
   test("applies a priced staging hull purchase from the Vessel Exchange", async ({ page }) => {
@@ -133,7 +133,7 @@ test.describe("Hangar Exchange and Vault redesign", () => {
             category: "ship",
             localKind: "ship",
             localKey: "zeusExplorer",
-            price: 22000,
+            price: 15000,
             levelRequirement: 0,
             stockType: "fixed"
           }]
@@ -167,10 +167,10 @@ test.describe("Hangar Exchange and Vault redesign", () => {
               localKind: "ship",
               localKey: "zeusExplorer",
               quantity: 1,
-              unitPrice: 22000,
-              totalCost: 22000,
+              unitPrice: 15000,
+              totalCost: 15000,
               creditsBefore: 30000,
-              creditsAfter: 8000,
+              creditsAfter: 15000,
               itemBefore: 0,
               itemAfter: 1,
               wouldPass: true,
@@ -199,12 +199,12 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     })()`));
 
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 22,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 15,000");
     await page.locator("#shipyardDetailPanel .buy-ship-action").click();
 
     await expect.poll(() => page.evaluate(() => ownedShips.includes("zeusExplorer"))).toBe(true);
     await expect(page.locator("#shipShop .vessel-exchange-card[data-ship-id='zeusExplorer']")).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => credits)).toBe(8000);
+    await expect.poll(() => page.evaluate(() => credits)).toBe(15000);
     await expect.poll(() => page.evaluate(() => window.__stagingHullPurchasePayloads[0])).toMatchObject({
       itemId: "ship:zeusExplorer",
       quantity: 1,

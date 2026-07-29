@@ -2,8 +2,8 @@ export const EREBUS_BOT_TYPES = Object.freeze({
   hunter: Object.freeze({
     botType: "hunter",
     displayName: "Erebus Hunter",
-    damagePerHit: 18,
-    attackCooldownMs: 2400,
+    damagePerHit: 20,
+    attackCooldownMs: 2300,
     image: "assets/bots/erebus-hunter.png",
     targetCount: 16,
     shield: 60,
@@ -16,8 +16,8 @@ export const EREBUS_BOT_TYPES = Object.freeze({
   attacker: Object.freeze({
     botType: "attacker",
     displayName: "Erebus Attacker",
-    damagePerHit: 24,
-    attackCooldownMs: 2800,
+    damagePerHit: 28,
+    attackCooldownMs: 2700,
     image: "assets/bots/erebus-attacker.png",
     targetCount: 10,
     shield: 90,
@@ -30,8 +30,8 @@ export const EREBUS_BOT_TYPES = Object.freeze({
   destroyer: Object.freeze({
     botType: "destroyer",
     displayName: "Erebus Destroyer",
-    damagePerHit: 32,
-    attackCooldownMs: 3500,
+    damagePerHit: 38,
+    attackCooldownMs: 3300,
     image: "assets/bots/erebus-destroyer.png",
     targetCount: 4,
     shield: 160,
@@ -44,8 +44,8 @@ export const EREBUS_BOT_TYPES = Object.freeze({
   behemoth: Object.freeze({
     botType: "behemoth",
     displayName: "Erebus Behemoth",
-    damagePerHit: 58,
-    attackCooldownMs: 4500,
+    damagePerHit: 64,
+    attackCooldownMs: 4300,
     image: "assets/bots/erebus-behemoth.png",
     targetCount: 3,
     shield: 300,

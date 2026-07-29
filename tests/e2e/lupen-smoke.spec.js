@@ -1635,7 +1635,7 @@ test.describe("Lupen browser smoke", () => {
     expect(progression.shieldOwned).toBe(0);
     expect(progression.ionOwned).toBe(1);
     expect(progression.equippedGuns).toBe(0);
-    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy - 36000);
+    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy - 24000);
     expect(progression.ownedAfterLockedBuy).toEqual(["falcon", "zeusExplorer", "bison"]);
     expect(progression.nightshadeAvailable.locked).toBe(false);
     expect(progression.nightshadeAvailable.state).toBe("owned");
@@ -1676,7 +1676,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).not.toHaveClass(/progression-locked/);
     await expect(page.locator("#shipyardDetailPanel")).not.toContainText("Unlock Requirements");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 48,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 30,000");
 
     await page.reload();
     await waitForGameGlobals(page);
@@ -1938,16 +1938,18 @@ test.describe("Lupen browser smoke", () => {
           });
         });
 
-        const repeatedStarterPlan = Array.from({ length: 25 }, (_, index) => EREBUS_STARTER_SPAWN_PLAN[index % EREBUS_STARTER_SPAWN_PLAN.length]);
-        const projectedXpAt25Kills = repeatedStarterPlan.reduce((sum, key) => sum + EREBUS_BOT_TYPES[key].xpReward, 0);
-        const levelFiveXp = Number(XP_CONFIG.combatLevelThresholds[XP_CONFIG.nextMapUnlockLevel - 1]);
+        const mapOneCapXp = Number(XP_CONFIG.combatLevelThresholds[XP_CONFIG.nextMapUnlockLevel - 1]);
         const progressionEvents = [];
         let progressionXp = 0;
         let progressionFightSeconds = 0;
         let progressionKills = 0;
-        while (progressionXp < levelFiveXp && progressionKills < 500) {
+        while (progressionXp < mapOneCapXp && progressionKills < 500) {
           const botKey = EREBUS_STARTER_SPAWN_PLAN[progressionKills % EREBUS_STARTER_SPAWN_PLAN.length];
-          progressionXp += EREBUS_BOT_TYPES[botKey].xpReward;
+          const baseXp = EREBUS_BOT_TYPES[botKey].xpReward;
+          const multiplier = progressionXp >= XP_CONFIG.combatLevelThresholds[1]
+            ? XP_CONFIG.postLevelTwoBotXpMultiplier
+            : 1;
+          progressionXp = Math.min(mapOneCapXp, progressionXp + Math.round(baseXp * multiplier));
           progressionFightSeconds += botFightMetrics[botKey].averageSeconds;
           progressionKills += 1;
           progressionEvents.push({
@@ -1956,6 +1958,7 @@ test.describe("Lupen browser smoke", () => {
             fightSeconds: progressionFightSeconds
           });
         }
+        const projectedXpAt25Kills = progressionEvents.find(entry => entry.kills === 25)?.xp || 0;
         const downtimeSeconds = { aggressive: 25, typical: 45, relaxed: 75 };
         const levelMilestones = XP_CONFIG.combatLevelThresholds.slice(1, XP_CONFIG.nextMapUnlockLevel).map((xp, index) => {
           const event = progressionEvents.find(entry => entry.xp >= xp) || progressionEvents[progressionEvents.length - 1];
@@ -1971,10 +1974,29 @@ test.describe("Lupen browser smoke", () => {
           };
         });
         const savedProgress = playerProgress;
-        const levelBoundaryAudit = [0, 2499, 2500, 4999, 5000, 7499, 7500, 9999, 10000, 12499, 12500].map(xp => {
+        const levelBoundaryAudit = [0, 2499, 2500, 5499, 5500, 7000].map(xp => {
           playerProgress = { ...savedProgress, combatXp: xp };
           const info = getCombatLevelInfo();
-          return { xp, level: info.level, current: info.current, next: info.next };
+          return { xp, level: info.level, current: info.current, next: info.next, capped: info.capped };
+        });
+        const xpAwardAudit = [
+          { startingXp: 2490, award: 100, source: "bot" },
+          { startingXp: 2500, award: 100, source: "bot" },
+          { startingXp: 5480, award: 100, source: "bot" },
+          { startingXp: 5500, award: 250, source: "bot" },
+          { startingXp: 2500, award: 100, source: "mission" }
+        ].map(scenario => {
+          playerProgress = normalizePlayerProgress({
+            combatXp: scenario.startingXp,
+            zoneCombatXp: { [XP_CONFIG.combatZoneKey]: scenario.startingXp }
+          });
+          const result = addCombatXp(scenario.award, scenario.source);
+          return {
+            ...scenario,
+            gained: result.gained,
+            endingXp: playerProgress.combatXp,
+            capped: getCombatLevelInfo().capped
+          };
         });
         playerProgress = savedProgress;
         const forgeCosts = Object.values(FORGE_LEVEL_COSTS);
@@ -1989,6 +2011,41 @@ test.describe("Lupen browser smoke", () => {
           const prices = MAP_ONE_MARKET_PLANETS.map(planet => LIVE_MARKET_BASE_PRICES[planet][resource]);
           return [resource, (Math.max(...prices) - Math.min(...prices)) * starterShip.cargo];
         }));
+        const freighterMarketFullHoldProfit = Object.fromEntries(MAP_ONE_TRADE_RESOURCES.map(resource => {
+          const prices = MAP_ONE_MARKET_PLANETS.map(planet => LIVE_MARKET_BASE_PRICES[planet][resource]);
+          return [resource, (Math.max(...prices) - Math.min(...prices)) * SHIPS.bison.cargo];
+        }));
+        const shipFleetCost = Object.values(shipPrices).reduce((sum, price) => sum + price, 0);
+        const dailyBountyCreditTotal = bountyCreditRewards.reduce((sum, reward) => sum + reward, 0);
+        const dailyTradeCreditTotal = dailyTradeRewards.reduce((sum, reward) => sum + reward, 0);
+        const starterGearAndRepairBudget = 2500;
+        const guaranteedCreditsBeforeMarketHauls = MAP_ONE_STARTING_CREDITS
+          - starterGearAndRepairBudget
+          + dailyBountyCreditTotal
+          + dailyTradeCreditTotal;
+        const averageFreighterMarketProfit = Math.round(
+          Object.values(freighterMarketFullHoldProfit).reduce((sum, profit) => sum + profit, 0)
+          / Object.values(freighterMarketFullHoldProfit).length
+        );
+        const profitableFreighterHaulsNeeded = Math.max(
+          0,
+          Math.ceil((shipFleetCost - guaranteedCreditsBeforeMarketHauls) / averageFreighterMarketProfit)
+        );
+        const levelThreeMilestone = levelMilestones.find(milestone => milestone.level === XP_CONFIG.nextMapUnlockLevel);
+        const mapOneCompletionModel = {
+          starterGearAndRepairBudget,
+          shipFleetCost,
+          guaranteedCreditsBeforeMarketHauls,
+          averageFreighterMarketProfit,
+          profitableFreighterHaulsNeeded,
+          journeyAndMenuMinutes: 15,
+          minutesPerMarketHaul: 2.5,
+          typicalMinutes: Number((
+            Number(levelThreeMilestone?.estimatedMinutes?.typical || 0)
+            + 15
+            + profitableFreighterHaulsNeeded * 2.5
+          ).toFixed(1))
+        };
         const asteroidClearsForForgeTiers = forgeCumulativeCosts.map(cost => Math.ceil(cost / ASTEROID_LUPEN_SHARD_REWARD));
 
         return {
@@ -2008,11 +2065,12 @@ test.describe("Lupen browser smoke", () => {
             bountyShardRewards,
             bountyCreditRewards,
             dailyBountyShardTotal: bountyShardRewards.reduce((sum, reward) => sum + reward, 0),
-            dailyBountyCreditTotal: bountyCreditRewards.reduce((sum, reward) => sum + reward, 0),
+            dailyBountyCreditTotal,
             dailyTradeRewards,
-            dailyTradeCreditTotal: dailyTradeRewards.reduce((sum, reward) => sum + reward, 0),
+            dailyTradeCreditTotal,
             marketRefreshMs: TRADE_MARKET_REFRESH_MS,
             baseMarketFullHoldProfit,
+            freighterMarketFullHoldProfit,
             forgeCumulativeCosts,
             asteroidClearsForForgeTiers,
             projectedXpAt25Kills,
@@ -2020,10 +2078,13 @@ test.describe("Lupen browser smoke", () => {
           },
           progression: {
             nextMapUnlockLevel: XP_CONFIG.nextMapUnlockLevel,
-            levelFiveXp,
+            mapOneCapXp,
+            postLevelTwoBotXpMultiplier: XP_CONFIG.postLevelTwoBotXpMultiplier,
             xpRewards: Object.fromEntries(Object.entries(EREBUS_BOT_TYPES).map(([key, bot]) => [key, bot.xpReward])),
             levelBoundaryAudit,
-            levelMilestones
+            xpAwardAudit,
+            levelMilestones,
+            mapOneCompletionModel
           }
         };
       })()
@@ -2040,14 +2101,14 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.behemoth.averageSeconds).toBeGreaterThan(metrics.destroyer.averageSeconds);
     expect(metrics.destroyerThenHunter.wins).toBe(200);
     expect(metrics.destroyerThenHunter.deaths).toBe(0);
-    expect(metrics.destroyerThenHunter.averageHullRemaining).toBeGreaterThanOrEqual(600);
+    expect(metrics.destroyerThenHunter.averageHullRemaining).toBeGreaterThanOrEqual(560);
     expect(metrics.weaponPairs.twinHeavy.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinIon.theoreticalDps);
     expect(metrics.weaponPairs.twinIon.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinPulse.theoreticalDps);
     expect(metrics.weaponPairs.pulseHeavy.speed).toBe(1644);
     expect(metrics.spawnConflicts).toBe(0);
     expect(metrics.economy).toMatchObject({
       startingCredits: 10000,
-      shipPrices: { falcon: 0, bison: 14000, zeusExplorer: 22000, monolith: 48000 },
+      shipPrices: { falcon: 0, bison: 9000, zeusExplorer: 15000, monolith: 30000 },
       asteroidShardReward: 10,
       bountyShardRewards: [25, 35, 50, 75],
       bountyCreditRewards: [900, 1100, 1500, 2500],
@@ -2056,21 +2117,20 @@ test.describe("Lupen browser smoke", () => {
       dailyTradeRewards: [1480, 2560, 3300, 4920],
       dailyTradeCreditTotal: 12260,
       marketRefreshMs: 90000,
-      baseMarketFullHoldProfit: { Iron: 1800, Copper: 2700, Cobalt: 4200 },
+      baseMarketFullHoldProfit: { Iron: 2550, Copper: 3300, Cobalt: 5700 },
+      freighterMarketFullHoldProfit: { Iron: 5100, Copper: 6600, Cobalt: 11400 },
       forgeCumulativeCosts: [25, 100, 250, 550],
       asteroidClearsForForgeTiers: [3, 10, 25, 55],
       combatLevelTwoXp: 2500
     });
-    expect(metrics.economy.startingCredits + metrics.economy.dailyBountyCreditTotal)
+    expect(metrics.economy.startingCredits)
       .toBeGreaterThanOrEqual(metrics.economy.shipPrices.bison);
-    expect(metrics.economy.startingCredits + metrics.economy.dailyBountyCreditTotal)
-      .toBeLessThan(metrics.economy.shipPrices.zeusExplorer);
     expect(metrics.economy.startingCredits + metrics.economy.dailyTradeCreditTotal)
       .toBeGreaterThanOrEqual(metrics.economy.shipPrices.zeusExplorer);
     expect(metrics.economy.startingCredits + metrics.economy.dailyTradeCreditTotal)
       .toBeLessThan(metrics.economy.shipPrices.monolith);
     expect(metrics.economy.startingCredits + metrics.economy.dailyBountyCreditTotal + metrics.economy.dailyTradeCreditTotal)
-      .toBeLessThan(metrics.economy.shipPrices.monolith);
+      .toBeLessThanOrEqual(metrics.economy.shipPrices.monolith);
     expect(Math.min(...metrics.economy.bountyShardRewards))
       .toBeGreaterThanOrEqual(metrics.economy.asteroidShardReward * 2);
     expect(metrics.economy.dailyBountyShardTotal)
@@ -2079,8 +2139,9 @@ test.describe("Lupen browser smoke", () => {
       .toBeLessThan(metrics.economy.forgeCumulativeCosts[2]);
     expect(metrics.economy.projectedXpAt25Kills).toBeGreaterThanOrEqual(metrics.economy.combatLevelTwoXp);
     expect(metrics.progression).toMatchObject({
-      nextMapUnlockLevel: 5,
-      levelFiveXp: 10000,
+      nextMapUnlockLevel: 3,
+      mapOneCapXp: 5500,
+      postLevelTwoBotXpMultiplier: 0.8,
       xpRewards: {
         erebus_hunter: 75,
         erebus_attacker: 100,
@@ -2088,12 +2149,22 @@ test.describe("Lupen browser smoke", () => {
         erebus_behemoth: 250
       }
     });
-    expect(metrics.progression.levelBoundaryAudit.map(({ level }) => level)).toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6]);
-    const levelFiveMilestone = metrics.progression.levelMilestones.find(milestone => milestone.level === 5);
-    expect(levelFiveMilestone.kills).toBeGreaterThanOrEqual(75);
-    expect(levelFiveMilestone.kills).toBeLessThanOrEqual(100);
-    expect(levelFiveMilestone.estimatedMinutes.typical).toBeGreaterThanOrEqual(60);
-    expect(levelFiveMilestone.estimatedMinutes.relaxed).toBeLessThanOrEqual(180);
+    expect(metrics.progression.levelBoundaryAudit.map(({ level }) => level)).toEqual([1, 1, 2, 2, 3, 3]);
+    expect(metrics.progression.levelBoundaryAudit.slice(-2).every(({ capped }) => capped)).toBe(true);
+    expect(metrics.progression.xpAwardAudit.map(({ gained, endingXp }) => ({ gained, endingXp }))).toEqual([
+      { gained: 100, endingXp: 2590 },
+      { gained: 80, endingXp: 2580 },
+      { gained: 20, endingXp: 5500 },
+      { gained: 0, endingXp: 5500 },
+      { gained: 100, endingXp: 2600 }
+    ]);
+    const levelThreeMilestone = metrics.progression.levelMilestones.find(milestone => milestone.level === 3);
+    expect(levelThreeMilestone.kills).toBeGreaterThanOrEqual(50);
+    expect(levelThreeMilestone.kills).toBeLessThanOrEqual(65);
+    expect(levelThreeMilestone.estimatedMinutes.typical).toBeGreaterThanOrEqual(55);
+    expect(levelThreeMilestone.estimatedMinutes.typical).toBeLessThanOrEqual(70);
+    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeLessThanOrEqual(4);
+    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeLessThanOrEqual(90);
 
     console.log(`Map 1 playtest metrics: ${JSON.stringify(metrics)}`);
     await expectNoUnexpectedBrowserErrors(failures);
@@ -2162,8 +2233,8 @@ test.describe("Lupen browser smoke", () => {
     await expect(profile.locator(".pilot-dossier-identity")).toContainText("WaffleFast");
     await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Combat Level 3");
     await expect(profile.locator('[data-profile-section="identity"]')).toContainText("Pioneer Hunter");
-    await expect(profile.locator(".pilot-record-header")).toContainText("700 / 2,500");
-    await expect(profile.locator(".pilot-record-header")).toContainText("XP to Level 4");
+    await expect(profile.locator(".pilot-record-header")).toContainText("5,500 XP · MAP 1 MAX");
+    await expect(profile.locator(".pilot-record-header")).toContainText("Map 1 combat certification complete");
 
     const summaryCards = profile.locator('[data-profile-section="career-summary"] .pilot-stat-card');
     await expect(summaryCards).toHaveCount(6);
@@ -2986,8 +3057,8 @@ test.describe("Lupen browser smoke", () => {
           x: 34,
           y: 25,
           level: 1,
-          damagePerHit: 18,
-          attackCooldownMs: 2400,
+          damagePerHit: 20,
+          attackCooldownMs: 2300,
           visualScale: 0.82,
           shield: 60,
           shieldMax: 60,
@@ -3007,8 +3078,8 @@ test.describe("Lupen browser smoke", () => {
           x: 45,
           y: 30,
           level: 2,
-          damagePerHit: 24,
-          attackCooldownMs: 2800,
+          damagePerHit: 28,
+          attackCooldownMs: 2700,
           visualScale: 0.94,
           shield: 90,
           shieldMax: 90,
@@ -3028,8 +3099,8 @@ test.describe("Lupen browser smoke", () => {
           x: 58,
           y: 31,
           level: 3,
-          damagePerHit: 32,
-          attackCooldownMs: 3500,
+          damagePerHit: 38,
+          attackCooldownMs: 3300,
           visualScale: 1.12,
           shield: 160,
           shieldMax: 160,
@@ -3049,8 +3120,8 @@ test.describe("Lupen browser smoke", () => {
           x: 72,
           y: 27,
           level: 5,
-          damagePerHit: 58,
-          attackCooldownMs: 4500,
+          damagePerHit: 64,
+          attackCooldownMs: 4300,
           visualScale: 1.32,
           shield: 300,
           shieldMax: 300,
@@ -5729,7 +5800,7 @@ test.describe("Lupen browser smoke", () => {
         selectedHangarShipId = STARTER_SHIP_ID;
         selectedFleetShipId = STARTER_SHIP_ID;
         ownedShips = [STARTER_SHIP_ID];
-        playerProgress = normalizePlayerProgress({ combatXp: 5000 });
+        playerProgress = normalizePlayerProgress({ combatXp: 5500 });
         ownedGuns = { ...ownedGuns, pulseLaser: 0, ionBlaster: 0, heavyLance: 0 };
         inventoryItems = [
           { id: "tier-refined-ion", key: "ionBlaster", quality: "standard", level: 2 },

@@ -57,7 +57,8 @@ import {
 } from "../src/services/progressionShadowService.js";
 import {
   applyPlayerSavePatchPlan,
-  buildPlayerSavePatchPlan
+  buildPlayerSavePatchPlan,
+  getMapOneBotXpDelta
 } from "../src/services/playerSaveWriteService.js";
 import {
   applyStagingLootClaimWrite,
@@ -382,10 +383,10 @@ function assertBotDisplayFields(room) {
 
 function assertMapOneBotTuning() {
   const expected = {
-    hunter: { damagePerHit: 18, xpReward: 75, threat: "Light Threat" },
-    attacker: { damagePerHit: 24, xpReward: 100, threat: "Medium Threat" },
-    destroyer: { damagePerHit: 32, attackCooldownMs: 3500, xpReward: 150, threat: "Heavy Threat" },
-    behemoth: { damagePerHit: 58, xpReward: 250, threat: "Extreme Threat" }
+    hunter: { damagePerHit: 20, xpReward: 75, threat: "Light Threat" },
+    attacker: { damagePerHit: 28, xpReward: 100, threat: "Medium Threat" },
+    destroyer: { damagePerHit: 38, attackCooldownMs: 3300, xpReward: 150, threat: "Heavy Threat" },
+    behemoth: { damagePerHit: 64, xpReward: 250, threat: "Extreme Threat" }
   };
   Object.entries(expected).forEach(([botType, values]) => {
     const config = EREBUS_BOT_TYPES[botType];
@@ -397,6 +398,11 @@ function assertMapOneBotTuning() {
     }
     assert(config.threat === values.threat, `Unexpected ${botType} threat label: ${config.threat}.`);
   });
+  assert(getMapOneBotXpDelta(0, 100) === 100, "Map 1 bot XP was reduced before Level II.");
+  assert(getMapOneBotXpDelta(2499, 100) === 100, "Map 1 bot XP was reduced before the Level II boundary.");
+  assert(getMapOneBotXpDelta(2500, 100) === 80, "Map 1 bot XP did not reduce to 80% at Level II.");
+  assert(getMapOneBotXpDelta(5480, 100) === 20, "Map 1 bot XP did not clamp at the Level III cap.");
+  assert(getMapOneBotXpDelta(5500, 250) === 0, "Map 1 bot XP continued beyond Level III.");
 }
 
 function playerCount(room) {
@@ -2122,9 +2128,9 @@ async function assertStagingStorePreviewHelpers() {
     .map((item) => [item.localKey, item.price]));
   assert(JSON.stringify(pioneerPrices) === JSON.stringify({
     falcon: 0,
-    bison: 14000,
-    monolith: 48000,
-    zeusExplorer: 22000
+    bison: 9000,
+    monolith: 30000,
+    zeusExplorer: 15000
   }), `Pioneer staging hull prices diverged from the intended catalogue: ${JSON.stringify(pioneerPrices)}`);
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
@@ -2165,7 +2171,7 @@ async function assertStagingStorePreviewHelpers() {
   const bisonSaveData = { ...validSaveData, credits: 15000 };
   const bisonPatch = buildStagingStorePurchasePatch(bisonSaveData, bisonItem, 1);
   assert(bisonPatch.ok === true, `Valid Bison Store patch was blocked: ${bisonPatch.blockReason}`);
-  assert(bisonPatch.creditsBefore === 15000 && bisonPatch.creditsAfter === 1000, "Pioneer Freighter Store patch did not subtract the hull price.");
+  assert(bisonPatch.creditsBefore === 15000 && bisonPatch.creditsAfter === 6000, "Pioneer Freighter Store patch did not subtract the hull price.");
   assert(bisonPatch.itemBefore === 1 && bisonPatch.itemAfter === 2, "Bison Store patch did not append ownedShips.");
   assert(bisonPatch.patchedSaveData.ownedShips.includes("bison"), "Bison Store patch did not add the ship.");
   assert(bisonPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Bison Store patch changed existing loadouts.");
@@ -2396,10 +2402,10 @@ async function assertStagingStorePreviewHelpers() {
     }
   });
   assert(appliedHaulerWrite.applied === true && appliedHaulerWrite.mode === "store_write", `Gated Bison Store write did not apply: ${appliedHaulerWrite.blockReason}`);
-  assert(appliedHaulerWrite.creditsBefore === 15000 && appliedHaulerWrite.creditsAfter === 1000, "Applied Pioneer Freighter Store write returned incorrect credits.");
+  assert(appliedHaulerWrite.creditsBefore === 15000 && appliedHaulerWrite.creditsAfter === 6000, "Applied Pioneer Freighter Store write returned incorrect credits.");
   assert(appliedHaulerWrite.creditsWritten === true && appliedHaulerWrite.shipWritten === true && appliedHaulerWrite.saveWritten === true, "Applied Bison Store write did not report allowed writes.");
   assert(appliedHaulerWrite.inventoryWritten === false && appliedHaulerWrite.attachmentWritten === false && appliedHaulerWrite.weaponWritten === false, "Applied Bison Store write reported forbidden writes.");
-  assert(haulerSave.credits === 1000 && haulerSave.ownedShips.includes("bison"), "Applied Bison Store write did not update mocked save state.");
+  assert(haulerSave.credits === 6000 && haulerSave.ownedShips.includes("bison"), "Applied Bison Store write did not update mocked save state.");
   assert(haulerSave.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Applied Bison Store write changed existing loadout.");
   assert(haulerSave.shipLoadouts.bison.attachments.length === 0, "Applied Bison Store write did not initialise loadout.");
   assert(haulerSave.ownedAttachments.cargoPod === 1, "Applied Bison Store write changed attachments.");
@@ -5818,8 +5824,8 @@ try {
   const inspectedBotBeforeCombat = botSnapshots(roomA).find((bot) => bot.botType === "destroyer") || botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
   assert(inspectedBotBeforeCombat.botType === "destroyer", "Regression combat bot was not a Destroyer.");
-  assert(inspectedBotBeforeCombat.damagePerHit === 32, `Destroyer damage should be 32, saw ${inspectedBotBeforeCombat.damagePerHit}.`);
-  assert(inspectedBotBeforeCombat.attackCooldownMs === 3500, `Destroyer cooldown changed unexpectedly: ${inspectedBotBeforeCombat.attackCooldownMs}.`);
+  assert(inspectedBotBeforeCombat.damagePerHit === 38, `Destroyer damage should be 38, saw ${inspectedBotBeforeCombat.damagePerHit}.`);
+  assert(inspectedBotBeforeCombat.attackCooldownMs === 3300, `Destroyer cooldown changed unexpectedly: ${inspectedBotBeforeCombat.attackCooldownMs}.`);
   assert(inspectedBotBeforeCombat.threat === "Heavy Threat", `Destroyer threat label mismatch: ${inspectedBotBeforeCombat.threat}.`);
 
   const stalePlayerNode = inspectedBotBeforeCombat.currentNode === "Asteron Prime" ? "Virella" : "Asteron Prime";

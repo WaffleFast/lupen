@@ -7,6 +7,9 @@
 const MAX_STAGING_XP_DELTA = 500;
 const MAX_STAGING_CREDITS_DELTA = 50000;
 const MAX_STAGING_LUPEN_SHARD_DELTA = 100;
+const MAP_ONE_LEVEL_TWO_XP = 2500;
+const MAP_ONE_MAX_XP = 5500;
+const MAP_ONE_POST_LEVEL_TWO_BOT_XP_MULTIPLIER = 0.8;
 
 function getStringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
@@ -23,6 +26,18 @@ function getIntegerValue(value, fallback = 0) {
 
 function clampInteger(value, min, max) {
   return Math.max(min, Math.min(max, getIntegerValue(value, min)));
+}
+
+export function getMapOneBotXpDelta(currentXp = 0, baseXp = 0) {
+  const safeCurrentXp = clampInteger(currentXp, 0, MAP_ONE_MAX_XP);
+  const safeBaseXp = Math.max(0, getIntegerValue(baseXp, 0));
+  const multiplier = safeCurrentXp >= MAP_ONE_LEVEL_TWO_XP
+    ? MAP_ONE_POST_LEVEL_TWO_BOT_XP_MULTIPLIER
+    : 1;
+  return Math.min(
+    Math.max(0, MAP_ONE_MAX_XP - safeCurrentXp),
+    Math.max(0, Math.round(safeBaseXp * multiplier))
+  );
 }
 
 function cloneJson(value) {
@@ -251,7 +266,7 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
   const sourceLedgerId = getStringValue(rewardApplicationPlan.sourceLedgerId || context.sourceLedgerId);
   const duplicateDetected = context.duplicateDetected === true || rewardApplicationPlan.duplicateDetected === true;
   const idempotencyKey = getIdempotencyKey(playerId, sourceEventId, sourceLedgerId);
-  const xpDelta = clampInteger(rewardApplicationPlan.xpDelta, 0, MAX_STAGING_XP_DELTA);
+  const requestedXpDelta = clampInteger(rewardApplicationPlan.xpDelta, 0, MAX_STAGING_XP_DELTA);
   const creditsDelta = clampInteger(rewardApplicationPlan.creditsDelta, 0, MAX_STAGING_CREDITS_DELTA);
   const lupenShardDelta = Math.min(
     MAX_STAGING_LUPEN_SHARD_DELTA,
@@ -262,6 +277,13 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
   const xpMatch = resolveNumericPath(currentSaveData, [
     ["playerProgress", "combatXp"]
   ]);
+  const isBotXpReward = String(rewardApplicationPlan.reason || "").includes("bot");
+  const xpBefore = xpMatch ? getIntegerValue(xpMatch.value, 0) : null;
+  const xpDelta = xpMatch && isBotXpReward
+    ? getMapOneBotXpDelta(xpBefore, requestedXpDelta)
+    : xpMatch
+      ? Math.min(requestedXpDelta, Math.max(0, MAP_ONE_MAX_XP - xpBefore))
+      : requestedXpDelta;
   const creditsMatch = resolveNumericPath(currentSaveData, [
     ["credits"]
   ]);
@@ -304,8 +326,8 @@ export function buildPlayerSavePatchPlan(currentSaveData = {}, rewardApplication
     xpDelta,
     creditsDelta,
     lupenShardDelta,
-    xpBefore: xpMatch ? getIntegerValue(xpMatch.value, 0) : null,
-    xpAfter: xpMatch ? getIntegerValue(xpMatch.value, 0) + xpDelta : null,
+    xpBefore,
+    xpAfter: xpMatch ? xpBefore + xpDelta : null,
     creditsBefore: creditsMatch ? getIntegerValue(creditsMatch.value, 0) : null,
     creditsAfter: creditsMatch ? getIntegerValue(creditsMatch.value, 0) + creditsDelta : null,
     lupenShardsBefore: lupenShardsMatch ? getIntegerValue(lupenShardsMatch.value, 0) : null,
