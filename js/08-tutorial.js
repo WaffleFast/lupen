@@ -489,7 +489,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "forge-upgrade-weapon",
     title: "Upgrade Pulse Laser",
-    text: "Upgrade the Pulse Laser. It will rise from Level I to Level II and remain fitted to your loadout.",
+    text: "Your Academy bounty funds this first upgrade. The equipped Pulse Laser is selected; press the highlighted upgrade button to raise it from Level I to Level II.",
     target: "tutorial:forgeUpgradeButton",
     event: "upgradedTutorialWeapon"
   },
@@ -624,6 +624,7 @@ function loadTutorialState() {
     lastStartedAt: parsed.lastStartedAt || null,
     pilotId: String(parsed.pilotId || ""),
     journeyIntroduced: Boolean(parsed.journeyIntroduced),
+    forgeStarterShardsReconciled: Boolean(parsed.forgeStarterShardsReconciled),
     stepId: String(parsed.stepId || ""),
     flowVersion: Math.max(0, Number(parsed.flowVersion || 0))
   };
@@ -1183,6 +1184,7 @@ function startStarterTutorial(reset = true, options = {}) {
     lastStartedAt: reset ? new Date().toISOString() : (tutorialState.lastStartedAt || new Date().toISOString()),
     pilotId,
     journeyIntroduced: reset ? false : Boolean(tutorialState.journeyIntroduced),
+    forgeStarterShardsReconciled: reset ? false : Boolean(tutorialState.forgeStarterShardsReconciled),
     stepId: reset ? STARTER_TUTORIAL_STEPS[Math.max(0, firstStep)]?.id || "" : String(tutorialState.stepId || ""),
     flowVersion: TUTORIAL_FLOW_VERSION
   };
@@ -1238,6 +1240,7 @@ function clearStarterTutorialState() {
     lastStartedAt: null,
     pilotId: "",
     journeyIntroduced: false,
+    forgeStarterShardsReconciled: false,
     stepId: "",
     flowVersion: TUTORIAL_FLOW_VERSION
   };
@@ -1676,7 +1679,7 @@ function getDynamicTutorialTarget(step) {
 
   if (step.target === "tutorial:forgeUpgradeButton") {
     return document.querySelector("#forgeStartBtn:not(:disabled)") ||
-           document.querySelector("#forgeChamber");
+           document.querySelector("#forgeStartBtn");
   }
 
   return null;

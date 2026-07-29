@@ -297,6 +297,32 @@ function prepareTutorialForgeSelection() {
   if (pulseLaserItemId) selectedForgeItemId = pulseLaserItemId;
 }
 
+function reconcileTutorialForgeStarterShards() {
+  if (!isTutorialForgeStepActive() || tutorialState?.forgeStarterShardsReconciled) return false;
+
+  const item = getForgeSelectedItem();
+  if (!item || item.key !== "pulseLaser" || item.categoryKey !== "guns") return false;
+
+  tutorialState.forgeStarterShardsReconciled = true;
+  if (typeof saveTutorialState === "function") saveTutorialState();
+
+  if (getForgeItemLevel(item) > 1) return false;
+  const requiredShards = getForgeLevelShardCost(1);
+  const currentShards = getLupenShardCount();
+  const restoredShards = Math.max(0, requiredShards - currentShards);
+  if (!restoredShards) return false;
+
+  upgradeMaterials.lupenShards = requiredShards;
+  if (typeof addActivityLog === "function") {
+    addActivityLog(`Academy bounty payout restored: +${formatNumber(restoredShards)} Lupen Shards.`);
+  }
+  if (typeof addHudToast === "function") {
+    addHudToast(`Academy bounty payout restored: +${formatNumber(restoredShards)} Lupen Shards. Forge upgrade ready.`);
+  }
+  if (typeof saveGame === "function") saveGame();
+  return true;
+}
+
 function setForgeMode(mode) {
   if (forgeAnimating) return;
   forgeUpgradeMode = "level";
@@ -964,6 +990,7 @@ function renderUpgradeForge() {
   upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
   forgeUpgradeMode = "level";
   prepareTutorialForgeSelection();
+  reconcileTutorialForgeStarterShards();
   const items = getForgeUpgradeableItems();
   const item = getForgeSelectedItem();
   const requirements = getForgeRequirements(item);

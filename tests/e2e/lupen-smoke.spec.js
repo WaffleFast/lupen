@@ -8679,6 +8679,100 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("Academy Forge restores a short bounty payout and highlights the enabled upgrade", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        selectedShipyardShipId = "falcon";
+        ownedShips = ["falcon"];
+        playerProgress = normalizePlayerProgress({ combatXp: 2500 });
+        ownedGuns.pulseLaser = 0;
+        inventoryItems = [];
+        shipLoadouts = {
+          falcon: normalizeShipLoadout({ attachments: [], guns: [makeLeveledLoadoutEntry("pulseLaser", "standard", 1)] }, "falcon")
+        };
+        shipConditions = {};
+        upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 10 });
+        tutorialState = {
+          active: true,
+          completed: false,
+          stepIndex: STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "open-forge"),
+          lastStartedAt: new Date().toISOString(),
+          forgeStarterShardsReconciled: false
+        };
+        saveTutorialState();
+        showScreen("gameScreen");
+        openUpgradeForge();
+      })()
+    `));
+
+    await page.waitForFunction(() => getCurrentTutorialStep()?.id === "forge-upgrade-weapon");
+    await page.waitForFunction(() => document.getElementById("forgeStartBtn")?.classList.contains("tutorial-highlight-target"));
+
+    const readyState = await page.evaluate(() => ({
+      shardCount: upgradeMaterials.lupenShards,
+      selectedForgeItemId,
+      selectedKey: getForgeSelectedItem()?.key || "",
+      buttonDisabled: document.getElementById("forgeStartBtn")?.disabled,
+      buttonText: document.getElementById("forgeStartBtn")?.textContent?.trim() || "",
+      buttonHighlighted: document.getElementById("forgeStartBtn")?.classList.contains("tutorial-highlight-target"),
+      chamberHighlighted: document.getElementById("forgeChamber")?.classList.contains("tutorial-highlight-target"),
+      payoutReconciled: tutorialState.forgeStarterShardsReconciled
+    }));
+
+    expect(readyState).toMatchObject({
+      shardCount: 25,
+      selectedKey: "pulseLaser",
+      buttonDisabled: false,
+      buttonHighlighted: true,
+      chamberHighlighted: false,
+      payoutReconciled: true
+    });
+    expect(readyState.selectedForgeItemId).toContain("equipped:falcon:guns:0");
+    expect(readyState.buttonText).toContain("Level II");
+
+    await page.locator("#forgeStartBtn").click();
+    await page.waitForFunction(() => getEquipmentLevel(shipLoadouts.falcon.guns[0]) === 2, null, { timeout: 5000 });
+    await page.waitForFunction(() => getCurrentTutorialStep()?.id === "return-after-forge", null, { timeout: 5000 });
+
+    const upgradedState = await page.evaluate(() => {
+      renderUpgradeForge();
+      return {
+        level: getEquipmentLevel(shipLoadouts.falcon.guns[0]),
+        shardCount: upgradeMaterials.lupenShards,
+        payoutReconciled: tutorialState.forgeStarterShardsReconciled
+      };
+    });
+    expect(upgradedState).toEqual({
+      level: 2,
+      shardCount: 0,
+      payoutReconciled: true
+    });
+
+    await page.reload();
+    await waitForGameGlobals(page);
+    const persistedState = await page.evaluate(() => ({
+      level: getEquipmentLevel(shipLoadouts.falcon.guns[0]),
+      shardCount: upgradeMaterials.lupenShards,
+      payoutReconciled: tutorialState.forgeStarterShardsReconciled
+    }));
+    expect(persistedState).toEqual({
+      level: 2,
+      shardCount: 0,
+      payoutReconciled: true
+    });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("ship switching restores each hull condition instead of inheriting previous hull", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
