@@ -1526,7 +1526,7 @@ test.describe("Lupen browser smoke", () => {
     const progression = await page.evaluate(() => window.eval(`
       (() => {
         localStorage.clear();
-        credits = 50000;
+        credits = 250000;
         currentShipId = "falcon";
         selectedHangarShipId = "falcon";
         selectedFleetShipId = "falcon";
@@ -1635,7 +1635,7 @@ test.describe("Lupen browser smoke", () => {
     expect(progression.shieldOwned).toBe(0);
     expect(progression.ionOwned).toBe(1);
     expect(progression.equippedGuns).toBe(0);
-    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy - 24000);
+    expect(progression.creditsAfterLockedBuy).toBe(progression.creditsBeforeLockedBuy - 90000);
     expect(progression.ownedAfterLockedBuy).toEqual(["falcon", "zeusExplorer", "bison"]);
     expect(progression.nightshadeAvailable.locked).toBe(false);
     expect(progression.nightshadeAvailable.state).toBe("owned");
@@ -1676,7 +1676,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).not.toHaveClass(/progression-locked/);
     await expect(page.locator("#shipyardDetailPanel")).not.toContainText("Unlock Requirements");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 30,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 120,000");
 
     await page.reload();
     await waitForGameGlobals(page);
@@ -1919,6 +1919,41 @@ test.describe("Lupen browser smoke", () => {
           );
           return [botKey, summarize(runs)];
         }));
+        const runNoRepairRoute = (route, seed) => {
+          const random = makeRandom(seed);
+          let player = freshPlayer();
+          let elapsedMs = 0;
+          let encountersCompleted = 0;
+          for (const botKey of route) {
+            if (player.hull <= 0) break;
+            const result = fight(twinPulse, botKey, player, random);
+            player = result.player;
+            elapsedMs += result.elapsedMs;
+            if (!result.won) break;
+            encountersCompleted += 1;
+          }
+          return {
+            won: encountersCompleted === route.length,
+            elapsedMs,
+            encountersCompleted,
+            player
+          };
+        };
+        const noRepairRoutes = {
+          frontierPatrol: ["erebus_attacker", "erebus_destroyer", "erebus_attacker", "erebus_behemoth"],
+          extendedPatrol: ["erebus_hunter", "erebus_attacker", "erebus_destroyer", "erebus_attacker", "erebus_behemoth", "erebus_destroyer"]
+        };
+        const noRepairMetrics = Object.fromEntries(Object.entries(noRepairRoutes).map(([key, route], routeIndex) => {
+          const runs = Array.from({ length: 500 }, (_, runIndex) =>
+            runNoRepairRoute(route, 9000 + routeIndex * 1000 + runIndex)
+          );
+          return [key, {
+            route,
+            ...summarize(runs),
+            completionRate: Number((runs.filter(run => run.won).length / runs.length * 100).toFixed(1)),
+            averageEncountersCompleted: Number((runs.reduce((sum, run) => sum + run.encountersCompleted, 0) / runs.length).toFixed(1))
+          }];
+        }));
 
         const nodeTargets = new Map();
         [...createInitialAsteroids(), ...createInitialHostileBots()].forEach(target => {
@@ -2056,6 +2091,7 @@ test.describe("Lupen browser smoke", () => {
           destroyerThenHunter: summarize(destroyerHunterRuns),
           weaponPairs: pairMetrics,
           botFightMetrics,
+          noRepairMetrics,
           spawnConflicts,
           busiestNodeTargetCount,
           economy: {
@@ -2102,13 +2138,17 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.destroyerThenHunter.wins).toBe(200);
     expect(metrics.destroyerThenHunter.deaths).toBe(0);
     expect(metrics.destroyerThenHunter.averageHullRemaining).toBeGreaterThanOrEqual(560);
+    expect(metrics.noRepairMetrics.frontierPatrol.deaths).toBeGreaterThan(0);
+    expect(metrics.noRepairMetrics.frontierPatrol.completionRate).toBeGreaterThanOrEqual(95);
+    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBeGreaterThanOrEqual(250);
+    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBeLessThanOrEqual(450);
     expect(metrics.weaponPairs.twinHeavy.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinIon.theoreticalDps);
     expect(metrics.weaponPairs.twinIon.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinPulse.theoreticalDps);
     expect(metrics.weaponPairs.pulseHeavy.speed).toBe(1644);
     expect(metrics.spawnConflicts).toBe(0);
     expect(metrics.economy).toMatchObject({
       startingCredits: 10000,
-      shipPrices: { falcon: 0, bison: 9000, zeusExplorer: 15000, monolith: 30000 },
+      shipPrices: { falcon: 0, bison: 24000, zeusExplorer: 66000, monolith: 120000 },
       asteroidShardReward: 10,
       bountyShardRewards: [25, 35, 50, 75],
       bountyCreditRewards: [900, 1100, 1500, 2500],
@@ -2124,13 +2164,13 @@ test.describe("Lupen browser smoke", () => {
       combatLevelTwoXp: 2500
     });
     expect(metrics.economy.startingCredits)
-      .toBeGreaterThanOrEqual(metrics.economy.shipPrices.bison);
+      .toBeLessThan(metrics.economy.shipPrices.bison);
     expect(metrics.economy.startingCredits + metrics.economy.dailyTradeCreditTotal)
-      .toBeGreaterThanOrEqual(metrics.economy.shipPrices.zeusExplorer);
+      .toBeLessThan(metrics.economy.shipPrices.zeusExplorer);
     expect(metrics.economy.startingCredits + metrics.economy.dailyTradeCreditTotal)
       .toBeLessThan(metrics.economy.shipPrices.monolith);
     expect(metrics.economy.startingCredits + metrics.economy.dailyBountyCreditTotal + metrics.economy.dailyTradeCreditTotal)
-      .toBeLessThanOrEqual(metrics.economy.shipPrices.monolith);
+      .toBeLessThan(metrics.economy.shipPrices.monolith);
     expect(Math.min(...metrics.economy.bountyShardRewards))
       .toBeGreaterThanOrEqual(metrics.economy.asteroidShardReward * 2);
     expect(metrics.economy.dailyBountyShardTotal)
@@ -2163,8 +2203,10 @@ test.describe("Lupen browser smoke", () => {
     expect(levelThreeMilestone.kills).toBeLessThanOrEqual(65);
     expect(levelThreeMilestone.estimatedMinutes.typical).toBeGreaterThanOrEqual(55);
     expect(levelThreeMilestone.estimatedMinutes.typical).toBeLessThanOrEqual(70);
-    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeLessThanOrEqual(4);
-    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeLessThanOrEqual(90);
+    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeGreaterThanOrEqual(20);
+    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeLessThanOrEqual(25);
+    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeGreaterThan(120);
+    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeLessThan(150);
 
     console.log(`Map 1 playtest metrics: ${JSON.stringify(metrics)}`);
     await expectNoUnexpectedBrowserErrors(failures);
@@ -2352,7 +2394,7 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.eval(`
       (() => {
         localStorage.clear();
-        credits = 50000;
+        credits = 250000;
         currentShipId = STARTER_SHIP_ID;
         selectedHangarShipId = STARTER_SHIP_ID;
         selectedFleetShipId = STARTER_SHIP_ID;
@@ -3057,8 +3099,8 @@ test.describe("Lupen browser smoke", () => {
           x: 34,
           y: 25,
           level: 1,
-          damagePerHit: 20,
-          attackCooldownMs: 2300,
+          damagePerHit: 24,
+          attackCooldownMs: 2200,
           visualScale: 0.82,
           shield: 60,
           shieldMax: 60,
@@ -3078,8 +3120,8 @@ test.describe("Lupen browser smoke", () => {
           x: 45,
           y: 30,
           level: 2,
-          damagePerHit: 28,
-          attackCooldownMs: 2700,
+          damagePerHit: 32,
+          attackCooldownMs: 2600,
           visualScale: 0.94,
           shield: 90,
           shieldMax: 90,
@@ -3099,8 +3141,8 @@ test.describe("Lupen browser smoke", () => {
           x: 58,
           y: 31,
           level: 3,
-          damagePerHit: 38,
-          attackCooldownMs: 3300,
+          damagePerHit: 44,
+          attackCooldownMs: 3200,
           visualScale: 1.12,
           shield: 160,
           shieldMax: 160,
@@ -3120,8 +3162,8 @@ test.describe("Lupen browser smoke", () => {
           x: 72,
           y: 27,
           level: 5,
-          damagePerHit: 64,
-          attackCooldownMs: 4300,
+          damagePerHit: 72,
+          attackCooldownMs: 4200,
           visualScale: 1.32,
           shield: 300,
           shieldMax: 300,

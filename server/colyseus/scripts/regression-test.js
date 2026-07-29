@@ -383,10 +383,10 @@ function assertBotDisplayFields(room) {
 
 function assertMapOneBotTuning() {
   const expected = {
-    hunter: { damagePerHit: 20, xpReward: 75, threat: "Light Threat" },
-    attacker: { damagePerHit: 28, xpReward: 100, threat: "Medium Threat" },
-    destroyer: { damagePerHit: 38, attackCooldownMs: 3300, xpReward: 150, threat: "Heavy Threat" },
-    behemoth: { damagePerHit: 64, xpReward: 250, threat: "Extreme Threat" }
+    hunter: { damagePerHit: 24, xpReward: 75, threat: "Light Threat" },
+    attacker: { damagePerHit: 32, xpReward: 100, threat: "Medium Threat" },
+    destroyer: { damagePerHit: 44, attackCooldownMs: 3200, xpReward: 150, threat: "Heavy Threat" },
+    behemoth: { damagePerHit: 72, xpReward: 250, threat: "Extreme Threat" }
   };
   Object.entries(expected).forEach(([botType, values]) => {
     const config = EREBUS_BOT_TYPES[botType];
@@ -2128,9 +2128,9 @@ async function assertStagingStorePreviewHelpers() {
     .map((item) => [item.localKey, item.price]));
   assert(JSON.stringify(pioneerPrices) === JSON.stringify({
     falcon: 0,
-    bison: 9000,
-    monolith: 30000,
-    zeusExplorer: 15000
+    bison: 24000,
+    monolith: 120000,
+    zeusExplorer: 66000
   }), `Pioneer staging hull prices diverged from the intended catalogue: ${JSON.stringify(pioneerPrices)}`);
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
   assert(patchPlan.ok === true, `Valid Cargo Pod Store patch was blocked: ${patchPlan.blockReason}`);
@@ -2168,10 +2168,10 @@ async function assertStagingStorePreviewHelpers() {
   assert(jumpDrivePatch.patchedSaveData.ownedAttachments.cargoPod === 1, "Jump Drive Store patch changed Cargo Pod ownership.");
   assert(jumpDrivePatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Jump Drive Store patch changed shipLoadouts.");
 
-  const bisonSaveData = { ...validSaveData, credits: 15000 };
+  const bisonSaveData = { ...validSaveData, credits: 30000 };
   const bisonPatch = buildStagingStorePurchasePatch(bisonSaveData, bisonItem, 1);
   assert(bisonPatch.ok === true, `Valid Bison Store patch was blocked: ${bisonPatch.blockReason}`);
-  assert(bisonPatch.creditsBefore === 15000 && bisonPatch.creditsAfter === 6000, "Pioneer Freighter Store patch did not subtract the hull price.");
+  assert(bisonPatch.creditsBefore === 30000 && bisonPatch.creditsAfter === 6000, "Pioneer Freighter Store patch did not subtract the hull price.");
   assert(bisonPatch.itemBefore === 1 && bisonPatch.itemAfter === 2, "Bison Store patch did not append ownedShips.");
   assert(bisonPatch.patchedSaveData.ownedShips.includes("bison"), "Bison Store patch did not add the ship.");
   assert(bisonPatch.patchedSaveData.shipLoadouts.lupenOrigin.attachments[0] === "shieldBooster", "Bison Store patch changed existing loadouts.");
@@ -2375,7 +2375,7 @@ async function assertStagingStorePreviewHelpers() {
   assert(weaponSave.playerProgress.combatXp === 33, "Applied Pulse Laser Store write changed progression.");
   assert(weaponFetchCalls.join(",") === "GET,PATCH", `Pulse Laser Store write expected read/write pair, got ${weaponFetchCalls.join(",")}.`);
 
-  let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 15000 }));
+  let haulerSave = JSON.parse(JSON.stringify({ ...validSaveData, credits: 30000 }));
   const haulerFetchCalls = [];
   const appliedHaulerWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
@@ -2383,7 +2383,7 @@ async function assertStagingStorePreviewHelpers() {
     quantity: 1,
     trustedState: {
       available: true,
-      validationState: { credits: 15000 }
+      validationState: { credits: 30000 }
     },
     env: {
       SUPABASE_URL: "https://example.supabase.co",
@@ -2402,7 +2402,7 @@ async function assertStagingStorePreviewHelpers() {
     }
   });
   assert(appliedHaulerWrite.applied === true && appliedHaulerWrite.mode === "store_write", `Gated Bison Store write did not apply: ${appliedHaulerWrite.blockReason}`);
-  assert(appliedHaulerWrite.creditsBefore === 15000 && appliedHaulerWrite.creditsAfter === 6000, "Applied Pioneer Freighter Store write returned incorrect credits.");
+  assert(appliedHaulerWrite.creditsBefore === 30000 && appliedHaulerWrite.creditsAfter === 6000, "Applied Pioneer Freighter Store write returned incorrect credits.");
   assert(appliedHaulerWrite.creditsWritten === true && appliedHaulerWrite.shipWritten === true && appliedHaulerWrite.saveWritten === true, "Applied Bison Store write did not report allowed writes.");
   assert(appliedHaulerWrite.inventoryWritten === false && appliedHaulerWrite.attachmentWritten === false && appliedHaulerWrite.weaponWritten === false, "Applied Bison Store write reported forbidden writes.");
   assert(haulerSave.credits === 6000 && haulerSave.ownedShips.includes("bison"), "Applied Bison Store write did not update mocked save state.");
@@ -5824,8 +5824,8 @@ try {
   const inspectedBotBeforeCombat = botSnapshots(roomA).find((bot) => bot.botType === "destroyer") || botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
   assert(inspectedBotBeforeCombat.botType === "destroyer", "Regression combat bot was not a Destroyer.");
-  assert(inspectedBotBeforeCombat.damagePerHit === 38, `Destroyer damage should be 38, saw ${inspectedBotBeforeCombat.damagePerHit}.`);
-  assert(inspectedBotBeforeCombat.attackCooldownMs === 3300, `Destroyer cooldown changed unexpectedly: ${inspectedBotBeforeCombat.attackCooldownMs}.`);
+  assert(inspectedBotBeforeCombat.damagePerHit === 44, `Destroyer damage should be 44, saw ${inspectedBotBeforeCombat.damagePerHit}.`);
+  assert(inspectedBotBeforeCombat.attackCooldownMs === 3200, `Destroyer cooldown changed unexpectedly: ${inspectedBotBeforeCombat.attackCooldownMs}.`);
   assert(inspectedBotBeforeCombat.threat === "Heavy Threat", `Destroyer threat label mismatch: ${inspectedBotBeforeCombat.threat}.`);
 
   const stalePlayerNode = inspectedBotBeforeCombat.currentNode === "Asteron Prime" ? "Virella" : "Asteron Prime";
