@@ -2022,8 +2022,12 @@
       sellNode: String(offer.sellNode || ""),
       buyPrice: Number.isFinite(Number(offer.buyPrice)) ? Number(offer.buyPrice) : 0,
       sellPrice: Number.isFinite(Number(offer.sellPrice)) ? Number(offer.sellPrice) : 0,
+      previousBuyPrice: Number.isFinite(Number(offer.previousBuyPrice)) ? Number(offer.previousBuyPrice) : 0,
+      previousSellPrice: Number.isFinite(Number(offer.previousSellPrice)) ? Number(offer.previousSellPrice) : 0,
+      marketCycle: Number.isFinite(Number(offer.marketCycle)) ? Number(offer.marketCycle) : 0,
       maxQuantity: Number.isFinite(Number(offer.maxQuantity)) ? Number(offer.maxQuantity) : 0,
-      refreshSeconds: Number.isFinite(Number(offer.refreshSeconds)) ? Number(offer.refreshSeconds) : 0
+      refreshSeconds: Number.isFinite(Number(offer.refreshSeconds)) ? Number(offer.refreshSeconds) : 0,
+      secondsUntilRefresh: Number.isFinite(Number(offer.secondsUntilRefresh)) ? Number(offer.secondsUntilRefresh) : 0
     };
   }
 
@@ -3417,6 +3421,9 @@
         creditsWritten: message?.creditsWritten === true,
         cargoWritten: message?.cargoWritten === true,
         saveWritten: message?.saveWritten === true,
+        marketCycle: Number.isFinite(Number(message?.marketCycle)) ? Number(message.marketCycle) : 0,
+        marketWindowStartedAt: Number.isFinite(Number(message?.marketWindowStartedAt)) ? Number(message.marketWindowStartedAt) : 0,
+        marketExpiresAt: Number.isFinite(Number(message?.marketExpiresAt)) ? Number(message.marketExpiresAt) : 0,
         reason: String(message?.reason || ""),
         receivedAt: Number.isFinite(Number(message?.receivedAt)) ? Number(message.receivedAt) : Date.now()
       };
@@ -3988,8 +3995,10 @@
       });
     },
 
-    requestStagingTradeOffers() {
-      return sendRoomMessage("requestStagingTradeOffers", "stagingTrade:listOffers", {});
+    requestStagingTradeOffers(options = {}) {
+      return sendRoomMessage("requestStagingTradeOffers", "stagingTrade:listOffers", {
+        restartWindow: options.restartWindow === true
+      });
     },
 
     requestStagingTradePreview(options = {}) {

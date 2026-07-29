@@ -63,9 +63,20 @@ function getStagingTradeOfferId(resourceId = "", buyNode = "", sellNode = "") {
   ].filter(Boolean).join("-");
 }
 
-function buildStagingTradeOffers(now = Date.now()) {
-  const cycle = getMarketCycle(now);
-  const nextRefreshAt = (cycle + 1) * STAGING_TRADE_REFRESH_MS;
+function buildStagingTradeOffers(now = Date.now(), options = {}) {
+  const rawRequestedCycle = options?.marketCycle;
+  const requestedCycle = Number(rawRequestedCycle);
+  const cycle = rawRequestedCycle !== null
+    && rawRequestedCycle !== undefined
+    && rawRequestedCycle !== ""
+    && Number.isFinite(requestedCycle)
+    && requestedCycle >= 0
+    ? Math.floor(requestedCycle)
+    : getMarketCycle(now);
+  const requestedExpiresAt = Number(options?.expiresAt);
+  const nextRefreshAt = Number.isFinite(requestedExpiresAt) && requestedExpiresAt > now
+    ? requestedExpiresAt
+    : (cycle + 1) * STAGING_TRADE_REFRESH_MS;
   const secondsUntilRefresh = Math.max(0, Math.ceil((nextRefreshAt - now) / 1000));
   return STAGING_TRADE_RESOURCES.flatMap((resource) => {
     return STAGING_TRADE_PLANETS.flatMap((buyNode) => {
@@ -90,13 +101,13 @@ function buildStagingTradeOffers(now = Date.now()) {
   });
 }
 
-export function getStagingTradeOffers(now = Date.now()) {
-  return buildStagingTradeOffers(now).map((offer) => ({ ...offer }));
+export function getStagingTradeOffers(now = Date.now(), options = {}) {
+  return buildStagingTradeOffers(now, options).map((offer) => ({ ...offer }));
 }
 
-export function getStagingTradeOfferById(offerId = "", now = Date.now()) {
+export function getStagingTradeOfferById(offerId = "", now = Date.now(), options = {}) {
   const safeOfferId = String(offerId || "").trim();
-  const offer = buildStagingTradeOffers(now).find((entry) => entry.offerId === safeOfferId);
+  const offer = buildStagingTradeOffers(now, options).find((entry) => entry.offerId === safeOfferId);
   return offer ? { ...offer } : null;
 }
 
@@ -467,11 +478,17 @@ export function buildStagingTradeWriteDryRun({
   playerSnapshot = null,
   trustedState = null,
   identity = {},
+  marketCycle = null,
+  marketExpiresAt = 0,
+  now = Date.now(),
   env = process.env
 } = {}) {
   const safeOperation = operation === "sell" ? "sell" : "buy";
   const config = getStagingTradeWriteConfig(env);
-  const offer = getStagingTradeOfferById(offerId);
+  const offer = getStagingTradeOfferById(offerId, now, {
+    marketCycle,
+    expiresAt: marketExpiresAt
+  });
   const requestedQuantity = Number(quantity);
   const gates = getTradeWriteGates({ identity, trustedState, config });
 
@@ -656,9 +673,15 @@ export function buildStagingTradePreview({
   offerId = "",
   quantity = 1,
   playerSnapshot = null,
-  trustedState = null
+  trustedState = null,
+  marketCycle = null,
+  marketExpiresAt = 0,
+  now = Date.now()
 } = {}) {
-  const offer = getStagingTradeOfferById(offerId);
+  const offer = getStagingTradeOfferById(offerId, now, {
+    marketCycle,
+    expiresAt: marketExpiresAt
+  });
   const requestedQuantity = Number(quantity);
 
   if (!offer) {

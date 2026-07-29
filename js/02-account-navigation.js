@@ -1506,6 +1506,17 @@ function openMarketplace() {
     currentNode = lastPlanetNode || "Asteron Prime";
   }
 
+  const carryingMarketCargo = typeof MAP_ONE_TRADE_RESOURCES !== "undefined" &&
+    MAP_ONE_TRADE_RESOURCES.some((good) => Math.max(0, Number(cargo?.[good] || 0)) > 0);
+  if (typeof beginTradeMarketWindow === "function") {
+    beginTradeMarketWindow({ force: !carryingMarketCargo });
+  }
+  if (typeof isMultiplayerStagingActive === "function" && isMultiplayerStagingActive()) {
+    window.LupenMultiplayerClient?.requestStagingTradeOffers?.({
+      restartWindow: !carryingMarketCargo
+    });
+  }
+
   const tutorialTradeStep = typeof getCurrentTutorialStep === "function" ? getCurrentTutorialStep()?.id : "";
   const tutorialNeedsMarket = [
     "select-market-resource",

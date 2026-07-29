@@ -25,6 +25,7 @@ import {
   buildStagingLootClaimPlan
 } from "../services/lootWriteService.js";
 import {
+  STAGING_TRADE_REFRESH_MS,
   buildStagingTradePreview,
   buildStagingTradeWriteDryRun,
   getStagingTradeOfferById,
@@ -203,7 +204,11 @@ const BOT_NODE_LINKS = new Map(
   ])
 );
 const BOT_MOVE_TICK_MS = 4000;
-const BOT_NODE_MOVE_MS = 16000;
+const BOT_INITIAL_MOVE_MIN_MS = 5000;
+const BOT_INITIAL_MOVE_MAX_MS = 12000;
+const BOT_NODE_MOVE_MIN_MS = 12000;
+const BOT_NODE_MOVE_MAX_MS = 28000;
+const BOT_COMBAT_HOLD_MS = 8000;
 const STAGING_TEST_DAMAGE = 5;
 const STAGING_PVP_TEST_DAMAGE = 90;
 const STAGING_PVP_SHIELD_MAX = 30;
@@ -374,6 +379,18 @@ const STAGING_ASTEROID_LUPEN_SHARD_REWARD = 10;
 
 function rollStagingResourceShardReward(resourceName = "") {
   return STAGING_ASTEROID_LUPEN_SHARD_REWARD;
+}
+
+function getRandomDelay(minimumMs, maximumMs) {
+  const minimum = Math.max(0, Math.floor(Number(minimumMs || 0)));
+  const maximum = Math.max(minimum, Math.floor(Number(maximumMs || minimum)));
+  return minimum + Math.floor(Math.random() * (maximum - minimum + 1));
+}
+
+function getRandomBotMoveDelay({ initial = false } = {}) {
+  return initial
+    ? getRandomDelay(BOT_INITIAL_MOVE_MIN_MS, BOT_INITIAL_MOVE_MAX_MS)
+    : getRandomDelay(BOT_NODE_MOVE_MIN_MS, BOT_NODE_MOVE_MAX_MS);
 }
 
 export class LupenSectorPlayer extends Schema {
@@ -1518,6 +1535,7 @@ export class LupenSectorRoom extends Room {
     // authorized once per depletion and applied by the owning browser save path.
     this.stagingResourceMineCooldowns = new Map();
     this.stagingResourcePayoutKeys = new Set();
+    this.stagingTradeWindows = new Map();
 
     this.spawnDummyBots();
     this.spawnStagingResources();
@@ -1623,13 +1641,23 @@ export class LupenSectorRoom extends Room {
     // Staging-only trade dry-run endpoints. These preview deterministic
     // server-owned route math without mutating credits, cargo, inventory,
     // player_saves, economy state, Supabase rows, bounties, loot, or rewards.
-    this.onMessage("stagingTrade:listOffers", (client) => {
+    this.onMessage("stagingTrade:listOffers", (client, message = {}) => {
       this.touchPlayer(client.sessionId);
+      const marketWindow = this.getStagingTradeWindow(client.sessionId, {
+        restart: message?.restartWindow === true
+      });
+      const now = Date.now();
       client.send("stagingTrade:offers", {
         ok: true,
         mode: "dry_run",
         applied: false,
-        offers: getStagingTradeOffers(),
+        offers: getStagingTradeOffers(now, {
+          marketCycle: marketWindow.marketCycle,
+          expiresAt: marketWindow.expiresAt
+        }),
+        marketCycle: marketWindow.marketCycle,
+        marketWindowStartedAt: marketWindow.startedAt,
+        marketExpiresAt: marketWindow.expiresAt,
         creditsWritten: false,
         cargoWritten: false,
         saveWritten: false,
@@ -1645,11 +1673,14 @@ export class LupenSectorRoom extends Room {
         trustedPlayerId: player?.trustedPlayerId || "",
         playerId: player?.playerId || ""
       });
+      const marketWindow = this.getStagingTradeWindow(client.sessionId);
       const preview = buildStagingTradePreview({
         offerId: message?.offerId,
         quantity: message?.quantity,
         playerSnapshot: message?.playerSnapshot,
-        trustedState
+        trustedState,
+        marketCycle: marketWindow.marketCycle,
+        marketExpiresAt: marketWindow.expiresAt
       });
       client.send("stagingTrade:previewResult", {
         ...preview,
@@ -1848,6 +1879,7 @@ export class LupenSectorRoom extends Room {
     this.stagingBountyStates.delete(client.sessionId);
     this.clearStagingReturnFireForSession(client.sessionId);
     this.stagingResourceMineCooldowns.delete(client.sessionId);
+    this.stagingTradeWindows.delete(client.sessionId);
   }
 
   onDispose() {
@@ -1882,7 +1914,7 @@ export class LupenSectorRoom extends Room {
         hull: Number(definition.hull || 1),
         hullMax: Number(definition.hull || 1),
         lastUpdatedAt: now,
-        nextMoveAt: 0,
+        nextMoveAt: now + getRandomBotMoveDelay({ initial: true }),
         visualOnly: true,
         disabled: false,
         disabledUntil: 0
@@ -1924,16 +1956,32 @@ export class LupenSectorRoom extends Room {
     const now = Date.now();
     this.botStep += 1;
 
-    // Staging-only shared bot simulation. These are Colyseus-owned visual
-    // markers so connected clients see the same bot positions before real
-    // authoritative combat exists. They never enter loot, XP, targeting, or
-    // bounty systems.
+    // Shared server patrol simulation. Bots move only through hostile/combat
+    // nodes and stay put while any player has a server lock on them, so an
+    // active fight is stable while idle patrol routes remain unpredictable.
     Array.from(this.state.bots.values()).forEach((bot, index) => {
       if (bot.disabled && now >= Number(bot.disabledUntil || 0)) {
         this.respawnStagingBot(bot, index, now);
       }
 
       if (bot.disabled) return;
+
+      const activeCombat = Array.from(this.state.players.values()).some((player) =>
+        String(player?.selectedTargetBotId || "") === String(bot.id || "") &&
+        normalizePresenceNode(player?.currentNode) === normalizePresenceNode(bot.currentNode) &&
+        now - Number(player?.lastFireAt || 0) < BOT_COMBAT_HOLD_MS
+      );
+      if (activeCombat) {
+        bot.nextMoveAt = Math.max(Number(bot.nextMoveAt || 0), now + BOT_MOVE_TICK_MS);
+      } else if (now >= Number(bot.nextMoveAt || 0)) {
+        const previousNode = bot.currentNode;
+        const nextNode = this.getNextBotNode(previousNode);
+        bot.currentNode = nextNode;
+        const position = this.allocateOpenSpacePosition(nextNode, { kind: "bot", id: bot.id });
+        bot.x = position.x;
+        bot.y = position.y;
+        bot.nextMoveAt = now + getRandomBotMoveDelay();
+      }
 
       const occupied = this.getOccupiedSpacePositions(bot.currentNode, { kind: "bot", id: bot.id });
       if (!this.isSpacePositionOpen(bot, occupied)) {
@@ -2053,10 +2101,28 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  getNextBotNode(currentNode, index = 0) {
+  getNextBotNode(currentNode) {
     const options = BOT_NODE_LINKS.get(currentNode) || STAGING_BOT_ALLOWED_NODE_IDS;
-    const nextNode = options[(this.botStep + index) % options.length] || currentNode || STAGING_BOT_ALLOWED_NODE_IDS[0];
+    const nextNode = options[Math.floor(Math.random() * Math.max(1, options.length))] ||
+      currentNode ||
+      STAGING_BOT_ALLOWED_NODE_IDS[0];
     return STAGING_BOT_ALLOWED_NODE_IDS.includes(nextNode) ? nextNode : STAGING_BOT_ALLOWED_NODE_IDS[0];
+  }
+
+  getStagingTradeWindow(sessionId, { restart = false } = {}) {
+    const now = Date.now();
+    const existing = this.stagingTradeWindows.get(sessionId);
+    if (!restart && existing && now < Number(existing.expiresAt || 0)) {
+      return existing;
+    }
+
+    const marketWindow = {
+      marketCycle: Math.floor(now / STAGING_TRADE_REFRESH_MS),
+      startedAt: now,
+      expiresAt: now + STAGING_TRADE_REFRESH_MS
+    };
+    this.stagingTradeWindows.set(sessionId, marketWindow);
+    return marketWindow;
   }
 
   touchPlayer(sessionId) {
@@ -3596,16 +3662,22 @@ export class LupenSectorRoom extends Room {
       trustedPlayerId: identity.trustedPlayerId,
       playerId: identity.playerId
     });
+    const marketWindow = this.getStagingTradeWindow(client.sessionId);
     const result = buildStagingTradeWriteDryRun({
       operation,
       offerId: message?.offerId,
       quantity: message?.quantity,
       playerSnapshot: message?.playerSnapshot,
       trustedState,
-      identity
+      identity,
+      marketCycle: marketWindow.marketCycle,
+      marketExpiresAt: marketWindow.expiresAt
     });
 
-    const offer = getStagingTradeOfferById(message?.offerId);
+    const offer = getStagingTradeOfferById(message?.offerId, Date.now(), {
+      marketCycle: marketWindow.marketCycle,
+      expiresAt: marketWindow.expiresAt
+    });
     const requestedNode = getStringValue(message?.currentNode)
       || getStringValue(message?.playerSnapshot?.currentNode);
     if (requestedNode && KNOWN_SECTOR_NODES.has(requestedNode) && player?.multiplayerMode === "staging") {
@@ -4111,7 +4183,7 @@ export class LupenSectorRoom extends Room {
 
   respawnStagingBot(bot, index = 0, now = Date.now()) {
     const botTypePayload = this.getBotTypePayload(bot);
-    const respawnNode = this.getNextBotNode(bot.currentNode, index + this.botStep + 1);
+    const respawnNode = this.getNextBotNode(bot.currentNode);
     const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
     bot.currentNode = nodePosition.node;
     const position = this.allocateOpenSpacePosition(bot.currentNode, { kind: "bot", id: bot.id });
@@ -4122,7 +4194,7 @@ export class LupenSectorRoom extends Room {
     bot.disabled = false;
     bot.disabledUntil = 0;
     bot.lastUpdatedAt = now;
-    bot.nextMoveAt = now + BOT_NODE_MOVE_MS + index * 1250;
+    bot.nextMoveAt = now + getRandomBotMoveDelay();
     this.clearBotContributions(bot.id);
     this.rewardPreviews.delete(bot.id);
 

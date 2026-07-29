@@ -436,10 +436,10 @@ test.describe("Trade Terminal final quick actions", () => {
     }));
 
     const after = await page.evaluate(({ cycle, price }) => {
-      let targetCycle = cycle + 1;
-      while (targetCycle < cycle + 30 && getLiveMarketPriceForCycle("Copper", "Asteron Prime", targetCycle) === price) targetCycle += 1;
+      let cycleOffset = 1;
+      while (cycleOffset < 30 && getLiveMarketPriceForCycle("Copper", "Asteron Prime", cycle + cycleOffset) === price) cycleOffset += 1;
       const realNow = Date.now;
-      Date.now = () => targetCycle * TRADE_MARKET_REFRESH_MS + 1;
+      Date.now = () => tradeMarketWindowStartedAt + cycleOffset * TRADE_MARKET_REFRESH_MS + 1;
       renderedMarketCycle = cycle;
       updateTradeTimerDisplay();
       const result = {
@@ -459,6 +459,80 @@ test.describe("Trade Terminal final quick actions", () => {
     expect(after.quantity).toBeGreaterThan(0);
     expect(after.totalText).toContain(`CR ${after.price * after.quantity}`);
     await expect(page.locator("#marketScreen")).not.toContainText(/Best Opportunity/i);
+  });
+
+  test("opening the market starts a full quote window that survives the trip to sell", async ({ page }) => {
+    await prepareTerminal(page);
+
+    const windowState = await page.evaluate(() => {
+      const realNow = Date.now;
+      const anchor = Math.floor(realNow() / TRADE_MARKET_REFRESH_MS) * TRADE_MARKET_REFRESH_MS + 89000;
+      Date.now = () => anchor;
+      beginTradeMarketWindow({ force: true, now: anchor });
+      renderedMarketCycle = getMarketCycle();
+      renderMarketplace();
+
+      const initial = {
+        seconds: getNextMarketRefreshSeconds(),
+        countdown: document.querySelector("[data-market-countdown]")?.textContent || "",
+        cycle: getMarketCycle(),
+        buyPrice: getLiveMarketPrice("Iron", "Asteron Prime"),
+        sellPrice: getLiveMarketPrice("Iron", "Virella"),
+        startedAt: tradeMarketWindowStartedAt
+      };
+
+      Date.now = () => anchor + 89000;
+      updateTradeTimerDisplay();
+      const beforeArrival = {
+        seconds: getNextMarketRefreshSeconds(),
+        cycle: getMarketCycle(),
+        buyPrice: getLiveMarketPrice("Iron", "Asteron Prime"),
+        sellPrice: getLiveMarketPrice("Iron", "Virella")
+      };
+
+      cargo.Iron = 1;
+      cargoPurchased.Iron = 1;
+      cargoCostBasis.Iron = initial.buyPrice;
+      currentNode = "Virella";
+      lastPlanetNode = "Virella";
+      openMarketplace();
+      const atDestination = {
+        seconds: getNextMarketRefreshSeconds(),
+        cycle: getMarketCycle(),
+        sellPrice: getLiveMarketPrice("Iron", "Virella"),
+        startedAt: tradeMarketWindowStartedAt
+      };
+
+      Date.now = () => anchor + 91000;
+      updateTradeTimerDisplay();
+      const afterExpiry = {
+        seconds: getNextMarketRefreshSeconds(),
+        cycle: getMarketCycle()
+      };
+
+      Date.now = realNow;
+      stopTradeTerminalTimer();
+      return { initial, beforeArrival, atDestination, afterExpiry };
+    });
+
+    expect(windowState.initial).toMatchObject({
+      seconds: 90,
+      countdown: "01:30"
+    });
+    expect(windowState.beforeArrival).toMatchObject({
+      seconds: 1,
+      cycle: windowState.initial.cycle,
+      buyPrice: windowState.initial.buyPrice,
+      sellPrice: windowState.initial.sellPrice
+    });
+    expect(windowState.atDestination).toMatchObject({
+      seconds: 1,
+      cycle: windowState.initial.cycle,
+      sellPrice: windowState.initial.sellPrice,
+      startedAt: windowState.initial.startedAt
+    });
+    expect(windowState.afterExpiry.cycle).toBe(windowState.initial.cycle + 1);
+    expect(windowState.afterExpiry.seconds).toBe(89);
   });
 
   test("future commodity rows scroll internally while header and quick actions remain fixed", async ({ page }) => {

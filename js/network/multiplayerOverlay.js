@@ -2123,6 +2123,15 @@
   }
 
   function getSelectedTargetBotId() {
+    const selectedCoreTarget = typeof global.getSelectedTargetEntity === "function"
+      ? global.getSelectedTargetEntity()
+      : null;
+    if (selectedCoreTarget) {
+      const selectedCoreType = typeof global.getTargetTypeFromEntity === "function"
+        ? global.getTargetTypeFromEntity(selectedCoreTarget)
+        : "";
+      return selectedCoreType === "stagingBot" ? String(selectedCoreTarget.id || "") : "";
+    }
     return getClient()?.getStatus?.()?.selectedTargetBotId || "";
   }
 
@@ -2343,9 +2352,10 @@
     const client = getClient();
     const status = client?.getStatus?.();
     if (!status?.enabled || !status?.isConnected) return;
-    client.selectStagingBot?.(bot.id, { currentNode: getCurrentNodeName() });
     if (typeof global.selectStagingBotTarget === "function") {
       global.selectStagingBotTarget(bot.id);
+    } else {
+      client.selectStagingBot?.(bot.id, { currentNode: getCurrentNodeName() });
     }
   }
 

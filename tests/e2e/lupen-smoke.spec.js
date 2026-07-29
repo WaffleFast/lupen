@@ -8146,6 +8146,179 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("selecting another server object keeps the active bot attack locked until Engage", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        const originalClient = window.LupenMultiplayerClient;
+        const originalSelected = selectedTarget;
+        const originalEngaged = engagedTarget;
+        const originalTimer = engageTimer;
+        if (engageTimer) clearInterval(engageTimer);
+        engageTimer = null;
+        selectedTarget = null;
+        engagedTarget = null;
+
+        const botA = {
+          id: "lock-bot-a",
+          name: "Erebus Hunter A",
+          displayName: "Erebus Hunter A",
+          currentNode: "Lower Gate Core",
+          x: 32,
+          y: 30,
+          hull: 60,
+          hullMax: 60,
+          shield: 60,
+          shieldMax: 60,
+          disabled: false
+        };
+        const botB = {
+          ...botA,
+          id: "lock-bot-b",
+          name: "Erebus Hunter B",
+          displayName: "Erebus Hunter B",
+          x: 68
+        };
+        const resource = {
+          id: "lock-resource",
+          resourceName: "Iron",
+          currentNode: "Lower Gate Core",
+          x: 50,
+          y: 24,
+          hp: 30,
+          hpMax: 30,
+          depleted: false
+        };
+        const bots = [botA, botB];
+        let serverSelectedBotId = "";
+        const selectCalls = [];
+        const clearCalls = [];
+        const combatIntents = [];
+
+        window.LupenMultiplayerClient = {
+          ...(originalClient || {}),
+          getStatus: () => ({
+            enabled: true,
+            isConnected: true,
+            sessionId: "lock-test-player",
+            selectedTargetBotId: serverSelectedBotId
+          }),
+          getBotById: id => bots.find(bot => bot.id === id) || null,
+          getBots: () => bots,
+          getBotsInCurrentNode: () => bots,
+          getResourceById: id => id === resource.id ? resource : null,
+          getResources: () => [resource],
+          getPlayers: () => [],
+          selectStagingBot: id => {
+            serverSelectedBotId = String(id || "");
+            selectCalls.push(serverSelectedBotId);
+            return { ok: true };
+          },
+          clearStagingTarget: () => {
+            serverSelectedBotId = "";
+            clearCalls.push("clear");
+            return { ok: true };
+          },
+          sendSelectedStagingBotCombatIntent: intent => {
+            combatIntents.push({ ...intent });
+            return { ok: true };
+          }
+        };
+
+        currentNode = "Lower Gate Core";
+        showScreen("spaceScreen");
+        selectStagingBotTarget(botA.id);
+        engageTarget();
+        const initiallyEngaged = {
+          selected: { ...selectedTarget },
+          engaged: { ...engagedTarget },
+          serverSelectedBotId,
+          selectCalls: [...selectCalls],
+          combatTargets: combatIntents.map(intent => intent.targetBotId)
+        };
+
+        selectStagingResourceTarget(resource.id);
+        performStagingBotAttackCycle();
+        const afterResourceSelection = {
+          selected: { ...selectedTarget },
+          engaged: { ...engagedTarget },
+          serverSelectedBotId,
+          actionText: document.getElementById("objectEngageBtn")?.textContent || "",
+          selectCalls: [...selectCalls],
+          combatTargets: combatIntents.map(intent => intent.targetBotId)
+        };
+
+        selectStagingBotTarget(botB.id);
+        performStagingBotAttackCycle();
+        const afterBotSelection = {
+          selected: { ...selectedTarget },
+          engaged: { ...engagedTarget },
+          serverSelectedBotId,
+          actionText: document.getElementById("objectEngageBtn")?.textContent || "",
+          selectCalls: [...selectCalls],
+          combatTargets: combatIntents.map(intent => intent.targetBotId)
+        };
+
+        toggleTargetEngagement();
+        const afterExplicitSwitch = {
+          selected: { ...selectedTarget },
+          engaged: { ...engagedTarget },
+          serverSelectedBotId,
+          actionText: document.getElementById("objectEngageBtn")?.textContent || "",
+          selectCalls: [...selectCalls],
+          clearCalls: [...clearCalls],
+          combatTargets: combatIntents.map(intent => intent.targetBotId)
+        };
+
+        if (engageTimer) clearInterval(engageTimer);
+        engageTimer = originalTimer;
+        selectedTarget = originalSelected;
+        engagedTarget = originalEngaged;
+        window.LupenMultiplayerClient = originalClient;
+        return { initiallyEngaged, afterResourceSelection, afterBotSelection, afterExplicitSwitch };
+      })()
+    `));
+
+    expect(state.initiallyEngaged).toMatchObject({
+      selected: { type: "stagingBot", id: "lock-bot-a" },
+      engaged: { type: "stagingBot", id: "lock-bot-a" },
+      serverSelectedBotId: "lock-bot-a",
+      selectCalls: ["lock-bot-a"],
+      combatTargets: ["lock-bot-a"]
+    });
+    expect(state.afterResourceSelection).toMatchObject({
+      selected: { type: "stagingResource", id: "lock-resource" },
+      engaged: { type: "stagingBot", id: "lock-bot-a" },
+      serverSelectedBotId: "lock-bot-a",
+      actionText: "ENGAGE",
+      selectCalls: ["lock-bot-a"],
+      combatTargets: ["lock-bot-a", "lock-bot-a"]
+    });
+    expect(state.afterBotSelection).toMatchObject({
+      selected: { type: "stagingBot", id: "lock-bot-b" },
+      engaged: { type: "stagingBot", id: "lock-bot-a" },
+      serverSelectedBotId: "lock-bot-a",
+      actionText: "ENGAGE",
+      selectCalls: ["lock-bot-a"],
+      combatTargets: ["lock-bot-a", "lock-bot-a", "lock-bot-a"]
+    });
+    expect(state.afterExplicitSwitch).toMatchObject({
+      selected: { type: "stagingBot", id: "lock-bot-b" },
+      engaged: { type: "stagingBot", id: "lock-bot-b" },
+      serverSelectedBotId: "lock-bot-b",
+      actionText: "DISENGAGE",
+      selectCalls: ["lock-bot-a", "lock-bot-b"],
+      clearCalls: ["clear"]
+    });
+    expect(state.afterExplicitSwitch.combatTargets.at(-1)).toBe("lock-bot-b");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("multiplayer bounty confirmations advance the tutorial and show the claimed reward", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

@@ -70,12 +70,46 @@ const DAILY_TRADE_CONTRACT_DEFINITIONS = Object.freeze([
   })
 ]);
 
-function getMarketCycle() {
-  return Math.floor(Date.now() / TRADE_MARKET_REFRESH_MS);
+function beginTradeMarketWindow({ force = false, now = Date.now() } = {}) {
+  const safeNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const expired = !tradeMarketWindowStartedAt ||
+    safeNow >= tradeMarketWindowStartedAt + TRADE_MARKET_REFRESH_MS;
+  if (!force && !expired && Number.isFinite(Number(tradeMarketWindowCycle))) {
+    return {
+      startedAt: tradeMarketWindowStartedAt,
+      cycle: tradeMarketWindowCycle
+    };
+  }
+
+  tradeMarketWindowStartedAt = safeNow;
+  tradeMarketWindowCycle = Math.floor(safeNow / TRADE_MARKET_REFRESH_MS);
+  return {
+    startedAt: tradeMarketWindowStartedAt,
+    cycle: tradeMarketWindowCycle
+  };
 }
 
-function getNextMarketRefreshSeconds() {
-  return Math.max(0, Math.ceil(((getMarketCycle() + 1) * TRADE_MARKET_REFRESH_MS - Date.now()) / 1000));
+function getMarketCycle(now = Date.now()) {
+  const safeNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  if (!tradeMarketWindowStartedAt || !Number.isFinite(Number(tradeMarketWindowCycle))) {
+    return Math.floor(safeNow / TRADE_MARKET_REFRESH_MS);
+  }
+  const elapsedCycles = Math.max(0, Math.floor((safeNow - tradeMarketWindowStartedAt) / TRADE_MARKET_REFRESH_MS));
+  return tradeMarketWindowCycle + elapsedCycles;
+}
+
+function getNextMarketRefreshSeconds(now = Date.now()) {
+  const safeNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  if (typeof isMultiplayerStagingActive === "function" && isMultiplayerStagingActive()) {
+    const serverExpiresAt = Number(window.LupenMultiplayerClient?.getStatus?.()?.lastStagingTradeOffers?.marketExpiresAt || 0);
+    if (serverExpiresAt > safeNow) {
+      return Math.max(0, Math.ceil((serverExpiresAt - safeNow) / 1000));
+    }
+  }
+  if (!tradeMarketWindowStartedAt) return Math.ceil(TRADE_MARKET_REFRESH_MS / 1000);
+  const elapsed = Math.max(0, safeNow - tradeMarketWindowStartedAt);
+  const remaining = TRADE_MARKET_REFRESH_MS - (elapsed % TRADE_MARKET_REFRESH_MS);
+  return Math.max(0, Math.ceil(remaining / 1000));
 }
 
 function getLiveMarketPriceForCycle(good, planet, cycle = getMarketCycle()) {

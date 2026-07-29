@@ -1,6 +1,6 @@
 # Lupen Local Colyseus Prototype
 
-This is local-only server groundwork for future Lupen multiplayer. It is not connected to the live Vercel frontend, Supabase, `lupen.io`, or production gameplay.
+This server powers Lupen's internal `?mp=staging` multiplayer route, including shared sector presence, bots, resources, combat validation, and gated save writes. The clean `lupen.io` player route does not yet enable this multiplayer layer by default.
 
 ## What It Provides
 
@@ -9,7 +9,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
 - Preferred registered room: `lupen_sector`.
 - Legacy compatibility room: `lupen_test`.
 - A `LupenSectorRoom` that tracks connected players by `sessionId`.
-- A small fixed set of server-owned staging bots for visual-only multiplayer presence testing.
+- A shared set of server-owned Erebus bots and resource asteroids for multiplayer staging.
 - Staging bots spawn only on a server allow-list of hostile/combat sector nodes. They deliberately avoid planet safe nodes such as `Asteron Prime`, `Virella`, and `Nyxara`, plus safe link nodes.
 - Each joined player gets:
   - `id` / `sessionId`: the Colyseus `sessionId`
@@ -37,7 +37,7 @@ This is local-only server groundwork for future Lupen multiplayer. It is not con
   - `x` / `y`: placeholder map position
   - `lastUpdatedAt`: local server timestamp
   - `nextMoveAt`: planned next node-move timestamp for debugging
-- Staging bots drift on a slow server tick and occasionally move to neighbouring allowed combat nodes. They are shared through Colyseus room state so all connected staging clients see the same visual bot layer. They are not real gameplay bots, cannot fight, cannot enter real target arrays, do not drop loot, do not grant XP/rewards, and are not persisted.
+- Staging bots follow independently randomized server patrol schedules, move only through neighbouring hostile/combat nodes, and pause movement while a player has an active server lock. All connected staging clients receive the same positions and combat state. Bot combat, bounty progress, resource depletion, and asteroid respawns are server-authoritative within staging; progression and loot writes remain protected by their existing server gates.
 - Combat intent handling can apply shield-first staging test damage to a locked same-node staging bot and returns `combat:resolved` with `rewardsGranted: false`. Clients may send equipped weapon display data, but the server clamps staging damage between `1` and `50`, derives/clamps cooldown safely, and falls back to conservative test damage when payloads are invalid. Fast repeat fire returns `combat:rejected` with `reason: staging_fire_cooldown` and `cooldownRemainingMs`. Invalid intents return `combat:rejected`. This does not mutate player progression, rewards, loot, saves, bounty data, Supabase data, or real combat systems.
 - Successful staging combat also broadcasts `staging:shot` as a visual-only synced event with attacker, target, weapon, damage, and resulting shield/hull data. Clients may render this as a beam/hit flash, but it is not real projectile simulation and does not damage players or grant progression.
 - When staging bot hull reaches `0`, the bot broadcasts `bot:disabled`, stops taking staging damage, and respawns after a short delay with shield/hull restored. Respawn broadcasts `bot:respawned` and never grants rewards.

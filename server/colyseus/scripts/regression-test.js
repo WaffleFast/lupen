@@ -812,6 +812,29 @@ async function assertStagingTradeValidationHelpers() {
   assert(generatedOffers.every((offer) => offer.refreshSeconds === 90), "Live-market offers did not advertise the 90-second refresh cycle.");
   assert(generatedOffers.every((offer) => Number.isFinite(offer.previousBuyPrice) && Number.isFinite(offer.previousSellPrice)), "Live-market offers did not include previous-cycle prices for trend arrows.");
 
+  const quoteWindowStartedAt = 1_726_000_089_000;
+  const quoteWindowExpiresAt = quoteWindowStartedAt + 90_000;
+  const quoteWindowCycle = 19_177;
+  const openingWindowOffers = getStagingTradeOffers(quoteWindowStartedAt, {
+    marketCycle: quoteWindowCycle,
+    expiresAt: quoteWindowExpiresAt
+  });
+  const destinationWindowOffers = getStagingTradeOffers(quoteWindowStartedAt + 89_000, {
+    marketCycle: quoteWindowCycle,
+    expiresAt: quoteWindowExpiresAt
+  });
+  assert(openingWindowOffers.every((offer) => offer.secondsUntilRefresh === 90), "Entering the staging market did not start a full 90-second quote window.");
+  assert(destinationWindowOffers.every((offer) => offer.secondsUntilRefresh === 1), "The staging market quote window did not survive the journey to the destination.");
+  assert(
+    destinationWindowOffers.every((offer, index) => (
+      offer.offerId === openingWindowOffers[index]?.offerId
+      && offer.buyPrice === openingWindowOffers[index]?.buyPrice
+      && offer.sellPrice === openingWindowOffers[index]?.sellPrice
+      && offer.marketCycle === quoteWindowCycle
+    )),
+    "Staging market prices changed before the player's quote window expired."
+  );
+
   const extracted = extractTradeValidationStateFromSave({
     credits: 500,
     cargo: {
@@ -5236,13 +5259,18 @@ try {
   assert(incompleteBountyClaim?.applied === false && incompleteBountyClaim?.saveWritten === false, "Incomplete staging bounty claim reported writes.");
 
   const tradeOffers = await expectStagingTradeOffers(roomA, () => {
-    roomA.send("stagingTrade:listOffers", {});
+    roomA.send("stagingTrade:listOffers", { restartWindow: true });
   });
   assert(tradeOffers?.ok === true, "Staging trade offers did not return ok.");
   assert(tradeOffers?.mode === "dry_run", `Unexpected trade offers mode: ${tradeOffers?.mode}`);
   assert(tradeOffers?.applied === false, "Staging trade offers reported applied.");
   assert(Array.isArray(tradeOffers?.offers) && tradeOffers.offers.length >= 3, "Staging trade offers were not deterministic/non-empty.");
   assert(tradeOffers?.creditsWritten === false && tradeOffers?.cargoWritten === false && tradeOffers?.saveWritten === false, "Staging trade offers reported writes.");
+  assert(
+    Number(tradeOffers?.marketExpiresAt) - Number(tradeOffers?.marketWindowStartedAt) === 90_000,
+    "Entering the staging Trade Terminal did not create a full 90-second server quote window."
+  );
+  assert(tradeOffers.offers.every((offer) => offer.marketCycle === tradeOffers.marketCycle), "Staging trade offers did not share the server quote-window cycle.");
   const firstTradeOffer = tradeOffers.offers[0];
   assert(firstTradeOffer?.offerId && firstTradeOffer?.buyPrice > 0 && firstTradeOffer?.sellPrice > 0, "First staging trade offer is invalid.");
 
@@ -5650,6 +5678,8 @@ try {
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
   const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
   const initialBotPositions = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}`).join("|");
+  const initialMoveSchedules = new Set(botSnapshots(roomA).map((bot) => Number(bot.nextMoveAt || 0)));
+  assert(initialMoveSchedules.size > 5, "Server bot patrol schedules were not independently randomized.");
 
   await waitFor("shared server bot update", () => {
     return latestBotUpdateAt(roomA) > initialBotUpdateAt &&
@@ -5658,7 +5688,7 @@ try {
   }, 7000);
   console.log("both clients received matching server bot presence update");
 
-  await waitFor("staging bots remain passive and position-stable", () => {
+  await waitFor("staging bots patrol shared hostile nodes", () => {
     assertAllowedBotNodes(roomA);
     assertAllowedBotNodes(roomB);
     assertBotDisplayFields(roomA);
@@ -5667,11 +5697,11 @@ try {
     assertServerObjectCombatSafePositions(roomB);
     const currentBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
     const currentBotPositions = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}`).join("|");
-    return currentBotNodes === initialBotNodes &&
-      currentBotPositions === initialBotPositions &&
+    return currentBotNodes !== initialBotNodes &&
+      currentBotPositions !== initialBotPositions &&
       botSnapshotKey(roomA) === botSnapshotKey(roomB);
-  }, 7000);
-  console.log("staging bots stayed passive and position-stable before combat");
+  }, 18000);
+  console.log("both clients received the same randomized server bot patrol movement");
 
   await waitFor("server resources to appear", () => resourceCount(roomA) >= 4 && resourceCount(roomB) >= 4);
   assertResourceDisplayFields(roomA);

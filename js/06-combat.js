@@ -186,7 +186,12 @@ function selectStagingBotTarget(botId) {
   if (!bot || !bot.alive || !isCombatEntityInCurrentNode(bot)) return;
 
   selectedTarget = { type: "stagingBot", id: bot.id };
-  window.LupenMultiplayerClient?.selectStagingBot?.(bot.id, { currentNode });
+  const engagedBotId = engageTimer && engagedTarget?.type === "stagingBot"
+    ? String(engagedTarget.id || "")
+    : "";
+  if (!engagedBotId || engagedBotId === String(bot.id || "")) {
+    window.LupenMultiplayerClient?.selectStagingBot?.(bot.id, { currentNode });
+  }
   showTargetPanel();
   updateAsteroidUI();
   updateTargetPanel();
@@ -2068,6 +2073,9 @@ function performStagingBotAttackCycle() {
   const status = client?.getStatus?.();
   if (!status?.enabled || !status?.isConnected) return;
 
+  if (String(status.selectedTargetBotId || "") !== String(target.id || "")) {
+    client.selectStagingBot?.(target.id, { currentNode });
+  }
   client.sendSelectedStagingBotCombatIntent?.({
     targetBotId: target.id,
     currentNode,
