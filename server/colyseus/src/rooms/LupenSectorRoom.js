@@ -4086,6 +4086,7 @@ export class LupenSectorRoom extends Room {
 
   async sendStagingStorePurchaseRequest(client, message = {}) {
     const player = this.touchPlayer(client.sessionId);
+    const requestId = getStringValue(message?.requestId).slice(0, 128);
     const identity = {
       authStatus: player?.authStatus || "guest",
       trustedPlayerId: player?.trustedPlayerId || "",
@@ -4134,6 +4135,7 @@ export class LupenSectorRoom extends Room {
 
     const baseResult = {
       ...preview,
+      requestId,
       operation: "purchase",
       gates,
       writes: {

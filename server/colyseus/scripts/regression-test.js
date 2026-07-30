@@ -2404,7 +2404,8 @@ async function assertStagingStorePreviewHelpers() {
     quantity: 1,
     trustedState: {
       available: true,
-      validationState: { credits: 1000 }
+      validationState: { credits: 1000 },
+      rawSaveData: sequentialSave
     },
     env: {
       SUPABASE_URL: "https://example.supabase.co",
@@ -2419,15 +2420,7 @@ async function assertStagingStorePreviewHelpers() {
       storeFetchCalls.push(options.method || "GET");
       assert(options.headers?.apikey === "stub-service-key", "Store write did not use service role apikey.");
       assert(options.headers?.Authorization === "Bearer stub-service-key", "Store write did not use service role bearer.");
-      if ((options.method || "GET") === "GET") {
-        assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a&select=save_data,updated_at&limit=1", `Unexpected Store read URL: ${url}`);
-        return {
-          ok: true,
-          status: 200,
-          json: async () => [{ save_data: sequentialSave }]
-        };
-      }
-      assert(options.method === "PATCH", "Store write expected PATCH after read.");
+      assert(options.method === "PATCH", "Store write expected PATCH from the trusted preflight save.");
       assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a", `Unexpected Store PATCH URL: ${url}`);
       const body = JSON.parse(options.body || "{}");
       sequentialSave = body.save_data;
@@ -2446,7 +2439,8 @@ async function assertStagingStorePreviewHelpers() {
   assert(sequentialSave.cargo.Iron === 2 && sequentialSave.cargoCostBasis.Iron === 12, "Applied Store write changed trade cargo.");
   assert(sequentialSave.playerProgress.combatXp === 33, "Applied Store write changed progression.");
   assert(sequentialSave.activeBountyId === "keep-bounty", "Applied Store write changed bounty state.");
-  assert(storeFetchCalls.join(",") === "GET,PATCH", `Store write expected read/write pair, got ${storeFetchCalls.join(",")}.`);
+  assert(storeFetchCalls.join(",") === "PATCH", `Store write should reuse the trusted preflight read, got ${storeFetchCalls.join(",")}.`);
+  assert(appliedWrite.saveDataSource === "trusted_preflight", "Store write did not report trusted preflight reuse.");
 
   let weaponSave = JSON.parse(JSON.stringify(validSaveData));
   const weaponFetchCalls = [];
@@ -5499,6 +5493,7 @@ try {
 
   const defaultStorePurchase = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {
+      requestId: "store-regression-1",
       itemId: "attachment:cargoPod",
       quantity: 1,
       currentNode: "Nyxara",
@@ -5511,6 +5506,7 @@ try {
     });
   });
   assert(defaultStorePurchase?.applied === false, "Default staging Store purchase unexpectedly applied.");
+  assert(defaultStorePurchase?.requestId === "store-regression-1", "Store purchase did not echo its request ID.");
   assert(defaultStorePurchase?.mode === "blocked" || defaultStorePurchase?.mode === "dry_run", `Unexpected default Store purchase mode: ${defaultStorePurchase?.mode}`);
   assert(defaultStorePurchase?.creditsWritten === false && defaultStorePurchase?.attachmentWritten === false && defaultStorePurchase?.saveWritten === false, "Default Store purchase reported writes.");
   assert(defaultStorePurchase?.gates?.writeEnabled === true && defaultStorePurchase?.gates?.dryRun === false, "Default Store purchase gate should be enabled for verified staging writes.");

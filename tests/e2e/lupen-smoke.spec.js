@@ -5648,7 +5648,13 @@ test.describe("Lupen browser smoke", () => {
             snapshotUsed: false,
             receivedAt: Date.now()
           },
-          lastStagingStorePurchase: null
+          lastStagingStorePurchase: null,
+          lastStagingLoadoutEquip: {
+            itemId: "gun:pulseLaser",
+            applied: false,
+            blockReason: "gun_slots_full",
+            receivedAt: Date.now() - 120000
+          }
         };
 
         window.__stagingStorePurchasePayloads = [];
@@ -5665,6 +5671,7 @@ test.describe("Lupen browser smoke", () => {
             window.__stagingStorePurchasePayloads.push({ ...payload });
             setTimeout(() => {
               status.lastStagingStorePurchase = {
+                requestId: payload.requestId,
                 ok: true,
                 mode: "store_write",
                 operation: "purchase",
@@ -5693,7 +5700,8 @@ test.describe("Lupen browser smoke", () => {
                 currentNode: "Asteron Prime",
                 requestedNode: "Asteron Prime",
                 presenceStatus: "docked",
-                receivedAt: Date.now()
+                receivedAt: Date.now() - 60000,
+                clientReceivedAt: Date.now()
               };
               status.lastStagingStorePreview = status.lastStagingStorePurchase;
               subscribers.forEach(callback => callback({}));
@@ -5746,7 +5754,10 @@ test.describe("Lupen browser smoke", () => {
       currentNode: "Asteron Prime",
       presenceStatus: "docked"
     });
+    expect(after.payload.requestId).toMatch(/^store-\d+-\d+$/);
     expect(after.panelText).toContain("Pulse Laser purchased");
+    expect(after.panelText).not.toContain("Pending");
+    expect(after.panelText).not.toContain("could not be equipped");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

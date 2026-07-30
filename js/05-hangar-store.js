@@ -41,6 +41,7 @@ let multiplayerStagingPulseLaserEquipPending = false;
 let multiplayerStagingShipEquipPending = false;
 let multiplayerStagingLoadoutEquipPendingItemId = "";
 let multiplayerStagingLoadoutUnequipPending = false;
+let multiplayerStagingStorePurchaseSequence = 0;
 let selectedVaultActionContext = null;
 let selectedLoadoutItemContext = null;
 let selectedLoadoutStatusMessage = "";
@@ -754,7 +755,10 @@ async function requestStagingStorePurchase(item) {
   multiplayerStagingStoreStatusMessage = "Purchase requested.";
   renderStore();
   const requestedAt = Date.now();
+  multiplayerStagingStorePurchaseSequence += 1;
+  const requestId = `store-${requestedAt}-${multiplayerStagingStorePurchaseSequence}`;
   client.purchaseStagingStoreItem({
+    requestId,
     itemId,
     quantity: 1,
     currentNode: getMultiplayerStagingStoreNodeName(),
@@ -764,7 +768,10 @@ async function requestStagingStorePurchase(item) {
   (async () => {
     const latest = await waitForMultiplayerStagingResult(
       () => client.getStatus?.().lastStagingStorePurchase,
-      result => result?.itemId === itemId && Number(result?.receivedAt || 0) >= requestedAt
+      result => result?.itemId === itemId && (
+        result?.requestId === requestId ||
+        (!result?.requestId && Number(result?.clientReceivedAt || 0) >= requestedAt)
+      )
     );
     multiplayerStagingStorePurchasePending = false;
     if (latest?.itemId === itemId && latest.applied) {
@@ -4778,9 +4785,6 @@ function renderStoreDetail() {
         </div>
         ${renderStoreTransactionNotice(item)}
         ${renderStagingStorePreviewNote(item)}
-        ${renderStagingCargoPodEquipNote(item)}
-        ${renderStagingShieldBoosterEquipNote(item)}
-        ${renderStagingPulseLaserEquipNote(item)}
         ${renderStagingShipEquipNote(item)}
         ${detailStatsHtml}
       </div>

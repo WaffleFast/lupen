@@ -2226,6 +2226,7 @@
     if (!preview || typeof preview !== "object") return null;
 
     return {
+      requestId: String(preview.requestId || ""),
       ok: preview.ok === true,
       mode: String(preview.mode || "dry_run"),
       operation: String(preview.operation || "purchase"),
@@ -2301,7 +2302,8 @@
       currentNode: String(preview.currentNode || ""),
       requestedNode: String(preview.requestedNode || ""),
       presenceStatus: String(preview.presenceStatus || ""),
-      receivedAt: Number.isFinite(Number(preview.receivedAt)) ? Number(preview.receivedAt) : Date.now()
+      receivedAt: Number.isFinite(Number(preview.receivedAt)) ? Number(preview.receivedAt) : Date.now(),
+      clientReceivedAt: Date.now()
     };
   }
 
@@ -4071,6 +4073,7 @@
     purchaseStagingStoreItem(options = {}) {
       const snapshot = options.playerSnapshot || getStagingStorePlayerSnapshot();
       return sendRoomMessage("purchaseStagingStoreItem", "stagingStore:purchase", {
+        requestId: String(options.requestId || ""),
         itemId: String(options.itemId || ""),
         quantity: Number.isFinite(Number(options.quantity)) ? Math.round(Number(options.quantity)) : options.quantity || 1,
         currentNode: String(options.currentNode || snapshot?.currentNode || localPresence.currentNode || ""),

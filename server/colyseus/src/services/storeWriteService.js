@@ -498,18 +498,25 @@ export async function applyStagingStorePurchaseWrite({
   if (!baseUrl || !config.serviceRoleKey) return getBlockedResult("supabase_config_missing", { envGate, itemId: selectedItem.itemId });
 
   try {
-    const readResult = await fetchPlayerSaveRow(baseUrl, safePlayerId, config, fetchImpl);
-    if (!readResult.ok) {
-      return getBlockedResult(readResult.reason, {
-        envGate,
-        status: readResult.status,
-        itemId: selectedItem.itemId,
-        name: selectedItem.name,
-        quantity: safeQuantity
-      });
+    const trustedSaveData = trustedState?.rawSaveData && typeof trustedState.rawSaveData === "object" && !Array.isArray(trustedState.rawSaveData)
+      ? trustedState.rawSaveData
+      : null;
+    let saveData = trustedSaveData;
+    let saveDataSource = "trusted_preflight";
+    if (!saveData) {
+      const readResult = await fetchPlayerSaveRow(baseUrl, safePlayerId, config, fetchImpl);
+      if (!readResult.ok) {
+        return getBlockedResult(readResult.reason, {
+          envGate,
+          status: readResult.status,
+          itemId: selectedItem.itemId,
+          name: selectedItem.name,
+          quantity: safeQuantity
+        });
+      }
+      saveData = getSaveDataFromRow(readResult.row);
+      saveDataSource = "store_write_read";
     }
-
-    const saveData = getSaveDataFromRow(readResult.row);
     const patchPlan = buildStagingStorePurchasePatch(saveData, selectedItem, safeQuantity);
     if (!patchPlan.ok) {
       return {
@@ -555,6 +562,7 @@ export async function applyStagingStorePurchaseWrite({
       itemBefore: patchPlan.itemBefore,
       itemAfter: patchPlan.itemAfter,
       validationMode: "trusted_save",
+      saveDataSource,
       trustedStateAvailable: true,
       status: patchResult.status,
       gates: {
