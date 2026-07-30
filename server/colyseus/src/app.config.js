@@ -84,13 +84,17 @@ export function getHealthPayload(
   rewardLedger = getDefaultRewardLedgerHealth(),
   progressionShadow = getDefaultProgressionShadowHealth()
 ) {
+  const environment = String(process.env.NODE_ENV || "development").toLowerCase();
+  const hostedRuntime = process.env.COLYSEUS_CLOUD !== undefined ||
+    environment === "production" ||
+    environment === "staging";
   return {
     ok: true,
     service: "lupen-colyseus",
-    status: process.env.NODE_ENV === "production" ? "online-ready" : "local-development",
+    status: hostedRuntime ? "online-ready" : "local-development",
     rooms: [ROOM_NAME, LEGACY_ROOM_NAME],
     preferredRoom: ROOM_NAME,
-    environment: process.env.NODE_ENV || "development",
+    environment,
     port,
     rewardLedger,
     progressionShadow,
