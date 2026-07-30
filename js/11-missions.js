@@ -204,14 +204,16 @@ const JOURNEY_CHAPTERS = Object.freeze([
     displayLabel: "Chapter II",
     routeLabel: "Chapter II",
     routeTitle: "Locked Route",
+    revealedRouteTitle: "Frontier Gateway",
     shortLabel: "Next Route",
-    subtitle: "Complete Frontier to reveal.",
+    subtitle: "Complete Frontier to locate.",
     status: "locked",
     theme: "locked",
     icon: "locked",
     progressMode: "static",
     progress: 0,
-    unlockText: "Complete Frontier to reveal the next ship-plan family"
+    unlockText: "Complete Frontier to locate the gateway and reveal the next ship-plan family",
+    revealText: "Frontier Gateway coordinates acquired. Chapter II will open a new sector and ship-plan family."
   })
 ]);
 
@@ -1079,6 +1081,7 @@ function getJourneyChapterStatusLabel(chapter) {
   const state = getJourneyChapterRouteState(chapter);
   if (state === "complete") return "COMPLETE";
   if (state === "active") return "ACTIVE";
+  if (state === "revealed") return "SIGNAL DETECTED";
   if (state === "locked") return "LOCKED";
   if (state === "pending" && chapter.id === "frontier") return "ACADEMY REQUIRED";
   if (state === "pending") return "PENDING";
@@ -1102,10 +1105,19 @@ function isJourneyAcademyComplete() {
   });
 }
 
+function isJourneyFrontierComplete() {
+  const summary = getChapterProgressSummary("frontier");
+  return summary.total > 0 && summary.completedOrClaimed >= summary.total;
+}
+
 function getJourneyChapterRouteState(chapter) {
   if (chapter.id === "academy" && isJourneyAcademyComplete()) return "complete";
   if (chapter.id === "academy") return "active";
-  if (chapter.id === "frontier") return isJourneyAcademyComplete() ? "active" : "pending";
+  if (chapter.id === "frontier") {
+    if (!isJourneyAcademyComplete()) return "pending";
+    return isJourneyFrontierComplete() ? "complete" : "active";
+  }
+  if (chapter.id === "next_route" && isJourneyFrontierComplete()) return "revealed";
   return chapter.status || "pending";
 }
 
@@ -1120,6 +1132,7 @@ function getJourneyChapterRouteSubtitle(chapter) {
   const state = getJourneyChapterRouteState(chapter);
   if (state === "complete") return "Completed";
   if (state === "active") return "Active";
+  if (state === "revealed") return "Gateway signal detected";
   if (state === "locked") return "Locked";
   if (chapter.id === "frontier" && state === "pending") return "Pending";
   return chapter.subtitle || "";
@@ -1127,9 +1140,11 @@ function getJourneyChapterRouteSubtitle(chapter) {
 
 function renderJourneyChapterNode(chapter) {
   const state = getJourneyChapterRouteState(chapter);
-  const selected = selectedJourneyChapterId === chapter.id && state !== "locked";
+  const selected = selectedJourneyChapterId === chapter.id && !["locked", "revealed"].includes(state);
   const routeLabel = chapter.routeLabel || chapter.displayLabel || chapter.label;
-  const routeTitle = chapter.routeTitle || "";
+  const routeTitle = state === "revealed"
+    ? chapter.revealedRouteTitle || chapter.routeTitle || ""
+    : chapter.routeTitle || "";
   const altText = chapter.id === "frontier" ? "Chapter I: Frontier" : state === "locked" ? "Locked route" : routeLabel;
   return `
     <button type="button" class="journey-chapter-route__item journey-chapter-route__item--${escapeHtml(state)} ${selected ? "journey-chapter-route__item--selected" : ""} journey-chapter-node journey-chapter-${escapeHtml(state)} journey-chapter-node--${escapeHtml(state)} journey-chapter-theme-${escapeHtml(chapter.theme)}" data-journey-chapter-id="${escapeHtml(chapter.id)}" data-journey-chapter-state="${escapeHtml(state)}" onclick="selectJourneyChapterRoute('${escapeJsString(chapter.id)}')" aria-pressed="${selected ? "true" : "false"}" ${state === "locked" ? `title="${escapeHtml(chapter.unlockText || "Complete Frontier to reveal this route.")}"` : ""}>
@@ -1152,6 +1167,8 @@ function selectJourneyChapterRoute(id) {
   const state = getJourneyChapterRouteState(chapter);
   if (state === "locked") {
     journeyChapterRouteMessage = chapter.unlockText || "Complete Frontier to reveal this route.";
+  } else if (state === "revealed") {
+    journeyChapterRouteMessage = chapter.revealText || "Frontier Gateway signal detected. Chapter II is on the horizon.";
   } else if (state === "pending") {
     journeyChapterRouteMessage = chapter.id === "frontier"
       ? "Complete Academy to activate Chapter I: Frontier."
@@ -1356,7 +1373,12 @@ function renderJourneyFrontierStatus() {
       return left.remaining - right.remaining;
     });
   const recommended = assignments[0] || null;
-  const nextUnlock = activeChapterId === "academy" ? "Chapter I: Frontier" : "Chapter II Route";
+  const frontierComplete = activeChapterId === "frontier" && isJourneyFrontierComplete();
+  const nextUnlock = activeChapterId === "academy"
+    ? "Chapter I: Frontier"
+    : frontierComplete
+      ? "Frontier Gateway Detected"
+      : "Chapter II: Frontier Gateway";
   return `
     <section class="journey-summary-panel journey-frontier-status">
       <div class="journey-panel-head"><span>CHAPTER PROGRESS</span></div>

@@ -1,6 +1,6 @@
 # Lupen Local Colyseus Prototype
 
-This server powers Lupen's internal `?mp=staging` multiplayer route, including shared sector presence, bots, resources, combat validation, and gated save writes. The clean `lupen.io` player route does not yet enable this multiplayer layer by default.
+This server powers Lupen's shared online universe on `lupen.io` and the internal `?mp=staging` QA route, including shared presence, bots, resources, combat validation, PvP, and gated save writes. The clean player URL connects in `online` mode by default without exposing staging diagnostics or test language.
 
 ## What It Provides
 
@@ -16,13 +16,14 @@ This server powers Lupen's internal `?mp=staging` multiplayer route, including s
   - `authStatus`: `guest`, `unverified`, or `verified`
   - `playerId` / `supabaseUserId` / `trustedPlayerId`: populated only after server-side Supabase token verification
   - `displayName`: supplied by join options, otherwise `Pilot`
-  - `currentShipId` / `shipName`: display-only ship identity
+  - `currentShipId` / `shipName`: the server-trusted active ship in online combat; display metadata remains non-authoritative
+  - `trustedPvpShipId` / `trustedPvpLoadoutStatus`: verified save-backed combat loadout diagnostics
   - `currentNode`: current sector node, default `Asteron Prime`
   - `x` / `y`: placeholder position
   - `joinedAt` / `lastSeenAt`: local server timestamps
 - On leave, the player is removed.
 - Local-only `ping`, `presence:update`, and `movement:update` messages for smoke testing.
-- Staging-only `combat:intent` messages for future combat pipeline testing. These are validated against the player's selected same-node staging bot, enforce a short per-player fire cooldown, and apply server-clamped weapon test damage only.
+- `combat:intent` messages are validated against the selected same-node server object, enforce server cooldowns, and apply server-known weapon damage. In production online mode, ship, weapon slots, weapon quality/level, hull, shield, and armor are derived from the verified account save; client-supplied loadout and damage claims are ignored.
 - Staging-only `target:select` / `target:clear` messages for lock-on UI preparation. These update `selectedTargetBotId` on the player's presence record only when the server-owned bot is in the same node.
 - Legacy local prototype `move` messages are still accepted for compatibility.
 - Presence updates are lightly validated for dev safety. Invalid `currentNode` values, missing node names, or absurd `x` / `y` values are ignored and may return a `presence:warning` message to the sender.
@@ -91,9 +92,9 @@ The current implementation uses Colyseus `Server` with `WebSocketTransport`, whi
 
 An `ecosystem.config.cjs` file is included for future PM2/Cloud-style process configuration. It uses `.cjs` because this package has `"type": "module"`.
 
-Manual Colyseus Cloud steps later:
+Colyseus Cloud is live for the current production room. Deployment checks:
 
-- Create/select the Colyseus Cloud staging application.
+- Select the existing Lupen Colyseus Cloud application.
 - Configure the app root as `server/colyseus` if the repository root is not used directly.
 - Confirm the Cloud start command runs `npm start` or uses `ecosystem.config.cjs`.
 - Add any staging environment variables in Colyseus Cloud settings; do not commit secrets.
@@ -104,8 +105,8 @@ Manual Colyseus Cloud steps later:
 - The future `player_saves` write adapter is implemented but disabled by default. It can build an XP-only patch plan from the known safe `save_data.playerProgress.combatXp` path, requires a stable idempotency key, marks duplicate reward applications, requires `STAGING_PROGRESSION_WRITE_ALLOWLIST` in the default allow-list scope, and defaults to `progression_writes_disabled`. `STAGING_PROGRESSION_WRITE_SCOPE=verified` is available for tightly controlled staging tests where any verified player may pass the allow-list gate. Do not enable `ENABLE_STAGING_PROGRESSION_WRITES` outside controlled staging tests.
 - Progression shadow writes remain disabled unless `ENABLE_STAGING_PROGRESSION_SHADOW_WRITES=true` is explicitly configured later. Leave this unset/false for current staging. If enabled, the adapter writes only to the shadow/audit table, forces `applied_to_real_save: false`, and never mutates `player_saves`.
 - `/health` includes safe reward ledger and progression shadow connectivity summaries. The progression shadow summary includes `progressionShadowReachable`, `progressionShadowWritesEnabled`, `reason`, and `status`. These checks use the service role key server-side only, perform read-only `select=id&limit=1` requests, and do not expose secrets or raw Supabase errors.
-- After deployment, use the assigned `https://` or `wss://` staging URL in local frontend testing with `?mp=1&mpServer=...`.
-- Keep production `lupen.io` multiplayer disabled until a separate production enablement step.
+- After deployment, verify `/health`, then use the assigned `https://` endpoint for the automated capacity soak and local override tests.
+- Keep `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` configured so production identity and trusted PvP loadout reads remain available.
 
 ## Future Reward Storage Options
 
@@ -170,11 +171,11 @@ This allows local frontend testing against Colyseus Cloud staging, including:
 http://127.0.0.1:4173/?mp=1&mpServer=https://gb-man-e55e725e.colyseus.cloud
 ```
 
-The production origins are CORS-allowed for later controlled staging tests, but production multiplayer is still disabled by frontend gating unless explicitly enabled.
+The production origins are CORS-allowed and connect to the hosted room in clean `online` mode. Staging-only UI remains query-gated.
 
 ## Frontend Server Configuration
 
-The real Lupen frontend remains multiplayer-disabled unless it is opened on an allowed development/staging host with `?mp=1`.
+`https://www.lupen.io/` and `https://lupen.io/` connect to the hosted shared room by default. Local builds remain offline unless multiplayer is explicitly requested.
 
 Default local development:
 
@@ -212,7 +213,7 @@ WebSocket URLs are also accepted when supported by the host:
 wss://your-colyseus-cloud-host.example
 ```
 
-Only `ws://`, `wss://`, `http://`, and `https://` server URLs are accepted. Page hosts are restricted to local development by default (`localhost`, `127.0.0.1`, and `::1`). A future staging page can opt in by setting an explicit allowed host config before `js/network/multiplayerClient.js` loads. Production `lupen.io` / `www.lupen.io` is not enabled just because `?mp=1` is present.
+Only `ws://`, `wss://`, `http://`, and `https://` server URLs are accepted. Local overrides remain restricted to local development; production hosts use the configured Colyseus Cloud endpoint.
 
 ## Smoke Test
 
@@ -294,11 +295,22 @@ Use `Connect` in each tab to join `lupen_sector`. The page shows the current tab
 
 This page is served only by the local prototype server. It is not imported by the real Lupen frontend.
 
+## Capacity Soak
+
+Run a non-combat multi-client soak locally or against the hosted room:
+
+```powershell
+$env:COLYSEUS_ENDPOINT = "https://gb-man-e55e725e.colyseus.cloud"
+$env:SOAK_CLIENTS = "12"
+$env:SOAK_DURATION_SECONDS = "45"
+npm.cmd run soak
+```
+
+The runner joins in small batches, sends movement and ping traffic, checks shared player/bot state, performs one leave/rejoin cycle, and reports join latency, ping success, RTT, and unexpected disconnects. Keep the initial public test small; increase client count only after a clean baseline.
+
 ## Production Status
 
-This package is intentionally separate from the browser game files. The main Lupen frontend does not import or connect to this server yet.
-
-Colyseus Cloud staging deployment is planned for a later step. Nothing in this local prototype deploys Colyseus, connects `lupen.io` to Colyseus, or enables multiplayer for production players.
+The browser and server remain separate deployables, but the public Lupen frontend now connects to the hosted Colyseus room in clean online mode. Server changes require a Colyseus Cloud deployment; pushing browser files updates the separate frontend deployment.
 
 Redeploy trigger: Colyseus Cloud environment refresh.
 

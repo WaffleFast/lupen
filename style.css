@@ -49746,6 +49746,28 @@ input::placeholder {
   cursor: help;
 }
 
+.journey-chapter-route .journey-chapter-route__item--revealed {
+  cursor: pointer;
+  border-color: rgba(201, 166, 255, 0.76);
+  background:
+    radial-gradient(circle at 16% 50%, rgba(119, 229, 255, 0.2), transparent 38%),
+    radial-gradient(circle at 84% 50%, rgba(173, 118, 255, 0.24), transparent 46%),
+    linear-gradient(180deg, rgba(23, 24, 61, 0.9), rgba(7, 13, 34, 0.86));
+  box-shadow: 0 0 22px rgba(147, 122, 255, 0.24), inset 0 0 20px rgba(105, 220, 255, 0.08);
+  animation: journeyGatewaySignal 2.8s ease-in-out infinite;
+}
+
+@keyframes journeyGatewaySignal {
+  0%, 100% { box-shadow: 0 0 15px rgba(147, 122, 255, 0.16), inset 0 0 20px rgba(105, 220, 255, 0.06); }
+  50% { box-shadow: 0 0 28px rgba(147, 122, 255, 0.38), inset 0 0 24px rgba(105, 220, 255, 0.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-chapter-route .journey-chapter-route__item--revealed {
+    animation: none;
+  }
+}
+
 .journey-chapter-route .journey-chapter-route__item--selected {
   box-shadow: 0 0 0 1px rgba(49, 207, 255, 0.18), 0 0 18px rgba(49, 207, 255, 0.14), inset 0 0 18px rgba(49, 207, 255, 0.06);
 }
@@ -49836,6 +49858,12 @@ input::placeholder {
 .journey-chapter-route__item--locked .journey-chapter-route__label,
 .journey-chapter-route__item--locked .journey-chapter-route__detail {
   color: rgba(235, 226, 255, 0.78);
+}
+
+.journey-chapter-route__item--revealed .journey-chapter-route__label,
+.journey-chapter-route__item--revealed .journey-chapter-route__detail {
+  color: #efe6ff;
+  text-shadow: 0 0 12px rgba(176, 135, 255, 0.68);
 }
 
 .journey-chapter-route__scrollbar {
@@ -50237,6 +50265,12 @@ input::placeholder {
 .journey-chapter-route__item--locked .journey-chapter-route__status {
   border-color: rgba(185, 156, 255, 0.34);
   background: rgba(147, 122, 255, 0.09);
+}
+
+.journey-chapter-route__item--revealed .journey-chapter-route__status {
+  border-color: rgba(201, 166, 255, 0.58);
+  background: linear-gradient(90deg, rgba(95, 213, 255, 0.14), rgba(157, 105, 255, 0.2));
+  color: #f0e8ff;
 }
 
 .journey-summary-next,

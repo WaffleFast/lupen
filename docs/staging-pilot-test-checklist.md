@@ -5,7 +5,7 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 ## Required Gates
 
 - `?mp=staging` is used on `https://www.lupen.io`.
-- Normal `https://www.lupen.io` is tested separately and should not connect to multiplayer.
+- Normal `https://www.lupen.io` is tested separately and should connect in clean online mode without staging UI.
 - Browser Supabase config points to `https://ylzglwiehkypetcdkqxd.supabase.co` with the matching `supabase-sky-park` publishable/anon browser key.
 - `js/00-supabase-client.js` uses the matching `supabase-sky-park` publishable browser key, not a placeholder or service-role key.
 - The tester is logged in with a verified Supabase account.
@@ -86,7 +86,7 @@ Later systems use separate gates:
 31. Confirm Lupen Shard remains preview-only unless loot write gates are deliberately enabled for that phase.
 32. Refresh or relogin.
 33. Confirm CR, cargo, active ship, loadout, equipped items, bot XP, bounty XP, and claimed bounty state persisted.
-34. Open normal `https://www.lupen.io` and confirm normal single-player remains unchanged with no staging chip, guide, or multiplayer connection.
+34. Open normal `https://www.lupen.io` and confirm it connects online with no staging chip, guide, or diagnostic language.
 
 ## Deploy Split
 
@@ -97,8 +97,7 @@ Later systems use separate gates:
 
 ## What Remains Excluded
 
-- PvP.
-- Player damage.
+- Automated production PvP with real authenticated accounts; trusted loadout spoofing is covered locally, but the two-account live pass remains manual.
 - Credits from combat or bounties.
 - Weapon or attachment loot writes.
 - Store sell writes.
@@ -126,7 +125,7 @@ Record:
 2. If server files changed, run Colyseus `npm.cmd run build` and `npm.cmd test`.
 3. Push/deploy the Vercel client when browser files changed.
 4. Deploy the Colyseus server when `server/colyseus` changed.
-5. Open normal `https://www.lupen.io` and confirm no staging UI appears.
+5. Open normal `https://www.lupen.io` and confirm online connection succeeds with no staging UI.
 6. Open `https://www.lupen.io/?mp=staging` and confirm connection/guide.
 7. Run the pilot flow with writes disabled/dry-run where applicable.
 8. Enable one narrow write gate at a time for an allowlisted account.

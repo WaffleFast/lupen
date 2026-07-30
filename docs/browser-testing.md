@@ -69,13 +69,13 @@ These tests do not validate CSS polish, authenticated cloud saves, or live stagi
 
 Public players and external playtesters should use `https://www.lupen.io/`. The clean root URL is the real player-facing game and must not expose staging chips, dry-run language, diagnostics, or test-loop guidance.
 
-`https://www.lupen.io/?mp=staging` remains an internal multiplayer QA route. Do not distribute it as the normal game URL, and do not silently make its server-backed behavior the production default while trade, Store, bounty, loot, inventory, and broad progression writes are still gated, partial, allow-listed, or dry-run only.
+`https://www.lupen.io/` now joins the hosted shared room in clean `online` mode. `https://www.lupen.io/?mp=staging` remains the internal QA route for diagnostics and staging-only controls; do not distribute it as the normal game URL.
 
 `https://www.lupen.io/?mp=staging&resetPilot=1` is the destructive full-profile reset route for an authenticated staging pilot. It preserves authentication, clears local and cloud gameplay state including all Journey/Academy assignments, restores the no-ship starter claim, removes the reset parameter, enters the hub, and opens Morgan's first-login Academy orientation. Use `resetTutorial=1` only when Journey and gameplay progress must remain intact.
 
 After a browser/client deploy, manually verify:
 
-- `https://www.lupen.io` loads normally with no multiplayer staging chip or guide.
+- `https://www.lupen.io` loads normally, connects online, and shows no multiplayer staging chip or guide.
 - `https://www.lupen.io/?mp=staging` shows the Multiplayer Staging chip and loop guide.
 - Trade Terminal, Store, Hangar, Bounty Board, Pilot, Planet, and Sector navigation still opens from the browser game hub.
 - `https://www.lupen.io/?mp=staging&debug=mp` shows diagnostics, while normal staging stays cleaner.

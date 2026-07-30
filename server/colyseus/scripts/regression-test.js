@@ -8,6 +8,7 @@ import {
   calculatePrototypePvpDamage,
   getPvpEligibilityPreview,
   getPresenceIdentityKey,
+  resolveStagingWeapon,
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
 import {
@@ -71,6 +72,11 @@ import {
   extractTradeValidationStateFromSave,
   fetchPlayerTradeValidationState
 } from "../src/services/playerSaveReadService.js";
+import {
+  deriveTrustedOnlineCombatLoadout,
+  fetchTrustedOnlineCombatLoadout,
+  getTrustedWeaponDamageMultiplier
+} from "../src/services/onlinePvpLoadoutService.js";
 import {
   applyStagingTradeBuyWrite,
   applyStagingTradeSellWrite,
@@ -189,6 +195,7 @@ function assertProductionPvpIdentityGate() {
     sessionId: "online-attacker",
     authStatus: "unverified",
     multiplayerMode: "online",
+    trustedPvpLoadoutStatus: "ready",
     presenceStatus: "space",
     currentNode: "Lower Gate Core",
     guildId: ""
@@ -197,6 +204,7 @@ function assertProductionPvpIdentityGate() {
     sessionId: "online-target",
     authStatus: "verified",
     multiplayerMode: "online",
+    trustedPvpLoadoutStatus: "ready",
     presenceStatus: "space",
     currentNode: "Lower Gate Core",
     guildId: "other"
@@ -213,6 +221,77 @@ function assertProductionPvpIdentityGate() {
   const protectedZone = getPvpEligibilityPreview(attacker, target, "Asteron Prime");
   assert(protectedZone.allowed === false && protectedZone.reason === "protected_zone", "Production PvP did not preserve protected-zone safety.");
   console.log("production PvP requires verified pilots and contested space");
+}
+
+async function assertTrustedOnlineCombatLoadoutHelper() {
+  const saveData = {
+    currentShipId: "falcon",
+    ownedShips: ["falcon", "bison"],
+    shipLoadouts: {
+      falcon: {
+        guns: [
+          { key: "pulseLaser", quality: "godlike", level: 5 },
+          { key: "ionBlaster", quality: "refined", level: 2 },
+          { key: "heavyLance", quality: "legendary", level: 5 }
+        ],
+        attachments: [
+          { key: "shieldBooster", quality: "legendary", level: 5 },
+          { key: "hullBooster", quality: "standard", level: 1 },
+          { key: "hullBooster", quality: "godlike", level: 5 }
+        ]
+      }
+    }
+  };
+  const trusted = deriveTrustedOnlineCombatLoadout(saveData, {
+    allowedWeaponKeys: new Set(["pulseLaser", "ionBlaster", "heavyLance"])
+  });
+  assert(trusted.trusted === true && trusted.currentShipId === "falcon", "Trusted loadout did not select the saved active ship.");
+  assert(trusted.weapons.length === 2, "Trusted loadout did not enforce the ship's weapon slot limit.");
+  assert(trusted.attachments.length === 2, "Trusted loadout did not enforce the ship's attachment slot limit.");
+  assert(trusted.stats.hull === 820 && trusted.stats.shield === 264, "Trusted loadout did not derive server-known defensive capacity.");
+
+  const spoofed = resolveStagingWeapon({
+    equippedWeaponKeys: ["heavyLance", "heavyLance", "heavyLance"],
+    damage: 999999
+  }, {
+    equippedWeaponKeys: "heavyLance,heavyLance,heavyLance"
+  }, trusted);
+  const expectedPulseDamage = Math.round(13 * getTrustedWeaponDamageMultiplier(saveData.shipLoadouts.falcon.guns[0]));
+  const expectedIonDamage = Math.round(9 * getTrustedWeaponDamageMultiplier(saveData.shipLoadouts.falcon.guns[1]));
+  assert(spoofed.trustedLoadoutUsed === true, "PvP weapon resolver did not use the trusted loadout.");
+  assert(spoofed.damage === expectedPulseDamage + expectedIonDamage, "Client-spoofed PvP weapons or damage changed the server volley.");
+  assert(spoofed.volleyWeaponKeys.join(",") === "pulseLaser,ionBlaster", "PvP volley did not match the saved trusted weapons.");
+  assert(spoofed.clientDamageIgnored === true, "PvP resolver did not flag spoofed client damage as ignored.");
+
+  const unarmed = resolveStagingWeapon({ weaponId: "heavyLance", damage: 999999 }, {}, {
+    ...trusted,
+    weapons: []
+  });
+  assert(unarmed.damage === 0 && unarmed.weaponSourceReason === "trusted_save_unarmed", "An unarmed trusted save received fallback client damage.");
+
+  const unowned = deriveTrustedOnlineCombatLoadout({
+    ...saveData,
+    currentShipId: "monolith"
+  });
+  assert(unowned.trusted === false && unowned.reason === "current_ship_not_owned", "Trusted loadout accepted an unowned ship.");
+
+  const fetched = await fetchTrustedOnlineCombatLoadout({
+    authStatus: "verified",
+    trustedPlayerId: "00000000-0000-4000-8000-000000000001"
+  }, {
+    allowedWeaponKeys: new Set(["pulseLaser", "ionBlaster"]),
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-test"
+    },
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [{ save_data: saveData, updated_at: "2026-07-30T00:00:00.000Z" }]
+    })
+  });
+  assert(fetched.trusted === true && fetched.source === "verified_player_save", "Verified save read did not produce a trusted combat loadout.");
+  console.log("online PvP loadout ignores spoofed ship, weapons, damage, and slot overflow");
 }
 
 function waitFor(description, predicate, timeoutMs = 4000) {
@@ -4749,6 +4828,7 @@ try {
   assertPresenceIdentityHelpers();
   assertLayeredPvpDamageHelper();
   assertProductionPvpIdentityGate();
+  await assertTrustedOnlineCombatLoadoutHelper();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot A",

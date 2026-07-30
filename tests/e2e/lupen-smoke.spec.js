@@ -10390,6 +10390,43 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("Frontier completion reveals the Chapter II gateway carrot", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+    await page.evaluate(() => {
+      localStorage.clear();
+      tutorialState = { active: false, completed: true, stepIndex: 0 };
+      ownedShips = ["falcon", "bison"];
+      currentShipId = "falcon";
+      selectedHangarShipId = "falcon";
+      missionProgress = normalizeMissionProgress(missionProgress);
+      Object.values(MISSIONS_BY_ID).forEach(mission => {
+        missionProgress.missions[mission.id] = {
+          ...missionProgress.missions[mission.id],
+          state: "completed",
+          progress: getMissionRequiredAmount(mission),
+          completedAt: new Date().toISOString()
+        };
+      });
+      window.showScreen("gameScreen");
+      window.openJourney();
+    });
+
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toHaveAttribute("data-journey-chapter-state", "complete");
+    await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("data-journey-chapter-state", "complete");
+    const gateway = page.locator("#journeyScreen [data-journey-chapter-id='next_route']");
+    await expect(gateway).toHaveAttribute("data-journey-chapter-state", "revealed");
+    await expect(gateway).toContainText("Frontier Gateway");
+    await expect(gateway).toContainText("SIGNAL DETECTED");
+    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Gateway Detected");
+    await gateway.click();
+    await expect(page.locator("#journeyChapterRouteMessage")).toContainText("Chapter II will open a new sector and ship-plan family");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("all new ships accept guns, equipment, combat stats, and cargo math", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

@@ -58,6 +58,10 @@ import {
   fetchPlayerTradeValidationState
 } from "../services/playerSaveReadService.js";
 import {
+  fetchTrustedOnlineCombatLoadout,
+  getTrustedWeaponDamageMultiplier
+} from "../services/onlinePvpLoadoutService.js";
+import {
   applyStagingTradeBuyWrite,
   applyStagingTradeSellWrite
 } from "../services/tradeWriteService.js";
@@ -217,6 +221,8 @@ const STAGING_PVP_MIN_HULL = 1;
 const STAGING_PVP_SHIELD_REGEN_DELAY_MS = 5000;
 const STAGING_PVP_SHIELD_REGEN_TICK_MS = 1000;
 const STAGING_PVP_SHIELD_REGEN_AMOUNT = 10;
+const ONLINE_TRUSTED_LOADOUT_TTL_MS = 5000;
+const ONLINE_TRUSTED_LOADOUT_STALE_GRACE_MS = 60000;
 const STAGING_DAMAGE_MIN = 1;
 const STAGING_DAMAGE_MAX = 50;
 const STAGING_VOLLEY_DAMAGE_MAX = 80;
@@ -417,6 +423,11 @@ type("string")(LupenSectorPlayer.prototype, "shipImage");
 type("string")(LupenSectorPlayer.prototype, "shipClass");
 type("string")(LupenSectorPlayer.prototype, "equippedWeaponKey");
 type("string")(LupenSectorPlayer.prototype, "equippedWeaponKeys");
+type("string")(LupenSectorPlayer.prototype, "reportedShipId");
+type("string")(LupenSectorPlayer.prototype, "trustedPvpShipId");
+type("string")(LupenSectorPlayer.prototype, "trustedPvpLoadoutStatus");
+type("string")(LupenSectorPlayer.prototype, "trustedPvpLoadoutReason");
+type("number")(LupenSectorPlayer.prototype, "trustedPvpLoadoutUpdatedAt");
 type("string")(LupenSectorPlayer.prototype, "multiplayerMode");
 type("string")(LupenSectorPlayer.prototype, "currentNode");
 type("string")(LupenSectorPlayer.prototype, "presenceStatus");
@@ -713,15 +724,15 @@ function ensurePlayerPvpState(player) {
   return player;
 }
 
-function updatePlayerPvpCapacityFromPresence(player, message = {}) {
+function updatePlayerPvpCapacityFromPresence(player, message = {}, trustedLoadout = null) {
   if (!player) return null;
   ensurePlayerPvpState(player);
 
-  const shipId = getSafeIdentityValue(message.currentShipId || player.currentShipId);
+  const shipId = getSafeIdentityValue(trustedLoadout?.currentShipId || message.currentShipId || player.currentShipId);
   const serverShip = STAGING_SHIP_CONFIG[shipId] || null;
-  const requestedShieldMax = Number(serverShip?.shield ?? message.pvpShieldMax ?? message.shieldMax ?? message.maxShield);
-  const requestedArmorMax = Number(serverShip?.armor ?? message.pvpArmorMax ?? message.armorMax ?? message.armor);
-  const requestedHullMax = Number(serverShip?.hull ?? message.pvpHullMax ?? message.hullMax ?? message.maxHull);
+  const requestedShieldMax = Number(trustedLoadout?.stats?.shield ?? serverShip?.shield ?? message.pvpShieldMax ?? message.shieldMax ?? message.maxShield);
+  const requestedArmorMax = Number(trustedLoadout?.stats?.armor ?? serverShip?.armor ?? message.pvpArmorMax ?? message.armorMax ?? message.armor);
+  const requestedHullMax = Number(trustedLoadout?.stats?.hull ?? serverShip?.hull ?? message.pvpHullMax ?? message.hullMax ?? message.maxHull);
   const previousShieldMax = Math.max(1, Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX));
   const previousArmorMax = Math.max(0, Number(player.pvpArmorMax || 0));
   const previousHullMax = Math.max(STAGING_PVP_MIN_HULL, Number(player.pvpHullMax || STAGING_PVP_HULL_MAX));
@@ -759,9 +770,9 @@ function updatePlayerPvpCapacityFromPresence(player, message = {}) {
   return player;
 }
 
-function syncPlayerPvpRepairState(player, message = {}, now = Date.now()) {
+function syncPlayerPvpRepairState(player, message = {}, now = Date.now(), trustedLoadout = null) {
   if (!player) return null;
-  updatePlayerPvpCapacityFromPresence(player, message);
+  updatePlayerPvpCapacityFromPresence(player, message, trustedLoadout);
   ensurePlayerPvpState(player);
 
   const shieldBefore = Number(player.pvpShield || 0);
@@ -878,6 +889,12 @@ export function getPvpEligibilityPreview(attacker = null, target = null, current
   if (productionOnline && target?.authStatus !== "verified") {
     return { allowed: false, reason: "target_verified_identity_required", pvpEnabled: false };
   }
+  if (productionOnline && !["ready", "stale"].includes(attacker?.trustedPvpLoadoutStatus)) {
+    return { allowed: false, reason: "attacker_trusted_loadout_required", pvpEnabled: false };
+  }
+  if (productionOnline && !["ready", "stale"].includes(target?.trustedPvpLoadoutStatus)) {
+    return { allowed: false, reason: "target_trusted_loadout_required", pvpEnabled: false };
+  }
   if (attackerId && targetId && attackerId === targetId) return { allowed: false, reason: "self_target", pvpEnabled: false };
   if (getSafePresenceStatus(attacker?.presenceStatus) === "docked") return { allowed: false, reason: "attacker_docked", pvpEnabled: false };
   if (getSafePresenceStatus(target?.presenceStatus) === "docked") return { allowed: false, reason: "target_docked", pvpEnabled: false };
@@ -923,6 +940,10 @@ function getPvpCombatIntentDiagnostics({
     targetGuildId: getSafeIdentityValue(target?.guildId),
     attackerShipId: getSafeIdentityValue(attacker?.currentShipId || attacker?.shipId),
     targetShipId: getSafeIdentityValue(target?.currentShipId || target?.shipId),
+    attackerTrustedShipId: getSafeIdentityValue(attacker?.trustedPvpShipId),
+    targetTrustedShipId: getSafeIdentityValue(target?.trustedPvpShipId),
+    attackerTrustedLoadoutStatus: getSafeIdentityValue(attacker?.trustedPvpLoadoutStatus),
+    targetTrustedLoadoutStatus: getSafeIdentityValue(target?.trustedPvpLoadoutStatus),
     weaponId: getSafeIdentityValue(message.weaponId),
     weaponKey: getSafeIdentityValue(message.weaponKey),
     weaponFamily: getSafeIdentityValue(message.weaponFamily),
@@ -1399,15 +1420,39 @@ function getRequestedDamageFromPayload(message = {}) {
   return Number.isFinite(directDamage) ? directDamage : 0;
 }
 
-function resolveStagingWeapon(message = {}, player = null) {
-  const equippedWeaponKeys = getStagingEquippedWeaponKeys(message, player);
-  const knownWeapons = equippedWeaponKeys
-    .map((key) => STAGING_WEAPON_STATS[key] || null)
-    .filter(Boolean);
+export function resolveStagingWeapon(message = {}, player = null, trustedLoadout = null) {
+  const trustedWeaponEntries = trustedLoadout?.trusted === true && Array.isArray(trustedLoadout.weapons)
+    ? trustedLoadout.weapons
+    : null;
+  const equippedWeaponKeys = trustedWeaponEntries
+    ? trustedWeaponEntries.map((entry) => getSafeWeaponKey(entry?.key)).filter(Boolean)
+    : getStagingEquippedWeaponKeys(message, player);
+  const knownWeapons = trustedWeaponEntries
+    ? trustedWeaponEntries.map((entry) => {
+      const knownWeapon = STAGING_WEAPON_STATS[getSafeWeaponKey(entry?.key)];
+      if (!knownWeapon) return null;
+      return {
+        ...knownWeapon,
+        quality: getSafeIdentityValue(entry?.quality, "standard"),
+        level: clampNumber(Math.round(Number(entry?.level || 1)), 1, 5),
+        damage: Math.max(1, Math.round(Number(knownWeapon.damage || 1) * getTrustedWeaponDamageMultiplier(entry)))
+      };
+    }).filter(Boolean)
+    : equippedWeaponKeys
+      .map((key) => STAGING_WEAPON_STATS[key] || null)
+      .filter(Boolean);
   const known = knownWeapons[0] || null;
-  const weaponKey = known?.key || equippedWeaponKeys[0] || getSafeWeaponKey(message.weaponId);
+  const weaponKey = known?.key || equippedWeaponKeys[0] || (trustedWeaponEntries ? "" : getSafeWeaponKey(message.weaponId));
   const requestedDamage = getRequestedDamageFromPayload(message);
-  const debug = getWeaponSourceDebug(message, player, weaponKey, equippedWeaponKeys);
+  const debug = trustedWeaponEntries
+    ? {
+      activeShipWeaponCount: trustedWeaponEntries.length,
+      validCombatWeaponCount: knownWeapons.length,
+      rejectedWeaponCount: Math.max(0, trustedWeaponEntries.length - knownWeapons.length),
+      firstRejectedWeaponReason: trustedWeaponEntries.length && !knownWeapons.length ? "trusted_loadout_has_no_known_weapon" : "",
+      weaponSourceReason: knownWeapons.length ? "trusted_save_loadout" : "trusted_save_unarmed"
+    }
+    : getWeaponSourceDebug(message, player, weaponKey, equippedWeaponKeys);
 
   if (known) {
     const volleyDamage = knownWeapons.reduce((total, weapon) => {
@@ -1431,7 +1476,7 @@ function resolveStagingWeapon(message = {}, player = null) {
       weaponType: volleyWeaponCount > 1 ? "volley" : known.type,
       damage: knownDamage,
       cooldownMs: clampNumber(Math.round(volleyCooldownMs), STAGING_FIRE_COOLDOWN_MIN_MS, STAGING_FIRE_COOLDOWN_MAX_MS),
-      damageSource: "server_known_weapon",
+      damageSource: trustedWeaponEntries ? "trusted_save_weapon" : "server_known_weapon",
       fallbackDamageUsed: false,
       pulseLaserDetected: volleyWeaponKeys.includes("pulseLaser"),
       volleyWeaponCount,
@@ -1440,7 +1485,32 @@ function resolveStagingWeapon(message = {}, player = null) {
       clientDamageIgnored: requestedDamage > 0 && Math.round(requestedDamage) !== knownDamage,
       serverAuthoritative: true,
       ...debug,
-      weaponSourceReason: "server_known_weapon"
+      trustedLoadoutUsed: !!trustedWeaponEntries,
+      trustedShipId: getSafeIdentityValue(trustedLoadout?.currentShipId),
+      weaponSourceReason: trustedWeaponEntries ? "trusted_save_loadout" : "server_known_weapon"
+    };
+  }
+
+  if (trustedWeaponEntries) {
+    return {
+      weaponKey: "",
+      weaponName: "Unarmed",
+      weaponFamily: "unarmed",
+      weaponType: "unarmed",
+      damage: 0,
+      cooldownMs: STAGING_FIRE_COOLDOWN_MS,
+      damageSource: "trusted_save_unarmed",
+      fallbackDamageUsed: false,
+      pulseLaserDetected: false,
+      volleyWeaponCount: 0,
+      volleyWeaponKeys: [],
+      requestedDamage,
+      clientDamageIgnored: requestedDamage > 0,
+      serverAuthoritative: true,
+      trustedLoadoutUsed: true,
+      trustedShipId: getSafeIdentityValue(trustedLoadout?.currentShipId),
+      ...debug,
+      weaponSourceReason: "trusted_save_unarmed"
     };
   }
 
@@ -1459,6 +1529,8 @@ function resolveStagingWeapon(message = {}, player = null) {
     requestedDamage,
     clientDamageIgnored: requestedDamage > 0 && Math.round(requestedDamage) !== STAGING_TEST_DAMAGE,
     serverAuthoritative: true,
+    trustedLoadoutUsed: false,
+    trustedShipId: "",
     ...debug,
     weaponSourceReason: debug.weaponSourceReason
   };
@@ -1556,6 +1628,10 @@ export class LupenSectorRoom extends Room {
     this.stagingResourceMineCooldowns = new Map();
     this.stagingResourcePayoutKeys = new Set();
     this.stagingTradeWindows = new Map();
+    // Verified production pilots use short-lived, read-only combat snapshots
+    // derived from player_saves. Pending reads are deduplicated per session.
+    this.trustedOnlineCombatLoadouts = new Map();
+    this.trustedOnlineCombatLoadoutReads = new Map();
 
     this.spawnDummyBots();
     this.spawnStagingResources();
@@ -1584,8 +1660,8 @@ export class LupenSectorRoom extends Room {
       this.applyPresenceUpdate(client, message, "movement:update");
     });
 
-    this.onMessage("pvp:repair", (client, message = {}) => {
-      this.syncPvpRepairState(client, message, "pvp:repair");
+    this.onMessage("pvp:repair", async (client, message = {}) => {
+      await this.syncPvpRepairState(client, message, "pvp:repair");
     });
 
     this.onMessage("chat:send", (client, message = {}) => {
@@ -1805,6 +1881,7 @@ export class LupenSectorRoom extends Room {
       supabaseUserId: verifiedIdentity.supabaseUserId || trustedPlayerId
     });
     let recoveredPvpState = null;
+    let recoveredTrustedLoadout = null;
     if (replacementIdentityKey) {
       this.state.players.forEach((player, sessionId) => {
         if (sessionId === client.sessionId) return;
@@ -1821,10 +1898,13 @@ export class LupenSectorRoom extends Room {
           lastPvpShieldRegenAt: player.lastPvpShieldRegenAt,
           nextPvpFireAt: player.nextPvpFireAt
         };
+        recoveredTrustedLoadout = this.trustedOnlineCombatLoadouts.get(sessionId) || recoveredTrustedLoadout;
         this.broadcast("playerLeft", this.buildPresenceEvent("left", player, {
           reason: "replaced_by_reconnect"
         }));
         this.state.players.delete(sessionId);
+        this.trustedOnlineCombatLoadouts.delete(sessionId);
+        this.trustedOnlineCombatLoadoutReads.delete(sessionId);
         this.stagingBountyStates.delete(sessionId);
         this.clearStagingReturnFireForSession(sessionId);
       });
@@ -1853,6 +1933,11 @@ export class LupenSectorRoom extends Room {
       equippedWeaponKeys: Array.isArray(options.equippedWeaponKeys)
         ? options.equippedWeaponKeys.map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 20).join(",")
         : String(options.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean).slice(0, 20).join(","),
+      reportedShipId: getSafeIdentityValue(options.currentShipId),
+      trustedPvpShipId: "",
+      trustedPvpLoadoutStatus: getSafeIdentityValue(options.multiplayerMode) === "online" ? "pending" : "not_required",
+      trustedPvpLoadoutReason: getSafeIdentityValue(options.multiplayerMode) === "online" ? "trusted_loadout_refresh_pending" : "trusted_online_loadout_not_required",
+      trustedPvpLoadoutUpdatedAt: 0,
       multiplayerMode: getSafeIdentityValue(options.multiplayerMode, "dev"),
       currentNode: getStringValue(options.currentNode, "Asteron Prime") || "Asteron Prime",
       presenceStatus: getSafePresenceStatus(options.presenceStatus || options.status),
@@ -1887,7 +1972,18 @@ export class LupenSectorRoom extends Room {
     }
 
     this.state.players.set(client.sessionId, joinedPlayer);
+    if (recoveredTrustedLoadout?.trusted === true) {
+      this.trustedOnlineCombatLoadouts.set(client.sessionId, recoveredTrustedLoadout);
+      this.applyTrustedOnlineCombatLoadout(joinedPlayer, recoveredTrustedLoadout, {
+        stale: Date.now() - Number(recoveredTrustedLoadout.fetchedAt || 0) > ONLINE_TRUSTED_LOADOUT_TTL_MS
+      });
+    }
     this.broadcast("playerJoined", this.buildPresenceEvent("joined", joinedPlayer));
+    if (joinedPlayer.multiplayerMode === "online") {
+      this.refreshTrustedOnlineCombatLoadout(joinedPlayer, {
+        force: recoveredTrustedLoadout?.trusted !== true
+      }).catch(() => {});
+    }
   }
 
   onLeave(client) {
@@ -1896,6 +1992,8 @@ export class LupenSectorRoom extends Room {
       this.broadcast("playerLeft", this.buildPresenceEvent("left", player));
     }
     this.state.players.delete(client.sessionId);
+    this.trustedOnlineCombatLoadouts.delete(client.sessionId);
+    this.trustedOnlineCombatLoadoutReads.delete(client.sessionId);
     this.stagingBountyStates.delete(client.sessionId);
     this.clearStagingReturnFireForSession(client.sessionId);
     this.stagingResourceMineCooldowns.delete(client.sessionId);
@@ -1905,6 +2003,8 @@ export class LupenSectorRoom extends Room {
   onDispose() {
     this.botInterval?.clear?.();
     this.pvpShieldRegenInterval?.clear?.();
+    this.trustedOnlineCombatLoadouts?.clear?.();
+    this.trustedOnlineCombatLoadoutReads?.clear?.();
   }
 
   spawnDummyBots() {
@@ -2093,12 +2193,137 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  syncPvpRepairState(client, message = {}, messageType = "pvp:repair") {
+  getTrustedOnlineCombatLoadout(playerOrSessionId) {
+    const sessionId = typeof playerOrSessionId === "string"
+      ? playerOrSessionId
+      : getStringValue(playerOrSessionId?.sessionId || playerOrSessionId?.id);
+    return sessionId ? this.trustedOnlineCombatLoadouts.get(sessionId) || null : null;
+  }
+
+  applyTrustedOnlineCombatLoadout(player, trustedLoadout, { stale = false } = {}) {
+    if (!player || trustedLoadout?.trusted !== true || !trustedLoadout.currentShipId) return false;
+
+    player.currentShipId = trustedLoadout.currentShipId;
+    player.trustedPvpShipId = trustedLoadout.currentShipId;
+    player.shipName = trustedLoadout.shipName || STAGING_SHIP_CONFIG[trustedLoadout.currentShipId]?.name || trustedLoadout.currentShipId;
+    const trustedWeaponKeys = Array.isArray(trustedLoadout.weapons)
+      ? trustedLoadout.weapons.map((entry) => getSafeWeaponKey(entry?.key)).filter(Boolean)
+      : [];
+    player.equippedWeaponKey = trustedWeaponKeys[0] || "";
+    player.equippedWeaponKeys = trustedWeaponKeys.join(",");
+    player.trustedPvpLoadoutStatus = stale ? "stale" : "ready";
+    player.trustedPvpLoadoutReason = stale
+      ? trustedLoadout.staleReason || "trusted_loadout_cache_stale"
+      : trustedLoadout.reason || "trusted_online_loadout_ready";
+    player.trustedPvpLoadoutUpdatedAt = Number(trustedLoadout.fetchedAt || Date.now());
+    updatePlayerPvpCapacityFromPresence(player, {}, trustedLoadout);
+    return true;
+  }
+
+  async refreshTrustedOnlineCombatLoadout(player, { force = false } = {}) {
+    if (!player || player.multiplayerMode !== "online") {
+      return { ok: true, required: false, trusted: false, reason: "trusted_online_loadout_not_required" };
+    }
+    if (player.authStatus !== "verified" || !player.trustedPlayerId) {
+      player.trustedPvpLoadoutStatus = "unverified";
+      player.trustedPvpLoadoutReason = "verified_identity_required";
+      return { ok: false, required: true, trusted: false, reason: "verified_identity_required" };
+    }
+
+    const sessionId = getStringValue(player.sessionId || player.id);
+    const now = Date.now();
+    const cached = this.trustedOnlineCombatLoadouts.get(sessionId) || null;
+    const cacheAgeMs = cached ? Math.max(0, now - Number(cached.fetchedAt || 0)) : Number.POSITIVE_INFINITY;
+    const reportedShipChanged = !!player.reportedShipId &&
+      !!cached?.currentShipId &&
+      player.reportedShipId !== cached.currentShipId;
+    if (!force && !reportedShipChanged && cached?.trusted === true && cacheAgeMs <= ONLINE_TRUSTED_LOADOUT_TTL_MS) {
+      this.applyTrustedOnlineCombatLoadout(player, cached);
+      return cached;
+    }
+
+    const pending = this.trustedOnlineCombatLoadoutReads.get(sessionId);
+    if (pending) return pending;
+
+    player.trustedPvpLoadoutStatus = cached?.trusted === true ? "stale" : "pending";
+    player.trustedPvpLoadoutReason = "trusted_loadout_refresh_pending";
+    const readPromise = fetchTrustedOnlineCombatLoadout({
+      authStatus: player.authStatus,
+      trustedPlayerId: player.trustedPlayerId,
+      playerId: player.playerId
+    }, {
+      allowedWeaponKeys: new Set(Object.keys(STAGING_WEAPON_STATS))
+    }).then((result) => {
+      if (this.state.players.get(sessionId) !== player) {
+        return { ok: false, required: true, trusted: false, reason: "session_replaced" };
+      }
+      if (result?.trusted === true) {
+        const trusted = { ...result, fetchedAt: Date.now() };
+        this.trustedOnlineCombatLoadouts.set(sessionId, trusted);
+        this.applyTrustedOnlineCombatLoadout(player, trusted);
+        return trusted;
+      }
+
+      const fallback = this.trustedOnlineCombatLoadouts.get(sessionId) || cached;
+      const fallbackAgeMs = fallback ? Math.max(0, Date.now() - Number(fallback.fetchedAt || 0)) : Number.POSITIVE_INFINITY;
+      if (fallback?.trusted === true && fallbackAgeMs <= ONLINE_TRUSTED_LOADOUT_STALE_GRACE_MS) {
+        const staleTrusted = {
+          ...fallback,
+          stale: true,
+          staleReason: result?.reason || "trusted_loadout_refresh_failed"
+        };
+        this.applyTrustedOnlineCombatLoadout(player, staleTrusted, { stale: true });
+        return staleTrusted;
+      }
+
+      player.trustedPvpLoadoutStatus = "unavailable";
+      player.trustedPvpLoadoutReason = result?.reason || "trusted_loadout_unavailable";
+      return {
+        ...(result || {}),
+        ok: false,
+        required: true,
+        trusted: false,
+        reason: player.trustedPvpLoadoutReason
+      };
+    }).catch((_err) => {
+      if (this.state.players.get(sessionId) !== player) {
+        return { ok: false, required: true, trusted: false, reason: "session_replaced" };
+      }
+      const fallback = this.trustedOnlineCombatLoadouts.get(sessionId) || cached;
+      const fallbackAgeMs = fallback ? Math.max(0, Date.now() - Number(fallback.fetchedAt || 0)) : Number.POSITIVE_INFINITY;
+      if (fallback?.trusted === true && fallbackAgeMs <= ONLINE_TRUSTED_LOADOUT_STALE_GRACE_MS) {
+        const staleTrusted = { ...fallback, stale: true, staleReason: "trusted_loadout_refresh_failed" };
+        this.applyTrustedOnlineCombatLoadout(player, staleTrusted, { stale: true });
+        return staleTrusted;
+      }
+      player.trustedPvpLoadoutStatus = "unavailable";
+      player.trustedPvpLoadoutReason = "trusted_loadout_refresh_failed";
+      return { ok: false, required: true, trusted: false, reason: "trusted_loadout_refresh_failed" };
+    }).finally(() => {
+      this.trustedOnlineCombatLoadoutReads.delete(sessionId);
+    });
+
+    this.trustedOnlineCombatLoadoutReads.set(sessionId, readPromise);
+    return readPromise;
+  }
+
+  async syncPvpRepairState(client, message = {}, messageType = "pvp:repair") {
     const player = this.touchPlayer(client.sessionId);
     if (!player) return;
 
     const now = Date.now();
-    const repairState = syncPlayerPvpRepairState(player, message, now);
+    if (player.multiplayerMode === "online" && player.presenceStatus !== "docked") {
+      this.sendWarning(client, "pvp_repair_requires_docking", messageType);
+      return;
+    }
+    const trustedLoadout = player.multiplayerMode === "online"
+      ? await this.refreshTrustedOnlineCombatLoadout(player, { force: true })
+      : null;
+    if (player.multiplayerMode === "online" && trustedLoadout?.trusted !== true) {
+      this.sendWarning(client, trustedLoadout?.reason || "trusted_loadout_required", messageType);
+      return;
+    }
+    const repairState = syncPlayerPvpRepairState(player, message, now, trustedLoadout);
     if (!repairState) return;
 
     this.broadcast("pvp:repair_synced", {
@@ -4331,11 +4556,17 @@ export class LupenSectorRoom extends Room {
     return payload;
   }
 
-  resolvePvpCombatIntent(client, message = {}, messageType = "combat:intent") {
+  async resolvePvpCombatIntent(client, message = {}, messageType = "combat:intent") {
     const attacker = this.touchPlayer(client.sessionId);
     const now = Date.now();
     const targetPlayerId = getStringValue(message.targetPlayerId || message.targetSessionId || message.playerTargetId);
     const targetPlayer = this.getPvpTargetPlayer(targetPlayerId);
+    if (attacker?.multiplayerMode === "online" || targetPlayer?.multiplayerMode === "online") {
+      await Promise.all([
+        attacker ? this.refreshTrustedOnlineCombatLoadout(attacker) : null,
+        targetPlayer ? this.refreshTrustedOnlineCombatLoadout(targetPlayer) : null
+      ]);
+    }
     const pvpEligibility = getPvpEligibilityPreview(attacker, targetPlayer, message.currentNode);
     const pvpDiagnostics = getPvpCombatIntentDiagnostics({
       attacker,
@@ -4369,7 +4600,19 @@ export class LupenSectorRoom extends Room {
 
     ensurePlayerPvpState(attacker);
     ensurePlayerPvpState(targetPlayer);
-    const resolvedWeapon = resolveStagingWeapon(message, attacker);
+    const trustedAttackerLoadout = attacker.multiplayerMode === "online"
+      ? this.getTrustedOnlineCombatLoadout(attacker)
+      : null;
+    const resolvedWeapon = resolveStagingWeapon(message, attacker, trustedAttackerLoadout);
+    if (attacker.multiplayerMode === "online" && Number(resolvedWeapon.damage || 0) <= 0) {
+      attacker.lastCombatIntentReason = "trusted_loadout_unarmed";
+      this.sendCombatRejected(client, "pvp_intent_rejected", message, messageType, "trusted_loadout_unarmed", {
+        ...pvpDiagnostics,
+        trustedLoadoutUsed: true,
+        trustedShipId: getSafeIdentityValue(trustedAttackerLoadout?.currentShipId)
+      });
+      return;
+    }
     const pvpCooldownMs = resolvedWeapon.cooldownMs;
     const serverDamageUsed = calculatePrototypePvpDamage(resolvedWeapon);
     const result = this.applyStagingPvpDamage(targetPlayer, serverDamageUsed);
@@ -4405,6 +4648,9 @@ export class LupenSectorRoom extends Room {
       fallbackDamageUsed: resolvedWeapon.fallbackDamageUsed,
       clientDamageIgnored: resolvedWeapon.clientDamageIgnored === true,
       weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
+      trustedLoadoutUsed: resolvedWeapon.trustedLoadoutUsed === true,
+      trustedShipId: getSafeIdentityValue(resolvedWeapon.trustedShipId),
+      trustedLoadoutUpdatedAt: Number(attacker.trustedPvpLoadoutUpdatedAt || 0),
       activeShipWeaponCount: resolvedWeapon.activeShipWeaponCount || 0,
       validCombatWeaponCount: resolvedWeapon.validCombatWeaponCount || 0,
       rejectedWeaponCount: resolvedWeapon.rejectedWeaponCount || 0,
@@ -4453,9 +4699,12 @@ export class LupenSectorRoom extends Room {
     const now = Date.now();
     const targetPlayerId = getStringValue(message.targetPlayerId || message.targetSessionId || message.playerTargetId);
     if (targetPlayerId || getStringValue(message.targetType) === "remotePlayer") {
-      this.resolvePvpCombatIntent(client, message, messageType);
+      await this.resolvePvpCombatIntent(client, message, messageType);
       return;
     }
+    const trustedOnlineLoadout = player?.multiplayerMode === "online"
+      ? await this.refreshTrustedOnlineCombatLoadout(player)
+      : null;
     const payloadWarning = validateCombatIntentPayload(message);
     const targetBotId = getStringValue(message.targetBotId);
     const targetBot = targetBotId ? this.state.bots.get(targetBotId) : null;
@@ -4499,6 +4748,10 @@ export class LupenSectorRoom extends Room {
       validationReason = "staging_bot_disabled";
     }
 
+    if (!validationReason && player?.multiplayerMode === "online" && trustedOnlineLoadout?.trusted !== true) {
+      validationReason = trustedOnlineLoadout?.reason || "trusted_loadout_required";
+    }
+
     if (validationReason) {
       if (player) {
         player.lastCombatIntentReason = validationReason;
@@ -4526,7 +4779,15 @@ export class LupenSectorRoom extends Room {
       });
     }
 
-    const resolvedWeapon = resolveStagingWeapon(message, player);
+    const resolvedWeapon = resolveStagingWeapon(message, player, trustedOnlineLoadout);
+    if (player.multiplayerMode === "online" && Number(resolvedWeapon.damage || 0) <= 0) {
+      player.lastCombatIntentReason = "trusted_loadout_unarmed";
+      this.sendCombatRejected(client, "combat_intent_rejected", message, messageType, "trusted_loadout_unarmed", {
+        trustedLoadoutUsed: true,
+        trustedShipId: getSafeIdentityValue(trustedOnlineLoadout?.currentShipId)
+      });
+      return;
+    }
     const stagingDamage = resolvedWeapon.damage;
     const stagingCooldownMs = resolvedWeapon.cooldownMs;
     const result = this.applyStagingTestDamage(targetBot, stagingDamage);
@@ -4573,6 +4834,9 @@ export class LupenSectorRoom extends Room {
       serverAuthoritative: resolvedWeapon.serverAuthoritative === true,
       pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
       weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
+      trustedLoadoutUsed: resolvedWeapon.trustedLoadoutUsed === true,
+      trustedShipId: getSafeIdentityValue(resolvedWeapon.trustedShipId),
+      trustedLoadoutUpdatedAt: Number(player.trustedPvpLoadoutUpdatedAt || 0),
       combatIntentReason: "staging_damage_applied",
       combatNodeValidationReason: "combat_node_valid",
       ...getNodeDebugPayload({ message, player, targetBot }),
@@ -4614,6 +4878,8 @@ export class LupenSectorRoom extends Room {
       serverAuthoritative: resolvedWeapon.serverAuthoritative === true,
       pulseLaserDetected: resolvedWeapon.pulseLaserDetected,
       weaponSourceReason: resolvedWeapon.weaponSourceReason || resolvedWeapon.damageSource || "",
+      trustedLoadoutUsed: resolvedWeapon.trustedLoadoutUsed === true,
+      trustedShipId: getSafeIdentityValue(resolvedWeapon.trustedShipId),
       shield: result.shield,
       hull: result.hull,
       disabled: result.disabled,
@@ -4695,7 +4961,10 @@ export class LupenSectorRoom extends Room {
     // not upgrade trusted identity. Only onJoin token verification can do that.
 
     if (typeof message.currentShipId === "string") {
-      player.currentShipId = message.currentShipId.trim();
+      player.reportedShipId = message.currentShipId.trim();
+      if (player.multiplayerMode !== "online") {
+        player.currentShipId = player.reportedShipId;
+      }
     }
 
     if (typeof message.shipName === "string" || typeof message.ship === "string") {
@@ -4716,15 +4985,18 @@ export class LupenSectorRoom extends Room {
       player.shipClass = getSafeShipClass(message);
     }
 
-    updatePlayerPvpCapacityFromPresence(player, message);
+    const trustedLoadout = player.multiplayerMode === "online"
+      ? this.getTrustedOnlineCombatLoadout(player)
+      : null;
+    updatePlayerPvpCapacityFromPresence(player, message, trustedLoadout);
 
     const weaponKey = getSafeWeaponKey(message.equippedWeaponKey || message.weaponKey);
-    if (weaponKey) player.equippedWeaponKey = weaponKey;
+    if (weaponKey && player.multiplayerMode !== "online") player.equippedWeaponKey = weaponKey;
 
     const weaponKeys = Array.isArray(message.equippedWeaponKeys)
       ? message.equippedWeaponKeys.map((entry) => getSafeWeaponKey(entry)).filter(Boolean)
       : String(message.equippedWeaponKeys || "").split(",").map((entry) => getSafeWeaponKey(entry)).filter(Boolean);
-    if (weaponKeys.length) player.equippedWeaponKeys = weaponKeys.slice(0, 20).join(",");
+    if (weaponKeys.length && player.multiplayerMode !== "online") player.equippedWeaponKeys = weaponKeys.slice(0, 20).join(",");
 
     const currentNode = getStringValue(message.currentNode);
     if (currentNode) player.currentNode = currentNode;
@@ -4749,6 +5021,10 @@ export class LupenSectorRoom extends Room {
         previousPresenceStatus,
         presenceStatus: player.presenceStatus || "space"
       }));
+    }
+    if (player.multiplayerMode === "online" &&
+      (!trustedLoadout?.trusted || (player.reportedShipId && player.reportedShipId !== trustedLoadout.currentShipId))) {
+      this.refreshTrustedOnlineCombatLoadout(player, { force: true }).catch(() => {});
     }
     this.reconcilePlayerSelection(player);
   }

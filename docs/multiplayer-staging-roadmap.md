@@ -11,13 +11,14 @@ Lupen is currently being prepared as a browser-first website game. The pilot foc
 - `https://www.lupen.io/` is the public player and external-playtest URL now.
 - `https://www.lupen.io/?mp=staging` is an internal multiplayer QA route, not a public game link.
 - Player-facing releases should use normal game language and keep staging, dry-run, allow-list, preview, and diagnostic wording behind the staging/debug routes.
-- Multiplayer should become the clean-root default only after the complete new-player route can persist safely through server-authoritative trade, Store/loadout, combat rewards, bounty claims, repair/state recovery, and Academy progression without allow-list-only or dry-run gaps.
+- The clean-root game now connects to the hosted shared room in `online` mode. Remaining authority migrations are tracked system by system rather than keeping the whole production connection disabled.
 
 ## Current Staging State
 
-Multiplayer staging is gated behind `?mp=staging` and connects to the hosted Colyseus `lupen_sector` room. It currently supports:
+Production online mode and `?mp=staging` both connect to the hosted Colyseus `lupen_sector` room; staging adds internal QA controls. The room currently supports:
 
 - Verified or guest player presence.
+- Verified save-backed PvP ship/loadout authority, including server-derived weapon upgrades and defensive capacity.
 - Remote player ship images and labels.
 - Server-owned staging bots.
 - Server-validated staging bot lock-on.
@@ -55,9 +56,9 @@ Dry-run or preview systems:
 - Reward preview, loot preview, ledger/shadow diagnostics, and most debug details behind `?debug=mp`.
 - Shield Booster shield stat is reflected in loadout/status diagnostics, but player shield damage is not enabled.
 
-Excluded systems:
+Remaining test/migration scope:
 
-- PvP, player damage, combat/bounty credits, Store sell, broad ship writes beyond LF-2 Hauler, weapon/attachment loot writes, broad inventory writes, schema/RLS changes, and broad progression.
+- Authenticated two-account PvP validation, higher-capacity soak testing, combat/bounty credits, Store sell, broader server-side inventory mutations, schema/RLS hardening, and broad progression authority.
 
 Next recommended phases:
 
