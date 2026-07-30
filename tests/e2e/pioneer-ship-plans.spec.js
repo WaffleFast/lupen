@@ -34,7 +34,7 @@ test.describe("Pioneer ship line", () => {
         { id: "falcon", name: "Pioneer Hunter" },
         { id: "zeusExplorer", name: "Pioneer Destroyer" },
         { id: "bison", name: "Pioneer Freighter" },
-        { id: "monolith", name: "Pioneer Moth" }
+        { id: "monolith", name: "Pioneer Behemoth" }
       ],
       unlocks: [true, true, true, true]
     });
@@ -91,7 +91,7 @@ test.describe("Pioneer ship line", () => {
     })()`));
 
     await expect(page.locator("#hangarShipyardSection")).toHaveClass(/active/);
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Pioneer Moth");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Pioneer Behemoth");
 
     const previewLayers = await page.locator("#shipyardDetailPanel .exchange-detail-preview").evaluate(preview => {
       const image = preview.querySelector("img");

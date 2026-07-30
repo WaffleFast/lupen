@@ -115,6 +115,14 @@
   }
 
   function isStagingMode(status = getClient()?.getStatus?.()) {
+    return status?.enabledReason === "staging_enabled" || status?.enabledReason === "production_online";
+  }
+
+  function isProductionOnlineMode(status = getClient()?.getStatus?.()) {
+    return status?.enabledReason === "production_online";
+  }
+
+  function isTestStagingMode(status = getClient()?.getStatus?.()) {
     return status?.enabledReason === "staging_enabled";
   }
 
@@ -1810,7 +1818,11 @@
   function getDevGhostLabel(player) {
     const shipLabel = getShipLabel(player);
     if (isStagingMode() && !isMpDebugEnabled()) return shipLabel === "Unknown ship" ? "" : shipLabel;
-    const modeLabel = isStagingMode() ? "STAGING PILOT" : "DEV GHOST";
+    const modeLabel = isProductionOnlineMode()
+      ? "ONLINE PILOT"
+      : isTestStagingMode()
+        ? "STAGING PILOT"
+        : "DEV GHOST";
     return shipLabel === "Unknown ship" ? modeLabel : `${shipLabel} / ${modeLabel}`;
   }
 
@@ -4373,7 +4385,11 @@
     chip.appendChild(dot);
 
     const label = global.document.createElement("span");
-    label.textContent = `Multiplayer Staging ${labelText}`;
+    label.textContent = isProductionOnlineMode(status)
+      ? connectionStatus === "online"
+        ? "Lupen Online"
+        : `Lupen Online — ${labelText}`
+      : `Multiplayer Staging ${labelText}`;
     chip.appendChild(label);
 
     const room = global.document.createElement("em");
@@ -4396,7 +4412,7 @@
 
     if (!selectedBot?.id) {
       const pilotText = players.length ? `${players.length} remote pilot${players.length === 1 ? "" : "s"} connected. ` : "";
-      return `${pilotText}${loop} No PvP; engaged bots return fire locally.`;
+      return `${pilotText}${loop} PvP is enabled in contested lower-sector nodes; protected zones remain safe.`;
     }
 
     if (selectedBot.disabled) {
@@ -4415,7 +4431,7 @@
 
   function renderStagingFlowHint(status, selectedBot, players, bots) {
     removeStagingFlowHint();
-    if (!isStagingMode(status) || !status?.enabled || isMpDebugEnabled() || isStagingFlowHintDismissed()) return;
+    if (!isTestStagingMode(status) || !status?.enabled || isMpDebugEnabled() || isStagingFlowHintDismissed()) return;
 
     ensureStyles();
 
@@ -4444,7 +4460,7 @@
 
     const note = global.document.createElement("span");
     note.className = "lupen-mp-flow-note";
-    note.textContent = "Trade, Store, loadout, combat XP, and bounty rewards are live for staging. No PvP; engaged bots return fire locally.";
+    note.textContent = "Trade, Store, loadout, combat XP, bounty rewards, and contested-zone PvP are enabled.";
     hint.appendChild(note);
 
     global.document.body.appendChild(hint);
@@ -4853,7 +4869,11 @@
     panel.setAttribute("aria-hidden", "true");
 
     const title = global.document.createElement("strong");
-    title.textContent = isStagingMode(status) ? "MP Staging" : "MP Dev Diagnostics";
+    title.textContent = isProductionOnlineMode(status)
+      ? "Lupen Online Diagnostics"
+      : isTestStagingMode(status)
+        ? "MP Staging"
+        : "MP Dev Diagnostics";
     panel.appendChild(title);
 
     setDiagnosticsRow(panel, "status", `${status.connectionStatus || (status.isConnected ? "online" : status.isConnecting ? "connecting" : "disconnected")} / ${status.connectionStatusReason || "none"}`);
@@ -5105,8 +5125,10 @@
 
     const note = global.document.createElement("span");
     note.className = "lupen-mp-diagnostics-note";
-    note.textContent = isStagingMode(status)
-      ? "Staging reward path - XP and Lupen Shard material writes are gate-only; no credits, equipment loot, normal bounty writes, or PvP."
+    note.textContent = isProductionOnlineMode(status)
+      ? "Live shared universe - server-owned pilots, targets, combat, PvP zone rules, chat, and presence."
+      : isTestStagingMode(status)
+        ? "Staging reward path - XP and Lupen Shard material writes are gate-only; no credits, equipment loot, or normal bounty writes."
       : "Dev bot markers are visual-only; real combat bots are still local.";
     panel.appendChild(note);
 

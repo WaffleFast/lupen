@@ -520,7 +520,7 @@ const STARTER_TUTORIAL_STEPS = [
     title: "Orientation Complete",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_outro_complete",
-    text: "You have the fundamentals, {pilot}. Open Journey and finish the remaining Academy assignments. Across the Pioneer Line, the Freighter or Destroyer are natural next hulls, with the Moth farther ahead. Earn a second Pioneer hull to unlock Frontier. Good luck out there—I will be with you for the road ahead.",
+    text: "You have the fundamentals, {pilot}. Open Journey and finish the remaining Academy assignments. Across the Pioneer Line, the Freighter or Destroyer are natural next hulls, with the Behemoth farther ahead. Earn a second Pioneer hull to unlock Frontier. Good luck out there—I will be with you for the road ahead.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Continue my journey",

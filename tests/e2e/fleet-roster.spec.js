@@ -97,7 +97,7 @@ test.describe("Hangar Fleet roster", () => {
     await mothCard.click();
     await expect(mothCard).toHaveClass(/selected/);
     await expect(mothCard).not.toHaveClass(/active/);
-    await expect(page.locator("#fleetDetailPanel .fleet-selected-identity")).toContainText("Pioneer Moth");
+    await expect(page.locator("#fleetDetailPanel .fleet-selected-identity")).toContainText("Pioneer Behemoth");
     await expect(page.locator("#fleetDetailPanel .fleet-selected-status")).toContainText("Owned");
     await expect(page.locator("#fleetDetailPanel .fleet-management-primary")).toHaveText("Set Active");
 

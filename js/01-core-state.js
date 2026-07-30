@@ -490,19 +490,19 @@ const SHIPS = {
   },
   monolith: {
     id: "monolith",
-    name: "Pioneer Moth",
+    name: "Pioneer Behemoth",
     manufacturer: "Lupen Foundry",
     lineId: PIONEER_LINE_ID,
-    className: "Moth",
+    className: "Behemoth",
     role: "Behemoth / Command",
     roleSubtitle: "Behemoth / Command",
-    description: "The Pioneer Line flagship: a command hull with immense defences and extensive weapon and equipment capacity.",
+    description: "The Pioneer Line flagship: a behemoth-class command hull with immense defences and overwhelming weapon capacity.",
     image: getShipAsset("monolith", "medium"),
     assets: SHIP_ASSET_MANIFEST.monolith,
-    price: 120000,
-    hull: 1800,
-    shield: 360,
-    armor: 28,
+    price: 240000,
+    hull: 2400,
+    shield: 600,
+    armor: 36,
     cargo: 220,
     jumpRecharge: 10,
     evasion: 6,
@@ -675,9 +675,9 @@ const SHIPS = {
     image: getShipAsset("zeusExplorer", "medium"),
     assets: SHIP_ASSET_MANIFEST.zeusExplorer,
     price: 66000,
-    hull: 1250,
-    shield: 240,
-    armor: 20,
+    hull: 1450,
+    shield: 300,
+    armor: 24,
     cargo: 120,
     jumpRecharge: 13,
     evasion: 12,
@@ -1798,9 +1798,9 @@ const EREBUS_BOT_TYPES = {
     className: "Hunter",
     role: "Light scout",
     image: "erebus-hunter",
-    hull: 110,
-    shield: 60,
-    armor: 6,
+    hull: 140,
+    shield: 75,
+    armor: 7,
     damage: 12,
     fireRateMs: 1400,
     accuracy: 0.72,
@@ -1815,9 +1815,9 @@ const EREBUS_BOT_TYPES = {
     className: "Attacker",
     role: "Assault craft",
     image: "erebus-attacker",
-    hull: 165,
-    shield: 95,
-    armor: 12,
+    hull: 210,
+    shield: 120,
+    armor: 14,
     damage: 19,
     fireRateMs: 1700,
     accuracy: 0.75,
@@ -1832,9 +1832,9 @@ const EREBUS_BOT_TYPES = {
     className: "Destroyer",
     role: "Heavy gunship",
     image: "erebus-destroyer",
-    hull: 260,
-    shield: 150,
-    armor: 22,
+    hull: 330,
+    shield: 190,
+    armor: 25,
     damage: 28,
     fireRateMs: 2300,
     accuracy: 0.78,
@@ -1849,9 +1849,9 @@ const EREBUS_BOT_TYPES = {
     className: "Behemoth",
     role: "Heavy mini-boss",
     image: "erebus-behemoth",
-    hull: 420,
-    shield: 240,
-    armor: 32,
+    hull: 540,
+    shield: 300,
+    armor: 36,
     damage: 40,
     fireRateMs: 3200,
     accuracy: 0.8,
@@ -2113,7 +2113,7 @@ function getStagingBotTargetById(id) {
     currentNodeId: node,
     node,
     alive: !bot.disabled,
-    name: bot.name || bot.displayName || "Staging Bot",
+    name: bot.name || bot.displayName || "Erebus Bot",
     stagingBot: true
   };
 }
@@ -2255,7 +2255,11 @@ function isConnectedStagingMultiplayerSession() {
       return false;
     }
   })();
-  return Boolean(status?.isConnected && (isStagingUrl || status?.enabledReason === "staging_enabled"));
+  return Boolean(status?.isConnected && (
+    isStagingUrl ||
+    status?.enabledReason === "staging_enabled" ||
+    status?.enabledReason === "production_online"
+  ));
 }
 
 function shouldUseServerOwnedSectorObjects() {
@@ -2278,12 +2282,12 @@ function isStagingLocalCombatBotVisualGuardActive() {
   }
 
   const status = window.LupenMultiplayerClient?.getStatus?.();
-  // Staging presence uses Colyseus-owned visual bots. Keep local real combat
-  // bots in their normal arrays/saves, but hide and pause their local combat
-  // presentation while ?mp=staging is active so two-player staging tests are
-  // not confused by client-local enemy spawns. This is temporary until
-  // Colyseus becomes authoritative for real bot simulation.
-  return isStagingUrl || status?.enabledReason === "staging_enabled";
+  // Shared online presence uses Colyseus-owned combat bots. Keep local fallback
+  // bots in saves, but hide and pause them whenever the authoritative room is
+  // active so every connected player sees the same targets and outcomes.
+  return isStagingUrl ||
+    status?.enabledReason === "staging_enabled" ||
+    status?.enabledReason === "production_online";
 }
 
 function getVisibleHostileBotsForLocalTargetUi() {

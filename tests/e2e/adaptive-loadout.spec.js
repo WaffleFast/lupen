@@ -192,7 +192,7 @@ test.describe("Adaptive Hangar Loadout", () => {
     await expect.poll(() => page.evaluate(() => ({ hull, savedHull: shipConditions.falcon.hull }))).toEqual({ hull: expectedHullMax, savedHull: expectedHullMax });
   });
 
-  test("fits the Moth's 15 weapon and 15 attachment slots without unsupported cells", async ({ page }) => {
+  test("fits the Behemoth's 15 weapon and 15 attachment slots without unsupported cells", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
     await openAdaptiveLoadout(page, () => window.eval(`(() => {
       localStorage.clear();

@@ -86,8 +86,8 @@ export function getHealthPayload(
 ) {
   return {
     ok: true,
-    service: "lupen-colyseus-prototype",
-    status: process.env.NODE_ENV === "production" ? "staging-ready" : "local-only",
+    service: "lupen-colyseus",
+    status: process.env.NODE_ENV === "production" ? "online-ready" : "local-development",
     rooms: [ROOM_NAME, LEGACY_ROOM_NAME],
     preferredRoom: ROOM_NAME,
     environment: process.env.NODE_ENV || "development",

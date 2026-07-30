@@ -210,7 +210,7 @@ const BOT_NODE_MOVE_MIN_MS = 12000;
 const BOT_NODE_MOVE_MAX_MS = 28000;
 const BOT_COMBAT_HOLD_MS = 8000;
 const STAGING_TEST_DAMAGE = 5;
-const STAGING_PVP_TEST_DAMAGE = 90;
+const STAGING_PVP_FALLBACK_DAMAGE = 5;
 const STAGING_PVP_SHIELD_MAX = 30;
 const STAGING_PVP_HULL_MAX = 120;
 const STAGING_PVP_MIN_HULL = 1;
@@ -717,34 +717,43 @@ function updatePlayerPvpCapacityFromPresence(player, message = {}) {
   if (!player) return null;
   ensurePlayerPvpState(player);
 
-  const requestedShieldMax = Number(message.pvpShieldMax ?? message.shieldMax ?? message.maxShield);
+  const shipId = getSafeIdentityValue(message.currentShipId || player.currentShipId);
+  const serverShip = STAGING_SHIP_CONFIG[shipId] || null;
+  const requestedShieldMax = Number(serverShip?.shield ?? message.pvpShieldMax ?? message.shieldMax ?? message.maxShield);
+  const requestedArmorMax = Number(serverShip?.armor ?? message.pvpArmorMax ?? message.armorMax ?? message.armor);
+  const requestedHullMax = Number(serverShip?.hull ?? message.pvpHullMax ?? message.hullMax ?? message.maxHull);
+  const previousShieldMax = Math.max(1, Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX));
+  const previousArmorMax = Math.max(0, Number(player.pvpArmorMax || 0));
+  const previousHullMax = Math.max(STAGING_PVP_MIN_HULL, Number(player.pvpHullMax || STAGING_PVP_HULL_MAX));
+  const pristine = Number(player.lastPvpHitAt || 0) <= 0 &&
+    Number(player.pvpShield || 0) >= previousShieldMax &&
+    Number(player.pvpArmor || 0) >= previousArmorMax &&
+    Number(player.pvpHull || 0) >= previousHullMax;
+
   if (Number.isFinite(requestedShieldMax) && requestedShieldMax > 0) {
     const nextShieldMax = clampNumber(Math.round(requestedShieldMax), 1, 10000);
-    const previousShieldMax = Number(player.pvpShieldMax || STAGING_PVP_SHIELD_MAX);
     player.pvpShieldMax = nextShieldMax;
-    player.pvpShield = previousShieldMax <= STAGING_PVP_SHIELD_MAX && Number(player.lastPvpHitAt || 0) <= 0
+    player.pvpShield = pristine
       ? nextShieldMax
-      : clampNumber(Number(player.pvpShield || 0), 0, nextShieldMax);
+      : clampNumber(Math.round(Number(player.pvpShield || 0) / previousShieldMax * nextShieldMax), 0, nextShieldMax);
   }
 
-  const requestedArmorMax = Number(message.pvpArmorMax ?? message.armorMax ?? message.armor);
   if (Number.isFinite(requestedArmorMax) && requestedArmorMax >= 0) {
     const nextArmorMax = clampNumber(Math.round(requestedArmorMax), 0, 10000);
-    const previousArmorMax = Number(player.pvpArmorMax || 0);
     player.pvpArmorMax = nextArmorMax;
-    player.pvpArmor = previousArmorMax <= 0 && Number(player.lastPvpHitAt || 0) <= 0
+    player.pvpArmor = pristine
       ? nextArmorMax
-      : clampNumber(Number(player.pvpArmor || 0), 0, nextArmorMax);
+      : previousArmorMax > 0
+        ? clampNumber(Math.round(Number(player.pvpArmor || 0) / previousArmorMax * nextArmorMax), 0, nextArmorMax)
+        : 0;
   }
 
-  const requestedHullMax = Number(message.pvpHullMax ?? message.hullMax ?? message.maxHull);
   if (Number.isFinite(requestedHullMax) && requestedHullMax > 0) {
     const nextHullMax = clampNumber(Math.round(requestedHullMax), STAGING_PVP_MIN_HULL, 10000);
-    const previousHullMax = Number(player.pvpHullMax || STAGING_PVP_HULL_MAX);
     player.pvpHullMax = nextHullMax;
-    player.pvpHull = previousHullMax <= STAGING_PVP_HULL_MAX && Number(player.lastPvpHitAt || 0) <= 0
+    player.pvpHull = pristine
       ? nextHullMax
-      : clampNumber(Number(player.pvpHull || nextHullMax), 0, nextHullMax);
+      : clampNumber(Math.round(Number(player.pvpHull || 0) / previousHullMax * nextHullMax), 0, nextHullMax);
   }
 
   return player;
@@ -848,16 +857,27 @@ export function applyLayeredPvpDamage(target, damage) {
   };
 }
 
-export function calculatePrototypePvpDamage() {
-  return STAGING_PVP_TEST_DAMAGE;
+export function calculatePrototypePvpDamage(resolvedWeapon = {}) {
+  return clampNumber(
+    Math.round(Number(resolvedWeapon?.damage || STAGING_PVP_FALLBACK_DAMAGE)),
+    STAGING_DAMAGE_MIN,
+    STAGING_VOLLEY_DAMAGE_MAX
+  );
 }
 
-function getPvpEligibilityPreview(attacker = null, target = null, currentNode = "") {
+export function getPvpEligibilityPreview(attacker = null, target = null, currentNode = "") {
   const node = getStringValue(currentNode || attacker?.currentNode || target?.currentNode);
   const targetId = getStringValue(target?.sessionId || target?.id);
   const attackerId = getStringValue(attacker?.sessionId || attacker?.id);
   if (!attacker) return { allowed: false, reason: "attacker_not_found", pvpEnabled: false };
   if (!target) return { allowed: false, reason: "target_not_found", pvpEnabled: false };
+  const productionOnline = attacker?.multiplayerMode === "online" || target?.multiplayerMode === "online";
+  if (productionOnline && attacker?.authStatus !== "verified") {
+    return { allowed: false, reason: "attacker_verified_identity_required", pvpEnabled: false };
+  }
+  if (productionOnline && target?.authStatus !== "verified") {
+    return { allowed: false, reason: "target_verified_identity_required", pvpEnabled: false };
+  }
   if (attackerId && targetId && attackerId === targetId) return { allowed: false, reason: "self_target", pvpEnabled: false };
   if (getSafePresenceStatus(attacker?.presenceStatus) === "docked") return { allowed: false, reason: "attacker_docked", pvpEnabled: false };
   if (getSafePresenceStatus(target?.presenceStatus) === "docked") return { allowed: false, reason: "target_docked", pvpEnabled: false };
@@ -4351,7 +4371,7 @@ export class LupenSectorRoom extends Room {
     ensurePlayerPvpState(targetPlayer);
     const resolvedWeapon = resolveStagingWeapon(message, attacker);
     const pvpCooldownMs = resolvedWeapon.cooldownMs;
-    const serverDamageUsed = calculatePrototypePvpDamage(attacker, targetPlayer);
+    const serverDamageUsed = calculatePrototypePvpDamage(resolvedWeapon);
     const result = this.applyStagingPvpDamage(targetPlayer, serverDamageUsed);
     const targetDefeated = result.defeated === true || Number(result.hull || 0) <= 0;
     attacker.lastFireAt = now;

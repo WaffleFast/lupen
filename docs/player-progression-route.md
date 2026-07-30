@@ -40,7 +40,7 @@ Morgan tracks nine durable Academy milestones:
 - Complete a hull repair or confirm a full-condition repair inspection.
 - Purchase a second Pioneer hull.
 
-The final hull purchase is deliberately the Frontier gate. A fresh pilot can reach the Pioneer Freighter through the first trade, bounty, and a small amount of continued play without skipping directly to the Destroyer or Moth.
+The final hull purchase is deliberately a long-term Frontier goal. A fresh pilot can reach the Pioneer Freighter through the first trade, bounty, and continued play without skipping directly to the Destroyer or Behemoth.
 
 ## Frontier and future plans
 

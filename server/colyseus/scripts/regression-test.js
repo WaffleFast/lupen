@@ -6,6 +6,7 @@ import {
   buildRewardClaimStatus,
   buildRewardWritePlan,
   calculatePrototypePvpDamage,
+  getPvpEligibilityPreview,
   getPresenceIdentityKey,
   verifySupabaseAccessToken
 } from "../src/rooms/LupenSectorRoom.js";
@@ -159,8 +160,10 @@ function assertLayeredPvpDamageHelper() {
   assert(destructionTarget.pvpHull === 0, `PvP hull did not reach 0 for destruction flow: ${destructionTarget.pvpHull}.`);
   assert(destroyed.defeated === true, "PvP damage helper did not mark zero-hull target defeated.");
 
-  const prototypeDamage = calculatePrototypePvpDamage();
-  assert(prototypeDamage === 90, `Unexpected prototype PvP damage tuning: ${prototypeDamage}.`);
+  const fallbackDamage = calculatePrototypePvpDamage();
+  const prototypeDamage = calculatePrototypePvpDamage({ damage: 26 });
+  assert(fallbackDamage === 5, `Unexpected PvP fallback damage tuning: ${fallbackDamage}.`);
+  assert(prototypeDamage === 26, `Unexpected server-known PvP volley damage: ${prototypeDamage}.`);
   const fullPrototypeTarget = {
     pvpShield: 180,
     pvpShieldMax: 180,
@@ -170,16 +173,46 @@ function assertLayeredPvpDamageHelper() {
     pvpHullMax: 700
   };
   const repeatedHits = [];
-  for (let index = 0; index < 10; index += 1) {
+  for (let index = 0; index < 40; index += 1) {
     repeatedHits.push(applyLayeredPvpDamage(fullPrototypeTarget, prototypeDamage));
     if (fullPrototypeTarget.pvpHull <= 0) break;
   }
-  assert(repeatedHits.length === 10, `Expected prototype full-health destruction in 10 hits, got ${repeatedHits.length}.`);
+  assert(repeatedHits.length > 10 && repeatedHits.length < 40, `Expected weapon-scaled full-health destruction, got ${repeatedHits.length} hits.`);
   assert(repeatedHits[0].shieldDamage === prototypeDamage && repeatedHits[0].armorDamage === 0 && repeatedHits[0].hullDamage === 0, "First prototype hit was not shield-only.");
   assert(repeatedHits[1].shieldDamage === prototypeDamage && repeatedHits[1].armorDamage === 0 && repeatedHits[1].hullDamage === 0, "Second prototype hit was not shield-only.");
-  assert(repeatedHits[2].shieldDamage === 0 && repeatedHits[2].armorDamage === 12 && repeatedHits[2].hullDamage === 78, "Third prototype hit did not overflow through armor into hull.");
-  assert(repeatedHits[9].defeated === true && fullPrototypeTarget.pvpHull === 0, "Tenth prototype hit did not destroy full-health target.");
+  assert(repeatedHits.at(-1)?.defeated === true && fullPrototypeTarget.pvpHull === 0, "Final weapon-scaled hit did not destroy full-health target.");
   console.log("layered PvP damage helper preserves shield/armor/hull order");
+}
+
+function assertProductionPvpIdentityGate() {
+  const attacker = {
+    sessionId: "online-attacker",
+    authStatus: "unverified",
+    multiplayerMode: "online",
+    presenceStatus: "space",
+    currentNode: "Lower Gate Core",
+    guildId: ""
+  };
+  const target = {
+    sessionId: "online-target",
+    authStatus: "verified",
+    multiplayerMode: "online",
+    presenceStatus: "space",
+    currentNode: "Lower Gate Core",
+    guildId: "other"
+  };
+  const unverified = getPvpEligibilityPreview(attacker, target, "Lower Gate Core");
+  assert(unverified.allowed === false && unverified.reason === "attacker_verified_identity_required", "Production PvP did not reject an unverified attacker.");
+
+  attacker.authStatus = "verified";
+  const verified = getPvpEligibilityPreview(attacker, target, "Lower Gate Core");
+  assert(verified.allowed === true && verified.reason === "contested_zone", "Production PvP did not allow two verified pilots in contested space.");
+
+  attacker.currentNode = "Asteron Prime";
+  target.currentNode = "Asteron Prime";
+  const protectedZone = getPvpEligibilityPreview(attacker, target, "Asteron Prime");
+  assert(protectedZone.allowed === false && protectedZone.reason === "protected_zone", "Production PvP did not preserve protected-zone safety.");
+  console.log("production PvP requires verified pilots and contested space");
 }
 
 function waitFor(description, predicate, timeoutMs = 4000) {
@@ -2129,7 +2162,7 @@ async function assertStagingStorePreviewHelpers() {
   assert(JSON.stringify(pioneerPrices) === JSON.stringify({
     falcon: 0,
     bison: 24000,
-    monolith: 120000,
+    monolith: 240000,
     zeusExplorer: 66000
   }), `Pioneer staging hull prices diverged from the intended catalogue: ${JSON.stringify(pioneerPrices)}`);
   const patchPlan = buildStagingStorePurchasePatch(validSaveData, cargoPodItem, 1);
@@ -2711,9 +2744,9 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "attachment:jumpDrive" });
-  assert(monolithAttachmentStressPlan.ok === true, `Pioneer Moth fifth attachment slot equip was blocked: ${monolithAttachmentStressPlan.blockReason}`);
-  assert(monolithAttachmentStressPlan.attachmentSlots === 5, "Pioneer Moth attachment stress plan reported unexpected attachment slot count.");
-  assert(monolithAttachmentStressPlan.patchedSaveData.shipLoadouts.monolith.attachments.length === 5, "Pioneer Moth attachment stress plan did not fill the fifth attachment slot.");
+  assert(monolithAttachmentStressPlan.ok === true, `Pioneer Behemoth fifth attachment slot equip was blocked: ${monolithAttachmentStressPlan.blockReason}`);
+  assert(monolithAttachmentStressPlan.attachmentSlots === 5, "Pioneer Behemoth attachment stress plan reported unexpected attachment slot count.");
+  assert(monolithAttachmentStressPlan.patchedSaveData.shipLoadouts.monolith.attachments.length === 5, "Pioneer Behemoth attachment stress plan did not fill the fifth attachment slot.");
 
   const monolithFullAttachmentSlotsPlan = buildStagingLoadoutEquipPlan({
     ...validSaveData,
@@ -2727,7 +2760,7 @@ async function assertStagingCargoPodEquipHelpers() {
       }
     }
   }, { itemId: "attachment:jumpDrive" });
-  assert(monolithFullAttachmentSlotsPlan.ok === false && monolithFullAttachmentSlotsPlan.blockReason === "attachment_slots_full", "Pioneer Moth sixth attachment slot was not blocked.");
+  assert(monolithFullAttachmentSlotsPlan.ok === false && monolithFullAttachmentSlotsPlan.blockReason === "attachment_slots_full", "Pioneer Behemoth sixth attachment slot was not blocked.");
 
   const pulseLaserUnequipPlan = buildStagingLoadoutUnequipPlan({
     ...validSaveData,
@@ -4715,6 +4748,7 @@ try {
   await assertIdentityVerificationAndRewardPlanHelpers();
   assertPresenceIdentityHelpers();
   assertLayeredPvpDamageHelper();
+  assertProductionPvpIdentityGate();
 
   roomA = await clientA.joinOrCreate(ROOM_NAME, {
     displayName: "Regression Pilot A",
@@ -4908,26 +4942,26 @@ try {
   const targetPvpArmorBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpArmor || 0);
   const targetPvpHullBefore = Number(playerFrom(roomA, roomB.sessionId)?.pvpHull || 0);
   const targetPvpShieldMax = Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0);
-  assert(targetPvpShieldMax === 180, `PvP target shield max did not use true presence shield capacity: ${targetPvpShieldMax}`);
+  assert(targetPvpShieldMax === 100, `PvP target shield max did not use server-known ship capacity: ${targetPvpShieldMax}`);
   assert(targetPvpArmorBefore === 12, `PvP target armor did not use true presence armor capacity: ${targetPvpArmorBefore}`);
-  assert(targetPvpHullBefore === 700, `PvP target hull did not initialize to true presence hull capacity: ${targetPvpHullBefore}`);
+  assert(targetPvpHullBefore === 1000, `PvP target hull did not use server-known ship capacity: ${targetPvpHullBefore}`);
   const combatSpacePvpResolved = await expectCombatResolved(roomA, () => {
     roomA.send("combat:intent", {
       targetType: "remotePlayer",
       targetPlayerId: roomB.sessionId,
       currentNode: "Lower Gate Core",
       weaponId: "pulse-laser",
-      weaponKey: "pulse-laser-mk1",
+      weaponKey: "pulseLaser",
       weaponFamily: "pulse",
       weaponName: "Pulse Laser",
-      equippedWeaponKeys: ["pulse-laser-mk1"]
+      equippedWeaponKeys: ["pulseLaser", "pulseLaser"]
     });
   });
   assert(combatSpacePvpResolved?.reason === "pvp_damage_applied", `Unexpected contested PvP result: ${combatSpacePvpResolved?.reason}`);
   assert(combatSpacePvpResolved?.pvpRulePreview === "contested_zone", `Unexpected contested PvP preview: ${combatSpacePvpResolved?.pvpRulePreview}`);
   assert(combatSpacePvpResolved?.pvpEligibility?.pvpEnabled === true, "PvP eligibility did not enable contested combat.");
   assert(combatSpacePvpResolved?.weaponId === "pulse-laser", "PvP result did not include weapon id diagnostics.");
-  assert(combatSpacePvpResolved?.weaponKey === "pulse-laser-mk1", "PvP result did not include weapon key diagnostics.");
+  assert(combatSpacePvpResolved?.weaponKey === "pulseLaser", "PvP result did not include weapon key diagnostics.");
   assert(combatSpacePvpResolved?.weaponFamily === "pulse", "PvP result did not include weapon family diagnostics.");
   assert(combatSpacePvpResolved?.pvpDamageApplied === true, "Contested PvP did not apply PvP damage.");
   assert(combatSpacePvpResolved?.playerDamageApplied === true, "Contested PvP did not apply player damage.");
@@ -4937,8 +4971,8 @@ try {
   assert(combatSpacePvpResolved?.bountyProgressChanged === false, "Contested PvP unexpectedly changed bounty progress.");
   assert(combatSpacePvpResolved?.cargoLost === false, "Contested PvP unexpectedly caused cargo loss.");
   assert(combatSpacePvpResolved?.deathApplied === false, "Contested PvP unexpectedly applied death.");
-  assert(Number(combatSpacePvpResolved?.serverDamageUsed || 0) === calculatePrototypePvpDamage(), "Contested PvP did not use prototype damage tuning.");
-  assert(Number(combatSpacePvpResolved?.damage || 0) === calculatePrototypePvpDamage(), "First contested PvP hit did not apply full prototype damage.");
+  assert(Number(combatSpacePvpResolved?.serverDamageUsed || 0) === calculatePrototypePvpDamage({ damage: 26 }), "Contested PvP did not use the server-known twin Pulse Laser volley.");
+  assert(Number(combatSpacePvpResolved?.damage || 0) === calculatePrototypePvpDamage({ damage: 26 }), "First contested PvP hit did not apply the server-known volley.");
   assert(Number(combatSpacePvpResolved?.shieldDamage || 0) > 0, "Contested PvP did not apply shield-first damage.");
   await waitFor("PvP hit broadcast delivered to both clients", () => roomAPvpHitEvents.length >= 1 && roomBPvpHitEvents.length >= 1);
   const targetAfterPvp = playerFrom(roomA, roomB.sessionId);
@@ -4960,15 +4994,15 @@ try {
       targetPlayerId: roomB.sessionId,
       currentNode: "Lower Gate Core",
       weaponId: "pulse-laser",
-      weaponKey: "pulse-laser-mk1",
+      weaponKey: "pulseLaser",
       weaponFamily: "pulse",
       weaponName: "Pulse Laser",
-      equippedWeaponKeys: ["pulse-laser-mk1"]
+      equippedWeaponKeys: ["pulseLaser", "pulseLaser"]
     });
   });
   assert(secondPvpResolved?.reason === "pvp_damage_applied", `Unexpected repeated PvP result: ${secondPvpResolved?.reason}`);
-  assert(Number(secondPvpResolved?.serverDamageUsed || 0) === calculatePrototypePvpDamage(), "Repeated PvP hit did not use consistent prototype damage.");
-  assert(Number(secondPvpResolved?.damage || 0) === calculatePrototypePvpDamage(), "Repeated PvP hit did not apply consistent prototype damage.");
+  assert(Number(secondPvpResolved?.serverDamageUsed || 0) === calculatePrototypePvpDamage({ damage: 26 }), "Repeated PvP hit did not use consistent server-known volley damage.");
+  assert(Number(secondPvpResolved?.damage || 0) === calculatePrototypePvpDamage({ damage: 26 }), "Repeated PvP hit did not apply consistent server-known volley damage.");
   const shieldAfterSecondHit = Number(secondPvpResolved?.shield || 0);
   const armorAfterSecondHit = Number(secondPvpResolved?.armor || 0);
   const hullAfterSecondHit = Number(secondPvpResolved?.hull || 0);
@@ -5002,6 +5036,7 @@ try {
   assert(Number(playerFrom(roomA, roomB.sessionId)?.pvpShieldMax || 0) === targetPvpShieldMax, "PvP shield max changed during regen.");
 
   roomB.send("movement:update", {
+    currentShipId: "regressionTestHull",
     currentNode: "Lower Gate Core",
     presenceStatus: "space",
     guildId: "guild-two",
@@ -5011,6 +5046,14 @@ try {
     hullMax: 700,
     x: 50,
     y: 57
+  });
+  roomB.send("pvp:repair", {
+    currentShipId: "regressionTestHull",
+    shieldMax: 1,
+    armor: 0,
+    armorMax: 0,
+    hullMax: 700,
+    reason: "regression_test_capacity"
   });
   await waitFor("PvP target shield capacity reduced for hull damage regression", () => {
     const target = playerFrom(roomA, roomB.sessionId);
@@ -5028,10 +5071,10 @@ try {
       targetPlayerId: roomB.sessionId,
       currentNode: "Lower Gate Core",
       weaponId: "pulse-laser",
-      weaponKey: "pulse-laser-mk1",
+      weaponKey: "pulseLaser",
       weaponFamily: "pulse",
       weaponName: "Pulse Laser",
-      equippedWeaponKeys: ["pulse-laser-mk1"]
+      equippedWeaponKeys: ["pulseLaser", "pulseLaser"]
     });
   });
   assert(Number(hullDamagePvpResolved?.hullDamage || 0) > 0, "PvP hull damage regression did not reach hull.");
@@ -5075,12 +5118,12 @@ try {
   assert(repairEvent?.xpAwarded === false, "PvP repair unexpectedly awarded XP.");
   assert(repairEvent?.bountyProgressChanged === false, "PvP repair unexpectedly changed bounty progress.");
   assert(repairEvent?.rewardsGranted === false, "PvP repair unexpectedly granted rewards.");
-  assert(Number(targetAfterRepair?.pvpHull || 0) === 700, "PvP repair did not restore hull in room state.");
-  assert(Number(targetAfterRepair?.pvpShield || 0) === 180, "PvP repair did not refresh shield in room state.");
+  assert(Number(targetAfterRepair?.pvpHull || 0) === 1000, "PvP repair did not restore the server-known hull in room state.");
+  assert(Number(targetAfterRepair?.pvpShield || 0) === 100, "PvP repair did not refresh the server-known shield in room state.");
   assert(Number(targetAfterRepair?.pvpArmor || 0) === 12, "PvP repair did not restore armor in room state.");
-  assert(Number(targetAfterRepair?.pvpShieldMax || 0) === 180, "PvP repair did not restore true shield max.");
+  assert(Number(targetAfterRepair?.pvpShieldMax || 0) === 100, "PvP repair did not restore the server-known shield max.");
   assert(Number(targetAfterRepair?.pvpArmorMax || 0) === 12, "PvP repair did not preserve true armor max.");
-  assert(Number(targetAfterRepair?.pvpHullMax || 0) === 700, "PvP repair did not preserve true hull max.");
+  assert(Number(targetAfterRepair?.pvpHullMax || 0) === 1000, "PvP repair did not preserve the server-known hull max.");
 
   roomA.send("movement:update", { currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "", x: 50, y: 57 });
   roomB.send("movement:update", {
@@ -5112,16 +5155,16 @@ try {
       targetType: "remotePlayer",
       targetPlayerId: roomB.sessionId,
       currentNode: "Lower Gate Core",
-      weaponId: "repeater",
-      weaponKey: "repeater",
-      weaponFamily: "rapid",
-      weaponName: "Repeater",
-      equippedWeaponKeys: ["repeater"]
+      weaponId: "pulse-laser",
+      weaponKey: "pulseLaser",
+      weaponFamily: "pulse",
+      weaponName: "Pulse Laser",
+      equippedWeaponKeys: ["pulseLaser", "pulseLaser"]
     });
   });
   assert(destructionPvpResolved?.deathApplied === true, "PvP destruction hit did not apply death.");
   assert(destructionPvpResolved?.defeated === true, "PvP destruction hit did not mark target defeated.");
-  assert(Number(destructionPvpResolved?.cooldownMs || 0) === 450, `PvP destruction hit did not use resolved Repeater cooldown: ${destructionPvpResolved?.cooldownMs}`);
+  assert(Number(destructionPvpResolved?.cooldownMs || 0) === 1250, `PvP destruction hit did not use resolved Pulse Laser cooldown: ${destructionPvpResolved?.cooldownMs}`);
   assert(Number(destructionPvpResolved?.shieldDamage || 0) === 1, "PvP destruction did not deplete shield before hull.");
   assert(Number(destructionPvpResolved?.armorDamage || 0) === 0, "PvP destruction unexpectedly damaged armor.");
   assert(Number(destructionPvpResolved?.hullDamage || 0) === 5, "PvP destruction did not apply exact hull overflow.");

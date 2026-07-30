@@ -1,7 +1,6 @@
-/* Future multiplayer client boundary.
-   Multiplayer remains disabled unless the game is opened locally with ?mp=1.
-   This local-only path is for Colyseus prototype testing and must not mutate
-   gameplay state. Server snapshots are read-only presence/visual data. */
+/* Lupen online client boundary.
+   Lupen.io connects to the shared Colyseus universe by default. Local builds
+   remain offline unless an explicit multiplayer mode is requested. */
 
 (function registerMultiplayerClient(global) {
   "use strict";
@@ -115,9 +114,19 @@
     return getMultiplayerMode() === "staging";
   }
 
+  function hasOnlineFlag() {
+    return getMultiplayerMode() === "online";
+  }
+
+  function hasHostedMultiplayerMode() {
+    return hasStagingFlag() || hasOnlineFlag();
+  }
+
   function getMultiplayerMode() {
     try {
-      return new URLSearchParams(global.location.search).get("mp") || "";
+      const explicitMode = new URLSearchParams(global.location.search).get("mp") || "";
+      if (explicitMode) return explicitMode;
+      return isProductionHost() ? "online" : "";
     } catch (_err) {
       return "";
     }
@@ -280,9 +289,22 @@
   function resolveServerConfig() {
     const queryServerUrl = getSearchParam("mpServer");
     const storedServerUrl = getStoredServerUrl();
-    const useStagingDefault = hasStagingFlag();
-    const rawServerUrl = String(useStagingDefault ? stagingServerUrl : queryServerUrl || storedServerUrl || localServerUrl).trim();
-    const source = useStagingDefault ? "staging-default" : queryServerUrl ? "query" : storedServerUrl ? "localStorage" : "default-local";
+    const useHostedDefault = hasHostedMultiplayerMode();
+    const useLocalQueryOverride = Boolean(queryServerUrl) && isLocalHost();
+    const rawServerUrl = String(
+      useLocalQueryOverride
+        ? queryServerUrl
+        : useHostedDefault
+          ? stagingServerUrl
+          : storedServerUrl || localServerUrl
+    ).trim();
+    const source = useLocalQueryOverride
+      ? "query"
+      : useHostedDefault
+      ? (hasOnlineFlag() ? "production-default" : "staging-default")
+      : storedServerUrl
+        ? "localStorage"
+        : "default-local";
 
     try {
       const parsedUrl = new URL(rawServerUrl);
@@ -319,14 +341,14 @@
     connection.serverUrl = serverConfig.serverUrl || localServerUrl;
     connection.serverUrlSource = serverConfig.source;
 
-    if (!hasDevFlag() && !hasStagingFlag()) {
+    if (!hasDevFlag() && !hasHostedMultiplayerMode()) {
       connection.enabled = false;
       connection.enabledReason = disabledReason;
       setMultiplayerConnectionStatus("disabled", disabledReason);
       return;
     }
 
-    if (hasStagingFlag()) {
+    if (hasHostedMultiplayerMode()) {
       if (!isProductionHost() && !isLocalHost()) {
         connection.enabled = false;
         connection.enabledReason = notLocalReason;
@@ -349,8 +371,10 @@
     }
 
     connection.enabled = true;
-    connection.enabledReason = hasStagingFlag()
-      ? "staging_enabled"
+    connection.enabledReason = hasOnlineFlag()
+      ? "production_online"
+      : hasStagingFlag()
+        ? "staging_enabled"
       : isLocalHost()
         ? "local_dev_enabled"
         : "allowed_staging_host_enabled";
@@ -471,8 +495,8 @@
     };
 
     try {
-      const supabaseClient = await waitForSupabaseClient(hasStagingFlag() ? 3000 : 0);
-      const sessionResponse = await waitForSupabaseSession(supabaseClient, hasStagingFlag() ? 3500 : 0);
+      const supabaseClient = await waitForSupabaseClient(hasHostedMultiplayerMode() ? 3000 : 0);
+      const sessionResponse = await waitForSupabaseSession(supabaseClient, hasHostedMultiplayerMode() ? 3500 : 0);
       const session = sessionResponse?.data?.session || null;
       const user = session?.user || null;
 
@@ -489,14 +513,14 @@
         identityOptions.supabaseAccessToken = String(session.access_token || "");
       }
     } catch (err) {
-      logDev("Supabase staging identity unavailable; connecting as guest", err);
+      logDev("Supabase identity unavailable; connecting as guest", err);
     }
 
     identity.authStatus = identityOptions.authStatus;
     identity.playerIdPresent = !!identityOptions.playerId;
     identity.sessionPresent = !!identityOptions.supabaseUserId;
     identity.tokenPresent = !!identityOptions.supabaseAccessToken;
-    identity.sessionWaitTimedOut = hasStagingFlag() && !identityOptions.supabaseAccessToken;
+    identity.sessionWaitTimedOut = hasHostedMultiplayerMode() && !identityOptions.supabaseAccessToken;
     identity.displayName = identityOptions.displayName || fallbackDisplayName;
     identity.lastCheckedAt = Date.now();
 
@@ -551,7 +575,7 @@
   }
 
   function scheduleStagingAuthReconnect() {
-    if (!hasStagingFlag() || identity.authReconnectAttempted) return;
+    if (!hasHostedMultiplayerMode() || identity.authReconnectAttempted) return;
 
     const startedAt = Date.now();
     const tryReconnect = async () => {
@@ -563,7 +587,7 @@
       }
 
       identity.authReconnectAttempted = true;
-      logDev("reconnecting with Supabase staging token");
+      logDev("reconnecting with Supabase identity");
       try {
         const previousRoom = room;
         await Promise.resolve(previousRoom.leave());
@@ -587,13 +611,13 @@
   }
 
   async function reconnectWithStagingAuth(reason = "auth_state_change") {
-    if (!hasStagingFlag() || !connection.enabled) return;
+    if (!hasHostedMultiplayerMode() || !connection.enabled) return;
 
     const identityOptions = await getMultiplayerIdentityOptions(getLocalPresenceOptions());
     if (!identityOptions.supabaseAccessToken) {
-      connection.lastServerWarning = "staging_login_required";
+      connection.lastServerWarning = "online_login_required";
       if (!connection.isConnected) {
-        connection.lastError = "Supabase session unavailable; login required for staging writes.";
+        connection.lastError = "Account session unavailable; login is required for online play.";
       }
       return;
     }
@@ -604,7 +628,7 @@
       playersById.get(connection.sessionId)?.authStatus !== "verified";
     if (!shouldReconnect) return;
 
-    logDev("reconnecting staging multiplayer after Supabase auth update", { reason });
+    logDev("reconnecting multiplayer after account authentication", { reason });
     try {
       const previousRoom = room;
       if (previousRoom) await Promise.resolve(previousRoom.leave());
@@ -628,7 +652,7 @@
   }
 
   function registerSupabaseAuthReconnect() {
-    if (authStateListenerRegistered || !hasStagingFlag()) return;
+    if (authStateListenerRegistered || !hasHostedMultiplayerMode()) return;
 
     const supabaseClient = getSupabaseClientIfAvailable();
     if (!supabaseClient?.auth?.onAuthStateChange) {
@@ -638,7 +662,7 @@
 
     authStateListenerRegistered = true;
     supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (!hasStagingFlag()) return;
+      if (!hasHostedMultiplayerMode()) return;
       const hasToken = !!session?.access_token;
       identity.sessionPresent = !!session?.user?.id;
       identity.tokenPresent = hasToken;

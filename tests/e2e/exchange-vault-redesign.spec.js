@@ -66,15 +66,15 @@ test.describe("Hangar Exchange and Vault redesign", () => {
       falcon: 0,
       bison: 24000,
       zeusExplorer: 66000,
-      monolith: 120000
+      monolith: 240000
     });
     await page.locator("#shipShop .vessel-exchange-card[data-ship-id='monolith']").click();
-    await expect(page.locator("#shipyardDetailPanel")).toContainText("Pioneer Moth");
+    await expect(page.locator("#shipyardDetailPanel")).toContainText("Pioneer Behemoth");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Ship Stats");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Weapon Slots");
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Equipment Slots");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 120,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 240,000");
 
     const layout = await page.locator("#hangarShipyardSection .vessel-exchange-layout").evaluate(shell => {
       const catalogue = shell.querySelector(".exchange-catalog-panel")?.getBoundingClientRect();
@@ -98,7 +98,7 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await page.locator("#shipyardDetailPanel .buy-ship-action").click();
     await expect(page.locator("#shipShop .vessel-exchange-card[data-ship-id='monolith']")).toHaveCount(0);
     await expect(page.locator("#shipShop .vessel-exchange-card")).toHaveCount(2);
-    await expect.poll(() => page.evaluate(() => credits)).toBe(130000);
+    await expect.poll(() => page.evaluate(() => credits)).toBe(10000);
   });
 
   test("applies a priced staging hull purchase from the Vessel Exchange", async ({ page }) => {

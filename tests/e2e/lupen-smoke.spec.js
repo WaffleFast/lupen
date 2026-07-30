@@ -286,6 +286,24 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("production online mode uses player-facing online language and the hosted connection boundary", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/?mp=online&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+    await expect(page.locator("#lupenMultiplayerStatusChip")).toContainText("Lupen Online", { timeout: 15000 });
+    await expect(page.locator("#lupenMultiplayerStatusChip")).not.toContainText(/Staging/i);
+    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toHaveCount(0);
+
+    const status = await page.evaluate(() => window.LupenMultiplayerClient?.getStatus?.());
+    expect(status.enabled).toBe(true);
+    expect(status.enabledReason).toBe("production_online");
+    expect(status.serverUrl).toBe("http://127.0.0.1:1");
+    expect(status.serverUrlSource).toBe("query");
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("successful signup opens Morgan's Academy orientation for a fresh pilot", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
@@ -1676,7 +1694,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".vessel-exchange-card[data-ship-id='monolith']")).not.toHaveClass(/progression-locked/);
     await expect(page.locator("#shipyardDetailPanel")).not.toContainText("Unlock Requirements");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
-    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 120,000");
+    await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 240,000");
 
     await page.reload();
     await waitForGameGlobals(page);
@@ -1797,9 +1815,9 @@ test.describe("Lupen browser smoke", () => {
             return state / 4294967296;
           };
         };
-        const getWeaponFor = guns => {
-          shipLoadouts[STARTER_SHIP_ID] = normalizeShipLoadout({ attachments: [], guns }, STARTER_SHIP_ID);
-          return getEquippedWeapon(STARTER_SHIP_ID);
+        const getWeaponFor = (guns, shipId = STARTER_SHIP_ID) => {
+          shipLoadouts[shipId] = normalizeShipLoadout({ attachments: [], guns }, shipId);
+          return getEquippedWeapon(shipId);
         };
         const makeEnemy = key => {
           const definition = EREBUS_BOT_TYPES[key];
@@ -1815,6 +1833,7 @@ test.describe("Lupen browser smoke", () => {
           const definition = EREBUS_BOT_TYPES[enemyKey];
           let target = makeEnemy(enemyKey);
           let playerState = { ...player };
+          const playerShip = SHIPS[playerState.shipId] || starterShip;
           let playerNextShot = 0;
           let botNextShot = definition.fireRateMs;
           let elapsedMs = 0;
@@ -1839,11 +1858,14 @@ test.describe("Lupen browser smoke", () => {
             elapsedMs = botNextShot;
             botShots += 1;
             if (random() <= definition.accuracy) {
-              const evasionReduction = Math.max(0, Math.min(0.4, starterShip.evasion / 100));
+              const evasionReduction = Math.max(0, Math.min(0.4, playerShip.evasion / 100));
               const mitigatedDamage = Math.max(0, Math.round(definition.damage * (1 - evasionReduction)));
               playerState = {
                 ...LupenCombatRules.resolveIncomingPlayerDamage(playerState, mitigatedDamage),
-                armor: starterShip.armor
+                armor: playerShip.armor,
+                evasion: playerShip.evasion,
+                hullMax: playerShip.hull,
+                shipId: playerShip.id
               };
             }
             botNextShot += definition.fireRateMs;
@@ -1863,6 +1885,10 @@ test.describe("Lupen browser smoke", () => {
           deaths: runs.filter(run => run.player.hull <= 0).length,
           averageSeconds: Number((runs.reduce((sum, run) => sum + run.elapsedMs, 0) / runs.length / 1000).toFixed(1)),
           averageHullRemaining: Math.round(runs.reduce((sum, run) => sum + run.player.hull, 0) / runs.length),
+          averageHullPercent: Number((runs.reduce((sum, run) => {
+            const hullMax = Math.max(1, Number(run.player.hullMax || run.player.hull || 1));
+            return sum + (Math.max(0, Number(run.player.hull || 0)) / hullMax * 100);
+          }, 0) / runs.length).toFixed(1)),
           minimumHullRemaining: Math.min(...runs.map(run => run.player.hull))
         });
 
@@ -1870,7 +1896,17 @@ test.describe("Lupen browser smoke", () => {
         const twinIon = getWeaponFor(["ionBlaster", "ionBlaster"]);
         const twinHeavy = getWeaponFor(["heavyLance", "heavyLance"]);
         const mixed = getWeaponFor(["pulseLaser", "heavyLance"]);
-        const freshPlayer = () => ({ hull: starterShip.hull, shield: starterShip.shield, armor: starterShip.armor });
+        const freshPlayer = (shipId = STARTER_SHIP_ID) => {
+          const ship = SHIPS[shipId] || starterShip;
+          return {
+            shipId: ship.id,
+            hull: ship.hull,
+            hullMax: ship.hull,
+            shield: ship.shield,
+            armor: ship.armor,
+            evasion: ship.evasion
+          };
+        };
         const destroyerRuns = [];
         const behemothRuns = [];
         const destroyerHunterRuns = [];
@@ -1919,14 +1955,14 @@ test.describe("Lupen browser smoke", () => {
           );
           return [botKey, summarize(runs)];
         }));
-        const runNoRepairRoute = (route, seed) => {
+        const runNoRepairRoute = (route, seed, shipId = STARTER_SHIP_ID, weapon = twinPulse) => {
           const random = makeRandom(seed);
-          let player = freshPlayer();
+          let player = freshPlayer(shipId);
           let elapsedMs = 0;
           let encountersCompleted = 0;
           for (const botKey of route) {
             if (player.hull <= 0) break;
-            const result = fight(twinPulse, botKey, player, random);
+            const result = fight(weapon, botKey, player, random);
             player = result.player;
             elapsedMs += result.elapsedMs;
             if (!result.won) break;
@@ -1952,6 +1988,35 @@ test.describe("Lupen browser smoke", () => {
             ...summarize(runs),
             completionRate: Number((runs.filter(run => run.won).length / runs.length * 100).toFixed(1)),
             averageEncountersCompleted: Number((runs.reduce((sum, run) => sum + run.encountersCompleted, 0) / runs.length).toFixed(1))
+          }];
+        }));
+        const pioneerCombatCurve = Object.fromEntries([
+          ["hunter", STARTER_SHIP_ID],
+          ["destroyer", "zeusExplorer"],
+          ["behemoth", "monolith"]
+        ].map(([label, shipId], shipIndex) => {
+          const ship = SHIPS[shipId];
+          const weapon = getWeaponFor(Array.from({ length: ship.gunSlots }, () => "pulseLaser"), shipId);
+          const duelRuns = Array.from({ length: 200 }, (_, runIndex) =>
+            fight(weapon, "erebus_behemoth", freshPlayer(shipId), makeRandom(12000 + shipIndex * 1000 + runIndex))
+          );
+          const attritionRoute = [
+            ...noRepairRoutes.extendedPatrol,
+            ...noRepairRoutes.extendedPatrol,
+            ...noRepairRoutes.extendedPatrol
+          ];
+          const patrolRuns = Array.from({ length: 500 }, (_, runIndex) =>
+            runNoRepairRoute(attritionRoute, 16000 + shipIndex * 1000 + runIndex, shipId, weapon)
+          );
+          return [label, {
+            shipId,
+            gunSlots: ship.gunSlots,
+            defensivePool: ship.hull + ship.shield,
+            duel: summarize(duelRuns),
+            patrol: {
+              ...summarize(patrolRuns),
+              completionRate: Number((patrolRuns.filter(run => run.won).length / patrolRuns.length * 100).toFixed(1))
+            }
           }];
         }));
 
@@ -2092,6 +2157,7 @@ test.describe("Lupen browser smoke", () => {
           weaponPairs: pairMetrics,
           botFightMetrics,
           noRepairMetrics,
+          pioneerCombatCurve,
           spawnConflicts,
           busiestNodeTargetCount,
           economy: {
@@ -2131,6 +2197,8 @@ test.describe("Lupen browser smoke", () => {
       contentType: "application/json"
     });
 
+    console.log(`Map 1 playtest metrics: ${JSON.stringify(metrics)}`);
+
     expect(metrics.attackTickMs).toBeLessThan(metrics.fastestEnemyFireRateMs);
     expect(metrics.destroyer.wins).toBe(200);
     expect(metrics.behemoth.wins).toBe(200);
@@ -2139,16 +2207,35 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.destroyerThenHunter.deaths).toBe(0);
     expect(metrics.destroyerThenHunter.averageHullRemaining).toBeGreaterThanOrEqual(560);
     expect(metrics.noRepairMetrics.frontierPatrol.deaths).toBeGreaterThan(0);
-    expect(metrics.noRepairMetrics.frontierPatrol.completionRate).toBeGreaterThanOrEqual(95);
-    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBeGreaterThanOrEqual(250);
-    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBeLessThanOrEqual(450);
+    expect(metrics.noRepairMetrics.frontierPatrol.completionRate).toBeGreaterThanOrEqual(20);
+    expect(metrics.noRepairMetrics.frontierPatrol.completionRate).toBeLessThanOrEqual(40);
+    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBe(500);
+    expect(metrics.pioneerCombatCurve.hunter.gunSlots).toBe(2);
+    expect(metrics.pioneerCombatCurve.destroyer.gunSlots).toBe(4);
+    expect(metrics.pioneerCombatCurve.behemoth.gunSlots).toBe(6);
+    expect(metrics.pioneerCombatCurve.hunter.duel.averageSeconds)
+      .toBeGreaterThan(metrics.pioneerCombatCurve.destroyer.duel.averageSeconds * 1.8);
+    expect(metrics.pioneerCombatCurve.destroyer.duel.averageSeconds)
+      .toBeGreaterThan(metrics.pioneerCombatCurve.behemoth.duel.averageSeconds * 1.35);
+    expect(metrics.pioneerCombatCurve.hunter.defensivePool)
+      .toBeLessThan(metrics.pioneerCombatCurve.destroyer.defensivePool);
+    expect(metrics.pioneerCombatCurve.destroyer.defensivePool)
+      .toBeLessThan(metrics.pioneerCombatCurve.behemoth.defensivePool);
+    expect(metrics.pioneerCombatCurve.hunter.patrol.completionRate)
+      .toBeLessThan(metrics.pioneerCombatCurve.destroyer.patrol.completionRate);
+    expect(metrics.pioneerCombatCurve.destroyer.patrol.completionRate)
+      .toBeLessThan(metrics.pioneerCombatCurve.behemoth.patrol.completionRate);
+    expect(metrics.pioneerCombatCurve.hunter.patrol.deaths)
+      .toBeGreaterThan(metrics.pioneerCombatCurve.destroyer.patrol.deaths);
+    expect(metrics.pioneerCombatCurve.destroyer.patrol.deaths)
+      .toBeGreaterThan(metrics.pioneerCombatCurve.behemoth.patrol.deaths);
     expect(metrics.weaponPairs.twinHeavy.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinIon.theoreticalDps);
     expect(metrics.weaponPairs.twinIon.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinPulse.theoreticalDps);
     expect(metrics.weaponPairs.pulseHeavy.speed).toBe(1644);
     expect(metrics.spawnConflicts).toBe(0);
     expect(metrics.economy).toMatchObject({
       startingCredits: 10000,
-      shipPrices: { falcon: 0, bison: 24000, zeusExplorer: 66000, monolith: 120000 },
+      shipPrices: { falcon: 0, bison: 24000, zeusExplorer: 66000, monolith: 240000 },
       asteroidShardReward: 10,
       bountyShardRewards: [25, 35, 50, 75],
       bountyCreditRewards: [900, 1100, 1500, 2500],
@@ -2203,12 +2290,11 @@ test.describe("Lupen browser smoke", () => {
     expect(levelThreeMilestone.kills).toBeLessThanOrEqual(65);
     expect(levelThreeMilestone.estimatedMinutes.typical).toBeGreaterThanOrEqual(55);
     expect(levelThreeMilestone.estimatedMinutes.typical).toBeLessThanOrEqual(70);
-    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeGreaterThanOrEqual(20);
-    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeLessThanOrEqual(25);
-    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeGreaterThan(120);
-    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeLessThan(150);
+    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeGreaterThanOrEqual(35);
+    expect(metrics.progression.mapOneCompletionModel.profitableFreighterHaulsNeeded).toBeLessThanOrEqual(45);
+    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeGreaterThan(160);
+    expect(metrics.progression.mapOneCompletionModel.typicalMinutes).toBeLessThan(190);
 
-    console.log(`Map 1 playtest metrics: ${JSON.stringify(metrics)}`);
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
@@ -2517,7 +2603,7 @@ test.describe("Lupen browser smoke", () => {
     expect(tutorialDefault.overlayActive).toBe(false);
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText("Multiplayer Staging Loop", { timeout: 15000 });
     await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/Trade for CR[\s\S]*Store upgrades[\s\S]*Launch[\s\S]*Engage bots[\s\S]*Claim bounty rewards/i);
-    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/No PvP[\s\S]*bots return fire locally/i);
+    await expect(page.locator("#lupenMultiplayerStagingFlowHint")).toContainText(/contested-zone PvP (?:is|are) enabled/i);
     await expect(page.locator("#chatPanel .chat-channel-tabs")).toBeHidden();
     await expect(page.locator("#onlinePilotsList")).toContainText(/Chat unavailable while disconnected|Online Pilots/i);
     await page.evaluate(() => {
@@ -3102,10 +3188,10 @@ test.describe("Lupen browser smoke", () => {
           damagePerHit: 24,
           attackCooldownMs: 2200,
           visualScale: 0.82,
-          shield: 60,
-          shieldMax: 60,
-          hull: 60,
-          hullMax: 60
+          shield: 75,
+          shieldMax: 75,
+          hull: 140,
+          hullMax: 140
         },
         {
           id: "staging-bot-attacker-01",
@@ -3123,10 +3209,10 @@ test.describe("Lupen browser smoke", () => {
           damagePerHit: 32,
           attackCooldownMs: 2600,
           visualScale: 0.94,
-          shield: 90,
-          shieldMax: 90,
-          hull: 90,
-          hullMax: 90
+          shield: 120,
+          shieldMax: 120,
+          hull: 210,
+          hullMax: 210
         },
         {
           id: "staging-bot-destroyer-01",
@@ -3144,10 +3230,10 @@ test.describe("Lupen browser smoke", () => {
           damagePerHit: 44,
           attackCooldownMs: 3200,
           visualScale: 1.12,
-          shield: 160,
-          shieldMax: 160,
-          hull: 160,
-          hullMax: 160
+          shield: 190,
+          shieldMax: 190,
+          hull: 330,
+          hullMax: 330
         },
         {
           id: "staging-bot-behemoth-01",
@@ -3167,8 +3253,8 @@ test.describe("Lupen browser smoke", () => {
           visualScale: 1.32,
           shield: 300,
           shieldMax: 300,
-          hull: 350,
-          hullMax: 350
+          hull: 540,
+          hullMax: 540
         }
       ];
       const selectedBot = bots[2];
@@ -6086,13 +6172,13 @@ test.describe("Lupen browser smoke", () => {
     expect(stepById.complete.text).toContain("Pioneer Line");
     expect(stepById.complete.text).toContain("Freighter");
     expect(stepById.complete.text).toContain("Destroyer");
-    expect(stepById.complete.text).toContain("Moth");
+    expect(stepById.complete.text).toContain("Behemoth");
     expect(stepById.complete.voiceCue).toBe("tutorial_outro_complete");
     expect(stepById.complete.text).toContain("Good luck");
 
     const allCopy = tutorial.steps.map(step => `${step.title} ${step.text} ${step.target} ${step.event}`).join("\n");
     expect(allCopy).not.toMatch(/Falcon|LF-1 Origin|Evasion Matrix|boughtStoreEvasionMatrix|tutorial:storeEvasionMatrix/);
-    expect(allCopy).toMatch(/Pioneer Hunter|Pioneer Line|Freighter|Destroyer|Moth|credits|XP|bounties|Forge/i);
+    expect(allCopy).toMatch(/Pioneer Hunter|Pioneer Line|Freighter|Destroyer|Behemoth|credits|XP|bounties|Forge/i);
 
     const portraitContexts = [
       { stepId: "open-trade", context: "trade", asset: /morgan-trade-advisor\.png$/, screenshot: "artifacts/morgan-trade-guidance-card.png" },
@@ -6774,7 +6860,7 @@ test.describe("Lupen browser smoke", () => {
     expect(cta.visible).toBe(true);
     expect(cta.disabled).toBe(false);
     expect(cta.insidePanel).toBe(true);
-    expect(cta.visibleShipNames).toEqual(expect.arrayContaining(["Pioneer Hunter", "Pioneer Destroyer", "Pioneer Freighter", "Pioneer Moth"]));
+    expect(cta.visibleShipNames).toEqual(expect.arrayContaining(["Pioneer Hunter", "Pioneer Destroyer", "Pioneer Freighter", "Pioneer Behemoth"]));
     expect(cta.lockedShipNames).toEqual([]);
 
     await page.locator("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']").click();
@@ -9155,7 +9241,7 @@ test.describe("Lupen browser smoke", () => {
       return { monolith, bisonBeforeRepair, bisonAfterRepair, repairSyncPayload, pvpRepairBefore, pvpRepairAfter, pvpRepairSyncPayload, falcon };
     });
 
-    expect(state.monolith).toMatchObject({ ship: "monolith", hull: 1800, hullMax: 1800, shield: 360, shieldMax: 360 });
+    expect(state.monolith).toMatchObject({ ship: "monolith", hull: 2400, hullMax: 2400, shield: 600, shieldMax: 600 });
     expect(state.bisonBeforeRepair).toMatchObject({ ship: "bison", hull: 930, hullMax: 1300, shield: 77, shieldMax: 135 });
     expect(state.bisonAfterRepair).toMatchObject({ ship: "bison", hull: 1300, hullMax: 1300, savedHull: 1300 });
     expect(state.repairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, armor: 18, armorMax: 18, reason: "hangar_repair" });
@@ -9175,7 +9261,7 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(state.pvpRepairSyncPayload).toMatchObject({ currentShipId: "bison", hull: 1300, hullMax: 1300, shield: 77, shieldMax: 135, armor: 18, armorMax: 18, reason: "hangar_repair" });
     expect(state.falcon).toMatchObject({ ship: "falcon", hull: 620, hullMax: 720, shield: 111, shieldMax: 180 });
-    expect(state.monolith.armor).toBe(28);
+    expect(state.monolith.armor).toBe(36);
     expect(state.bisonBeforeRepair.cargo).toBe(300);
     expect(state.falcon.jumpRecharge).toBe(16);
 

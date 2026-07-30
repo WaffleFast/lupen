@@ -94,14 +94,14 @@ export const STAGING_STORE_ITEMS = Object.freeze([
   }),
   Object.freeze({
     itemId: "ship:monolith",
-    name: "Pioneer Moth",
+    name: "Pioneer Behemoth",
     category: "ship",
     localKind: "ship",
     localKey: "monolith",
-    price: 120000,
+    price: 240000,
     levelRequirement: 0,
     stockType: "fixed",
-    description: "The Pioneer Line flagship with immense defences, six weapon mounts and deep equipment capacity.",
+    description: "The Pioneer Line behemoth-class flagship with immense defences, six weapon mounts and deep equipment capacity.",
     reference: "SHIPS.monolith"
   }),
   Object.freeze({

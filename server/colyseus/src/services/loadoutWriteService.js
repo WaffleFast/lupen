@@ -20,7 +20,7 @@ const PULSE_LASER_KEY = "pulseLaser";
 const STAGING_SHIP_ITEMS = Object.freeze([
   Object.freeze({ itemId: "ship:falcon", key: "falcon", name: "Pioneer Hunter" }),
   Object.freeze({ itemId: "ship:bison", key: "bison", name: "Pioneer Freighter" }),
-  Object.freeze({ itemId: "ship:monolith", key: "monolith", name: "Pioneer Moth" }),
+  Object.freeze({ itemId: "ship:monolith", key: "monolith", name: "Pioneer Behemoth" }),
   Object.freeze({ itemId: "ship:zeusExplorer", key: "zeusExplorer", name: "Pioneer Destroyer" })
 ]);
 const MAX_ATTACHMENT_COUNT = 9999;
