@@ -75,6 +75,8 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await expect(page.locator("#shipyardDetailPanel")).toContainText("Equipment Slots");
     await expect(page.locator("#shipyardDetailPanel .buy-ship-action")).toHaveText("Buy Hull");
     await expect(page.locator("#shipyardDetailPanel .shipyard-price-action")).toHaveText("CR 240,000");
+    await expect(page.locator("#shipyardDetailPanel .exchange-purchase-summary")).toContainText("Purchase Price");
+    await expect(page.locator("#shipyardDetailPanel .exchange-purchase-summary .is-purchase-price")).toHaveText("CR 240,000");
 
     const layout = await page.locator("#hangarShipyardSection .vessel-exchange-layout").evaluate(shell => {
       const catalogue = shell.querySelector(".exchange-catalog-panel")?.getBoundingClientRect();

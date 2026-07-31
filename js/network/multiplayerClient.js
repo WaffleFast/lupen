@@ -868,72 +868,17 @@
       : null;
     connection.lastStagingXpRefresh = {
       source,
-      status: localApplied ? "hud_refreshed" : "hud_refresh_pending",
+      status: localApplied ? "local_confirmed" : "local_refresh_pending",
       trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
       refreshXp: Number.isFinite(Number(immediateSnapshot?.combatXp)) ? Number(immediateSnapshot.combatXp) : null,
       matched: Number.isFinite(trustedXpAfter) && Number.isFinite(Number(immediateSnapshot?.combatXp))
         ? Number(immediateSnapshot.combatXp) >= trustedXpAfter
         : false,
       stale: false,
-      reason: localApplied ? "hud_xp_refreshed" : "hud_xp_refresh_not_applied",
+      reason: localApplied ? "trusted_result_applied" : "trusted_result_not_applied",
       checkedAt: Date.now()
     };
     notifyServerState(room?.state || null);
-
-    if (typeof global.loadGameFromSupabase !== "function") {
-      connection.lastStagingXpRefresh = {
-        source,
-        status: "local_applied",
-        trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
-        refreshXp: null,
-        matched: false,
-        stale: false,
-        reason: "loadGameFromSupabase_unavailable",
-        checkedAt: Date.now()
-      };
-      notifyServerState(room?.state || null);
-      return;
-    }
-
-    Promise.resolve()
-      .then(() => global.loadGameFromSupabase())
-      .then((loadResult) => {
-        if (typeof global.applyStagingXpClaimToLoadedState === "function") {
-          global.applyStagingXpClaimToLoadedState(result);
-        }
-        const snapshot = typeof global.getLupenCombatXpSnapshot === "function"
-          ? global.getLupenCombatXpSnapshot()
-          : null;
-        const refreshXp = Number(loadResult?.combatXp ?? snapshot?.combatXp);
-        const staleInfo = snapshot?.lastStagingXpRefresh || null;
-        connection.lastStagingXpRefresh = {
-          source,
-          status: "refreshed",
-          trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
-          refreshXp: Number.isFinite(refreshXp) ? refreshXp : null,
-          matched: Number.isFinite(trustedXpAfter) && Number.isFinite(refreshXp) ? refreshXp >= trustedXpAfter : false,
-          stale: staleInfo?.stale === true || loadResult?.staleStagingXpRefresh === true,
-          reason: staleInfo?.stale === true || loadResult?.staleStagingXpRefresh === true ? "xp_refresh_stale_guarded" : "xp_refresh_loaded",
-          checkedAt: Date.now()
-        };
-        logDev("refreshed cloud save after staging XP claim");
-        notifyServerState(room?.state || null);
-      })
-      .catch((error) => {
-        connection.lastServerWarning = "staging_xp_save_refresh_failed";
-        connection.lastStagingXpRefresh = {
-          source,
-          status: "failed",
-          trustedXpAfter: Number.isFinite(trustedXpAfter) ? trustedXpAfter : null,
-          refreshXp: null,
-          matched: false,
-          stale: false,
-          reason: "staging_xp_save_refresh_failed",
-          checkedAt: Date.now()
-        };
-        logDev("staging XP save refresh failed", error?.message || error);
-        notifyServerState(room?.state || null);
-      });
   }
 
   function getTrustedXpAfter(result = {}) {
@@ -1023,17 +968,10 @@
 
   function refreshCloudSaveAfterStagingLootClaim(result) {
     const saveWritten = result?.writes?.saveWritten === true || result?.saveWritten === true;
-    if (!isEnabled() || !saveWritten || typeof global.loadGameFromSupabase !== "function") return;
-
-    Promise.resolve()
-      .then(() => global.loadGameFromSupabase())
-      .then(() => {
-        logDev("refreshed cloud save after staging loot claim");
-      })
-      .catch((error) => {
-        connection.lastServerWarning = "staging_loot_save_refresh_failed";
-        logDev("staging loot save refresh failed", error?.message || error);
-      });
+    if (!isEnabled() || !saveWritten) return;
+    if (typeof global.applyStagingXpClaimToLoadedState === "function") {
+      global.applyStagingXpClaimToLoadedState({ ...result, applied: true, saveWritten: true });
+    }
   }
 
   function normalizeNodeKey(value) {

@@ -107,6 +107,13 @@ async function lupenResetPilotProgress(options = {}) {
     return { ok: false, reason: "staging_or_dev_required" };
   }
 
+  const previousCloudSync = getCloudSaveSyncStatus();
+  disableCloudSaveSync("pilot_reset_in_progress");
+  const resetWaitStartedAt = Date.now();
+  while (cloudSaveCoordinator.inFlight && Date.now() - resetWaitStartedAt < 10000) {
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+
   const localReset = lupenClearLocalSave();
   if (typeof resetToNoShipStarterState === "function") resetToNoShipStarterState();
   if (typeof clearStarterTutorialState === "function") clearStarterTutorialState();
@@ -123,6 +130,9 @@ async function lupenResetPilotProgress(options = {}) {
     await saveGameStateToSupabaseForUser(auth.client, auth.user, cleanState);
     cloudSaved = true;
     cloudReason = "saved";
+    enableCloudSaveSync(auth.user.id, "pilot_reset_complete");
+  } else if (previousCloudSync.enabled && previousCloudSync.userId) {
+    enableCloudSaveSync(previousCloudSync.userId, "pilot_reset_auth_pending");
   }
 
   if (typeof updateProgressDisplays === "function") updateProgressDisplays();
@@ -573,29 +583,10 @@ async function refreshProgressAfterStagingCombat(options = {}) {
   const trustedXpAfter = Number(options.trustedXpAfter ?? window.lupenTrustedStagingXpAfter?.xpAfter);
   const before = getCurrentCombatXpSnapshot();
   const localBefore = Math.max(before.combatXp, before.zoneCombatXp);
-  const liveJumpCharge = Number.isFinite(Number(jumpCharge)) ? Number(jumpCharge) : null;
-  let loadResult = null;
-  let loadError = "";
-
-  try {
-    if (typeof loadGameFromSupabase === "function") {
-      loadResult = await loadGameFromSupabase();
-      if (Number.isFinite(liveJumpCharge) && Number(jumpCharge) < liveJumpCharge) {
-        jumpCharge = liveJumpCharge;
-        if (typeof updateSpaceHUD === "function") updateSpaceHUD();
-      }
-    }
-  } catch (error) {
-    loadError = error?.message || "cloud_refresh_failed";
-  }
-
-  const afterLoad = getCurrentCombatXpSnapshot();
-  const cloudXp = Math.max(
-    Number(loadResult?.combatXp || 0),
-    Number(loadResult?.zoneCombatXp || 0),
-    afterLoad.combatXp,
-    afterLoad.zoneCombatXp
-  );
+  // Server combat responses already carry the trusted XP floor. Never replace
+  // the whole live profile here: a delayed cloud read can contain an older
+  // ship/Journey snapshot and erase progress made seconds earlier.
+  const cloudXp = localBefore;
   const bestXp = Math.max(
     localBefore,
     Number.isFinite(trustedXpAfter) ? trustedXpAfter : 0,
@@ -614,7 +605,7 @@ async function refreshProgressAfterStagingCombat(options = {}) {
     appliedXp,
     matched,
     stale: cloudXp < bestXp,
-    reason: loadError || (applied ? "combat_refresh_applied" : matched ? "combat_refresh_matched" : "combat_refresh_no_change"),
+    reason: applied ? "combat_refresh_applied" : matched ? "combat_refresh_matched" : "combat_refresh_no_change",
     checkedAt: Date.now()
   };
   redrawProgressAfterStagingXp();
@@ -1048,6 +1039,23 @@ function clearTransientStateAfterLoadedSave() {
   if (typeof clearAllCombatVisuals === "function") clearAllCombatVisuals();
 }
 
+function shouldRepairMissingStarterShip(saved = {}) {
+  if (!Array.isArray(saved.ownedShips) || saved.ownedShips.length > 0 || saved.currentShipId) return false;
+  const progress = saved.playerProgress && typeof saved.playerProgress === "object" ? saved.playerProgress : {};
+  const totals = progress.totals && typeof progress.totals === "object" ? progress.totals : {};
+  const hasProgress = Number(progress.combatXp || 0) > 0 ||
+    Object.values(totals).some(value => Number(value || 0) > 0);
+  const hasEquipment = Object.values(saved.ownedGuns || {}).some(value => Number(value || 0) > 0) ||
+    Object.values(saved.ownedAttachments || {}).some(value => Number(value || 0) > 0) ||
+    (Array.isArray(saved.inventoryItems) && saved.inventoryItems.length > 0);
+  const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
+  const starterLoadout = saved.shipLoadouts?.[starterShipId];
+  const hasStarterLoadout = ["guns", "attachments"].some(key =>
+    Array.isArray(starterLoadout?.[key]) && starterLoadout[key].some(Boolean)
+  );
+  return hasProgress || hasEquipment || hasStarterLoadout;
+}
+
 function applyLoadedGameState(rawSaved) {
   const saved = migrateSavedGame(rawSaved);
   if (!saved) return false;
@@ -1065,10 +1073,11 @@ function applyLoadedGameState(rawSaved) {
 
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   const savedOwnedShips = Array.isArray(saved.ownedShips) ? saved.ownedShips.filter(shipId => SHIPS[shipId]) : ownedShips;
-  const noShipStarterState = Array.isArray(saved.ownedShips) && saved.ownedShips.length === 0 && !saved.currentShipId;
+  const repairedMissingStarterShip = shouldRepairMissingStarterShip(saved) && Boolean(SHIPS[starterShipId]);
+  const noShipStarterState = Array.isArray(saved.ownedShips) && saved.ownedShips.length === 0 && !saved.currentShipId && !repairedMissingStarterShip;
   ownedShips = savedOwnedShips;
   unlockedShipLines = Array.from(new Set([PIONEER_LINE_ID, ...(Array.isArray(saved.unlockedShipLines) ? saved.unlockedShipLines : [])]));
-  if (!ownedShips.length && !noShipStarterState && SHIPS[starterShipId]) ownedShips = [starterShipId];
+  if (repairedMissingStarterShip || (!ownedShips.length && !noShipStarterState && SHIPS[starterShipId])) ownedShips = [starterShipId];
   currentShipId = noShipStarterState ? "" : (SHIPS[saved.currentShipId] && ownedShips.includes(saved.currentShipId) ? saved.currentShipId : (ownedShips[0] || starterShipId));
   selectedHangarShipId = SHIPS[saved.selectedHangarShipId] ? saved.selectedHangarShipId : (currentShipId || starterShipId);
   selectedFleetShipId = SHIPS[saved.selectedFleetShipId] ? saved.selectedFleetShipId : (currentShipId || starterShipId);
@@ -1147,6 +1156,9 @@ function applyLoadedGameState(rawSaved) {
       save: false,
       notify: false
     });
+  }
+  if (repairedMissingStarterShip && typeof window.repairProgressFromCompletedStarterTutorial === "function") {
+    window.repairProgressFromCompletedStarterTutorial();
   }
 
   hull = Number.isFinite(Number(saved.hull)) ? Number(saved.hull) : hull;
@@ -1252,6 +1264,10 @@ function applyLoadedGameState(rawSaved) {
   if (typeof updateTargetPanel === "function") updateTargetPanel();
   if (typeof updateObjectActionPanel === "function") updateObjectActionPanel(false);
   if (typeof window.LupenMultiplayerOverlay?.render === "function") window.LupenMultiplayerOverlay.render();
+  if (repairedMissingStarterShip) {
+    console.warn("Repaired a progressed pilot save whose starter ship ownership was missing.");
+    saveGame();
+  }
 
   return true;
 }

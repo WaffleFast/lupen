@@ -103,6 +103,35 @@ const TUTORIAL_JOURNEY_PORTRAIT_STEPS = new Set([
 let tutorialState = loadTutorialState();
 let tutorialAdvanceTimeout = null;
 
+function repairProgressFromCompletedStarterTutorial() {
+  if (!tutorialState?.completed || !missionProgress?.missions) return false;
+  const completedAt = new Date().toISOString();
+  TUTORIAL_ACADEMY_MILESTONES.forEach(({ missionId }) => {
+    const mission = typeof MISSIONS_BY_ID !== "undefined" ? MISSIONS_BY_ID?.[missionId] : null;
+    const state = missionProgress.missions[missionId];
+    if (!mission || !state || ["completed", "claimed"].includes(state.state)) return;
+    const required = typeof getMissionRequiredAmount === "function" ? getMissionRequiredAmount(mission) : 1;
+    state.progress = Math.max(1, Number(required || 1));
+    state.state = "completed";
+    state.completedAt = state.completedAt || completedAt;
+  });
+  if (typeof reconcileMissionAvailability === "function") reconcileMissionAvailability(missionProgress);
+
+  playerProgress = normalizePlayerProgress(playerProgress);
+  const totals = playerProgress.totals;
+  const quote = getTutorialTradeQuote();
+  totals.botsDestroyed = Math.max(3, Number(totals.botsDestroyed || 0));
+  totals.erebusBotsDestroyed = Math.max(3, Number(totals.erebusBotsDestroyed || 0));
+  totals.tradesCompleted = Math.max(1, Number(totals.tradesCompleted || 0));
+  totals.tradeProfit = Math.max(1, Number(totals.tradeProfit || 0), Number(quote.projectedProfit || 0));
+  totals.totalTradingProfit = Math.max(Number(totals.totalTradingProfit || 0), totals.tradeProfit);
+  totals.cargoSold = Math.max(1, Number(totals.cargoSold || 0), Number(quote.units || 0));
+  totals.bountiesClaimed = Math.max(1, Number(totals.bountiesClaimed || 0));
+  return true;
+}
+
+window.repairProgressFromCompletedStarterTutorial = repairProgressFromCompletedStarterTutorial;
+
 const STARTER_TUTORIAL_STEPS = [
   {
     id: "cinematic-welcome",

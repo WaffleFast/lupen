@@ -1094,12 +1094,13 @@ test.describe("Lupen browser smoke", () => {
     );
     expect(Object.values(reset.missionStates).every(state => state.state === "available" && state.progress === 0)).toBe(true);
     await page.screenshot({ path: "artifacts/profile-reset-morgan-intro-1366x768.png", fullPage: false });
-    expect(reset.cloudUpserts).toHaveLength(1);
-    expect(reset.cloudUpserts[0].table).toBe("player_saves");
-    expect(reset.cloudUpserts[0].payload.user_id).toBe("77777777-7777-4777-8777-777777777777");
-    expect(reset.cloudUpserts[0].payload.save_data.credits).toBe(10000);
-    expect(reset.cloudUpserts[0].payload.save_data.currentShipId).toBe("");
-    expect(reset.cloudUpserts[0].payload.save_data.ownedShips).toEqual([]);
+    expect(reset.cloudUpserts.length).toBeGreaterThanOrEqual(1);
+    const finalResetUpsert = reset.cloudUpserts.at(-1);
+    expect(finalResetUpsert.table).toBe("player_saves");
+    expect(finalResetUpsert.payload.user_id).toBe("77777777-7777-4777-8777-777777777777");
+    expect(finalResetUpsert.payload.save_data.credits).toBe(10000);
+    expect(finalResetUpsert.payload.save_data.currentShipId).toBe("");
+    expect(finalResetUpsert.payload.save_data.ownedShips).toEqual([]);
 
     const starterClaim = await page.evaluate(() => window.eval(`
       (() => {
@@ -1707,6 +1708,152 @@ test.describe("Lupen browser smoke", () => {
     expect(restored.hauler.locked).toBe(false);
     expect(restored.hauler.requirementLines).toEqual([]);
 
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("repairs a progressed tutorial save missing its starter hull without changing a pristine reset", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+    await page.addInitScript(() => {
+      localStorage.setItem("lupenStarterPilotTutorial", JSON.stringify({
+        version: 3,
+        active: false,
+        completed: true,
+        stepIndex: 52
+      }));
+    });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const result = await page.evaluate(() => window.eval(`
+      (() => {
+        const damaged = {
+          ...buildSaveState(),
+          currentShipId: "",
+          ownedShips: [],
+          playerProgress: normalizePlayerProgress({ combatXp: 725 }),
+          missionProgress: createDefaultMissionProgress(),
+          shipLoadouts: {
+            falcon: {
+              guns: [
+                { key: "pulseLaser", quality: "standard", level: 1 },
+                { key: "pulseLaser", quality: "standard", level: 1 }
+              ],
+              attachments: [{ key: "cargoPod", quality: "standard", level: 1 }]
+            }
+          },
+          ownedGuns: { pulseLaser: 0 },
+          ownedAttachments: { cargoPod: 0 }
+        };
+        applyLoadedGameState(damaged);
+        const repaired = {
+          currentShipId,
+          ownedShips: [...ownedShips],
+          botsDestroyed: playerProgress.totals.botsDestroyed,
+          tradesCompleted: playerProgress.totals.tradesCompleted,
+          bountiesClaimed: playerProgress.totals.bountiesClaimed,
+          academyComplete: [
+            "academy_starter_ship",
+            "academy_launch_ship",
+            "academy_first_trade",
+            "academy_two_guns",
+            "academy_attachment",
+            "academy_erebus_bots",
+            "academy_bounty",
+            "academy_repair_ship"
+          ].every(id => ["completed", "claimed"].includes(missionProgress.missions[id].state))
+        };
+
+        resetToNoShipStarterState();
+        const pristine = {
+          ...buildSaveState(),
+          currentShipId: "",
+          ownedShips: [],
+          playerProgress: normalizePlayerProgress({ combatXp: 0 }),
+          missionProgress: createDefaultMissionProgress(),
+          shipLoadouts: {},
+          ownedGuns: { pulseLaser: 0 },
+          ownedAttachments: { cargoPod: 0 },
+          inventoryItems: []
+        };
+        applyLoadedGameState(pristine);
+        return {
+          repaired,
+          pristine: { currentShipId, ownedShips: [...ownedShips], active: hasActiveShip() }
+        };
+      })()
+    `));
+
+    expect(result.repaired.currentShipId).toBe("falcon");
+    expect(result.repaired.ownedShips).toEqual(["falcon"]);
+    expect(result.repaired.botsDestroyed).toBeGreaterThanOrEqual(1);
+    expect(result.repaired.tradesCompleted).toBeGreaterThanOrEqual(1);
+    expect(result.repaired.bountiesClaimed).toBeGreaterThanOrEqual(1);
+    expect(result.repaired.academyComplete).toBe(true);
+    expect(result.pristine).toEqual({ currentShipId: "", ownedShips: [], active: false });
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("trusted combat refresh never replaces the live ship and Journey with an older cloud snapshot", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const result = await page.evaluate(async () => window.eval(`
+      (async () => {
+        currentShipId = "falcon";
+        selectedHangarShipId = "falcon";
+        selectedFleetShipId = "falcon";
+        ownedShips = ["falcon"];
+        shipLoadouts.falcon = {
+          guns: [
+            { key: "pulseLaser", quality: "standard", level: 1 },
+            { key: "pulseLaser", quality: "standard", level: 1 }
+          ],
+          attachments: [{ key: "cargoPod", quality: "standard", level: 1 }]
+        };
+        playerProgress = normalizePlayerProgress({ combatXp: 650, totals: { botsDestroyed: 4 } });
+        missionProgress = normalizeMissionProgress(missionProgress);
+        missionProgress.missions.academy_starter_ship.state = "completed";
+        missionProgress.missions.academy_starter_ship.progress = 1;
+        window.__destructiveCloudLoadCalls = 0;
+        window.loadGameFromSupabase = async () => {
+          window.__destructiveCloudLoadCalls += 1;
+          applyLoadedGameState({
+            ...buildSaveState(),
+            currentShipId: "",
+            ownedShips: [],
+            shipLoadouts: {},
+            playerProgress: normalizePlayerProgress({ combatXp: 725 }),
+            missionProgress: createDefaultMissionProgress()
+          });
+          return { loaded: true };
+        };
+
+        const refresh = await refreshProgressAfterStagingCombat({
+          reason: "regression_test",
+          trustedXpAfter: 725
+        });
+        return {
+          cloudLoadCalls: window.__destructiveCloudLoadCalls,
+          currentShipId,
+          ownedShips: [...ownedShips],
+          gunCount: shipLoadouts.falcon.guns.length,
+          academyStarterState: missionProgress.missions.academy_starter_ship.state,
+          botsDestroyed: playerProgress.totals.botsDestroyed,
+          combatXp: playerProgress.combatXp,
+          refresh
+        };
+      })()
+    `));
+
+    expect(result.cloudLoadCalls).toBe(0);
+    expect(result.currentShipId).toBe("falcon");
+    expect(result.ownedShips).toEqual(["falcon"]);
+    expect(result.gunCount).toBe(2);
+    expect(result.academyStarterState).toBe("completed");
+    expect(result.botsDestroyed).toBe(4);
+    expect(result.combatXp).toBe(725);
+    expect(result.refresh.matched).toBe(true);
     await expectNoUnexpectedBrowserErrors(failures);
   });
 

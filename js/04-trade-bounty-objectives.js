@@ -794,55 +794,39 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
     reason: ""
   };
 
-  const cargoSign = result.cargoDelta < 0 ? "-" : "+";
   const summary = result.operation === "buy"
     ? `Bought ${formatNumber(Math.abs(result.cargoDelta || result.quantity || 0))} ${result.resourceName || "cargo"} for CR ${formatNumber(Math.abs(result.creditsDelta || result.cost || 0))}.`
     : `Sold ${formatNumber(Math.abs(result.cargoDelta || result.quantity || 0))} ${result.resourceName || "cargo"} for CR ${formatNumber(Math.abs(result.creditsDelta || result.revenue || 0))}.`;
   if (typeof addHudToast === "function") addHudToast(summary);
   if (result.operation === "buy" && typeof addActivityLog === "function") addActivityLog(summary);
   if (result.operation === "sell") showMultiplayerStagingTradeSellFeedback(result);
-  applyMultiplayerStagingTradeObjective(result);
 
-  if (typeof loadGameFromSupabase !== "function") {
-    multiplayerStagingTradeSyncStatus = {
-      status: "unavailable",
-      receivedAt: result.receivedAt,
-      reason: "loadGameFromSupabase unavailable"
-    };
-    if (typeof addHudToast === "function") addHudToast(`Server ${result.operation} applied. Reload or reopen to sync full save display.`);
-    return;
-  }
-
-  try {
-    const loadResult = await loadGameFromSupabase();
-    if (loadResult?.loaded) {
-      applyMultiplayerStagingTradeObjective(result);
-      multiplayerStagingTradeSyncStatus = {
-        status: "synced",
-        receivedAt: result.receivedAt,
-        reason: "cloud save refreshed"
-      };
-      if (typeof updateSpaceHUD === "function") updateSpaceHUD();
-      if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
-      return;
+  const resourceName = String(result.resourceName || "");
+  if (Number.isFinite(Number(result.creditsAfter))) credits = Math.max(0, Number(result.creditsAfter));
+  if (resourceName && Object.prototype.hasOwnProperty.call(cargo, resourceName) && Number.isFinite(Number(result.cargoAfter))) {
+    cargo[resourceName] = Math.max(0, Number(result.cargoAfter));
+    const quantity = Math.max(0, Number(result.quantity || Math.abs(result.cargoDelta || 0)));
+    if (result.operation === "buy") {
+      cargoPurchased[resourceName] = Math.max(0, Number(cargoPurchased?.[resourceName] || 0)) + quantity;
+    } else {
+      cargoPurchased[resourceName] = Math.max(0, Number(cargoPurchased?.[resourceName] || 0) - quantity);
+      if (cargoPurchased[resourceName] <= 0) delete cargoPurchased[resourceName];
     }
-
-    multiplayerStagingTradeSyncStatus = {
-      status: "failed",
-      receivedAt: result.receivedAt,
-      reason: loadResult?.reason || "cloud save refresh failed"
-    };
-    if (typeof addHudToast === "function") addHudToast(`Server ${result.operation} applied. Reload or reopen to sync full save display.`);
-  } catch (_err) {
-    multiplayerStagingTradeSyncStatus = {
-      status: "failed",
-      receivedAt: result.receivedAt,
-      reason: "cloud save refresh failed"
-    };
-    if (typeof addHudToast === "function") addHudToast(`Server ${result.operation} applied. Reload or reopen to sync full save display.`);
-  } finally {
-    if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
+    if (Number.isFinite(Number(result.cargoCostBasisAfter)) && Number(result.cargoCostBasisAfter) > 0) {
+      cargoCostBasis[resourceName] = Number(result.cargoCostBasisAfter);
+    } else {
+      delete cargoCostBasis[resourceName];
+    }
   }
+  applyMultiplayerStagingTradeObjective(result);
+  multiplayerStagingTradeSyncStatus = {
+    status: "synced",
+    receivedAt: result.receivedAt,
+    reason: "trusted trade result applied"
+  };
+  LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  if (document.getElementById("marketScreen")?.classList.contains("active")) renderMarketplace();
 }
 
 function renderMultiplayerStagingTradePreviewResult(offerId, { operation = "buy" } = {}) {

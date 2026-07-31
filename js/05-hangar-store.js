@@ -339,6 +339,72 @@ function reconcileMissionProgressAfterStagingLoadoutResult(result) {
   return reconcileMissionProgressFromGameplayState(options);
 }
 
+function applyStagingLoadoutResultToLocalState(result) {
+  if (!result?.applied) return false;
+  const itemId = String(result.itemId || "");
+  if (itemId.startsWith("ship:")) {
+    const shipId = String(result.selectedShipAfter || result.targetShipId || itemId.slice(5));
+    if (!SHIPS[shipId] || !ownedShips.includes(shipId)) return false;
+    currentShipId = shipId;
+    selectedHangarShipId = shipId;
+    selectedFleetShipId = shipId;
+    selectedShipyardShipId = shipId;
+    shipLoadouts[shipId] = normalizeShipLoadout(shipLoadouts[shipId], shipId);
+    applyShipStats(false);
+  } else {
+    const categoryKey = itemId.startsWith("gun:") ? "guns" : itemId.startsWith("attachment:") ? "attachments" : "";
+    const key = itemId.split(":")[1] || "";
+    const shipId = String(result.currentShipId || currentShipId || "");
+    if (!categoryKey || !key || !SHIPS[shipId]) return false;
+    shipLoadouts[shipId] = normalizeShipLoadout(shipLoadouts[shipId], shipId);
+    const list = shipLoadouts[shipId][categoryKey];
+    const quality = String(result.quality || "standard");
+    const level = Math.max(1, Number(result.level || 1));
+    const targetCount = Math.max(0, Number(result.equippedAfter || 0));
+
+    if (result.operation === "unequip") {
+      let index = Number.isInteger(Number(result.slotIndex)) ? Number(result.slotIndex) : -1;
+      if (index < 0 || getEquipmentKey(list[index]) !== key) {
+        index = list.findIndex(entry => getEquipmentKey(entry) === key &&
+          getEquipmentQuality(entry) === quality &&
+          Math.max(1, Number(entry?.level || 1)) === level);
+      }
+      if (index >= 0) list.splice(index, 1);
+      if (result.inventoryWritten) {
+        ensureInventoryObjects();
+        const returnedInventoryId = String(result.inventoryItemId || `loadout-${key}-${Date.now()}`);
+        if (!inventoryItems.some(entry => entry?.id === returnedInventoryId)) {
+          inventoryItems.push({ id: returnedInventoryId, key, quality, level });
+        }
+      }
+    } else {
+      const currentCount = list.filter(entry => getEquipmentKey(entry) === key).length;
+      if (currentCount < targetCount) {
+        const entry = { key, quality, level };
+        const requestedIndex = Number(result.slotIndex);
+        if (Number.isInteger(requestedIndex) && requestedIndex >= 0 && !getEquipmentKey(list[requestedIndex])) {
+          list[requestedIndex] = entry;
+        } else {
+          list.push(entry);
+        }
+      }
+      if (result.inventoryWritten && result.inventoryItemId) {
+        ensureInventoryObjects();
+        inventoryItems = inventoryItems.filter(entry => entry?.id !== result.inventoryItemId);
+      }
+    }
+
+    const ownedStore = categoryKey === "guns" ? ownedGuns : ownedAttachments;
+    if (Number.isFinite(Number(result.ownedAfter))) ownedStore[key] = Math.max(0, Number(result.ownedAfter));
+    shipLoadouts[shipId] = normalizeShipLoadout(shipLoadouts[shipId], shipId);
+    applyShipStats(false);
+  }
+
+  LupenSaveService.writeJsonLocalStorage(STORAGE_GAME_KEY, buildSaveState({ leaveSave: false }));
+  if (typeof updateSpaceHUD === "function") updateSpaceHUD();
+  return true;
+}
+
 function isTutorialLoadoutEquipStepActive() {
   if (!tutorialState?.active || tutorialState?.completed) return false;
   const stepId = typeof getCurrentTutorialStep === "function"
@@ -544,19 +610,9 @@ async function requestStagingShipEquip(item) {
       const message = `${selectedName} selected: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      applyStagingLoadoutResultToLocalState(latest);
       reconcileMissionProgressAfterStagingLoadoutResult(latest);
-      if (typeof loadGameFromSupabase === "function") {
-        try {
-          const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded) {
-            reconcileMissionProgressAfterStagingLoadoutResult(latest);
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("ship_selected");
-            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
-          }
-        } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast(`${selectedName} selected. Reload if ship values look stale.`);
-        }
-      }
+      if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("ship_selected");
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
@@ -584,19 +640,9 @@ async function requestStagingCargoPodEquip(item) {
       const message = `Cargo Pod equipped: cargo ${formatNumber(latest.cargoCapacityBefore)} -> ${formatNumber(latest.cargoCapacityAfter)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      applyStagingLoadoutResultToLocalState(latest);
       reconcileMissionProgressAfterStagingLoadoutResult(latest);
-      if (typeof loadGameFromSupabase === "function") {
-        try {
-          const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded) {
-            reconcileMissionProgressAfterStagingLoadoutResult(latest);
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("cargo_pod_equipped");
-            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
-          }
-        } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast("Cargo Pod equipped. Reload if loadout values look stale.");
-        }
-      }
+      if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("cargo_pod_equipped");
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
@@ -624,19 +670,9 @@ async function requestStagingShieldBoosterEquip(item) {
       const message = `Shield Booster equipped: shield ${formatNumber(latest.shieldBefore)} -> ${formatNumber(latest.shieldAfter)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      applyStagingLoadoutResultToLocalState(latest);
       reconcileMissionProgressAfterStagingLoadoutResult(latest);
-      if (typeof loadGameFromSupabase === "function") {
-        try {
-          const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded) {
-            reconcileMissionProgressAfterStagingLoadoutResult(latest);
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("shield_booster_equipped");
-            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
-          }
-        } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast("Shield Booster equipped. Reload if shield values look stale.");
-        }
-      }
+      if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("shield_booster_equipped");
     }
     renderStore();
     if (document.getElementById("hangarScreen")?.classList.contains("active")) renderHangar();
@@ -698,19 +734,9 @@ async function requestStagingLoadoutEquip(item) {
       selectedLoadoutStatusMessage = message;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      applyStagingLoadoutResultToLocalState(latest);
       reconcileMissionProgressAfterStagingLoadoutResult(latest);
-      if (typeof loadGameFromSupabase === "function") {
-        try {
-          const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded) {
-            reconcileMissionProgressAfterStagingLoadoutResult(latest);
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_equipped");
-            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
-          }
-        } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast("Item equipped. Reload if loadout values look stale.");
-        }
-      }
+      if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_equipped");
       tutorialEvent(itemId.startsWith("gun:") ? "equippedItem" : "equippedAttachment");
     } else if (latest?.itemId === itemId && recoverTutorialLoadoutEquipLocally(item, latest)) {
       // The Academy must remain playable if the staging write gate rejects an
@@ -770,7 +796,7 @@ async function requestStagingStorePurchase(item) {
       () => client.getStatus?.().lastStagingStorePurchase,
       result => result?.itemId === itemId && (
         result?.requestId === requestId ||
-        (!result?.requestId && Number(result?.clientReceivedAt || 0) >= requestedAt)
+        (!result?.requestId && Number(result?.clientReceivedAt || result?.receivedAt || 0) >= requestedAt)
       )
     );
     multiplayerStagingStorePurchasePending = false;
@@ -1716,19 +1742,9 @@ async function requestStagingLoadoutUnequip(entry) {
         : `${latest.name || entry.name} unequipped. Available ${formatNumber(latest.ownedAfter ?? 1)}.`;
       if (typeof addHudToast === "function") addHudToast(message);
       if (typeof addActivityLog === "function") addActivityLog(message);
+      applyStagingLoadoutResultToLocalState(latest);
       reconcileMissionProgressAfterStagingLoadoutResult(latest);
-      if (typeof loadGameFromSupabase === "function") {
-        try {
-          const loaded = await loadGameFromSupabase();
-          if (loaded?.loaded) {
-            reconcileMissionProgressAfterStagingLoadoutResult(latest);
-            if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_unequipped");
-            if (typeof addHudToast === "function") addHudToast("Save refreshed from server.");
-          }
-        } catch (_err) {
-          if (typeof addHudToast === "function") addHudToast(`${latest.name || entry.name} unequipped. Reload if loadout values look stale.`);
-        }
-      }
+      if (typeof syncMultiplayerPresence === "function") syncMultiplayerPresence("staging_loadout_unequipped");
     } else if (latest?.itemId === itemId) {
       const reason = latest.userReason || latest.blockReason || latest.reason || "loadout unavailable";
       if (typeof addHudToast === "function") addHudToast(`Unequip blocked: ${reason}`);
@@ -3975,6 +3991,10 @@ function renderShipyardDetail() {
         : starterClaim
           ? "Your first hull is ready to claim."
           : `Available for CR ${formatNumber(ship.price)}.`;
+  const purchaseSummaryLabel = !owned && unlock.state !== "locked" ? "Purchase Price" : "Hull Status";
+  const purchaseSummaryValue = !owned && unlock.state !== "locked"
+    ? (starterClaim ? "FREE" : `CR ${formatNumber(ship.price)}`)
+    : statusLabel;
 
   panel.innerHTML = `
     <div class="exchange-selected-vessel ${unlock.locked ? "is-locked" : "is-open"}" data-ship-id="${escapeHtml(ship.id)}">
@@ -3997,8 +4017,8 @@ function renderShipyardDetail() {
 
       <footer class="exchange-purchase-bar">
         <div class="exchange-purchase-summary">
-          <span>Hull Status</span>
-          <strong>${statusLabel}</strong>
+          <span>${purchaseSummaryLabel}</span>
+          <strong class="${!owned && unlock.state !== "locked" ? "is-purchase-price" : ""}">${purchaseSummaryValue}</strong>
           <small>${statusMessage}</small>
         </div>
         <div class="exchange-detail-footer">

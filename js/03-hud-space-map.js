@@ -1369,7 +1369,7 @@ window.getLupenMultiplayerPresence = getMultiplayerPresencePayload;
 function syncMultiplayerPresence(reason = "position_update", overrides = {}) {
   const client = window.LupenMultiplayerClient;
   const status = client?.getStatus?.();
-  if (!status?.enabled || !status?.isConnected) return;
+  if (!status?.enabled || !status?.isConnected || typeof client?.sendMovementIntent !== "function") return;
 
   client.sendMovementIntent({
     ...getMultiplayerPresencePayload(overrides),

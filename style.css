@@ -55205,6 +55205,13 @@ input::placeholder {
   text-transform: uppercase !important;
 }
 
+#hangarShipyardSection .exchange-purchase-summary strong.is-purchase-price {
+  color: #ffffff !important;
+  font-size: 18px !important;
+  letter-spacing: 0.035em !important;
+  text-shadow: 0 0 12px rgba(70, 210, 242, 0.34) !important;
+}
+
 #hangarOwnedSection .exchange-purchase-summary small,
 #hangarShipyardSection .exchange-purchase-summary small {
   max-width: 420px !important;
