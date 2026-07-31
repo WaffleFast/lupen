@@ -4811,7 +4811,7 @@
     inner.appendChild(title);
 
     const objective = global.document.createElement("span");
-    const requiredKills = Math.round(Number(bounty.requiredKills || 2));
+    const requiredKills = Math.round(Number(bounty.requiredKills || 1));
     const targetLabel = bounty.targetBotLabel || bounty.target || "Erebus bots";
     objective.textContent = bounty.accepted
       ? `Progress: ${Math.round(Number(bounty.progress || 0))}/${requiredKills} ${targetLabel}`
@@ -4821,7 +4821,7 @@
     const progress = global.document.createElement("div");
     progress.className = "lupen-mp-bounty-progress";
     const fill = global.document.createElement("i");
-    fill.style.width = `${getPercent(Number(bounty.progress || 0), Number(bounty.requiredKills || 2))}%`;
+    fill.style.width = `${getPercent(Number(bounty.progress || 0), Number(bounty.requiredKills || 1))}%`;
     progress.appendChild(fill);
     inner.appendChild(progress);
 

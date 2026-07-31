@@ -6939,7 +6939,7 @@ test.describe("Lupen browser smoke", () => {
       "Timed Suppression",
       "Behemoth Warning"
     ]);
-    expect(state.rewards["erebus-patrol-sweep"]).toMatchObject({ credits: 900, xp: 0, lupenShards: 25, targetBotType: "any", requiredKills: 4 });
+    expect(state.rewards["erebus-patrol-sweep"]).toMatchObject({ credits: 900, xp: 0, lupenShards: 25, targetBotType: "any", requiredKills: 1 });
     expect(state.rewards["hunter-clearance"]).toMatchObject({ credits: 1100, xp: 0, lupenShards: 35, targetBotType: "hunter", requiredKills: 4 });
     expect(state.rewards["timed-suppression"]).toMatchObject({ credits: 1500, xp: 0, lupenShards: 50, targetBotType: "any", requiredKills: 4 });
     expect(state.rewards["behemoth-warning"]).toMatchObject({ credits: 2500, xp: 0, lupenShards: 75, targetBotType: "behemoth", requiredKills: 1 });
@@ -7789,7 +7789,7 @@ test.describe("Lupen browser smoke", () => {
     expect(offlineFallbackAccepted.step).toBe("return-for-combat-launch");
     expect(offlineFallbackAccepted.objectiveType).toBe("bounty");
     expect(offlineFallbackAccepted.contractId).toBe("tutorial-erebus-patrol");
-    expect(offlineFallbackAccepted.killsRequired).toBe(2);
+    expect(offlineFallbackAccepted.killsRequired).toBe(1);
     expect(offlineFallbackAccepted.localCombatGuardActive).toBe(false);
 
     const returnGuidance = await page.evaluate(() => window.eval(`
@@ -7889,8 +7889,8 @@ test.describe("Lupen browser smoke", () => {
         const active = {
           id: "staging_erebus_patrol_2",
           title: "Erebus Patrol Sweep",
-          description: "Destroy 4 Erebus bots.",
-          requiredKills: 4,
+          description: "Destroy 1 Erebus bot, then return to claim the Academy payout.",
+          requiredKills: 1,
           progress: 0,
           xpReward: 0,
           creditsReward: 900,
@@ -7938,8 +7938,8 @@ test.describe("Lupen browser smoke", () => {
         const active = {
           id: "staging_erebus_patrol_2",
           title: "Erebus Patrol Sweep",
-          description: "Destroy 4 Erebus bots.",
-          requiredKills: 4,
+          description: "Destroy 1 Erebus bot, then return to claim the Academy payout.",
+          requiredKills: 1,
           progress: 0,
           xpReward: 0,
           creditsReward: 900,
@@ -8871,12 +8871,12 @@ test.describe("Lupen browser smoke", () => {
         const bounty = {
           id: "staging_erebus_patrol_2",
           title: "Erebus Patrol Sweep",
-          description: "Destroy 4 Erebus bots.",
+          description: "Destroy 1 Erebus bot, then return to claim the Academy payout.",
           contractType: "Kill Contract",
           targetBotType: "any",
           targetBotLabel: "Any Erebus",
           difficulty: "Easy",
-          requiredKills: 4,
+          requiredKills: 1,
           progress: 0,
           creditsReward: 900,
           lupenShardsReward: 25,
@@ -9057,7 +9057,7 @@ test.describe("Lupen browser smoke", () => {
         const active = {
           id: "staging_erebus_patrol_2",
           title: "Erebus Patrol Sweep",
-          requiredKills: 4,
+          requiredKills: 1,
           progress: 1,
           xpReward: 0,
           creditsReward: 900,
@@ -9065,8 +9065,8 @@ test.describe("Lupen browser smoke", () => {
           targetBotType: "any",
           targetBotLabel: "Erebus bots",
           accepted: true,
-          completed: false,
-          claimAvailable: false,
+          completed: true,
+          claimAvailable: true,
           claimed: false
         };
         window.LupenMultiplayerClient = {
@@ -11362,7 +11362,7 @@ test.describe("Lupen browser smoke", () => {
     await page.evaluate(() => window.eval(`
       (() => {
         const bounties = [
-          { id: "staging_erebus_patrol_2", title: "Erebus Patrol Sweep", description: "Destroy 4 Erebus bots.", contractType: "Kill Contract", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 900, lupenShardsReward: 25, icon: "assets/bounties/erebus-patrol-sweep.png" },
+          { id: "staging_erebus_patrol_2", title: "Erebus Patrol Sweep", description: "Destroy 1 Erebus bot, then return to claim the Academy payout.", contractType: "Kill Contract", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Easy", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 900, lupenShardsReward: 25, icon: "assets/bounties/erebus-patrol-sweep.png" },
           { id: "staging_hunter_clearance_4", title: "Hunter Clearance", description: "Destroy 4 Erebus Hunters.", contractType: "Targeted Hunt", targetBotType: "hunter", targetBotLabel: "Hunter", difficulty: "Easy", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1100, lupenShardsReward: 35, icon: "assets/bounties/hunter-clearance.png" },
           { id: "staging_timed_suppression_4", title: "Timed Suppression", description: "Destroy 4 Erebus bots within 4 minutes.", contractType: "Timed Elimination", targetBotType: "any", targetBotLabel: "Any Erebus", difficulty: "Medium", requiredKills: 4, progress: 0, xpReward: 0, creditsReward: 1500, lupenShardsReward: 50, timed: true, timeLimitSeconds: 240, icon: "assets/bounties/timed-suppression.png" },
           { id: "staging_behemoth_warning_1", title: "Behemoth Warning", description: "Destroy 1 Erebus Behemoth.", contractType: "Boss Contract", targetBotType: "behemoth", targetBotLabel: "Erebus Behemoth", difficulty: "Extreme", requiredKills: 1, progress: 0, xpReward: 0, creditsReward: 2500, lupenShardsReward: 75, icon: "assets/bounties/behemoth-warning.png" }
@@ -11472,7 +11472,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
     const objectiveCard = page.locator(".tactical-bounty-card", { hasText: "Erebus Patrol Sweep" });
-    await expect(objectiveCard).toContainText("0 / 4");
+    await expect(objectiveCard).toContainText("0 / 1");
     await expect(objectiveCard).toContainText("CR 900");
     await expect(objectiveCard).toContainText("25 Shards");
     await expect(objectiveCard).toHaveClass(/is-active/);

@@ -7,12 +7,10 @@ This document tracks the narrow `?mp=staging` bounty wrapper for server-owned st
 `Erebus Patrol Sweep`
 
 - Id: `staging_erebus_patrol_2`
-- Objective: destroy 2 server-owned staging Erebus bots.
+- Objective: destroy 1 server-owned Erebus bot, then return to claim the Academy payout.
 - Eligible kills: disabled server-owned staging bots where the player contributed damage.
-- Reward: XP only.
-- XP amount: 40.
-- Credits: 0.
-- Loot: none.
+- Bounty reward: `900 CR` and `25 Lupen Shards`.
+- Bounty XP: 0; the destroyed bot still grants its normal combat XP separately.
 - Persistence: room/session only for bounty progress.
 - Repeatable: false in the current room/session.
 
@@ -20,7 +18,7 @@ This document tracks the narrow `?mp=staging` bounty wrapper for server-owned st
 
 The staging bounty does not use or mutate local bounty state in `js/04-trade-bounty-objectives.js`, local objective state, local bot arrays, bounty contracts, cargo, inventory, loot, trade totals, route completion, PvP, or player damage.
 
-The claim flow reuses the existing gated XP-only reward path:
+The claim flow uses the existing verified, idempotent server reward path:
 
 - Verified Supabase identity is required for a real XP write.
 - The player must have accepted the staging bounty.
@@ -28,9 +26,9 @@ The claim flow reuses the existing gated XP-only reward path:
 - The claim must not be a duplicate for the same bounty completion.
 - `ENABLE_STAGING_PROGRESSION_WRITES=true` must be enabled server-side.
 - `STAGING_PROGRESSION_WRITE_SCOPE` and `STAGING_PROGRESSION_WRITE_ALLOWLIST` gates must pass.
-- The service-role `player_saves` read and XP-only patch must succeed.
+- The service-role `player_saves` read and narrow reward patch must succeed.
 
-When the XP-only patch applies, it touches only `playerProgress.combatXp`. Credits, loot, inventory, bounties, route completion, trade totals, cargo, loadouts, owned items, and broad progression remain excluded.
+The bounty claim is limited to its declared credits and Lupen Shards. Bot combat XP is awarded by the separate server-owned bot-destruction receipt; inventory items, cargo, loadouts, owned ships, trade totals, route completion and broad progression remain excluded.
 
 ## Client UX
 
@@ -38,10 +36,10 @@ The real Bounty Board now switches to a staging-backed mode when `?mp=staging` i
 
 - `MP STAGING BOUNTIES`
 - `Erebus Patrol Sweep`
-- Server-owned progress `0/2`, `1/2`, `2/2`
+- Server-owned progress `0/1`, `1/1`
 - Accept staging bounty
-- Progress `0/2`, `1/2`, `2/2`
-- Claim XP
+- Progress `0/1`, `1/1`
+- Claim bounty payout
 - Claim state: simulated, blocked, applied, or already claimed
 - Clear copy that the bounty is server-owned and excludes credits, loot, inventory, and local bounty save writes
 

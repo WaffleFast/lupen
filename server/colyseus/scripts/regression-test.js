@@ -3434,7 +3434,7 @@ async function assertStagingBountyHelpers() {
   const bounties = getStagingBounties();
   assert(bounties.length === 4, `Expected four staging daily bounties, got ${bounties.length}.`);
   const expectedBounties = {
-    [STAGING_BOUNTY_ID]: { title: "Erebus Patrol Sweep", requiredKills: 4, creditsReward: 900, lupenShardsReward: 25, targetBotType: "any", timed: false },
+    [STAGING_BOUNTY_ID]: { title: "Erebus Patrol Sweep", requiredKills: 1, creditsReward: 900, lupenShardsReward: 25, targetBotType: "any", timed: false },
     staging_hunter_clearance_4: { title: "Hunter Clearance", requiredKills: 4, creditsReward: 1100, lupenShardsReward: 35, targetBotType: "hunter", timed: false },
     staging_timed_suppression_4: { title: "Timed Suppression", requiredKills: 4, creditsReward: 1500, lupenShardsReward: 50, targetBotType: "any", timed: true },
     staging_behemoth_warning_1: { title: "Behemoth Warning", requiredKills: 1, creditsReward: 2500, lupenShardsReward: 75, targetBotType: "behemoth" }
@@ -3457,7 +3457,7 @@ async function assertStagingBountyHelpers() {
   let bountyState = createStagingBountyState("session-a", 1000);
   let publicState = getPublicStagingBountyState(bountyState);
   assert(publicState.accepted === true, "Accepted staging bounty did not report accepted.");
-  assert(publicState.progress === 0 && publicState.requiredKills === 4, "Initial staging bounty progress was incorrect.");
+  assert(publicState.progress === 0 && publicState.requiredKills === 1, "Initial staging bounty progress was incorrect.");
   assert(publicState.claimAvailable === false, "Initial staging bounty claim was unexpectedly available.");
 
   const noContribution = recordStagingBountyBotDestruction(bountyState, {
@@ -3479,9 +3479,9 @@ async function assertStagingBountyHelpers() {
     contributorSessionIds: ["session-a", "session-b"],
     now: 1200
   });
-  assert(firstKill.changed === true && firstKill.reason === "progress_updated", "First staging bounty bot kill did not update progress.");
+  assert(firstKill.changed === true && firstKill.reason === "completed", "First staging bounty bot kill did not complete the Academy contract.");
   bountyState = firstKill.state;
-  assert(bountyState.progress === 1 && bountyState.completed === false, "First staging bounty bot kill completed too early.");
+  assert(bountyState.progress === 1 && bountyState.completed === true, "First staging bounty bot kill did not complete the Academy contract.");
 
   const duplicateKill = recordStagingBountyBotDestruction(bountyState, {
     botId: "dev-bot-erebus-1",
@@ -3491,41 +3491,11 @@ async function assertStagingBountyHelpers() {
     contributorSessionIds: ["session-a"],
     now: 1300
   });
-  assert(duplicateKill.changed === false && duplicateKill.reason === "bot_already_counted", "Duplicate staging bounty bot kill was not blocked.");
+  assert(duplicateKill.changed === false && duplicateKill.reason === "bounty_already_complete", "Completed Academy bounty accepted another bot kill.");
   assert(duplicateKill.state.progress === 1, "Duplicate staging bounty bot kill changed progress.");
 
-  const secondKill = recordStagingBountyBotDestruction(bountyState, {
-    botId: "dev-bot-erebus-2",
-    botType: "destroyer",
-    botFaction: "Erebus",
-    botDisplayName: "Erebus Destroyer",
-    contributorSessionIds: ["session-a"],
-    now: 1400
-  });
-  assert(secondKill.changed === true && secondKill.reason === "progress_updated", "Second staging bounty bot kill should progress bounty.");
-  bountyState = secondKill.state;
-  const thirdKill = recordStagingBountyBotDestruction(bountyState, {
-    botId: "dev-bot-erebus-3",
-    botType: "attacker",
-    botFaction: "Erebus",
-    botDisplayName: "Erebus Attacker",
-    contributorSessionIds: ["session-a"],
-    now: 1450
-  });
-  assert(thirdKill.changed === true && thirdKill.reason === "progress_updated", "Third staging bounty bot kill should progress bounty.");
-  bountyState = thirdKill.state;
-  const fourthKill = recordStagingBountyBotDestruction(bountyState, {
-    botId: "dev-bot-erebus-4",
-    botType: "behemoth",
-    botFaction: "Erebus",
-    botDisplayName: "Erebus Behemoth",
-    contributorSessionIds: ["session-a"],
-    now: 1480
-  });
-  assert(fourthKill.changed === true && fourthKill.reason === "completed", "Fourth staging bounty bot kill did not complete bounty.");
-  bountyState = fourthKill.state;
   publicState = getPublicStagingBountyState(bountyState);
-  assert(publicState.progress === 4 && publicState.completed === true && publicState.claimAvailable === true, "Completed staging bounty public state was incorrect.");
+  assert(publicState.progress === 1 && publicState.completed === true && publicState.claimAvailable === true, "Completed staging bounty public state was incorrect.");
   assert(buildStagingBountySourceEventId(bountyState, "verified-player-a") === `${STAGING_BOUNTY_ID}:verified-player-a:1`, "Staging bounty source event id was not deterministic.");
 
   let hunterState = createStagingBountyState("session-a", 1500, "staging_hunter_clearance_4");
@@ -5373,7 +5343,7 @@ try {
   assert(bountyList?.ok === true, "Staging bounty list did not return ok.");
   assert(Array.isArray(bountyList?.bounties) && bountyList.bounties.length === 4, "Staging bounty list did not return four daily bounties.");
   const bountyListById = new Map(bountyList.bounties.map((bounty) => [bounty.id, bounty]));
-  assert(bountyListById.get(STAGING_BOUNTY_ID)?.requiredKills === 4, "Patrol Sweep returned unexpected kill requirement.");
+  assert(bountyListById.get(STAGING_BOUNTY_ID)?.requiredKills === 1, "Patrol Sweep returned unexpected kill requirement.");
   assert(bountyListById.get(STAGING_BOUNTY_ID)?.xpReward === 0, "Patrol Sweep returned unexpected XP reward.");
   assert(bountyListById.get(STAGING_BOUNTY_ID)?.creditsReward === 900, "Patrol Sweep returned unexpected credits reward.");
   assert(bountyListById.get(STAGING_BOUNTY_ID)?.lupenShardsReward === 25, "Patrol Sweep returned unexpected Lupen Shards reward.");
@@ -6483,7 +6453,7 @@ try {
   assert(botDisabledReceipt?.rewardsGranted === false, "bot:disabled incorrectly reported direct reward grants.");
   assert(botDisabledReceipt?.bountyProgressChanged === true, "bot:disabled did not include changed bounty progress.");
   assert(botDisabledReceipt?.bountyProgress?.progress === 1, `Unexpected bot disabled bounty progress: ${botDisabledReceipt?.bountyProgress?.progress}`);
-  assert(botDisabledReceipt?.bountyProgress?.requiredKills === 4, `Unexpected bot disabled bounty requirement: ${botDisabledReceipt?.bountyProgress?.requiredKills}`);
+  assert(botDisabledReceipt?.bountyProgress?.requiredKills === 1, `Unexpected bot disabled bounty requirement: ${botDisabledReceipt?.bountyProgress?.requiredKills}`);
   assert(Array.isArray(botDisabledReceipt?.contributors) && botDisabledReceipt.contributors.length >= 2, "bot:disabled did not include contributor summary.");
   await waitFor("staging reward preview after bot disabled", () => {
     return rewardPreviewEvents.some((event) => {
@@ -6509,14 +6479,14 @@ try {
   const rewardPreview = rewardPreviewEvents.find((event) => event?.botId === inspectedBotBeforeCombat.id && event?.finalHitBy === roomA.sessionId);
   await waitFor("staging bounty progress after contributed bot destruction", () => {
     return bountyStatusEvents.some((event) => {
-      return event?.reason === "progress_updated" &&
+      return event?.reason === "completed" &&
         event?.active?.id === STAGING_BOUNTY_ID &&
         event?.active?.progress === 1 &&
-        event?.active?.requiredKills === 4 &&
-        event?.active?.claimAvailable === false;
+        event?.active?.requiredKills === 1 &&
+        event?.active?.claimAvailable === true;
     });
   });
-  console.log("staging bounty progress advanced after contributed bot destruction");
+  console.log("Academy bounty completed after one contributed bot destruction");
   const contributorA = rewardPreview?.contributors?.find((contributor) => contributor?.sessionId === roomA.sessionId);
   const contributorB = rewardPreview?.contributors?.find((contributor) => contributor?.sessionId === roomB.sessionId);
   assert(contributorA?.totalDamage > contributorB?.totalDamage, "Top contributor did not have the largest damage contribution.");
@@ -6751,16 +6721,12 @@ try {
     }
   }
   assert(respawnedBot?.disabled === true, "Respawned staging bot was not disabled by a legitimate second kill.");
-  await waitFor("staging bounty progresses after second legitimate destruction", () => {
-    return bountyStatusEvents.some((event) => {
-      return event?.reason === "progress_updated" &&
-        event?.active?.id === STAGING_BOUNTY_ID &&
-        event?.active?.progress === 2 &&
-        event?.active?.requiredKills === 4 &&
-        event?.active?.claimAvailable === false;
-    });
+  const bountyAfterSecondKill = await expectRoomMessage(roomA, "stagingBounty:statusResult", () => {
+    roomA.send("stagingBounty:status", {});
   });
-  console.log("staging bounty counted a second legitimate respawned bot destruction");
+  assert(bountyAfterSecondKill?.active?.progress === 1, "Completed Academy bounty counted an extra bot destruction.");
+  assert(bountyAfterSecondKill?.active?.requiredKills === 1 && bountyAfterSecondKill?.active?.claimAvailable === true, "Completed Academy bounty lost its claimable state.");
+  console.log("completed Academy bounty ignored later bot destructions and remained claimable");
 
   roomA.send("movement:update", {
     displayName: "Regression Pilot A",

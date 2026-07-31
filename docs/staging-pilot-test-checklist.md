@@ -70,17 +70,17 @@ Later systems use separate gates:
 18. Equip Shield Booster.
 19. Confirm shield stat or equipped Shield Booster state persists.
 20. Open the Bounty Board.
-21. Accept Erebus Patrol Sweep (`40 XP` staging bounty reward).
+21. Accept the Academy Erebus Patrol Sweep (`900 CR` and `25 Lupen Shards`).
 22. Launch to Sector and jump through connected nodes toward a server-owned staging bot.
 23. Click a bot in the same node.
 24. Press Engage and confirm auto-fire continues.
 25. Press Disengage once and confirm auto-fire stops.
 26. Re-engage and destroy the bot.
 27. Confirm bot-kill XP applies automatically and the HUD/Pilot XP updates.
-28. Confirm the Activity log records the engagement, destruction, XP, and bounty progress.
-29. Destroy a second staging bot and confirm Erebus Patrol Sweep reaches `2/2`.
-30. Return to the Bounty Board and claim the `40 XP` bounty bonus.
-31. Confirm Lupen Shard remains preview-only unless loot write gates are deliberately enabled for that phase.
+28. Confirm the Activity log records the engagement, destruction, XP, and completed `1/1` bounty.
+29. Disengage from any surviving patrol bots and return to a planet.
+30. Return to the Bounty Board and claim `900 CR` and `25 Lupen Shards`.
+31. Confirm the bounty payout appears once and the ship can be repaired from the station.
 32. Refresh or relogin.
 33. Confirm CR, cargo, active ship, loadout, equipped items, bot XP, bounty XP, and claimed bounty state persisted.
 34. Open normal `https://www.lupen.io` and confirm it connects online with no staging chip, guide, or diagnostic language.

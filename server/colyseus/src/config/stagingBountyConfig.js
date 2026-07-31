@@ -13,7 +13,7 @@ export const STAGING_BOUNTIES = Object.freeze([
   Object.freeze({
     id: STAGING_BOUNTY_ID,
     title: "Erebus Patrol Sweep",
-    description: "Destroy 4 Erebus bots.",
+    description: "Destroy 1 Erebus bot, then return to claim the Academy payout.",
     contractType: "Kill Contract",
     targetType: "server_bot_destroy",
     targetFaction: "Erebus",
@@ -21,7 +21,7 @@ export const STAGING_BOUNTIES = Object.freeze([
     targetBotType: "any",
     targetBotLabel: "Any Erebus",
     difficulty: "Easy",
-    requiredKills: 4,
+    requiredKills: 1,
     xpReward: 0,
     creditsReward: 900,
     lupenShardsReward: 25,
@@ -198,6 +198,10 @@ export function recordStagingBountyBotDestruction(state = null, { botId = "", bo
 
   if (state.failed === true) {
     return { state, changed: false, reason: "bounty_failed" };
+  }
+
+  if (state.completed === true) {
+    return { state, changed: false, reason: "bounty_already_complete" };
   }
 
   if (state.timed === true && state.expiresAt && now > Number(state.expiresAt)) {

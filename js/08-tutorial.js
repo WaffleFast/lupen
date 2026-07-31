@@ -429,7 +429,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "accept-bounty",
     title: "Accept bounty",
-    text: "Accept a bounty. Bot kills still build combat XP, while completed bounties pay credits and Lupen Shards.",
+    text: "Accept the one-target Academy bounty. Destroying one Erebus bot will complete it; ordinary contracts become more demanding after orientation.",
     target: ".bounty-detail-panel button, .bounty-action-btn",
     event: "acceptedBounty"
   },
@@ -472,8 +472,8 @@ const STARTER_TUTORIAL_STEPS = [
     place: "left"  },
   {
     id: "destroy-bot",
-    title: "Destroy the bounty bots",
-    text: "Use Jump, Bots scan, and ENGAGE as needed. Destroy the target, gain XP, and push the bounty forward.",
+    title: "Destroy the bounty target",
+    text: "Use Jump, Bots scan, and ENGAGE to destroy one Erebus bot. Once it falls, disengage from its allies and return for your payout and repairs.",
     target: "tutorial:destroyBountyBot",
     event: ["destroyedBountyBot", "openedSectorMap", "scannedBots", "jumpedNode"],
     place: "left"
@@ -481,7 +481,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-map-return-bounty",
     title: "Return to a planet",
-    text: "Bounty complete. Open the sector map and return to a planet; rewards are claimed while docked.",
+    text: "Bounty complete. Do not stay for the rest of the patrol—open the sector map and return to a planet. Rewards and repairs are handled while docked.",
     target: "tutorial:bountyClaimReturn",
     event: ["openedSectorMap", "landedOnPlanet"],
     place: "left"  },
