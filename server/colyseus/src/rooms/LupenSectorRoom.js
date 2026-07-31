@@ -42,6 +42,7 @@ import {
 } from "../config/stagingShipConfig.js";
 import {
   EREBUS_BOT_TYPE_ORDER,
+  EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER,
   getErebusBotTypeConfig
 } from "../config/stagingBotConfig.js";
 import {
@@ -3061,7 +3062,12 @@ export class LupenSectorRoom extends Room {
 
     const botTypePayload = this.getBotTypePayload(bot);
     const cooldownMs = botTypePayload.attackCooldownMs;
-    const botDamage = botTypePayload.damagePerHit;
+    const baseDamagePerHit = botTypePayload.damagePerHit;
+    const fireRole = String(player.selectedTargetBotId || "") === String(bot.id || "")
+      ? "primary"
+      : "support";
+    const damageMultiplier = fireRole === "primary" ? 1 : EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER;
+    const botDamage = Math.max(1, Math.round(baseDamagePerHit * damageMultiplier));
     const nextReturnFireAt = now + cooldownMs;
     this.stagingBotReturnFireCooldowns.set(cooldownKey, nextReturnFireAt);
 
@@ -3080,6 +3086,9 @@ export class LupenSectorRoom extends Room {
       damage: botDamage,
       botDamage,
       damagePerHit: botDamage,
+      baseDamagePerHit,
+      fireRole,
+      damageMultiplier,
       damageType: "shield_first",
       sessionOnly: true,
       persisted: false,

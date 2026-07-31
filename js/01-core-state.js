@@ -1767,6 +1767,24 @@ const HULL_REPAIR_COST_PER_POINT = 2;
 const DISABLED_CARGO_LOSS_RATE = 0.3;
 const EREBUS_BOT_AGGRO_MS = 45000;
 const EREBUS_NODE_MAX_ACTIVE_BOTS = 3;
+const EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER = 0.5;
+const MAP_ONE_COMBAT_BALANCE_MODEL = Object.freeze({
+  version: 1,
+  assumedWeaponKey: "pulseLaser",
+  assumedFullWeaponSlots: true,
+  referenceWeaponDamage: 13,
+  referenceWeaponCooldownMs: 1250,
+  maxBotsPerNode: EREBUS_NODE_MAX_ACTIVE_BOTS,
+  primaryFireDamageMultiplier: 1,
+  supportFireDamageMultiplier: EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER,
+  referenceNode: Object.freeze(["erebus_hunter", "erebus_attacker", "erebus_destroyer"]),
+  firstTarget: "erebus_hunter",
+  firstKillMinimumCombinedHealthPercent: Object.freeze({
+    falcon: 82,
+    zeusExplorer: 90,
+    monolith: 96
+  })
+});
 const EREBUS_BOT_ASSET_PATH = "assets/bots/";
 const EREBUS_BOT_FALLBACK_ASSET = "assets/bots/erebus-attacker.png";
 const EREBUS_BOT_SPAWN_CAPS = {

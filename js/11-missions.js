@@ -52,6 +52,16 @@ const CHAPTER_MISSIONS = Object.freeze([
     reward: Object.freeze({ xp: 0, credits: 0 })
   }),
   Object.freeze({
+    id: "academy_daily_contract",
+    title: "Complete a Daily Trade Contract",
+    chapter: "academy",
+    giver: "Morgan",
+    briefing: "Complete one fixed-route delivery from Daily Contracts.",
+    completeText: "Daily delivery confirmed. You can now use fixed contracts for guaranteed returns between market runs.",
+    objective: Object.freeze({ type: "complete_daily_trade_contract", required: 1 }),
+    reward: Object.freeze({ xp: 0, credits: 0 })
+  }),
+  Object.freeze({
     id: "academy_two_guns",
     title: "Equip Two Guns",
     chapter: "academy",
@@ -277,6 +287,21 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     autoActive: true,
     rewards: Object.freeze({ xp: 0, credits: 0 }),
     order: 40
+  }),
+  Object.freeze({
+    id: "academy_daily_contract",
+    chapterId: "academy",
+    journeyTitle: "Complete a Daily Trade Contract",
+    journeyShortDescription: "Deliver one fixed-route Daily Contract.",
+    journeyObjectiveLabel: "Complete one Daily Contract delivery",
+    assignmentType: "trade",
+    journeyTheme: "gold",
+    icon: "cargo",
+    assignmentMode: "chapter",
+    requiresAccept: false,
+    autoActive: true,
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
+    order: 35
   }),
   Object.freeze({
     id: "academy_attachment",
@@ -546,6 +571,7 @@ function getMissionObjectiveLabel(mission) {
   const required = getMissionRequiredAmount(mission);
   if (mission.objective.type === "launch_from_station") return `Launch from a station or planet ${required} time`;
   if (mission.objective.type === "profitable_trade") return `Complete ${required} profitable cargo sale`;
+  if (mission.objective.type === "complete_daily_trade_contract") return "Complete one Daily Contract delivery";
   if (mission.objective.type === "recover_resource") return `Recover ${formatNumber(required)} cargo from mining or salvage`;
   if (mission.objective.type === "destroy_bot") return `Destroy ${formatNumber(required)} Erebus bot${required === 1 ? "" : "s"}`;
   if (mission.objective.type === "starter_ship_claimed") return "Claim or activate the starter ship";
@@ -715,6 +741,11 @@ function hasClaimedBountyForMission() {
   return claimedTotal > 0 || localClaim;
 }
 
+function hasCompletedDailyTradeContractForMission() {
+  return Array.isArray(dailyTradeContracts) &&
+    dailyTradeContracts.some(contract => contract?.status === "complete");
+}
+
 function hasPurchasedPioneerHullForMission() {
   const starterShipId = typeof STARTER_SHIP_ID !== "undefined" ? STARTER_SHIP_ID : "falcon";
   const pioneerLineId = typeof PIONEER_LINE_ID !== "undefined" ? PIONEER_LINE_ID : "pioneer";
@@ -760,6 +791,9 @@ function reconcileMissionProgressFromGameplayState(options = {}) {
   const bountyClaimed = options.bountyClaimed === undefined
     ? hasClaimedBountyForMission()
     : Boolean(options.bountyClaimed);
+  const dailyTradeContractCompleted = options.dailyTradeContractCompleted === undefined
+    ? hasCompletedDailyTradeContractForMission()
+    : Boolean(options.dailyTradeContractCompleted);
   const pioneerHullPurchased = options.pioneerHullPurchased === undefined
     ? hasPurchasedPioneerHullForMission()
     : Boolean(options.pioneerHullPurchased);
@@ -768,6 +802,7 @@ function reconcileMissionProgressFromGameplayState(options = {}) {
   changed = setMissionProgressAbsolute("academy_starter_ship", starterShipClaimed ? 1 : 0, options) || changed;
   changed = setMissionProgressAbsolute("academy_two_guns", weaponCount, options) || changed;
   changed = setMissionProgressAbsolute("academy_attachment", attachmentCount, options) || changed;
+  changed = setMissionProgressAbsolute("academy_daily_contract", dailyTradeContractCompleted ? 1 : 0, options) || changed;
   changed = setMissionProgressAbsolute("academy_bounty", bountyClaimed ? 1 : 0, options) || changed;
   changed = setMissionProgressAbsolute("academy_pioneer_hull", pioneerHullPurchased ? 1 : 0, options) || changed;
 
@@ -782,6 +817,7 @@ function reconcileMissionProgressFromGameplayState(options = {}) {
     starterShipClaimed,
     weaponCount,
     attachmentCount,
+    dailyTradeContractCompleted,
     bountyClaimed,
     pioneerHullPurchased
   };

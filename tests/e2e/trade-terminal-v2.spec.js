@@ -231,6 +231,7 @@ test.describe("Trade Terminal final quick actions", () => {
       }
       const saved = buildSaveState();
       const completedBeforeReset = getDailyTradeProgress();
+      const academyMission = { ...missionProgress.missions.academy_daily_contract };
       ensureDailyTradeContracts(new Date(Date.now() + 86400000));
       return {
         duplicateBlocked,
@@ -238,6 +239,7 @@ test.describe("Trade Terminal final quick actions", () => {
         creditsAfterDuplicate,
         packageAfterFirst,
         completedBeforeReset,
+        academyMission,
         savedStatuses: saved.dailyTradeContracts.map((entry) => entry.status),
         savedPackage: saved.dailyTradeContractCargo,
         resetStatuses: dailyTradeContracts.map((entry) => entry.status)
@@ -247,6 +249,7 @@ test.describe("Trade Terminal final quick actions", () => {
     expect(completion.creditsAfterDuplicate).toBe(completion.creditsAfterFirst);
     expect(completion.packageAfterFirst).toBeNull();
     expect(completion.completedBeforeReset).toBe(4);
+    expect(completion.academyMission).toMatchObject({ state: "completed", progress: 1 });
     expect(completion.savedStatuses).toEqual(["complete", "complete", "complete", "complete"]);
     expect(completion.savedPackage).toBeNull();
     expect(completion.resetStatuses).toEqual(["available", "available", "available", "available"]);

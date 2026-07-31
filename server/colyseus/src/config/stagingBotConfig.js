@@ -57,6 +57,8 @@ export const EREBUS_BOT_TYPES = Object.freeze({
   })
 });
 
+export const EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER = 0.5;
+
 export const EREBUS_BOT_TYPE_ORDER = Object.freeze([
   "hunter",
   "attacker",

@@ -17,7 +17,10 @@ import {
   isProgressionWriteEnabled
 } from "./services/playerSaveWriteService.js";
 import { getLoadoutWriteEnvGate } from "./services/loadoutWriteService.js";
-import { EREBUS_BOT_TYPES } from "./config/stagingBotConfig.js";
+import {
+  EREBUS_BOT_TYPES,
+  EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER
+} from "./config/stagingBotConfig.js";
 
 export const ROOM_NAME = "lupen_sector";
 export const LEGACY_ROOM_NAME = "lupen_test";
@@ -114,7 +117,8 @@ export function getHealthPayload(
     },
     botBalance: {
       activePopulation: botTypes.reduce((sum, bot) => sum + Number(bot.targetCount || 0), 0),
-      maxBotsPerNode: 3
+      maxBotsPerNode: 3,
+      supportFireDamageMultiplier: EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER
     }
   };
 }

@@ -444,6 +444,15 @@ function completeDailyTradeContract(id, eventId = "") {
     title: "Contract Complete",
     detail: contract.packageName
   });
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("complete_daily_trade_contract", {
+      contractId: contract.id,
+      completionEventId: completionKey,
+      origin: contract.origin,
+      destination: contract.destination,
+      reward: contract.reward
+    });
+  }
   setTradeTerminalStatus(contract.name + " complete. Another daily contract is now available.");
   saveGame();
   renderMarketplace();
@@ -474,6 +483,9 @@ function toggleDailyTradeContracts() {
     selectedDailyTradeContractId = activeDailyTradeContractId || selectedDailyTradeContractId || dailyTradeContracts[0]?.id || null;
   }
   renderMarketplace();
+  if (typeof tutorialEvent === "function") {
+    tutorialEvent(tradeContractsExpanded ? "openedDailyTradeContracts" : "closedDailyTradeContracts");
+  }
   requestAnimationFrame(() => {
     document.querySelector(tradeContractsExpanded ? ".trade-v2-contract-drawer-close" : ".trade-v2-contract-strip-button")?.focus();
   });
@@ -526,7 +538,11 @@ function reviewTutorialMarketPrice(priceKind, event) {
   event?.preventDefault?.();
   event?.stopPropagation?.();
   const expectedStepId = priceKind === "sell" ? "review-market-sell-price" : "review-market-buy-price";
-  if (tutorialState?.active && getCurrentTutorialStep?.()?.id === expectedStepId) {
+  if (
+    typeof tutorialState !== "undefined" &&
+    tutorialState?.active &&
+    getCurrentTutorialStep?.()?.id === expectedStepId
+  ) {
     tutorialEvent(priceKind === "sell" ? "reviewedTutorialSellPrice" : "reviewedTutorialBuyPrice");
     return;
   }
@@ -686,6 +702,13 @@ function sellMarketCargo() {
   setTradeTerminalStatus("Sale complete at the current live price.");
   saveGame();
   renderMarketplace();
+  if (
+    typeof tutorialState !== "undefined" &&
+    tutorialState?.active &&
+    typeof renderStarterTutorial === "function"
+  ) {
+    renderStarterTutorial();
+  }
   updateCargoSummary();
   updateSpaceHUD();
   marketSellInProgress = false;
@@ -1098,6 +1121,14 @@ function renderLiveMarketQuickActions() {
 function renderDailyContractsStrip() {
   const completed = getDailyTradeProgress();
   const active = getDailyTradeContract(activeDailyTradeContractId);
+  const tutorialStepId = typeof getCurrentTutorialStep === "function"
+    ? getCurrentTutorialStep()?.id
+    : "";
+  const tutorialOpenClass = typeof tutorialState !== "undefined" &&
+    tutorialState?.active &&
+    tutorialStepId === "review-daily-contracts"
+    ? " tutorial-highlight-target"
+    : "";
   const supportingText = active
     ? `Deliver ${escapeHtml(active.name)} to ${escapeHtml(active.destination)} &middot; ${formatNumber(active.cargoSpace)} cargo reserved`
     : "Optional routes refresh each UTC day";
@@ -1107,7 +1138,7 @@ function renderDailyContractsStrip() {
       <strong>Daily Contracts</strong>
       <span class="trade-v2-contract-strip-progress">${completed} / 4 Complete</span>
       <span class="trade-v2-contract-strip-copy">${supportingText}</span>
-      <button type="button" class="trade-v2-contract-strip-button" aria-expanded="${tradeContractsExpanded}" onclick="toggleDailyTradeContracts()">${tradeContractsExpanded ? "Close Contracts" : "View Contracts"}</button>
+      <button type="button" class="trade-v2-contract-strip-button${tutorialOpenClass}" aria-expanded="${tradeContractsExpanded}" onclick="toggleDailyTradeContracts()">${tradeContractsExpanded ? "Close Contracts" : "View Contracts"}</button>
     </section>
   `;
 }
@@ -1115,6 +1146,14 @@ function renderDailyContractsStrip() {
 function renderDailyContractsDrawer() {
   if (!tradeContractsExpanded) return "";
   const completed = getDailyTradeProgress();
+  const tutorialStepId = typeof getCurrentTutorialStep === "function"
+    ? getCurrentTutorialStep()?.id
+    : "";
+  const tutorialCloseClass = typeof tutorialState !== "undefined" &&
+    tutorialState?.active &&
+    tutorialStepId === "close-daily-contracts"
+    ? " tutorial-highlight-target"
+    : "";
   return `
     <section class="trade-v2-contract-drawer" role="dialog" aria-label="Daily Contracts">
       <header>
@@ -1127,7 +1166,7 @@ function renderDailyContractsDrawer() {
           <strong>${completed} / 4 Complete</strong>
           <small>Reset ${formatBountyResetCountdown(getDailyResetSeconds())}</small>
         </div>
-        <button type="button" class="trade-v2-contract-drawer-close" aria-label="Close Daily Contracts" onclick="toggleDailyTradeContracts()">&times;</button>
+        <button type="button" class="trade-v2-contract-drawer-close${tutorialCloseClass}" aria-label="Close Daily Contracts" onclick="toggleDailyTradeContracts()">&times;</button>
       </header>
       <div class="trade-v2-contract-drawer-list">
         ${dailyTradeContracts.map(renderDailyTradePreviewRow).join("")}

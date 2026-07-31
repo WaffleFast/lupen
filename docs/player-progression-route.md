@@ -22,7 +22,7 @@ Morgan then guides the first session through the immediate controls and economy:
 
 The Hunter is issued with one mounted Pulse Laser, plus an unfitted Cargo Pod and Jump Drive. This makes the Store, second weapon, and first attachment meaningful without leaving the pilot unarmed.
 
-The orientation card names the active Academy assignment and shows its live completion state. Its opening route summary covers the starter ship, first trade and launch, two-gun loadout, attachment, Erebus combat, bounty claim, and repair check so players understand that tutorial actions are also real Academy progress.
+The orientation card names the active Academy assignment and shows its live completion state. Its opening route summary covers the starter ship, first profitable live-market trade and launch, a short Daily Contracts introduction, two-gun loadout, attachment, Erebus combat, bounty claim, and repair check so players understand that tutorial actions are also real Academy progress. Completing one fixed-route Daily Contract is an Academy assignment; Morgan explains the difference between player-chosen market margins and guaranteed contract rewards without turning the opening tutorial into a second long delivery walkthrough.
 
 Morgan's portrait changes with context: the command portrait handles formal orientation, the trade portrait covers market and navigation steps, the tactical portrait covers loadout, bounties, and Erebus combat, and the Journey portrait anchors Academy/Frontier progression plus Forge and repair guidance.
 

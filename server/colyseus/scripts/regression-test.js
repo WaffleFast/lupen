@@ -5849,6 +5849,24 @@ try {
       .map((event) => event.attackerBotId));
     return sharedAggroGroup.every((bot) => attackers.has(bot.id));
   }, 3000);
+  const nodeAggroEvents = roomAReturnFireEvents.filter((event) =>
+    event?.targetSessionId === roomA.sessionId &&
+    event?.currentNode === aggroTarget.currentNode &&
+    Number(event?.receivedAt || 0) >= nodeAggroStartedAt
+  );
+  const primaryAggroEvent = nodeAggroEvents.find((event) => event?.attackerBotId === aggroTarget.id);
+  assert(primaryAggroEvent?.fireRole === "primary", "Engaged bot was not marked as primary fire.");
+  assert(primaryAggroEvent?.damageMultiplier === 1, "Engaged bot did not retain full damage.");
+  assert(primaryAggroEvent?.damage === primaryAggroEvent?.baseDamagePerHit, "Engaged bot damage was reduced unexpectedly.");
+  sharedAggroGroup.slice(1).forEach((supportBot) => {
+    const supportEvent = nodeAggroEvents.find((event) => event?.attackerBotId === supportBot.id);
+    assert(supportEvent?.fireRole === "support", `Supporting bot ${supportBot.id} was not marked as support fire.`);
+    assert(supportEvent?.damageMultiplier === 0.5, `Supporting bot ${supportBot.id} did not use the 50% support multiplier.`);
+    assert(
+      supportEvent?.damage === Math.max(1, Math.round(Number(supportEvent?.baseDamagePerHit || 0) * 0.5)),
+      `Supporting bot ${supportBot.id} damage was not reduced to the expected value.`
+    );
+  });
 
   const escapedNode = STAGING_BOT_ALLOWED_NODE_IDS.find((nodeId) => nodeId !== aggroTarget.currentNode);
   roomA.send("movement:update", {
@@ -5863,7 +5881,7 @@ try {
   const returnFireCountAfterEscape = roomAReturnFireEvents.length;
   await sleep(5500);
   assert(roomAReturnFireEvents.length === returnFireCountAfterEscape, "Bots continued hunting after the player changed node.");
-  console.log("attacking one bot aggroed its node; changing node cleared all server hostility");
+  console.log("attacking one bot triggered full primary and half-damage support fire; changing node cleared all server hostility");
 
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
   const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");

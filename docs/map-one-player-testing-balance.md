@@ -32,7 +32,18 @@ Cobalt's Nyxara base price is 102 CR. This keeps it the strongest Map 1 commodit
 
 ## Combat baseline
 
-Bot durability and the Pioneer weapon-mount curve are regression-protected together. The two-mount Hunter takes the longest to clear Erebus targets and carries the greatest cumulative repair risk. The four-mount Destroyer shortens fights and has a substantially larger defensive pool. The six-mount Behemoth is fastest and safest, while sustained combat without planetary repairs can still destroy a careless pilot.
+Bot durability and the Pioneer weapon-mount curve are regression-protected together. Balance checks assume every ship has filled all available weapon mounts with standard Level I Pulse Lasers; an under-equipped ship is intentionally below the reference curve.
+
+Node hostility uses a primary-and-support model:
+
+- The bot actively engaged by the player deals 100% of its normal damage.
+- Every other hostile bot in the same node attacks as support at 50% damage.
+- A node contains no more than three active Erebus bots.
+- Leaving the node or docking clears that node's hostility.
+
+The reference encounter is an Erebus Hunter supported by an Attacker and Destroyer. A fresh, fully armed Pioneer Hunter must destroy that first Hunter with at least 82% of its combined hull and shield remaining. The Destroyer target is at least 90%; the Behemoth target is at least 96%. Continuing to clear the entire node without repairing remains an attrition choice rather than a free win.
+
+The two-mount Hunter takes the longest to clear Erebus targets and carries the greatest cumulative repair risk. The four-mount Destroyer shortens fights and has a substantially larger defensive pool. The six-mount Behemoth is fastest and safest, while sustained combat without planetary repairs can still destroy a careless pilot. These percentages and the support-fire multiplier live in the executable `MAP_ONE_COMBAT_BALANCE_MODEL`, so later maps can use the same fully-armed ship-versus-reference-node method with different target bands.
 
 PvP damage is resolved from server-known equipped weapons. Protected nodes reject player attacks; contested lower-sector nodes allow them. Server-known hull, shield, and armor values prevent the browser from supplying arbitrary PvP health totals.
 
@@ -42,6 +53,7 @@ PvP damage is resolved from server-known equipped weapons. Protected nodes rejec
 - Do combat, trade, and mining each feel worthwhile without one invalidating the others?
 - Does a Forge upgrade feel earned, and is its effect noticeable?
 - Is the Erebus Behemoth threatening without making the starter Hunter unusable?
+- Can a fully armed Hunter comfortably secure one light-bot kill from a three-bot node, while a full clear still creates a meaningful repair decision?
 - Does Level 3 arrive before Map 1 becomes repetitive?
 
 Record completion time, chosen activity, purchases, Forge levels, deaths, remaining credits, and the point where the player first feels under- or over-powered.

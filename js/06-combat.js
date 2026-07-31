@@ -2278,6 +2278,9 @@ function hostileBotAttackCycle() {
   if (!attackers.length) return;
 
   let totalDamage = 0;
+  const primaryBotId = engagedTarget?.type === "hostileBot"
+    ? String(engagedTarget.id || "")
+    : "";
 
   speakWarning();
   triggerWarningBanner("WARNING");
@@ -2286,7 +2289,10 @@ function hostileBotAttackCycle() {
     markBotFacingPlayer(bot);
     bot.lastFiredAt = now;
     if (Math.random() <= Number(bot.accuracy || 1)) {
-      totalDamage += Number(bot.damage || HOSTILE_BOT_DAMAGE);
+      const baseDamage = Number(bot.damage || HOSTILE_BOT_DAMAGE);
+      const isPrimaryAttacker = primaryBotId && String(bot.id || "") === primaryBotId;
+      const damageMultiplier = isPrimaryAttacker ? 1 : EREBUS_SUPPORT_FIRE_DAMAGE_MULTIPLIER;
+      totalDamage += Math.max(1, Math.round(baseDamage * damageMultiplier));
     }
   });
 

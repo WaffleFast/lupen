@@ -1,6 +1,6 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
-const TUTORIAL_FLOW_VERSION = 3;
+const TUTORIAL_FLOW_VERSION = 4;
 const TUTORIAL_NARRATOR_LABEL = "Morgan";
 const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
 const TUTORIAL_TRADE_ROUTE = Object.freeze({
@@ -82,10 +82,17 @@ const TUTORIAL_MORGAN_PORTRAITS = Object.freeze({
   tactical: "assets/morgan-tactical-liaison.png",
   journey: "assets/morgan-journey-guide.png"
 });
+const TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS = Object.freeze([
+  "review-daily-contracts",
+  "close-daily-contracts"
+]);
 const TUTORIAL_TRADE_PORTRAIT_STEPS = new Set(
-  TUTORIAL_ACADEMY_MILESTONES
-    .filter(milestone => ["academy_first_trade", "academy_launch_ship"].includes(milestone.missionId))
-    .flatMap(milestone => [...milestone.stepIds])
+  [
+    ...TUTORIAL_ACADEMY_MILESTONES
+      .filter(milestone => ["academy_first_trade", "academy_launch_ship"].includes(milestone.missionId))
+      .flatMap(milestone => [...milestone.stepIds]),
+    ...TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS
+  ]
 );
 const TUTORIAL_TACTICAL_PORTRAIT_STEPS = new Set(
   TUTORIAL_ACADEMY_MILESTONES
@@ -296,6 +303,20 @@ const STARTER_TUTORIAL_STEPS = [
     text: "Sell the Iron. The profit is yours, and every clean run brings a Pioneer Freighter closer.",
     target: "tutorial:sellCargo",
     event: "soldTradeCargo"
+  },
+  {
+    id: "review-daily-contracts",
+    title: "Meet Daily Contracts",
+    text: "That was a live-market trade: you chose the cargo and margin. Daily Contracts are different—fixed packages, marked destinations, and guaranteed rewards. Open them for a quick look.",
+    target: "tutorial:openDailyTradeContracts",
+    event: "openedDailyTradeContracts"
+  },
+  {
+    id: "close-daily-contracts",
+    title: "Your Academy delivery",
+    text: "Completing one Daily Contract is now an Academy assignment. Collect its sealed cargo at the marked origin, deliver it to the destination, and claim the fixed reward. Close the list for now; Journey will keep the assignment visible.",
+    target: "tutorial:closeDailyTradeContracts",
+    event: "closedDailyTradeContracts"
   },
   {
     id: "return-after-trade",
@@ -549,7 +570,7 @@ const STARTER_TUTORIAL_STEPS = [
     title: "Orientation Complete",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_outro_complete",
-    text: "You have the fundamentals, {pilot}. Open Journey and finish the remaining Academy assignments. Across the Pioneer Line, the Freighter or Destroyer are natural next hulls, with the Behemoth farther ahead. Earn a second Pioneer hull to unlock Frontier. Good luck out there—I will be with you for the road ahead.",
+    text: "You have the fundamentals, {pilot}. Open Journey and finish the remaining Academy assignments, including one guaranteed Daily Contract delivery. Across the Pioneer Line, the Freighter or Destroyer are natural next hulls, with the Behemoth farther ahead. Earn a second Pioneer hull to unlock Frontier. Good luck out there—I will be with you for the road ahead.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Continue my journey",
@@ -569,6 +590,7 @@ const TUTORIAL_FLOW_V2_ADDED_STEP_IDS = new Set([
   "select-second-weapon-slot",
   "open-attachment-loadout"
 ]);
+const TUTORIAL_FLOW_V4_ADDED_STEP_IDS = new Set(TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS);
 
 function migrateTutorialStateToCurrentFlow() {
   const savedStepId = String(tutorialState.stepId || "");
@@ -586,7 +608,10 @@ function migrateTutorialStateToCurrentFlow() {
   }
 
   if (nextIndex < 0 && Number(tutorialState.flowVersion || 0) < TUTORIAL_FLOW_VERSION) {
-    const legacySteps = STARTER_TUTORIAL_STEPS.filter(step => !TUTORIAL_FLOW_V2_ADDED_STEP_IDS.has(step.id));
+    const legacySteps = STARTER_TUTORIAL_STEPS.filter(step => (
+      !TUTORIAL_FLOW_V2_ADDED_STEP_IDS.has(step.id) &&
+      !TUTORIAL_FLOW_V4_ADDED_STEP_IDS.has(step.id)
+    ));
     const legacyStep = legacySteps[Math.min(Math.max(0, tutorialState.stepIndex), legacySteps.length - 1)];
     nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === legacyStep?.id);
   }
@@ -613,6 +638,7 @@ const TUTORIAL_PROGRESS_PHASES = Object.freeze([
     label: "Trade",
     stepIds: Object.freeze([
       ...TUTORIAL_ACADEMY_MILESTONES[1].stepIds,
+      ...TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS,
       ...TUTORIAL_ACADEMY_MILESTONES[2].stepIds
     ])
   }),
@@ -998,6 +1024,14 @@ function getTutorialStateCompletionReason(step) {
       return hasCompletedTutorialTrade() ? "trade_already_completed" : document.getElementById("marketScreen")?.classList.contains("active") ? "trade_terminal_open" : "";
     case "sell-cargo":
       return hasCompletedTutorialTrade() ? "trade_already_completed" : "";
+    case "review-daily-contracts":
+      return typeof tradeContractsExpanded !== "undefined" && tradeContractsExpanded
+        ? "daily_contracts_already_open"
+        : "";
+    case "close-daily-contracts":
+      return typeof tradeContractsExpanded !== "undefined" && !tradeContractsExpanded
+        ? "daily_contracts_already_closed"
+        : "";
     case "open-store":
       return hasTutorialPurchasedLoadoutKit() ? "starter_loadout_kit_ready" : "";
     case "buy-equipment":
@@ -1682,6 +1716,14 @@ function getDynamicTutorialTarget(step) {
 
   if (step.target === "tutorial:marketSellPrice") {
     return document.querySelector("[data-tutorial-target='marketSellPrice']");
+  }
+
+  if (step.target === "tutorial:openDailyTradeContracts") {
+    return document.querySelector(".trade-v2-contract-strip-button");
+  }
+
+  if (step.target === "tutorial:closeDailyTradeContracts") {
+    return document.querySelector(".trade-v2-contract-drawer-close");
   }
 
   if (step.target === "tutorial:storeCargoPod") {
