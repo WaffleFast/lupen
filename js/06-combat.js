@@ -1167,6 +1167,18 @@ function triggerErebusAggro(attackedBotId, playerId = getPilotName()) {
     });
 }
 
+function clearErebusNodeAggro(nodeId = "") {
+  const nodeKey = String(nodeId || "").trim().toLowerCase();
+  hostileBots.forEach(bot => {
+    if (bot.faction !== "erebus" || bot.aggroState !== "hostile") return;
+    if (nodeKey && String(getCombatEntityNodeName(bot) || "").trim().toLowerCase() !== nodeKey) return;
+    bot.aggroState = "neutral";
+    bot.aggroUntil = null;
+    bot.targetPlayerId = null;
+    bot.lastFiredAt = 0;
+  });
+}
+
 function updateErebusAggroStates() {
   const now = Date.now();
   hostileBots.forEach(bot => {
@@ -2137,10 +2149,18 @@ function respawnHostileBot(botId) {
   if (!bot) return;
 
   const spaceNodes = getAllowedErebusBotNodeIds();
+  const openSpaceNodes = spaceNodes.filter(nodeId =>
+    hostileBots.filter(item =>
+      item.alive &&
+      item.id !== bot.id &&
+      getCombatEntityNodeName(item) === nodeId
+    ).length < EREBUS_NODE_MAX_ACTIVE_BOTS
+  );
   const botClass = EREBUS_BOT_TYPES[bot.botType] || EREBUS_BOT_TYPES.erebus_attacker;
   const shield = Number(botClass.shield || HOSTILE_BOT_BASE_SHIELD);
   const hullValue = Number(botClass.hull || HOSTILE_BOT_BASE_HP);
-  setErebusBotNode(bot, spaceNodes[Math.floor(Math.random() * spaceNodes.length)] || currentNode);
+  const respawnNodes = openSpaceNodes.length ? openSpaceNodes : spaceNodes;
+  setErebusBotNode(bot, respawnNodes[Math.floor(Math.random() * respawnNodes.length)] || currentNode);
   bot.name = botClass.displayName || bot.name || "Erebus Bot";
   bot.displayName = botClass.displayName || bot.name;
   bot.className = botClass.className || bot.className;
@@ -2181,7 +2201,15 @@ function getAllowedErebusBotMoves(bot) {
   const current = getNodeById(currentNodeId);
   if (!current) return [];
   const connectedNodeIds = current.connections || current.connectedNodes || current.connects || [];
-  return connectedNodeIds.filter(nodeId => isAllowedErebusBotNode(nodeId));
+  return connectedNodeIds.filter(nodeId => {
+    if (!isAllowedErebusBotNode(nodeId)) return false;
+    const activeAtNode = hostileBots.filter(item =>
+      item.alive &&
+      item.id !== bot.id &&
+      getCombatEntityNodeName(item) === nodeId
+    ).length;
+    return activeAtNode < EREBUS_NODE_MAX_ACTIVE_BOTS;
+  });
 }
 
 function moveHostileBotsBetweenNodes() {

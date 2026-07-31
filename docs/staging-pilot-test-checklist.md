@@ -1,6 +1,6 @@
 # Multiplayer Staging Pilot Test Checklist
 
-Use this checklist for allowlisted live staging tests after each deployment. The default Playwright suite stays read-only; this checklist is manual and only for approved staging accounts.
+Use this checklist for verified-account live tests after each deployment. The default Playwright suite stays read-only; this checklist is manual and only for accounts owned by approved testers.
 
 ## Required Gates
 
@@ -9,7 +9,7 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 - Browser Supabase config points to `https://ylzglwiehkypetcdkqxd.supabase.co` with the matching `supabase-sky-park` publishable/anon browser key.
 - `js/00-supabase-client.js` uses the matching `supabase-sky-park` publishable browser key, not a placeholder or service-role key.
 - The tester is logged in with a verified Supabase account.
-- The account is included in the relevant staging allowlists.
+- The account is authenticated and verified; public player-test actions must not depend on a per-account allowlist.
 - Colyseus Cloud has the intended staging env vars set.
 - Trade writes, Store writes, loadout writes, and XP-only writes are enabled only for the specific phase being tested.
 - Lupen Shard writes remain optional/phase-gated; when disabled, shard UI should read as preview-only.
@@ -18,16 +18,15 @@ Use this checklist for allowlisted live staging tests after each deployment. The
 
 ### Colyseus Cloud Env Checklist
 
-For real allowlisted Trade Terminal buy/sell writes, Colyseus Cloud needs all of:
+For real verified-player Trade Terminal buy/sell writes, Colyseus Cloud needs all of:
 
 - `SUPABASE_URL=https://ylzglwiehkypetcdkqxd.supabase.co`
 - `SUPABASE_SERVICE_ROLE_KEY` from the same `ylzglwiehkypetcdkqxd` project
 - `STAGING_TRADE_WRITE_ENABLED=true`
 - `STAGING_TRADE_WRITE_DRY_RUN=false`
-- `STAGING_TRADE_WRITE_SCOPE=allowlist`
-- `STAGING_TRADE_WRITE_ALLOWLIST=<verified Supabase auth user UUID>`
+- `STAGING_TRADE_WRITE_SCOPE=verified`
 
-`STAGING_TRADE_WRITE_ALLOWLIST` is a comma-separated list of verified Supabase user ids, for example `uuid1,uuid2`. It is not an email allowlist, and there is no wildcard. `STAGING_TRADE_WRITE_SCOPE=verified` allows any verified staging player, so use `allowlist` for live pilot tests. Optional trade gates are `STAGING_TRADE_WRITE_MAX_QUANTITY=1000` for the temporary manual pilot pass and `STAGING_TRADE_WRITE_ALLOWED_OFFERS=<offerId1,offerId2>`; leaving allowed offers unset allows the current staging trade offers.
+`STAGING_TRADE_WRITE_SCOPE=verified` allows any authenticated, verified player while retaining server-side offer, price, cargo, credit and save validation. Optional trade gates are `STAGING_TRADE_WRITE_MAX_QUANTITY=1000` and `STAGING_TRADE_WRITE_ALLOWED_OFFERS=<offerId1,offerId2>`; leaving allowed offers unset allows the current trade offers.
 
 `ENABLE_STAGING_REWARD_WRITES` is still used, but only for the dedicated reward ledger path. It does not enable Trade Terminal writes.
 
@@ -36,14 +35,12 @@ Later systems use separate gates:
 - Store purchases:
   - `STAGING_STORE_WRITE_ENABLED=true`
   - `STAGING_STORE_WRITE_DRY_RUN=false`
-  - `STAGING_STORE_WRITE_SCOPE=allowlist`
-  - `STAGING_STORE_WRITE_ALLOWLIST=<verified Supabase auth user UUID>`
+  - `STAGING_STORE_WRITE_SCOPE=verified`
   - `STAGING_STORE_WRITE_ALLOWED_ITEMS=attachment:cargoPod,attachment:shieldBooster,gun:pulseLaser,ship:lupenHauler`
 - Loadout equip/ship select:
   - `STAGING_LOADOUT_WRITE_ENABLED=true`
   - `STAGING_LOADOUT_WRITE_DRY_RUN=false`
-  - `STAGING_LOADOUT_WRITE_SCOPE=allowlist`
-  - `STAGING_LOADOUT_WRITE_ALLOWLIST=<verified Supabase auth user UUID>`
+  - `STAGING_LOADOUT_WRITE_SCOPE=verified`
   - `STAGING_LOADOUT_WRITE_ALLOWED_ITEMS=attachment:cargoPod,attachment:shieldBooster,gun:pulseLaser,ship:lupenHauler`
 - XP/progression: `ENABLE_STAGING_PROGRESSION_WRITES`, `STAGING_PROGRESSION_WRITE_SCOPE`, `STAGING_PROGRESSION_WRITE_ALLOWLIST`.
 - Lupen Shard loot: `STAGING_LOOT_WRITE_ENABLED`, `STAGING_LOOT_WRITE_DRY_RUN`, `STAGING_LOOT_WRITE_SCOPE`, `STAGING_LOOT_WRITE_ALLOWLIST`.

@@ -12,7 +12,13 @@ export default {
       exec_mode: "fork",
       port: 2567,
       env: {
-        NODE_ENV: "production"
+        NODE_ENV: "production",
+        // Public player testing: every authenticated Supabase player may use
+        // server-validated loadout writes. Identity, owned-item, slot, ship and
+        // save-shape checks still run before any patch is applied.
+        STAGING_LOADOUT_WRITE_ENABLED: "true",
+        STAGING_LOADOUT_WRITE_DRY_RUN: "false",
+        STAGING_LOADOUT_WRITE_SCOPE: "verified"
       }
     }
   ]

@@ -2016,6 +2016,7 @@ function handleShipDisabled() {
   closeSectorMap();
 
   const lostCargo = calculateDisabledCargoLoss();
+  if (typeof clearErebusNodeAggro === "function") clearErebusNodeAggro(currentNode);
   const towPlanet = sectorNodes[homePlanet]?.type === "planet" ? homePlanet : "Asteron Prime";
   currentNode = towPlanet;
   lastPlanetNode = towPlanet;
@@ -2704,6 +2705,8 @@ function jumpToNode(destination) {
     return;
   }
 
+  const departedNode = currentNode;
+  if (typeof clearErebusNodeAggro === "function") clearErebusNodeAggro(departedNode);
   currentNode = destination;
   if (transition.isPlanetDestination) {
     lastPlanetNode = currentNode;

@@ -16,6 +16,8 @@ import {
   getProgressionWriteScope,
   isProgressionWriteEnabled
 } from "./services/playerSaveWriteService.js";
+import { getLoadoutWriteEnvGate } from "./services/loadoutWriteService.js";
+import { EREBUS_BOT_TYPES } from "./config/stagingBotConfig.js";
 
 export const ROOM_NAME = "lupen_sector";
 export const LEGACY_ROOM_NAME = "lupen_test";
@@ -88,6 +90,8 @@ export function getHealthPayload(
   const hostedRuntime = process.env.COLYSEUS_CLOUD !== undefined ||
     environment === "production" ||
     environment === "staging";
+  const loadoutWriteGate = getLoadoutWriteEnvGate("verified-health-check", "gun:pulseLaser");
+  const botTypes = Object.values(EREBUS_BOT_TYPES);
   return {
     ok: true,
     service: "lupen-colyseus",
@@ -101,6 +105,16 @@ export function getHealthPayload(
     progressionWrites: {
       progressionWritesEnabled: isProgressionWriteEnabled(),
       progressionWriteScope: getProgressionWriteScope()
+    },
+    loadoutWrites: {
+      loadoutWritesEnabled: loadoutWriteGate.writeEnabled,
+      loadoutWritesDryRun: loadoutWriteGate.dryRun,
+      loadoutWriteScope: loadoutWriteGate.scope,
+      verifiedPlayersAllowed: loadoutWriteGate.playerAllowed
+    },
+    botBalance: {
+      activePopulation: botTypes.reduce((sum, bot) => sum + Number(bot.targetCount || 0), 0),
+      maxBotsPerNode: 3
     }
   };
 }

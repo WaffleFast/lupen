@@ -1766,12 +1766,13 @@ const HOSTILE_BOT_DAMAGE = 4;
 const HULL_REPAIR_COST_PER_POINT = 2;
 const DISABLED_CARGO_LOSS_RATE = 0.3;
 const EREBUS_BOT_AGGRO_MS = 45000;
+const EREBUS_NODE_MAX_ACTIVE_BOTS = 3;
 const EREBUS_BOT_ASSET_PATH = "assets/bots/";
 const EREBUS_BOT_FALLBACK_ASSET = "assets/bots/erebus-attacker.png";
 const EREBUS_BOT_SPAWN_CAPS = {
-  erebus_hunter: 8,
-  erebus_attacker: 5,
-  erebus_destroyer: 4,
+  erebus_hunter: 6,
+  erebus_attacker: 4,
+  erebus_destroyer: 3,
   erebus_behemoth: 2
 };
 const EREBUS_STARTER_SPAWN_PLAN = [
@@ -1801,8 +1802,8 @@ const EREBUS_BOT_TYPES = {
     hull: 140,
     shield: 75,
     armor: 7,
-    damage: 12,
-    fireRateMs: 1400,
+    damage: 14,
+    fireRateMs: 2600,
     accuracy: 0.72,
     moveIntervalMs: 14000,
     threat: "Low",
@@ -1818,8 +1819,8 @@ const EREBUS_BOT_TYPES = {
     hull: 210,
     shield: 120,
     armor: 14,
-    damage: 19,
-    fireRateMs: 1700,
+    damage: 20,
+    fireRateMs: 3000,
     accuracy: 0.75,
     moveIntervalMs: 18000,
     threat: "Medium",
@@ -1836,7 +1837,7 @@ const EREBUS_BOT_TYPES = {
     shield: 190,
     armor: 25,
     damage: 28,
-    fireRateMs: 2300,
+    fireRateMs: 3700,
     accuracy: 0.78,
     moveIntervalMs: 24000,
     threat: "High",
@@ -1852,8 +1853,8 @@ const EREBUS_BOT_TYPES = {
     hull: 540,
     shield: 300,
     armor: 36,
-    damage: 40,
-    fireRateMs: 3200,
+    damage: 45,
+    fireRateMs: 5000,
     accuracy: 0.8,
     moveIntervalMs: 32000,
     threat: "Extreme",

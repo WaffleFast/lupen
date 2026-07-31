@@ -375,12 +375,21 @@ function botCountsByType(room) {
 
 function assertErebusBotPopulation(room) {
   const counts = botCountsByType(room);
-  assert(counts.hunter >= 16, `Expected at least 16 Hunters, got ${counts.hunter || 0}.`);
-  assert(counts.attacker >= 10, `Expected at least 10 Attackers, got ${counts.attacker || 0}.`);
-  assert(counts.destroyer >= 4, `Expected at least 4 Destroyers, got ${counts.destroyer || 0}.`);
-  assert(counts.behemoth >= 3, `Expected at least 3 Behemoths, got ${counts.behemoth || 0}.`);
+  assert(counts.hunter === 6, `Expected 6 Hunters, got ${counts.hunter || 0}.`);
+  assert(counts.attacker === 4, `Expected 4 Attackers, got ${counts.attacker || 0}.`);
+  assert(counts.destroyer === 3, `Expected 3 Destroyers, got ${counts.destroyer || 0}.`);
+  assert(counts.behemoth === 2, `Expected 2 Behemoths, got ${counts.behemoth || 0}.`);
   assert((counts.attacker || 0) > (counts.destroyer || 0), "Attackers should outnumber Destroyers.");
   assert((counts.hunter || 0) > (counts.attacker || 0), "Hunters should outnumber Attackers.");
+}
+
+function assertBotNodeDensity(room, maxActive = 3) {
+  const counts = new Map();
+  botSnapshots(room).filter((bot) => !bot.disabled).forEach((bot) => {
+    counts.set(bot.currentNode, Number(counts.get(bot.currentNode) || 0) + 1);
+  });
+  const crowded = Array.from(counts.entries()).find(([, count]) => count > maxActive);
+  assert(!crowded, `Bot density exceeded ${maxActive} in ${crowded?.[0]} (${crowded?.[1]} bots).`);
 }
 
 function botSnapshotKey(room) {
@@ -495,10 +504,10 @@ function assertBotDisplayFields(room) {
 
 function assertMapOneBotTuning() {
   const expected = {
-    hunter: { damagePerHit: 24, xpReward: 75, threat: "Light Threat" },
-    attacker: { damagePerHit: 32, xpReward: 100, threat: "Medium Threat" },
-    destroyer: { damagePerHit: 44, attackCooldownMs: 3200, xpReward: 150, threat: "Heavy Threat" },
-    behemoth: { damagePerHit: 72, xpReward: 250, threat: "Extreme Threat" }
+    hunter: { damagePerHit: 14, attackCooldownMs: 2600, xpReward: 75, threat: "Light Threat" },
+    attacker: { damagePerHit: 20, attackCooldownMs: 3000, xpReward: 100, threat: "Medium Threat" },
+    destroyer: { damagePerHit: 28, attackCooldownMs: 3700, xpReward: 150, threat: "Heavy Threat" },
+    behemoth: { damagePerHit: 45, attackCooldownMs: 5000, xpReward: 250, threat: "Extreme Threat" }
   };
   Object.entries(expected).forEach(([botType, values]) => {
     const config = EREBUS_BOT_TYPES[botType];
@@ -2540,7 +2549,13 @@ async function assertStagingCargoPodEquipHelpers() {
   };
 
   const defaultGate = getLoadoutWriteEnvGate("verified-player-a", "attachment:cargoPod", {});
-  assert(defaultGate.writeEnabled === false && defaultGate.dryRun === true, "Loadout write gate default was not safe.");
+  assert(
+    defaultGate.writeEnabled === true &&
+    defaultGate.dryRun === false &&
+    defaultGate.scope === "verified" &&
+    defaultGate.playerAllowed === true,
+    "Loadout write gate default did not allow a verified public-test player."
+  );
   assert(defaultGate.itemAllowed === true, "Catalog loadout items should be allowed by the default staging item gate.");
   const allScopeGate = getLoadoutWriteEnvGate("verified-player-b", "attachment:cargoPod", {
     STAGING_LOADOUT_WRITE_SCOPE: "all",
@@ -2947,10 +2962,11 @@ async function assertStagingCargoPodEquipHelpers() {
     trustedState: { available: true, validationState: { credits: 780 } },
     env: {},
     fetchImpl: async () => {
-      throw new Error("Loadout write default should not fetch.");
+      throw new Error("Loadout write default without Supabase config should not fetch.");
     }
   });
-  assert(defaultWrite.applied === false && defaultWrite.blockReason === "staging_loadout_writes_disabled", "Default Cargo Pod equip write did not fail closed.");
+  assert(defaultWrite.applied === false && defaultWrite.blockReason === "supabase_config_missing", `Default Cargo Pod equip did not stop at config gate: ${defaultWrite.blockReason}`);
+  assert(defaultWrite.envGate?.writeEnabled === true && defaultWrite.envGate?.dryRun === false && defaultWrite.envGate?.scope === "verified", "Default Loadout write did not use verified public-test defaults.");
   assert(defaultWrite.saveWritten === false, "Default Cargo Pod equip reported save write.");
 
   const dryRunWrite = await applyStagingCargoPodEquipWrite({
@@ -5788,7 +5804,7 @@ try {
   assertServerObjectCombatSafePosition(playerFrom(roomA, roomA.sessionId), "Player");
   console.log("docked and launched presence status replicated promptly");
 
-  await waitFor("Erebus bot population to appear", () => botCount(roomA) >= 33 && botCount(roomB) >= 33);
+  await waitFor("Erebus bot population to appear", () => botCount(roomA) >= 15 && botCount(roomB) >= 15);
   assertMapOneBotTuning();
   assertAllowedBotNodes(roomA);
   assertAllowedBotNodes(roomB);
@@ -5796,10 +5812,59 @@ try {
   assertBotDisplayFields(roomB);
   assertErebusBotPopulation(roomA);
   assertErebusBotPopulation(roomB);
-  assert(botCount(roomA) === 33 && botCount(roomB) === 33, `Expected 33 staging bots, saw A=${botCount(roomA)} B=${botCount(roomB)}`);
+  assert(botCount(roomA) === 15 && botCount(roomB) === 15, `Expected 15 staging bots, saw A=${botCount(roomA)} B=${botCount(roomB)}`);
+  assertBotNodeDensity(roomA);
+  assertBotNodeDensity(roomB);
   assertServerObjectCombatSafePositions(roomA);
   assertServerObjectCombatSafePositions(roomB);
   console.log(`Erebus bot count: A=${botCount(roomA)} B=${botCount(roomB)}`);
+
+  const botsByInitialNode = botSnapshots(roomA).reduce((groups, bot) => {
+    if (!groups.has(bot.currentNode)) groups.set(bot.currentNode, []);
+    groups.get(bot.currentNode).push(bot);
+    return groups;
+  }, new Map());
+  const sharedAggroGroup = Array.from(botsByInitialNode.values()).find((bots) => bots.length >= 2);
+  assert(sharedAggroGroup, "Expected an initial node with at least two bots for node-aggro coverage.");
+  const aggroTarget = sharedAggroGroup[0];
+  await moveAndSelectBot(roomA, aggroTarget.id, "Regression Pilot A");
+  const nodeAggroStartedAt = Date.now();
+  const nodeAggroCombat = await expectCombatResolved(roomA, () => {
+    roomA.send("combat:intent", {
+      targetBotId: aggroTarget.id,
+      weaponId: "pulseLaser",
+      weaponFamily: "pulse",
+      currentNode: aggroTarget.currentNode,
+      timestamp: nodeAggroStartedAt
+    });
+  });
+  assert(nodeAggroCombat?.ok === true, "Node-wide aggro trigger combat did not resolve.");
+  await waitFor("every bot in the attacked node to return fire", () => {
+    const attackers = new Set(roomAReturnFireEvents
+      .filter((event) =>
+        event?.targetSessionId === roomA.sessionId &&
+        event?.currentNode === aggroTarget.currentNode &&
+        Number(event?.receivedAt || 0) >= nodeAggroStartedAt
+      )
+      .map((event) => event.attackerBotId));
+    return sharedAggroGroup.every((bot) => attackers.has(bot.id));
+  }, 3000);
+
+  const escapedNode = STAGING_BOT_ALLOWED_NODE_IDS.find((nodeId) => nodeId !== aggroTarget.currentNode);
+  roomA.send("movement:update", {
+    displayName: "Regression Pilot A",
+    currentShipId: "lupenOrigin",
+    currentNode: escapedNode,
+    presenceStatus: "space"
+  });
+  await waitFor("player to leave the aggro node", () =>
+    playerFrom(roomA, roomA.sessionId)?.currentNode === escapedNode
+  );
+  const returnFireCountAfterEscape = roomAReturnFireEvents.length;
+  await sleep(5500);
+  assert(roomAReturnFireEvents.length === returnFireCountAfterEscape, "Bots continued hunting after the player changed node.");
+  console.log("attacking one bot aggroed its node; changing node cleared all server hostility");
+
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
   const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
   const initialBotPositions = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}`).join("|");
@@ -5818,6 +5883,8 @@ try {
     assertAllowedBotNodes(roomB);
     assertBotDisplayFields(roomA);
     assertBotDisplayFields(roomB);
+    assertBotNodeDensity(roomA);
+    assertBotNodeDensity(roomB);
     assertServerObjectCombatSafePositions(roomA);
     assertServerObjectCombatSafePositions(roomB);
     const currentBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
@@ -5943,8 +6010,8 @@ try {
   const inspectedBotBeforeCombat = botSnapshots(roomA).find((bot) => bot.botType === "destroyer") || botSnapshots(roomA)[0];
   assert(inspectedBotBeforeCombat, "No staging bot available for combat intent test.");
   assert(inspectedBotBeforeCombat.botType === "destroyer", "Regression combat bot was not a Destroyer.");
-  assert(inspectedBotBeforeCombat.damagePerHit === 44, `Destroyer damage should be 44, saw ${inspectedBotBeforeCombat.damagePerHit}.`);
-  assert(inspectedBotBeforeCombat.attackCooldownMs === 3200, `Destroyer cooldown changed unexpectedly: ${inspectedBotBeforeCombat.attackCooldownMs}.`);
+  assert(inspectedBotBeforeCombat.damagePerHit === 28, `Destroyer damage should be 28, saw ${inspectedBotBeforeCombat.damagePerHit}.`);
+  assert(inspectedBotBeforeCombat.attackCooldownMs === 3700, `Destroyer cooldown changed unexpectedly: ${inspectedBotBeforeCombat.attackCooldownMs}.`);
   assert(inspectedBotBeforeCombat.threat === "Heavy Threat", `Destroyer threat label mismatch: ${inspectedBotBeforeCombat.threat}.`);
 
   const stalePlayerNode = inspectedBotBeforeCombat.currentNode === "Asteron Prime" ? "Virella" : "Asteron Prime";

@@ -213,6 +213,8 @@ const BOT_INITIAL_MOVE_MAX_MS = 12000;
 const BOT_NODE_MOVE_MIN_MS = 12000;
 const BOT_NODE_MOVE_MAX_MS = 28000;
 const BOT_COMBAT_HOLD_MS = 8000;
+const BOT_ATTACK_TICK_MS = 250;
+const BOT_NODE_MAX_ACTIVE = 3;
 const STAGING_TEST_DAMAGE = 5;
 const STAGING_PVP_FALLBACK_DAMAGE = 5;
 const STAGING_PVP_SHIELD_MAX = 30;
@@ -1623,6 +1625,10 @@ export class LupenSectorRoom extends Room {
     // Session-only return-fire cooldowns for Map 1 staging bots. The room never
     // persists player damage, saves, cargo loss, PvP, credits, loot, or death.
     this.stagingBotReturnFireCooldowns = new Map();
+    // Once a pilot attacks an Erebus bot, every active bot sharing that node
+    // becomes hostile to that pilot. Aggro is scoped to the node and is cleared
+    // as soon as the pilot moves or docks, so bots never hunt between nodes.
+    this.stagingBotAggroBySession = new Map();
     // Server-owned asteroid/resource mining state for staging. Rewards are
     // authorized once per depletion and applied by the owning browser save path.
     this.stagingResourceMineCooldowns = new Map();
@@ -1639,6 +1645,9 @@ export class LupenSectorRoom extends Room {
       this.updateStagingBots();
       this.updateStagingResources();
     }, BOT_MOVE_TICK_MS);
+    this.botAttackInterval = this.clock.setInterval(() => {
+      this.processStagingNodeAggro();
+    }, BOT_ATTACK_TICK_MS);
     this.pvpShieldRegenInterval = this.clock.setInterval(() => {
       this.updatePvpShieldRegeneration();
     }, STAGING_PVP_SHIELD_REGEN_TICK_MS);
@@ -1995,6 +2004,7 @@ export class LupenSectorRoom extends Room {
     this.trustedOnlineCombatLoadouts.delete(client.sessionId);
     this.trustedOnlineCombatLoadoutReads.delete(client.sessionId);
     this.stagingBountyStates.delete(client.sessionId);
+    this.clearStagingNodeAggroForSession(client.sessionId);
     this.clearStagingReturnFireForSession(client.sessionId);
     this.stagingResourceMineCooldowns.delete(client.sessionId);
     this.stagingTradeWindows.delete(client.sessionId);
@@ -2002,7 +2012,9 @@ export class LupenSectorRoom extends Room {
 
   onDispose() {
     this.botInterval?.clear?.();
+    this.botAttackInterval?.clear?.();
     this.pvpShieldRegenInterval?.clear?.();
+    this.stagingBotAggroBySession?.clear?.();
     this.trustedOnlineCombatLoadouts?.clear?.();
     this.trustedOnlineCombatLoadoutReads?.clear?.();
   }
@@ -2086,16 +2098,18 @@ export class LupenSectorRoom extends Room {
 
       if (bot.disabled) return;
 
-      const activeCombat = Array.from(this.state.players.values()).some((player) =>
-        String(player?.selectedTargetBotId || "") === String(bot.id || "") &&
-        normalizePresenceNode(player?.currentNode) === normalizePresenceNode(bot.currentNode) &&
-        now - Number(player?.lastFireAt || 0) < BOT_COMBAT_HOLD_MS
-      );
+      const activeCombat = Array.from(this.state.players.values()).some((player) => {
+        const sameNode = normalizePresenceNode(player?.currentNode) === normalizePresenceNode(bot.currentNode);
+        const recentlyTargeted = String(player?.selectedTargetBotId || "") === String(bot.id || "") &&
+          now - Number(player?.lastFireAt || 0) < BOT_COMBAT_HOLD_MS;
+        const nodeAggro = sameNode && this.isStagingNodeAggroActive(player?.sessionId, bot.currentNode);
+        return sameNode && (recentlyTargeted || nodeAggro);
+      });
       if (activeCombat) {
         bot.nextMoveAt = Math.max(Number(bot.nextMoveAt || 0), now + BOT_MOVE_TICK_MS);
       } else if (now >= Number(bot.nextMoveAt || 0)) {
         const previousNode = bot.currentNode;
-        const nextNode = this.getNextBotNode(previousNode);
+        const nextNode = this.getNextBotNode(previousNode, bot.id);
         bot.currentNode = nextNode;
         const position = this.allocateOpenSpacePosition(nextNode, { kind: "bot", id: bot.id });
         bot.x = position.x;
@@ -2346,9 +2360,24 @@ export class LupenSectorRoom extends Room {
     });
   }
 
-  getNextBotNode(currentNode) {
+  getActiveBotCountAtNode(nodeId, excludeBotId = "") {
+    const nodeKey = normalizePresenceNode(nodeId);
+    const excludedId = getStringValue(excludeBotId);
+    let count = 0;
+    this.state.bots.forEach((bot, botId) => {
+      if (bot?.disabled || getStringValue(botId) === excludedId) return;
+      if (normalizePresenceNode(bot.currentNode) === nodeKey) count += 1;
+    });
+    return count;
+  }
+
+  getNextBotNode(currentNode, botId = "") {
     const options = BOT_NODE_LINKS.get(currentNode) || STAGING_BOT_ALLOWED_NODE_IDS;
-    const nextNode = options[Math.floor(Math.random() * Math.max(1, options.length))] ||
+    const openOptions = options.filter((nodeId) =>
+      this.getActiveBotCountAtNode(nodeId, botId) < BOT_NODE_MAX_ACTIVE
+    );
+    const candidates = openOptions.length ? openOptions : [currentNode].filter(Boolean);
+    const nextNode = candidates[Math.floor(Math.random() * Math.max(1, candidates.length))] ||
       currentNode ||
       STAGING_BOT_ALLOWED_NODE_IDS[0];
     return STAGING_BOT_ALLOWED_NODE_IDS.includes(nextNode) ? nextNode : STAGING_BOT_ALLOWED_NODE_IDS[0];
@@ -2943,6 +2972,47 @@ export class LupenSectorRoom extends Room {
     return `${getStringValue(sessionId)}:${getStringValue(botId)}`;
   }
 
+  activateStagingNodeAggro(sessionId, nodeId, now = Date.now()) {
+    const safeSessionId = getStringValue(sessionId);
+    const safeNodeId = getStringValue(nodeId);
+    if (!safeSessionId || !safeNodeId) return null;
+    const aggro = { sessionId: safeSessionId, nodeId: safeNodeId, activatedAt: now };
+    this.stagingBotAggroBySession.set(safeSessionId, aggro);
+    return aggro;
+  }
+
+  isStagingNodeAggroActive(sessionId, nodeId) {
+    const aggro = this.stagingBotAggroBySession.get(getStringValue(sessionId));
+    return !!aggro && normalizePresenceNode(aggro.nodeId) === normalizePresenceNode(nodeId);
+  }
+
+  clearStagingNodeAggroForSession(sessionId) {
+    const safeSessionId = getStringValue(sessionId);
+    if (!safeSessionId) return;
+    this.stagingBotAggroBySession.delete(safeSessionId);
+    this.clearStagingReturnFireForSession(safeSessionId);
+  }
+
+  processStagingNodeAggro(now = Date.now()) {
+    Array.from(this.stagingBotAggroBySession.entries()).forEach(([sessionId, aggro]) => {
+      const player = this.state.players.get(sessionId);
+      const client = this.clients.find((candidate) => candidate.sessionId === sessionId);
+      const stillInAggroNode = player &&
+        player.presenceStatus !== "docked" &&
+        normalizePresenceNode(player.currentNode) === normalizePresenceNode(aggro.nodeId);
+      if (!client || !stillInAggroNode) {
+        this.clearStagingNodeAggroForSession(sessionId);
+        return;
+      }
+
+      this.state.bots.forEach((bot) => {
+        if (bot?.disabled) return;
+        if (normalizePresenceNode(bot.currentNode) !== normalizePresenceNode(aggro.nodeId)) return;
+        this.maybeSendStagingBotReturnFire(client, player, bot, now);
+      });
+    });
+  }
+
   clearStagingReturnFireForSession(sessionId) {
     const safeSessionId = getStringValue(sessionId);
     if (!safeSessionId || !this.stagingBotReturnFireCooldowns) return;
@@ -2983,7 +3053,7 @@ export class LupenSectorRoom extends Room {
   maybeSendStagingBotReturnFire(client, player, bot, now = Date.now()) {
     if (!client || !player || !bot) return null;
     if (bot.disabled || bot.currentNode !== player.currentNode) return null;
-    if (player.selectedTargetBotId !== bot.id) return null;
+    if (!this.isStagingNodeAggroActive(client.sessionId, player.currentNode)) return null;
 
     const cooldownKey = this.getStagingReturnFireKey(client.sessionId, bot.id);
     const nextAllowedAt = Number(this.stagingBotReturnFireCooldowns.get(cooldownKey) || 0);
@@ -4430,7 +4500,7 @@ export class LupenSectorRoom extends Room {
 
   respawnStagingBot(bot, index = 0, now = Date.now()) {
     const botTypePayload = this.getBotTypePayload(bot);
-    const respawnNode = this.getNextBotNode(bot.currentNode);
+    const respawnNode = this.getNextBotNode(bot.currentNode, bot.id);
     const nodePosition = BOT_NODE_POSITIONS.get(respawnNode) || STAGING_BOT_NODES[index % STAGING_BOT_NODES.length] || STAGING_BOT_NODES[0];
     bot.currentNode = nodePosition.node;
     const position = this.allocateOpenSpacePosition(bot.currentNode, { kind: "bot", id: bot.id });
@@ -4890,9 +4960,8 @@ export class LupenSectorRoom extends Room {
       receivedAt: resolvedAt
     });
 
-    if (!result.disabled) {
-      this.maybeSendStagingBotReturnFire(client, player, targetBot, resolvedAt);
-    }
+    this.activateStagingNodeAggro(client.sessionId, player.currentNode, resolvedAt);
+    this.processStagingNodeAggro(resolvedAt);
 
     if (result.disabled) {
       this.clearStagingReturnFireForBot(targetBot.id);
@@ -5008,6 +5077,9 @@ export class LupenSectorRoom extends Room {
     const presenceStatusChanged = previousPresenceStatus !== (player.presenceStatus || "space");
     const nodeChanged = normalizePresenceNode(previousNode) !== normalizePresenceNode(player.currentNode);
     const enteredSpace = previousPresenceStatus === "docked" && player.presenceStatus !== "docked";
+    if (nodeChanged || player.presenceStatus === "docked") {
+      this.clearStagingNodeAggroForSession(client.sessionId);
+    }
     if (player.presenceStatus !== "docked" && (nodeChanged || enteredSpace || !Number.isFinite(Number(player.x)) || !Number.isFinite(Number(player.y)))) {
       const position = this.allocateOpenSpacePosition(player.currentNode, {
         kind: "player",

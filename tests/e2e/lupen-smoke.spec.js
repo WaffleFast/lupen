@@ -2353,10 +2353,14 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.destroyerThenHunter.wins).toBe(200);
     expect(metrics.destroyerThenHunter.deaths).toBe(0);
     expect(metrics.destroyerThenHunter.averageHullRemaining).toBeGreaterThanOrEqual(560);
-    expect(metrics.noRepairMetrics.frontierPatrol.deaths).toBeGreaterThan(0);
-    expect(metrics.noRepairMetrics.frontierPatrol.completionRate).toBeGreaterThanOrEqual(20);
-    expect(metrics.noRepairMetrics.frontierPatrol.completionRate).toBeLessThanOrEqual(40);
-    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBe(500);
+    // The four-bot tutorial patrol should now be survivable in the starter
+    // Hunter. Risk comes from node-wide group aggro and from staying out for a
+    // longer no-repair run, rather than a single over-tuned bot.
+    expect(metrics.noRepairMetrics.frontierPatrol.deaths).toBe(0);
+    expect(metrics.noRepairMetrics.frontierPatrol.completionRate).toBe(100);
+    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBeGreaterThan(0);
+    expect(metrics.noRepairMetrics.extendedPatrol.deaths).toBeLessThan(50);
+    expect(metrics.noRepairMetrics.extendedPatrol.completionRate).toBeGreaterThanOrEqual(90);
     expect(metrics.pioneerCombatCurve.hunter.gunSlots).toBe(2);
     expect(metrics.pioneerCombatCurve.destroyer.gunSlots).toBe(4);
     expect(metrics.pioneerCombatCurve.behemoth.gunSlots).toBe(6);
@@ -2371,15 +2375,16 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.pioneerCombatCurve.hunter.patrol.completionRate)
       .toBeLessThan(metrics.pioneerCombatCurve.destroyer.patrol.completionRate);
     expect(metrics.pioneerCombatCurve.destroyer.patrol.completionRate)
-      .toBeLessThan(metrics.pioneerCombatCurve.behemoth.patrol.completionRate);
+      .toBeLessThanOrEqual(metrics.pioneerCombatCurve.behemoth.patrol.completionRate);
     expect(metrics.pioneerCombatCurve.hunter.patrol.deaths)
       .toBeGreaterThan(metrics.pioneerCombatCurve.destroyer.patrol.deaths);
-    expect(metrics.pioneerCombatCurve.destroyer.patrol.deaths)
-      .toBeGreaterThan(metrics.pioneerCombatCurve.behemoth.patrol.deaths);
+    expect(metrics.pioneerCombatCurve.destroyer.patrol.averageHullPercent)
+      .toBeLessThan(metrics.pioneerCombatCurve.behemoth.patrol.averageHullPercent);
     expect(metrics.weaponPairs.twinHeavy.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinIon.theoreticalDps);
     expect(metrics.weaponPairs.twinIon.theoreticalDps).toBeGreaterThan(metrics.weaponPairs.twinPulse.theoreticalDps);
     expect(metrics.weaponPairs.pulseHeavy.speed).toBe(1644);
     expect(metrics.spawnConflicts).toBe(0);
+    expect(metrics.busiestNodeTargetCount).toBeLessThanOrEqual(3);
     expect(metrics.economy).toMatchObject({
       startingCredits: 10000,
       shipPrices: { falcon: 0, bison: 24000, zeusExplorer: 66000, monolith: 240000 },

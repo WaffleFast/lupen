@@ -305,7 +305,7 @@ function getShieldCapacity(saveData, shipId, attachments = []) {
 }
 
 export function getLoadoutWriteEnvGate(playerId, itemId = CARGO_POD_ITEM_ID, env = process.env) {
-  const scopeGate = normalizeStagingWriteScope(env.STAGING_LOADOUT_WRITE_SCOPE, "disabled");
+  const scopeGate = normalizeStagingWriteScope(env.STAGING_LOADOUT_WRITE_SCOPE, "verified");
   const normalizedScope = scopeGate.scope;
   const allowlist = getCsvSet(env.STAGING_LOADOUT_WRITE_ALLOWLIST);
   const allowedItems = getCatalogAllowedSet(env.STAGING_LOADOUT_WRITE_ALLOWED_ITEMS, DEFAULT_ALLOWED_LOADOUT_ITEMS);
@@ -314,8 +314,8 @@ export function getLoadoutWriteEnvGate(playerId, itemId = CARGO_POD_ITEM_ID, env
     : normalizedScope === "allowlist" && !!playerId && allowlist.has(playerId);
 
   return {
-    writeEnabled: getBooleanEnv(env.STAGING_LOADOUT_WRITE_ENABLED, false),
-    dryRun: getBooleanEnv(env.STAGING_LOADOUT_WRITE_DRY_RUN, true),
+    writeEnabled: getBooleanEnv(env.STAGING_LOADOUT_WRITE_ENABLED, true),
+    dryRun: getBooleanEnv(env.STAGING_LOADOUT_WRITE_DRY_RUN, false),
     scope: normalizedScope,
     requestedScope: scopeGate.requestedScope,
     scopeInvalid: scopeGate.scopeInvalid,
