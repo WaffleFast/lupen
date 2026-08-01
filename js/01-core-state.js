@@ -306,14 +306,41 @@ function isAllowedErebusBotNode(nodeId) {
   if (!node || isPlanetNode(nodeId)) return false;
   return Boolean(
     node.tags?.includes("upper_combat_zone") ||
+    node.tags?.includes("lower_combat_zone") ||
     node.tags?.includes("erebus_patrol_zone") ||
     node.zone === "upper" ||
-    (node.type === "space" && node.danger === "hostile" && Number(node.y) < 50)
+    node.zone === "lower" ||
+    (node.type === "space" && node.route === "combat" && node.danger === "hostile")
   );
 }
 
 function getAllowedErebusBotNodeIds() {
   return Object.keys(sectorNodes).filter(isAllowedErebusBotNode);
+}
+
+function getErebusBotNodeZone(nodeId) {
+  const node = getNodeById(nodeId);
+  if (!node) return "";
+  if (node.tags?.includes("upper_combat_zone") || node.zone === "upper") return "upper";
+  if (node.tags?.includes("lower_combat_zone") || node.zone === "lower") return "lower";
+  const y = Number(node.y);
+  if (!Number.isFinite(y)) return "";
+  return y < 50 ? "upper" : "lower";
+}
+
+function getBalancedErebusBotNodeIds() {
+  const allowedNodes = getAllowedErebusBotNodeIds();
+  const upperNodes = allowedNodes.filter(nodeId => getErebusBotNodeZone(nodeId) === "upper");
+  const lowerNodes = allowedNodes.filter(nodeId => getErebusBotNodeZone(nodeId) === "lower");
+  if (!upperNodes.length || !lowerNodes.length) return allowedNodes;
+
+  const balancedNodes = [];
+  const longestLane = Math.max(upperNodes.length, lowerNodes.length);
+  for (let index = 0; index < longestLane; index += 1) {
+    if (upperNodes[index]) balancedNodes.push(upperNodes[index]);
+    if (lowerNodes[index]) balancedNodes.push(lowerNodes[index]);
+  }
+  return balancedNodes;
 }
 
 function getSpaceNodes() {
@@ -2073,7 +2100,7 @@ function createErebusBot(def, nodeId, index = 0) {
 }
 
 function createInitialHostileBots() {
-  const allowedNodes = getAllowedErebusBotNodeIds();
+  const allowedNodes = getBalancedErebusBotNodeIds();
   if (!allowedNodes.length) {
     console.warn("No allowed Erebus bot nodes found.");
     return [];
@@ -2086,6 +2113,28 @@ function createInitialHostileBots() {
       : index % allowedNodes.length;
     return createErebusBot(def, allowedNodes[nodeIndex], index);
   });
+}
+
+function chooseBalancedErebusBotNode(candidateNodeIds = [], ignoredBotId = "") {
+  const candidates = (Array.isArray(candidateNodeIds) && candidateNodeIds.length
+    ? candidateNodeIds
+    : getBalancedErebusBotNodeIds()).filter(Boolean);
+  if (!candidates.length) return "";
+
+  const zoneCounts = hostileBots.reduce((counts, bot) => {
+    if (!bot?.alive || bot.id === ignoredBotId || bot.faction !== "erebus") return counts;
+    const zone = getErebusBotNodeZone(bot.currentNodeId || bot.currentNode || bot.node);
+    if (zone === "upper" || zone === "lower") counts[zone] += 1;
+    return counts;
+  }, { upper: 0, lower: 0 });
+  const preferredZone = zoneCounts.upper > zoneCounts.lower
+    ? "lower"
+    : zoneCounts.lower > zoneCounts.upper
+      ? "upper"
+      : getErebusBotNodeZone(candidates[0]);
+  const preferredCandidates = candidates.filter(nodeId => getErebusBotNodeZone(nodeId) === preferredZone);
+  const pool = preferredCandidates.length ? preferredCandidates : candidates;
+  return pool[Math.floor(Math.random() * pool.length)] || "";
 }
 
 function enforceErebusSpawnCaps(bots = hostileBots) {

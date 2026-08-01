@@ -2168,10 +2168,15 @@ test.describe("Lupen browser smoke", () => {
         }));
 
         const nodeTargets = new Map();
+        const botSpawnZoneCounts = { upper: 0, lower: 0 };
         [...createInitialAsteroids(), ...createInitialHostileBots()].forEach(target => {
           const node = getCombatEntityNodeName(target);
           if (!nodeTargets.has(node)) nodeTargets.set(node, []);
           nodeTargets.get(node).push(target);
+          if (target.faction === "erebus") {
+            const zone = getErebusBotNodeZone(node);
+            if (zone === "upper" || zone === "lower") botSpawnZoneCounts[zone] += 1;
+          }
         });
         let spawnConflicts = 0;
         let busiestNodeTargetCount = 0;
@@ -2307,6 +2312,7 @@ test.describe("Lupen browser smoke", () => {
           pioneerCombatCurve,
           spawnConflicts,
           busiestNodeTargetCount,
+          botSpawnZoneCounts,
           economy: {
             startingCredits: MAP_ONE_STARTING_CREDITS,
             shipPrices,
@@ -2385,6 +2391,7 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.weaponPairs.pulseHeavy.speed).toBe(1644);
     expect(metrics.spawnConflicts).toBe(0);
     expect(metrics.busiestNodeTargetCount).toBeLessThanOrEqual(3);
+    expect(Math.abs(metrics.botSpawnZoneCounts.upper - metrics.botSpawnZoneCounts.lower)).toBeLessThanOrEqual(1);
     expect(metrics.economy).toMatchObject({
       startingCredits: 10000,
       shipPrices: { falcon: 0, bison: 24000, zeusExplorer: 66000, monolith: 240000 },

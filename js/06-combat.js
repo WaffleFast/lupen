@@ -2160,7 +2160,10 @@ function respawnHostileBot(botId) {
   const shield = Number(botClass.shield || HOSTILE_BOT_BASE_SHIELD);
   const hullValue = Number(botClass.hull || HOSTILE_BOT_BASE_HP);
   const respawnNodes = openSpaceNodes.length ? openSpaceNodes : spaceNodes;
-  setErebusBotNode(bot, respawnNodes[Math.floor(Math.random() * respawnNodes.length)] || currentNode);
+  const respawnNode = typeof chooseBalancedErebusBotNode === "function"
+    ? chooseBalancedErebusBotNode(respawnNodes, bot.id)
+    : respawnNodes[Math.floor(Math.random() * respawnNodes.length)];
+  setErebusBotNode(bot, respawnNode || currentNode);
   bot.name = botClass.displayName || bot.name || "Erebus Bot";
   bot.displayName = botClass.displayName || bot.name;
   bot.className = botClass.className || bot.className;

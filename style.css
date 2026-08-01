@@ -48347,15 +48347,17 @@ input::placeholder {
 }
 
 .journey-briefing__portrait {
-  flex: 0 0 108px;
-  width: 108px;
-  height: 100px;
+  flex: 0 0 114px;
+  width: 114px;
+  height: 104px;
   display: grid;
   place-items: center;
   padding: 4px;
   border: 1px solid rgba(49, 207, 255, 0.7);
   border-radius: 8px;
-  background: rgba(1, 12, 22, 0.72);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(54, 195, 255, 0.2), transparent 62%),
+    rgba(1, 12, 22, 0.72);
   box-shadow: 0 0 26px rgba(49, 207, 255, 0.22), inset 0 0 18px rgba(49, 207, 255, 0.1);
 }
 
@@ -48364,8 +48366,8 @@ input::placeholder {
   height: 100%;
   border: 0;
   border-radius: 6px;
-  object-fit: cover;
-  object-position: center 35%;
+  object-fit: contain;
+  object-position: center center;
   box-shadow: none;
 }
 
@@ -50189,10 +50191,10 @@ input::placeholder {
 .journey-briefing__portrait-img.journey-morgan-portrait {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center top;
-  transform: scale(1.48);
-  transform-origin: 50% 25%;
+  object-fit: contain;
+  object-position: center center;
+  transform: scale(0.9);
+  transform-origin: center center;
 }
 
 .journey-briefing__content .journey-briefing__name {
@@ -52743,21 +52745,21 @@ input::placeholder {
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-summary {
   display: grid !important;
-  grid-template-columns: 30px minmax(0, 1fr) auto !important;
+  grid-template-columns: 26px minmax(86px, 1fr) 40px !important;
   grid-template-rows: 1fr !important;
   align-items: center !important;
-  gap: 7px !important;
+  gap: 5px !important;
   width: 100% !important;
   height: 42px !important;
   min-height: 42px !important;
-  padding: 5px 9px !important;
+  padding: 5px 7px !important;
   text-align: left !important;
 }
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-icon {
   display: block !important;
-  width: 22px !important;
-  height: 22px !important;
+  width: 20px !important;
+  height: 20px !important;
   fill: none !important;
   stroke: #21d7ff !important;
   stroke-width: 1.6 !important;
@@ -52767,7 +52769,7 @@ input::placeholder {
 .player-orbit-screen .player-bottom-hud .hud-cargo-copy {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
-  grid-template-rows: 9px 12px 3px !important;
+  grid-template-rows: 9px 13px 4px !important;
   align-items: center !important;
   column-gap: 0 !important;
   row-gap: 2px !important;
@@ -52798,7 +52800,8 @@ input::placeholder {
   grid-column: 1 !important;
   grid-row: 2 !important;
   color: #f4fbff !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
+  letter-spacing: 0 !important;
   justify-self: start !important;
   white-space: nowrap !important;
 }
@@ -52825,6 +52828,24 @@ input::placeholder {
   position: static !important;
   grid-column: 3 !important;
   grid-row: 1 !important;
+  align-self: end !important;
+  justify-self: end !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  margin: 0 !important;
+  padding: 2px 0 !important;
+  border: 1px solid rgba(255, 211, 80, 0.76) !important;
+  border-radius: 999px !important;
+  background: rgba(33, 22, 5, 0.78) !important;
+  color: #ffd553 !important;
+  font-size: 9px !important;
+  font-style: normal !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  text-shadow: 0 0 7px rgba(255, 211, 80, 0.48) !important;
 }
 
 .player-orbit-screen .player-bottom-hud .ship-action-strip.ship-hud-action-row,
