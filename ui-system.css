@@ -1219,24 +1219,15 @@
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
-  grid-template-rows: 48px 42px minmax(78px, 1fr) 90px;
-  gap: 6px;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource {
-  grid-template-columns: 40px minmax(0, 1fr);
-  padding-bottom: 4px;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource img {
-  width: 38px;
-  height: 38px;
+  grid-template-rows: minmax(146px, 1fr) 54px 40px;
+  align-items: stretch;
+  gap: 9px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control {
-  grid-template-rows: 10px 38px 12px;
+  grid-template-rows: 10px 38px;
   gap: 4px;
-  padding-top: 3px;
+  padding-top: 0;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control > span,
@@ -1251,7 +1242,7 @@
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons {
-  grid-template-rows: 34px 34px 12px;
+  grid-template-rows: none;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons button {

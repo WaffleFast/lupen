@@ -1,4 +1,4 @@
-/* Map 1 live-market config. Prices are deterministic within a 90-second
+/* Map 1 live-market config. Prices are deterministic within a 3-minute
    server cycle, allowing the client to render a stable table while keeping
    verified writes authoritative. */
 
@@ -33,7 +33,7 @@ const STAGING_TRADE_PLANET_SLUGS = Object.freeze({
   Nyxara: "nyxara"
 });
 const STAGING_TRADE_RESOURCE_SLUGS = Object.freeze({});
-export const STAGING_TRADE_REFRESH_MS = 90000;
+export const STAGING_TRADE_REFRESH_MS = 180000;
 
 function marketHash(input = "") {
   let hash = 0;
@@ -94,7 +94,7 @@ function buildStagingTradeOffers(now = Date.now(), options = {}) {
           previousSellPrice: getLivePrice(resource.resourceName, sellNode, cycle - 1),
           marketCycle: cycle,
           maxQuantity: 1000,
-          refreshSeconds: 90,
+          refreshSeconds: Math.ceil(STAGING_TRADE_REFRESH_MS / 1000),
           secondsUntilRefresh
         }));
     });

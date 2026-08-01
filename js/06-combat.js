@@ -113,6 +113,19 @@ function getCurrentWeaponFireIntervalMs() {
   return Math.max(250, Math.min(4000, interval));
 }
 
+function canCurrentShipFire() {
+  const weapon = typeof getEquippedWeapon === "function" ? getEquippedWeapon() : null;
+  const count = Number(weapon?.count || 0);
+  const damage = Number(weapon?.damage || 0);
+  return count > 0 && damage > 0;
+}
+
+function showUnarmedEngageMessage() {
+  const message = "Equip a weapon before engaging targets.";
+  if (typeof addHudToast === "function") addHudToast(message);
+  else if (typeof addActivityLog === "function") addActivityLog(message);
+}
+
 function getTargetRefFromEntity(target) {
   if (!target) return null;
   return {
@@ -124,6 +137,11 @@ function getTargetRefFromEntity(target) {
 function retargetEngagementToSelectedTarget() {
   if (!engageTimer) return false;
   reconcileStagingBotTargetState();
+  if (!canCurrentShipFire()) {
+    showUnarmedEngageMessage();
+    disengageTarget(true);
+    return false;
+  }
 
   const target = getSelectedTargetEntity();
   if (!target || !target.alive || !isCombatEntityInCurrentNode(target)) return false;
@@ -401,6 +419,12 @@ function engageTarget() {
   if (staleStagingBotCleared) return;
 
   let target = getSelectedTargetEntityForAction();
+
+  if (!canCurrentShipFire()) {
+    showUnarmedEngageMessage();
+    updateObjectActionPanel(false);
+    return;
+  }
 
   if (target?.remotePlayer) {
     sendRemotePlayerPvpIntent(target);

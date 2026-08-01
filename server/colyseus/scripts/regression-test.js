@@ -936,21 +936,21 @@ async function assertStagingTradeValidationHelpers() {
     }
   }
   assert(!generatedOffers.some((offer) => offer.resourceName === "Crystal Shards"), "Upgrade-only Crystal Shards leaked into live-market offers.");
-  assert(generatedOffers.every((offer) => offer.refreshSeconds === 90), "Live-market offers did not advertise the 90-second refresh cycle.");
+  assert(generatedOffers.every((offer) => offer.refreshSeconds === 180), "Live-market offers did not advertise the 180-second refresh cycle.");
   assert(generatedOffers.every((offer) => Number.isFinite(offer.previousBuyPrice) && Number.isFinite(offer.previousSellPrice)), "Live-market offers did not include previous-cycle prices for trend arrows.");
 
   const quoteWindowStartedAt = 1_726_000_089_000;
-  const quoteWindowExpiresAt = quoteWindowStartedAt + 90_000;
+  const quoteWindowExpiresAt = quoteWindowStartedAt + 180_000;
   const quoteWindowCycle = 19_177;
   const openingWindowOffers = getStagingTradeOffers(quoteWindowStartedAt, {
     marketCycle: quoteWindowCycle,
     expiresAt: quoteWindowExpiresAt
   });
-  const destinationWindowOffers = getStagingTradeOffers(quoteWindowStartedAt + 89_000, {
+  const destinationWindowOffers = getStagingTradeOffers(quoteWindowStartedAt + 179_000, {
     marketCycle: quoteWindowCycle,
     expiresAt: quoteWindowExpiresAt
   });
-  assert(openingWindowOffers.every((offer) => offer.secondsUntilRefresh === 90), "Entering the staging market did not start a full 90-second quote window.");
+  assert(openingWindowOffers.every((offer) => offer.secondsUntilRefresh === 180), "Entering the staging market did not start a full 180-second quote window.");
   assert(destinationWindowOffers.every((offer) => offer.secondsUntilRefresh === 1), "The staging market quote window did not survive the journey to the destination.");
   assert(
     destinationWindowOffers.every((offer, index) => (
@@ -5376,8 +5376,8 @@ try {
   assert(Array.isArray(tradeOffers?.offers) && tradeOffers.offers.length >= 3, "Staging trade offers were not deterministic/non-empty.");
   assert(tradeOffers?.creditsWritten === false && tradeOffers?.cargoWritten === false && tradeOffers?.saveWritten === false, "Staging trade offers reported writes.");
   assert(
-    Number(tradeOffers?.marketExpiresAt) - Number(tradeOffers?.marketWindowStartedAt) === 90_000,
-    "Entering the staging Trade Terminal did not create a full 90-second server quote window."
+    Number(tradeOffers?.marketExpiresAt) - Number(tradeOffers?.marketWindowStartedAt) === 180_000,
+    "Entering the staging Trade Terminal did not use the 180-second universal server quote window."
   );
   assert(tradeOffers.offers.every((offer) => offer.marketCycle === tradeOffers.marketCycle), "Staging trade offers did not share the server quote-window cycle.");
   const firstTradeOffer = tradeOffers.offers[0];

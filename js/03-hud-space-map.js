@@ -1593,13 +1593,16 @@ function updateObjectActionPanel(forceVisible = false) {
   if (!panel || !actionBtn) return;
 
   const targetType = target ? getTargetTypeFromEntity(target) : "";
+  const unarmed = typeof canCurrentShipFire === "function" && !canCurrentShipFire();
   if (targetType === "remotePlayer") {
     const blockReason = typeof getRemotePlayerTargetBlockReason === "function"
       ? getRemotePlayerTargetBlockReason(target)
       : "PvP disabled in protected zones.";
     panel.classList.add("visible");
-    actionBtn.disabled = !!blockReason;
-    actionBtn.textContent = blockReason === "PvP disabled in protected zones."
+    actionBtn.disabled = !!blockReason || unarmed;
+    actionBtn.textContent = unarmed
+      ? "NO WEAPON"
+      : blockReason === "PvP disabled in protected zones."
       ? "PVP DISABLED"
       : blockReason
         ? "PVP LOCKED"
@@ -1617,6 +1620,15 @@ function updateObjectActionPanel(forceVisible = false) {
     panel.classList.add("visible");
     actionBtn.disabled = true;
     actionBtn.textContent = "ENGAGE";
+    actionBtn.classList.remove("disengage-action");
+    actionBtn.classList.add("action-inactive");
+    return;
+  }
+
+  if (unarmed) {
+    panel.classList.add("visible");
+    actionBtn.disabled = true;
+    actionBtn.textContent = "NO WEAPON";
     actionBtn.classList.remove("disengage-action");
     actionBtn.classList.add("action-inactive");
     return;

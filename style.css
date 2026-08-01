@@ -56264,8 +56264,8 @@ input::placeholder {
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 40px 30px minmax(62px, 1fr) 58px 36px;
-  gap: 5px;
+  grid-template-rows: minmax(146px, 1fr) 54px 40px;
+  gap: 9px;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -56276,69 +56276,6 @@ input::placeholder {
   background:
     radial-gradient(circle at 18% 8%, rgba(41, 164, 211, 0.13), transparent 40%),
     rgba(3, 18, 30, 0.92);
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  padding-bottom: 4px;
-  min-height: 0;
-  overflow: hidden;
-  border-bottom: 1px solid rgba(77, 179, 218, 0.26);
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource img {
-  width: 34px;
-  height: 34px;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource strong {
-  font-size: 17px;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: end;
-  min-height: 0;
-  gap: 2px 12px;
-  overflow: hidden;
-  padding: 0 0 3px;
-  border-left: 0;
-  border-bottom: 1px solid rgba(77, 179, 218, 0.22);
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price > span {
-  grid-column: 1;
-  color: #6ce0f5;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price > strong {
-  grid-column: 1;
-  font-size: 18px;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-route-quote > strong b {
-  color: #35dcf7;
-  font-size: 18px;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price > small {
-  grid-column: 2;
-  grid-row: 2;
-  color: #9bb3c0;
-  font-size: 9px;
-  white-space: nowrap;
-}
-
-#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-route-quote > small {
-  display: none;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control {
@@ -56356,32 +56293,30 @@ input::placeholder {
 
 .trade-v2-route-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(58px, 1fr));
+  align-content: stretch;
+  gap: 8px;
   min-height: 0;
   overflow: hidden;
 }
 
 .trade-v2-route-metrics > div {
+  display: grid;
+  align-content: center;
   min-width: 0;
-  padding: 5px 7px;
+  min-height: 58px;
+  padding: 8px 10px;
   border: 1px solid rgba(72, 192, 235, 0.25);
   border-radius: 6px;
   background: rgba(2, 16, 27, 0.68);
-}
-
-.trade-v2-route-metrics .trade-v2-route-metric-wide {
-  grid-column: span 2;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
 }
 
 .trade-v2-route-metrics span {
   display: block;
   overflow: hidden;
   color: #62dff4;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -56394,15 +56329,10 @@ input::placeholder {
   margin-top: 2px;
   overflow: hidden;
   color: #f4fbff;
-  font-size: 13px;
+  font-size: 17px;
   line-height: 1;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.trade-v2-route-metric-wide strong {
-  margin-top: 0;
-  font-size: 18px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons {

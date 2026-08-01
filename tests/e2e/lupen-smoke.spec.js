@@ -11220,6 +11220,21 @@ test.describe("Lupen browser smoke", () => {
           shieldMax: 0
         }];
         selectAsteroid("cleanup-asteroid");
+        updateObjectActionPanel(false);
+        const unarmedBeforeHp = asteroids[0].hp;
+        const unarmedButtonBefore = {
+          text: document.getElementById("objectEngageBtn")?.textContent || "",
+          disabled: document.getElementById("objectEngageBtn")?.disabled ?? false
+        };
+        engageTarget();
+        const unarmedState = {
+          beforeButtonText: unarmedButtonBefore.text,
+          beforeButtonDisabled: unarmedButtonBefore.disabled,
+          hpAfterEngageAttempt: asteroids[0].hp,
+          engageTimerActive: Boolean(engageTimer),
+          selectedTarget,
+          engagedTarget
+        };
         const fxLayer = document.getElementById("combatFxLayer") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "combatFxLayer" }));
         const fx = document.createElement("div");
         fx.dataset.targetId = "cleanup-asteroid";
@@ -11293,6 +11308,8 @@ test.describe("Lupen browser smoke", () => {
 
         return {
           activityCountAfterDuplicate,
+          unarmedBeforeHp,
+          unarmedState,
           asteroidState,
           resourceState,
           remoteState,
@@ -11302,6 +11319,12 @@ test.describe("Lupen browser smoke", () => {
     `));
 
     expect(state.activityCountAfterDuplicate).toBe(1);
+    expect(state.unarmedState.beforeButtonText).toBe("NO WEAPON");
+    expect(state.unarmedState.beforeButtonDisabled).toBe(true);
+    expect(state.unarmedState.hpAfterEngageAttempt).toBe(state.unarmedBeforeHp);
+    expect(state.unarmedState.engageTimerActive).toBe(false);
+    expect(state.unarmedState.selectedTarget).toEqual({ type: "asteroid", id: "cleanup-asteroid" });
+    expect(state.unarmedState.engagedTarget).toBeNull();
     expect(state.asteroidState.cleanup.cleared).toBe(true);
     expect(state.asteroidState.selectedTarget).toBeNull();
     expect(state.asteroidState.engagedTarget).toBeNull();

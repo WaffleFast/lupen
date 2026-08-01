@@ -2391,10 +2391,11 @@ export class LupenSectorRoom extends Room {
       return existing;
     }
 
+    const marketCycle = Math.floor(now / STAGING_TRADE_REFRESH_MS);
     const marketWindow = {
-      marketCycle: Math.floor(now / STAGING_TRADE_REFRESH_MS),
-      startedAt: now,
-      expiresAt: now + STAGING_TRADE_REFRESH_MS
+      marketCycle,
+      startedAt: marketCycle * STAGING_TRADE_REFRESH_MS,
+      expiresAt: (marketCycle + 1) * STAGING_TRADE_REFRESH_MS
     };
     this.stagingTradeWindows.set(sessionId, marketWindow);
     return marketWindow;

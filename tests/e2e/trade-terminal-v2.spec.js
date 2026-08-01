@@ -90,7 +90,12 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-market-table")).toContainText("Cobalt");
     await expect(page.locator(".trade-v2-quick-action")).toBeVisible();
     await expect(page.locator(".trade-v2-market-overview")).toContainText("Select a commodity, choose a sell target, then purchase cargo.");
-    await expect(page.locator(".trade-v2-quick-action")).toContainText("Route Quote");
+    await expect(page.locator(".trade-v2-quick-action")).not.toContainText("Route Quote");
+    await expect(page.locator(".trade-v2-route-metrics > div")).toHaveCount(4);
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Buy at Asteron Prime");
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Sell at Nyxara");
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Total Cost");
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Estimated Profit");
     await expect(page.locator(".trade-v2-market-table thead th.is-current")).toContainText("Current Station");
     await expect(page.locator(".trade-v2-market-table td.is-current").first()).toContainText("Buy Here");
     await expect(page.locator(".trade-v2-market-table td.is-target").first()).toContainText("Selected Sell Target");

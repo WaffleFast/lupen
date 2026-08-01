@@ -1124,7 +1124,6 @@ function renderLiveMarketQuickActions() {
   const planet = getCurrentMarketPlanet();
   const quote = getSelectedLiveMarketRouteQuote(good);
   const target = quote.destination;
-  const info = commodityInfo[good] || {};
   const price = quote.buyPrice;
   const capacity = Math.max(1, Number(getShipStats().cargo || 1));
   const used = Math.max(0, Number(cargoUsed() || 0));
@@ -1160,21 +1159,11 @@ function renderLiveMarketQuickActions() {
         : "Purchase Cargo";
   return `
     <section class="trade-v2-quick-action" aria-label="${escapeHtml(good)} trade ticket">
-      <div class="trade-v2-quick-resource">
-        <img src="${escapeHtml(info.icon || getCommodityImage(good))}" alt="">
-        <div><strong>${escapeHtml(good)}</strong><span>${escapeHtml(planet)} &rarr; ${escapeHtml(target || "Select target")}</span><small>${formatNumber(freeCargo)} free &middot; ${formatNumber(credits)} CR</small></div>
-      </div>
-      <div class="trade-v2-current-price trade-v2-route-quote">
-        <span>Route Quote</span>
-        <strong>CR ${formatNumber(price)} <b>&rarr;</b> CR ${formatNumber(quote.sellPrice || 0)}</strong>
-        <small class="${marginClass}">${unitMargin >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(unitMargin))} / unit</small>
-      </div>
       <div class="trade-v2-route-metrics">
         <div><span>Buy at ${escapeHtml(planet)}</span><strong>CR ${formatNumber(price)}</strong></div>
         <div><span>Sell at ${escapeHtml(target || "Target")}</span><strong>CR ${formatNumber(quote.sellPrice || 0)}</strong></div>
-        <div><span>Profit / Unit</span><strong class="${marginClass}">${unitMargin >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(unitMargin))}</strong></div>
         <div><span>Total Cost</span><strong>CR ${formatNumber(price * quantity)}</strong></div>
-        <div class="trade-v2-route-metric-wide"><span>Estimated Profit</span><strong class="${marginClass}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>
+        <div><span>Estimated Profit</span><strong class="${marginClass}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>
       </div>
       <div class="trade-v2-buy-control">
         <span>Quantity</span>
