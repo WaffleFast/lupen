@@ -60,6 +60,8 @@ These tests do not validate CSS polish, authenticated cloud saves, or live stagi
 
 ## What To Run By Change Type
 
+Keep routine Lupen development swift. For small, localized fixes, prefer focused syntax checks and the smallest relevant Playwright grep or visual probe. Run broader browser suites periodically, before important player-testing releases, or whenever a change crosses several player-facing systems.
+
 - UI or browser-facing staging copy changes: run `npm.cmd run test:e2e`.
 - Colyseus server, staging gate, trade, Store, loadout, combat, bounty, XP, or loot service changes: run `npm.cmd run build` and `npm.cmd test` from `server/colyseus`, then run `npm.cmd run test:e2e` from the repo root if browser UI changed.
 - Docs-only changes: `git diff --check` is enough unless the docs describe a changed workflow that should be smoke-tested.

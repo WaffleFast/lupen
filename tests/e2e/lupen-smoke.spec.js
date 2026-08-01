@@ -7643,6 +7643,35 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "review-daily-contracts");
+    const dailyContractsHubFallback = await page.evaluate(() => window.eval(`
+      (() => {
+        showScreen("gameScreen");
+        setTutorialStepById("review-daily-contracts");
+        renderStarterTutorial();
+        const terminal = document.querySelector("[data-tutorial-target='planetTradeTerminal']");
+        const card = document.querySelector("#tutorialOverlay .tutorial-card");
+        const terminalRect = terminal?.getBoundingClientRect();
+        return {
+          screen: document.querySelector("section.active")?.id || "",
+          step: getCurrentTutorialStep().id,
+          highlighted: terminal?.classList.contains("tutorial-highlight-target") || false,
+          text: terminal?.textContent || "",
+          cardInViewport: card ? (
+            card.getBoundingClientRect().left >= 0 &&
+            card.getBoundingClientRect().right <= window.innerWidth &&
+            card.getBoundingClientRect().top >= 0 &&
+            card.getBoundingClientRect().bottom <= window.innerHeight
+          ) : false,
+          terminalInViewport: Boolean(terminalRect) &&
+            terminalRect.left >= 0 &&
+            terminalRect.right <= window.innerWidth &&
+            terminalRect.top >= 0 &&
+            terminalRect.bottom <= window.innerHeight
+        };
+      })()
+    `));
+    await page.locator("[data-tutorial-target='planetTradeTerminal']").click();
+    await expect(page.locator("#marketScreen")).toHaveClass(/active/);
     const dailyContractIntro = page.locator(".trade-v2-contract-strip-button");
     await expect(dailyContractIntro).toBeVisible();
     await expect(dailyContractIntro).toHaveClass(/tutorial-highlight-target/);
@@ -7702,6 +7731,14 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeSell.tradeProfit).toBeGreaterThan(0);
     expect(tradeSell.tradesCompleted).toBe(1);
     expect(tradeSell.finalStep).toBe("review-daily-contracts");
+    expect(dailyContractsHubFallback).toMatchObject({
+      screen: "gameScreen",
+      step: "review-daily-contracts",
+      highlighted: true,
+      cardInViewport: true,
+      terminalInViewport: true
+    });
+    expect(dailyContractsHubFallback.text).toContain("Trade");
     expect(["return-after-trade", "open-store", "open-bounty"]).toContain(finalStep);
 
     await expectNoUnexpectedBrowserErrors(failures);

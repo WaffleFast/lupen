@@ -1421,6 +1421,16 @@ function tutorialEvent(eventName, detail = {}) {
   if (!step) return;
   const originatingStepId = step.id;
 
+  if (step.id === "review-daily-contracts" && eventName === "openedTradeTerminal") {
+    if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
+    tutorialAdvanceTimeout = setTimeout(() => {
+      if (tutorialState.active && getCurrentTutorialStep()?.id === "review-daily-contracts") {
+        renderStarterTutorial();
+      }
+    }, 180);
+    return;
+  }
+
   const acceptedEvents = Array.isArray(step.event) ? step.event : [step.event];
   if (!acceptedEvents.includes(eventName)) return;
 
@@ -1719,7 +1729,13 @@ function getDynamicTutorialTarget(step) {
   }
 
   if (step.target === "tutorial:openDailyTradeContracts") {
-    return document.querySelector(".trade-v2-contract-strip-button");
+    const marketOpen = document.getElementById("marketScreen")?.classList.contains("active");
+    if (!marketOpen) {
+      return document.querySelector("[data-tutorial-target='planetTradeTerminal']") ||
+             document.querySelector(".hub-actions button[onclick='openMarketplace()']");
+    }
+    return document.querySelector(".trade-v2-contract-strip-button") ||
+           document.querySelector("[data-tutorial-target='planetTradeTerminal']");
   }
 
   if (step.target === "tutorial:closeDailyTradeContracts") {
@@ -1780,7 +1796,7 @@ function highlightTutorialTarget(step) {
   const spotlight = document.getElementById("tutorialSpotlight");
   if (!target || !spotlight) return;
 
-  if (["tutorial:storePulseLaser", "tutorial:storeCargoPod"].includes(step?.target)) {
+  if (["tutorial:storePulseLaser", "tutorial:storeCargoPod", "tutorial:openDailyTradeContracts", "tutorial:closeDailyTradeContracts"].includes(step?.target)) {
     target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }
 
