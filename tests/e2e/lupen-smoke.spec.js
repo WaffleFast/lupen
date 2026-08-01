@@ -9004,6 +9004,7 @@ test.describe("Lupen browser smoke", () => {
         multiplayerStagingBountyLastHandledAt = 0;
         multiplayerStagingBountyLastTutorialAcceptKey = "";
         multiplayerStagingBountyLastTutorialClaimKey = "";
+        multiplayerStagingBountyLastProgressClaimKey = "";
         tutorialState = {
           active: true,
           completed: false,
@@ -9063,6 +9064,17 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyRewardOverlay")).toContainText("25 Lupen Shards");
     await expect(page.locator("#bountyRewardOverlay button")).toHaveClass(/tutorial-highlight-target/);
     await expect(page.locator("#bountyRewardOverlay")).toHaveClass(/tutorial-reward-active/);
+    const claimedBountyProgress = await page.evaluate(() => window.eval(`({
+      bountiesClaimed: playerProgress.totals.bountiesClaimed || 0,
+      credits,
+      lupenShards: upgradeMaterials.lupenShards || 0,
+      academyBounty: missionProgress.missions.academy_bounty,
+      profileText: document.getElementById("pilotProfileScreen")?.textContent || ""
+    })`));
+    expect(claimedBountyProgress.bountiesClaimed).toBe(1);
+    expect(claimedBountyProgress.credits).toBe(10900);
+    expect(claimedBountyProgress.lupenShards).toBe(25);
+    expect(claimedBountyProgress.academyBounty).toMatchObject({ state: "completed", progress: 1 });
     await expect(page.locator(".tutorial-card")).toBeVisible();
     await expect(page.locator(".tutorial-card")).toContainText("Reward claimed");
     const rewardLayering = await page.evaluate(() => ({
@@ -9078,6 +9090,48 @@ test.describe("Lupen browser smoke", () => {
     await page.locator("#bountyScreen .screen-back-btn").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-forge");
     await expect(page.locator(".hub-actions button[onclick='openUpgradeForge()']")).toHaveClass(/tutorial-highlight-target/);
+
+    const stagingTradeStats = await page.evaluate(async () => window.eval(`
+      (async () => {
+        playerProgress = normalizePlayerProgress({ totals: { cargoSold: 150 } });
+        credits = 10000;
+        cargo.Iron = 175;
+        cargoPurchased.Iron = 175;
+        cargoCostBasis.Iron = 18;
+        selectedMarketResource = "Iron";
+        multiplayerStagingTradeLastHandledAt = 0;
+        await reconcileMultiplayerStagingTradeWrite({
+          ok: true,
+          mode: "trade_write",
+          operation: "sell",
+          applied: true,
+          offerId: "staging-iron-asteron-virella",
+          resourceName: "Iron",
+          quantity: 175,
+          revenue: 5250,
+          creditsDelta: 5250,
+          creditsAfter: 15250,
+          cargoDelta: -175,
+          cargoAfter: 0,
+          cargoCostBasisBefore: 18,
+          cargoCostBasisAfter: null,
+          receivedAt: Date.now()
+        });
+        const saved = JSON.parse(localStorage.getItem(STORAGE_GAME_KEY) || "{}");
+        return {
+          cargoSold: playerProgress.totals.cargoSold || 0,
+          savedCargoSold: saved.playerProgress?.totals?.cargoSold || 0,
+          cargoIron: cargo.Iron || 0,
+          credits
+        };
+      })()
+    `));
+    expect(stagingTradeStats).toMatchObject({
+      cargoSold: 325,
+      savedCargoSold: 325,
+      cargoIron: 0,
+      credits: 15250
+    });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

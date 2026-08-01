@@ -29,6 +29,7 @@ let multiplayerStagingBountyLastRefreshAt = 0;
 let multiplayerStagingBountyLastCompletionBurstKey = "";
 let multiplayerStagingBountyLastTutorialAcceptKey = "";
 let multiplayerStagingBountyLastTutorialClaimKey = "";
+let multiplayerStagingBountyLastProgressClaimKey = "";
 // Mirrors the current Colyseus STAGING_TRADE_WRITE_MAX_QUANTITY gate so the
 // Trade Builder never asks staging to write more than the server will accept.
 const MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY = 1000;
@@ -348,6 +349,37 @@ function reconcileMultiplayerStagingBountyResult() {
     if (claimLine && typeof addActivityLog === "function") addActivityLog(`Bounty contract: ${claimLine}`);
   }
 
+  const claim = status.lastStagingBountyClaimResult;
+  const claimApplied = Boolean(
+    claim?.applied ||
+    claim?.playerSavePatchResult?.applied ||
+    claim?.playerSave?.written ||
+    claim?.bounty?.claimed ||
+    claim?.reason === "staging_bounty_already_claimed"
+  );
+  const claimReceivedAt = Number(claim?.receivedAt || 0);
+  if (claimApplied) {
+    const progressClaimKey = `${claim?.bounty?.id || claim?.id || "staging-bounty"}:${claim?.receivedAt || claim?.creditsAfter || claim?.lupenShardsAfter || "claimed"}`;
+    if (progressClaimKey !== multiplayerStagingBountyLastProgressClaimKey) {
+      multiplayerStagingBountyLastProgressClaimKey = progressClaimKey;
+      if (Number.isFinite(Number(claim?.creditsAfter))) credits = Math.max(0, Number(claim.creditsAfter));
+      if (Number.isFinite(Number(claim?.lupenShardsAfter))) {
+        upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
+        upgradeMaterials.lupenShards = Math.max(0, Number(claim.lupenShardsAfter));
+      }
+      recordBountyClaimProgress(claim?.bounty || { id: claim?.id || "staging-bounty", title: "Bounty Contract" }, {
+        eventKey: progressClaimKey,
+        save: false
+      });
+      if (typeof reconcileMissionProgressFromGameplayState === "function") {
+        reconcileMissionProgressFromGameplayState({ bountyClaimed: true, refresh: true, save: false });
+      }
+      if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+      if (typeof renderPilotProfileIfActive === "function") renderPilotProfileIfActive();
+      if (typeof saveGame === "function") saveGame();
+    }
+  }
+
   if (!tutorialState?.active || typeof getCurrentTutorialStep !== "function") return;
   const stepId = getCurrentTutorialStep()?.id || "";
   const active = status.lastStagingBountyStatus?.active || status.lastStagingBountyList?.active;
@@ -360,15 +392,6 @@ function reconcileMultiplayerStagingBountyResult() {
     }
   }
 
-  const claim = status.lastStagingBountyClaimResult;
-  const claimApplied = Boolean(
-    claim?.applied ||
-    claim?.playerSavePatchResult?.applied ||
-    claim?.playerSave?.written ||
-    claim?.bounty?.claimed ||
-    claim?.reason === "staging_bounty_already_claimed"
-  );
-  const claimReceivedAt = Number(claim?.receivedAt || 0);
   const tutorialStartedAt = Date.parse(tutorialState?.lastStartedAt || "") || 0;
   const claimBountyId = String(claim?.bounty?.id || claim?.id || "");
   const claimMatchesPending = pendingAction === "claim" &&
@@ -809,6 +832,8 @@ async function reconcileMultiplayerStagingTradeWrite(result) {
     if (result.operation === "buy") {
       cargoPurchased[resourceName] = Math.max(0, Number(cargoPurchased?.[resourceName] || 0)) + quantity;
     } else {
+      playerProgress = normalizePlayerProgress(playerProgress);
+      playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + quantity;
       cargoPurchased[resourceName] = Math.max(0, Number(cargoPurchased?.[resourceName] || 0) - quantity);
       if (cargoPurchased[resourceName] <= 0) delete cargoPurchased[resourceName];
     }
@@ -3508,6 +3533,41 @@ function claimBountyReward(contractId) {
   updateBountyHubBadge();
   renderBountyBoard();
   saveGame();
+}
+
+function recordBountyClaimProgress(contract = {}, options = {}) {
+  const defaultKey = `${dailyBountyDate || "bounty"}:${contract.id || contract.contractId || ""}`;
+  const eventKey = String(options.eventKey || contract.claimKey || defaultKey).trim();
+  const missionEventKey = eventKey ? `claim_bounty:${eventKey}` : "";
+  if (eventKey) {
+    if (!recordBountyClaimProgress.keys) recordBountyClaimProgress.keys = new Set();
+    if (recordBountyClaimProgress.keys.has(eventKey)) return false;
+    recordBountyClaimProgress.keys.add(eventKey);
+  }
+
+  playerProgress = normalizePlayerProgress(playerProgress);
+  missionProgress = typeof normalizeMissionProgress === "function"
+    ? normalizeMissionProgress(missionProgress)
+    : (missionProgress && typeof missionProgress === "object" ? missionProgress : {});
+  missionProgress.eventKeys = missionProgress.eventKeys && typeof missionProgress.eventKeys === "object" ? missionProgress.eventKeys : {};
+  if (missionEventKey && missionProgress.eventKeys[missionEventKey]) return false;
+  if (missionEventKey) missionProgress.eventKeys[missionEventKey] = true;
+
+  playerProgress.totals.bountiesClaimed = Math.max(0, Number(playerProgress.totals.bountiesClaimed || 0)) + 1;
+
+  if (typeof recordMissionEvent === "function") {
+    recordMissionEvent("claim_bounty", {
+      contractId: contract.id || contract.contractId || "bounty",
+      title: contract.title || contract.name || "Bounty",
+      eventKey
+    });
+  }
+  if (typeof reconcileMissionProgressFromGameplayState === "function") {
+    reconcileMissionProgressFromGameplayState({ bountyClaimed: true, refresh: options.refresh !== false, save: false });
+  }
+  if (typeof updateProgressDisplays === "function") updateProgressDisplays();
+  if (options.save !== false && typeof saveGame === "function") saveGame();
+  return true;
 }
 
 function applyBountyReward(bounty) {
