@@ -527,9 +527,25 @@ function setMarketResource(good) {
   selectedMarketResource = good;
   selectedMarketMode = "buy";
   selectedMarketQuantity = 1;
+  ensureLiveMarketTargetPlanet(good);
   if (typeof shouldUseLocalTutorialTrade === "function" && shouldUseLocalTutorialTrade()) {
     activeTradeTerminalTab = "overview";
   }
+  tutorialEvent("selectedMarketResource");
+  renderMarketplace();
+}
+
+function setLiveMarketSelection(good, planet, event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  if (!MAP_ONE_TRADE_RESOURCES.includes(good) || !MAP_ONE_MARKET_PLANETS.includes(planet)) return;
+  selectedMarketResource = good;
+  selectedMarketMode = "buy";
+  if (planet !== getCurrentMarketPlanet()) {
+    selectedMarketTargetPlanet = planet;
+    tutorialEvent("selectedMarketTarget");
+  }
+  selectedMarketQuantity = clampNumber(selectedMarketQuantity || 1, getMarketQuantityLimit("buy") > 0 ? 1 : 0, Math.max(0, getMarketQuantityLimit("buy")));
   tutorialEvent("selectedMarketResource");
   renderMarketplace();
 }
@@ -560,7 +576,11 @@ function getMarketQuantityLimit(operation = "buy") {
   const price = getLiveMarketPrice(good, planet);
   const affordable = price > 0 ? Math.floor(credits / price) : 0;
   const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
-  return Math.max(0, Math.min(affordable, freeCargo, MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY));
+  const target = ensureLiveMarketTargetPlanet(good, planet);
+  const stagingLimit = isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && typeof getMultiplayerStagingTradeQuantityLimit === "function"
+    ? getMultiplayerStagingTradeQuantityLimit({ operation: "buy", good, origin: planet, destination: target })
+    : MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY;
+  return Math.max(0, Math.min(affordable, freeCargo, stagingLimit));
 }
 
 function syncMarketQuantity(value) {
@@ -583,21 +603,79 @@ function getOpenMarketStagingOffer(operation, good, planet) {
   return getMultiplayerStagingBuyOffersAt(planet).find((offer) => isMultiplayerStagingOfferForResource(offer, good)) || null;
 }
 
+function getMarketTargetOptions(origin = getCurrentMarketPlanet()) {
+  return MAP_ONE_MARKET_PLANETS.filter((planet) => planet !== origin);
+}
+
+function getBestLiveMarketTargetPlanet(good = selectedMarketResource, origin = getCurrentMarketPlanet()) {
+  const options = getMarketTargetOptions(origin);
+  if (!options.length) return "";
+  if (activeTradeRoute?.marketTrade && activeTradeRoute.good === good && options.includes(activeTradeRoute.destination)) {
+    return activeTradeRoute.destination;
+  }
+  return options
+    .map((planet) => ({ planet, price: getLiveMarketPrice(good, planet) }))
+    .sort((a, b) => b.price - a.price || a.planet.localeCompare(b.planet))[0]?.planet || options[0];
+}
+
+function ensureLiveMarketTargetPlanet(good = selectedMarketResource, origin = getCurrentMarketPlanet()) {
+  if (!MAP_ONE_TRADE_RESOURCES.includes(good)) good = MAP_ONE_TRADE_RESOURCES[0];
+  if (!MAP_ONE_MARKET_PLANETS.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === origin) {
+    selectedMarketTargetPlanet = getBestLiveMarketTargetPlanet(good, origin);
+  }
+  return selectedMarketTargetPlanet;
+}
+
+function getSelectedLiveMarketRouteQuote(good = selectedMarketResource) {
+  const origin = getCurrentMarketPlanet();
+  const destination = ensureLiveMarketTargetPlanet(good, origin);
+  const buyPrice = getLiveMarketPrice(good, origin);
+  const sellPrice = destination ? getLiveMarketPrice(good, destination) : 0;
+  const unitProfit = sellPrice - buyPrice;
+  return { origin, destination, buyPrice, sellPrice, unitProfit };
+}
+
+function getLiveMarketRouteOffer(good = selectedMarketResource, destination = selectedMarketTargetPlanet) {
+  if (!isMultiplayerStagingActive() || isLocalTutorialTradeActive()) return null;
+  return findMultiplayerStagingTradeOffer({
+    good,
+    origin: getCurrentMarketPlanet(),
+    destination
+  });
+}
+
 function buyMarketCargo() {
   if (marketBuyInProgress) return;
   const good = selectedMarketResource;
   const planet = getCurrentMarketPlanet();
+  const target = ensureLiveMarketTargetPlanet(good, planet);
+  const quote = getSelectedLiveMarketRouteQuote(good);
   const limit = getMarketQuantityLimit("buy");
   const quantity = clampNumber(selectedMarketQuantity, limit > 0 ? 1 : 0, Math.max(0, limit));
-  const price = getLiveMarketPrice(good, planet);
+  const price = quote.buyPrice;
   if (!MAP_ONE_TRADE_RESOURCES.includes(good) || quantity <= 0 || price <= 0) {
     const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
     setTradeTerminalStatus(freeCargo <= 0 ? "Cargo hold full." : credits < price ? "Not enough credits." : "Choose a valid purchase quantity.");
     renderMarketplace();
     return;
   }
+  if (!target || target === planet) {
+    setTradeTerminalStatus("Select another station as the sell target before locking a trade.");
+    renderMarketplace();
+    return;
+  }
+  if (quote.unitProfit <= 0) {
+    setTradeTerminalStatus("Choose a sell target with a higher price before locking a trade.");
+    renderMarketplace();
+    return;
+  }
   if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive()) {
-    const offer = getOpenMarketStagingOffer("buy", good, planet);
+    const offer = getLiveMarketRouteOffer(good, target);
+    if (!offer) {
+      setTradeTerminalStatus("That route is not currently available.");
+      renderMarketplace();
+      return;
+    }
     requestMultiplayerStagingTradeDryRun({ operation: "buy", offerId: offer?.offerId || "", quantity });
     return;
   }
@@ -607,31 +685,30 @@ function buyMarketCargo() {
   cargo[good] = Number(cargo[good] || 0) + quantity;
   addPurchasedCargoQuantity(good, quantity);
   updatePurchasedCargoCostBasis(good, quantity, price);
-  if (isLocalTutorialTradeActive() && good === TUTORIAL_TRADE_ROUTE.good && planet === TUTORIAL_TRADE_ROUTE.origin) {
-    const destination = TUTORIAL_TRADE_ROUTE.destination;
-    const sellPrice = Math.max(getLiveMarketPrice(good, destination), price + 1);
-    setActiveTradeObjective({
-      id: "tutorial-market-" + Date.now(),
-      type: "trade",
-      title: "First Trade Run",
-      marketTrade: true,
-      tutorialTrade: true,
-      good,
-      origin: planet,
-      destination,
-      buyPrice: price,
-      sellPrice,
-      profitPerUnit: sellPrice - price,
-      maxUnits: quantity,
-      purchasedUnits: quantity,
-      realizedProfit: 0,
-      status: "active"
-    });
-    renderObjectiveHud();
-  }
+  const tutorialTrade = isLocalTutorialTradeActive() && good === TUTORIAL_TRADE_ROUTE.good && planet === TUTORIAL_TRADE_ROUTE.origin;
+  const destination = tutorialTrade ? TUTORIAL_TRADE_ROUTE.destination : target;
+  const sellPrice = tutorialTrade ? Math.max(getLiveMarketPrice(good, destination), price + 1) : quote.sellPrice;
+  setActiveTradeObjective({
+    id: tutorialTrade ? "tutorial-market-" + Date.now() : `market-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+    type: "trade",
+    title: tutorialTrade ? "First Trade Run" : `${good} Trade`,
+    marketTrade: true,
+    tutorialTrade,
+    good,
+    origin: planet,
+    destination,
+    buyPrice: price,
+    sellPrice,
+    profitPerUnit: sellPrice - price,
+    maxUnits: quantity,
+    purchasedUnits: quantity,
+    realizedProfit: 0,
+    status: "active"
+  });
+  renderObjectiveHud();
   tutorialEvent("boughtTradeCargo");
-  addActivityLog("Bought " + formatNumber(quantity) + " " + good + " at " + planet + " for CR " + formatNumber(totalCost) + ". No destination locked.");
-  setTradeTerminalStatus("Cargo purchased at the current live price. Sell it at any Map 1 market.");
+  addActivityLog("Trade locked: " + planet + " -> " + destination + ". Bought " + formatNumber(quantity) + " " + good + " for CR " + formatNumber(totalCost) + ".");
+  setTradeTerminalStatus("Trade locked. Deliver " + good + " to " + destination + " for the quoted sell price.");
   saveGame();
   renderMarketplace();
   updateCargoSummary();
@@ -671,12 +748,12 @@ function sellMarketCargo() {
   credits += revenue;
   playerProgress.totals.cargoSold = Math.max(0, Number(playerProgress.totals.cargoSold || 0)) + quantity;
   if (getPurchasedCargoQuantity(good) <= 0) delete cargoCostBasis[good];
-  const tutorialRouteSale = Boolean(
-    activeTradeRoute?.tutorialTrade &&
+  const routeSale = Boolean(
+    activeTradeRoute?.marketTrade &&
     activeTradeRoute.good === good &&
     activeTradeRoute.destination === planet
   );
-  if (tutorialRouteSale) {
+  if (routeSale) {
     updateActiveTradeProgress({
       realizedProfit: Math.max(0, Number(activeTradeRoute.realizedProfit || 0)) + Math.max(0, purchasedProfit),
       purchasedUnits: Math.max(0, Number(activeTradeRoute.purchasedUnits || 0) - purchasedSold)
@@ -698,7 +775,7 @@ function sellMarketCargo() {
   });
   showTradeMiniFloat({ profit: recoveredOnly ? revenue : purchasedProfit });
   tutorialEvent("soldTradeCargo");
-  if (tutorialRouteSale) completeActiveTradeIfReady(good);
+  if (routeSale) completeActiveTradeIfReady(good);
   setTradeTerminalStatus("Sale complete at the current live price.");
   saveGame();
   renderMarketplace();
@@ -712,10 +789,6 @@ function sellMarketCargo() {
   updateCargoSummary();
   updateSpaceHUD();
   marketSellInProgress = false;
-}
-
-function applyMultiplayerStagingTradeObjective(_result) {
-  // Live Market trades never create a destination objective. Daily Contracts own tracked routes.
 }
 
 function getTradeTrendMarkup(good, planet) {
@@ -753,6 +826,7 @@ function getTradeSummaryMarkup() {
 }
 
 function renderLiveMarketPriceCell(good, planet, currentPlanet, interactive = false) {
+  const isTarget = interactive && good === selectedMarketResource && planet === selectedMarketTargetPlanet && planet !== currentPlanet;
   const priceMarkup = `<span>CR ${formatNumber(getLiveMarketPrice(good, planet))}</span>${getTradeTrendMarkup(good, planet)}`;
   const tutorialPriceKind = good === TUTORIAL_TRADE_ROUTE.good && planet === TUTORIAL_TRADE_ROUTE.origin
     ? "buy"
@@ -760,10 +834,13 @@ function renderLiveMarketPriceCell(good, planet, currentPlanet, interactive = fa
       ? "sell"
       : "";
   const tutorialTarget = tutorialPriceKind === "buy" ? "marketBuyPrice" : "marketSellPrice";
-  const content = interactive && tutorialPriceKind
-    ? `<button type="button" class="trade-v2-tutorial-price" data-tutorial-target="${tutorialTarget}" aria-label="Review ${escapeHtml(planet)} ${escapeHtml(good)} ${tutorialPriceKind} price" onclick="reviewTutorialMarketPrice('${tutorialPriceKind}', event)">${priceMarkup}</button>`
+  const clickHandler = interactive && tutorialPriceKind
+    ? `reviewTutorialMarketPrice('${tutorialPriceKind}', event); setLiveMarketSelection('${escapeJsString(good)}', '${escapeJsString(planet)}', event);`
+    : `setLiveMarketSelection('${escapeJsString(good)}', '${escapeJsString(planet)}', event)`;
+  const content = interactive
+    ? `<button type="button" class="trade-v2-price-cell-button ${isTarget ? "is-target" : ""}" ${tutorialPriceKind ? `data-tutorial-target="${tutorialTarget}"` : ""} aria-pressed="${isTarget}" aria-label="${planet === currentPlanet ? "Select " + escapeHtml(good) + " at current station " + escapeHtml(planet) : "Target " + escapeHtml(planet) + " sell price for " + escapeHtml(good)}" onclick="${clickHandler}">${priceMarkup}<small>${planet === currentPlanet ? "Current" : isTarget ? "Target" : "Target"}</small></button>`
     : priceMarkup;
-  return `<td class="${planet === currentPlanet ? "is-current" : ""}">${content}</td>`;
+  return `<td class="${planet === currentPlanet ? "is-current" : ""} ${isTarget ? "is-target" : ""}">${content}</td>`;
 }
 
 function renderLiveMarketPriceTable({ interactive = false } = {}) {
@@ -1047,13 +1124,15 @@ function renderDailyTradePreviewRow(contract, index) {
   `;
 }
 
-function getQuickMarketWriteState(operation, good, planet) {
+function getQuickMarketWriteState(operation, good, planet, destination = selectedMarketTargetPlanet) {
   if (!MAP_ONE_TRADE_RESOURCES.includes(good) || !MAP_ONE_MARKET_PLANETS.includes(planet)) {
     return { enabled: false, reason: "Market unavailable here.", offer: null };
   }
   if (!isMultiplayerStagingActive() || isLocalTutorialTradeActive()) return { enabled: true, reason: "", offer: null };
   if (!isMultiplayerStagingTradeReady()) return { enabled: false, reason: "Market connection unavailable.", offer: null };
-  const offer = getOpenMarketStagingOffer(operation, good, planet);
+  const offer = operation === "buy"
+    ? getLiveMarketRouteOffer(good, destination)
+    : getOpenMarketStagingOffer(operation, good, planet);
   if (!offer) return { enabled: false, reason: "This resource is unavailable here.", offer: null };
   if (isMultiplayerStagingTradePending(operation, offer.offerId)) return { enabled: false, reason: "Trade processing.", offer };
   return { enabled: true, reason: "", offer };
@@ -1063,8 +1142,10 @@ function renderLiveMarketQuickActions() {
   const good = MAP_ONE_TRADE_RESOURCES.includes(selectedMarketResource) ? selectedMarketResource : MAP_ONE_TRADE_RESOURCES[0];
   selectedMarketResource = good;
   const planet = getCurrentMarketPlanet();
+  const quote = getSelectedLiveMarketRouteQuote(good);
+  const target = quote.destination;
   const info = commodityInfo[good] || {};
-  const price = getLiveMarketPrice(good, planet);
+  const price = quote.buyPrice;
   const capacity = Math.max(1, Number(getShipStats().cargo || 1));
   const used = Math.max(0, Number(cargoUsed() || 0));
   const freeCargo = Math.max(0, capacity - used);
@@ -1072,10 +1153,11 @@ function renderLiveMarketQuickActions() {
   selectedMarketQuantity = clampNumber(selectedMarketQuantity, buyLimit > 0 ? 1 : 0, Math.max(0, buyLimit));
   const quantity = selectedMarketQuantity;
   const sellable = getLiveMarketSellableQuantity(good);
-  const buyWrite = getQuickMarketWriteState("buy", good, planet);
+  const buyWrite = getQuickMarketWriteState("buy", good, planet, target);
   const sellWrite = getQuickMarketWriteState("sell", good, planet);
-  const buyReason = freeCargo <= 0 ? "Cargo hold full." : credits < price ? "Not enough credits." : buyLimit <= 0 ? "Purchase unavailable." : buyWrite.reason;
-  const buyDisabled = quantity <= 0 || price <= 0 || !buyWrite.enabled;
+  const unitMargin = quote.unitProfit;
+  const buyReason = !target ? "Choose a sell target." : unitMargin <= 0 ? "Choose a higher sell price." : freeCargo <= 0 ? "Cargo hold full." : credits < price ? "Not enough credits." : buyLimit <= 0 ? "Purchase unavailable." : buyWrite.reason;
+  const buyDisabled = quantity <= 0 || price <= 0 || !target || unitMargin <= 0 || !buyWrite.enabled;
   const sellDisabled = sellable <= 0 || price <= 0 || !sellWrite.enabled;
   const saleValue = price * sellable;
   const purchased = getPurchasedCargoQuantity(good);
@@ -1085,20 +1167,28 @@ function renderLiveMarketQuickActions() {
   const projectedResultLabel = projectedResult === 0
     ? "Break even"
     : `Projected result: ${projectedResult > 0 ? "+" : "-"}CR ${formatNumber(Math.abs(projectedResult))}`;
+  const estimatedProfit = unitMargin * quantity;
+  const marginClass = unitMargin >= 0 ? "profit-good" : "profit-bad";
   const buyButtonLabel = freeCargo <= 0
     ? "Cargo Hold Full"
     : credits < price
       ? "Insufficient Credits"
-      : buyWrite.reason
+      : unitMargin <= 0
+        ? "Choose Higher Sell Price"
+        : buyWrite.reason
         ? "Market Unavailable"
-        : `Buy ${good}`;
+        : "Lock Trade";
   return `
-    <section class="trade-v2-quick-action" aria-label="${escapeHtml(good)} quick actions">
+    <section class="trade-v2-quick-action" aria-label="${escapeHtml(good)} trade ticket">
       <div class="trade-v2-quick-resource">
         <img src="${escapeHtml(info.icon || getCommodityImage(good))}" alt="">
-        <div><strong>${escapeHtml(good)}</strong><span>${escapeHtml(planet)}</span><small>${formatNumber(freeCargo)} free &middot; ${formatNumber(credits)} CR</small></div>
+        <div><strong>${escapeHtml(good)}</strong><span>${escapeHtml(planet)} &rarr; ${escapeHtml(target || "Select target")}</span><small>${formatNumber(freeCargo)} free &middot; ${formatNumber(credits)} CR</small></div>
       </div>
-      <div class="trade-v2-current-price"><span>Current Price</span><strong>CR ${formatNumber(price)}</strong><small>per unit</small></div>
+      <div class="trade-v2-current-price trade-v2-route-quote">
+        <span>Route Quote</span>
+        <strong>CR ${formatNumber(price)} <b>&rarr;</b> CR ${formatNumber(quote.sellPrice || 0)}</strong>
+        <small class="${marginClass}">${unitMargin >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(unitMargin))} / unit</small>
+      </div>
       <div class="trade-v2-buy-control">
         <span>Quantity</span>
         <div class="trade-v2-stepper">
@@ -1107,7 +1197,7 @@ function renderLiveMarketQuickActions() {
           <button type="button" aria-label="Increase quantity" onclick="adjustMarketQuantity(1)" ${quantity >= buyLimit ? "disabled" : ""}>+</button>
           <button type="button" class="trade-v2-max" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyLimit <= 0 ? "disabled" : ""}>Max</button>
         </div>
-        <small>${buyDisabled ? escapeHtml(buyReason) : `Total cost: <strong>CR ${formatNumber(price * quantity)}</strong>`}</small>
+        <small>${buyDisabled ? `${escapeHtml(buyReason)} Cost <strong>CR ${formatNumber(price * quantity)}</strong>` : `Cost <strong>CR ${formatNumber(price * quantity)}</strong> &middot; Est. ${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}`}</small>
       </div>
       <div class="trade-v2-quick-buttons">
         <button type="button" class="trade-v2-transaction-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${buyDisabled ? "disabled aria-disabled=\"true\"" : ""}>${escapeHtml(buyButtonLabel)}</button>
@@ -1183,11 +1273,10 @@ function renderTradeOverview() {
   return `
     <div class="trade-v2-view trade-v2-overview ${tradeContractsExpanded ? "contracts-expanded" : ""}" data-trade-view="market-first">
       ${getTradeSummaryMarkup()}
-      ${renderDailyContractsStrip()}
       <section class="trade-v2-primary-panel trade-v2-market-overview" aria-labelledby="liveMarketTitle">
         <header class="trade-v2-panel-heading">
           <span class="trade-v2-panel-icon" aria-hidden="true">&#8599;</span>
-          <div><h3 id="liveMarketTitle">Live Market</h3><p>Select a commodity, compare stations, then buy or sell.</p></div>
+          <div><h3 id="liveMarketTitle">Live Market</h3><p>Select a commodity, choose a sell target, then lock the trade.</p></div>
         </header>
         <div class="trade-v2-market-first-content">
           <section class="trade-v2-market-board">
@@ -1196,6 +1285,7 @@ function renderTradeOverview() {
           ${renderLiveMarketQuickActions()}
         </div>
       </section>
+      ${renderDailyContractsStrip()}
       <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 90 seconds. Sell carried cargo at the current station.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
       ${renderDailyContractsDrawer()}
     </div>
@@ -1208,13 +1298,17 @@ function renderMarketplace() {
   ensureDailyTradeContracts();
   if (typeof reconcileTradeCargoLedgers === "function") reconcileTradeCargoLedgers();
   if (!MAP_ONE_TRADE_RESOURCES.includes(selectedMarketResource)) selectedMarketResource = "Iron";
+  ensureLiveMarketTargetPlanet(selectedMarketResource);
   activeTradeTerminalTab = "overview";
   const planet = getCurrentMarketPlanet();
   const title = document.getElementById("marketLocationTitle");
   const flavor = document.getElementById("marketFlavorText");
   const body = document.getElementById("marketGoods");
   if (title) title.textContent = planet.toUpperCase();
-  if (flavor) flavor.textContent = getMarketFlavorText(planet);
+  if (flavor) {
+    flavor.textContent = "";
+    flavor.hidden = true;
+  }
   if (!body) return;
   renderedMarketCycle = getMarketCycle();
   body.innerHTML = renderTradeOverview();

@@ -69,7 +69,8 @@ function expectPageFits(geometry) {
   expect(geometry.document.scrollY).toBe(0);
   expect(geometry.strip.left).toBeGreaterThanOrEqual(geometry.screen.left);
   expect(geometry.strip.right).toBeLessThanOrEqual(geometry.screen.right + 1);
-  expect(geometry.strip.bottom).toBeLessThanOrEqual(geometry.market.top);
+  expect(geometry.strip.top).toBeGreaterThanOrEqual(geometry.market.bottom - 1);
+  expect(geometry.strip.bottom).toBeLessThanOrEqual(geometry.screen.bottom + 1);
   expect(geometry.market.left).toBeGreaterThanOrEqual(geometry.screen.left);
   expect(geometry.market.right).toBeLessThanOrEqual(geometry.screen.right + 1);
   expect(geometry.market.bottom).toBeLessThanOrEqual(geometry.screen.bottom + 1);
@@ -88,7 +89,9 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-market-table")).toContainText("Copper");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Cobalt");
     await expect(page.locator(".trade-v2-quick-action")).toBeVisible();
-    await expect(page.locator(".trade-v2-market-overview")).toContainText("Select a commodity, compare stations, then buy or sell.");
+    await expect(page.locator(".trade-v2-market-overview")).toContainText("Select a commodity, choose a sell target, then lock the trade.");
+    await expect(page.locator(".trade-v2-quick-action")).toContainText("Route Quote");
+    await expect(page.getByRole("button", { name: "Lock Trade" })).toBeVisible();
     await expect(page.locator("#marketScreen")).not.toContainText(/Open Contracts|Open Market|Best Opportunity|Titanium|Nickel|Crystal Shards|Lupen Shards/i);
     const quickActionLayout = await page.locator(".trade-v2-quick-action").evaluate(panel => {
       const panelRect = panel.getBoundingClientRect();
@@ -329,7 +332,7 @@ test.describe("Trade Terminal final quick actions", () => {
     });
   });
 
-  test("commodity selection, quantity, MAX, buy, sell-all, ledgers, and progression work inline", async ({ page }) => {
+  test("commodity and target selection, affordability MAX, route lock, sell-all, ledgers, and progression work inline", async ({ page }) => {
     await prepareTerminal(page);
     const ironRow = page.locator(".trade-v2-market-table tbody tr", { hasText: "Iron" });
     const copperRow = page.locator(".trade-v2-market-table tbody tr", { hasText: "Copper" });
@@ -340,7 +343,31 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(ironRow).toHaveAttribute("aria-selected", "false");
     await expect(page.locator(".trade-v2-market-table tbody tr[aria-selected='true']")).toHaveCount(1);
     await expect(page.locator(".trade-v2-quick-action")).toContainText(/Copper/i);
+    await page.getByRole("button", { name: /Target Virella sell price for Copper/i }).click();
+    await expect(page.locator(".trade-v2-quick-action")).toContainText(/Asteron Prime → Virella/i);
     await page.screenshot({ path: "artifacts/trade-terminal-quick-copper-selected.png" });
+
+    await page.evaluate(() => {
+      credits = 1000;
+      selectedMarketQuantity = 1;
+      renderMarketplace();
+    });
+    await page.getByRole("button", { name: "Max" }).click();
+    const affordableMaxState = await page.evaluate(() => ({
+      quantity: selectedMarketQuantity,
+      expected: Math.min(
+        Math.floor(credits / getLiveMarketPrice("Copper", getCurrentMarketPlanet())),
+        getShipStats().cargo - cargoUsed(),
+        MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY
+      )
+    }));
+    expect(affordableMaxState.quantity).toBe(affordableMaxState.expected);
+
+    await page.evaluate(() => {
+      credits = 50000;
+      selectedMarketQuantity = 1;
+      renderMarketplace();
+    });
 
     await page.getByRole("button", { name: "Max" }).click();
     const maxState = await page.evaluate(() => ({
@@ -354,8 +381,14 @@ test.describe("Trade Terminal final quick actions", () => {
     expect(maxState.quantity).toBe(maxState.expected);
     await page.screenshot({ path: "artifacts/trade-terminal-quick-max-buy.png" });
 
-    const beforeBuy = await page.evaluate(() => ({ credits, quantity: selectedMarketQuantity, price: getLiveMarketPrice("Copper", "Asteron Prime") }));
-    await page.getByRole("button", { name: "Buy Copper" }).click();
+    const beforeBuy = await page.evaluate(() => ({
+      credits,
+      quantity: selectedMarketQuantity,
+      price: getLiveMarketPrice("Copper", "Asteron Prime"),
+      target: selectedMarketTargetPlanet,
+      sellPrice: getLiveMarketPrice("Copper", selectedMarketTargetPlanet)
+    }));
+    await page.getByRole("button", { name: "Lock Trade" }).click();
     const afterBuy = await page.evaluate(() => ({
       credits,
       held: cargo.Copper || 0,
@@ -367,7 +400,15 @@ test.describe("Trade Terminal final quick actions", () => {
     expect(afterBuy.held).toBe(beforeBuy.quantity);
     expect(afterBuy.purchased).toBe(beforeBuy.quantity);
     expect(afterBuy.recovered).toBe(0);
-    expect(afterBuy.objective).toBeNull();
+    expect(afterBuy.objective).toMatchObject({
+      marketTrade: true,
+      good: "Copper",
+      origin: "Asteron Prime",
+      destination: beforeBuy.target,
+      buyPrice: beforeBuy.price,
+      sellPrice: beforeBuy.sellPrice,
+      purchasedUnits: beforeBuy.quantity
+    });
     await expect(page.getByRole("button", { name: new RegExp(`Sell ${beforeBuy.quantity} Copper`, "i") })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Cargo Hold Full" })).toBeDisabled();
     await expect(page.locator(".trade-v2-buy-control")).toContainText("Cargo hold full.");
@@ -375,13 +416,13 @@ test.describe("Trade Terminal final quick actions", () => {
     await page.screenshot({ path: "artifacts/trade-terminal-quick-sell-enabled.png" });
 
     await page.evaluate(() => {
-      currentNode = "Virella";
-      lastPlanetNode = "Virella";
+      currentNode = activeTradeRoute.destination;
+      lastPlanetNode = activeTradeRoute.destination;
       renderMarketplace();
     });
     await expect(page.locator(".trade-v2-quick-buttons")).toContainText("Projected result:");
     const beforeSale = await page.evaluate(() => ({ credits, cargoSold: playerProgress.totals.cargoSold || 0 }));
-    await page.getByRole("button", { name: /Sell .* Copper/i }).click();
+    await page.locator(".trade-v2-sell-action", { hasText: /Sell .* Copper/i }).click();
     const afterSale = await page.evaluate(() => ({
       credits,
       held: cargo.Copper || 0,
@@ -390,6 +431,7 @@ test.describe("Trade Terminal final quick actions", () => {
       cargoSold: playerProgress.totals.cargoSold || 0,
       tradeProfit: playerProgress.totals.tradeProfit || 0,
       tradesCompleted: playerProgress.totals.tradesCompleted || 0,
+      objective: activeTradeRoute,
       saved: buildSaveState()
     }));
     expect(afterSale.credits).toBeGreaterThan(beforeSale.credits);
@@ -399,6 +441,7 @@ test.describe("Trade Terminal final quick actions", () => {
     expect(afterSale.cargoSold).toBe(beforeSale.cargoSold + beforeBuy.quantity);
     expect(afterSale.tradeProfit).toBeGreaterThan(0);
     expect(afterSale.tradesCompleted).toBe(1);
+    expect(afterSale.objective).toBeNull();
     expect(afterSale.saved.cargoPurchased.Copper || 0).toBe(0);
     expect(afterSale.saved.cargoRecovered.Copper || 0).toBe(0);
     const creditsAfterFirstSale = afterSale.credits;

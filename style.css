@@ -14623,8 +14623,8 @@ input::placeholder {
 }
 
 #marketScreen .trade-terminal-header-v2 {
-  min-height: 90px;
-  margin-bottom: 10px;
+  min-height: 78px;
+  margin-bottom: 8px;
 }
 
 #marketScreen .trade-terminal-header-v2 h2 {
@@ -14636,7 +14636,11 @@ input::placeholder {
 }
 
 #marketScreen .trade-terminal-layout-v2 {
-  height: calc(100% - 100px);
+  height: calc(100% - 86px);
+}
+
+#marketScreen .trade-terminal-station-copy {
+  display: none;
 }
 
 .trade-v2-view[data-trade-view="quick-actions"] {
@@ -55974,7 +55978,7 @@ input::placeholder {
 #marketScreen .trade-v2-view[data-trade-view="market-first"] {
   position: relative;
   display: grid;
-  grid-template-rows: 72px 56px minmax(0, 1fr) 30px;
+  grid-template-rows: 72px minmax(0, 1fr) 54px 30px;
   gap: 8px;
   width: 100%;
   height: 100%;
@@ -56020,7 +56024,7 @@ input::placeholder {
   border-left: 3px solid rgba(110, 235, 62, 0.72);
   border-radius: 8px;
   background:
-    linear-gradient(90deg, rgba(15, 50, 30, 0.34), transparent 26%),
+    linear-gradient(90deg, rgba(15, 50, 30, 0.24), transparent 30%),
     rgba(3, 17, 29, 0.9);
 }
 
@@ -56095,7 +56099,7 @@ input::placeholder {
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-market-overview {
   display: grid;
-  grid-template-rows: 52px minmax(0, 1fr);
+  grid-template-rows: 48px minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
   min-height: 0;
@@ -56176,10 +56180,55 @@ input::placeholder {
   height: calc((100% - 42px) / 3);
 }
 
+.trade-v2-price-cell-button {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.trade-v2-price-cell-button > span {
+  font-weight: 900;
+}
+
+.trade-v2-price-cell-button > small {
+  color: #86a9bd;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trade-v2-price-cell-button:hover,
+.trade-v2-price-cell-button:focus-visible,
+.trade-v2-price-cell-button.is-target {
+  border-color: rgba(52, 224, 255, 0.78);
+  background: rgba(25, 146, 208, 0.2);
+  outline: none;
+  box-shadow: 0 0 14px rgba(33, 203, 255, 0.16), inset 0 0 18px rgba(33, 203, 255, 0.08);
+}
+
+.trade-v2-market-table td.is-target {
+  background: rgba(28, 152, 206, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(48, 218, 255, 0.48);
+}
+
+.trade-v2-price-cell-button.is-target > small {
+  color: #55e9ff;
+}
+
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 54px 48px minmax(74px, 1fr) 88px;
+  grid-template-rows: 58px 70px minmax(78px, 1fr) 88px;
   gap: 7px;
   min-width: 0;
   min-height: 0;
@@ -56232,7 +56281,12 @@ input::placeholder {
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price > strong {
   grid-column: 1;
-  font-size: 24px;
+  font-size: 22px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-route-quote > strong b {
+  color: #35dcf7;
+  font-size: 18px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price > small {
@@ -56240,6 +56294,7 @@ input::placeholder {
   grid-row: 2;
   color: #9bb3c0;
   font-size: 9px;
+  white-space: nowrap;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control {
@@ -56277,7 +56332,7 @@ input::placeholder {
 .trade-v2-contract-drawer {
   position: absolute;
   z-index: 20;
-  inset: 136px 0 30px;
+  inset: 80px 0 30px;
   display: grid;
   grid-template-rows: 66px minmax(0, 1fr) 28px;
   gap: 9px;
@@ -56415,7 +56470,7 @@ input::placeholder {
 
 @media (max-height: 760px) and (min-width: 901px) {
   #marketScreen .trade-v2-view[data-trade-view="market-first"] {
-    grid-template-rows: 64px 50px minmax(0, 1fr) 28px;
+    grid-template-rows: 64px minmax(0, 1fr) 50px 28px;
     gap: 7px;
   }
 
@@ -56428,7 +56483,7 @@ input::placeholder {
   }
 
   .trade-v2-contract-drawer {
-    inset: 121px 0 28px;
+    inset: 72px 0 28px;
   }
 }
 
