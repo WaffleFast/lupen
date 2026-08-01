@@ -1512,7 +1512,7 @@ test.describe("Lupen browser smoke", () => {
     expect(buyState.objective.destination).toBe("Nyxara");
     expect(buyState.savedCredits).toBe(14);
     expect(buyState.savedCargoCrystalShards).toBe(123);
-    expect(buyState.activityText).toContain("Route locked: Virella -> Nyxara");
+    expect(buyState.activityText).toContain("Trade accepted: Virella -> Nyxara");
 
     await page.evaluate(() => window.eval(`
       (() => {
@@ -2402,7 +2402,7 @@ test.describe("Lupen browser smoke", () => {
       dailyBountyCreditTotal: 6000,
       dailyTradeRewards: [1480, 2560, 3300, 4920],
       dailyTradeCreditTotal: 12260,
-      marketRefreshMs: 90000,
+      marketRefreshMs: 180000,
       baseMarketFullHoldProfit: { Iron: 2550, Copper: 3300, Cobalt: 5700 },
       freighterMarketFullHoldProfit: { Iron: 5100, Copper: 6600, Cobalt: 11400 },
       forgeCumulativeCosts: [25, 100, 250, 550],

@@ -1,6 +1,6 @@
 /* Map 1 Trade Terminal V2: daily freight contracts + destination-free live market. */
 
-const TRADE_MARKET_REFRESH_MS = 90000;
+const TRADE_MARKET_REFRESH_MS = 180000;
 const LIVE_MARKET_BASE_PRICES = Object.freeze({
   "Asteron Prime": Object.freeze({ Iron: 16, Copper: 34, Cobalt: 84 }),
   Virella: Object.freeze({ Iron: 23, Copper: 52, Cobalt: 70 }),
@@ -72,17 +72,17 @@ const DAILY_TRADE_CONTRACT_DEFINITIONS = Object.freeze([
 
 function beginTradeMarketWindow({ force = false, now = Date.now() } = {}) {
   const safeNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
-  const expired = !tradeMarketWindowStartedAt ||
-    safeNow >= tradeMarketWindowStartedAt + TRADE_MARKET_REFRESH_MS;
-  if (!force && !expired && Number.isFinite(Number(tradeMarketWindowCycle))) {
+  const cycle = Math.floor(safeNow / TRADE_MARKET_REFRESH_MS);
+  const startedAt = cycle * TRADE_MARKET_REFRESH_MS;
+  if (!force && tradeMarketWindowStartedAt === startedAt && tradeMarketWindowCycle === cycle) {
     return {
       startedAt: tradeMarketWindowStartedAt,
       cycle: tradeMarketWindowCycle
     };
   }
 
-  tradeMarketWindowStartedAt = safeNow;
-  tradeMarketWindowCycle = Math.floor(safeNow / TRADE_MARKET_REFRESH_MS);
+  tradeMarketWindowStartedAt = startedAt;
+  tradeMarketWindowCycle = cycle;
   return {
     startedAt: tradeMarketWindowStartedAt,
     cycle: tradeMarketWindowCycle
@@ -91,11 +91,7 @@ function beginTradeMarketWindow({ force = false, now = Date.now() } = {}) {
 
 function getMarketCycle(now = Date.now()) {
   const safeNow = Number.isFinite(Number(now)) ? Number(now) : Date.now();
-  if (!tradeMarketWindowStartedAt || !Number.isFinite(Number(tradeMarketWindowCycle))) {
-    return Math.floor(safeNow / TRADE_MARKET_REFRESH_MS);
-  }
-  const elapsedCycles = Math.max(0, Math.floor((safeNow - tradeMarketWindowStartedAt) / TRADE_MARKET_REFRESH_MS));
-  return tradeMarketWindowCycle + elapsedCycles;
+  return Math.floor(safeNow / TRADE_MARKET_REFRESH_MS);
 }
 
 function getNextMarketRefreshSeconds(now = Date.now()) {
@@ -106,9 +102,7 @@ function getNextMarketRefreshSeconds(now = Date.now()) {
       return Math.max(0, Math.ceil((serverExpiresAt - safeNow) / 1000));
     }
   }
-  if (!tradeMarketWindowStartedAt) return Math.ceil(TRADE_MARKET_REFRESH_MS / 1000);
-  const elapsed = Math.max(0, safeNow - tradeMarketWindowStartedAt);
-  const remaining = TRADE_MARKET_REFRESH_MS - (elapsed % TRADE_MARKET_REFRESH_MS);
+  const remaining = TRADE_MARKET_REFRESH_MS - (safeNow % TRADE_MARKET_REFRESH_MS);
   return Math.max(0, Math.ceil(remaining / 1000));
 }
 
@@ -164,20 +158,7 @@ function getLiveMarketPrice(good, planet) {
 }
 
 function getLiveMarketTrend(good, planet) {
-  if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive()) {
-    const currentPlanet = getCurrentMarketPlanet();
-    const relevantOffer = planet === currentPlanet
-      ? getMultiplayerStagingBuyOffersAt(currentPlanet).find((offer) => isMultiplayerStagingOfferForResource(offer, good))
-      : findMultiplayerStagingTradeOffer({ good, origin: currentPlanet, destination: planet });
-    const currentPrice = getLiveMarketPrice(good, planet);
-    const previousPrice = planet === currentPlanet
-      ? Number(relevantOffer?.previousBuyPrice || 0)
-      : Number(relevantOffer?.previousSellPrice || 0);
-    if (previousPrice > 0) return currentPrice > previousPrice ? "up" : currentPrice < previousPrice ? "down" : "stable";
-  }
-  const current = getLiveMarketPriceForCycle(good, planet, getMarketCycle());
-  const previous = getLiveMarketPriceForCycle(good, planet, getMarketCycle() - 1);
-  return current > previous ? "up" : current < previous ? "down" : "stable";
+  return "stable";
 }
 
 function getTradeCountdownLabel(seconds = getNextMarketRefreshSeconds()) {
@@ -660,12 +641,12 @@ function buyMarketCargo() {
     return;
   }
   if (!target || target === planet) {
-    setTradeTerminalStatus("Select another station as the sell target before locking a trade.");
+    setTradeTerminalStatus("Select another station as the sell target before purchasing cargo.");
     renderMarketplace();
     return;
   }
   if (quote.unitProfit <= 0) {
-    setTradeTerminalStatus("Choose a sell target with a higher price before locking a trade.");
+    setTradeTerminalStatus("Choose a sell target with a higher price before purchasing cargo.");
     renderMarketplace();
     return;
   }
@@ -703,12 +684,13 @@ function buyMarketCargo() {
     maxUnits: quantity,
     purchasedUnits: quantity,
     realizedProfit: 0,
+    acceptedAtCycle: getMarketCycle(),
     status: "active"
   });
   renderObjectiveHud();
   tutorialEvent("boughtTradeCargo");
-  addActivityLog("Trade locked: " + planet + " -> " + destination + ". Bought " + formatNumber(quantity) + " " + good + " for CR " + formatNumber(totalCost) + ".");
-  setTradeTerminalStatus("Trade locked. Deliver " + good + " to " + destination + " for the quoted sell price.");
+  addActivityLog("Trade accepted: " + planet + " -> " + destination + ". Bought " + formatNumber(quantity) + " " + good + " for CR " + formatNumber(totalCost) + ".");
+  setTradeTerminalStatus("Cargo purchased. Deliver " + good + " to " + destination + " before market refresh.");
   saveGame();
   renderMarketplace();
   updateCargoSummary();
@@ -792,10 +774,7 @@ function sellMarketCargo() {
 }
 
 function getTradeTrendMarkup(good, planet) {
-  const trend = getLiveMarketTrend(good, planet);
-  const symbol = trend === "up" ? "▲" : trend === "down" ? "▼" : "—";
-  const label = trend === "up" ? "rising" : trend === "down" ? "falling" : "stable";
-  return `<span class="trade-v2-trend is-${trend}" aria-label="${escapeHtml(label)}">${symbol}</span>`;
+  return "";
 }
 
 function getTradeSummaryMarkup() {
@@ -827,6 +806,7 @@ function getTradeSummaryMarkup() {
 
 function renderLiveMarketPriceCell(good, planet, currentPlanet, interactive = false) {
   const isTarget = interactive && good === selectedMarketResource && planet === selectedMarketTargetPlanet && planet !== currentPlanet;
+  const isCurrent = planet === currentPlanet;
   const priceMarkup = `<span>CR ${formatNumber(getLiveMarketPrice(good, planet))}</span>${getTradeTrendMarkup(good, planet)}`;
   const tutorialPriceKind = good === TUTORIAL_TRADE_ROUTE.good && planet === TUTORIAL_TRADE_ROUTE.origin
     ? "buy"
@@ -838,9 +818,9 @@ function renderLiveMarketPriceCell(good, planet, currentPlanet, interactive = fa
     ? `reviewTutorialMarketPrice('${tutorialPriceKind}', event); setLiveMarketSelection('${escapeJsString(good)}', '${escapeJsString(planet)}', event);`
     : `setLiveMarketSelection('${escapeJsString(good)}', '${escapeJsString(planet)}', event)`;
   const content = interactive
-    ? `<button type="button" class="trade-v2-price-cell-button ${isTarget ? "is-target" : ""}" ${tutorialPriceKind ? `data-tutorial-target="${tutorialTarget}"` : ""} aria-pressed="${isTarget}" aria-label="${planet === currentPlanet ? "Select " + escapeHtml(good) + " at current station " + escapeHtml(planet) : "Target " + escapeHtml(planet) + " sell price for " + escapeHtml(good)}" onclick="${clickHandler}">${priceMarkup}<small>${planet === currentPlanet ? "Current" : isTarget ? "Target" : "Target"}</small></button>`
+    ? `<button type="button" class="trade-v2-price-cell-button ${isTarget ? "is-target" : ""}" ${tutorialPriceKind ? `data-tutorial-target="${tutorialTarget}"` : ""} aria-pressed="${isTarget}" aria-label="${isCurrent ? "Buy here: " + escapeHtml(good) + " at " + escapeHtml(planet) : "Target " + escapeHtml(planet) + " sell price for " + escapeHtml(good)}" onclick="${clickHandler}">${priceMarkup}<small>${isCurrent ? "Buy Here" : isTarget ? "Selected Sell Target" : "Sell Target"}</small></button>`
     : priceMarkup;
-  return `<td class="${planet === currentPlanet ? "is-current" : ""} ${isTarget ? "is-target" : ""}">${content}</td>`;
+  return `<td class="${isCurrent ? "is-current" : ""} ${isTarget ? "is-target" : ""}">${content}</td>`;
 }
 
 function renderLiveMarketPriceTable({ interactive = false } = {}) {
@@ -848,7 +828,7 @@ function renderLiveMarketPriceTable({ interactive = false } = {}) {
   return `
     <div class="trade-v2-table-wrap">
       <table class="trade-v2-market-table">
-        <thead><tr><th scope="col">Commodity</th>${MAP_ONE_MARKET_PLANETS.map((planet) => `<th scope="col" class="${planet === currentPlanet ? "is-current" : ""}">${escapeHtml(planet)}</th>`).join("")}</tr></thead>
+        <thead><tr><th scope="col">Commodity</th>${MAP_ONE_MARKET_PLANETS.map((planet) => `<th scope="col" class="${planet === currentPlanet ? "is-current" : ""}">${planet === currentPlanet ? `<span class="trade-v2-current-station-marker" aria-hidden="true">&#8982;</span>${escapeHtml(planet)} <small>Current Station</small>` : escapeHtml(planet)}</th>`).join("")}</tr></thead>
         <tbody>
           ${MAP_ONE_TRADE_RESOURCES.map((good) => {
             const info = commodityInfo[good] || {};
@@ -1007,7 +987,7 @@ function renderLiveMarketTransactionPanel() {
       </div>
       <div class="trade-v2-total"><span>${buying ? "Total Purchase Cost" : "Total Sale Value"}</span><strong>CR ${formatNumber(total)}</strong></div>
       <button type="button" class="trade-v2-transaction-action" data-tutorial-target="${buying ? "buyCargo" : "sellCargo"}" onclick="${buying ? "buyMarketCargo()" : "sellMarketCargo()"}" ${disabled ? "disabled" : ""}>${buying ? "Buy Cargo" : "Sell Cargo"}</button>
-      <p class="trade-v2-transaction-note">${buying ? "No route is accepted and no destination is locked. Prices may change while you travel." : "Purchased and recovered cargo sell at the same current local price. Upgrade materials are excluded."}</p>
+      <p class="trade-v2-transaction-note">${buying ? "No route is accepted yet. Prices may change while you travel." : "Purchased and recovered cargo sell at the same current local price. Upgrade materials are excluded."}</p>
     </aside>
   `;
 }
@@ -1074,7 +1054,7 @@ function renderLiveMarketPriceTable({ interactive = true } = {}) {
   return `
     <div class="trade-v2-table-wrap" data-market-scroll-region tabindex="0" aria-label="Live commodity prices">
       <table class="trade-v2-market-table">
-        <thead><tr><th scope="col">Commodity</th>${MAP_ONE_MARKET_PLANETS.map((planet) => `<th scope="col" class="${planet === currentPlanet ? "is-current" : ""}">${escapeHtml(planet)}</th>`).join("")}</tr></thead>
+        <thead><tr><th scope="col">Commodity</th>${MAP_ONE_MARKET_PLANETS.map((planet) => `<th scope="col" class="${planet === currentPlanet ? "is-current" : ""}">${planet === currentPlanet ? `<span class="trade-v2-current-station-marker" aria-hidden="true">&#8982;</span>${escapeHtml(planet)} <small>Current Station</small>` : escapeHtml(planet)}</th>`).join("")}</tr></thead>
         <tbody>
           ${MAP_ONE_TRADE_RESOURCES.map((good) => {
             const info = commodityInfo[good] || {};
@@ -1177,7 +1157,7 @@ function renderLiveMarketQuickActions() {
         ? "Choose Higher Sell Price"
         : buyWrite.reason
         ? "Market Unavailable"
-        : "Lock Trade";
+        : "Purchase Cargo";
   return `
     <section class="trade-v2-quick-action" aria-label="${escapeHtml(good)} trade ticket">
       <div class="trade-v2-quick-resource">
@@ -1189,6 +1169,13 @@ function renderLiveMarketQuickActions() {
         <strong>CR ${formatNumber(price)} <b>&rarr;</b> CR ${formatNumber(quote.sellPrice || 0)}</strong>
         <small class="${marginClass}">${unitMargin >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(unitMargin))} / unit</small>
       </div>
+      <div class="trade-v2-route-metrics">
+        <div><span>Buy at ${escapeHtml(planet)}</span><strong>CR ${formatNumber(price)}</strong></div>
+        <div><span>Sell at ${escapeHtml(target || "Target")}</span><strong>CR ${formatNumber(quote.sellPrice || 0)}</strong></div>
+        <div><span>Profit / Unit</span><strong class="${marginClass}">${unitMargin >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(unitMargin))}</strong></div>
+        <div><span>Total Cost</span><strong>CR ${formatNumber(price * quantity)}</strong></div>
+        <div class="trade-v2-route-metric-wide"><span>Estimated Profit</span><strong class="${marginClass}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>
+      </div>
       <div class="trade-v2-buy-control">
         <span>Quantity</span>
         <div class="trade-v2-stepper">
@@ -1197,12 +1184,11 @@ function renderLiveMarketQuickActions() {
           <button type="button" aria-label="Increase quantity" onclick="adjustMarketQuantity(1)" ${quantity >= buyLimit ? "disabled" : ""}>+</button>
           <button type="button" class="trade-v2-max" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyLimit <= 0 ? "disabled" : ""}>Max</button>
         </div>
-        <small>${buyDisabled ? `${escapeHtml(buyReason)} Cost <strong>CR ${formatNumber(price * quantity)}</strong>` : `Cost <strong>CR ${formatNumber(price * quantity)}</strong> &middot; Est. ${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}`}</small>
       </div>
       <div class="trade-v2-quick-buttons">
         <button type="button" class="trade-v2-transaction-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${buyDisabled ? "disabled aria-disabled=\"true\"" : ""}>${escapeHtml(buyButtonLabel)}</button>
-        <button type="button" class="trade-v2-sell-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${sellDisabled ? "disabled aria-disabled=\"true\"" : ""}>${sellable > 0 ? "Sell " + formatNumber(sellable) + " " : "Sell "}${escapeHtml(good)}</button>
-        <small>${sellable > 0 ? `Sale value: CR ${formatNumber(saleValue)} &middot; ${escapeHtml(projectedResultLabel)}` : "No " + escapeHtml(good) + " carried"}</small>
+        ${sellable > 0 ? `<button type="button" class="trade-v2-sell-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${sellDisabled ? "disabled aria-disabled=\"true\"" : ""}>Sell ${formatNumber(sellable)} ${escapeHtml(good)}</button>` : ""}
+        ${sellable > 0 ? `<small>Sale value: CR ${formatNumber(saleValue)} &middot; ${escapeHtml(projectedResultLabel)}</small>` : ""}
       </div>
     </section>
   `;
@@ -1276,7 +1262,7 @@ function renderTradeOverview() {
       <section class="trade-v2-primary-panel trade-v2-market-overview" aria-labelledby="liveMarketTitle">
         <header class="trade-v2-panel-heading">
           <span class="trade-v2-panel-icon" aria-hidden="true">&#8599;</span>
-          <div><h3 id="liveMarketTitle">Live Market</h3><p>Select a commodity, choose a sell target, then lock the trade.</p></div>
+          <div><h3 id="liveMarketTitle">Live Market</h3><p>Select a commodity, choose a sell target, then purchase cargo.</p></div>
         </header>
         <div class="trade-v2-market-first-content">
           <section class="trade-v2-market-board">
@@ -1286,7 +1272,7 @@ function renderTradeOverview() {
         </div>
       </section>
       ${renderDailyContractsStrip()}
-      <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 90 seconds. Sell carried cargo at the current station.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
+      <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 3 minutes for all pilots. Sell carried cargo at the current station.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
       ${renderDailyContractsDrawer()}
     </div>
   `;

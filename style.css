@@ -56134,7 +56134,7 @@ input::placeholder {
 
 .trade-v2-market-first-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.7fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.78fr);
   gap: 12px;
   min-width: 0;
   min-height: 0;
@@ -56174,6 +56174,35 @@ input::placeholder {
   top: 0;
   height: 42px;
   background: rgba(3, 22, 36, 0.99);
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-market-table thead th.is-current {
+  color: #91f3ff;
+  background:
+    linear-gradient(180deg, rgba(31, 181, 222, 0.24), rgba(4, 33, 49, 0.98)),
+    rgba(3, 22, 36, 0.99);
+  box-shadow: inset 0 -2px 0 rgba(78, 230, 255, 0.7);
+}
+
+.trade-v2-current-station-marker {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border: 1px solid rgba(112, 235, 255, 0.64);
+  border-radius: 50%;
+  color: #8af2ff;
+  background: rgba(24, 139, 180, 0.3);
+  font-size: 11px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-market-table thead th small {
+  display: block;
+  margin-top: 2px;
+  color: #9deefe;
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-market-table tbody tr {
@@ -56217,8 +56246,15 @@ input::placeholder {
 }
 
 .trade-v2-market-table td.is-target {
-  background: rgba(28, 152, 206, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(48, 218, 255, 0.48);
+  background: rgba(28, 152, 206, 0.24);
+  box-shadow: inset 0 0 0 2px rgba(66, 228, 255, 0.68), 0 0 18px rgba(31, 202, 255, 0.14);
+}
+
+.trade-v2-market-table td.is-current {
+  background:
+    linear-gradient(180deg, rgba(35, 186, 230, 0.15), rgba(20, 119, 159, 0.1)),
+    rgba(12, 69, 95, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(72, 214, 247, 0.38);
 }
 
 .trade-v2-price-cell-button.is-target > small {
@@ -56228,12 +56264,12 @@ input::placeholder {
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 58px 70px minmax(78px, 1fr) 88px;
-  gap: 7px;
+  grid-template-rows: 40px 30px minmax(62px, 1fr) 58px 36px;
+  gap: 5px;
   min-width: 0;
   min-height: 0;
   height: 100%;
-  padding: 10px 12px;
+  padding: 8px 10px;
   overflow: hidden;
   border: 1px solid rgba(67, 186, 229, 0.42);
   border-radius: 7px;
@@ -56244,28 +56280,32 @@ input::placeholder {
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
-  padding-bottom: 6px;
+  padding-bottom: 4px;
+  min-height: 0;
+  overflow: hidden;
   border-bottom: 1px solid rgba(77, 179, 218, 0.26);
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource img {
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-resource strong {
-  font-size: 18px;
+  font-size: 17px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: end;
+  min-height: 0;
   gap: 2px 12px;
-  padding: 0 0 5px;
+  overflow: hidden;
+  padding: 0 0 3px;
   border-left: 0;
   border-bottom: 1px solid rgba(77, 179, 218, 0.22);
 }
@@ -56281,7 +56321,7 @@ input::placeholder {
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-current-price > strong {
   grid-column: 1;
-  font-size: 22px;
+  font-size: 18px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-route-quote > strong b {
@@ -56297,29 +56337,93 @@ input::placeholder {
   white-space: nowrap;
 }
 
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-route-quote > small {
+  display: none;
+}
+
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 4px;
   min-height: 0;
-  padding-top: 5px;
+  overflow: hidden;
+  padding-top: 0;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-stepper {
   grid-template-columns: 42px minmax(64px, 1fr) 42px 70px;
 }
 
+.trade-v2-route-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.trade-v2-route-metrics > div {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid rgba(72, 192, 235, 0.25);
+  border-radius: 6px;
+  background: rgba(2, 16, 27, 0.68);
+}
+
+.trade-v2-route-metrics .trade-v2-route-metric-wide {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.trade-v2-route-metrics span {
+  display: block;
+  overflow: hidden;
+  color: #62dff4;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trade-v2-route-metrics strong {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: #f4fbff;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trade-v2-route-metric-wide strong {
+  margin-top: 0;
+  font-size: 18px;
+}
+
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-content: end;
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons button {
-  min-height: 34px;
+  min-height: 31px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons .trade-v2-transaction-action:only-child {
+  grid-column: 1 / -1;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons > small {
+  grid-column: 1 / -1;
   min-height: 10px;
   text-align: center;
 }

@@ -89,9 +89,13 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-market-table")).toContainText("Copper");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Cobalt");
     await expect(page.locator(".trade-v2-quick-action")).toBeVisible();
-    await expect(page.locator(".trade-v2-market-overview")).toContainText("Select a commodity, choose a sell target, then lock the trade.");
+    await expect(page.locator(".trade-v2-market-overview")).toContainText("Select a commodity, choose a sell target, then purchase cargo.");
     await expect(page.locator(".trade-v2-quick-action")).toContainText("Route Quote");
-    await expect(page.getByRole("button", { name: "Lock Trade" })).toBeVisible();
+    await expect(page.locator(".trade-v2-market-table thead th.is-current")).toContainText("Current Station");
+    await expect(page.locator(".trade-v2-market-table td.is-current").first()).toContainText("Buy Here");
+    await expect(page.locator(".trade-v2-market-table td.is-target").first()).toContainText("Selected Sell Target");
+    await expect(page.locator(".trade-v2-market-table")).not.toContainText(/▲|▼/);
+    await expect(page.getByRole("button", { name: "Purchase Cargo" })).toBeVisible();
     await expect(page.locator("#marketScreen")).not.toContainText(/Open Contracts|Open Market|Best Opportunity|Titanium|Nickel|Crystal Shards|Lupen Shards/i);
     const quickActionLayout = await page.locator(".trade-v2-quick-action").evaluate(panel => {
       const panelRect = panel.getBoundingClientRect();
@@ -100,6 +104,7 @@ test.describe("Trade Terminal final quick actions", () => {
       const sellButton = panel.querySelector(".trade-v2-sell-action")?.getBoundingClientRect();
       const sellSummary = panel.querySelector(".trade-v2-quick-buttons > small")?.getBoundingClientRect();
       const elements = [buySummary, buyButton, sellButton, sellSummary].filter(Boolean);
+      const lastButtonBottom = Math.max(buyButton?.bottom || 0, sellButton?.bottom || 0);
       return {
         allFit: elements.every(rect => (
           rect.left >= panelRect.left - 1 &&
@@ -107,9 +112,14 @@ test.describe("Trade Terminal final quick actions", () => {
           rect.top >= panelRect.top - 1 &&
           rect.bottom <= panelRect.bottom + 1
         )),
-        buySummaryAboveButton: Boolean(buySummary && buyButton && buySummary.bottom <= buyButton.top + 1),
-        buttonsSeparated: Boolean(buyButton && sellButton && buyButton.bottom <= sellButton.top + 1),
-        sellSummaryBelowButton: Boolean(sellButton && sellSummary && sellButton.bottom <= sellSummary.top + 1)
+        buySummaryAboveButton: !buySummary || Boolean(buyButton && buySummary.bottom <= buyButton.top + 1),
+        buttonsSeparated: !sellButton || Boolean(buyButton && (
+          buyButton.bottom <= sellButton.top + 1 ||
+          sellButton.bottom <= buyButton.top + 1 ||
+          buyButton.right <= sellButton.left + 1 ||
+          sellButton.right <= buyButton.left + 1
+        )),
+        sellSummaryBelowButton: !sellSummary || Boolean(buyButton && lastButtonBottom <= sellSummary.top + 1)
       };
     });
     expect(quickActionLayout).toEqual({
@@ -332,12 +342,12 @@ test.describe("Trade Terminal final quick actions", () => {
     });
   });
 
-  test("commodity and target selection, affordability MAX, route lock, sell-all, ledgers, and progression work inline", async ({ page }) => {
+  test("commodity and target selection, affordability MAX, cargo purchase, sell-all, ledgers, and progression work inline", async ({ page }) => {
     await prepareTerminal(page);
     const ironRow = page.locator(".trade-v2-market-table tbody tr", { hasText: "Iron" });
     const copperRow = page.locator(".trade-v2-market-table tbody tr", { hasText: "Copper" });
 
-    await expect(page.getByRole("button", { name: "Sell Iron" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Sell Iron" })).toHaveCount(0);
     await copperRow.click();
     await expect(copperRow).toHaveAttribute("aria-selected", "true");
     await expect(ironRow).toHaveAttribute("aria-selected", "false");
@@ -388,7 +398,7 @@ test.describe("Trade Terminal final quick actions", () => {
       target: selectedMarketTargetPlanet,
       sellPrice: getLiveMarketPrice("Copper", selectedMarketTargetPlanet)
     }));
-    await page.getByRole("button", { name: "Lock Trade" }).click();
+    await page.getByRole("button", { name: "Purchase Cargo" }).click();
     const afterBuy = await page.evaluate(() => ({
       credits,
       held: cargo.Copper || 0,
@@ -407,11 +417,12 @@ test.describe("Trade Terminal final quick actions", () => {
       destination: beforeBuy.target,
       buyPrice: beforeBuy.price,
       sellPrice: beforeBuy.sellPrice,
-      purchasedUnits: beforeBuy.quantity
+      purchasedUnits: beforeBuy.quantity,
+      acceptedAtCycle: expect.any(Number)
     });
     await expect(page.getByRole("button", { name: new RegExp(`Sell ${beforeBuy.quantity} Copper`, "i") })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Cargo Hold Full" })).toBeDisabled();
-    await expect(page.locator(".trade-v2-buy-control")).toContainText("Cargo hold full.");
+    await expect(page.locator(".trade-v2-quick-action")).toContainText("Cargo Hold Full");
     await expect(page.locator(".trade-v2-quick-buttons")).toContainText("Break even");
     await page.screenshot({ path: "artifacts/trade-terminal-quick-sell-enabled.png" });
 
@@ -493,7 +504,7 @@ test.describe("Trade Terminal final quick actions", () => {
         quantity: selectedMarketQuantity,
         selected: selectedMarketResource,
         selectedRows: document.querySelectorAll(".trade-v2-market-table tbody tr[aria-selected='true']").length,
-        totalText: document.querySelector(".trade-v2-buy-control > small")?.textContent || ""
+        totalText: document.querySelector(".trade-v2-route-metrics")?.textContent || ""
       };
       Date.now = realNow;
       renderedMarketCycle = getMarketCycle();
@@ -507,12 +518,40 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator("#marketScreen")).not.toContainText(/Best Opportunity/i);
   });
 
+  test("each origin has at least one profitable outgoing live-market route across cycles", async ({ page }) => {
+    await prepareTerminal(page);
+    const routeAudit = await page.evaluate(() => {
+      const startCycle = getMarketCycle();
+      return Array.from({ length: 30 }, (_, offset) => startCycle + offset).map((cycle) => ({
+        cycle,
+        origins: MAP_ONE_MARKET_PLANETS.map((origin) => {
+          const profitableRoutes = [];
+          for (const good of MAP_ONE_TRADE_RESOURCES) {
+            const buyPrice = getLiveMarketPriceForCycle(good, origin, cycle);
+            for (const destination of MAP_ONE_MARKET_PLANETS.filter((planet) => planet !== origin)) {
+              const sellPrice = getLiveMarketPriceForCycle(good, destination, cycle);
+              if (sellPrice > buyPrice) profitableRoutes.push({ good, origin, destination, buyPrice, sellPrice });
+            }
+          }
+          return { origin, profitableRoutes };
+        })
+      }));
+    });
+    for (const auditCycle of routeAudit) {
+      for (const row of auditCycle.origins) {
+        expect(row.profitableRoutes.length, `${row.origin} should have an outgoing profitable route in cycle ${auditCycle.cycle}`).toBeGreaterThan(0);
+      }
+      expect(auditCycle.origins.find((row) => row.origin === "Virella")?.profitableRoutes.some((route) => route.destination === "Nyxara")).toBe(true);
+      expect(auditCycle.origins.find((row) => row.origin === "Nyxara")?.profitableRoutes.some((route) => route.destination === "Virella")).toBe(true);
+    }
+  });
+
   test("opening the market starts a full quote window that survives the trip to sell", async ({ page }) => {
     await prepareTerminal(page);
 
     const windowState = await page.evaluate(() => {
       const realNow = Date.now;
-      const anchor = Math.floor(realNow() / TRADE_MARKET_REFRESH_MS) * TRADE_MARKET_REFRESH_MS + 89000;
+      const anchor = Math.floor(realNow() / TRADE_MARKET_REFRESH_MS) * TRADE_MARKET_REFRESH_MS + 1000;
       Date.now = () => anchor;
       beginTradeMarketWindow({ force: true, now: anchor });
       renderedMarketCycle = getMarketCycle();
@@ -527,7 +566,7 @@ test.describe("Trade Terminal final quick actions", () => {
         startedAt: tradeMarketWindowStartedAt
       };
 
-      Date.now = () => anchor + 89000;
+      Date.now = () => anchor + 178000;
       updateTradeTimerDisplay();
       const beforeArrival = {
         seconds: getNextMarketRefreshSeconds(),
@@ -549,11 +588,39 @@ test.describe("Trade Terminal final quick actions", () => {
         startedAt: tradeMarketWindowStartedAt
       };
 
-      Date.now = () => anchor + 91000;
+      Date.now = () => anchor + 180001;
       updateTradeTimerDisplay();
+      activeTradeRoute = createTradeObjective({
+        id: "expired-live-market-quote",
+        type: "trade",
+        title: "Iron Trade",
+        marketTrade: true,
+        good: "Iron",
+        origin: "Asteron Prime",
+        destination: "Virella",
+        buyPrice: initial.buyPrice,
+        sellPrice: initial.sellPrice,
+        profitPerUnit: initial.sellPrice - initial.buyPrice,
+        maxUnits: 1,
+        purchasedUnits: 1,
+        acceptedAtCycle: initial.cycle,
+        status: "active"
+      });
+      activeObjective = activeTradeRoute;
+      let objectivePanel = document.getElementById("activeObjectiveSummary");
+      if (!objectivePanel) {
+        objectivePanel = document.createElement("div");
+        objectivePanel.id = "activeObjectiveSummary";
+        document.body.appendChild(objectivePanel);
+      }
+      renderObjectiveHud();
       const afterExpiry = {
         seconds: getNextMarketRefreshSeconds(),
-        cycle: getMarketCycle()
+        cycle: getMarketCycle(),
+        objectiveTarget: getTradeObjectiveTargetNode(activeTradeRoute),
+        objectiveStage: getTradeObjectiveStage(activeTradeRoute),
+        objectiveAction: getTradeObjectiveActionText(activeTradeRoute),
+        objectiveHudText: objectivePanel.textContent || ""
       };
 
       Date.now = realNow;
@@ -562,8 +629,8 @@ test.describe("Trade Terminal final quick actions", () => {
     });
 
     expect(windowState.initial).toMatchObject({
-      seconds: 90,
-      countdown: "01:30"
+      seconds: 179,
+      countdown: "02:59"
     });
     expect(windowState.beforeArrival).toMatchObject({
       seconds: 1,
@@ -578,7 +645,14 @@ test.describe("Trade Terminal final quick actions", () => {
       startedAt: windowState.initial.startedAt
     });
     expect(windowState.afterExpiry.cycle).toBe(windowState.initial.cycle + 1);
-    expect(windowState.afterExpiry.seconds).toBe(89);
+    expect(windowState.afterExpiry.seconds).toBe(179);
+    expect(windowState.afterExpiry.objectiveTarget).toBeNull();
+    expect(windowState.afterExpiry.objectiveStage).toBe("sell-open");
+    expect(windowState.afterExpiry.objectiveAction).toBe("Review live prices");
+    expect(windowState.afterExpiry.objectiveHudText).toContain("Market refreshed");
+    expect(windowState.afterExpiry.objectiveHudText).toContain("Review live prices");
+    expect(windowState.afterExpiry.objectiveHudText).not.toContain("Asteron Prime -> Virella");
+    expect(windowState.afterExpiry.objectiveHudText).not.toContain("Deliver before");
   });
 
   test("future commodity rows scroll internally while header and quick actions remain fixed", async ({ page }) => {

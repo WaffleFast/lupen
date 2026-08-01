@@ -61,7 +61,8 @@ function getMultiplayerStagingTradeOfferId(resourceId = "", buyNode = "", sellNo
 
 function buildMultiplayerStagingTradeOfferFallbacks() {
   const planets = Object.keys(MULTIPLAYER_STAGING_TRADE_PRICE_TABLE);
-  const cycle = typeof getMarketCycle === "function" ? getMarketCycle() : Math.floor(Date.now() / 90000);
+  const refreshMs = typeof TRADE_MARKET_REFRESH_MS !== "undefined" ? TRADE_MARKET_REFRESH_MS : 180000;
+  const cycle = typeof getMarketCycle === "function" ? getMarketCycle() : Math.floor(Date.now() / refreshMs);
   const getFallbackPrice = (resourceName, planet, priceCycle) => {
     if (typeof getLiveMarketPriceForCycle === "function") {
       return getLiveMarketPriceForCycle(resourceName, planet, priceCycle);
@@ -83,7 +84,7 @@ function buildMultiplayerStagingTradeOfferFallbacks() {
           previousBuyPrice: getFallbackPrice(resource.resourceName, buyNode, cycle - 1),
           previousSellPrice: getFallbackPrice(resource.resourceName, sellNode, cycle - 1),
           marketCycle: cycle,
-          refreshSeconds: 90,
+          refreshSeconds: Math.ceil(refreshMs / 1000),
           maxQuantity: MULTIPLAYER_STAGING_TRADE_WRITE_MAX_QUANTITY
         }));
     });
@@ -781,6 +782,7 @@ function applyMultiplayerStagingTradeObjective(result) {
       profitPerUnit: sellPrice - buyPrice,
       maxUnits: quantity,
       purchasedUnits: quantity,
+      acceptedAtCycle: typeof getMarketCycle === "function" ? getMarketCycle() : null,
       status: "active"
     };
     setActiveTradeObjective(route);
@@ -1822,7 +1824,7 @@ function buyMarketCargo() {
 
   if (typeof addActivityLog === "function") {
     const estimatedRouteProfit = (sellPrice - price) * quantity;
-    addActivityLog(`Route locked: ${currentPlanet} -> ${destination}. Loaded ${formatNumber(quantity)} ${good}. Estimated profit: ${estimatedRouteProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedRouteProfit))}.`);
+    addActivityLog(`Trade accepted: ${currentPlanet} -> ${destination}. Loaded ${formatNumber(quantity)} ${good}. Estimated profit: ${estimatedRouteProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedRouteProfit))}.`);
   }
   tutorialEvent("boughtTradeCargo");
   saveGame();
@@ -3800,10 +3802,20 @@ function getTradeObjectiveTargetNode(objective = getActiveObjective()) {
   if (!objective || objective.type !== "trade") return null;
   if (objective.dailyTradeContract) return objective.destination;
   const held = cargo[objective.good] || 0;
+  const quoteActive = isTradeObjectiveQuoteActive(objective);
 
+  if ((held > 0 || Number(objective.purchasedUnits || 0) > 0) && !quoteActive) return null;
   if (currentNode === objective.destination) return objective.destination;
-  if (held > 0 || Number(objective.purchasedUnits || 0) > 0) return objective.destination;
+  if ((held > 0 || Number(objective.purchasedUnits || 0) > 0) && quoteActive) return objective.destination;
   return objective.origin;
+}
+
+function isTradeObjectiveQuoteActive(objective = getActiveObjective()) {
+  if (!objective || objective.type !== "trade") return false;
+  if (objective.dailyTradeContract || objective.tutorialTrade) return true;
+  const acceptedCycle = Number(objective.acceptedAtCycle);
+  if (!Number.isFinite(acceptedCycle)) return true;
+  return typeof getMarketCycle !== "function" || acceptedCycle === getMarketCycle();
 }
 
 function getObjectiveRoutePath(objective = getActiveObjective()) {
@@ -3827,6 +3839,8 @@ function getTradeObjectiveStage(objective = getActiveObjective()) {
   if (!objective || objective.type !== "trade") return "none";
   if (objective.dailyTradeContract) return currentNode === objective.destination ? "deliver" : "travel";
   const held = cargo[objective.good] || 0;
+  const quoteActive = isTradeObjectiveQuoteActive(objective);
+  if (held > 0 && !quoteActive) return sectorNodes[currentNode]?.type === "planet" ? "sell-open" : "travel-open";
   if (currentNode === objective.destination) return held > 0 ? "sell" : "arrived";
   if (currentNode === objective.origin) return held > 0 ? "launch" : "buy";
   return "travel";
@@ -3838,6 +3852,8 @@ function getTradeObjectiveActionText(objective = getActiveObjective()) {
   if (stage === "buy") return "Buy stock";
   if (stage === "launch") return "Launch";
   if (stage === "sell") return "Sell cargo";
+  if (stage === "sell-open") return "Review live prices";
+  if (stage === "travel-open") return "Choose best market";
   if (stage === "arrived") return "Complete";
   if (stage === "travel") return `Go to ${objective.destination}`;
   return "No objective";
@@ -3954,9 +3970,25 @@ function renderObjectiveHud() {
     const nextHop = path.length > 1 ? path[1] : targetNode;
     const stage = getTradeObjectiveStage(objective);
     const potentialProfit = held > 0 ? held * margin : Number(objective.maxUnits || 0) * margin;
-    const routeProgress = stage === "buy" ? "Buy cargo" : stage === "launch" ? "Launch and travel" : stage === "travel" ? `Next: ${nextHop || objective.destination}` : stage === "sell" ? "Sell cargo" : "Complete";
+    const quoteActive = isTradeObjectiveQuoteActive(objective);
+    const refreshLabel = typeof getTradeCountdownLabel === "function" ? getTradeCountdownLabel() : "";
+    const routeProgress = stage === "buy"
+      ? "Buy cargo"
+      : stage === "launch"
+        ? (quoteActive && refreshLabel ? `Deliver before ${refreshLabel}` : "Review live prices")
+        : stage === "travel"
+          ? (quoteActive && refreshLabel ? `Next: ${nextHop || objective.destination} - sell before ${refreshLabel}` : "Review live prices")
+          : stage === "sell"
+            ? (quoteActive && refreshLabel ? `Sell before ${refreshLabel}` : "Sell cargo")
+            : stage === "sell-open"
+              ? "Review live prices"
+              : stage === "travel-open"
+                ? "Choose best market"
+                : "Complete";
     const capacityText = `${formatNumber(held)} / ${formatNumber(objective.maxUnits || 0)}`;
     const profitText = `${potentialProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(potentialProfit))}`;
+    const routeLabel = quoteActive ? `${objective.origin} -> ${objective.destination}` : "Market refreshed";
+    const titleVerb = quoteActive ? "Deliver" : "Sell";
 
     panel.innerHTML = `
       <div class="objective-list compact-objective-list">
@@ -3969,9 +4001,9 @@ function renderObjectiveHud() {
             <div class="objective-copy objective-copy-large objective-orbit-copy">
               <div class="objective-title-line">
                 <span class="objective-type-pill">Trade</span>
-                <strong>Deliver ${formatNumber(objective.maxUnits || held || 0)} ${objective.good}</strong>
+                <strong>${titleVerb} ${formatNumber(objective.maxUnits || held || 0)} ${objective.good}</strong>
               </div>
-              <span>${objective.origin} -> ${objective.destination}</span>
+              <span>${routeLabel}</span>
               <em>${routeProgress}</em>
             </div>
 
