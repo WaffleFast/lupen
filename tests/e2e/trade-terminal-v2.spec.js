@@ -96,6 +96,8 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-route-metrics")).toContainText("Sell at Nyxara");
     await expect(page.locator(".trade-v2-route-metrics")).toContainText("Total Cost");
     await expect(page.locator(".trade-v2-route-metrics")).toContainText("Estimated Profit");
+    await expect(page.locator(".trade-v2-ticket-head")).toContainText("Selected Cargo");
+    await expect(page.locator(".trade-v2-ticket-head img")).toBeVisible();
     await expect(page.locator(".trade-v2-market-table thead th.is-current")).toContainText("Current Station");
     await expect(page.locator(".trade-v2-market-table td.is-current").first()).toContainText("Buy Here");
     await expect(page.locator(".trade-v2-market-table td.is-target").first()).toContainText("Selected Sell Target");
@@ -148,6 +150,84 @@ test.describe("Trade Terminal final quick actions", () => {
     await page.evaluate(() => renderMarketplace());
     expectPageFits(await getPageGeometry(page));
     await page.screenshot({ path: "artifacts/trade-terminal-quick-large-desktop.png" });
+  });
+
+  test("loss routes can be purchased and full cargo uses a clean sell action", async ({ page }) => {
+    await prepareTerminal(page);
+
+    const lossRoute = await page.evaluate(() => {
+      const origin = getCurrentMarketPlanet();
+      for (const good of MAP_ONE_TRADE_RESOURCES) {
+        const buyPrice = getLiveMarketPrice(good, origin);
+        for (const destination of MAP_ONE_MARKET_PLANETS.filter((planet) => planet !== origin)) {
+          const sellPrice = getLiveMarketPrice(good, destination);
+          if (sellPrice < buyPrice) {
+            selectedMarketResource = good;
+            selectedMarketTargetPlanet = destination;
+            selectedMarketQuantity = 1;
+            renderMarketplace();
+            return { good, origin, destination, buyPrice, sellPrice };
+          }
+        }
+      }
+      return null;
+    });
+
+    expect(lossRoute).not.toBeNull();
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("-CR");
+    await expect(page.getByRole("button", { name: "Purchase Cargo" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: /Choose Higher Sell Price/i })).toHaveCount(0);
+
+    const purchased = await page.evaluate(() => {
+      const beforeCredits = credits;
+      const beforeCargo = Number(cargo[selectedMarketResource] || 0);
+      buyMarketCargo();
+      return {
+        beforeCredits,
+        afterCredits: credits,
+        beforeCargo,
+        afterCargo: Number(cargo[selectedMarketResource] || 0)
+      };
+    });
+    expect(purchased.afterCredits).toBe(purchased.beforeCredits - lossRoute.buyPrice);
+    expect(purchased.afterCargo).toBe(purchased.beforeCargo + 1);
+
+    const fullCargoState = await page.evaluate((route) => {
+      const capacity = getShipStats().cargo;
+      Object.keys(cargo).forEach((key) => { cargo[key] = 0; });
+      cargo[route.good] = capacity;
+      cargoPurchased[route.good] = capacity;
+      cargoRecovered[route.good] = 0;
+      cargoCostBasis[route.good] = route.buyPrice;
+      selectedMarketResource = route.good;
+      selectedMarketTargetPlanet = route.destination;
+      selectedMarketQuantity = 0;
+      renderMarketplace();
+      return { capacity };
+    }, lossRoute);
+    await expect(page.locator(".trade-v2-quick-action")).toHaveClass(/is-sell-mode/);
+    await expect(page.locator(".trade-v2-cargo-note")).toContainText(`${fullCargoState.capacity} ${lossRoute.good}`);
+    await expect(page.getByRole("button", { name: "Purchase Cargo" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: `Sell ${fullCargoState.capacity} ${lossRoute.good}` })).toBeVisible();
+
+    const sellLayout = await page.locator(".trade-v2-quick-action").evaluate(panel => {
+      const panelRect = panel.getBoundingClientRect();
+      const children = Array.from(panel.children).map((child) => {
+        const rect = child.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+      });
+      return {
+        allFit: children.every((rect) => (
+          rect.left >= panelRect.left - 1 &&
+          rect.right <= panelRect.right + 1 &&
+          rect.top >= panelRect.top - 1 &&
+          rect.bottom <= panelRect.bottom + 1
+        )),
+        ordered: children.every((rect, index) => index === 0 || rect.top >= children[index - 1].bottom - 1)
+      };
+    });
+    expect(sellLayout).toEqual({ allFit: true, ordered: true });
+    await page.screenshot({ path: "artifacts/trade-terminal-sell-mode-1366x768.png" });
   });
 
   test("contract packages load at their origin, persist, deliver once, and reset", async ({ page }) => {
@@ -359,7 +439,8 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-market-table tbody tr[aria-selected='true']")).toHaveCount(1);
     await expect(page.locator(".trade-v2-quick-action")).toContainText(/Copper/i);
     await page.getByRole("button", { name: /Target Virella sell price for Copper/i }).click();
-    await expect(page.locator(".trade-v2-quick-action")).toContainText(/Asteron Prime → Virella/i);
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Buy at Asteron Prime");
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Sell at Virella");
     await page.screenshot({ path: "artifacts/trade-terminal-quick-copper-selected.png" });
 
     await page.evaluate(() => {
@@ -426,9 +507,10 @@ test.describe("Trade Terminal final quick actions", () => {
       acceptedAtCycle: expect.any(Number)
     });
     await expect(page.getByRole("button", { name: new RegExp(`Sell ${beforeBuy.quantity} Copper`, "i") })).toBeEnabled();
-    await expect(page.getByRole("button", { name: "Cargo Hold Full" })).toBeDisabled();
-    await expect(page.locator(".trade-v2-quick-action")).toContainText("Cargo Hold Full");
-    await expect(page.locator(".trade-v2-quick-buttons")).toContainText("Break even");
+    await expect(page.getByRole("button", { name: "Cargo Hold Full" })).toHaveCount(0);
+    await expect(page.locator(".trade-v2-quick-action")).toHaveClass(/is-sell-mode/);
+    await expect(page.locator(".trade-v2-cargo-note")).toContainText("Cargo hold full");
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Projected Result");
     await page.screenshot({ path: "artifacts/trade-terminal-quick-sell-enabled.png" });
 
     await page.evaluate(() => {
@@ -436,7 +518,7 @@ test.describe("Trade Terminal final quick actions", () => {
       lastPlanetNode = activeTradeRoute.destination;
       renderMarketplace();
     });
-    await expect(page.locator(".trade-v2-quick-buttons")).toContainText("Projected result:");
+    await expect(page.locator(".trade-v2-route-metrics")).toContainText("Projected Result");
     const beforeSale = await page.evaluate(() => ({ credits, cargoSold: playerProgress.totals.cargoSold || 0 }));
     await page.locator(".trade-v2-sell-action", { hasText: /Sell .* Copper/i }).click();
     const afterSale = await page.evaluate(() => ({

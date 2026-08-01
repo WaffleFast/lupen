@@ -1219,9 +1219,13 @@
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
-  grid-template-rows: minmax(146px, 1fr) 54px 40px;
+  grid-template-rows: 38px minmax(118px, 1fr) 54px 42px;
   align-items: stretch;
-  gap: 9px;
+  gap: 8px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action.is-sell-mode {
+  grid-template-rows: 38px minmax(118px, 1fr) 48px 58px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control {
@@ -1243,6 +1247,10 @@
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons {
   grid-template-rows: none;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action.is-sell-mode .trade-v2-quick-buttons {
+  grid-template-rows: 34px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons button {

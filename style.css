@@ -56264,8 +56264,8 @@ input::placeholder {
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(146px, 1fr) 54px 40px;
-  gap: 9px;
+  grid-template-rows: 38px minmax(118px, 1fr) 54px 42px;
+  gap: 8px;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -56276,6 +56276,51 @@ input::placeholder {
   background:
     radial-gradient(circle at 18% 8%, rgba(41, 164, 211, 0.13), transparent 40%),
     rgba(3, 18, 30, 0.92);
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action.is-sell-mode {
+  grid-template-rows: 38px minmax(118px, 1fr) 48px 58px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-ticket-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(77, 179, 218, 0.22);
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-ticket-head img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(54, 218, 255, 0.2));
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-ticket-head span,
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-ticket-head strong {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-ticket-head span {
+  color: #68dff3;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-ticket-head strong {
+  margin-top: 1px;
+  color: #f4fbff;
+  font-size: 18px;
+  line-height: 1;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-buy-control {
@@ -56291,10 +56336,44 @@ input::placeholder {
   grid-template-columns: 42px minmax(64px, 1fr) 42px 70px;
 }
 
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-cargo-note {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 7px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 209, 73, 0.32);
+  border-radius: 6px;
+  background: rgba(43, 31, 8, 0.42);
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-cargo-note span,
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-cargo-note strong {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-cargo-note span {
+  color: #ffd35e;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-cargo-note strong {
+  margin-top: 2px;
+  color: #fff2bd;
+  font-size: 13px;
+}
+
 .trade-v2-route-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(58px, 1fr));
+  grid-template-rows: repeat(2, minmax(54px, 1fr));
   align-content: stretch;
   gap: 8px;
   min-height: 0;
@@ -56305,8 +56384,8 @@ input::placeholder {
   display: grid;
   align-content: center;
   min-width: 0;
-  min-height: 58px;
-  padding: 8px 10px;
+  min-height: 54px;
+  padding: 7px 10px;
   border: 1px solid rgba(72, 192, 235, 0.25);
   border-radius: 6px;
   background: rgba(2, 16, 27, 0.68);
@@ -56339,9 +56418,21 @@ input::placeholder {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-content: end;
-  gap: 4px;
+  gap: 5px;
   min-height: 0;
   overflow: hidden;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action.is-sell-mode .trade-v2-quick-buttons {
+  grid-template-columns: 1fr;
+  grid-template-rows: 34px;
+}
+
+#marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action.is-sell-mode .trade-v2-sell-action {
+  border-color: rgba(82, 232, 255, 0.72);
+  background: linear-gradient(180deg, rgba(23, 143, 219, 0.92), rgba(10, 83, 154, 0.94));
+  color: #f8feff;
+  box-shadow: 0 0 16px rgba(25, 181, 255, 0.2);
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons button {

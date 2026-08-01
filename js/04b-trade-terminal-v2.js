@@ -645,11 +645,6 @@ function buyMarketCargo() {
     renderMarketplace();
     return;
   }
-  if (quote.unitProfit <= 0) {
-    setTradeTerminalStatus("Choose a sell target with a higher price before purchasing cargo.");
-    renderMarketplace();
-    return;
-  }
   if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive()) {
     const offer = getLiveMarketRouteOffer(good, target);
     if (!offer) {
@@ -1124,6 +1119,7 @@ function renderLiveMarketQuickActions() {
   const planet = getCurrentMarketPlanet();
   const quote = getSelectedLiveMarketRouteQuote(good);
   const target = quote.destination;
+  const info = commodityInfo[good] || {};
   const price = quote.buyPrice;
   const capacity = Math.max(1, Number(getShipStats().cargo || 1));
   const used = Math.max(0, Number(cargoUsed() || 0));
@@ -1135,9 +1131,10 @@ function renderLiveMarketQuickActions() {
   const buyWrite = getQuickMarketWriteState("buy", good, planet, target);
   const sellWrite = getQuickMarketWriteState("sell", good, planet);
   const unitMargin = quote.unitProfit;
-  const buyReason = !target ? "Choose a sell target." : unitMargin <= 0 ? "Choose a higher sell price." : freeCargo <= 0 ? "Cargo hold full." : credits < price ? "Not enough credits." : buyLimit <= 0 ? "Purchase unavailable." : buyWrite.reason;
-  const buyDisabled = quantity <= 0 || price <= 0 || !target || unitMargin <= 0 || !buyWrite.enabled;
+  const buyReason = !target ? "Choose a sell target." : freeCargo <= 0 ? "Cargo hold full." : credits < price ? "Not enough credits." : buyLimit <= 0 ? "Purchase unavailable." : buyWrite.reason;
+  const buyDisabled = quantity <= 0 || price <= 0 || !target || freeCargo <= 0 || credits < price || buyLimit <= 0 || !buyWrite.enabled;
   const sellDisabled = sellable <= 0 || price <= 0 || !sellWrite.enabled;
+  const sellMode = freeCargo <= 0 && sellable > 0;
   const saleValue = price * sellable;
   const purchased = getPurchasedCargoQuantity(good);
   const recovered = getRecoveredCargoQuantity(good);
@@ -1148,23 +1145,31 @@ function renderLiveMarketQuickActions() {
     : `Projected result: ${projectedResult > 0 ? "+" : "-"}CR ${formatNumber(Math.abs(projectedResult))}`;
   const estimatedProfit = unitMargin * quantity;
   const marginClass = unitMargin >= 0 ? "profit-good" : "profit-bad";
+  const resultClass = projectedResult >= 0 ? "profit-good" : "profit-bad";
   const buyButtonLabel = freeCargo <= 0
     ? "Cargo Hold Full"
     : credits < price
       ? "Insufficient Credits"
-      : unitMargin <= 0
-        ? "Choose Higher Sell Price"
-        : buyWrite.reason
+      : buyWrite.reason
         ? "Market Unavailable"
         : "Purchase Cargo";
   return `
-    <section class="trade-v2-quick-action" aria-label="${escapeHtml(good)} trade ticket">
+    <section class="trade-v2-quick-action ${sellMode ? "is-sell-mode" : ""}" aria-label="${escapeHtml(good)} trade ticket">
+      <div class="trade-v2-ticket-head">
+        <img src="${escapeHtml(info.icon || getCommodityImage(good))}" alt="">
+        <div><span>Selected Cargo</span><strong>${escapeHtml(good)}</strong></div>
+      </div>
       <div class="trade-v2-route-metrics">
         <div><span>Buy at ${escapeHtml(planet)}</span><strong>CR ${formatNumber(price)}</strong></div>
         <div><span>Sell at ${escapeHtml(target || "Target")}</span><strong>CR ${formatNumber(quote.sellPrice || 0)}</strong></div>
-        <div><span>Total Cost</span><strong>CR ${formatNumber(price * quantity)}</strong></div>
-        <div><span>Estimated Profit</span><strong class="${marginClass}">${estimatedProfit >= 0 ? "+" : "-"}CR ${formatNumber(Math.abs(estimatedProfit))}</strong></div>
+        <div><span>${sellMode ? "Sale Value" : "Total Cost"}</span><strong>CR ${formatNumber(sellMode ? saleValue : price * quantity)}</strong></div>
+        <div><span>${sellMode ? "Projected Result" : "Estimated Profit"}</span><strong class="${sellMode ? resultClass : marginClass}">${sellMode ? (projectedResult >= 0 ? "+" : "-") : (estimatedProfit >= 0 ? "+" : "-")}CR ${formatNumber(Math.abs(sellMode ? projectedResult : estimatedProfit))}</strong></div>
       </div>
+      ${sellMode ? `
+      <div class="trade-v2-cargo-note">
+        <span>Cargo hold full</span>
+        <strong>${formatNumber(sellable)} ${escapeHtml(good)} ready to sell</strong>
+      </div>` : `
       <div class="trade-v2-buy-control">
         <span>Quantity</span>
         <div class="trade-v2-stepper">
@@ -1173,11 +1178,11 @@ function renderLiveMarketQuickActions() {
           <button type="button" aria-label="Increase quantity" onclick="adjustMarketQuantity(1)" ${quantity >= buyLimit ? "disabled" : ""}>+</button>
           <button type="button" class="trade-v2-max" data-tutorial-target="marketMaxAmount" onclick="setMarketQuantityMax()" ${buyLimit <= 0 ? "disabled" : ""}>Max</button>
         </div>
-      </div>
+      </div>`}
       <div class="trade-v2-quick-buttons">
-        <button type="button" class="trade-v2-transaction-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${buyDisabled ? "disabled aria-disabled=\"true\"" : ""}>${escapeHtml(buyButtonLabel)}</button>
+        ${sellMode ? "" : `<button type="button" class="trade-v2-transaction-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${buyDisabled ? "disabled aria-disabled=\"true\"" : ""}>${escapeHtml(buyButtonLabel)}</button>`}
         ${sellable > 0 ? `<button type="button" class="trade-v2-sell-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${sellDisabled ? "disabled aria-disabled=\"true\"" : ""}>Sell ${formatNumber(sellable)} ${escapeHtml(good)}</button>` : ""}
-        ${sellable > 0 ? `<small>Sale value: CR ${formatNumber(saleValue)} &middot; ${escapeHtml(projectedResultLabel)}</small>` : ""}
+        ${sellable > 0 && !sellMode ? `<small>Sale value: CR ${formatNumber(saleValue)} &middot; ${escapeHtml(projectedResultLabel)}</small>` : ""}
       </div>
     </section>
   `;
