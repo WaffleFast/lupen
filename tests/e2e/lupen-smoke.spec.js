@@ -7721,7 +7721,8 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeSell.terminalHighlightedInTerminal).toBe(false);
     expect(tradeSell.buyButtonPresent).toBe(true);
     expect(tradeSell.builderText).toContain("Quantity");
-    expect(tradeSell.builderText).toContain("Sale value");
+    expect(tradeSell.builderText).not.toContain("Sale value");
+    expect(tradeSell.builderText).not.toContain("Projected result");
     expect(tradeSell.builderText).not.toContain("current route sell support unavailable");
     expect(tradeSell.cargoBeforeSell).toBeGreaterThan(0);
     expect(tradeSell.creditsAfterFirstSell).toBeGreaterThan(tradeSell.creditsBeforeSell);

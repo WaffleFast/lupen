@@ -56177,11 +56177,11 @@ input::placeholder {
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-market-table thead th.is-current {
-  color: #91f3ff;
+  color: #8dff63;
   background:
-    linear-gradient(180deg, rgba(31, 181, 222, 0.24), rgba(4, 33, 49, 0.98)),
+    linear-gradient(180deg, rgba(95, 218, 67, 0.22), rgba(6, 43, 27, 0.98)),
     rgba(3, 22, 36, 0.99);
-  box-shadow: inset 0 -2px 0 rgba(78, 230, 255, 0.7);
+  box-shadow: inset 0 -2px 0 rgba(124, 255, 89, 0.72);
 }
 
 .trade-v2-current-station-marker {
@@ -56190,17 +56190,17 @@ input::placeholder {
   width: 18px;
   height: 18px;
   margin-right: 6px;
-  border: 1px solid rgba(112, 235, 255, 0.64);
+  border: 1px solid rgba(128, 255, 91, 0.68);
   border-radius: 50%;
-  color: #8af2ff;
-  background: rgba(24, 139, 180, 0.3);
+  color: #9cff71;
+  background: rgba(50, 152, 45, 0.28);
   font-size: 11px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-market-table thead th small {
   display: block;
   margin-top: 2px;
-  color: #9deefe;
+  color: #9cff71;
   font-size: 8px;
   letter-spacing: 0.08em;
 }
@@ -56252,9 +56252,9 @@ input::placeholder {
 
 .trade-v2-market-table td.is-current {
   background:
-    linear-gradient(180deg, rgba(35, 186, 230, 0.15), rgba(20, 119, 159, 0.1)),
-    rgba(12, 69, 95, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(72, 214, 247, 0.38);
+    linear-gradient(180deg, rgba(102, 230, 64, 0.14), rgba(46, 143, 50, 0.1)),
+    rgba(12, 78, 47, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(120, 239, 66, 0.42);
 }
 
 .trade-v2-price-cell-button.is-target > small {
@@ -56264,7 +56264,7 @@ input::placeholder {
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-action {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 38px minmax(118px, 1fr) 54px 42px;
+  grid-template-rows: 38px minmax(118px, 1fr) 54px 36px;
   gap: 8px;
   min-width: 0;
   min-height: 0;
@@ -56436,7 +56436,7 @@ input::placeholder {
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons button {
-  min-height: 31px;
+  min-height: 34px;
 }
 
 #marketScreen .trade-v2-view[data-trade-view="market-first"] .trade-v2-quick-buttons .trade-v2-transaction-action:only-child {

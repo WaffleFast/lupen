@@ -588,8 +588,23 @@ function getMarketTargetOptions(origin = getCurrentMarketPlanet()) {
   return MAP_ONE_MARKET_PLANETS.filter((planet) => planet !== origin);
 }
 
+function getOrderedLiveMarketPlanets(currentPlanet = getCurrentMarketPlanet()) {
+  if (!MAP_ONE_MARKET_PLANETS.includes(currentPlanet)) return MAP_ONE_MARKET_PLANETS;
+  return [currentPlanet, ...MAP_ONE_MARKET_PLANETS.filter((planet) => planet !== currentPlanet)];
+}
+
+function getAvailableLiveMarketTargetOptions(good = selectedMarketResource, origin = getCurrentMarketPlanet()) {
+  const baseOptions = getMarketTargetOptions(origin);
+  if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && typeof getMultiplayerStagingTargetPlanetsForResource === "function") {
+    const stagingTargets = getMultiplayerStagingTargetPlanetsForResource(good, origin)
+      .filter((planet) => baseOptions.includes(planet));
+    if (stagingTargets.length) return stagingTargets;
+  }
+  return baseOptions;
+}
+
 function getBestLiveMarketTargetPlanet(good = selectedMarketResource, origin = getCurrentMarketPlanet()) {
-  const options = getMarketTargetOptions(origin);
+  const options = getAvailableLiveMarketTargetOptions(good, origin);
   if (!options.length) return "";
   if (activeTradeRoute?.marketTrade && activeTradeRoute.good === good && options.includes(activeTradeRoute.destination)) {
     return activeTradeRoute.destination;
@@ -601,7 +616,8 @@ function getBestLiveMarketTargetPlanet(good = selectedMarketResource, origin = g
 
 function ensureLiveMarketTargetPlanet(good = selectedMarketResource, origin = getCurrentMarketPlanet()) {
   if (!MAP_ONE_TRADE_RESOURCES.includes(good)) good = MAP_ONE_TRADE_RESOURCES[0];
-  if (!MAP_ONE_MARKET_PLANETS.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === origin) {
+  const options = getAvailableLiveMarketTargetOptions(good, origin);
+  if (!options.includes(selectedMarketTargetPlanet) || selectedMarketTargetPlanet === origin) {
     selectedMarketTargetPlanet = getBestLiveMarketTargetPlanet(good, origin);
   }
   return selectedMarketTargetPlanet;
@@ -707,6 +723,11 @@ function sellMarketCargo() {
   }
   if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive()) {
     const offer = getOpenMarketStagingOffer("sell", good, planet);
+    if (!offer) {
+      setTradeTerminalStatus("No buyer is available for " + good + " at " + planet + ".");
+      renderMarketplace();
+      return;
+    }
     requestMultiplayerStagingTradeDryRun({ operation: "sell", offerId: offer?.offerId || "", quantity });
     return;
   }
@@ -820,10 +841,11 @@ function renderLiveMarketPriceCell(good, planet, currentPlanet, interactive = fa
 
 function renderLiveMarketPriceTable({ interactive = false } = {}) {
   const currentPlanet = getCurrentMarketPlanet();
+  const orderedPlanets = getOrderedLiveMarketPlanets(currentPlanet);
   return `
     <div class="trade-v2-table-wrap">
       <table class="trade-v2-market-table">
-        <thead><tr><th scope="col">Commodity</th>${MAP_ONE_MARKET_PLANETS.map((planet) => `<th scope="col" class="${planet === currentPlanet ? "is-current" : ""}">${planet === currentPlanet ? `<span class="trade-v2-current-station-marker" aria-hidden="true">&#8982;</span>${escapeHtml(planet)} <small>Current Station</small>` : escapeHtml(planet)}</th>`).join("")}</tr></thead>
+        <thead><tr><th scope="col">Commodity</th>${orderedPlanets.map((planet) => `<th scope="col" class="${planet === currentPlanet ? "is-current" : ""}">${planet === currentPlanet ? `<span class="trade-v2-current-station-marker" aria-hidden="true">&#8982;</span>${escapeHtml(planet)} <small>Current Station</small>` : escapeHtml(planet)}</th>`).join("")}</tr></thead>
         <tbody>
           ${MAP_ONE_TRADE_RESOURCES.map((good) => {
             const info = commodityInfo[good] || {};
@@ -833,7 +855,7 @@ function renderLiveMarketPriceTable({ interactive = false } = {}) {
               ${good === "Iron" ? 'data-tutorial-target="marketResourceIron"' : ""}
               ${interactive ? `tabindex="0" role="button" aria-label="Select ${escapeHtml(good)}" onclick="setMarketResource('${escapeJsString(good)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setMarketResource('${escapeJsString(good)}');}"` : ""}>
               <th scope="row"><span class="trade-v2-commodity"><img src="${escapeHtml(info.icon || getCommodityImage(good))}" alt=""><strong>${escapeHtml(good)}</strong></span></th>
-              ${MAP_ONE_MARKET_PLANETS.map((planet) => renderLiveMarketPriceCell(good, planet, currentPlanet, interactive)).join("")}
+              ${orderedPlanets.map((planet) => renderLiveMarketPriceCell(good, planet, currentPlanet, interactive)).join("")}
             </tr>`;
           }).join("")}
         </tbody>
@@ -1182,7 +1204,6 @@ function renderLiveMarketQuickActions() {
       <div class="trade-v2-quick-buttons">
         ${sellMode ? "" : `<button type="button" class="trade-v2-transaction-action" data-tutorial-target="buyCargo" onclick="buyMarketCargo()" ${buyDisabled ? "disabled aria-disabled=\"true\"" : ""}>${escapeHtml(buyButtonLabel)}</button>`}
         ${sellable > 0 ? `<button type="button" class="trade-v2-sell-action" data-tutorial-target="sellCargo" onclick="sellMarketCargo()" ${sellDisabled ? "disabled aria-disabled=\"true\"" : ""}>Sell ${formatNumber(sellable)} ${escapeHtml(good)}</button>` : ""}
-        ${sellable > 0 && !sellMode ? `<small>Sale value: CR ${formatNumber(saleValue)} &middot; ${escapeHtml(projectedResultLabel)}</small>` : ""}
       </div>
     </section>
   `;

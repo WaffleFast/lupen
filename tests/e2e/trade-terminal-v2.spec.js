@@ -99,6 +99,7 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-ticket-head")).toContainText("Selected Cargo");
     await expect(page.locator(".trade-v2-ticket-head img")).toBeVisible();
     await expect(page.locator(".trade-v2-market-table thead th.is-current")).toContainText("Current Station");
+    await expect(page.locator(".trade-v2-market-table thead th").nth(1)).toContainText("Asteron Prime");
     await expect(page.locator(".trade-v2-market-table td.is-current").first()).toContainText("Buy Here");
     await expect(page.locator(".trade-v2-market-table td.is-target").first()).toContainText("Selected Sell Target");
     await expect(page.locator(".trade-v2-market-table")).not.toContainText(/▲|▼/);
@@ -209,6 +210,8 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-cargo-note")).toContainText(`${fullCargoState.capacity} ${lossRoute.good}`);
     await expect(page.getByRole("button", { name: "Purchase Cargo" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: `Sell ${fullCargoState.capacity} ${lossRoute.good}` })).toBeVisible();
+    await expect(page.locator(".trade-v2-quick-buttons")).not.toContainText("Sale value");
+    await expect(page.locator(".trade-v2-quick-buttons")).not.toContainText("Projected result");
 
     const sellLayout = await page.locator(".trade-v2-quick-action").evaluate(panel => {
       const panelRect = panel.getBoundingClientRect();
@@ -228,6 +231,62 @@ test.describe("Trade Terminal final quick actions", () => {
     });
     expect(sellLayout).toEqual({ allFit: true, ordered: true });
     await page.screenshot({ path: "artifacts/trade-terminal-sell-mode-1366x768.png" });
+  });
+
+  test("recovered resources can be sold without cramped helper text", async ({ page }) => {
+    await prepareTerminal(page);
+
+    const before = await page.evaluate(() => {
+      cargo.Iron = 14;
+      cargoRecovered.Iron = 14;
+      cargoPurchased.Iron = 0;
+      delete cargoCostBasis.Iron;
+      selectedMarketResource = "Iron";
+      selectedMarketTargetPlanet = "Nyxara";
+      selectedMarketQuantity = 1;
+      renderMarketplace();
+      return {
+        credits,
+        sellPrice: getLiveMarketPrice("Iron", getCurrentMarketPlanet()),
+        cargoSold: playerProgress.totals.cargoSold || 0
+      };
+    });
+
+    await expect(page.getByRole("button", { name: "Sell 14 Iron" })).toBeEnabled();
+    await expect(page.locator(".trade-v2-quick-buttons")).not.toContainText("Sale value");
+    await expect(page.locator(".trade-v2-quick-buttons")).not.toContainText("Projected result");
+    await page.getByRole("button", { name: "Sell 14 Iron" }).click();
+
+    const after = await page.evaluate(() => ({
+      credits,
+      held: cargo.Iron || 0,
+      recovered: cargoRecovered.Iron || 0,
+      cargoSold: playerProgress.totals.cargoSold || 0,
+      status: tradeTerminalStatusMessage
+    }));
+    expect(after.credits).toBe(before.credits + before.sellPrice * 14);
+    expect(after.held).toBe(0);
+    expect(after.recovered).toBe(0);
+    expect(after.cargoSold).toBe(before.cargoSold + 14);
+    expect(after.status).toContain("Sale complete");
+    await page.screenshot({ path: "artifacts/trade-terminal-recovered-iron-sold.png" });
+  });
+
+  test("mixed recovered cargo does not block buying another resource", async ({ page }) => {
+    await prepareTerminal(page);
+
+    await page.evaluate(() => {
+      cargo.Iron = 14;
+      cargoRecovered.Iron = 14;
+      selectedMarketResource = "Cobalt";
+      selectedMarketTargetPlanet = "Nyxara";
+      selectedMarketQuantity = 1;
+      renderMarketplace();
+    });
+
+    await expect(page.locator(".trade-v2-quick-action")).toContainText("Cobalt");
+    await expect(page.getByRole("button", { name: "Purchase Cargo" })).toBeEnabled();
+    await expect(page.locator("#cargoText")).toContainText("14 /");
   });
 
   test("contract packages load at their origin, persist, deliver once, and reset", async ({ page }) => {
