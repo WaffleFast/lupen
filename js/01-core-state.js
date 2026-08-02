@@ -37,6 +37,14 @@ const mineralKeys = ["Iron", "Copper", "Cobalt", "Titanium", "Crystal Shards", "
 const MAP_ONE_MARKET_PLANETS = ["Asteron Prime", "Virella", "Nyxara"];
 const MAP_ONE_TRADE_RESOURCES = Object.freeze(["Iron", "Copper", "Cobalt"]);
 
+function isMapOneCargoResource(resource) {
+  return MAP_ONE_TRADE_RESOURCES.includes(resource);
+}
+
+function getMapOneCargoResource(resource, fallback = "Iron") {
+  return isMapOneCargoResource(resource) ? resource : (isMapOneCargoResource(fallback) ? fallback : "Iron");
+}
+
 const COMMODITY_ICON_PATH = "assets/commodities/";
 
 const commodityInfo = {
@@ -185,20 +193,20 @@ Object.entries(sectorNodes).forEach(([name, node]) => {
 const nodeMineralPools = Object.fromEntries(
   Object.entries(sectorNodes).map(([name, node]) => {
     if (node.type === "planet") {
-      if (name === "Virella") return [name, ["Iron", "Copper", "Crystal Shards"]];
-      if (name === "Asteron Prime") return [name, ["Titanium", "Cobalt", "Crystal Shards"]];
-      return [name, ["Crystal Shards", "Platinum", "Dark Matter Residue"]];
+      if (name === "Virella") return [name, ["Iron", "Copper"]];
+      if (name === "Asteron Prime") return [name, ["Iron", "Cobalt"]];
+      return [name, ["Copper", "Cobalt"]];
     }
 
     if (node.route === "safe") {
-      return [name, ["Iron", "Copper", "Cobalt", "Titanium"]];
+      return [name, ["Iron", "Copper", "Cobalt"]];
     }
 
     if (node.y < 50) {
-      return [name, ["Cobalt", "Crystal Shards", "Iridium", "Xenon Gas"]];
+      return [name, ["Iron", "Cobalt"]];
     }
 
-    return [name, ["Titanium", "Iridium", "Platinum", "Uranium"]];
+    return [name, ["Copper", "Cobalt"]];
   })
 );
 
@@ -865,7 +873,7 @@ function getRecoveredCargoQuantity(good) {
 
 function addRecoveredCargoQuantity(good, quantity) {
   const amount = Math.max(0, Math.round(Number(quantity || 0)));
-  if (!good || !amount || !mineralKeys.includes(good)) return 0;
+  if (!good || !amount || !isMapOneCargoResource(good)) return 0;
   cargoRecovered[good] = getRecoveredCargoQuantity(good) + amount;
   cargoRecovered[good] = Math.min(Number(cargo[good] || 0), cargoRecovered[good]);
   if (cargoRecovered[good] <= 0) delete cargoRecovered[good];
@@ -889,7 +897,7 @@ function pruneRecoveredCargoQuantities() {
     return cargoRecovered;
   }
   Object.keys(cargoRecovered).forEach((good) => {
-    if (!mineralKeys.includes(good)) {
+    if (!isMapOneCargoResource(good)) {
       delete cargoRecovered[good];
       return;
     }
@@ -922,7 +930,35 @@ function reconcileTradeCargoLedgers() {
   Object.keys(cargoPurchased).forEach((good) => {
     if (!MAP_ONE_TRADE_RESOURCES.includes(good)) delete cargoPurchased[good];
   });
+  Object.keys(cargoRecovered).forEach((good) => {
+    if (!MAP_ONE_TRADE_RESOURCES.includes(good)) delete cargoRecovered[good];
+  });
   return { cargoPurchased, cargoRecovered };
+}
+
+function pruneMapOneCargoState() {
+  mineralKeys.forEach((good) => {
+    if (isMapOneCargoResource(good)) return;
+    cargo[good] = 0;
+    if (cargoCostBasis?.[good]) delete cargoCostBasis[good];
+    if (cargoPurchased?.[good]) delete cargoPurchased[good];
+    if (cargoRecovered?.[good]) delete cargoRecovered[good];
+  });
+
+  if (lootByNode && typeof lootByNode === "object") {
+    Object.entries(lootByNode).forEach(([nodeId, loot]) => {
+      if (!loot || typeof loot !== "object") {
+        delete lootByNode[nodeId];
+        return;
+      }
+      Object.keys(loot).forEach((good) => {
+        if (!isMapOneCargoResource(good)) delete loot[good];
+      });
+      if (!Object.values(loot).some(amount => Number(amount || 0) > 0)) delete lootByNode[nodeId];
+    });
+  }
+
+  return reconcileTradeCargoLedgers();
 }
 
 let activeTradeTerminalTab = "overview";
@@ -1951,7 +1987,8 @@ function isAllowedAsteroidNode(nodeId) {
 }
 
 function createAsteroid(resource, nodeId, index = 0) {
-  const definition = getAsteroidResourceDefinition(resource);
+  const safeResource = getMapOneCargoResource(resource, "Iron");
+  const definition = getAsteroidResourceDefinition(safeResource);
   const variant = ASTEROID_YIELD_VARIANTS[index % ASTEROID_YIELD_VARIANTS.length];
   const position = ASTEROID_FIELD_POSITIONS[index % ASTEROID_FIELD_POSITIONS.length];
   const maxHp = Math.max(80, Math.round(Number(definition.hp || ASTEROID_BASE_HP) * variant.hp));
@@ -1959,11 +1996,11 @@ function createAsteroid(resource, nodeId, index = 0) {
   const dropMax = Math.max(dropMin, Math.round(Number(definition.dropMax || dropMin) * variant.drop));
 
   return {
-    id: `asteroid-${index + 1}-${getAsteroidResourceSlug(resource)}`,
-    resource,
-    name: getAsteroidDisplayName(resource, variant.label),
+    id: `asteroid-${index + 1}-${getAsteroidResourceSlug(safeResource)}`,
+    resource: safeResource,
+    name: getAsteroidDisplayName(safeResource, variant.label),
     node: nodeId,
-    image: getAsteroidImage(resource),
+    image: getAsteroidImage(safeResource),
     shield: 0,
     shieldMax: 0,
     maxShield: 0,
@@ -1998,7 +2035,8 @@ function normalizeAsteroid(asteroid, index = 0) {
   const fallback = createMapOneAsteroid(index);
   if (!asteroid || typeof asteroid !== "object") return fallback;
 
-  const resource = ASTEROID_RESOURCE_TYPES[asteroid.resource] ? asteroid.resource : fallback.resource;
+  const resource = getMapOneCargoResource(asteroid.resource, fallback.resource);
+  const resourceChanged = asteroid.resource !== resource;
   const definition = getAsteroidResourceDefinition(resource);
   const node = isAllowedAsteroidNode(asteroid.node) ? asteroid.node : fallback.node;
   const maxHp = Math.max(80, Math.round(Number(asteroid.maxHp || asteroid.hullMax || definition.hp || fallback.maxHp)));
@@ -2011,7 +2049,7 @@ function normalizeAsteroid(asteroid, index = 0) {
     ...asteroid,
     id: asteroid.id || fallback.id,
     resource,
-    name: asteroid.name || getAsteroidDisplayName(resource, asteroid.yieldLabel || fallback.yieldLabel),
+    name: resourceChanged ? getAsteroidDisplayName(resource, asteroid.yieldLabel || fallback.yieldLabel) : (asteroid.name || getAsteroidDisplayName(resource, asteroid.yieldLabel || fallback.yieldLabel)),
     node,
     image: getAsteroidImage(resource),
     shield: 0,

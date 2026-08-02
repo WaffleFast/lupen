@@ -1711,7 +1711,9 @@ function updateTargetPanel() {
 
 function generateLootFromAsteroid(asteroidOrNode) {
   if (asteroidOrNode && typeof asteroidOrNode === "object") {
-    const resource = ASTEROID_RESOURCE_TYPES[asteroidOrNode.resource] ? asteroidOrNode.resource : "Iron";
+    const resource = typeof getMapOneCargoResource === "function"
+      ? getMapOneCargoResource(asteroidOrNode.resource, "Iron")
+      : (MAP_ONE_TRADE_RESOURCES.includes(asteroidOrNode.resource) ? asteroidOrNode.resource : "Iron");
     const min = Math.max(1, Math.round(Number(asteroidOrNode.dropMin || getAsteroidResourceDefinition(resource).dropMin || 1)));
     const max = Math.max(min, Math.round(Number(asteroidOrNode.dropMax || getAsteroidResourceDefinition(resource).dropMax || min)));
     return {
@@ -1720,7 +1722,9 @@ function generateLootFromAsteroid(asteroidOrNode) {
   }
 
   const nodeName = asteroidOrNode;
-  const fallbackMineral = nodeMineralPools[nodeName]?.[0] || "Iron";
+  const fallbackMineral = typeof getMapOneCargoResource === "function"
+    ? getMapOneCargoResource(nodeMineralPools[nodeName]?.[0], "Iron")
+    : (MAP_ONE_TRADE_RESOURCES.includes(nodeMineralPools[nodeName]?.[0]) ? nodeMineralPools[nodeName]?.[0] : "Iron");
   const definition = getAsteroidResourceDefinition(fallbackMineral);
   const min = Math.max(1, Number(definition.dropMin || 1));
   const max = Math.max(min, Number(definition.dropMax || min));
@@ -1792,6 +1796,7 @@ function addLootToNode(nodeName, drops) {
 
   Object.entries(drops).forEach(([mineral, amount]) => {
     if (!amount || amount <= 0) return;
+    if (typeof isMapOneCargoResource === "function" && !isMapOneCargoResource(mineral)) return;
     lootByNode[nodeName][mineral] = (lootByNode[nodeName][mineral] || 0) + amount;
   });
 
@@ -1809,6 +1814,7 @@ function depositLootToCargo(drops) {
   Object.entries(drops || {}).forEach(([mineral, amount]) => {
     const quantity = Math.max(0, Math.round(Number(amount || 0)));
     if (!quantity || !mineralKeys.includes(mineral)) return;
+    if (typeof isMapOneCargoResource === "function" && !isMapOneCargoResource(mineral)) return;
 
     const collectedQuantity = Math.min(quantity, availableSpace);
     const overflowQuantity = quantity - collectedQuantity;
@@ -1841,7 +1847,13 @@ function depositLootToCargo(drops) {
 function applyStagingResourceMineResult(result = {}) {
   const resourceName = String(result.resourceName || "").trim();
   const cargoDelta = Math.max(0, Math.round(Number(result.cargoDelta || 0)));
-  if (!result || result.ok !== true || cargoDelta <= 0 || !mineralKeys.includes(resourceName)) {
+  if (
+    !result ||
+    result.ok !== true ||
+    cargoDelta <= 0 ||
+    !mineralKeys.includes(resourceName) ||
+    (typeof isMapOneCargoResource === "function" && !isMapOneCargoResource(resourceName))
+  ) {
     return { applied: false, reason: "invalid_resource_award", collectedAmount: 0, overflowAmount: 0 };
   }
 
@@ -2004,11 +2016,17 @@ function collectLoot(mineralToCollect = null) {
   }
 
   const collectedLoot = {};
-  const mineralsToCheck = mineralToCollect ? [mineralToCollect] : mineralKeys;
+  const mineralsToCheck = mineralToCollect
+    ? [mineralToCollect]
+    : (typeof MAP_ONE_TRADE_RESOURCES !== "undefined" ? MAP_ONE_TRADE_RESOURCES : mineralKeys);
 
   mineralsToCheck.forEach(mineral => {
     const amount = loot[mineral] || 0;
     if (amount <= 0 || availableSpace <= 0) return;
+    if (typeof isMapOneCargoResource === "function" && !isMapOneCargoResource(mineral)) {
+      delete loot[mineral];
+      return;
+    }
 
     const collected = Math.min(amount, availableSpace);
     cargo[mineral] += collected;
@@ -2055,6 +2073,7 @@ function jettisonCargo(mineral, amount = "all") {
 
 
 function updateCargoSummary() {
+  if (typeof pruneMapOneCargoState === "function") pruneMapOneCargoState();
   updateHudDock();
 }
 

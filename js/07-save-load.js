@@ -207,6 +207,7 @@ function getLeaveSaveNode() {
 function buildSaveState(options = {}) {
   if (typeof saveActiveShipCondition === "function") saveActiveShipCondition(currentShipId);
   if (typeof normalizePlayerProgress === "function") playerProgress = normalizePlayerProgress(playerProgress);
+  if (typeof pruneMapOneCargoState === "function") pruneMapOneCargoState();
   const leaveSave = Boolean(options.leaveSave);
   const savedCurrentNode = leaveSave ? getLeaveSaveNode() : currentNode;
   const savedLastPlanetNode = sectorNodes[savedCurrentNode]?.type === "planet" ? savedCurrentNode : lastPlanetNode;
@@ -1244,6 +1245,7 @@ function applyLoadedGameState(rawSaved) {
       if (purchased > 0) cargoPurchased[good] = purchased;
     });
   }
+  if (typeof pruneMapOneCargoState === "function") pruneMapOneCargoState();
   if (typeof reconcileTradeCargoLedgers === "function") reconcileTradeCargoLedgers();
   else if (typeof pruneRecoveredCargoQuantities === "function") pruneRecoveredCargoQuantities();
   if (typeof ensureDailyTradeContracts === "function") ensureDailyTradeContracts();

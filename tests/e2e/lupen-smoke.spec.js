@@ -4428,7 +4428,7 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
     await expect(page.locator(".active-bounty-summary.has-active-bounty")).toBeVisible();
-    await expect(page.locator(".active-bounty-summary.has-active-bounty")).toContainText("1 / 4 destroyed");
+    await expect(page.locator(".active-bounty-summary.has-active-bounty")).toContainText("1 / 1 destroyed");
     const activeBountyHeight = await page.locator(".active-bounty-summary.has-active-bounty").evaluate(card => card.getBoundingClientRect().height);
     expect(activeBountyHeight).toBeLessThanOrEqual(130);
     await page.locator(".tactical-summary-column").screenshot({ path: "artifacts/tactical-hud-summary-active.png" });
@@ -6858,6 +6858,20 @@ test.describe("Lupen browser smoke", () => {
         });
         const ironBeforeFullCargo = cargo.Iron;
         const copperBeforeFullCargo = cargo.Copper;
+        const oldCrystalDrops = generateLootFromAsteroid({ resource: "Crystal Shards", dropMin: 6, dropMax: 6 });
+        const oldCrystalResult = applyStagingResourceMineResult({
+          ok: true,
+          resourceId: "staging-resource-crystal-test",
+          resourceName: "Crystal Shards",
+          cargoDelta: 6,
+          lupenShardDelta: 10,
+          resourceRewardId: "staging-resource-crystal-test:1",
+          depletedUntil: Date.now() + 1000,
+          receivedAt: Date.now()
+        });
+        cargo["Crystal Shards"] = 6;
+        cargoRecovered["Crystal Shards"] = 6;
+        pruneMapOneCargoState();
 
         mineralKeys.forEach(key => { cargo[key] = 0; });
         cargo.Iron = getShipStats().cargo;
@@ -6879,6 +6893,11 @@ test.describe("Lupen browser smoke", () => {
           localShardDelta,
           stagingApplied: stagingResult.applied,
           stagingShardDelta: stagingResult.lupenShardDelta,
+          oldCrystalDrops,
+          oldCrystalApplied: oldCrystalResult.applied,
+          oldCrystalReason: oldCrystalResult.reason,
+          crystalCargoAfterPrune: cargo["Crystal Shards"],
+          crystalRecoveredAfterPrune: cargoRecovered["Crystal Shards"] || 0,
           fullCargoApplied: fullCargoResult.applied,
           fullCargoReason: fullCargoResult.reason,
           fullCargoShardDelta: fullCargoResult.lupenShardDelta,
@@ -6894,6 +6913,11 @@ test.describe("Lupen browser smoke", () => {
       localShardDelta: 10,
       stagingApplied: true,
       stagingShardDelta: 10,
+      oldCrystalDrops: { Iron: 6 },
+      oldCrystalApplied: false,
+      oldCrystalReason: "invalid_resource_award",
+      crystalCargoAfterPrune: 0,
+      crystalRecoveredAfterPrune: 0,
       fullCargoApplied: false,
       fullCargoReason: "cargo_full_no_resource_recovered",
       fullCargoShardDelta: 10,
