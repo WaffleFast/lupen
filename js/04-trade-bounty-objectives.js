@@ -2780,12 +2780,15 @@ function getBountyProgressStatusLine(stateKey, options = {}) {
 }
 
 function renderBountyInfoRows(rows = []) {
-  return rows.map((row) => `
-    <div class="selected-contract-row bounty-detail-stat selected-bounty-info-row ${row.wide ? "selected-bounty-info-row--wide" : ""}">
+  return rows.map((row) => {
+    const rowKey = String(row.label || "info").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "info";
+    return `
+    <div class="selected-contract-row bounty-detail-stat selected-bounty-info-row selected-contract-row--${escapeHtml(rowKey)} ${row.wide ? "selected-bounty-info-row--wide" : ""}">
       <span>${escapeHtml(row.label)}</span>
       ${row.html ? row.value : `<strong>${escapeHtml(row.value || "None")}</strong>`}
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function getBountyIconSrc(iconName) {
@@ -3116,7 +3119,6 @@ function renderMultiplayerStagingBountyBoard() {
             <span class="bounty-reward-box__label">PAYOUT</span>
             <strong class="bounty-reward-box__value"><span>CR ${formatNumber(bounty.creditsReward)}</span><span><img class="bounty-reward-box__icon" src="assets/items/lupen-shard.png" alt=""> ${formatNumber(bounty.lupenShardsReward)} Lupen Shards</span></strong>
             <em class="bounty-card-status bounty-status-chip bounty-status-chip--${statusKey}">${active ? "ACCEPTED" : status}</em>
-            <small>Progress: ${formatNumber(progress)} / ${formatNumber(requiredKills)}</small>
           </span>
         </button>
       `;

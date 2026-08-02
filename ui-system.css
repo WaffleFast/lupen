@@ -1096,24 +1096,24 @@
 
 /* Bounty Board mockup pass: calmer contract brief and clearer reward hierarchy. */
 #bountyScreen .bounty-main-grid {
-  grid-template-columns: minmax(0, 1.36fr) minmax(430px, 1fr) !important;
-  gap: 14px !important;
+  grid-template-columns: minmax(0, 1.34fr) minmax(430px, 1fr) !important;
+  gap: 12px !important;
 }
 
 #bountyScreen .bounty-board-layout-refined .bounty-contract-grid.bounty-list {
   grid-template-rows: repeat(4, minmax(0, 1fr)) !important;
-  gap: 8px !important;
-  padding: 12px !important;
+  gap: 7px !important;
+  padding: 11px !important;
   overflow: hidden !important;
 }
 
 #bountyScreen .bounty-board-layout-refined .bounty-contract-card.bounty-card {
   position: relative;
-  grid-template-columns: 112px minmax(0, 1fr) 174px !important;
+  grid-template-columns: 104px minmax(0, 1fr) 158px !important;
   grid-template-rows: minmax(0, 1fr) !important;
-  gap: 14px !important;
+  gap: 12px !important;
   min-height: 0 !important;
-  padding: 8px 12px !important;
+  padding: 7px 10px !important;
   overflow: hidden;
   border-radius: var(--lupen-control-radius) !important;
 }
@@ -1137,68 +1137,72 @@
 }
 
 #bountyScreen .bounty-board-layout-refined .bounty-card-icon.bounty-card__icon-frame {
-  width: 100px !important;
-  height: 86px !important;
-  min-width: 100px !important;
+  width: 92px !important;
+  height: 78px !important;
+  min-width: 92px !important;
   align-self: center;
   border-radius: var(--lupen-control-radius) !important;
 }
 
 #bountyScreen .bounty-card__body {
   align-self: center;
-  gap: 7px !important;
+  gap: 5px !important;
 }
 
 #bountyScreen .bounty-card__title {
-  font-size: 1.18rem !important;
-  line-height: 1.04 !important;
+  font-size: 1.02rem !important;
+  line-height: 1.08 !important;
 }
 
 #bountyScreen .bounty-card__subtitle {
-  font-size: 0.77rem !important;
-  line-height: 1.3 !important;
+  font-size: 0.68rem !important;
+  line-height: 1.24 !important;
 }
 
 #bountyScreen .bounty-card__chips {
   flex-wrap: wrap;
-  gap: 6px !important;
+  gap: 5px !important;
 }
 
 #bountyScreen .bounty-chip {
-  min-height: 20px !important;
-  padding: 3px 8px !important;
-  font-size: 0.52rem !important;
+  min-height: 18px !important;
+  padding: 3px 7px !important;
+  font-size: 0.48rem !important;
   letter-spacing: 0.08em !important;
 }
 
 #bountyScreen .bounty-reward-box,
 #bountyScreen .bounty-board-layout-refined .bounty-card-reward.bounty-reward-box {
   align-self: center;
-  width: 174px !important;
-  min-height: 78px !important;
-  padding: 8px 10px !important;
-  border-radius: var(--lupen-control-radius) !important;
-  background: rgba(2, 21, 34, 0.7) !important;
+  width: 158px !important;
+  min-height: 70px !important;
+  padding: 6px 8px 6px 12px !important;
+  border: 0 !important;
+  border-left: 1px solid rgba(91, 213, 255, 0.2) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 #bountyScreen .bounty-contract-card.selected .bounty-reward-box {
-  border-color: rgba(111, 238, 122, 0.48) !important;
-  background: rgba(8, 50, 35, 0.66) !important;
+  border-left-color: rgba(111, 238, 122, 0.38) !important;
+  background: transparent !important;
 }
 
 #bountyScreen .bounty-reward-box__label {
-  font-size: 0.55rem !important;
+  font-size: 0.5rem !important;
 }
 
 #bountyScreen .bounty-reward-box__value {
-  gap: 4px;
-  font-size: 0.78rem !important;
+  gap: 3px;
+  font-size: 0.7rem !important;
+  line-height: 1.12;
 }
 
 #bountyScreen .bounty-card-status {
-  width: min(120px, 100%);
+  width: min(112px, 100%);
   justify-content: center;
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 #bountyScreen .bounty-card__status-check {
@@ -1463,6 +1467,49 @@
 
 #bountyScreen .selected-contract-row:nth-child(4)::before {
   content: "◷";
+}
+
+#bountyScreen .selected-contract-row {
+  position: relative;
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+  gap: 2px 9px !important;
+}
+
+#bountyScreen .selected-contract-row::before {
+  content: "INFO" !important;
+  display: grid;
+  width: 32px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(126, 213, 255, 0.4);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(114, 223, 255, 0.18), transparent 58%),
+    rgba(5, 23, 39, 0.72);
+  font-size: 0.44rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+}
+
+#bountyScreen .selected-contract-row--target::before {
+  content: "TGT" !important;
+}
+
+#bountyScreen .selected-contract-row--hunt-zone::before {
+  content: "ZONE" !important;
+}
+
+#bountyScreen .selected-contract-row--threat::before {
+  content: "LVL" !important;
+  color: #a159ff;
+  border-color: rgba(161, 89, 255, 0.42);
+  background:
+    radial-gradient(circle at 50% 20%, rgba(161, 89, 255, 0.22), transparent 58%),
+    rgba(20, 12, 43, 0.72);
+}
+
+#bountyScreen .selected-contract-row--time-limit::before {
+  content: "TIME" !important;
 }
 
 #bountyScreen .selected-contract-row > span,
