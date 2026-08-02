@@ -55363,6 +55363,18 @@ input::placeholder {
 .player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action > .ship-card-main {
   grid-template-rows: minmax(0, 1fr) !important;
   padding: 0 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action::before,
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action::after {
+  content: none !important;
+  display: none !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .player-orbit-screen .player-bottom-hud .hud-ship-name {
@@ -55380,6 +55392,27 @@ input::placeholder {
   height: min(100px, 96%) !important;
   max-height: 100px !important;
   filter: drop-shadow(0 0 13px rgba(46, 218, 255, 0.34)) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-panel.ship-display-panel-action > .ship-hud-info-column {
+  padding: 2px 9px 2px 0 !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress::before,
+.player-orbit-screen .player-bottom-hud .ship-mini-progress::after {
+  content: none !important;
+  display: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-mini-progress .xp-bar,
+.player-orbit-screen .player-bottom-hud .xp-bar {
+  border: 0 !important;
 }
 
 .player-orbit-screen .player-bottom-hud .ship-hud-cargo-row {
