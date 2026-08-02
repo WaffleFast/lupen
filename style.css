@@ -55361,7 +55361,7 @@ input::placeholder {
 }
 
 .player-orbit-screen .player-bottom-hud .ship-hud-cargo-row {
-  min-height: 48px !important;
+  min-height: 50px !important;
   align-self: stretch !important;
 }
 
@@ -55372,9 +55372,9 @@ input::placeholder {
   align-items: center !important;
   justify-items: center !important;
   gap: 6px !important;
-  height: 44px !important;
-  min-height: 44px !important;
-  padding: 6px 8px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 9px 8px 5px !important;
   overflow: hidden !important;
   text-align: center !important;
 }
@@ -55391,13 +55391,13 @@ input::placeholder {
   grid-column: 2 !important;
   grid-row: 1 !important;
   display: grid !important;
-  grid-template-rows: auto auto 4px !important;
+  grid-template-rows: 10px 14px 4px !important;
   gap: 2px !important;
   min-width: 0 !important;
   width: 100% !important;
   align-content: center !important;
   justify-items: center !important;
-  transform: none !important;
+  transform: translateY(4px) !important;
 }
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span,
@@ -55413,7 +55413,7 @@ input::placeholder {
 
 .player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span {
   grid-row: 1 !important;
-  font-size: 8px !important;
+  font-size: 7.5px !important;
   letter-spacing: 0.06em !important;
 }
 
