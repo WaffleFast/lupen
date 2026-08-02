@@ -11406,7 +11406,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter Clearance");
     await expect(page.locator("#bountyDetailPanel")).toContainText("Hunter");
     await expect(page.locator("#bountyDetailPanel")).toContainText("CR 1,100");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("35 Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("35 Lupen Shards");
     await page.locator(".bounty-contract-card", { hasText: "Timed Suppression" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyDetailPanel")).toContainText("04:00");
@@ -11436,8 +11436,8 @@ test.describe("Lupen browser smoke", () => {
       renderBountyBoard();
     `));
     await expect(page.locator("#bountyDetailPanel .bounty-claim-btn")).toBeVisible();
-    await expect(page.locator("#bountyDetailPanel")).toContainText("Contract complete");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("Return to the board and claim this payout.");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("COMPLETE");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Return here to claim reward.");
     await expect(page.locator("#gameRewardBurst")).not.toHaveClass(/active/);
     const claimGeometry = await measureSelectedPanelAction(".bounty-claim-btn");
     expect(claimGeometry).toMatchObject({
@@ -11457,8 +11457,8 @@ test.describe("Lupen browser smoke", () => {
         renderBountyBoard();
       })()
     `));
-    await expect(page.locator("#bountyDetailPanel")).toContainText("Reward claimed");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("This contract has been paid out.");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("CLAIMED");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Reward collected.");
 
     await page.evaluate(() => window.eval(`
       (() => {
@@ -11468,7 +11468,8 @@ test.describe("Lupen browser smoke", () => {
         renderBountyBoard();
       })()
     `));
-    await expect(page.locator("#bountyDetailPanel")).toContainText("Expired");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("FAILED");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("Contract expired.");
     await expect(page.locator("#bountyDetailPanel .accept-bounty-button")).toBeDisabled();
     await expect(page.locator("#bountyDetailPanel .accept-bounty-button")).toContainText("Failed");
 
@@ -11555,11 +11556,11 @@ test.describe("Lupen browser smoke", () => {
     await page.locator(".bounty-contract-card", { hasText: "Behemoth Warning" }).click();
     await expect(page.locator("#bountyDetailPanel")).toContainText("Erebus Behemoth");
     await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("75 Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("75 Lupen Shards");
     await page.evaluate(() => window.eval("renderBountyBoard()"));
     await expect(page.locator("#bountyDetailPanel")).toContainText("Behemoth Warning");
     await expect(page.locator("#bountyDetailPanel")).toContainText("CR 2,500");
-    await expect(page.locator("#bountyDetailPanel")).toContainText("75 Shards");
+    await expect(page.locator("#bountyDetailPanel")).toContainText("75 Lupen Shards");
 
     await page.evaluate(() => window.eval(`
       (() => {
