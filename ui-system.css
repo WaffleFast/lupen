@@ -1137,9 +1137,9 @@
 }
 
 #bountyScreen .bounty-board-layout-refined .bounty-card-icon.bounty-card__icon-frame {
-  width: 92px !important;
-  height: 78px !important;
-  min-width: 92px !important;
+  width: 86px !important;
+  height: 72px !important;
+  min-width: 86px !important;
   align-self: center;
   border-radius: var(--lupen-control-radius) !important;
 }
@@ -1150,12 +1150,12 @@
 }
 
 #bountyScreen .bounty-card__title {
-  font-size: 1.02rem !important;
+  font-size: 0.96rem !important;
   line-height: 1.08 !important;
 }
 
 #bountyScreen .bounty-card__subtitle {
-  font-size: 0.68rem !important;
+  font-size: 0.64rem !important;
   line-height: 1.24 !important;
 }
 
@@ -1166,8 +1166,8 @@
 
 #bountyScreen .bounty-chip {
   min-height: 18px !important;
-  padding: 3px 7px !important;
-  font-size: 0.48rem !important;
+  padding: 3px 6px !important;
+  font-size: 0.45rem !important;
   letter-spacing: 0.08em !important;
 }
 
@@ -1190,12 +1190,12 @@
 }
 
 #bountyScreen .bounty-reward-box__label {
-  font-size: 0.5rem !important;
+  font-size: 0.48rem !important;
 }
 
 #bountyScreen .bounty-reward-box__value {
   gap: 3px;
-  font-size: 0.7rem !important;
+  font-size: 0.66rem !important;
   line-height: 1.12;
 }
 
