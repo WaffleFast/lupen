@@ -672,24 +672,68 @@ const TUTORIAL_PROGRESS_PHASES = Object.freeze([
 
 function loadTutorialState() {
   const parsed = safeParseLocalStorage(TUTORIAL_STORAGE_KEY, {});
+  return normalizeTutorialState(parsed);
+}
+
+function normalizeTutorialState(raw = {}) {
   return {
-    active: Boolean(parsed.active),
-    completed: Boolean(parsed.completed),
-    stepIndex: Math.max(0, Number(parsed.stepIndex || 0)),
-    lastStartedAt: parsed.lastStartedAt || null,
-    pilotId: String(parsed.pilotId || ""),
-    journeyIntroduced: Boolean(parsed.journeyIntroduced),
-    forgeStarterShardsReconciled: Boolean(parsed.forgeStarterShardsReconciled),
-    stepId: String(parsed.stepId || ""),
-    flowVersion: Math.max(0, Number(parsed.flowVersion || 0))
+    active: Boolean(raw.active),
+    completed: Boolean(raw.completed),
+    stepIndex: Math.max(0, Number(raw.stepIndex || 0)),
+    lastStartedAt: raw.lastStartedAt || null,
+    pilotId: String(raw.pilotId || ""),
+    journeyIntroduced: Boolean(raw.journeyIntroduced),
+    forgeStarterShardsReconciled: Boolean(raw.forgeStarterShardsReconciled),
+    stepId: String(raw.stepId || ""),
+    flowVersion: Math.max(0, Number(raw.flowVersion || 0))
   };
 }
 
-function saveTutorialState() {
+function getTutorialSaveState() {
+  const snapshot = normalizeTutorialState(tutorialState);
+  const stepIndex = Math.min(Math.max(0, Number(snapshot.stepIndex || 0)), STARTER_TUTORIAL_STEPS.length - 1);
+  return {
+    ...snapshot,
+    stepIndex,
+    stepId: STARTER_TUTORIAL_STEPS[stepIndex]?.id || snapshot.stepId || "",
+    flowVersion: TUTORIAL_FLOW_VERSION
+  };
+}
+
+function checkpointTutorialSave() {
+  if (window.__lupenTutorialSaveCheckpointInFlight) return;
+  if (typeof saveGame !== "function") return;
+  window.__lupenTutorialSaveCheckpointInFlight = true;
+  try {
+    saveGame({ tutorialCheckpoint: true });
+  } finally {
+    window.__lupenTutorialSaveCheckpointInFlight = false;
+  }
+}
+
+function saveTutorialState(options = {}) {
   tutorialState.stepIndex = Math.min(Math.max(0, Number(tutorialState.stepIndex || 0)), STARTER_TUTORIAL_STEPS.length - 1);
   tutorialState.stepId = STARTER_TUTORIAL_STEPS[tutorialState.stepIndex]?.id || "";
   tutorialState.flowVersion = TUTORIAL_FLOW_VERSION;
   localStorage.setItem(TUTORIAL_STORAGE_KEY, JSON.stringify(tutorialState));
+  if (options.checkpoint !== false) checkpointTutorialSave();
+}
+
+function restoreTutorialStateFromSave(savedTutorialState, options = {}) {
+  if (!savedTutorialState || typeof savedTutorialState !== "object") return false;
+  const restored = normalizeTutorialState(savedTutorialState);
+  const stepIndexFromId = restored.stepId
+    ? STARTER_TUTORIAL_STEPS.findIndex(step => step.id === restored.stepId)
+    : -1;
+  restored.stepIndex = stepIndexFromId >= 0
+    ? stepIndexFromId
+    : Math.min(Math.max(0, restored.stepIndex), STARTER_TUTORIAL_STEPS.length - 1);
+  restored.stepId = STARTER_TUTORIAL_STEPS[restored.stepIndex]?.id || "";
+  restored.flowVersion = TUTORIAL_FLOW_VERSION;
+  tutorialState = restored;
+  saveTutorialState({ checkpoint: options.checkpoint === true });
+  if (options.render === true && tutorialState.active) renderStarterTutorial();
+  return true;
 }
 
 function getCurrentTutorialStep() {
@@ -1330,6 +1374,8 @@ window.lupenResetTutorial = lupenResetTutorial;
 window.lupenResetStarterPilotProgramme = lupenResetTutorial;
 window.startMorganAcademyOrientation = startMorganAcademyOrientation;
 window.resumeMorganAcademyOrientation = resumeMorganAcademyOrientation;
+window.getTutorialSaveState = getTutorialSaveState;
+window.restoreTutorialStateFromSave = restoreTutorialStateFromSave;
 window.lupenStartTutorial = () => {
   startStarterTutorial(true);
   return { started: true, step: getCurrentTutorialStep()?.id || "" };

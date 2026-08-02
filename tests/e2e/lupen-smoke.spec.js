@@ -694,6 +694,71 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("loaded saves restore Morgan's tutorial checkpoint and docked station", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const result = await page.evaluate(() => {
+      const pilotId = "57575757-5757-4757-8757-575757575757";
+      localStorage.clear();
+      currentNode = "Virella";
+      lastPlanetNode = "Virella";
+      tutorialState = {
+        active: true,
+        completed: false,
+        stepIndex: STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "review-daily-contracts"),
+        stepId: "review-daily-contracts",
+        lastStartedAt: "2026-07-26T11:30:00.000Z",
+        pilotId,
+        journeyIntroduced: true,
+        forgeStarterShardsReconciled: false,
+        flowVersion: TUTORIAL_FLOW_VERSION
+      };
+      saveTutorialState({ checkpoint: false });
+      const saved = buildSaveState({ leaveSave: false });
+
+      clearStarterTutorialState();
+      currentNode = "Asteron Prime";
+      lastPlanetNode = "Asteron Prime";
+      const applied = applyLoadedGameState(saved);
+      const localTutorial = JSON.parse(localStorage.getItem("lupenStarterPilotTutorial"));
+      return {
+        applied,
+        currentNode,
+        lastPlanetNode,
+        savedTutorial: saved.tutorialState,
+        runtimeTutorial: { ...tutorialState },
+        localTutorial
+      };
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.currentNode).toBe("Virella");
+    expect(result.lastPlanetNode).toBe("Virella");
+    expect(result.savedTutorial).toMatchObject({
+      active: true,
+      completed: false,
+      pilotId: "57575757-5757-4757-8757-575757575757",
+      stepId: "review-daily-contracts"
+    });
+    expect(result.runtimeTutorial).toMatchObject({
+      active: true,
+      completed: false,
+      pilotId: "57575757-5757-4757-8757-575757575757",
+      stepId: "review-daily-contracts"
+    });
+    expect(result.localTutorial).toMatchObject({
+      active: true,
+      completed: false,
+      pilotId: "57575757-5757-4757-8757-575757575757",
+      stepId: "review-daily-contracts"
+    });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("login does not show local save migration until the profile matches the authenticated user", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 

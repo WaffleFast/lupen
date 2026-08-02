@@ -262,6 +262,9 @@ function buildSaveState(options = {}) {
     storeDailyPurchases,
     upgradeMaterials,
     playerProgress,
+    tutorialState: typeof getTutorialSaveState === "function"
+      ? getTutorialSaveState()
+      : LupenSaveService.readJsonLocalStorage("lupenStarterPilotTutorial"),
     missionProgress: typeof normalizeMissionProgress === "function" ? normalizeMissionProgress(missionProgress) : missionProgress
   };
 }
@@ -1064,6 +1067,9 @@ function applyLoadedGameState(rawSaved) {
   playerProgress = normalizePlayerProgress(saved.playerProgress || playerProgress);
   if (typeof normalizeMissionProgress === "function") {
     missionProgress = normalizeMissionProgress(saved.missionProgress || missionProgress);
+  }
+  if (saved.tutorialState && typeof restoreTutorialStateFromSave === "function") {
+    restoreTutorialStateFromSave(saved.tutorialState, { checkpoint: false, render: false });
   }
   applyTrustedStagingXpIfNewer("loadGameFromSupabase");
   upgradeMaterials = normalizeUpgradeMaterials(saved.upgradeMaterials);
