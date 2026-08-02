@@ -1694,8 +1694,8 @@ function updateHudDock() {
   }
 
   if (hudCargoFullBadge) {
-    const isFull = maxCargo > 0 && usedCargo >= maxCargo;
-    hudCargoFullBadge.hidden = !isFull;
+    hudCargoFullBadge.hidden = true;
+    hudCargoFullBadge.textContent = "";
   }
 
   if (inventoryItemCountText) {

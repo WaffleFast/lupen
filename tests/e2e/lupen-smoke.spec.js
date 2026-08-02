@@ -4035,6 +4035,7 @@ test.describe("Lupen browser smoke", () => {
       expect(resourceEngageState.middleHudLayout.cargoFull.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargoAmount.right + 4);
       expect(resourceEngageState.middleHudLayout.cargoFull.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.cargo.right + 2);
     }
+    expect(resourceEngageState.middleHudLayout.cargoFull).toBeNull();
     const rectsOverlap = (first, second) => (
       first.left < second.right - 2
       && first.right > second.left + 2
@@ -4053,7 +4054,7 @@ test.describe("Lupen browser smoke", () => {
     ) + 4);
     expect(resourceEngageState.middleHudLayout.action.bottom).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.panel.bottom + 2);
     expect(resourceEngageState.cargoSummaryText).toContain("Cargo");
-    expect(resourceEngageState.cargoSummaryText).toContain("FULL");
+    expect(resourceEngageState.cargoSummaryText).not.toContain("FULL");
     expect(resourceEngageState.guildPlaceholderCount).toBe(0);
     expect(resourceEngageState.centerHudText).not.toContain("Guild");
     expect(resourceEngageState.resourceIntentReason).toBe("resource_mine_intent_sent");
@@ -4161,6 +4162,7 @@ test.describe("Lupen browser smoke", () => {
           cargoAmount: rectFor("#hudCargoCapacityText"),
           cargoMeter: rectFor("#hudCargoSummary .hud-cargo-meter"),
           cargoPercentCount: document.querySelectorAll("#hudCargoPercentText").length,
+          cargoFull: rectFor("#hudCargoFullBadge:not([hidden])"),
           engage: rectFor("#objectEngageBtn"),
           actionRow: rectFor(".ship-hud-action-row"),
           panel: rectFor(".ship-display-panel-action"),
@@ -4179,6 +4181,8 @@ test.describe("Lupen browser smoke", () => {
           xpText: document.getElementById("hudProgressStrip")?.textContent || "",
           cargoText: document.getElementById("hudCargoSummary")?.textContent || "",
           shipName: document.getElementById("hudShipName")?.textContent || "",
+          shipNameVisible: getComputedStyle(document.getElementById("hudShipName")).display !== "none",
+          shipRingVisible: getComputedStyle(document.querySelector(".ship-card-main"), "::before").display !== "none",
           centerText: document.querySelector(".ship-display-panel-action")?.textContent || "",
           guildCount: document.querySelectorAll("#hudGuildPlaceholder").length
         };
@@ -4194,6 +4198,7 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.cargoLabel).not.toBeNull();
     expect(centerHud.cargoAmount).not.toBeNull();
     expect(centerHud.cargoMeter).not.toBeNull();
+    expect(centerHud.cargoFull).toBeNull();
     expect(centerHud.engage).not.toBeNull();
     expect(centerHud.actionText).toBe("ENGAGE");
     expect(centerHud.actionDisabled).toBe(true);
@@ -4227,6 +4232,8 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.xpText).toContain("XP");
     expect(centerHud.cargoText).toContain("Cargo");
     expect(centerHud.shipName).toContain("PIONEER HUNTER");
+    expect(centerHud.shipNameVisible).toBe(false);
+    expect(centerHud.shipRingVisible).toBe(false);
     expect(centerHud.guildCount).toBe(0);
     expect(centerHud.centerText).not.toContain("Guild");
     expect(centerHud.bottomHud.height).toBeLessThanOrEqual(185);
@@ -4270,16 +4277,16 @@ test.describe("Lupen browser smoke", () => {
         label: rect("#hudCargoSummary .hud-cargo-copy > span"),
         amount: rect("#hudCargoCapacityText"),
         meter: rect("#hudCargoSummary .hud-cargo-meter"),
-        badge: rect("#hudCargoFullBadge"),
+        badge: document.querySelector("#hudCargoFullBadge:not([hidden])") ? rect("#hudCargoFullBadge:not([hidden])") : null,
         text: document.getElementById("hudCargoSummary").innerText
       };
     });
     expect(compactCargoLayout.amount.top).toBeGreaterThanOrEqual(compactCargoLayout.label.bottom);
     expect(compactCargoLayout.meter.top).toBeGreaterThanOrEqual(compactCargoLayout.amount.bottom);
-    expect(compactCargoLayout.amount.right).toBeLessThanOrEqual(compactCargoLayout.badge.left);
+    expect(compactCargoLayout.badge).toBeNull();
     expect(compactCargoLayout.text.toUpperCase()).toContain("CARGO HOLD");
     expect(compactCargoLayout.text).toContain("150 / 150");
-    expect(compactCargoLayout.text).toContain("FULL");
+    expect(compactCargoLayout.text).not.toContain("FULL");
     await page.locator("#spaceScreen").screenshot({ path: "artifacts/tutorial-cargo-hud-1230x734.png" });
     await page.evaluate(() => {
       cargo.Iron = 0;
