@@ -55353,6 +55353,97 @@ input::placeholder {
   }
 }
 
+/* Final polish: keep Morgan's Journey portrait and the compact orbit cargo HUD readable. */
+.journey-briefing__portrait-img.journey-morgan-portrait {
+  object-fit: contain !important;
+  object-position: center top !important;
+  transform: none !important;
+}
+
+.player-orbit-screen .player-bottom-hud .ship-hud-cargo-row {
+  min-height: 50px !important;
+  align-self: stretch !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr) 34px !important;
+  grid-template-rows: 1fr !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 7px 7px 5px !important;
+  overflow: hidden !important;
+  text-align: left !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-icon {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 17px !important;
+  height: 17px !important;
+  align-self: center !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-copy {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: grid !important;
+  grid-template-rows: 9px 14px 4px !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  align-content: center !important;
+  transform: translateY(3px) !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span,
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong {
+  position: static !important;
+  grid-column: 1 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  line-height: 1.15 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > span {
+  grid-row: 1 !important;
+  font-size: 7px !important;
+  letter-spacing: 0.06em !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary .hud-cargo-copy > strong {
+  grid-row: 2 !important;
+  font-size: 12px !important;
+  justify-self: start !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-meter {
+  grid-column: 1 !important;
+  grid-row: 3 !important;
+  width: 100% !important;
+  height: 3px !important;
+}
+
+.player-orbit-screen .player-bottom-hud .hud-cargo-summary em {
+  position: static !important;
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  align-self: center !important;
+  justify-self: end !important;
+  transform: none !important;
+  width: auto !important;
+  min-width: 30px !important;
+  max-width: 34px !important;
+  height: 14px !important;
+  margin: 0 !important;
+  padding: 0 5px !important;
+  font-size: 8px !important;
+  line-height: 1 !important;
+}
+
 /* ===== Forge energy signature and tier spectacle ===== */
 .forge-tier-common {
   --forge-energy-opacity: 0.2;

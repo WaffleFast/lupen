@@ -10471,14 +10471,19 @@ test.describe("Lupen browser smoke", () => {
       const image = portrait.querySelector("img");
       const portraitRect = portrait.getBoundingClientRect();
       const imageRect = image?.getBoundingClientRect();
+      const imageStyles = image ? getComputedStyle(image) : null;
       return {
         overflow: getComputedStyle(portrait).overflow,
         portraitHeight: portraitRect.height,
-        imageHeight: imageRect?.height || 0
+        imageHeight: imageRect?.height || 0,
+        objectFit: imageStyles?.objectFit || "",
+        objectPosition: imageStyles?.objectPosition || ""
       };
     });
     expect(morganPortraitCrop.overflow).toBe("hidden");
-    expect(morganPortraitCrop.imageHeight).toBeGreaterThan(morganPortraitCrop.portraitHeight);
+    expect(morganPortraitCrop.objectFit).toBe("contain");
+    expect(morganPortraitCrop.objectPosition).toMatch(/(?:top|0%)/);
+    expect(morganPortraitCrop.imageHeight).toBeLessThanOrEqual(morganPortraitCrop.portraitHeight);
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER ROUTE");
     await expect(page.locator("#journeyScreen")).toContainText("Academy");
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toContainText("ACTIVE");
