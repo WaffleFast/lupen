@@ -6231,6 +6231,7 @@ test.describe("Lupen browser smoke", () => {
       const actionRect = screen.querySelector(".store-detail-actions")?.getBoundingClientRect();
       const summaryRect = screen.querySelector(".store-item-summary")?.getBoundingClientRect();
       const selectedCard = screen.querySelector(".store-catalog-card.selected");
+      const selectedCardStyle = selectedCard ? getComputedStyle(selectedCard) : null;
       return {
         documentOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         screenOverflowX: screen.scrollWidth - screen.clientWidth,
@@ -6241,7 +6242,10 @@ test.describe("Lupen browser smoke", () => {
         detailContained: Boolean(detailRect && detailRect.bottom <= screenRect.bottom + 1),
         actionVisible: Boolean(actionRect && detailRect && actionRect.bottom <= detailRect.bottom + 1),
         summaryVisible: Boolean(summaryRect && detailRect && summaryRect.bottom <= detailRect.bottom + 1),
-        selectedCardVisible: Boolean(selectedCard && selectedCard.getBoundingClientRect().top >= catalogRect.top)
+        selectedCardVisible: Boolean(selectedCard && selectedCard.getBoundingClientRect().top >= catalogRect.top),
+        selectedCardBorder: selectedCardStyle?.borderColor || "",
+        selectedCardOutlineWidth: selectedCardStyle?.outlineWidth || "0px",
+        selectedCardShadow: selectedCardStyle?.boxShadow || ""
       };
     });
     expect(layout.documentOverflowX).toBeLessThanOrEqual(0);
@@ -6253,6 +6257,9 @@ test.describe("Lupen browser smoke", () => {
     expect(layout.actionVisible).toBe(true);
     expect(layout.summaryVisible).toBe(true);
     expect(layout.selectedCardVisible).toBe(true);
+    expect(layout.selectedCardBorder).toMatch(/rgb\(118, 230, 255\)|rgba\(118, 230, 255/);
+    expect(parseFloat(layout.selectedCardOutlineWidth)).toBeGreaterThanOrEqual(1);
+    expect(layout.selectedCardShadow).toContain("118, 230, 255");
 
     const purchaseButton = page.locator(".store-detail-buy-action[data-item-key='pulseLaser']");
     await expect(purchaseButton).toBeEnabled();
