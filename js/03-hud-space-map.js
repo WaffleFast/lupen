@@ -1773,6 +1773,7 @@ function updateHudDock() {
       hudInfoColumn.style.setProperty("display", "grid", "important");
       hudInfoColumn.style.setProperty("grid-template-rows", "46px 52px", "important");
       hudInfoColumn.style.setProperty("gap", "6px", "important");
+      hudInfoColumn.style.setProperty("transform", "translateX(-8px)", "important");
     }
 
     if (hudLevelBadge) {
@@ -1794,6 +1795,7 @@ function updateHudDock() {
       hudActionRow.style.setProperty("grid-row", "3", "important");
       hudActionRow.style.setProperty("width", "100%", "important");
       hudActionRow.style.setProperty("height", "30px", "important");
+      hudActionRow.style.setProperty("transform", "translateX(-8px)", "important");
     }
 
     if (hudObjectActionPanel) {

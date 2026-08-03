@@ -4185,6 +4185,8 @@ test.describe("Lupen browser smoke", () => {
           controlBottomGap: panel && controlBottom !== null ? panel.bottom - controlBottom : null,
           progressCargoGap: level && xpBar && cargo ? cargo.top - Math.max(level.bottom, xpBar.bottom) : null,
           cargoEngageGap: cargo && engage ? engage.top - cargo.bottom : null,
+          controlRightInset: panel && progressStrip ? panel.right - progressStrip.right : null,
+          shipControlGap: ship && progressStrip ? progressStrip.left - ship.right : null,
           statusPanel: rectFor(".player-bottom-hud > .status-panel"),
           infoPanel: rectFor(".player-bottom-hud > .info-panel"),
           tacticalSummary: rectFor(".tactical-summary-card"),
@@ -4223,6 +4225,8 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.panelClusterBottomGap).not.toBeNull();
     expect(centerHud.controlTopGap).not.toBeNull();
     expect(centerHud.controlBottomGap).not.toBeNull();
+    expect(centerHud.controlRightInset).not.toBeNull();
+    expect(centerHud.shipControlGap).not.toBeNull();
     expect(centerHud.actionText).toBe("ENGAGE");
     expect(centerHud.actionDisabled).toBe(true);
     expect(centerHud.actionInShipHud).toBe(true);
@@ -4245,6 +4249,10 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.progressCargoGap).toBeLessThanOrEqual(10);
     expect(centerHud.cargoEngageGap).toBeGreaterThanOrEqual(6);
     expect(centerHud.cargoEngageGap).toBeLessThanOrEqual(12);
+    expect(centerHud.controlRightInset).toBeGreaterThanOrEqual(10);
+    expect(centerHud.controlRightInset).toBeLessThanOrEqual(18);
+    expect(centerHud.shipControlGap).toBeGreaterThanOrEqual(0);
+    expect(centerHud.shipControlGap).toBeLessThanOrEqual(18);
     expect(centerHud.ship.left).toBeGreaterThanOrEqual(centerHud.panel.left - 2);
     expect(centerHud.ship.right).toBeLessThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.ship.top).toBeGreaterThanOrEqual(centerHud.panel.top);

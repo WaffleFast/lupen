@@ -61610,3 +61610,8 @@ input::placeholder {
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action #hudShipImage {
   transform: translateY(-8px) scale(1.14) !important;
 }
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-hud-info-column,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-hud-action-row {
+  transform: translateX(-8px) !important;
+}
