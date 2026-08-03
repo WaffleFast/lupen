@@ -1261,12 +1261,44 @@ function toggleTargetEngagement() {
   updateObjectActionPanel(true);
 }
 
+function shouldDisplayActivityLogMessage(message) {
+  const normalized = String(message || "").trim();
+  if (!normalized) return false;
+
+  const importantPatterns = [
+    /^Morgan:/i,
+    /Academy|Frontier|Journey|Mission/i,
+    /Bounty (accepted|complete|reward claimed|expired|cancelled)|Bounty contract|Bounty progress/i,
+    /Trade (accepted|completed|route accepted|route completed)|Daily contract complete|Contract package collected|Courier contract|Sold |Recovered resource sale/i,
+    /Recovered [\d,]+ .*Cargo|asteroid depleted|Asteroid reward|Resource Recovered/i,
+    /Bot destroyed|XP earned|Combat XP|upgraded to|reward claimed|payout restored/i,
+    /Ship (disabled|destroyed)|Hull critical|Hull integrity critical|Shield depleted|Cargo hold full|Launch blocked/i
+  ];
+  if (importantPatterns.some((pattern) => pattern.test(normalized))) return true;
+
+  const noisyPatterns = [
+    /\bhit you for\b/i,
+    /^Engaged\b/i,
+    /^Disengaged\b/i,
+    /scan complete/i,
+    /route plotted/i,
+    /PvP hit request sent/i,
+    /equipped\.|unequipped\.|dropped\.$/i,
+    /No target selected|Target is no longer|Unable to engage/i,
+    /Purchase blocked|Equipment change blocked|Purchase failed/i
+  ];
+  if (noisyPatterns.some((pattern) => pattern.test(normalized))) return false;
+
+  return false;
+}
+
 function addActivityLog(message) {
   const feed = document.getElementById("activityLogFeed");
   if (!feed) return;
 
   const normalizedMessage = String(message || "").trim();
   if (!normalizedMessage) return;
+  if (!shouldDisplayActivityLogMessage(normalizedMessage)) return;
 
   const now = Date.now();
   const lastMessage = String(feed.dataset.lastMessage || "");
