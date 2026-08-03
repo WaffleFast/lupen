@@ -4022,8 +4022,8 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.ship.height).toBeGreaterThanOrEqual(58);
     expect(resourceEngageState.middleHudLayout.xpBar.width).toBeGreaterThanOrEqual(80);
     expect(resourceEngageState.middleHudLayout.xpBar.height).toBeGreaterThanOrEqual(6);
-    expect(resourceEngageState.middleHudLayout.cargo.height).toBeLessThanOrEqual(66);
-    expect(resourceEngageState.middleHudLayout.action.height).toBeLessThanOrEqual(40);
+    expect(resourceEngageState.middleHudLayout.cargo.height).toBeLessThanOrEqual(56);
+    expect(resourceEngageState.middleHudLayout.action.height).toBeLessThanOrEqual(32);
     expect(resourceEngageState.middleHudLayout.action.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.infoColumn.width * 0.95));
     expect(resourceEngageState.middleHudLayout.actionRow.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.infoColumn.width * 0.95));
     const centerX = rect => Math.round((rect.left + rect.right) / 2);
@@ -4047,7 +4047,7 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.shipBay.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.infoColumn.left);
     expect(resourceEngageState.middleHudLayout.cargo.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.shipBay.right);
     expect(resourceEngageState.middleHudLayout.xpBar.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpRow.bottom - 2);
-    expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpBar.bottom + 8);
+    expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpBar.bottom + 5);
     expect(resourceEngageState.middleHudLayout.action.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.shipBay.right);
     expect(resourceEngageState.middleHudLayout.action.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.infoColumn.right + 2);
     expect(resourceEngageState.middleHudLayout.action.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.infoColumn.bottom + 4);
@@ -4204,6 +4204,11 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.actionInShipHud).toBe(true);
     expect(centerHud.centralActionCount).toBe(0);
     expect(centerHud.ship.height).toBeGreaterThanOrEqual(70);
+    expect(centerHud.level.height).toBeLessThanOrEqual(46);
+    expect(centerHud.level.width).toBeLessThanOrEqual(54);
+    expect(centerHud.xpBar.height).toBeLessThanOrEqual(8);
+    expect(centerHud.cargo.height).toBeLessThanOrEqual(56);
+    expect(centerHud.engage.height).toBeLessThanOrEqual(32);
     expect(centerHud.ship.left).toBeGreaterThanOrEqual(centerHud.panel.left - 2);
     expect(centerHud.ship.right).toBeLessThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.ship.top).toBeGreaterThanOrEqual(centerHud.panel.top);
@@ -4212,10 +4217,10 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.infoColumn.right).toBeLessThanOrEqual(centerHud.panel.right + 2);
     expect(centerHud.level.left).toBeGreaterThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.level.right).toBeLessThanOrEqual(centerHud.infoColumn.right);
-    expect(centerHud.progressStrip.top).toBeGreaterThanOrEqual(centerHud.infoColumn.top);
+    expect(centerHud.progressStrip.top).toBeGreaterThanOrEqual(centerHud.infoColumn.top - 2);
     expect(centerHud.progressStrip.bottom).toBeLessThanOrEqual(centerHud.infoColumn.bottom);
     expect(centerHud.xpBar.top).toBeGreaterThanOrEqual(centerHud.xpRow.bottom - 2);
-    expect(centerHud.cargoRow.top).toBeGreaterThanOrEqual(centerHud.xpBar.bottom + 8);
+    expect(centerHud.cargoRow.top).toBeGreaterThanOrEqual(centerHud.xpBar.bottom + 5);
     expect(centerHud.cargoRow.left).toBeGreaterThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.cargoRow.right).toBeLessThanOrEqual(centerHud.infoColumn.right);
     expect(centerHud.cargoRow.bottom).toBeLessThanOrEqual(centerHud.infoColumn.bottom + 3);

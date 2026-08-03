@@ -1751,11 +1751,13 @@ function updateHudDock() {
     const hudActionRow = hudShipPanel.querySelector(".ship-hud-action-row");
     const hudObjectActionPanel = hudShipPanel.querySelector("#objectActionPanel");
     const hudEngageButton = hudShipPanel.querySelector("#objectEngageBtn");
+    const hudLevelBadge = hudShipPanel.querySelector(".ship-mini-level");
+    const hudXpBar = hudShipPanel.querySelector(".xp-bar");
 
     hudShipPanel.style.setProperty("grid-template-columns", "minmax(150px, 0.43fr) minmax(200px, 0.57fr)", "important");
-    hudShipPanel.style.setProperty("grid-template-rows", "52px 61px 36px", "important");
+    hudShipPanel.style.setProperty("grid-template-rows", "46px 52px 30px", "important");
     hudShipPanel.style.setProperty("column-gap", "14px", "important");
-    hudShipPanel.style.setProperty("row-gap", "7px", "important");
+    hudShipPanel.style.setProperty("row-gap", "6px", "important");
 
     if (hudShipCard) {
       hudShipCard.style.setProperty("grid-column", "1", "important");
@@ -1768,15 +1770,29 @@ function updateHudDock() {
       hudInfoColumn.style.setProperty("grid-column", "2", "important");
       hudInfoColumn.style.setProperty("grid-row", "1 / 3", "important");
       hudInfoColumn.style.setProperty("display", "grid", "important");
-      hudInfoColumn.style.setProperty("grid-template-rows", "52px 61px", "important");
-      hudInfoColumn.style.setProperty("gap", "8px", "important");
+      hudInfoColumn.style.setProperty("grid-template-rows", "46px 52px", "important");
+      hudInfoColumn.style.setProperty("gap", "6px", "important");
+    }
+
+    if (hudLevelBadge) {
+      hudLevelBadge.style.setProperty("box-sizing", "border-box", "important");
+      hudLevelBadge.style.setProperty("width", "52px", "important");
+      hudLevelBadge.style.setProperty("height", "44px", "important");
+      hudLevelBadge.style.setProperty("min-width", "52px", "important");
+      hudLevelBadge.style.setProperty("min-height", "44px", "important");
+      hudLevelBadge.style.setProperty("padding", "4px 3px", "important");
+    }
+
+    if (hudXpBar) {
+      hudXpBar.style.setProperty("height", "7px", "important");
+      hudXpBar.style.setProperty("min-height", "7px", "important");
     }
 
     if (hudActionRow) {
       hudActionRow.style.setProperty("grid-column", "2", "important");
       hudActionRow.style.setProperty("grid-row", "3", "important");
       hudActionRow.style.setProperty("width", "100%", "important");
-      hudActionRow.style.setProperty("height", "36px", "important");
+      hudActionRow.style.setProperty("height", "30px", "important");
     }
 
     if (hudObjectActionPanel) {
@@ -1786,13 +1802,15 @@ function updateHudDock() {
     }
 
     if (hudCargoSummary) {
-      hudCargoSummary.style.setProperty("height", "61px", "important");
-      hudCargoSummary.style.setProperty("min-height", "61px", "important");
+      hudCargoSummary.style.setProperty("height", "52px", "important");
+      hudCargoSummary.style.setProperty("min-height", "52px", "important");
     }
 
     if (hudEngageButton) {
       hudEngageButton.style.setProperty("width", "100%", "important");
       hudEngageButton.style.setProperty("max-width", "none", "important");
+      hudEngageButton.style.setProperty("height", "28px", "important");
+      hudEngageButton.style.setProperty("min-height", "28px", "important");
       hudEngageButton.style.setProperty("justify-self", "stretch", "important");
     }
 

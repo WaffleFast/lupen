@@ -61410,10 +61410,10 @@ input::placeholder {
 /* Orbit pilot card reference lock: ship, XP, cargo, and Engage align as one compact unit. */
 #spaceScreen.player-orbit-screen.active .player-bottom-hud.command-hud.space-combat-hud > .ship-panel.ship-display-panel-action {
   grid-template-columns: minmax(150px, 0.43fr) minmax(200px, 0.57fr) !important;
-  grid-template-rows: 52px 61px 36px !important;
+  grid-template-rows: 46px 52px 30px !important;
   column-gap: 14px !important;
-  row-gap: 7px !important;
-  padding: 11px 20px 10px !important;
+  row-gap: 6px !important;
+  padding: 9px 18px 8px !important;
   border-color: rgba(33, 219, 255, 0.92) !important;
   border-radius: 9px !important;
 }
@@ -61443,17 +61443,17 @@ input::placeholder {
   grid-column: 2 !important;
   grid-row: 1 / 3 !important;
   display: grid !important;
-  grid-template-rows: 52px 61px !important;
-  gap: 8px !important;
+  grid-template-rows: 46px 52px !important;
+  gap: 6px !important;
   padding: 0 !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .ship-mini-progress {
   display: grid !important;
-  grid-template-columns: 58px minmax(0, 1fr) !important;
-  grid-template-rows: 25px 12px !important;
-  column-gap: 12px !important;
-  row-gap: 7px !important;
+  grid-template-columns: 52px minmax(0, 1fr) !important;
+  grid-template-rows: 22px 9px !important;
+  column-gap: 10px !important;
+  row-gap: 5px !important;
   align-content: center !important;
   align-items: center !important;
   border: 0 !important;
@@ -61464,14 +61464,16 @@ input::placeholder {
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .level-badge {
   grid-column: 1 !important;
   grid-row: 1 / 3 !important;
+  box-sizing: border-box !important;
   align-self: stretch !important;
   justify-self: stretch !important;
-  width: 58px !important;
-  height: 50px !important;
-  min-width: 58px !important;
-  min-height: 50px !important;
+  width: 52px !important;
+  height: 44px !important;
+  min-width: 52px !important;
+  min-height: 44px !important;
+  padding: 4px 3px !important;
   border: 1px solid rgba(42, 223, 255, 0.95) !important;
-  border-radius: 8px !important;
+  border-radius: 7px !important;
   background: linear-gradient(180deg, rgba(5, 23, 42, 0.94), rgba(1, 10, 24, 0.96)) !important;
 }
 
@@ -61481,7 +61483,7 @@ input::placeholder {
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .level-badge strong {
-  font-size: 28px !important;
+  font-size: 24px !important;
   line-height: 0.92 !important;
 }
 
@@ -61491,21 +61493,21 @@ input::placeholder {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 10px !important;
+  gap: 8px !important;
   color: #f4fbff !important;
-  font-size: 11px !important;
+  font-size: 10px !important;
   font-weight: 900 !important;
   line-height: 1 !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .xp-row span:first-child {
   color: #27d9ff !important;
-  font-size: 15px !important;
+  font-size: 13px !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .xp-row span:last-child {
   color: #f4fbff !important;
-  font-size: 11px !important;
+  font-size: 10px !important;
   text-align: right !important;
   white-space: nowrap !important;
 }
@@ -61514,8 +61516,8 @@ input::placeholder {
   grid-column: 2 !important;
   grid-row: 2 !important;
   width: 100% !important;
-  height: 9px !important;
-  min-height: 9px !important;
+  height: 7px !important;
+  min-height: 7px !important;
   border: 0 !important;
   border-radius: 999px !important;
   background: rgba(8, 45, 67, 0.72) !important;
@@ -61528,40 +61530,41 @@ input::placeholder {
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-summary {
+  box-sizing: border-box !important;
   display: grid !important;
-  grid-template-columns: 38px minmax(0, 1fr) !important;
-  gap: 12px !important;
+  grid-template-columns: 32px minmax(0, 1fr) !important;
+  gap: 10px !important;
   width: 100% !important;
-  height: 61px !important;
-  min-height: 61px !important;
-  padding: 8px 14px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 6px 12px !important;
   border: 1px solid rgba(76, 157, 214, 0.48) !important;
   border-radius: 8px !important;
   background: linear-gradient(180deg, rgba(3, 19, 35, 0.9), rgba(0, 10, 23, 0.92)) !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-icon {
-  width: 28px !important;
-  height: 28px !important;
+  width: 24px !important;
+  height: 24px !important;
   justify-self: center !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-copy {
   display: grid !important;
-  grid-template-rows: 13px 19px 4px !important;
-  gap: 3px !important;
+  grid-template-rows: 11px 17px 4px !important;
+  gap: 2px !important;
   justify-items: start !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-copy > span {
   color: #35dfff !important;
-  font-size: 13px !important;
-  letter-spacing: 0.14em !important;
+  font-size: 11px !important;
+  letter-spacing: 0.12em !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-copy > strong {
   color: #f4fbff !important;
-  font-size: 20px !important;
+  font-size: 17px !important;
   justify-self: start !important;
 }
 
@@ -61579,16 +61582,18 @@ input::placeholder {
   grid-column: 2 !important;
   grid-row: 3 !important;
   width: 100% !important;
-  height: 36px !important;
+  height: 30px !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action #objectEngageBtn {
+  box-sizing: border-box !important;
   width: 100% !important;
   max-width: none !important;
-  height: 34px !important;
-  border-radius: 6px !important;
-  font-size: 19px !important;
-  letter-spacing: 0.14em !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  border-radius: 5px !important;
+  font-size: 16px !important;
+  letter-spacing: 0.12em !important;
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-hud-action-row > #objectActionPanel,
