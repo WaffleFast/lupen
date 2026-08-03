@@ -30178,11 +30178,6 @@ input::placeholder {
   overflow: hidden;
 }
 
-#storeScreen .simplified-store-detail .store-detail-visual {
-  min-height: 108px;
-  max-height: 108px;
-}
-
 #storeScreen .store-buy-footer {
   padding-top: 8px;
 }
@@ -45249,11 +45244,6 @@ input::placeholder {
   pointer-events: none !important;
 }
 
-#storeScreen .store-card-art .quality-fx {
-  width: 100% !important;
-  height: 100% !important;
-}
-
 #storeScreen .store-card-art::before,
 #storeScreen .store-card-art::after,
 #storeScreen .store-detail-visual::before,
@@ -45301,7 +45291,6 @@ input::placeholder {
   object-fit: contain !important;
   object-position: 50% 50% !important;
   margin: auto !important;
-  transform: translate3d(0, 0, 0) !important;
   transform-origin: 50% 50% !important;
 }
 
@@ -45313,35 +45302,15 @@ input::placeholder {
   transform: translate3d(0, -34px, 0) !important;
 }
 
-#storeScreen .store-detail-visual .quality-fx__item {
-  width: 82% !important;
-  height: 82% !important;
-  max-width: 112px !important;
-  max-height: 88px !important;
-}
-
 #storeScreen .store-art-material .quality-fx__item,
 #storeScreen .store-art-core .quality-fx__item {
   width: 76% !important;
   height: 76% !important;
 }
 
-#storeScreen .store-detail-visual.store-art-material .quality-fx__item,
-#storeScreen .store-detail-visual.store-art-core .quality-fx__item {
-  width: 70% !important;
-  height: 70% !important;
-  max-width: 96px !important;
-  max-height: 78px !important;
-}
-
 #storeScreen .store-art-lupenShards .quality-fx__item {
   width: 72% !important;
   height: 72% !important;
-}
-
-#storeScreen .store-detail-visual.store-art-lupenShards .quality-fx__item {
-  width: 66% !important;
-  height: 66% !important;
 }
 
 #storeScreen .simplified-store-detail .store-detail-visual {
