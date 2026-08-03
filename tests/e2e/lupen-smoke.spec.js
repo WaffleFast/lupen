@@ -1,5 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const fs = require("fs");
+const path = require("path");
 
 function collectUnexpectedBrowserErrors(page) {
   const failures = [];
@@ -1450,6 +1451,22 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#marketScreen")).not.toContainText("Server Buy");
 
     await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("trade terminal keeps a single current declaration for each renderer entry point", async () => {
+    const source = fs.readFileSync(path.join(__dirname, "../../js/04b-trade-terminal-v2.js"), "utf8");
+    const rendererNames = [
+      "renderLiveMarketPriceTable",
+      "renderDailyTradePreviewRow",
+      "renderTradeOverview",
+      "getDailyContractActionMarkup",
+      "renderMarketplace"
+    ];
+
+    rendererNames.forEach(name => {
+      const declarations = source.match(new RegExp(`^function ${name}\\(`, "gm")) || [];
+      expect(declarations, name).toHaveLength(1);
+    });
   });
 
   test.skip("trade terminal route cards accept max profitable cargo and hide loss routes", async ({ page }) => {

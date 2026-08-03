@@ -841,7 +841,8 @@ function renderLiveMarketPriceCell(good, planet, currentPlanet, interactive = fa
   return `<td class="${isCurrent ? "is-current" : ""} ${isTarget ? "is-target" : ""}">${content}</td>`;
 }
 
-function renderLiveMarketPriceTable({ interactive = false } = {}) {
+/* Legacy dedicated-screen renderers retained temporarily for deletion as one isolated unit. */
+function renderLegacyLiveMarketPriceTable({ interactive = false } = {}) {
   const currentPlanet = getCurrentMarketPlanet();
   const orderedPlanets = getOrderedLiveMarketPlanets(currentPlanet);
   return `
@@ -866,7 +867,7 @@ function renderLiveMarketPriceTable({ interactive = false } = {}) {
   `;
 }
 
-function renderDailyTradePreviewRow(contract, index) {
+function renderLegacyDailyTradePreviewRow(contract, index) {
   const state = getTradeContractState(contract);
   const stateLabel = state === "complete" ? "COMPLETE" : state === "active" ? "ACTIVE" : state === "locked" ? "LOCKED" : contract.risk;
   return `
@@ -880,7 +881,7 @@ function renderDailyTradePreviewRow(contract, index) {
   `;
 }
 
-function renderTradeOverview() {
+function renderLegacyTradeOverview() {
   const completed = getDailyTradeProgress();
   return `
     <div class="trade-v2-view trade-v2-overview" data-trade-view="overview">
@@ -911,7 +912,7 @@ function renderTradeOverview() {
   `;
 }
 
-function getDailyContractActionMarkup(contract) {
+function getLegacyDailyContractActionMarkup(contract) {
   const state = getTradeContractState(contract);
   if (state === "complete") return `<button type="button" class="trade-v2-contract-action is-complete" disabled>Contract Complete</button>`;
   if (state === "locked") return `<button type="button" class="trade-v2-contract-action" disabled title="Complete the active contract before accepting another.">Complete Active Contract First</button>`;
@@ -1028,7 +1029,7 @@ function renderLiveMarketView() {
   `;
 }
 
-function renderMarketplace() {
+function renderLegacyMarketplace() {
   setupMultiplayerStagingTradeTerminalSubscription();
   requestMultiplayerStagingTradeOffersIfNeeded();
   ensureDailyTradeContracts();
@@ -1066,8 +1067,7 @@ function updateTradeTimerDisplay() {
   }
 }
 
-/* Final quick-action terminal. The dedicated V2 renderers above remain as a safe
-   compatibility fallback, while this single workspace owns the player flow. */
+/* Current player-facing Trade Terminal renderers. */
 function renderLiveMarketPriceTable({ interactive = true } = {}) {
   const currentPlanet = getCurrentMarketPlanet();
   return `
