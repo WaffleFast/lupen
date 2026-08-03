@@ -10514,24 +10514,50 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("COMMAND LIAISON");
     await expect(page.locator("#journeyScreen")).toContainText("ACADEMY BRIEFING");
     await expect(page.locator("#journeyScreen")).not.toContainText("STATION AI");
-    await expect(page.locator("#journeyScreen")).toContainText("Academy training is active, Pilot.");
+    await expect(page.locator("#journeyScreen")).toContainText("Welcome back, Pilot. Your Academy light is still burning steady.");
     const morganPortraitCrop = await page.locator("#journeyScreen .journey-briefing__portrait").evaluate(portrait => {
       const image = portrait.querySelector("img");
       const portraitRect = portrait.getBoundingClientRect();
       const imageRect = image?.getBoundingClientRect();
       const imageStyles = image ? getComputedStyle(image) : null;
+      const portraitStyles = getComputedStyle(portrait);
       return {
-        overflow: getComputedStyle(portrait).overflow,
+        overflow: portraitStyles.overflow,
+        paddingTop: portraitStyles.paddingTop,
+        paddingRight: portraitStyles.paddingRight,
+        paddingBottom: portraitStyles.paddingBottom,
+        paddingLeft: portraitStyles.paddingLeft,
         portraitHeight: portraitRect.height,
+        portraitWidth: portraitRect.width,
+        portraitClientHeight: portrait.clientHeight,
+        portraitClientWidth: portrait.clientWidth,
         imageHeight: imageRect?.height || 0,
+        imageWidth: imageRect?.width || 0,
+        imageTop: imageRect?.top || 0,
+        imageBottom: imageRect?.bottom || 0,
+        imageLeft: imageRect?.left || 0,
+        imageRight: imageRect?.right || 0,
+        portraitTop: portraitRect.top,
+        portraitBottom: portraitRect.bottom,
+        portraitLeft: portraitRect.left,
+        portraitRight: portraitRect.right,
         objectFit: imageStyles?.objectFit || "",
         objectPosition: imageStyles?.objectPosition || ""
       };
     });
     expect(morganPortraitCrop.overflow).toBe("hidden");
-    expect(morganPortraitCrop.objectFit).toBe("contain");
-    expect(morganPortraitCrop.objectPosition).toMatch(/(?:top|0%)/);
-    expect(morganPortraitCrop.imageHeight).toBeLessThanOrEqual(morganPortraitCrop.portraitHeight);
+    expect(morganPortraitCrop.paddingTop).toBe("0px");
+    expect(morganPortraitCrop.paddingRight).toBe("0px");
+    expect(morganPortraitCrop.paddingBottom).toBe("0px");
+    expect(morganPortraitCrop.paddingLeft).toBe("0px");
+    expect(morganPortraitCrop.objectFit).toBe("cover");
+    expect(morganPortraitCrop.objectPosition).toMatch(/24%/);
+    expect(morganPortraitCrop.imageHeight).toBeGreaterThanOrEqual(morganPortraitCrop.portraitClientHeight);
+    expect(morganPortraitCrop.imageWidth).toBeGreaterThanOrEqual(morganPortraitCrop.portraitClientWidth);
+    expect(morganPortraitCrop.imageTop).toBeLessThanOrEqual(morganPortraitCrop.portraitTop + 1);
+    expect(morganPortraitCrop.imageBottom).toBeGreaterThanOrEqual(morganPortraitCrop.portraitBottom - 1);
+    expect(morganPortraitCrop.imageLeft).toBeLessThanOrEqual(morganPortraitCrop.portraitLeft + 1);
+    expect(morganPortraitCrop.imageRight).toBeGreaterThanOrEqual(morganPortraitCrop.portraitRight - 1);
     await expect(page.locator("#journeyScreen")).toContainText("CHAPTER ROUTE");
     await expect(page.locator("#journeyScreen")).toContainText("Academy");
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='academy']")).toContainText("ACTIVE");
@@ -10777,7 +10803,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("data-journey-chapter-state", "active");
     await expect(page.locator("#journeyScreen [data-journey-chapter-id='frontier']")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#journeyScreen")).toContainText("FRONTIER BRIEFING");
-    await expect(page.locator("#journeyScreen")).toContainText("Frontier operations are active, Pilot.");
+    await expect(page.locator("#journeyScreen")).toContainText("Frontier space is listening, Pilot.");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Frontier Progress");
     await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("0 / 4");
     await expect(page.locator("#journeyScreen")).toContainText("Frontier Assignments");

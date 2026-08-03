@@ -55429,9 +55429,16 @@ input::placeholder {
 }
 
 /* Final polish: keep Morgan's Journey portrait and the compact orbit cargo HUD readable. */
+.journey-briefing__portrait {
+  padding: 0 !important;
+}
+
 .journey-briefing__portrait-img.journey-morgan-portrait {
-  object-fit: contain !important;
-  object-position: center top !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center 24% !important;
   transform: none !important;
 }
 
