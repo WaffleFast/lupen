@@ -1756,7 +1756,7 @@ function updateHudDock() {
 
     hudShipPanel.style.setProperty("grid-template-columns", "minmax(150px, 0.43fr) minmax(200px, 0.57fr)", "important");
     hudShipPanel.style.setProperty("grid-template-rows", "46px 52px 30px", "important");
-    hudShipPanel.style.setProperty("align-content", "center", "important");
+    hudShipPanel.style.setProperty("align-content", "space-between", "important");
     hudShipPanel.style.setProperty("column-gap", "14px", "important");
     hudShipPanel.style.setProperty("row-gap", "6px", "important");
 

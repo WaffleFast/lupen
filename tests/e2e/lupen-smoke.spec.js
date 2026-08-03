@@ -4154,7 +4154,7 @@ test.describe("Lupen browser smoke", () => {
         const engage = rectFor("#objectEngageBtn");
         const actionRow = rectFor(".ship-hud-action-row");
         const panel = rectFor(".ship-display-panel-action");
-        const clusterRects = [shipBay, progressStrip, cargo, actionRow].filter(Boolean);
+        const clusterRects = [shipBay, progressStrip, cargo, engage].filter(Boolean);
         const panelClusterTop = panel && clusterRects.length ? Math.min(...clusterRects.map((rect) => rect.top)) : null;
         const panelClusterBottom = panel && clusterRects.length ? Math.max(...clusterRects.map((rect) => rect.bottom)) : null;
         return {
@@ -4225,7 +4225,9 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.engage.height).toBeLessThanOrEqual(32);
     expect(centerHud.panelClusterTopGap).toBeGreaterThanOrEqual(6);
     expect(centerHud.panelClusterBottomGap).toBeGreaterThanOrEqual(6);
-    expect(Math.abs(centerHud.panelClusterTopGap - centerHud.panelClusterBottomGap)).toBeLessThanOrEqual(16);
+    expect(centerHud.panelClusterTopGap).toBeLessThanOrEqual(14);
+    expect(centerHud.panelClusterBottomGap).toBeLessThanOrEqual(14);
+    expect(Math.abs(centerHud.panelClusterTopGap - centerHud.panelClusterBottomGap)).toBeLessThanOrEqual(6);
     expect(centerHud.ship.left).toBeGreaterThanOrEqual(centerHud.panel.left - 2);
     expect(centerHud.ship.right).toBeLessThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.ship.top).toBeGreaterThanOrEqual(centerHud.panel.top);
