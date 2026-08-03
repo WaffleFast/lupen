@@ -1756,9 +1756,9 @@ function updateHudDock() {
 
     hudShipPanel.style.setProperty("grid-template-columns", "minmax(150px, 0.43fr) minmax(200px, 0.57fr)", "important");
     hudShipPanel.style.setProperty("grid-template-rows", "46px 52px 30px", "important");
-    hudShipPanel.style.setProperty("align-content", "space-between", "important");
+    hudShipPanel.style.setProperty("align-content", "center", "important");
     hudShipPanel.style.setProperty("column-gap", "14px", "important");
-    hudShipPanel.style.setProperty("row-gap", "6px", "important");
+    hudShipPanel.style.setProperty("row-gap", "8px", "important");
 
     if (hudShipCard) {
       hudShipCard.style.setProperty("grid-column", "1", "important");
@@ -1820,7 +1820,7 @@ function updateHudDock() {
     hudShipImage.style.setProperty("max-width", "100%", "important");
     hudShipImage.style.setProperty("max-height", "146px", "important");
     hudShipImage.style.setProperty("object-fit", "contain", "important");
-    hudShipImage.style.setProperty("transform", "scale(1.14)", "important");
+    hudShipImage.style.setProperty("transform", "translateY(-8px) scale(1.14)", "important");
   }
 
   if (cargoCapacityText) {

@@ -61407,13 +61407,13 @@ input::placeholder {
     grid-template-columns: 250px minmax(0, 1fr) !important;
   }
 }
-/* Orbit pilot card reference lock: ship, XP, cargo, and Engage fill the shared-height HUD frame. */
+/* Orbit pilot card reference lock: centre the ship and controls as one balanced group. */
 #spaceScreen.player-orbit-screen.active .player-bottom-hud.command-hud.space-combat-hud > .ship-panel.ship-display-panel-action {
   grid-template-columns: minmax(150px, 0.43fr) minmax(200px, 0.57fr) !important;
   grid-template-rows: 46px 52px 30px !important;
-  align-content: space-between !important;
+  align-content: center !important;
   column-gap: 14px !important;
-  row-gap: 6px !important;
+  row-gap: 8px !important;
   padding: 9px 18px 8px !important;
   border-color: rgba(33, 219, 255, 0.92) !important;
   border-radius: 9px !important;
@@ -61605,4 +61605,8 @@ input::placeholder {
   width: 100% !important;
   max-width: none !important;
   justify-self: stretch !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action #hudShipImage {
+  transform: translateY(-8px) scale(1.14) !important;
 }
