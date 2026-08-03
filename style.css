@@ -61411,6 +61411,7 @@ input::placeholder {
 #spaceScreen.player-orbit-screen.active .player-bottom-hud.command-hud.space-combat-hud > .ship-panel.ship-display-panel-action {
   grid-template-columns: minmax(150px, 0.43fr) minmax(200px, 0.57fr) !important;
   grid-template-rows: 46px 52px 30px !important;
+  align-content: center !important;
   column-gap: 14px !important;
   row-gap: 6px !important;
   padding: 9px 18px 8px !important;

@@ -4147,24 +4147,36 @@ test.describe("Lupen browser smoke", () => {
           };
         };
         const action = document.getElementById("objectEngageBtn");
+        const ship = rectFor("#hudShipImage");
+        const shipBay = rectFor(".ship-card-main");
+        const progressStrip = rectFor("#hudProgressStrip");
+        const cargo = rectFor("#hudCargoSummary");
+        const engage = rectFor("#objectEngageBtn");
+        const actionRow = rectFor(".ship-hud-action-row");
+        const panel = rectFor(".ship-display-panel-action");
+        const clusterRects = [shipBay, progressStrip, cargo, actionRow].filter(Boolean);
+        const panelClusterTop = panel && clusterRects.length ? Math.min(...clusterRects.map((rect) => rect.top)) : null;
+        const panelClusterBottom = panel && clusterRects.length ? Math.max(...clusterRects.map((rect) => rect.bottom)) : null;
         return {
-          ship: rectFor("#hudShipImage"),
-          shipBay: rectFor(".ship-card-main"),
+          ship,
+          shipBay,
           infoColumn: rectFor(".ship-hud-info-column"),
-          progressStrip: rectFor("#hudProgressStrip"),
+          progressStrip,
           level: rectFor("#hudProgressStrip .level-badge"),
           xpRow: rectFor("#hudProgressStrip .xp-row"),
           xpBar: rectFor("#hudProgressStrip .xp-bar"),
-          cargo: rectFor("#hudCargoSummary"),
+          cargo,
           cargoRow: rectFor(".ship-hud-cargo-row"),
           cargoLabel: rectFor("#hudCargoSummary .hud-cargo-copy > span"),
           cargoAmount: rectFor("#hudCargoCapacityText"),
           cargoMeter: rectFor("#hudCargoSummary .hud-cargo-meter"),
           cargoPercentCount: document.querySelectorAll("#hudCargoPercentText").length,
           cargoFull: rectFor("#hudCargoFullBadge:not([hidden])"),
-          engage: rectFor("#objectEngageBtn"),
-          actionRow: rectFor(".ship-hud-action-row"),
-          panel: rectFor(".ship-display-panel-action"),
+          engage,
+          actionRow,
+          panel,
+          panelClusterTopGap: panelClusterTop === null ? null : panelClusterTop - panel.top,
+          panelClusterBottomGap: panelClusterBottom === null ? null : panel.bottom - panelClusterBottom,
           statusPanel: rectFor(".player-bottom-hud > .status-panel"),
           infoPanel: rectFor(".player-bottom-hud > .info-panel"),
           tacticalSummary: rectFor(".tactical-summary-card"),
@@ -4199,6 +4211,8 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.cargoMeter).not.toBeNull();
     expect(centerHud.cargoFull).toBeNull();
     expect(centerHud.engage).not.toBeNull();
+    expect(centerHud.panelClusterTopGap).not.toBeNull();
+    expect(centerHud.panelClusterBottomGap).not.toBeNull();
     expect(centerHud.actionText).toBe("ENGAGE");
     expect(centerHud.actionDisabled).toBe(true);
     expect(centerHud.actionInShipHud).toBe(true);
@@ -4209,6 +4223,9 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.xpBar.height).toBeLessThanOrEqual(8);
     expect(centerHud.cargo.height).toBeLessThanOrEqual(56);
     expect(centerHud.engage.height).toBeLessThanOrEqual(32);
+    expect(centerHud.panelClusterTopGap).toBeGreaterThanOrEqual(6);
+    expect(centerHud.panelClusterBottomGap).toBeGreaterThanOrEqual(6);
+    expect(Math.abs(centerHud.panelClusterTopGap - centerHud.panelClusterBottomGap)).toBeLessThanOrEqual(16);
     expect(centerHud.ship.left).toBeGreaterThanOrEqual(centerHud.panel.left - 2);
     expect(centerHud.ship.right).toBeLessThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.ship.top).toBeGreaterThanOrEqual(centerHud.panel.top);
