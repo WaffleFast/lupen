@@ -1453,19 +1453,36 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("trade terminal keeps a single current declaration for each renderer entry point", async () => {
-    const source = fs.readFileSync(path.join(__dirname, "../../js/04b-trade-terminal-v2.js"), "utf8");
-    const rendererNames = [
+  test("trade terminal keeps a single current declaration for each owned entry point", async () => {
+    const currentSource = fs.readFileSync(path.join(__dirname, "../../js/04b-trade-terminal-v2.js"), "utf8");
+    const legacySource = fs.readFileSync(path.join(__dirname, "../../js/04-trade-bounty-objectives.js"), "utf8");
+    const ownedNames = [
       "renderLiveMarketPriceTable",
       "renderDailyTradePreviewRow",
       "renderTradeOverview",
       "getDailyContractActionMarkup",
-      "renderMarketplace"
+      "renderMarketplace",
+      "setTradeTerminalTab",
+      "getMarketCycle",
+      "getNextMarketRefreshSeconds",
+      "updateTradeTimerDisplay",
+      "getMapOneMarketPrice",
+      "setMarketResource",
+      "syncMarketQuantity",
+      "adjustMarketQuantity",
+      "setMarketQuantityMax",
+      "getMarketQuantityLimit",
+      "buyMarketCargo",
+      "sellMarketCargo",
+      "getPurchasedCargoQuantity",
+      "updatePurchasedCargoCostBasis"
     ];
 
-    rendererNames.forEach(name => {
-      const declarations = source.match(new RegExp(`^function ${name}\\(`, "gm")) || [];
-      expect(declarations, name).toHaveLength(1);
+    ownedNames.forEach(name => {
+      const currentDeclarations = currentSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [];
+      const legacyDeclarations = legacySource.match(new RegExp(`^function ${name}\\(`, "gm")) || [];
+      expect(currentDeclarations, `${name} current declarations`).toHaveLength(1);
+      expect(legacyDeclarations, `${name} legacy declarations`).toHaveLength(0);
     });
   });
 

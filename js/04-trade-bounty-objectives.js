@@ -534,13 +534,13 @@ function getCargoCostBasisForResource(good = "") {
   return Number.isFinite(basis) && basis > 0 ? basis : null;
 }
 
-function getPurchasedCargoQuantity(good = "") {
+function getLegacyPurchasedCargoQuantity(good = "") {
   const held = Math.max(0, Number(cargo[good] || 0));
   const recovered = typeof getRecoveredCargoQuantity === "function" ? getRecoveredCargoQuantity(good) : 0;
   return Math.max(0, held - recovered);
 }
 
-function updatePurchasedCargoCostBasis(good, quantity, price) {
+function updateLegacyPurchasedCargoCostBasis(good, quantity, price) {
   const boughtQuantity = Math.max(0, Math.round(Number(quantity || 0)));
   const unitPrice = Number(price || 0);
   if (!good || !boughtQuantity || !Number.isFinite(unitPrice) || unitPrice <= 0) return;
@@ -1023,15 +1023,15 @@ function sellInventoryItemToNpc(key, quality, amount = "all", refreshStore = fal
 }
 
 
-function getMarketCycle() {
+function getLegacyMarketCycle() {
   return Math.floor(Date.now() / 600000);
 }
 
-function getNextMarketRefreshSeconds() {
+function getLegacyNextMarketRefreshSeconds() {
   return Math.max(0, 600 - Math.floor((Date.now() % 600000) / 1000));
 }
 
-function updateTradeTimerDisplay() {
+function updateLegacyTradeTimerDisplay() {
   const cycleText = document.getElementById("marketCycleText");
   if (!cycleText) return;
 
@@ -1091,7 +1091,7 @@ function getDynamicMarketPrices(location = currentNode) {
   return prices;
 }
 
-function getMapOneMarketPrice(good, planet) {
+function getLegacyMapOneMarketPrice(good, planet) {
   return planetMarkets[planet]?.[good] || 0;
 }
 
@@ -1389,12 +1389,12 @@ function getEffectiveSellPrice(good, location = currentNode) {
   return getCommoditySellPrice(good, location);
 }
 
-function setTradeTerminalTab(tabName) {
+function setLegacyTradeTerminalTab(tabName) {
   activeTradeTerminalTab = "market";
   renderMarketplace();
 }
 
-function renderMarketplace() {
+function renderLegacyMarketplace() {
   setupMultiplayerStagingTradeTerminalSubscription();
   requestMultiplayerStagingTradeOffersIfNeeded();
 
@@ -1611,7 +1611,7 @@ function renderMapOneMarketTerminal(goodsBox) {
   `;
 }
 
-function setMarketResource(good) {
+function setLegacyMarketResource(good) {
   if (!MAP_ONE_TRADE_RESOURCES.includes(good)) return;
   if (isMultiplayerStagingActive() && !isLocalTutorialTradeActive() && !canSelectMultiplayerStagingMarketResource(good, getCurrentMarketPlanet())) {
     if (typeof addHudToast === "function") addHudToast("That resource is not available on a supported route from this planet.");
@@ -1709,28 +1709,28 @@ function confirmMarketTargetPlanet() {
   setMarketTargetPlanet(selectedMarketTargetPlanet);
 }
 
-function syncMarketQuantity(value) {
+function syncLegacyMarketQuantity(value) {
   normalizeMarketBuilderState();
   selectedMarketQuantity = clampNumber(value, 1, Math.max(1, getMarketQuantityLimit()));
   tutorialEvent("selectedBuyAmount");
   renderMarketplace();
 }
 
-function adjustMarketQuantity(delta) {
+function adjustLegacyMarketQuantity(delta) {
   normalizeMarketBuilderState();
   selectedMarketQuantity = clampNumber((selectedMarketQuantity || 1) + delta, 1, Math.max(1, getMarketQuantityLimit()));
   tutorialEvent("selectedBuyAmount");
   renderMarketplace();
 }
 
-function setMarketQuantityMax() {
+function setLegacyMarketQuantityMax() {
   normalizeMarketBuilderState();
   selectedMarketQuantity = Math.max(1, getMarketQuantityLimit());
   tutorialEvent("selectedBuyAmount");
   renderMarketplace();
 }
 
-function getMarketQuantityLimit() {
+function getLegacyMarketQuantityLimit() {
   const localRouteSellReady = getLocalRouteSellReadyState();
   if (localRouteSellReady.ready && selectedMarketResource === localRouteSellReady.good) {
     return Math.max(1, localRouteSellReady.held);
@@ -1753,7 +1753,7 @@ function getMarketQuantityLimit() {
 let marketBuyInProgress = false;
 let marketSellInProgress = false;
 
-function buyMarketCargo() {
+function buyLegacyMarketCargo() {
   if (marketBuyInProgress) return;
   normalizeMarketBuilderState();
 
@@ -1836,7 +1836,7 @@ function buyMarketCargo() {
   marketBuyInProgress = false;
 }
 
-function sellMarketCargo() {
+function sellLegacyMarketCargo() {
   if (marketSellInProgress) return;
   normalizeMarketBuilderState();
   const good = selectedMarketResource;
