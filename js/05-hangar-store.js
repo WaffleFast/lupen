@@ -2307,6 +2307,7 @@ function setShipyardLineFilter(lineId = "all") {
 function createVesselCatalogueCard(ship, { mode = "fleet", selected = false, active = false, unlock = null } = {}) {
   const isExchange = mode === "exchange";
   const card = document.createElement("button");
+  const roleLabel = getVesselLineLabel(getVesselLineId(ship));
   const statusLabel = active
     ? "Active"
     : isExchange
@@ -2327,7 +2328,7 @@ function createVesselCatalogueCard(ship, { mode = "fleet", selected = false, act
     <div class="fleet-card-image-wrap fleet-roster-image">
       <img src="${typeof getShipAsset === "function" ? getShipAsset(ship.id, "medium") : ship.image}" alt="${escapeHtml(ship.name)}">
     </div>
-    <div class="fleet-card-role">${escapeHtml(ship.className || "Vessel")}</div>
+    <div class="fleet-card-role">${escapeHtml(roleLabel)}</div>
     <div class="fleet-card-name">${escapeHtml(ship.name)}</div>
     <div class="vessel-card-description">${escapeHtml(supportingLabel)}</div>
   `;

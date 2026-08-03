@@ -54863,9 +54863,9 @@ input::placeholder {
   position: relative !important;
   display: grid !important;
   grid-template-columns: 64px minmax(0, 1fr) !important;
-  grid-template-rows: 16px 20px 16px !important;
+  grid-template-rows: 17px 21px 17px !important;
   column-gap: 10px !important;
-  row-gap: 3px !important;
+  row-gap: 2px !important;
   width: 100% !important;
   min-width: 0 !important;
   min-height: 80px !important;
@@ -54935,7 +54935,7 @@ input::placeholder {
   align-self: end !important;
   min-width: 0 !important;
   margin: 0 !important;
-  padding: 0 72px 0 0 !important;
+  padding: 0 82px 0 0 !important;
   overflow: hidden !important;
   border: 0 !important;
   color: #71dff3 !important;
@@ -54953,9 +54953,10 @@ input::placeholder {
   grid-row: 2 !important;
   min-width: 0 !important;
   margin: 0 !important;
+  padding-right: 2px !important;
   overflow: hidden !important;
   color: #f0fbff !important;
-  font-size: 14px !important;
+  font-size: 13.5px !important;
   font-weight: 800 !important;
   line-height: 1.05 !important;
   text-overflow: ellipsis !important;
@@ -54970,8 +54971,8 @@ input::placeholder {
   margin: 0 !important;
   overflow: hidden !important;
   color: #7f969f !important;
-  font-size: 8px !important;
-  line-height: 1.1 !important;
+  font-size: 8.5px !important;
+  line-height: 1.15 !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
@@ -59087,6 +59088,7 @@ input::placeholder {
   top: 7px !important;
   right: 7px !important;
   min-width: 0 !important;
+  max-width: 82px !important;
   min-height: 20px !important;
   padding: 4px 7px !important;
   border-radius: 999px !important;
@@ -61094,12 +61096,16 @@ input::placeholder {
   top: 7px !important;
   right: 7px !important;
   min-width: 0 !important;
+  max-width: 82px !important;
   min-height: 20px !important;
   padding: 4px 7px !important;
   border-radius: 999px !important;
   font-size: 8px !important;
   font-weight: 900 !important;
   letter-spacing: 0.05em !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 #hangarOwnedSection .exchange-selected-vessel,
