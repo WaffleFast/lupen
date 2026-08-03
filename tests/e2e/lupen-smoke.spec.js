@@ -6198,6 +6198,14 @@ test.describe("Lupen browser smoke", () => {
     await expect(catalogCards.nth(0)).not.toHaveClass(/progression-locked/);
     await expect(catalogCards.nth(2)).not.toHaveClass(/progression-locked/);
     await expect(catalogCards.nth(3)).toHaveClass(/progression-locked/);
+    const catalogArtSizes = await catalogCards.evaluateAll(cards => cards.map(card => {
+      const art = card.querySelector(".quality-fx__item")?.getBoundingClientRect();
+      return { width: art?.width || 0, height: art?.height || 0 };
+    }));
+    catalogArtSizes.forEach(size => {
+      expect(size.width).toBeGreaterThanOrEqual(160);
+      expect(size.height).toBeGreaterThanOrEqual(160);
+    });
 
     const measurements = await page.evaluate(async () => {
       const items = [
