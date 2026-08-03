@@ -61208,9 +61208,9 @@ input::placeholder {
 }
 /* Orbit pilot card reference lock: ship, XP, cargo, and Engage align as one compact unit. */
 #spaceScreen.player-orbit-screen.active .player-bottom-hud.command-hud.space-combat-hud > .ship-panel.ship-display-panel-action {
-  grid-template-columns: minmax(150px, 0.92fr) minmax(200px, 1.08fr) !important;
-  grid-template-rows: minmax(0, 1fr) 36px !important;
-  column-gap: 12px !important;
+  grid-template-columns: minmax(150px, 0.43fr) minmax(200px, 0.57fr) !important;
+  grid-template-rows: 52px 61px 36px !important;
+  column-gap: 14px !important;
   row-gap: 7px !important;
   padding: 11px 20px 10px !important;
   border-color: rgba(33, 219, 255, 0.92) !important;
@@ -61227,6 +61227,8 @@ input::placeholder {
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-card-main {
+  grid-column: 1 !important;
+  grid-row: 1 / 4 !important;
   display: grid !important;
   grid-template-rows: minmax(0, 1fr) !important;
   place-items: center !important;
@@ -61237,9 +61239,11 @@ input::placeholder {
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-hud-info-column {
+  grid-column: 2 !important;
+  grid-row: 1 / 3 !important;
   display: grid !important;
-  grid-template-rows: 50px 56px !important;
-  gap: 7px !important;
+  grid-template-rows: 52px 61px !important;
+  gap: 8px !important;
   padding: 0 !important;
 }
 
@@ -61327,8 +61331,8 @@ input::placeholder {
   grid-template-columns: 38px minmax(0, 1fr) !important;
   gap: 12px !important;
   width: 100% !important;
-  height: 56px !important;
-  min-height: 56px !important;
+  height: 61px !important;
+  min-height: 61px !important;
   padding: 8px 14px !important;
   border: 1px solid rgba(76, 157, 214, 0.48) !important;
   border-radius: 8px !important;
@@ -61371,8 +61375,8 @@ input::placeholder {
 }
 
 #spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-action-strip.ship-hud-action-row {
-  grid-column: 1 / -1 !important;
-  grid-row: 2 !important;
+  grid-column: 2 !important;
+  grid-row: 3 !important;
   width: 100% !important;
   height: 36px !important;
 }
@@ -61384,4 +61388,14 @@ input::placeholder {
   border-radius: 6px !important;
   font-size: 19px !important;
   letter-spacing: 0.14em !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-hud-action-row > #objectActionPanel,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-engage-panel,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-engage-panel:not(.visible),
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-engage-panel.visible,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-engage-panel .engage-action {
+  width: 100% !important;
+  max-width: none !important;
+  justify-self: stretch !important;
 }

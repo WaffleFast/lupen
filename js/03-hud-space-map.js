@@ -1676,13 +1676,64 @@ function updateHudDock() {
 
   updateShipStorageHud();
 
-  if (hudShipImage && hudShipImage.closest(".ship-display-panel-action")) {
-    hudShipImage.style.setProperty("width", "106px", "important");
-    hudShipImage.style.setProperty("height", "106px", "important");
+  const hudShipPanel = hudShipImage ? hudShipImage.closest(".ship-display-panel-action") : null;
+  if (hudShipPanel) {
+    const hudShipCard = hudShipPanel.querySelector(".ship-card-main");
+    const hudInfoColumn = hudShipPanel.querySelector(".ship-hud-info-column");
+    const hudActionRow = hudShipPanel.querySelector(".ship-hud-action-row");
+    const hudObjectActionPanel = hudShipPanel.querySelector("#objectActionPanel");
+    const hudEngageButton = hudShipPanel.querySelector("#objectEngageBtn");
+
+    hudShipPanel.style.setProperty("grid-template-columns", "minmax(150px, 0.43fr) minmax(200px, 0.57fr)", "important");
+    hudShipPanel.style.setProperty("grid-template-rows", "52px 61px 36px", "important");
+    hudShipPanel.style.setProperty("column-gap", "14px", "important");
+    hudShipPanel.style.setProperty("row-gap", "7px", "important");
+
+    if (hudShipCard) {
+      hudShipCard.style.setProperty("grid-column", "1", "important");
+      hudShipCard.style.setProperty("grid-row", "1 / 4", "important");
+      hudShipCard.style.setProperty("display", "grid", "important");
+      hudShipCard.style.setProperty("place-items", "center", "important");
+    }
+
+    if (hudInfoColumn) {
+      hudInfoColumn.style.setProperty("grid-column", "2", "important");
+      hudInfoColumn.style.setProperty("grid-row", "1 / 3", "important");
+      hudInfoColumn.style.setProperty("display", "grid", "important");
+      hudInfoColumn.style.setProperty("grid-template-rows", "52px 61px", "important");
+      hudInfoColumn.style.setProperty("gap", "8px", "important");
+    }
+
+    if (hudActionRow) {
+      hudActionRow.style.setProperty("grid-column", "2", "important");
+      hudActionRow.style.setProperty("grid-row", "3", "important");
+      hudActionRow.style.setProperty("width", "100%", "important");
+      hudActionRow.style.setProperty("height", "36px", "important");
+    }
+
+    if (hudObjectActionPanel) {
+      hudObjectActionPanel.style.setProperty("width", "100%", "important");
+      hudObjectActionPanel.style.setProperty("height", "100%", "important");
+      hudObjectActionPanel.style.setProperty("justify-items", "stretch", "important");
+    }
+
+    if (hudCargoSummary) {
+      hudCargoSummary.style.setProperty("height", "61px", "important");
+      hudCargoSummary.style.setProperty("min-height", "61px", "important");
+    }
+
+    if (hudEngageButton) {
+      hudEngageButton.style.setProperty("width", "100%", "important");
+      hudEngageButton.style.setProperty("max-width", "none", "important");
+      hudEngageButton.style.setProperty("justify-self", "stretch", "important");
+    }
+
+    hudShipImage.style.setProperty("width", "146px", "important");
+    hudShipImage.style.setProperty("height", "146px", "important");
     hudShipImage.style.setProperty("max-width", "100%", "important");
-    hudShipImage.style.setProperty("max-height", "106px", "important");
+    hudShipImage.style.setProperty("max-height", "146px", "important");
     hudShipImage.style.setProperty("object-fit", "contain", "important");
-    hudShipImage.style.setProperty("transform", "none", "important");
+    hudShipImage.style.setProperty("transform", "scale(1.14)", "important");
   }
 
   if (cargoCapacityText) {

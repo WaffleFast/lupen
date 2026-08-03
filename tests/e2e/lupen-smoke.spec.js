@@ -4022,13 +4022,13 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.ship.height).toBeGreaterThanOrEqual(58);
     expect(resourceEngageState.middleHudLayout.xpBar.width).toBeGreaterThanOrEqual(80);
     expect(resourceEngageState.middleHudLayout.xpBar.height).toBeGreaterThanOrEqual(6);
-    expect(resourceEngageState.middleHudLayout.cargo.height).toBeLessThanOrEqual(54);
+    expect(resourceEngageState.middleHudLayout.cargo.height).toBeLessThanOrEqual(66);
     expect(resourceEngageState.middleHudLayout.action.height).toBeLessThanOrEqual(40);
-    expect(resourceEngageState.middleHudLayout.action.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.panel.width * 0.85));
-    expect(resourceEngageState.middleHudLayout.actionRow.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.panel.width * 0.9));
+    expect(resourceEngageState.middleHudLayout.action.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.infoColumn.width * 0.95));
+    expect(resourceEngageState.middleHudLayout.actionRow.width).toBeGreaterThanOrEqual(Math.round(resourceEngageState.middleHudLayout.infoColumn.width * 0.95));
     const centerX = rect => Math.round((rect.left + rect.right) / 2);
     const centerY = rect => Math.round((rect.top + rect.bottom) / 2);
-    expect(Math.abs(centerX(resourceEngageState.middleHudLayout.action) - centerX(resourceEngageState.middleHudLayout.panel))).toBeLessThanOrEqual(4);
+    expect(Math.abs(centerX(resourceEngageState.middleHudLayout.action) - centerX(resourceEngageState.middleHudLayout.infoColumn))).toBeLessThanOrEqual(4);
     expect(resourceEngageState.middleHudLayout.cargoLabel.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.cargo.left);
     expect(resourceEngageState.middleHudLayout.cargoAmount.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.cargo.right + 2);
     if (resourceEngageState.middleHudLayout.cargoFull) {
@@ -4048,10 +4048,9 @@ test.describe("Lupen browser smoke", () => {
     expect(resourceEngageState.middleHudLayout.cargo.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.shipBay.right);
     expect(resourceEngageState.middleHudLayout.xpBar.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpRow.bottom - 2);
     expect(resourceEngageState.middleHudLayout.cargo.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.xpBar.bottom + 8);
-    expect(resourceEngageState.middleHudLayout.action.top).toBeGreaterThanOrEqual(Math.max(
-      resourceEngageState.middleHudLayout.shipBay.bottom,
-      resourceEngageState.middleHudLayout.infoColumn.bottom
-    ) + 4);
+    expect(resourceEngageState.middleHudLayout.action.left).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.shipBay.right);
+    expect(resourceEngageState.middleHudLayout.action.right).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.infoColumn.right + 2);
+    expect(resourceEngageState.middleHudLayout.action.top).toBeGreaterThanOrEqual(resourceEngageState.middleHudLayout.infoColumn.bottom + 4);
     expect(resourceEngageState.middleHudLayout.action.bottom).toBeLessThanOrEqual(resourceEngageState.middleHudLayout.panel.bottom + 2);
     expect(resourceEngageState.cargoSummaryText).toContain("Cargo");
     expect(resourceEngageState.cargoSummaryText).not.toContain("FULL");
@@ -4205,10 +4204,10 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.actionInShipHud).toBe(true);
     expect(centerHud.centralActionCount).toBe(0);
     expect(centerHud.ship.height).toBeGreaterThanOrEqual(70);
-    expect(centerHud.ship.left).toBeGreaterThanOrEqual(centerHud.shipBay.left);
-    expect(centerHud.ship.right).toBeLessThanOrEqual(centerHud.shipBay.right);
-    expect(centerHud.ship.top).toBeGreaterThanOrEqual(centerHud.shipBay.top);
-    expect(centerHud.ship.bottom).toBeLessThanOrEqual(centerHud.shipBay.bottom);
+    expect(centerHud.ship.left).toBeGreaterThanOrEqual(centerHud.panel.left - 2);
+    expect(centerHud.ship.right).toBeLessThanOrEqual(centerHud.infoColumn.left);
+    expect(centerHud.ship.top).toBeGreaterThanOrEqual(centerHud.panel.top);
+    expect(centerHud.ship.bottom).toBeLessThanOrEqual(centerHud.panel.bottom + 2);
     expect(centerHud.shipBay.right).toBeLessThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.infoColumn.right).toBeLessThanOrEqual(centerHud.panel.right + 2);
     expect(centerHud.level.left).toBeGreaterThanOrEqual(centerHud.infoColumn.left);
@@ -4219,15 +4218,16 @@ test.describe("Lupen browser smoke", () => {
     expect(centerHud.cargoRow.top).toBeGreaterThanOrEqual(centerHud.xpBar.bottom + 8);
     expect(centerHud.cargoRow.left).toBeGreaterThanOrEqual(centerHud.infoColumn.left);
     expect(centerHud.cargoRow.right).toBeLessThanOrEqual(centerHud.infoColumn.right);
-    expect(centerHud.cargoRow.bottom).toBeLessThanOrEqual(centerHud.infoColumn.bottom + 2);
+    expect(centerHud.cargoRow.bottom).toBeLessThanOrEqual(centerHud.infoColumn.bottom + 3);
     expect(centerHud.cargo.left).toBeGreaterThanOrEqual(centerHud.shipBay.right);
     expect(centerHud.cargoMeter.right).toBeLessThanOrEqual(centerHud.cargo.right);
     expect(centerHud.cargoPercentCount).toBe(0);
-    expect(centerHud.actionRow.top).toBeGreaterThanOrEqual(Math.max(centerHud.shipBay.bottom, centerHud.infoColumn.bottom) + 4);
-    expect(centerHud.actionRow.left).toBeLessThanOrEqual(centerHud.shipBay.left + 2);
-    expect(centerHud.actionRow.right).toBeGreaterThanOrEqual(centerHud.infoColumn.right - 2);
-    expect(centerHud.actionRow.width).toBeGreaterThanOrEqual(centerHud.panel.width * 0.9);
-    expect(centerHud.engage.width).toBeGreaterThanOrEqual(centerHud.actionRow.width * 0.9);
+    expect(centerHud.actionRow.top).toBeGreaterThanOrEqual(centerHud.infoColumn.bottom + 4);
+    expect(centerHud.actionRow.left).toBeGreaterThanOrEqual(centerHud.shipBay.right);
+    expect(Math.abs(centerHud.actionRow.left - centerHud.infoColumn.left)).toBeLessThanOrEqual(2);
+    expect(Math.abs(centerHud.actionRow.right - centerHud.infoColumn.right)).toBeLessThanOrEqual(2);
+    expect(centerHud.actionRow.width).toBeGreaterThanOrEqual(centerHud.infoColumn.width * 0.95);
+    expect(centerHud.engage.width).toBeGreaterThanOrEqual(centerHud.actionRow.width * 0.95);
     expect(centerHud.actionRow.bottom).toBeLessThanOrEqual(centerHud.panel.bottom + 2);
     expect(centerHud.xpText).toContain("XP");
     expect(centerHud.cargoText).toContain("Cargo");
