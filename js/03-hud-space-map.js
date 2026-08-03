@@ -265,19 +265,54 @@ function getAcademyTacticalIcon(mission) {
     starter_ship_claimed: "ship",
     launch_from_station: "ship",
     profitable_trade: "trade",
+    complete_daily_trade_contract: "trade",
     equip_guns: "combat",
     equip_attachment: "repair",
     destroy_bot: "combat",
-    repair_ship: "repair"
+    repair_ship: "repair",
+    claim_bounty: "bounties",
+    purchase_pioneer_hull: "ship",
+    recover_resource: "cargo",
+    complete_missions: "academy"
   };
   return getTacticalIconSvg(iconByType[mission?.objective?.type] || "academy");
+}
+
+function getTacticalJourneyChapterId() {
+  return typeof getJourneyActiveChapterId === "function" ? getJourneyActiveChapterId() : "academy";
+}
+
+function getTacticalJourneyChapterLabel(chapterId = getTacticalJourneyChapterId()) {
+  if (typeof getJourneyActiveChapter === "function") {
+    const chapter = getJourneyActiveChapter();
+    if (chapter?.id === chapterId) return chapter.displayLabel || chapter.label || chapter.shortLabel || "Journey";
+  }
+  if (chapterId === "frontier") return "Chapter I: Frontier";
+  return "Academy";
+}
+
+function getTacticalJourneyChapterDescription(chapterId = getTacticalJourneyChapterId()) {
+  if (chapterId === "frontier") return "Track your current Frontier assignments and chapter readiness.";
+  return "Complete your current Academy assignments and launch path.";
+}
+
+function updateTacticalJourneyNavLabel() {
+  const button = document.getElementById("tacticalNavAcademy");
+  const label = getTacticalJourneyChapterLabel();
+  const shortLabel = label.includes(":") ? label.split(":").pop().trim() : label;
+  const span = button?.querySelector("span");
+  if (span) span.textContent = shortLabel || "Journey";
+  button?.setAttribute("aria-label", `${label} Journey phase`);
 }
 
 function renderTacticalAcademy() {
   if (typeof reconcileMissionProgressFromGameplayState === "function") {
     reconcileMissionProgressFromGameplayState({ refresh: false, notify: false, save: false });
   }
-  const missions = typeof getVisibleChapterMissions === "function" ? getVisibleChapterMissions("academy") : [];
+  const chapterId = getTacticalJourneyChapterId();
+  const chapterLabel = getTacticalJourneyChapterLabel(chapterId);
+  const chapterDescription = getTacticalJourneyChapterDescription(chapterId);
+  const missions = typeof getVisibleChapterMissions === "function" ? getVisibleChapterMissions(chapterId) : [];
   const rows = missions.map(mission => {
     const state = typeof getMissionState === "function" ? getMissionState(mission.id) : null;
     const required = typeof getMissionRequiredAmount === "function" ? getMissionRequiredAmount(mission) : 1;
@@ -288,7 +323,7 @@ function renderTacticalAcademy() {
     return `
       <div class="tactical-task-row ${complete ? "is-complete" : started ? "is-progress" : ""}">
         <span class="tactical-task-icon">${getAcademyTacticalIcon(mission)}</span>
-        <div class="tactical-task-copy"><strong>${escapeTacticalHtml(mission.title)}</strong><span>${escapeTacticalHtml(mission.briefing || "Complete Academy assignment.")}</span></div>
+        <div class="tactical-task-copy"><strong>${escapeTacticalHtml(mission.title)}</strong><span>${escapeTacticalHtml(mission.briefing || `Complete ${chapterLabel} assignment.`)}</span></div>
         <div class="tactical-task-progress"><div class="tactical-meter"><i style="width:${percent}%"></i></div><b>${formatNumber(progress)} / ${formatNumber(required)}</b></div>
         <span class="tactical-task-status">${complete ? "COMPLETE" : started ? "IN PROGRESS" : "PENDING"}</span>
       </div>
@@ -302,11 +337,11 @@ function renderTacticalAcademy() {
   return `
     <div class="tactical-primary-column tactical-academy-view" data-tactical-section="academy">
       <div class="tactical-content-heading">
-        <span class="tactical-heading-icon">${getTacticalIconSvg("academy")}</span>
-        <div><h3>Academy</h3><p>Complete tasks to learn the basics and earn rewards.</p></div>
+        <span class="tactical-heading-icon">${getTacticalIconSvg(chapterId === "frontier" ? "ship" : "academy")}</span>
+        <div><h3>${escapeTacticalHtml(chapterLabel)}</h3><p>${escapeTacticalHtml(chapterDescription)}</p></div>
         <span class="tactical-heading-chip">${formatNumber(completeCount)} / ${formatNumber(missions.length)} COMPLETE</span>
       </div>
-      <div class="tactical-task-list" tabindex="0" aria-label="Academy assignment list">${rows || `<div class="tactical-empty-state">Academy assignments are unavailable.</div>`}</div>
+      <div class="tactical-task-list" tabindex="0" aria-label="${escapeTacticalHtml(chapterLabel)} assignment list">${rows || `<div class="tactical-empty-state">${escapeTacticalHtml(chapterLabel)} assignments are unavailable.</div>`}</div>
     </div>
     ${renderTacticalSummaryCards()}
   `;
@@ -490,6 +525,7 @@ function renderTacticalPanel(force = false) {
   const activeElement = document.activeElement;
   const preserveCommsInput = !force && activeTacticalSection === "comms" && activeElement?.id === "tacticalChatInput";
 
+  updateTacticalJourneyNavLabel();
   document.querySelectorAll(".tactical-panel-nav [role='tab']").forEach(button => {
     const selected = button.id === `tacticalNav${activeTacticalSection.charAt(0).toUpperCase()}${activeTacticalSection.slice(1)}`;
     button.classList.toggle("active", selected);
