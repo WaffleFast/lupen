@@ -28,8 +28,18 @@ const STAGING_STORE_LOCAL_ITEM_IDS = Object.freeze({
   "ship:zeusExplorer": "ship:zeusExplorer"
 });
 
-const MAP_ONE_STORE_GUN_KEYS = Object.freeze(["pulseLaser", "ionBlaster", "heavyLance"]);
-const MAP_ONE_STORE_ATTACHMENT_KEYS = Object.freeze(["cargoPod", "jumpDrive"]);
+const MAP_ONE_STORE_GUN_KEYS = Object.freeze(["pulseLaser", "repeater", "ionBlaster", "heavyLance", "voidRail"]);
+const MAP_ONE_STORE_ATTACHMENT_KEYS = Object.freeze(["cargoPod", "jumpDrive", "shieldBooster"]);
+const MAP_ONE_STORE_CATALOG_ORDER = Object.freeze([
+  "cargoPod",
+  "jumpDrive",
+  "pulseLaser",
+  "shieldBooster",
+  "repeater",
+  "ionBlaster",
+  "heavyLance",
+  "voidRail"
+]);
 
 let multiplayerStagingStoreSubscribed = false;
 let multiplayerStagingStorePurchasePending = false;
@@ -4235,10 +4245,17 @@ function getStoreCatalogItems() {
     items.push(dailyItem);
   }
 
-  const order = { attachments: 0, guns: 1, materials: 2 };
+  const order = new Map(MAP_ONE_STORE_CATALOG_ORDER.map((key, index) => [key, index]));
   return items.sort((a, b) => {
     if (a.dailyStock !== b.dailyStock) return a.dailyStock ? 1 : -1;
-    const delta = (order[a.category] ?? 99) - (order[b.category] ?? 99);
+    const aLocked = a.kind === "gun" || a.kind === "attachment"
+      ? getEquipmentUnlockStatus(a.kind === "gun" ? "guns" : "attachments", a.key).locked
+      : false;
+    const bLocked = b.kind === "gun" || b.kind === "attachment"
+      ? getEquipmentUnlockStatus(b.kind === "gun" ? "guns" : "attachments", b.key).locked
+      : false;
+    if (aLocked !== bLocked) return aLocked ? 1 : -1;
+    const delta = (order.get(a.key) ?? 99) - (order.get(b.key) ?? 99);
     if (delta !== 0) return delta;
     return a.name.localeCompare(b.name);
   });
@@ -4665,6 +4682,12 @@ function getStoreItemLevelLabel(item) {
   return "—";
 }
 
+function getStoreLockedActionLabel(unlock) {
+  const combatLevel = Number(unlock?.requirements?.combatLevel || 0);
+  if (combatLevel > 0) return `REQUIRES COMBAT LEVEL ${formatNumber(combatLevel)}`;
+  return String(unlock?.requirementLines?.[0] || "Purchase unavailable").toUpperCase();
+}
+
 function getStoreAvailabilityState({ item, progressionLocked, hasStock, buyPrice }) {
   if (progressionLocked) return { label: "Locked", tone: "locked" };
   if (!hasStock) return { label: "Sold out", tone: "sold-out" };
@@ -4725,9 +4748,11 @@ function renderStoreDetail() {
   const stagingStoreLocked = isMultiplayerStagingStoreActive();
   const stagingStoreItemId = getStagingStoreItemId(item);
   const stagingWritableItem = isStagingStoreWritableItem(item);
-  const stagingPreviewButton = stagingStoreItemId
-    ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Purchase") : "Validate") : "Sold Out"}</button>`
-    : `<button class="store-detail-buy-action" disabled>Purchase unavailable</button>`;
+  const stagingPreviewButton = progressionLocked
+    ? `<button class="store-detail-buy-action locked-action" data-item-key="${item.key}" data-item-kind="${item.kind}" disabled>${escapeHtml(getStoreLockedActionLabel(unlock))}</button>`
+    : stagingStoreItemId
+      ? `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${hasStock && !multiplayerStagingStorePurchasePending ? "" : "disabled"}>${hasStock ? (stagingWritableItem ? (multiplayerStagingStorePurchasePending ? "Pending..." : "Purchase") : "Validate") : "Sold Out"}</button>`
+      : `<button class="store-detail-buy-action" disabled>Purchase unavailable</button>`;
 
   if (item.kind === "material") {
     buyButton = stagingStoreLocked
@@ -4751,7 +4776,7 @@ function renderStoreDetail() {
     buyButton = stagingStoreLocked
       ? stagingPreviewButton
       : progressionLocked
-        ? `<button class="store-detail-buy-action locked-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()">Locked</button>`
+        ? `<button class="store-detail-buy-action locked-action" data-item-key="${item.key}" data-item-kind="${item.kind}" disabled>${escapeHtml(getStoreLockedActionLabel(unlock))}</button>`
         : `<button class="store-detail-buy-action" data-item-key="${item.key}" data-item-kind="${item.kind}" onclick="storeBuySelected()" ${!canBuy ? "disabled" : ""}>${hasStock ? (credits >= buyPrice ? `Purchase · CR ${formatNumber(buyPrice)}` : "Insufficient credits") : "Sold Out"}</button>`;
     if (sellPrice > 0) {
       const sellHandler = (item.kind === "attachment" || item.kind === "gun") && quality === "standard" && ownedReady > 0

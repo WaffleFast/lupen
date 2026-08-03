@@ -5989,7 +5989,10 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#storeScreen")).toContainText(/Heavy Lance/i);
     await expect(page.locator("#storeScreen")).toContainText(/Cargo Pod/i);
     await expect(page.locator("#storeScreen")).toContainText(/Jump Drive/i);
-    await expect(page.locator("#storeScreen")).not.toContainText(/Repeater|Ripper Gun|Melt Cannon|Void Rail|Shield Booster|Lupen Shard|Lupen Core|Materials/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Repeater/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Void Rail/i);
+    await expect(page.locator("#storeScreen")).toContainText(/Shield Booster/i);
+    await expect(page.locator("#storeScreen")).not.toContainText(/Ripper Gun|Melt Cannon|Lupen Shard|Lupen Core|Materials/i);
     await expect(page.locator("#storeScreen")).toContainText(/Cargo Pod|Purchase unavailable|Purchase/i);
     await expect(page.locator("#storeScreen")).not.toContainText(/server-backed|preview pending|validation is ready|dry run|MP staging/i);
     await expect(page.locator("#storeScreen")).not.toContainText("Buy / CR");
@@ -6180,6 +6183,22 @@ test.describe("Lupen browser smoke", () => {
     await page.goto("/");
     await openStore(page);
 
+    const catalogCards = page.locator("#storeCatalogGrid .store-catalog-card");
+    await expect(catalogCards).toHaveCount(8);
+    expect(await catalogCards.evaluateAll(cards => cards.map(card => card.dataset.itemKey))).toEqual([
+      "cargoPod",
+      "jumpDrive",
+      "pulseLaser",
+      "shieldBooster",
+      "repeater",
+      "ionBlaster",
+      "heavyLance",
+      "voidRail"
+    ]);
+    await expect(catalogCards.nth(0)).not.toHaveClass(/progression-locked/);
+    await expect(catalogCards.nth(2)).not.toHaveClass(/progression-locked/);
+    await expect(catalogCards.nth(3)).toHaveClass(/progression-locked/);
+
     const measurements = await page.evaluate(async () => {
       const items = [
         ["cargoPod", "attachment:cargoPod"],
@@ -6215,7 +6234,12 @@ test.describe("Lupen browser smoke", () => {
       expect(row.offsetX, row.key).toBeLessThanOrEqual(1);
       expect(row.offsetY, row.key).toBeLessThanOrEqual(1);
       expect(row.actionText, row.key).not.toBe("");
-      expect(row.actionDisabled, row.key).toBe(false);
+      if (row.key === "ionBlaster" || row.key === "heavyLance") {
+        expect(row.actionText, row.key).toMatch(/^REQUIRES COMBAT LEVEL \d+$/);
+        expect(row.actionDisabled, row.key).toBe(true);
+      } else {
+        expect(row.actionDisabled, row.key).toBe(false);
+      }
     }
 
     await expectNoUnexpectedBrowserErrors(failures);
