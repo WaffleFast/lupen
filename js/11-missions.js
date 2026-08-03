@@ -1052,11 +1052,11 @@ function renderJourneyMorganBriefing() {
   });
   const briefingMessage = academyActive
     ? nextAssignment
-      ? `Academy training is active, Pilot. Next: ${nextAssignment.journeyTitle}. ${nextAssignment.journeyShortDescription}`
-      : "Academy training is complete, Pilot. Chapter I: Frontier is opening."
+      ? `Welcome back, Pilot. Your Academy light is still burning steady. Next, ${nextAssignment.journeyTitle}: ${nextAssignment.journeyShortDescription} I will stay on comms while you make it real.`
+      : "Beautiful work, Pilot. Academy lights are green across the board, and Chapter I: Frontier is opening like a new star lane."
     : nextAssignment
-      ? `Frontier operations are active, Pilot. Next: ${nextAssignment.journeyTitle}. ${nextAssignment.journeyShortDescription}`
-      : "Frontier operations are complete, Pilot. The next ship-plan route is ready to be revealed.";
+      ? `Frontier space is listening, Pilot. Next, ${nextAssignment.journeyTitle}: ${nextAssignment.journeyShortDescription} Keep your course clean, and I will keep the signal warm.`
+      : "Frontier operations are complete, Pilot. You have turned first steps into a real wake through the dark; the next ship-plan route is ready to reveal.";
   return `
     <section class="journey-morgan-panel journey-briefing">
       <div class="journey-briefing__bg" aria-hidden="true"></div>
