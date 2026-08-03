@@ -61206,3 +61206,182 @@ input::placeholder {
     grid-template-columns: 250px minmax(0, 1fr) !important;
   }
 }
+/* Orbit pilot card reference lock: ship, XP, cargo, and Engage align as one compact unit. */
+#spaceScreen.player-orbit-screen.active .player-bottom-hud.command-hud.space-combat-hud > .ship-panel.ship-display-panel-action {
+  grid-template-columns: minmax(150px, 0.92fr) minmax(200px, 1.08fr) !important;
+  grid-template-rows: minmax(0, 1fr) 36px !important;
+  column-gap: 12px !important;
+  row-gap: 7px !important;
+  padding: 11px 20px 10px !important;
+  border-color: rgba(33, 219, 255, 0.92) !important;
+  border-radius: 9px !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action::before,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action::after,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .ship-card-main::before,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .ship-mini-progress::before,
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .ship-mini-progress::after {
+  content: none !important;
+  display: none !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-card-main {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-hud-info-column {
+  display: grid !important;
+  grid-template-rows: 50px 56px !important;
+  gap: 7px !important;
+  padding: 0 !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .ship-mini-progress {
+  display: grid !important;
+  grid-template-columns: 58px minmax(0, 1fr) !important;
+  grid-template-rows: 25px 12px !important;
+  column-gap: 12px !important;
+  row-gap: 7px !important;
+  align-content: center !important;
+  align-items: center !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .level-badge {
+  grid-column: 1 !important;
+  grid-row: 1 / 3 !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  width: 58px !important;
+  height: 50px !important;
+  min-width: 58px !important;
+  min-height: 50px !important;
+  border: 1px solid rgba(42, 223, 255, 0.95) !important;
+  border-radius: 8px !important;
+  background: linear-gradient(180deg, rgba(5, 23, 42, 0.94), rgba(1, 10, 24, 0.96)) !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .level-badge span {
+  color: #35dfff !important;
+  font-size: 8px !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .level-badge strong {
+  font-size: 28px !important;
+  line-height: 0.92 !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .xp-row {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  color: #f4fbff !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .xp-row span:first-child {
+  color: #27d9ff !important;
+  font-size: 15px !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .xp-row span:last-child {
+  color: #f4fbff !important;
+  font-size: 11px !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .xp-bar {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  width: 100% !important;
+  height: 9px !important;
+  min-height: 9px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(8, 45, 67, 0.72) !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .xp-fill {
+  height: 100% !important;
+  border-radius: inherit !important;
+  background: linear-gradient(90deg, #12c3e8, #56edff) !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-summary {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  gap: 12px !important;
+  width: 100% !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  padding: 8px 14px !important;
+  border: 1px solid rgba(76, 157, 214, 0.48) !important;
+  border-radius: 8px !important;
+  background: linear-gradient(180deg, rgba(3, 19, 35, 0.9), rgba(0, 10, 23, 0.92)) !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-icon {
+  width: 28px !important;
+  height: 28px !important;
+  justify-self: center !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-copy {
+  display: grid !important;
+  grid-template-rows: 13px 19px 4px !important;
+  gap: 3px !important;
+  justify-items: start !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-copy > span {
+  color: #35dfff !important;
+  font-size: 13px !important;
+  letter-spacing: 0.14em !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-copy > strong {
+  color: #f4fbff !important;
+  font-size: 20px !important;
+  justify-self: start !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-meter {
+  width: 100% !important;
+  height: 4px !important;
+  border-radius: 999px !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action .hud-cargo-summary em {
+  display: none !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action > .ship-action-strip.ship-hud-action-row {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  width: 100% !important;
+  height: 36px !important;
+}
+
+#spaceScreen.player-orbit-screen.active .ship-panel.ship-display-panel-action #objectEngageBtn {
+  width: 100% !important;
+  max-width: none !important;
+  height: 34px !important;
+  border-radius: 6px !important;
+  font-size: 19px !important;
+  letter-spacing: 0.14em !important;
+}

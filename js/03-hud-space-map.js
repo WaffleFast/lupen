@@ -1656,6 +1656,7 @@ function updateHudDock() {
   const hudCargoPercentText = document.getElementById("hudCargoPercentText");
   const hudCargoCapacityFill = document.getElementById("hudCargoCapacityFill");
   const hudCargoFullBadge = document.getElementById("hudCargoFullBadge");
+  const hudShipImage = document.getElementById("hudShipImage");
   const inventoryItemCountText = document.getElementById("inventoryItemCountText");
   const itemInventorySummary = document.getElementById("itemInventorySummary");
 
@@ -1674,6 +1675,15 @@ function updateHudDock() {
   }
 
   updateShipStorageHud();
+
+  if (hudShipImage && hudShipImage.closest(".ship-display-panel-action")) {
+    hudShipImage.style.setProperty("width", "106px", "important");
+    hudShipImage.style.setProperty("height", "106px", "important");
+    hudShipImage.style.setProperty("max-width", "100%", "important");
+    hudShipImage.style.setProperty("max-height", "106px", "important");
+    hudShipImage.style.setProperty("object-fit", "contain", "important");
+    hudShipImage.style.setProperty("transform", "none", "important");
+  }
 
   if (cargoCapacityText) {
     cargoCapacityText.textContent = `${formatNumber(usedCargo)} / ${formatNumber(maxCargo)}`;
