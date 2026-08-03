@@ -1,6 +1,6 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
-const TUTORIAL_FLOW_VERSION = 4;
+const TUTORIAL_FLOW_VERSION = 5;
 const TUTORIAL_NARRATOR_LABEL = "Morgan";
 const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
 const TUTORIAL_TRADE_ROUTE = Object.freeze({
@@ -86,12 +86,23 @@ const TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS = Object.freeze([
   "review-daily-contracts",
   "close-daily-contracts"
 ]);
+const TUTORIAL_DAILY_CONTRACT_STEP_IDS = Object.freeze([
+  ...TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS,
+  "accept-daily-contract",
+  "return-after-daily-contract-accept",
+  "launch-daily-contract",
+  "map-daily-contract-route",
+  "jump-daily-contract-route",
+  "land-daily-contract-destination",
+  "open-trade-complete-daily",
+  "complete-daily-contract"
+]);
 const TUTORIAL_TRADE_PORTRAIT_STEPS = new Set(
   [
     ...TUTORIAL_ACADEMY_MILESTONES
       .filter(milestone => ["academy_first_trade", "academy_launch_ship"].includes(milestone.missionId))
       .flatMap(milestone => [...milestone.stepIds]),
-    ...TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS
+    ...TUTORIAL_DAILY_CONTRACT_STEP_IDS
   ]
 );
 const TUTORIAL_TACTICAL_PORTRAIT_STEPS = new Set(
@@ -145,7 +156,7 @@ const STARTER_TUTORIAL_STEPS = [
     title: "Welcome to Lupen, {pilot}",
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_intro_welcome",
-    text: "I'm Morgan, your Command Liaison. Trade across living markets, explore distant systems, destroy those who stand against you, or build a fleet entirely your own. I'll guide your first steps—after that, the path is yours.",
+    text: "I'm Morgan, your Command Liaison. Asteron Prime is holding your launch window, the markets are awake, and the dark between worlds is already moving. Stay with my signal for the first run; after that, Pilot, the stars start answering to you.",
     target: "#tutorialCinematicContinue",
     event: null,
     actionLabel: "Begin your journey",
@@ -157,7 +168,7 @@ const STARTER_TUTORIAL_STEPS = [
     id: "welcome-new-pilot",
     title: "Academy link established",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Morgan's introductory transmission has been received.",
+    text: "Good. My signal is locked to your helm, and your Academy route is ready to unfold.",
     target: "#tutorialNextBtn",
     event: null,
     actionLabel: "Continue",
@@ -169,7 +180,7 @@ const STARTER_TUTORIAL_STEPS = [
     id: "welcome-core-loop",
     title: "Open Journey",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Journey is where your Academy route and next objective live. Open it now and I’ll show you where to begin.",
+    text: "Open Journey. It is your route-map through the noise: one clear assignment, then the next, until the Frontier knows your name.",
     target: "#journeyHubBtn",
     event: "openedJourney",
     actionLabel: "Open highlighted Journey"
@@ -178,7 +189,7 @@ const STARTER_TUTORIAL_STEPS = [
     id: "welcome-academy",
     title: "Your Academy route",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Your first objective is Claim Starter Ship. Journey will update as you complete each Academy assignment. Return to the station and I’ll guide you to the Hangar.",
+    text: "First light: claim your starter ship. Journey will mark each assignment as you prove it. Return to the station, and I will walk you to the Hangar.",
     target: "#journeyScreen .screen-back-btn",
     event: "returnedToHub",
     actionLabel: "Use highlighted Back"
@@ -314,9 +325,67 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "close-daily-contracts",
     title: "Your Academy delivery",
-    text: "Completing one Daily Contract is now an Academy assignment. Collect its sealed cargo at the marked origin, deliver it to the destination, and claim the fixed reward. Close the list for now; Journey will keep the assignment visible.",
+    text: "Completing one Daily Contract is now an Academy assignment. Close this briefing, then we will load the Virella priority package and fly it cleanly to Nyxara.",
     target: "tutorial:closeDailyTradeContracts",
     event: "closedDailyTradeContracts"
+  },
+  {
+    id: "accept-daily-contract",
+    title: "Load the priority package",
+    text: "Open Daily Contracts again and accept Priority Shipment. You are already docked at Virella, so the sealed cipher case will load straight into your hold.",
+    target: "tutorial:acceptDailyTradeContract",
+    event: "acceptedDailyTradeContract"
+  },
+  {
+    id: "return-after-daily-contract-accept",
+    title: "Back to the pad",
+    text: "Package secured. Return to the station hub. Keep the seal intact and the route quiet; the reward is guaranteed when Nyxara signs it off.",
+    target: "#marketScreen .screen-back-btn",
+    event: "returnedToHub",
+    place: "left"
+  },
+  {
+    id: "launch-daily-contract",
+    title: "Launch the courier run",
+    text: "Launch from Virella. The contract is now your active objective, and I will keep the destination signal lit.",
+    target: ".hub-launch-btn",
+    event: "launched"
+  },
+  {
+    id: "map-daily-contract-route",
+    title: "Plot Nyxara",
+    text: "Open Jump and follow the contract route. Courier work is simple on paper: one sealed package, one promised destination, no excuses in between.",
+    target: "#jumpBtn",
+    event: "openedSectorMap"
+  },
+  {
+    id: "jump-daily-contract-route",
+    title: "Carry the signal",
+    text: "Follow the highlighted route to Nyxara. Let the Jump drive breathe between burns; rushing a courier lane is how pilots make expensive stories.",
+    target: "dynamicTradeRoute",
+    event: "jumpedNode"
+  },
+  {
+    id: "land-daily-contract-destination",
+    title: "Dock at Nyxara",
+    text: "Nyxara is beneath you. Land and keep the package sealed until the Trade Terminal confirms delivery.",
+    target: "#planetLandBtn",
+    event: "landedOnPlanet",
+    place: "left"
+  },
+  {
+    id: "open-trade-complete-daily",
+    title: "Open Trade Terminal",
+    text: "Open the Trade Terminal. The courier desk will recognize the package and prepare the payout.",
+    target: "tutorial:planetTradeTerminal",
+    event: "openedTradeTerminal"
+  },
+  {
+    id: "complete-daily-contract",
+    title: "Complete delivery",
+    text: "Complete the delivery. That is how a fixed contract should feel: clean cargo, clean arrival, clean credits.",
+    target: "tutorial:completeDailyTradeContract",
+    event: "completedDailyTradeContract"
   },
   {
     id: "return-after-trade",
@@ -329,7 +398,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-store",
     title: "Open Store",
-    text: "Open the Store. We will collect the two weapons and one attachment needed for the Hunter's first complete loadout.",
+    text: "Open the Store. The Hunter has a good heart, but a bare hull is only a promise. We are going to give it teeth and room to breathe.",
     target: ".hub-actions button[onclick='openStore()']",
     event: "openedStore"
   },
@@ -422,7 +491,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-bounty",
     title: "Open Bounty Board",
-    text: "Open the Bounty Board and choose a starter contract. Bounties give your weapons a purpose.",
+    text: "Open the Bounty Board. Out here, a weapon is not decoration; it is a promise to keep the lanes alive.",
     target: ".hub-actions button[onclick='openBountyBoard()']",
     event: "openedBountyBoard"
   },
@@ -473,7 +542,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "destroy-bot",
     title: "Destroy the bounty target",
-    text: "Use Jump, Bots scan, and ENGAGE to destroy one Erebus bot. Once it falls, disengage from its allies and return for your payout and repairs.",
+    text: "Use Jump, Bots scan, and ENGAGE to bring down one Erebus bot. When it breaks, do not linger in the sparks. Disengage, breathe, and come home for the payout.",
     target: "tutorial:destroyBountyBot",
     event: ["destroyedBountyBot", "openedSectorMap", "scannedBots", "jumpedNode"],
     place: "left"
@@ -532,7 +601,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-forge",
     title: "Open Forge",
-    text: "Open the Forge. Lupen Shards raise item levels; for now, we will upgrade your Pulse Laser once and keep the lesson clean.",
+    text: "Open the Forge. Lupen Shards are not just salvage; they are pressure, memory, and power waiting to be shaped.",
     target: ".hub-actions button[onclick='openUpgradeForge()']",
     event: "openedForge"
   },
@@ -554,7 +623,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "repair-reminder",
     title: "Repair check",
-    text: "Open Hangar after combat and check hull condition. Morgan will guide the repair or confirm that no hull service is needed.",
+    text: "Open Hangar and check the Hunter's hull. Every pilot comes back marked by something; the professional ones repair before the next burn.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },
@@ -591,6 +660,9 @@ const TUTORIAL_FLOW_V2_ADDED_STEP_IDS = new Set([
   "open-attachment-loadout"
 ]);
 const TUTORIAL_FLOW_V4_ADDED_STEP_IDS = new Set(TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS);
+const TUTORIAL_FLOW_V5_ADDED_STEP_IDS = new Set(
+  TUTORIAL_DAILY_CONTRACT_STEP_IDS.filter(stepId => !TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS.includes(stepId))
+);
 
 function migrateTutorialStateToCurrentFlow() {
   const savedStepId = String(tutorialState.stepId || "");
@@ -607,10 +679,15 @@ function migrateTutorialStateToCurrentFlow() {
     nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "review-market-buy-price");
   }
 
+  if (Number(tutorialState.flowVersion || 0) < 5 && savedStepId === "return-after-trade") {
+    nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === "accept-daily-contract");
+  }
+
   if (nextIndex < 0 && Number(tutorialState.flowVersion || 0) < TUTORIAL_FLOW_VERSION) {
     const legacySteps = STARTER_TUTORIAL_STEPS.filter(step => (
       !TUTORIAL_FLOW_V2_ADDED_STEP_IDS.has(step.id) &&
-      !TUTORIAL_FLOW_V4_ADDED_STEP_IDS.has(step.id)
+      !TUTORIAL_FLOW_V4_ADDED_STEP_IDS.has(step.id) &&
+      !TUTORIAL_FLOW_V5_ADDED_STEP_IDS.has(step.id)
     ));
     const legacyStep = legacySteps[Math.min(Math.max(0, tutorialState.stepIndex), legacySteps.length - 1)];
     nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === legacyStep?.id);
@@ -638,7 +715,7 @@ const TUTORIAL_PROGRESS_PHASES = Object.freeze([
     label: "Trade",
     stepIds: Object.freeze([
       ...TUTORIAL_ACADEMY_MILESTONES[1].stepIds,
-      ...TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS,
+      ...TUTORIAL_DAILY_CONTRACT_STEP_IDS,
       ...TUTORIAL_ACADEMY_MILESTONES[2].stepIds
     ])
   }),
@@ -768,6 +845,13 @@ function formatTutorialCopy(value) {
 }
 
 function getTutorialAcademyMilestone(stepId = getCurrentTutorialStep()?.id) {
+  if (TUTORIAL_DAILY_CONTRACT_STEP_IDS.includes(stepId)) {
+    return {
+      missionId: "academy_daily_contract",
+      shortLabel: "Daily Contract",
+      stepIds: TUTORIAL_DAILY_CONTRACT_STEP_IDS
+    };
+  }
   return TUTORIAL_ACADEMY_MILESTONES.find(milestone => milestone.stepIds.includes(stepId)) || null;
 }
 
@@ -1788,6 +1872,20 @@ function getDynamicTutorialTarget(step) {
     return document.querySelector(".trade-v2-contract-drawer-close");
   }
 
+  if (step.target === "tutorial:acceptDailyTradeContract") {
+    const acceptButton = document.querySelector(".trade-v2-contract-preview[data-contract-id='priority-shipment'] [data-contract-action='accept']:not(:disabled)");
+    return acceptButton ||
+           document.querySelector(".trade-v2-contract-strip-button") ||
+           document.querySelector("[data-tutorial-target='planetTradeTerminal']");
+  }
+
+  if (step.target === "tutorial:completeDailyTradeContract") {
+    const completeButton = document.querySelector(".trade-v2-contract-preview[data-contract-id='priority-shipment'] [data-contract-action='complete']:not(:disabled)");
+    return completeButton ||
+           document.querySelector(".trade-v2-contract-strip-button") ||
+           document.querySelector("[data-tutorial-target='planetTradeTerminal']");
+  }
+
   if (step.target === "tutorial:storeCargoPod") {
     const selected = typeof getStoreSelectedItem === "function" ? getStoreSelectedItem() : null;
     const cargoBuy = document.querySelector(".store-detail-buy-action[data-item-key='cargoPod']:not(:disabled)");
@@ -1842,7 +1940,7 @@ function highlightTutorialTarget(step) {
   const spotlight = document.getElementById("tutorialSpotlight");
   if (!target || !spotlight) return;
 
-  if (["tutorial:storePulseLaser", "tutorial:storeCargoPod", "tutorial:openDailyTradeContracts", "tutorial:closeDailyTradeContracts"].includes(step?.target)) {
+  if (["tutorial:storePulseLaser", "tutorial:storeCargoPod", "tutorial:openDailyTradeContracts", "tutorial:closeDailyTradeContracts", "tutorial:acceptDailyTradeContract", "tutorial:completeDailyTradeContract"].includes(step?.target)) {
     target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }
 

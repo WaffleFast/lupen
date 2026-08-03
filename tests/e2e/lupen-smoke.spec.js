@@ -364,7 +364,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".tutorial-cinematic__image")).toHaveAttribute("src", /morgan-cinematic-welcome\.png$/);
     await expect(page.locator("#tutorialCinematicTitle")).toHaveText("Welcome to Lupen, First Pilot");
     await expect(page.locator("#tutorialCinematicText")).toContainText("I'm Morgan, your Command Liaison");
-    await expect(page.locator("#tutorialCinematicText")).toContainText("the path is yours");
+    await expect(page.locator("#tutorialCinematicText")).toContainText("stars start answering");
     await expect(page.locator(".tutorial-cinematic__paths")).toContainText("Trade");
     await expect(page.locator(".tutorial-cinematic__paths")).toContainText("Explore");
     await expect(page.locator(".tutorial-cinematic__paths")).toContainText("Destroy");
@@ -429,7 +429,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator(".tutorial-morgan-portrait")).toHaveAttribute("src", /morgan-journey-guide\.png$/);
     await expect(page.locator(".tutorial-morgan-portrait")).toHaveAttribute("data-morgan-context", "journey");
     await expect(page.locator("#tutorialTitle")).toHaveText("Open Journey");
-    await expect(page.locator("#tutorialText")).toContainText("Academy route");
+    await expect(page.locator("#tutorialText")).toContainText("route-map");
     await expect(page.locator("#journeyHubBtn")).toHaveClass(/tutorial-highlight-target/);
     await expect(page.locator(".tutorial-actions")).toBeHidden();
     await expect(page.locator(".tutorial-card")).toBeInViewport();
@@ -446,7 +446,7 @@ test.describe("Lupen browser smoke", () => {
     await page.locator("#journeyHubBtn").click();
     await expect(page.locator("#journeyScreen")).toHaveClass(/active/);
     await expect(page.locator("#tutorialTitle")).toHaveText("Your Academy route");
-    await expect(page.locator("#tutorialText")).toContainText("first objective is Claim Starter Ship");
+    await expect(page.locator("#tutorialText")).toContainText("First light: claim your starter ship");
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("Next Academy Assignment");
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Starter Ship");
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("0 / 1");
@@ -6452,7 +6452,7 @@ test.describe("Lupen browser smoke", () => {
       target: "#tutorialCinematicContinue"
     });
     expect(stepById["cinematic-welcome"].text).toContain("I'm Morgan, your Command Liaison");
-    expect(stepById["cinematic-welcome"].text).toContain("the path is yours");
+    expect(stepById["cinematic-welcome"].text).toContain("stars start answering");
     expect(stepById["welcome-new-pilot"]).toMatchObject({
       title: "Academy link established",
       autoSkip: true
@@ -6467,7 +6467,7 @@ test.describe("Lupen browser smoke", () => {
       target: "#journeyScreen .screen-back-btn",
       event: "returnedToHub"
     });
-    expect(stepById["welcome-academy"].text).toContain("first objective is Claim Starter Ship");
+    expect(stepById["welcome-academy"].text).toContain("First light: claim your starter ship");
     expect(stepById["buy-first-ship"]).toMatchObject({
       title: "Claim Pioneer Hunter",
       target: "tutorial:firstShipBuy",
@@ -6493,6 +6493,16 @@ test.describe("Lupen browser smoke", () => {
       title: "Your Academy delivery",
       target: "tutorial:closeDailyTradeContracts",
       event: "closedDailyTradeContracts"
+    });
+    expect(stepById["accept-daily-contract"]).toMatchObject({
+      title: "Load the priority package",
+      target: "tutorial:acceptDailyTradeContract",
+      event: "acceptedDailyTradeContract"
+    });
+    expect(stepById["complete-daily-contract"]).toMatchObject({
+      title: "Complete delivery",
+      target: "tutorial:completeDailyTradeContract",
+      event: "completedDailyTradeContract"
     });
     expect(stepById["select-market-target"].text).toContain("{tradeProjectedProfit}");
     expect(stepById["buy-equipment"]).toMatchObject({
@@ -7598,6 +7608,7 @@ test.describe("Lupen browser smoke", () => {
     await page.locator("[data-tutorial-target='marketSellPrice']").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "select-market-target");
     await expect(page.locator("#tutorialText")).toContainText(`+CR ${quoteNumber(tutorialQuote.projectedProfit)}`);
+    const targetTargetExistsBeforeBuy = await page.locator("[data-tutorial-target='marketMaxAmount']").count();
     await page.locator("[data-tutorial-target='marketMaxAmount']").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "buy-cargo");
     await page.locator("[data-tutorial-target='buyCargo']").click();
@@ -7609,7 +7620,6 @@ test.describe("Lupen browser smoke", () => {
           resourceTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketResourceIron']")),
           buyPriceTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketBuyPrice']")),
           sellPriceTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketSellPrice']")),
-          targetTargetExists: Boolean(document.querySelector("[data-tutorial-target='marketMaxAmount']")),
           maxQuantity: route.purchasedUnits,
           route,
           creditsAfterBuy: credits,
@@ -7778,13 +7788,13 @@ test.describe("Lupen browser smoke", () => {
     const closeDailyContractIntro = page.locator(".trade-v2-contract-drawer-close");
     await expect(closeDailyContractIntro).toHaveClass(/tutorial-highlight-target/);
     await closeDailyContractIntro.click();
-    await page.waitForFunction(() => ["return-after-trade", "open-store", "open-bounty"].includes(window.eval("getCurrentTutorialStep().id")));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "accept-daily-contract");
     const finalStep = await page.evaluate(() => window.eval("getCurrentTutorialStep().id"));
 
     expect(tradeBuy.resourceTargetExists).toBe(true);
     expect(tradeBuy.buyPriceTargetExists).toBe(true);
     expect(tradeBuy.sellPriceTargetExists).toBe(true);
-    expect(tradeBuy.targetTargetExists).toBe(true);
+    expect(targetTargetExistsBeforeBuy).toBeGreaterThan(0);
     expect(tradeBuy.maxQuantity).toBeGreaterThan(0);
     expect(tradeBuy.cargoAfterBuy).toBeGreaterThan(0);
     expect(tradeBuy.creditsAfterBuy).toBeLessThan(10000);
@@ -7815,10 +7825,10 @@ test.describe("Lupen browser smoke", () => {
     expect(tradeSell.sellButtonDisabled).toBe(false);
     expect(tradeSell.sellButtonHighlightedInTerminal).toBe(true);
     expect(tradeSell.terminalHighlightedInTerminal).toBe(false);
-    expect(tradeSell.buyButtonPresent).toBe(true);
-    expect(tradeSell.builderText).toContain("Quantity");
-    expect(tradeSell.builderText).not.toContain("Sale value");
-    expect(tradeSell.builderText).not.toContain("Projected result");
+    expect(tradeSell.buyButtonPresent).toBe(false);
+    expect(tradeSell.builderText).toContain("Sale Value");
+    expect(tradeSell.builderText).toContain("Projected Result");
+    expect(tradeSell.builderText).toContain("Sell");
     expect(tradeSell.builderText).not.toContain("current route sell support unavailable");
     expect(tradeSell.cargoBeforeSell).toBeGreaterThan(0);
     expect(tradeSell.creditsAfterFirstSell).toBeGreaterThan(tradeSell.creditsBeforeSell);
@@ -7836,7 +7846,7 @@ test.describe("Lupen browser smoke", () => {
       terminalInViewport: true
     });
     expect(dailyContractsHubFallback.text).toContain("Trade");
-    expect(["return-after-trade", "open-store", "open-bounty"]).toContain(finalStep);
+    expect(finalStep).toBe("accept-daily-contract");
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

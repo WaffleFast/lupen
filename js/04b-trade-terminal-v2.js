@@ -386,6 +386,7 @@ function acceptDailyTradeContract(id) {
   updateCargoSummary();
   updateSpaceHUD();
   renderObjectiveHud();
+  tutorialEvent("acceptedDailyTradeContract");
   return true;
 }
 
@@ -440,6 +441,7 @@ function completeDailyTradeContract(id, eventId = "") {
   updateCargoSummary();
   updateSpaceHUD();
   renderObjectiveHud();
+  tutorialEvent("completedDailyTradeContract");
   return true;
 }
 
