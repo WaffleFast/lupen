@@ -1156,6 +1156,32 @@ function syncTargetHpFromLayers(target) {
   return target;
 }
 
+function getTargetLayerPct(value, maxValue) {
+  const max = Math.max(0, Number(maxValue || 0));
+  if (!max) return 0;
+  return Math.max(0, Math.min(100, (Number(value || 0) / max) * 100));
+}
+
+function getBotTypeDisplayLabel(target = {}) {
+  const rawLabel = target.className || target.classRole || target.role || target.botType || target.displayName || target.name || "Bot";
+  const cleaned = String(rawLabel)
+    .replace(/^erebus[\s_-]+/i, "")
+    .replace(/_/g, " ")
+    .trim();
+  return cleaned || "Bot";
+}
+
+function renderBotConditionMeters(target = {}) {
+  const shieldPct = getTargetLayerPct(target.shield, target.shieldMax || target.maxShield);
+  const hullPct = getTargetLayerPct(target.hull, target.hullMax || target.maxHull);
+  return `
+    <div class="sector-bot-condition" aria-hidden="true">
+      <span class="sector-bot-condition-bar bot-shield"><i style="width:${shieldPct}%"></i></span>
+      <span class="sector-bot-condition-bar bot-hull"><i style="width:${hullPct}%"></i></span>
+    </div>
+  `;
+}
+
 function applyWeaponDamageToTarget(target, weapon) {
   const resolved = LupenCombatRules.resolveWeaponDamageToTarget(target, weapon, Math.random() * 100, HOSTILE_BOT_BASE_HP);
   Object.assign(target, resolved.target);
@@ -1436,19 +1462,21 @@ function renderTargetButton(target, options = {}) {
     btn.style.setProperty("--asteroid-scale", Number(target.scale || 1));
   }
 
-  const hpPct = Math.max(0, (target.hp / target.maxHp) * 100);
   const isSelectedBot = options.isHostileBot && selectedTarget?.type === "hostileBot" && selectedTarget?.id === target.id;
   const fallbackSrc = options.fallbackSrc || EREBUS_BOT_FALLBACK_ASSET;
   const label = isSelectedBot
     ? `<div class="sector-bot-label">
-        <strong class="sector-bot-label-text">${escapeHtml(target.displayName || target.name || "Erebus Bot").toUpperCase()}</strong>
+        <strong class="sector-bot-label-text">${escapeHtml(getBotTypeDisplayLabel(target)).toUpperCase()}</strong>
       </div>`
     : "";
+  const conditionMeter = options.isHostileBot
+    ? renderBotConditionMeters(target)
+    : `<div class="asteroid-hp-mini"><span style="width:${Math.max(0, (target.hp / target.maxHp) * 100)}%"></span></div>`;
 
   btn.innerHTML = `
     <img src="${options.imageSrc}" alt="${target.name}" onerror="this.onerror=null;this.src='${fallbackSrc}'">
     ${label}
-    <div class="asteroid-hp-mini"><span style="width:${hpPct}%"></span></div>
+    ${conditionMeter}
   `;
 
   field.appendChild(btn);

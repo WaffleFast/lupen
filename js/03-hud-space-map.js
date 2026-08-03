@@ -2537,9 +2537,9 @@ function drawSectorScanMarkers(svg) {
     marker.setAttribute("class", `svg-scan-marker scan-${type}`);
     marker.setAttribute("data-node", signal.node || "");
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-    title.textContent = signal.names?.length
-      ? `${signal.node}: ${signal.names.map((name, index) => `${name} / ${signal.classes?.[index] || "Bot"} / ${signal.threats?.[index] || "Medium"} / ${signal.aggroStates?.[index] || "neutral"}`).join(", ")}`
-      : `${signal.node || "Unknown signal"}`;
+    const signalCount = Math.max(1, Number(signal.count || signal.names?.length || 1));
+    const signalLabel = type === "bot" ? "bot" : type === "ally" ? "ally" : "enemy";
+    title.textContent = `${signal.node || "Unknown signal"}: ${formatNumber(signalCount)} ${signalLabel} signal${signalCount === 1 ? "" : "s"}`;
     marker.appendChild(title);
 
     const pulse = document.createElementNS("http://www.w3.org/2000/svg", "circle");

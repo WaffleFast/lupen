@@ -11295,6 +11295,101 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
+  test("space targets keep bot labels compact and object art modest", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        currentNode = "Lower Gate Core";
+        showScreen("spaceScreen");
+        hostileBots = [{
+          id: "compact-bot",
+          botType: "erebus_hunter",
+          name: "Erebus Watcher",
+          displayName: "Erebus Watcher",
+          className: "Hunter",
+          role: "Interceptor",
+          currentNodeId: "Lower Gate Core",
+          node: "Lower Gate Core",
+          hull: 64,
+          hullMax: 100,
+          maxHull: 100,
+          shield: 30,
+          shieldMax: 60,
+          maxShield: 60,
+          armor: 0,
+          hp: 94,
+          maxHp: 160,
+          alive: true,
+          image: EREBUS_BOT_FALLBACK_ASSET,
+          threat: "Medium",
+          aggroState: "neutral",
+          x: 42,
+          y: 28
+        }];
+        asteroids = [{
+          id: "compact-asteroid",
+          name: "Large Iron Asteroid",
+          resource: "Iron",
+          alive: true,
+          node: "Lower Gate Core",
+          x: 58,
+          y: 34,
+          hp: 80,
+          maxHp: 120,
+          hull: 80,
+          hullMax: 120,
+          shield: 0,
+          shieldMax: 0,
+          scale: 1
+        }];
+        selectedTarget = { type: "hostileBot", id: "compact-bot" };
+        engagedTarget = null;
+        updateAsteroidUI();
+
+        const bot = document.querySelector(".enemy-bot-target");
+        const asteroid = document.querySelector(".resource-asteroid-target");
+        const botStyle = bot ? getComputedStyle(bot) : null;
+        const botImgStyle = bot?.querySelector("img") ? getComputedStyle(bot.querySelector("img")) : null;
+        const asteroidStyle = asteroid ? getComputedStyle(asteroid) : null;
+        const label = bot?.querySelector(".sector-bot-label-text")?.textContent?.trim() || "";
+        const shieldWidth = bot?.querySelector(".sector-bot-condition-bar.bot-shield i")?.style.width || "";
+        const hullWidth = bot?.querySelector(".sector-bot-condition-bar.bot-hull i")?.style.width || "";
+
+        return {
+          botWidth: botStyle?.width || "",
+          botImageWidth: botImgStyle?.width || "",
+          asteroidWidth: asteroidStyle?.width || "",
+          label,
+          labelText: bot?.querySelector(".sector-bot-label")?.textContent || "",
+          hiddenMetaCount: bot?.querySelectorAll(".sector-bot-nameplate, .sector-bot-meta").length || 0,
+          botTotalHpMiniCount: bot?.querySelectorAll(".asteroid-hp-mini").length || 0,
+          botConditionCount: bot?.querySelectorAll(".sector-bot-condition-bar").length || 0,
+          shieldWidth,
+          hullWidth
+        };
+      })()
+    `));
+
+    expect(state.label).toBe("HUNTER");
+    expect(state.labelText).not.toContain("Erebus Watcher");
+    expect(state.hiddenMetaCount).toBe(0);
+    expect(state.botTotalHpMiniCount).toBe(0);
+    expect(state.botConditionCount).toBe(2);
+    expect(state.shieldWidth).toBe("50%");
+    expect(state.hullWidth).toBe("64%");
+    expect(parseFloat(state.botWidth)).toBeLessThanOrEqual(94);
+    expect(parseFloat(state.botImageWidth)).toBeLessThanOrEqual(72);
+    expect(parseFloat(state.asteroidWidth)).toBeLessThanOrEqual(84);
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
   test("Map 1 session cleanup clears stale targets, FX, and duplicate activity", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
