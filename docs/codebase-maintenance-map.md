@@ -11,7 +11,7 @@ persistence. Use it before adding a renderer, storage key, or late CSS override.
 | Trade Terminal | `js/02-account-navigation.js` | `js/04b-trade-terminal-v2.js` | This is the sole owner of current market renderer and action globals. |
 | Bounty Board | `js/02-account-navigation.js` | `js/04a-bounty-board.js` | Daily contracts, rewards, and multiplayer staging bounty flows have a dedicated module. Shared Trade/Bounty objective routing remains in the base Trade support file. |
 | Store | `js/02-account-navigation.js` | `js/05b-store.js` | Store catalogue, detail, pricing, purchase, and resale flows have a dedicated later-loaded module. |
-| Hangar, Fleet, Vessel Exchange, Loadout, Vault | `js/02-account-navigation.js` | `js/05-hangar-store.js`, `js/05a-hangar-vault.js` | Vault browsing and selected-item loadout actions have a dedicated later-loaded module; the compact space HUD slot detail remains in `js/03-hud-space-map.js`. |
+| Hangar, Fleet, Vessel Exchange, Loadout, Vault | `js/02-account-navigation.js` | `js/05-hangar-store.js`, `js/05a-hangar-vault.js`, `js/05c-hangar-fleet.js` | Fleet, Ship Plans, repair, and active-vessel selection now have a dedicated module. Vault browsing and selected-item loadout actions remain separately owned; the compact space HUD slot detail remains in `js/03-hud-space-map.js`. |
 | Tutorial | Screen entry functions above | `js/08-tutorial.js` | Tutorial steps should call current public screen actions rather than duplicate screen behavior. |
 | Space HUD and map | `js/02-account-navigation.js` | `js/03-hud-space-map.js` | Multiplayer overlay rendering is isolated in `js/network/multiplayerOverlay.js`. |
 
@@ -67,6 +67,8 @@ change behavior even when their declarations are unchanged.
   module without changing its browser-global API.
 - Vault browsing, detail, upgrading, and selected-item loadout actions have been
   extracted behind the same browser-global API.
+- Fleet browsing, Ship Plans, repair, shared vessel-card helpers, and active-ship
+  selection have been extracted behind the same browser-global API.
 - Repeated Store artwork rules and exact Journey desktop, modifier, and compact
   breakpoint duplicates have been removed.
 - The final orbit pilot-card cascade has been moved into an order-preserving,

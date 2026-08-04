@@ -1598,6 +1598,24 @@ test.describe("Lupen browser smoke", () => {
     });
   });
 
+  test("Fleet and Ship Plans entry points live in the dedicated Fleet module", async () => {
+    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const fleetSource = fs.readFileSync(path.join(__dirname, "../../js/05c-hangar-fleet.js"), "utf8");
+    const fleetEntryPoints = [
+      "renderHangar",
+      "renderOwnedShips",
+      "renderFleetDetail",
+      "repairCurrentShip",
+      "renderShipPlans",
+      "equipShip"
+    ];
+
+    fleetEntryPoints.forEach(name => {
+      expect(supportSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} support declarations`).toHaveLength(0);
+      expect(fleetSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} Fleet declarations`).toHaveLength(1);
+    });
+  });
+
   test("Hangar Vault entry points live in the dedicated Vault module", async () => {
     const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
     const vaultSource = fs.readFileSync(path.join(__dirname, "../../js/05a-hangar-vault.js"), "utf8");
