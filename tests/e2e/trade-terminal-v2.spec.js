@@ -85,6 +85,14 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-contract-strip")).toBeVisible();
     await expect(page.locator(".trade-v2-contract-preview")).toHaveCount(0);
     await expect(page.locator(".trade-v2-market-table tbody tr")).toHaveCount(3);
+    const commodityArtSizes = await page.locator(".trade-v2-commodity img").evaluateAll(images =>
+      images.map(image => {
+        const rect = image.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      })
+    );
+    expect(commodityArtSizes).toHaveLength(3);
+    commodityArtSizes.forEach(size => expect(size).toEqual({ width: 36, height: 36 }));
     await expect(page.locator(".trade-v2-market-table")).toContainText("Iron");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Copper");
     await expect(page.locator(".trade-v2-market-table")).toContainText("Cobalt");
