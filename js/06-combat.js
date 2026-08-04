@@ -1171,6 +1171,15 @@ function getBotTypeDisplayLabel(target = {}) {
   return cleaned || "Bot";
 }
 
+function getBotVisualClassKey(target = {}) {
+  const raw = String(target.botType || target.id || target.className || target.displayName || target.name || "").toLowerCase();
+  if (raw.includes("behemoth")) return "behemoth";
+  if (raw.includes("destroyer")) return "destroyer";
+  if (raw.includes("attacker")) return "attacker";
+  if (raw.includes("hunter")) return "hunter";
+  return "unknown";
+}
+
 function renderBotConditionMeters(target = {}) {
   const shieldPct = getTargetLayerPct(target.shield, target.shieldMax || target.maxShield);
   const hullPct = getTargetLayerPct(target.hull, target.hullMax || target.maxHull);
@@ -1445,6 +1454,7 @@ function renderTargetButton(target, options = {}) {
 
   if (options.isHostileBot) {
     btn.classList.add(...getBotDirectionClass(target).split(" "));
+    btn.classList.add(`bot-${getBotVisualClassKey(target)}`);
     btn.classList.add(`threat-${String(target.threat || "medium").toLowerCase()}`);
     if (target.aggroState === "hostile") btn.classList.add("is-hostile");
   }

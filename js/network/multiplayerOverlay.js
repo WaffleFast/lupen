@@ -698,8 +698,7 @@
         animation: lupen-mp-ghost-departure 520ms ease-in forwards;
       }
 
-      .lupen-mp-space-ghost.is-selected::after,
-      .lupen-mp-space-bot.is-locked::before {
+      .lupen-mp-space-ghost.is-selected::after {
         content: "";
         position: absolute;
         inset: -6px -9px 10px;
@@ -718,10 +717,6 @@
 
       .lupen-mp-space-ghost.is-selected::after {
         color: rgba(111, 245, 255, 0.78);
-      }
-
-      .lupen-mp-space-bot.is-locked::before {
-        color: rgba(255, 180, 78, 0.8);
       }
 
       .lupen-mp-space-ghost-ship {
@@ -851,24 +846,24 @@
       .lupen-mp-space-bot::after {
         content: "";
         position: absolute;
-        inset: -8px -11px 18px;
+        inset: -12px -18px 14px;
         opacity: 0;
         pointer-events: none;
         background:
-          linear-gradient(#7fe7ff, #7fe7ff) left top / 18px 2px no-repeat,
-          linear-gradient(#7fe7ff, #7fe7ff) left top / 2px 18px no-repeat,
-          linear-gradient(#7fe7ff, #7fe7ff) right top / 18px 2px no-repeat,
-          linear-gradient(#7fe7ff, #7fe7ff) right top / 2px 18px no-repeat,
-          linear-gradient(#7fe7ff, #7fe7ff) left bottom / 18px 2px no-repeat,
-          linear-gradient(#7fe7ff, #7fe7ff) left bottom / 2px 18px no-repeat,
-          linear-gradient(#7fe7ff, #7fe7ff) right bottom / 18px 2px no-repeat,
-          linear-gradient(#7fe7ff, #7fe7ff) right bottom / 2px 18px no-repeat;
-        filter: drop-shadow(0 0 8px rgba(91, 213, 255, 0.56));
+          linear-gradient(#f2b34f, #f2b34f) left top / 15px 2px no-repeat,
+          linear-gradient(#f2b34f, #f2b34f) left top / 2px 15px no-repeat,
+          linear-gradient(#f2b34f, #f2b34f) right top / 15px 2px no-repeat,
+          linear-gradient(#f2b34f, #f2b34f) right top / 2px 15px no-repeat,
+          linear-gradient(#f2b34f, #f2b34f) left bottom / 15px 2px no-repeat,
+          linear-gradient(#f2b34f, #f2b34f) left bottom / 2px 15px no-repeat,
+          linear-gradient(#f2b34f, #f2b34f) right bottom / 15px 2px no-repeat,
+          linear-gradient(#f2b34f, #f2b34f) right bottom / 2px 15px no-repeat;
+        filter: drop-shadow(0 0 4px rgba(242, 179, 79, 0.42));
       }
 
       .lupen-mp-space-bot.is-locked {
-        opacity: 0.95;
-        filter: drop-shadow(0 0 10px rgba(255, 198, 102, 0.54));
+        opacity: 1;
+        filter: drop-shadow(0 0 7px rgba(191, 124, 255, 0.34));
       }
 
       .lupen-mp-space-bot.is-locked::after {
@@ -1095,16 +1090,49 @@
       .lupen-target-card.hostile {
         --target-accent: #ff9a35;
         --target-glow: rgba(255, 138, 45, 0.76);
-        min-width: 142px;
-        max-width: 174px;
-        border-color: rgba(255, 166, 74, 0.72);
-        box-shadow: 0 0 14px rgba(255, 124, 46, 0.18);
+        min-width: 154px;
+        max-width: 190px;
+        gap: 5px;
+        padding: 7px 12px 8px;
+        border-color: rgba(242, 179, 79, 0.72);
+        border-radius: 5px;
+        background: linear-gradient(180deg, rgba(10, 8, 23, 0.88), rgba(3, 5, 15, 0.78));
+        box-shadow: 0 0 10px rgba(135, 73, 190, 0.14);
       }
 
       .lupen-target-card.hostile strong,
       .lupen-target-card.hostile small,
       .lupen-target-card.hostile .lupen-target-meta-row {
-        max-width: 158px;
+        max-width: 174px;
+      }
+
+      .lupen-target-card.hostile::before {
+        display: none;
+      }
+
+      .lupen-target-card.hostile strong {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+      }
+
+      .lupen-target-card.hostile .lupen-target-bars {
+        width: 116px;
+      }
+
+      .lupen-target-card.hostile .lupen-target-bar-track {
+        height: 3px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(104, 54, 139, 0.28);
+        box-shadow: inset 0 0 0 1px rgba(220, 163, 255, 0.12);
+        overflow: hidden;
+      }
+
+      .lupen-target-card.hostile .lupen-target-bar-fill.condition {
+        border-radius: inherit;
+        background: linear-gradient(90deg, #8f3cff, #df73ff);
+        box-shadow: 0 0 7px rgba(190, 77, 255, 0.54);
       }
 
       .lupen-target-card.player {
@@ -2039,8 +2067,8 @@
     const explicit = Number(bot?.visualScale);
     if (Number.isFinite(explicit) && explicit > 0) return Math.max(0.5, Math.min(1.8, explicit));
     const typeKey = getBotTypeKey(bot);
-    if (typeKey === "behemoth") return 1.32;
-    if (typeKey === "destroyer") return 1.12;
+    if (typeKey === "behemoth") return 1.06;
+    if (typeKey === "destroyer") return 0.9;
     if (typeKey === "attacker") return 0.94;
     if (typeKey === "hunter") return 0.82;
     return 1;
@@ -2115,12 +2143,6 @@
     const faction = bot.faction || "Erebus";
     const threat = bot.threat ? ` / ${bot.threat}` : "";
     return `${faction} ${level}${threat} / ${bot.currentNode || "unknown"}`;
-  }
-
-  function getBotTargetSummary(bot) {
-    if (!bot) return "none";
-    const level = Number(bot.level || 0) > 0 ? `L${bot.level}` : "L?";
-    return bot.threat ? `${level} / ${bot.threat}` : getBotLayerSummary(bot);
   }
 
   function getBotHullSummary(bot) {
@@ -2502,17 +2524,11 @@
     card.appendChild(title);
 
     if (selectedBot) {
-      const meta = global.document.createElement("div");
-      meta.className = "lupen-target-meta-row";
-      const summary = global.document.createElement("small");
-      summary.textContent = getBotTargetSummary(selectedBot);
-      meta.appendChild(summary);
-      card.appendChild(meta);
-
       const bars = global.document.createElement("div");
       bars.className = "lupen-target-bars";
-      appendTargetBar(bars, selectedBot.hull, selectedBot.hullMax ?? selectedBot.maxHull, "hull");
-      appendTargetBar(bars, selectedBot.shield, selectedBot.shieldMax ?? selectedBot.maxShield, "shield");
+      const condition = Number(selectedBot.hull || 0) + Number(selectedBot.shield || 0);
+      const conditionMax = Number(selectedBot.hullMax ?? selectedBot.maxHull ?? 0) + Number(selectedBot.shieldMax ?? selectedBot.maxShield ?? 0);
+      appendTargetBar(bars, condition, conditionMax, "condition");
       card.appendChild(bars);
     } else if (selectedPlayer) {
       const meta = global.document.createElement("div");

@@ -31090,6 +31090,8 @@ input::placeholder {
   --sector-bot-hitbox-size: 92px;
   --sector-bot-size: 66px;
   --sector-bot-selected-size: 70px;
+  --sector-large-bot-size: 53px;
+  --sector-large-bot-selected-size: 56px;
   --sector-asteroid-base-size: 82px;
 }
 
@@ -31162,6 +31164,20 @@ input::placeholder {
   text-align: center;
   pointer-events: none;
   z-index: 12;
+}
+
+.enemy-bot-target.bot-destroyer img,
+.enemy-bot-target.bot-behemoth img {
+  width: var(--sector-large-bot-size) !important;
+  height: var(--sector-large-bot-size) !important;
+}
+
+.enemy-bot-target.bot-destroyer.selected img,
+.enemy-bot-target.bot-destroyer.is-selected img,
+.enemy-bot-target.bot-behemoth.selected img,
+.enemy-bot-target.bot-behemoth.is-selected img {
+  width: var(--sector-large-bot-selected-size) !important;
+  height: var(--sector-large-bot-selected-size) !important;
 }
 
 .sector-bot-label-text {

@@ -3806,7 +3806,7 @@ test.describe("Lupen browser smoke", () => {
           level: 3,
           damagePerHit: 44,
           attackCooldownMs: 3200,
-          visualScale: 1.12,
+          visualScale: 0.9,
           shield: 190,
           shieldMax: 190,
           hull: 330,
@@ -3827,7 +3827,7 @@ test.describe("Lupen browser smoke", () => {
           level: 5,
           damagePerHit: 72,
           attackCooldownMs: 4200,
-          visualScale: 1.32,
+          visualScale: 1.06,
           shield: 300,
           shieldMax: 300,
           hull: 540,
@@ -3878,8 +3878,8 @@ test.describe("Lupen browser smoke", () => {
     expect(renderedBots.map(bot => bot.type).sort()).toEqual(["attacker", "behemoth", "destroyer", "hunter"]);
     expect(renderedBots.find(bot => bot.type === "hunter")).toMatchObject({ src: "assets/bots/erebus-hunter.png", scale: "0.82" });
     expect(renderedBots.find(bot => bot.type === "attacker")).toMatchObject({ src: "assets/bots/erebus-attacker.png", scale: "0.94" });
-    expect(renderedBots.find(bot => bot.type === "destroyer")).toMatchObject({ src: "assets/bots/erebus-destroyer.png", scale: "1.12" });
-    expect(renderedBots.find(bot => bot.type === "behemoth")).toMatchObject({ src: "assets/bots/erebus-behemoth.png", scale: "1.32" });
+    expect(renderedBots.find(bot => bot.type === "destroyer")).toMatchObject({ src: "assets/bots/erebus-destroyer.png", scale: "0.9" });
+    expect(renderedBots.find(bot => bot.type === "behemoth")).toMatchObject({ src: "assets/bots/erebus-behemoth.png", scale: "1.06" });
     expect(renderedBots.find(bot => bot.type === "hunter")?.title).toContain("Light Threat");
     expect(renderedBots.find(bot => bot.type === "attacker")?.title).toContain("Medium Threat");
     expect(renderedBots.find(bot => bot.type === "destroyer")?.title).toContain("Heavy Threat");
@@ -3890,7 +3890,24 @@ test.describe("Lupen browser smoke", () => {
       expect(bot.title).toContain("Erebus");
     });
     await expect(page.locator(".lupen-target-card.hostile")).toContainText("Erebus Destroyer");
-    await expect(page.locator(".lupen-target-card.hostile")).toContainText("Heavy Threat");
+    await expect(page.locator(".lupen-target-card.hostile")).not.toContainText("Heavy Threat");
+    await expect(page.locator(".lupen-target-card.hostile .lupen-target-meta-row")).toHaveCount(0);
+    await expect(page.locator(".lupen-target-card.hostile .lupen-target-bar")).toHaveCount(1);
+    await expect(page.locator(".lupen-target-card.hostile .lupen-target-bar-fill.condition")).toHaveCount(1);
+    const selectedTreatment = await page.evaluate(() => {
+      const marker = document.querySelector("#lupenMultiplayerSpaceBotLayer .lupen-mp-space-bot.is-locked");
+      const card = document.querySelector(".lupen-target-card.hostile");
+      return {
+        markerBeforeContent: marker ? getComputedStyle(marker, "::before").content : "",
+        markerAfterOpacity: marker ? getComputedStyle(marker, "::after").opacity : "",
+        markerAfterBackground: marker ? getComputedStyle(marker, "::after").backgroundImage : "",
+        cardWidth: card?.getBoundingClientRect().width || 0
+      };
+    });
+    expect(selectedTreatment.markerBeforeContent).toBe("none");
+    expect(selectedTreatment.markerAfterOpacity).toBe("1");
+    expect(selectedTreatment.markerAfterBackground).toContain("rgb(242, 179, 79)");
+    expect(selectedTreatment.cardWidth).toBeGreaterThanOrEqual(154);
 
     fs.mkdirSync("artifacts", { recursive: true });
     await page.locator("#spaceScreen").screenshot({ path: "artifacts/map1-bot-threat-labels.png" });
@@ -8642,7 +8659,7 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.targetCardText).not.toContain("LEVEL 1");
     expect(stagingBotSelectedState.targetCardText).not.toContain("Hull");
     expect(stagingBotSelectedState.targetCardText).not.toContain("Shield");
-    expect(stagingBotSelectedState.targetBars).toBe(2);
+    expect(stagingBotSelectedState.targetBars).toBe(1);
     expect(stagingBotSelectedState.markerHasInlineLabel).toBe(false);
     expect(stagingBotSelectedState.shotBeamCount).toBe(1);
     expect(stagingBotSelectedState.localShotBeamCount).toBe(1);
@@ -8657,7 +8674,7 @@ test.describe("Lupen browser smoke", () => {
     expect(stagingBotSelectedState.muzzleCount).toBe(0);
     expect(stagingBotSelectedState.hitCount).toBe(1);
     expect(stagingBotSelectedState.lowBarCount).toBeGreaterThanOrEqual(1);
-    expect(stagingBotSelectedState.emptyBarCount).toBeGreaterThanOrEqual(1);
+    expect(stagingBotSelectedState.emptyBarCount).toBe(0);
     expect(stagingBotSelectedState.floatingDamageCount).toBe(0);
     expect(stagingBotSelectedState.engagedMarkerCount).toBeGreaterThanOrEqual(1);
     expect(stagingBotSelectedState.bountyTargetCount).toBe(10);
@@ -11637,11 +11654,11 @@ test.describe("Lupen browser smoke", () => {
         showScreen("spaceScreen");
         hostileBots = [{
           id: "compact-bot",
-          botType: "erebus_hunter",
-          name: "Erebus Watcher",
-          displayName: "Erebus Watcher",
-          className: "Hunter",
-          role: "Interceptor",
+          botType: "erebus_destroyer",
+          name: "Erebus Destroyer",
+          displayName: "Erebus Destroyer",
+          className: "Destroyer",
+          role: "Heavy gunship",
           currentNodeId: "Lower Gate Core",
           node: "Lower Gate Core",
           hull: 64,
@@ -11692,6 +11709,7 @@ test.describe("Lupen browser smoke", () => {
         return {
           botWidth: botStyle?.width || "",
           botImageWidth: botImgStyle?.width || "",
+          botClassName: bot?.className || "",
           asteroidWidth: asteroidStyle?.width || "",
           label,
           labelText: bot?.querySelector(".sector-bot-label")?.textContent || "",
@@ -11704,15 +11722,16 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    expect(state.label).toBe("HUNTER");
-    expect(state.labelText).not.toContain("Erebus Watcher");
+    expect(state.label).toBe("DESTROYER");
+    expect(state.labelText).not.toContain("Erebus Destroyer");
+    expect(state.botClassName).toContain("bot-destroyer");
     expect(state.hiddenMetaCount).toBe(0);
     expect(state.botTotalHpMiniCount).toBe(0);
     expect(state.botConditionCount).toBe(2);
     expect(state.shieldWidth).toBe("50%");
     expect(state.hullWidth).toBe("64%");
     expect(parseFloat(state.botWidth)).toBeLessThanOrEqual(94);
-    expect(parseFloat(state.botImageWidth)).toBeLessThanOrEqual(72);
+    expect(parseFloat(state.botImageWidth)).toBeLessThanOrEqual(58);
     expect(parseFloat(state.asteroidWidth)).toBeLessThanOrEqual(84);
 
     await expectNoUnexpectedBrowserErrors(failures);

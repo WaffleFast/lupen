@@ -39,7 +39,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     xpReward: 150,
     level: 3,
     threat: "Heavy Threat",
-    visualScale: 1.12
+    visualScale: 0.9
   }),
   behemoth: Object.freeze({
     botType: "behemoth",
@@ -53,7 +53,7 @@ export const EREBUS_BOT_TYPES = Object.freeze({
     xpReward: 250,
     level: 5,
     threat: "Extreme Threat",
-    visualScale: 1.32
+    visualScale: 1.06
   })
 });
 
