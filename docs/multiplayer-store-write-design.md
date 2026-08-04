@@ -32,8 +32,9 @@ Initial staging Store items:
 ## Local Store Audit
 
 Store catalogue and purchase logic lives in [js/05b-store.js](../js/05b-store.js),
-while Hangar, Loadout, Vault, and the staging Store bridge remain in
-[js/05-hangar-store.js](../js/05-hangar-store.js).
+while Hangar and the staging Store bridge remain in
+[js/05-hangar-store.js](../js/05-hangar-store.js). Vault browsing and selected
+loadout actions live in [js/05a-hangar-vault.js](../js/05a-hangar-vault.js).
 
 Purchase flow:
 

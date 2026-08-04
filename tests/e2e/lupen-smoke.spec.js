@@ -1531,6 +1531,25 @@ test.describe("Lupen browser smoke", () => {
     });
   });
 
+  test("Hangar Vault entry points live in the dedicated Vault module", async () => {
+    const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const vaultSource = fs.readFileSync(path.join(__dirname, "../../js/05a-hangar-vault.js"), "utf8");
+    const vaultEntryPoints = [
+      "buildVaultEntries",
+      "renderVaultCatalog",
+      "renderVaultDetail",
+      "equipSelectedVaultItem",
+      "unequipSelectedVaultItem",
+      "renderLoadoutItemDetail",
+      "renderHangarVault"
+    ];
+
+    vaultEntryPoints.forEach(name => {
+      expect(hangarSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} hangar declarations`).toHaveLength(0);
+      expect(vaultSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} Vault declarations`).toHaveLength(1);
+    });
+  });
+
   test.skip("trade terminal route cards accept max profitable cargo and hide loss routes", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
