@@ -2,6 +2,7 @@ import { Client } from "colyseus.js";
 import { ROOM_NAME } from "../src/app.config.js";
 import {
   STAGING_BOT_ALLOWED_NODE_IDS,
+  getStagingBotLinkedNodeIds,
   applyLayeredPvpDamage,
   buildRewardClaimStatus,
   buildRewardWritePlan,
@@ -375,12 +376,30 @@ function botCountsByType(room) {
 
 function assertErebusBotPopulation(room) {
   const counts = botCountsByType(room);
-  assert(counts.hunter === 6, `Expected 6 Hunters, got ${counts.hunter || 0}.`);
+  assert(counts.hunter === 5, `Expected 5 Hunters, got ${counts.hunter || 0}.`);
   assert(counts.attacker === 4, `Expected 4 Attackers, got ${counts.attacker || 0}.`);
-  assert(counts.destroyer === 3, `Expected 3 Destroyers, got ${counts.destroyer || 0}.`);
+  assert(counts.destroyer === 4, `Expected 4 Destroyers, got ${counts.destroyer || 0}.`);
   assert(counts.behemoth === 2, `Expected 2 Behemoths, got ${counts.behemoth || 0}.`);
-  assert((counts.attacker || 0) > (counts.destroyer || 0), "Attackers should outnumber Destroyers.");
   assert((counts.hunter || 0) > (counts.attacker || 0), "Hunters should outnumber Attackers.");
+
+  const zoneFor = (bot) => String(bot.currentNode || "").startsWith("Upper") ? "upper" : "lower";
+  const zoneCounts = botSnapshots(room).reduce((result, bot) => {
+    result[zoneFor(bot)] += 1;
+    return result;
+  }, { upper: 0, lower: 0 });
+  assert(zoneCounts.upper === 8 && zoneCounts.lower === 7,
+    `Expected an 8/7 upper/lower split, got ${zoneCounts.upper}/${zoneCounts.lower}.`);
+  ["destroyer", "behemoth"].forEach((botType) => {
+    const typeZones = botSnapshots(room)
+      .filter((bot) => bot.botType === botType)
+      .reduce((result, bot) => {
+        result[zoneFor(bot)] += 1;
+        return result;
+      }, { upper: 0, lower: 0 });
+    const expectedPerZone = botType === "destroyer" ? 2 : 1;
+    assert(typeZones.upper === expectedPerZone && typeZones.lower === expectedPerZone,
+      `Expected ${botType} split ${expectedPerZone}/${expectedPerZone}, got ${typeZones.upper}/${typeZones.lower}.`);
+  });
 }
 
 function assertBotNodeDensity(room, maxActive = 3) {
@@ -5824,6 +5843,12 @@ try {
     event?.currentNode === aggroTarget.currentNode &&
     Number(event?.receivedAt || 0) >= nodeAggroStartedAt
   );
+  const allPilotAggroEvents = roomAReturnFireEvents.filter((event) =>
+    event?.targetSessionId === roomA.sessionId &&
+    Number(event?.receivedAt || 0) >= nodeAggroStartedAt
+  );
+  assert(allPilotAggroEvents.every((event) => event?.currentNode === aggroTarget.currentNode),
+    "Attacking a bot attracted return fire from outside the attacked node.");
   const primaryAggroEvent = nodeAggroEvents.find((event) => event?.attackerBotId === aggroTarget.id);
   assert(primaryAggroEvent?.fireRole === "primary", "Engaged bot was not marked as primary fire.");
   assert(primaryAggroEvent?.damageMultiplier === 1, "Engaged bot did not retain full damage.");
@@ -5854,6 +5879,7 @@ try {
   console.log("attacking one bot triggered full primary and half-damage support fire; changing node cleared all server hostility");
 
   const initialBotUpdateAt = latestBotUpdateAt(roomA);
+  const initialBotNodeById = new Map(botSnapshots(roomA).map((bot) => [bot.id, bot.currentNode]));
   const initialBotNodes = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}`).join("|");
   const initialBotPositions = botSnapshots(roomA).map((bot) => `${bot.id}:${bot.currentNode}:${bot.x}:${bot.y}`).join("|");
   const initialMoveSchedules = new Set(botSnapshots(roomA).map((bot) => Number(bot.nextMoveAt || 0)));
@@ -5881,7 +5907,13 @@ try {
       currentBotPositions !== initialBotPositions &&
       botSnapshotKey(roomA) === botSnapshotKey(roomB);
   }, 18000);
-  console.log("both clients received the same randomized server bot patrol movement");
+  botSnapshots(roomA).forEach((bot) => {
+    const previousNode = initialBotNodeById.get(bot.id);
+    if (!previousNode || previousNode === bot.currentNode) return;
+    assert(getStagingBotLinkedNodeIds(previousNode).includes(bot.currentNode),
+      `${bot.id} skipped from ${previousNode} to non-adjacent ${bot.currentNode}.`);
+  });
+  console.log("both clients received the same adjacent-node server bot patrol movement");
 
   await waitFor("server resources to appear", () => resourceCount(roomA) >= 4 && resourceCount(roomB) >= 4);
   assertResourceDisplayFields(roomA);

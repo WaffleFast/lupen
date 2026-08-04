@@ -208,6 +208,10 @@ const BOT_NODE_LINKS = new Map(
     entry.connects.filter((nodeId) => STAGING_BOT_ALLOWED_NODE_IDS.includes(nodeId))
   ])
 );
+
+export function getStagingBotLinkedNodeIds(nodeId = "") {
+  return [...(BOT_NODE_LINKS.get(String(nodeId || "")) || [])];
+}
 const BOT_MOVE_TICK_MS = 4000;
 const BOT_INITIAL_MOVE_MIN_MS = 5000;
 const BOT_INITIAL_MOVE_MAX_MS = 12000;
@@ -313,29 +317,29 @@ const CHAT_MESSAGE_MAX_LENGTH = 200;
 const STAGING_BOT_SPAWN_NODES_BY_TYPE = Object.freeze({
   hunter: Object.freeze([
     "Upper Arc West",
-    "Upper Arc East",
-    "Upper Mid West B",
-    "Upper Mid East B",
-    "Upper Lane West B",
-    "Upper Lane East B",
-    "Lower Lane West B",
     "Lower Lane East B",
+    "Upper Mid East B",
     "Lower Mid West B",
-    "Lower Mid East B",
+    "Upper Lane West B",
+    "Lower Arc East",
+    "Upper Arc East",
     "Lower Arc West",
-    "Lower Arc East"
+    "Upper Mid West B",
+    "Lower Mid East B",
+    "Upper Lane East B",
+    "Lower Lane West B"
   ]),
   attacker: Object.freeze([
+    "Lower Mid East B",
     "Upper Mid West B",
-    "Upper Mid East B",
-    "Upper Lane Core West",
-    "Upper Lane Core East",
-    "Upper Gate West",
-    "Upper Gate East",
-    "Lower Gate West",
     "Lower Gate East",
+    "Upper Gate West",
     "Lower Lane Core West",
-    "Lower Lane Core East"
+    "Upper Lane Core East",
+    "Lower Gate West",
+    "Upper Gate East",
+    "Lower Lane Core East",
+    "Upper Mid East B"
   ]),
   destroyer: Object.freeze([
     "Upper Gate Core",
@@ -1630,6 +1634,9 @@ export class LupenSectorRoom extends Room {
     // becomes hostile to that pilot. Aggro is scoped to the node and is cleared
     // as soon as the pilot moves or docks, so bots never hunt between nodes.
     this.stagingBotAggroBySession = new Map();
+    // Remembers the previous patrol node so bots prefer continuing through the
+    // graph instead of immediately reversing along the edge they just crossed.
+    this.stagingBotPreviousNodeById = new Map();
     // Server-owned asteroid/resource mining state for staging. Rewards are
     // authorized once per depletion and applied by the owning browser save path.
     this.stagingResourceMineCooldowns = new Map();
@@ -2016,6 +2023,7 @@ export class LupenSectorRoom extends Room {
     this.botAttackInterval?.clear?.();
     this.pvpShieldRegenInterval?.clear?.();
     this.stagingBotAggroBySession?.clear?.();
+    this.stagingBotPreviousNodeById?.clear?.();
     this.trustedOnlineCombatLoadouts?.clear?.();
     this.trustedOnlineCombatLoadoutReads?.clear?.();
   }
@@ -2089,9 +2097,8 @@ export class LupenSectorRoom extends Room {
     const now = Date.now();
     this.botStep += 1;
 
-    // Shared server patrol simulation. Bots move only through hostile/combat
-    // nodes and stay put while any player has a server lock on them, so an
-    // active fight is stable while idle patrol routes remain unpredictable.
+    // Shared server patrol simulation. Each move crosses exactly one graph
+    // edge, while bots in an active same-node encounter remain stationary.
     Array.from(this.state.bots.values()).forEach((bot, index) => {
       if (bot.disabled && now >= Number(bot.disabledUntil || 0)) {
         this.respawnStagingBot(bot, index, now);
@@ -2111,6 +2118,9 @@ export class LupenSectorRoom extends Room {
       } else if (now >= Number(bot.nextMoveAt || 0)) {
         const previousNode = bot.currentNode;
         const nextNode = this.getNextBotNode(previousNode, bot.id);
+        if (nextNode !== previousNode) {
+          this.stagingBotPreviousNodeById.set(bot.id, previousNode);
+        }
         bot.currentNode = nextNode;
         const position = this.allocateOpenSpacePosition(nextNode, { kind: "bot", id: bot.id });
         bot.x = position.x;
@@ -2373,15 +2383,14 @@ export class LupenSectorRoom extends Room {
   }
 
   getNextBotNode(currentNode, botId = "") {
-    const options = BOT_NODE_LINKS.get(currentNode) || STAGING_BOT_ALLOWED_NODE_IDS;
+    const options = BOT_NODE_LINKS.get(currentNode) || [];
     const openOptions = options.filter((nodeId) =>
       this.getActiveBotCountAtNode(nodeId, botId) < BOT_NODE_MAX_ACTIVE
     );
-    const candidates = openOptions.length ? openOptions : [currentNode].filter(Boolean);
-    const nextNode = candidates[Math.floor(Math.random() * Math.max(1, candidates.length))] ||
-      currentNode ||
-      STAGING_BOT_ALLOWED_NODE_IDS[0];
-    return STAGING_BOT_ALLOWED_NODE_IDS.includes(nextNode) ? nextNode : STAGING_BOT_ALLOWED_NODE_IDS[0];
+    const previousNode = this.stagingBotPreviousNodeById.get(botId);
+    const forwardOptions = openOptions.filter((nodeId) => nodeId !== previousNode);
+    const candidates = forwardOptions.length ? forwardOptions : openOptions;
+    return candidates[Math.floor(Math.random() * candidates.length)] || currentNode;
   }
 
   getStagingTradeWindow(sessionId, { restart = false } = {}) {
@@ -4522,6 +4531,7 @@ export class LupenSectorRoom extends Room {
     bot.disabledUntil = 0;
     bot.lastUpdatedAt = now;
     bot.nextMoveAt = now + getRandomBotMoveDelay();
+    this.stagingBotPreviousNodeById.delete(bot.id);
     this.clearBotContributions(bot.id);
     this.rewardPreviews.delete(bot.id);
 

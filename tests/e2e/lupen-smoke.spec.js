@@ -2455,11 +2455,13 @@ test.describe("Lupen browser smoke", () => {
 
         const nodeTargets = new Map();
         const botSpawnZoneCounts = { upper: 0, lower: 0 };
+        const botSpawnTypeCounts = {};
         [...createInitialAsteroids(), ...createInitialHostileBots()].forEach(target => {
           const node = getCombatEntityNodeName(target);
           if (!nodeTargets.has(node)) nodeTargets.set(node, []);
           nodeTargets.get(node).push(target);
           if (target.faction === "erebus") {
+            botSpawnTypeCounts[target.botType] = Number(botSpawnTypeCounts[target.botType] || 0) + 1;
             const zone = getErebusBotNodeZone(node);
             if (zone === "upper" || zone === "lower") botSpawnZoneCounts[zone] += 1;
           }
@@ -2599,6 +2601,7 @@ test.describe("Lupen browser smoke", () => {
           spawnConflicts,
           busiestNodeTargetCount,
           botSpawnZoneCounts,
+          botSpawnTypeCounts,
           economy: {
             startingCredits: MAP_ONE_STARTING_CREDITS,
             shipPrices,
@@ -2678,6 +2681,13 @@ test.describe("Lupen browser smoke", () => {
     expect(metrics.spawnConflicts).toBe(0);
     expect(metrics.busiestNodeTargetCount).toBeLessThanOrEqual(3);
     expect(Math.abs(metrics.botSpawnZoneCounts.upper - metrics.botSpawnZoneCounts.lower)).toBeLessThanOrEqual(1);
+    expect(metrics.botSpawnZoneCounts).toEqual({ upper: 8, lower: 7 });
+    expect(metrics.botSpawnTypeCounts).toEqual({
+      erebus_hunter: 5,
+      erebus_attacker: 4,
+      erebus_destroyer: 4,
+      erebus_behemoth: 2
+    });
     expect(metrics.economy).toMatchObject({
       startingCredits: 10000,
       shipPrices: { falcon: 0, bison: 24000, zeusExplorer: 66000, monolith: 240000 },

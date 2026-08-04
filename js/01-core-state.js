@@ -1837,9 +1837,9 @@ const MAP_ONE_COMBAT_BALANCE_MODEL = Object.freeze({
 const EREBUS_BOT_ASSET_PATH = "assets/bots/";
 const EREBUS_BOT_FALLBACK_ASSET = "assets/bots/erebus-attacker.png";
 const EREBUS_BOT_SPAWN_CAPS = {
-  erebus_hunter: 6,
+  erebus_hunter: 5,
   erebus_attacker: 4,
-  erebus_destroyer: 3,
+  erebus_destroyer: 4,
   erebus_behemoth: 2
 };
 const EREBUS_STARTER_SPAWN_PLAN = [
@@ -1848,16 +1848,22 @@ const EREBUS_STARTER_SPAWN_PLAN = [
   "erebus_hunter",
   "erebus_hunter",
   "erebus_hunter",
-  "erebus_hunter",
   "erebus_attacker",
   "erebus_attacker",
   "erebus_attacker",
   "erebus_attacker",
+  "erebus_destroyer",
   "erebus_destroyer",
   "erebus_destroyer",
   "erebus_destroyer",
   "erebus_behemoth",
   "erebus_behemoth"
+];
+const EREBUS_STARTER_SPAWN_ZONES = [
+  "upper", "lower", "upper", "lower", "upper",
+  "lower", "upper", "lower", "upper",
+  "upper", "lower", "upper", "lower",
+  "lower", "upper"
 ];
 const EREBUS_BOT_TYPES = {
   erebus_hunter: {
@@ -2130,12 +2136,19 @@ function createInitialHostileBots() {
     return [];
   }
 
+  const nodesByZone = {
+    upper: allowedNodes.filter(nodeId => getErebusBotNodeZone(nodeId) === "upper"),
+    lower: allowedNodes.filter(nodeId => getErebusBotNodeZone(nodeId) === "lower")
+  };
+  const nextNodeIndex = { upper: 0, lower: 0 };
+
   return EREBUS_STARTER_SPAWN_PLAN.map((botType, index) => {
     const def = EREBUS_BOT_TYPES[botType] || EREBUS_BOT_TYPES.erebus_attacker;
-    const nodeIndex = botType === "erebus_behemoth"
-      ? (index * 5) % allowedNodes.length
-      : index % allowedNodes.length;
-    return createErebusBot(def, allowedNodes[nodeIndex], index);
+    const zone = EREBUS_STARTER_SPAWN_ZONES[index];
+    const zoneNodes = nodesByZone[zone]?.length ? nodesByZone[zone] : allowedNodes;
+    const nodeIndex = nextNodeIndex[zone] % zoneNodes.length;
+    nextNodeIndex[zone] += 1;
+    return createErebusBot(def, zoneNodes[nodeIndex], index);
   });
 }
 

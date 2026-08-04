@@ -1189,15 +1189,23 @@ function applyLoadedGameState(rawSaved) {
 
   if (Array.isArray(saved.hostileBots) && saved.hostileBots.length) {
     const defaultBots = createInitialHostileBots();
-    hostileBots = defaultBots.map((defaultBot, index) => {
-      const savedBot = saved.hostileBots[index] || {};
-      const canRestoreSavedErebus = savedBot.faction === "erebus" && EREBUS_BOT_TYPES[savedBot.botType];
-      const restoredNode = savedBot.currentNodeId || savedBot.node;
-      const nodeId = canRestoreSavedErebus && isAllowedErebusBotNode(restoredNode) ? restoredNode : defaultBot.currentNodeId;
+    const savedBotsByType = saved.hostileBots.reduce((groups, savedBot) => {
+      if (savedBot?.faction !== "erebus" || !EREBUS_BOT_TYPES[savedBot.botType]) return groups;
+      if (!groups[savedBot.botType]) groups[savedBot.botType] = [];
+      groups[savedBot.botType].push(savedBot);
+      return groups;
+    }, {});
+    hostileBots = defaultBots.map(defaultBot => {
+      const savedBot = savedBotsByType[defaultBot.botType]?.shift() || {};
+      const canRestoreSavedErebus = savedBot.faction === "erebus" && savedBot.botType === defaultBot.botType;
+      // Bot patrol positions are transient. Starting from the canonical node
+      // layout also migrates older upper-heavy saves into the balanced roster.
+      const nodeId = defaultBot.currentNodeId;
       return {
         ...defaultBot,
         ...(canRestoreSavedErebus ? savedBot : {}),
-        botType: canRestoreSavedErebus ? savedBot.botType : defaultBot.botType,
+        id: defaultBot.id,
+        botType: defaultBot.botType,
         name: canRestoreSavedErebus ? (savedBot.name || savedBot.displayName || defaultBot.name) : defaultBot.name,
         displayName: canRestoreSavedErebus ? (savedBot.displayName || savedBot.name || defaultBot.displayName) : defaultBot.displayName,
         className: canRestoreSavedErebus ? (savedBot.className || defaultBot.className) : defaultBot.className,
