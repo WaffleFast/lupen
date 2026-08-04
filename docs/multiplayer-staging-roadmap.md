@@ -166,7 +166,7 @@ Classification:
 
 ### Store, Equipment, And Ships
 
-Ship definitions live in [js/01-core-state.js](../js/01-core-state.js) under `SHIPS`; equipment definitions are spread through core state and weapon data modules such as [js/data/weapon-families.js](../js/data/weapon-families.js). Store catalogue, stock, purchase buttons, `storeBuySelected()`, `buyGun()`, `buyAttachment()`, and sell helpers live in [js/05b-store.js](../js/05b-store.js). Hangar and Vessel Exchange logic, including `buyShip()`, remains in [js/05-hangar-store.js](../js/05-hangar-store.js).
+Ship definitions live in [js/01-core-state.js](../js/01-core-state.js) under `SHIPS`; equipment definitions are spread through core state and weapon data modules such as [js/data/weapon-families.js](../js/data/weapon-families.js). Store catalogue, stock, purchase buttons, `storeBuySelected()`, `buyGun()`, `buyAttachment()`, and sell helpers live in [js/05b-store.js](../js/05b-store.js). Vessel Exchange browsing and `buyShip()` live in [js/05d-vessel-exchange.js](../js/05d-vessel-exchange.js), while shared staging Store support remains in [js/05-hangar-store.js](../js/05-hangar-store.js).
 
 Purchases currently mutate `credits`, `ownedShips`, `ownedGuns`, `ownedAttachments`, `inventoryItems`, `shipLoadouts`, and `storeDailyPurchases`, then save locally/cloud via `saveGame()`.
 

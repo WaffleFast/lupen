@@ -1616,6 +1616,24 @@ test.describe("Lupen browser smoke", () => {
     });
   });
 
+  test("Vessel Exchange entry points live in the dedicated Exchange module", async () => {
+    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const exchangeSource = fs.readFileSync(path.join(__dirname, "../../js/05d-vessel-exchange.js"), "utf8");
+    const exchangeEntryPoints = [
+      "getExchangeShips",
+      "selectShipyardShip",
+      "setShipyardFilter",
+      "renderShipyardDetail",
+      "renderShipShop",
+      "buyShip"
+    ];
+
+    exchangeEntryPoints.forEach(name => {
+      expect(supportSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} support declarations`).toHaveLength(0);
+      expect(exchangeSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} Exchange declarations`).toHaveLength(1);
+    });
+  });
+
   test("Hangar Vault entry points live in the dedicated Vault module", async () => {
     const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
     const vaultSource = fs.readFileSync(path.join(__dirname, "../../js/05a-hangar-vault.js"), "utf8");
