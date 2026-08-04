@@ -11951,6 +11951,34 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toContainText("CR 900");
     await expect(page.locator("#bountyScreen")).not.toContainText(/Lupen Cores/i);
 
+    const contractCardGeometry = await page.locator(".bounty-contract-card").evaluateAll(cards => cards.map(card => {
+      const frame = card.getBoundingClientRect();
+      const icon = card.querySelector(".bounty-card__icon-frame")?.getBoundingClientRect();
+      const body = card.querySelector(".bounty-card__body")?.getBoundingClientRect();
+      const reward = card.querySelector(".bounty-reward-box")?.getBoundingClientRect();
+      const fits = rect => rect &&
+        rect.top >= frame.top + 4 &&
+        rect.bottom <= frame.bottom - 4 &&
+        rect.left >= frame.left + 4 &&
+        rect.right <= frame.right - 4;
+      return {
+        iconFits: fits(icon),
+        bodyFits: fits(body),
+        rewardFits: fits(reward),
+        iconBodyGap: icon && body ? body.left - icon.right : -1,
+        bodyRewardGap: body && reward ? reward.left - body.right : -1
+      };
+    }));
+    contractCardGeometry.forEach(geometry => {
+      expect(geometry).toMatchObject({
+        iconFits: true,
+        bodyFits: true,
+        rewardFits: true
+      });
+      expect(geometry.iconBodyGap).toBeGreaterThanOrEqual(8);
+      expect(geometry.bodyRewardGap).toBeGreaterThanOrEqual(8);
+    });
+
     const measureSelectedPanelAction = async (selector) => page.evaluate((buttonSelector) => {
       const screen = document.querySelector("#bountyScreen")?.getBoundingClientRect();
       const panel = document.querySelector(".selected-contract-panel")?.getBoundingClientRect();

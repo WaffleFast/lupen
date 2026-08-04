@@ -32308,17 +32308,18 @@ input::placeholder {
 #bountyScreen.bounty-board-screen.active .bounty-board-layout-refined .bounty-contract-card.bounty-card {
   min-height: 0 !important;
   height: 100% !important;
-  padding: 12px 14px !important;
-  grid-template-columns: 104px minmax(0, 1fr) 174px !important;
+  padding: 9px 12px !important;
+  grid-template-columns: 86px minmax(0, 1fr) 158px !important;
   grid-template-rows: 1fr !important;
-  gap: 14px !important;
+  gap: 12px !important;
   overflow: hidden !important;
+  box-sizing: border-box;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-board-layout-refined .bounty-card-icon.bounty-card__icon-frame {
-  width: 96px !important;
-  height: 96px !important;
-  min-width: 96px !important;
+  width: 80px !important;
+  height: 80px !important;
+  min-width: 80px !important;
   grid-row: 1 / 2 !important;
   border-radius: 8px !important;
   clip-path: none !important;
@@ -32337,19 +32338,21 @@ input::placeholder {
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-card__title {
-  font-size: clamp(0.94rem, 1.1vw, 1.12rem) !important;
+  font-size: 0.96rem !important;
+  line-height: 1.08 !important;
   overflow-wrap: anywhere;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-card__subtitle {
-  font-size: 0.78rem !important;
+  font-size: 0.68rem !important;
+  line-height: 1.2 !important;
   overflow-wrap: anywhere;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-chip {
-  min-height: 20px;
-  padding: 3px 7px;
-  font-size: 0.52rem !important;
+  min-height: 18px;
+  padding: 3px 6px;
+  font-size: 0.47rem !important;
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-card-threat {
@@ -32357,7 +32360,7 @@ input::placeholder {
 }
 
 #bountyScreen.bounty-board-screen.active .bounty-reward-box {
-  width: 174px !important;
+  width: 158px !important;
   min-height: 54px !important;
   padding: 4px 10px !important;
   gap: 2px;
