@@ -166,7 +166,7 @@ Classification:
 
 ### Store, Equipment, And Ships
 
-Ship definitions live in [js/01-core-state.js](../js/01-core-state.js) under `SHIPS`; equipment definitions are spread through core state and weapon data modules such as [js/data/weapon-families.js](../js/data/weapon-families.js). Store catalogue, stock, purchase buttons, `storeBuySelected()`, `buyGun()`, `buyAttachment()`, and sell helpers live in [js/05b-store.js](../js/05b-store.js). Vessel Exchange browsing and `buyShip()` live in [js/05d-vessel-exchange.js](../js/05d-vessel-exchange.js), while shared staging Store support remains in [js/05-hangar-store.js](../js/05-hangar-store.js).
+Ship definitions live in [js/01-core-state.js](../js/01-core-state.js) under `SHIPS`; equipment definitions are spread through core state and weapon data modules such as [js/data/weapon-families.js](../js/data/weapon-families.js). Store catalogue, stock, purchase buttons, `storeBuySelected()`, `buyGun()`, `buyAttachment()`, and sell helpers live in [js/05b-store.js](../js/05b-store.js). Vessel Exchange browsing and `buyShip()` live in [js/05d-vessel-exchange.js](../js/05d-vessel-exchange.js), while shared staging Store support remains in [js/05-hangar-staging-support.js](../js/05-hangar-staging-support.js).
 
 Purchases currently mutate `credits`, `ownedShips`, `ownedGuns`, `ownedAttachments`, `inventoryItems`, `shipLoadouts`, and `storeDailyPurchases`, then save locally/cloud via `saveGame()`.
 
@@ -189,7 +189,7 @@ Classification:
 
 ### Inventory And Loadout
 
-Inventory state lives in [js/01-core-state.js](../js/01-core-state.js) as `inventoryItems`, `ownedGuns`, `ownedAttachments`, `ownedShips`, and `shipLoadouts`. Hangar loadout operations live in [js/05-hangar-store.js](../js/05-hangar-store.js), including `equipAttachmentFromInventory()`, `equipGunFromInventory()`, `removeAttachment()`, `removeGun()`, `equipShip()`, `applyShipStats()`, and vault grouping helpers.
+Inventory state lives in [js/01-core-state.js](../js/01-core-state.js) as `inventoryItems`, `ownedGuns`, `ownedAttachments`, `ownedShips`, and `shipLoadouts`. Hangar slot rendering and equipment mutations live in [js/05e-hangar-loadout.js](../js/05e-hangar-loadout.js), including `equipAttachmentFromInventory()`, `equipGunFromInventory()`, `removeAttachment()`, and `removeGun()`. Active-vessel selection lives in [js/05c-hangar-fleet.js](../js/05c-hangar-fleet.js), Vault grouping lives in [js/05a-hangar-vault.js](../js/05a-hangar-vault.js), and the staging Loadout bridge remains in [js/05-hangar-staging-support.js](../js/05-hangar-staging-support.js).
 
 Item stats affect ship stats and weapon payloads, so online play needs server validation for ownership, slot limits, item quality/level, loadout legality, and derived stat calculation.
 

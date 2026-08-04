@@ -1579,7 +1579,7 @@ test.describe("Lupen browser smoke", () => {
   });
 
   test("station store catalogue entry points live in the dedicated store module", async () => {
-    const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-staging-support.js"), "utf8");
     const storeSource = fs.readFileSync(path.join(__dirname, "../../js/05b-store.js"), "utf8");
     const storeEntryPoints = [
       "getStoreCatalogItems",
@@ -1593,13 +1593,13 @@ test.describe("Lupen browser smoke", () => {
     ];
 
     storeEntryPoints.forEach(name => {
-      expect(hangarSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} hangar declarations`).toHaveLength(0);
+      expect(supportSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} support declarations`).toHaveLength(0);
       expect(storeSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} store declarations`).toHaveLength(1);
     });
   });
 
   test("Fleet and Ship Plans entry points live in the dedicated Fleet module", async () => {
-    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-staging-support.js"), "utf8");
     const fleetSource = fs.readFileSync(path.join(__dirname, "../../js/05c-hangar-fleet.js"), "utf8");
     const fleetEntryPoints = [
       "renderHangar",
@@ -1617,7 +1617,7 @@ test.describe("Lupen browser smoke", () => {
   });
 
   test("Vessel Exchange entry points live in the dedicated Exchange module", async () => {
-    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-staging-support.js"), "utf8");
     const exchangeSource = fs.readFileSync(path.join(__dirname, "../../js/05d-vessel-exchange.js"), "utf8");
     const exchangeEntryPoints = [
       "getExchangeShips",
@@ -1634,8 +1634,28 @@ test.describe("Lupen browser smoke", () => {
     });
   });
 
+  test("Hangar Loadout entry points live in the dedicated Loadout module", async () => {
+    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-staging-support.js"), "utf8");
+    const loadoutSource = fs.readFileSync(path.join(__dirname, "../../js/05e-hangar-loadout.js"), "utf8");
+    const loadoutEntryPoints = [
+      "renderHangarEditor",
+      "renderLoadoutSlotGrid",
+      "equipLoadoutVaultEntry",
+      "equipAttachmentFromInventory",
+      "removeAttachment",
+      "equipGunFromInventory",
+      "removeGun"
+    ];
+
+    loadoutEntryPoints.forEach(name => {
+      expect(supportSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} support declarations`).toHaveLength(0);
+      expect(loadoutSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} Loadout declarations`).toHaveLength(1);
+    });
+    expect(supportSource.match(/^async function requestStagingLoadoutEquip\(/gm) || []).toHaveLength(1);
+  });
+
   test("Hangar Vault entry points live in the dedicated Vault module", async () => {
-    const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const supportSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-staging-support.js"), "utf8");
     const vaultSource = fs.readFileSync(path.join(__dirname, "../../js/05a-hangar-vault.js"), "utf8");
     const vaultEntryPoints = [
       "buildVaultEntries",
@@ -1648,7 +1668,7 @@ test.describe("Lupen browser smoke", () => {
     ];
 
     vaultEntryPoints.forEach(name => {
-      expect(hangarSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} hangar declarations`).toHaveLength(0);
+      expect(supportSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} support declarations`).toHaveLength(0);
       expect(vaultSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} Vault declarations`).toHaveLength(1);
     });
   });

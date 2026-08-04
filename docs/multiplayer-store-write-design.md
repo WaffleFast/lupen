@@ -34,8 +34,10 @@ Initial staging Store items:
 Store catalogue and purchase logic lives in [js/05b-store.js](../js/05b-store.js),
 Vessel Exchange browsing and hull purchasing live in
 [js/05d-vessel-exchange.js](../js/05d-vessel-exchange.js), and shared staging
-Store support remains in [js/05-hangar-store.js](../js/05-hangar-store.js). Vault browsing and selected
-loadout actions live in [js/05a-hangar-vault.js](../js/05a-hangar-vault.js).
+Store support remains in [js/05-hangar-staging-support.js](../js/05-hangar-staging-support.js).
+Loadout fitting lives in [js/05e-hangar-loadout.js](../js/05e-hangar-loadout.js),
+while Vault browsing and selected loadout actions live in
+[js/05a-hangar-vault.js](../js/05a-hangar-vault.js).
 
 Purchase flow:
 
