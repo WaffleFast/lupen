@@ -6451,8 +6451,10 @@ test.describe("Lupen browser smoke", () => {
       return { width: art?.width || 0, height: art?.height || 0 };
     }));
     catalogArtSizes.forEach(size => {
-      expect(size.width).toBeGreaterThanOrEqual(160);
-      expect(size.height).toBeGreaterThanOrEqual(160);
+      expect(size.width).toBeGreaterThanOrEqual(128);
+      expect(size.width).toBeLessThanOrEqual(136);
+      expect(size.height).toBeGreaterThanOrEqual(128);
+      expect(size.height).toBeLessThanOrEqual(136);
     });
 
     const measurements = await page.evaluate(async () => {
@@ -6485,8 +6487,8 @@ test.describe("Lupen browser smoke", () => {
     });
 
     for (const row of measurements) {
-      expect(row.frameHeight, row.key).toBeGreaterThanOrEqual(145);
-      expect(row.itemHeight, row.key).toBeGreaterThanOrEqual(110);
+      expect(row.frameHeight, row.key).toBeGreaterThanOrEqual(155);
+      expect(row.itemHeight, row.key).toBeGreaterThanOrEqual(140);
       expect(row.offsetX, row.key).toBeLessThanOrEqual(1);
       expect(row.offsetY, row.key).toBeLessThanOrEqual(1);
       expect(row.actionText, row.key).not.toBe("");

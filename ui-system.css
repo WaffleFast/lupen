@@ -407,14 +407,14 @@
 }
 
 #storeScreen .simplified-store-detail .store-detail-visual {
-  min-height: 124px !important;
-  max-height: 124px !important;
-  flex: 0 0 124px;
+  min-height: 138px !important;
+  max-height: 138px !important;
+  flex: 0 0 138px;
   border-radius: var(--lupen-control-radius) !important;
 }
 
 #storeScreen .store-detail-visual .quality-fx__item {
-  max-height: 110px !important;
+  max-height: 124px !important;
 }
 
 #storeScreen .store-detail-heading {
@@ -585,13 +585,13 @@
   }
 
   #storeScreen .simplified-store-detail .store-detail-visual {
-    min-height: 146px !important;
-    max-height: 146px !important;
-    flex-basis: 146px;
+    min-height: 156px !important;
+    max-height: 156px !important;
+    flex-basis: 156px;
   }
 
   #storeScreen .store-detail-visual .quality-fx__item {
-    max-height: 132px !important;
+    max-height: 146px !important;
   }
 
   #storeScreen .store-detail-title {

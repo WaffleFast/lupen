@@ -45314,11 +45314,11 @@ input::placeholder {
 }
 
 #storeScreen .store-card-art .quality-fx__item {
-  width: 164px !important;
-  height: 164px !important;
-  max-width: 164px !important;
-  max-height: 164px !important;
-  transform: translate3d(0, -34px, 0) !important;
+  width: 132px !important;
+  height: 132px !important;
+  max-width: 132px !important;
+  max-height: 132px !important;
+  transform: translate3d(0, -26px, 0) !important;
 }
 
 #storeScreen .store-art-material .quality-fx__item,
@@ -45342,7 +45342,7 @@ input::placeholder {
   height: 190px !important;
   max-width: 280px !important;
   max-height: 190px !important;
-  transform: translate3d(0, -6px, 0) !important;
+  transform: translate3d(0, -8px, 0) !important;
 }
 
 #storeScreen .store-detail-visual.store-art-material .quality-fx__item,
