@@ -1531,6 +1531,22 @@ test.describe("Lupen browser smoke", () => {
     });
   });
 
+  test("orbit pilot card overrides live in their dedicated ordered stylesheet", async () => {
+    const indexSource = fs.readFileSync(path.join(__dirname, "../../index.html"), "utf8");
+    const baseSource = fs.readFileSync(path.join(__dirname, "../../style.css"), "utf8");
+    const orbitSource = fs.readFileSync(path.join(__dirname, "../../styles/orbit-pilot-card.css"), "utf8");
+    const marker = "Orbit pilot card reference lock";
+    const baseLinkIndex = indexSource.indexOf('href="style.css');
+    const orbitLinkIndex = indexSource.indexOf('href="styles/orbit-pilot-card.css');
+    const referenceLinkIndex = indexSource.indexOf('href="orbit-reference.css');
+
+    expect(baseSource).not.toContain(marker);
+    expect(orbitSource).toContain(marker);
+    expect(baseLinkIndex).toBeGreaterThanOrEqual(0);
+    expect(orbitLinkIndex).toBeGreaterThan(baseLinkIndex);
+    expect(referenceLinkIndex).toBeGreaterThan(orbitLinkIndex);
+  });
+
   test("station store catalogue entry points live in the dedicated store module", async () => {
     const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
     const storeSource = fs.readFileSync(path.join(__dirname, "../../js/05b-store.js"), "utf8");

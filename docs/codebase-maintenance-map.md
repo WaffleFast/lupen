@@ -38,8 +38,10 @@ not cleared with gameplay progress.
 ## CSS maintenance rules
 
 `style.css` remains a large historical cascade. Store, Journey, Forge, Vault,
-Hangar, and the space HUD each have multiple generations of selectors. Small UI
-changes should follow this sequence:
+Hangar, and the space HUD each have multiple generations of selectors. The final
+orbit pilot-card lock now lives in `styles/orbit-pilot-card.css`, loaded directly
+after `style.css` to preserve its original position before the other shared
+stylesheets. Small UI changes should follow this sequence:
 
 1. Find every occurrence of the selector and its surrounding media query.
 2. Identify the last active owner at the affected viewport.
@@ -67,6 +69,8 @@ change behavior even when their declarations are unchanged.
   extracted behind the same browser-global API.
 - Repeated Store artwork rules and exact Journey desktop, modifier, and compact
   breakpoint duplicates have been removed.
+- The final orbit pilot-card cascade has been moved into an order-preserving,
+  screen-specific stylesheet with a source-order regression test.
 - Browser storage keys are centralized without changing their persisted values.
 
 ## Remaining opportunities
@@ -77,8 +81,9 @@ change behavior even when their declarations are unchanged.
 2. Continue splitting the remaining slot-grid and inventory fitting code from
    `js/05-hangar-store.js`. Preserve the public globals and script order until
    browser tests cover each extracted API.
-3. Modularize `style.css` one screen at a time, starting with Journey or Store.
-   Treat this as an order-sensitive migration, not a formatting exercise.
+3. Continue modularizing `style.css` one screen at a time, starting with a stable
+   Journey or Store boundary. Treat this as an order-sensitive migration, not a
+   formatting exercise.
 4. Add focused coverage for the activity-feed visibility policy so large
    multiplayer scenarios do not need to own assertions about filtered presence
    and combat chatter.
