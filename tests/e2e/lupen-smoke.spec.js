@@ -1547,6 +1547,37 @@ test.describe("Lupen browser smoke", () => {
     expect(referenceLinkIndex).toBeGreaterThan(orbitLinkIndex);
   });
 
+  test("browser JSON persistence access is owned by the save service", async ({ page }) => {
+    const coreSource = fs.readFileSync(path.join(__dirname, "../../js/01-core-state.js"), "utf8");
+    const hudSource = fs.readFileSync(path.join(__dirname, "../../js/03-hud-space-map.js"), "utf8");
+    const tutorialSource = fs.readFileSync(path.join(__dirname, "../../js/08-tutorial.js"), "utf8");
+
+    expect(coreSource).not.toContain("function safeParseLocalStorage");
+    expect(hudSource).not.toMatch(/localStorage\.(getItem|setItem|removeItem)/);
+    expect(tutorialSource).not.toMatch(/localStorage\.(getItem|setItem|removeItem)/);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    const result = await page.evaluate(() => {
+      const key = window.LupenSaveService.storageKeys.tutorial;
+      const corruptValue = "{not-valid-json";
+      localStorage.setItem(key, corruptValue);
+      const restored = window.eval("loadTutorialState()");
+      const corruptKey = Object.keys(localStorage).find(candidate => candidate.startsWith(`${key}.corrupt.`));
+      return {
+        restored,
+        original: localStorage.getItem(key),
+        corruptBackup: corruptKey ? localStorage.getItem(corruptKey) : null,
+        parserType: window.eval("typeof safeParseLocalStorage")
+      };
+    });
+
+    expect(result.restored).toMatchObject({ active: false, completed: false, stepIndex: 0 });
+    expect(result.original).toBeNull();
+    expect(result.corruptBackup).toBe("{not-valid-json");
+    expect(result.parserType).toBe("undefined");
+  });
+
   test("station store catalogue entry points live in the dedicated store module", async () => {
     const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
     const storeSource = fs.readFileSync(path.join(__dirname, "../../js/05b-store.js"), "utf8");

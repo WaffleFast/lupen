@@ -72,6 +72,9 @@ change behavior even when their declarations are unchanged.
 - The final orbit pilot-card cascade has been moved into an order-preserving,
   screen-specific stylesheet with a source-order regression test.
 - Browser storage keys are centralized without changing their persisted values.
+- Browser JSON parsing, corrupt-entry quarantine, HUD account reads, and Tutorial
+  persistence now go through `LupenSaveService`; the duplicate global parser has
+  been removed.
 
 ## Remaining opportunities
 

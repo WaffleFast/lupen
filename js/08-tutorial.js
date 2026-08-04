@@ -748,7 +748,7 @@ const TUTORIAL_PROGRESS_PHASES = Object.freeze([
 ]);
 
 function loadTutorialState() {
-  const parsed = safeParseLocalStorage(TUTORIAL_STORAGE_KEY, {});
+  const parsed = LupenSaveService.readJsonLocalStorage(TUTORIAL_STORAGE_KEY, {});
   return normalizeTutorialState(parsed);
 }
 
@@ -792,7 +792,7 @@ function saveTutorialState(options = {}) {
   tutorialState.stepIndex = Math.min(Math.max(0, Number(tutorialState.stepIndex || 0)), STARTER_TUTORIAL_STEPS.length - 1);
   tutorialState.stepId = STARTER_TUTORIAL_STEPS[tutorialState.stepIndex]?.id || "";
   tutorialState.flowVersion = TUTORIAL_FLOW_VERSION;
-  localStorage.setItem(TUTORIAL_STORAGE_KEY, JSON.stringify(tutorialState));
+  LupenSaveService.writeJsonLocalStorage(TUTORIAL_STORAGE_KEY, tutorialState);
   if (options.checkpoint !== false) checkpointTutorialSave();
 }
 
@@ -819,7 +819,7 @@ function getCurrentTutorialStep() {
 
 function getTutorialPilotIdentity() {
   const accountKey = typeof STORAGE_ACCOUNT_KEY !== "undefined" ? STORAGE_ACCOUNT_KEY : LupenSaveService.storageKeys.account;
-  const account = safeParseLocalStorage(accountKey, {});
+  const account = LupenSaveService.readJsonLocalStorage(accountKey, {});
   return {
     id: String(account?.id || ""),
     name: String(account?.pilot_name || account?.username || "Pilot").trim() || "Pilot"
@@ -1423,7 +1423,7 @@ function resetStarterTutorialState() {
 }
 
 function clearStarterTutorialState() {
-  localStorage.removeItem(TUTORIAL_STORAGE_KEY);
+  LupenSaveService.removeLocalStorage(TUTORIAL_STORAGE_KEY);
   tutorialState = {
     active: false,
     completed: false,

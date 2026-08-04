@@ -1380,8 +1380,8 @@ function addHudToast(message) {
 }
 
 function getPilotName() {
-  const savedAccount = safeParseLocalStorage(STORAGE_ACCOUNT_KEY);
-  const localPilot = localStorage.getItem("sectorOneLoggedIn");
+  const savedAccount = LupenSaveService.readJsonLocalStorage(STORAGE_ACCOUNT_KEY);
+  const localPilot = LupenSaveService.readLocalStorage(LupenSaveService.storageKeys.loginFlag);
   return savedAccount?.username || localPilot || "Pilot";
 }
 

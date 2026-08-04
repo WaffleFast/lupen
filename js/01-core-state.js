@@ -359,20 +359,6 @@ function getSafeRouteNodes() {
   return Object.keys(sectorNodes).filter(name => sectorNodes[name].route === "safe");
 }
 
-function safeParseLocalStorage(key, fallback = null) {
-  const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
-
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    console.warn(`Ignoring corrupted localStorage entry: ${key}`, error);
-    localStorage.setItem(`${key}.corrupt.${Date.now()}`, raw);
-    localStorage.removeItem(key);
-    return fallback;
-  }
-}
-
 function migrateSavedGame(saved) {
   if (!saved || typeof saved !== "object") return null;
 
