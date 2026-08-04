@@ -72,9 +72,9 @@ change behavior even when their declarations are unchanged.
    public globals and script order until browser tests cover each extracted API.
 3. Modularize `style.css` one screen at a time, starting with Journey or Store.
    Treat this as an order-sensitive migration, not a formatting exercise.
-4. Make the multiplayer activity-feed smoke setup deterministic. Its synthetic
-   join message can intermittently remain at `Awaiting sector activity` even
-   when the rest of the staging scenario succeeds.
+4. Add focused coverage for the activity-feed visibility policy so large
+   multiplayer scenarios do not need to own assertions about filtered presence
+   and combat chatter.
 5. Continue the server-authority migration in the order documented in
    `docs/player-data-storage-audit.md`; broad browser-built save JSON is still the
    main architectural risk.

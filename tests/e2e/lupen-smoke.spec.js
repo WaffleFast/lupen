@@ -3390,8 +3390,8 @@ test.describe("Lupen browser smoke", () => {
     expect(connectedHudState.onlineText).not.toContain("here");
     expect(connectedHudState.visiblePlayerMessageCount).toBe(1);
     expect(connectedHudState.chatText).not.toContain("joined at Asteron Prime");
-    expect(connectedHudState.activityText).toContain("Remote Pilot entered Asteron Prime.");
-    expect(connectedHudState.activityText).toContain("PvP disabled in protected zones.");
+    expect(connectedHudState.activityText).not.toContain("Remote Pilot entered Asteron Prime.");
+    expect(connectedHudState.activityText).not.toContain("PvP disabled in protected zones.");
     expect(connectedHudState.placeholder).toBe("Sector message...");
     expect(connectedHudState.inputDisabled).toBe(false);
     expect(connectedHudState.sentMessages).toEqual([
@@ -5444,7 +5444,7 @@ test.describe("Lupen browser smoke", () => {
     expect(eligibility.after.selectedType).toBe("remotePlayer");
     expect(eligibility.after.engagedType).toBe("");
     expect(eligibility.after.engageTimerActive).toBe(false);
-    expect(eligibility.after.pvpRequestMessages).toBe(1);
+    expect(eligibility.after.pvpRequestMessages).toBe(0);
     expect(eligibility.sentPvpIntents).toHaveLength(2);
     expect(eligibility.sentPvpIntents[0]).toMatchObject({
       targetType: "remotePlayer",
@@ -11912,7 +11912,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#bountyScreen")).toContainText("Hunter Clearance");
     await expect(page.locator("#bountyScreen")).toContainText("Timed Suppression");
     await expect(page.locator("#bountyScreen")).toContainText("Behemoth Warning");
-    await expect(page.locator("#bountyScreen")).toContainText(/Progress updates automatically while this contract is active|Connecting to the contract network/);
+    await expect(page.locator("#bountyScreen")).toContainText("Only one contract can be active at a time.");
     await expect(page.locator("#bountyScreen")).not.toContainText(/MP staging|server-tracked staging|multiplayer staging/i);
     await expect(page.locator("#bountyScreen")).toContainText("CR 900");
     await expect(page.locator("#bountyScreen")).not.toContainText("XP REWARD");
