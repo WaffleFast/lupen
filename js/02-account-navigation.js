@@ -4,10 +4,14 @@
     addActivityLog(`Bounty XP earned: +${formatNumber(result.gained)} Combat XP.`);
     addHudToast(`Bounty complete: +${formatNumber(result.gained)} Combat XP`);
   }
-  recordBountyClaimProgress(contract);
+  if (typeof recordBountyClaimProgress === "function") {
+    recordBountyClaimProgress(contract);
+  } else {
+    recordFallbackBountyClaimProgress(contract);
+  }
 }
 
-function recordBountyClaimProgress(contract = {}) {
+function recordFallbackBountyClaimProgress(contract = {}) {
   playerProgress = normalizePlayerProgress(playerProgress);
   playerProgress.totals.bountiesClaimed = Math.max(0, Number(playerProgress.totals.bountiesClaimed || 0)) + 1;
   if (typeof recordMissionEvent === "function") {

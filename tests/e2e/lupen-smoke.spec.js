@@ -1502,6 +1502,15 @@ test.describe("Lupen browser smoke", () => {
     });
   });
 
+  test("bounty claim progress keeps one authoritative browser implementation", async () => {
+    const accountSource = fs.readFileSync(path.join(__dirname, "../../js/02-account-navigation.js"), "utf8");
+    const bountySource = fs.readFileSync(path.join(__dirname, "../../js/04-trade-bounty-objectives.js"), "utf8");
+
+    expect(accountSource.match(/^function recordBountyClaimProgress\(/gm) || []).toHaveLength(0);
+    expect(accountSource.match(/^function recordFallbackBountyClaimProgress\(/gm) || []).toHaveLength(1);
+    expect(bountySource.match(/^function recordBountyClaimProgress\(/gm) || []).toHaveLength(1);
+  });
+
   test.skip("trade terminal route cards accept max profitable cargo and hide loss routes", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
