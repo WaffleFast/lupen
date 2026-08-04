@@ -10,7 +10,7 @@ persistence. Use it before adding a renderer, storage key, or late CSS override.
 | Journey | `js/02-account-navigation.js` | `js/11-missions.js` | Mission configuration and reconciliation also live with the Journey renderer. |
 | Trade Terminal | `js/02-account-navigation.js` | `js/04b-trade-terminal-v2.js` | This is the sole owner of current market renderer and action globals. |
 | Bounty Board | `js/02-account-navigation.js` | `js/04-trade-bounty-objectives.js` | The mixed module still contains shared staging/trade support used by the V2 terminal. |
-| Store | `js/02-account-navigation.js` | `js/05-hangar-store.js` | Store catalogue, detail, purchase, and filters share one module with Hangar. |
+| Store | `js/02-account-navigation.js` | `js/05b-store.js` | Store catalogue, detail, pricing, purchase, and resale flows have a dedicated later-loaded module. |
 | Hangar, Fleet, Vessel Exchange, Loadout, Vault | `js/02-account-navigation.js` | `js/05-hangar-store.js` | The full-screen loadout is owned here; the compact space HUD slot detail remains in `js/03-hud-space-map.js`. |
 | Tutorial | Screen entry functions above | `js/08-tutorial.js` | Tutorial steps should call current public screen actions rather than duplicate screen behavior. |
 | Space HUD and map | `js/02-account-navigation.js` | `js/03-hud-space-map.js` | Multiplayer overlay rendering is isolated in `js/network/multiplayerOverlay.js`. |
@@ -59,6 +59,8 @@ change behavior even when their declarations are unchanged.
 - Current Trade globals have one owner, with old mixed-module declarations
   isolated under legacy names.
 - Bounty claim progress has one idempotent owner and an explicit early fallback.
+- The Store catalogue and purchase subsystem has been extracted from the Hangar
+  module without changing its browser-global API.
 - Repeated Store artwork rules and exact Journey desktop, modifier, and compact
   breakpoint duplicates have been removed.
 - Browser storage keys are centralized without changing their persisted values.
@@ -68,8 +70,9 @@ change behavior even when their declarations are unchanged.
 1. Split Bounty and multiplayer Trade support out of
    `js/04-trade-bounty-objectives.js`. First map which helpers are consumed by
    `js/04b-trade-terminal-v2.js`; deleting the mixed module is not currently safe.
-2. Split the Store and Hangar domains in `js/05-hangar-store.js`. Preserve its
-   public globals and script order until browser tests cover each extracted API.
+2. Continue splitting Vault and Loadout from `js/05-hangar-store.js`. Preserve
+   the public globals and script order until browser tests cover each extracted
+   API.
 3. Modularize `style.css` one screen at a time, starting with Journey or Store.
    Treat this as an order-sensitive migration, not a formatting exercise.
 4. Add focused coverage for the activity-feed visibility policy so large

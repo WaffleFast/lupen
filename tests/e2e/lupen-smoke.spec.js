@@ -1511,6 +1511,26 @@ test.describe("Lupen browser smoke", () => {
     expect(bountySource.match(/^function recordBountyClaimProgress\(/gm) || []).toHaveLength(1);
   });
 
+  test("station store catalogue entry points live in the dedicated store module", async () => {
+    const hangarSource = fs.readFileSync(path.join(__dirname, "../../js/05-hangar-store.js"), "utf8");
+    const storeSource = fs.readFileSync(path.join(__dirname, "../../js/05b-store.js"), "utf8");
+    const storeEntryPoints = [
+      "getStoreCatalogItems",
+      "getStoreSelectedItem",
+      "renderStore",
+      "renderStoreCatalog",
+      "renderStoreDetail",
+      "storeBuySelected",
+      "buyAttachment",
+      "buyGun"
+    ];
+
+    storeEntryPoints.forEach(name => {
+      expect(hangarSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} hangar declarations`).toHaveLength(0);
+      expect(storeSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} store declarations`).toHaveLength(1);
+    });
+  });
+
   test.skip("trade terminal route cards accept max profitable cargo and hide loss routes", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
