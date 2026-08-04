@@ -1415,7 +1415,7 @@ function deactivateMorganAcademyOrientation() {
 
 function resetStarterTutorialState() {
   clearStarterTutorialState();
-  saveTutorialState();
+  saveTutorialState({ checkpoint: false });
   clearTutorialOverlayOnly();
   return {
     tutorialKeyCleared: TUTORIAL_STORAGE_KEY
