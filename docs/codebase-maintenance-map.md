@@ -9,7 +9,7 @@ persistence. Use it before adding a renderer, storage key, or late CSS override.
 | --- | --- | --- | --- |
 | Journey | `js/02-account-navigation.js` | `js/11-missions.js` | Mission configuration and reconciliation also live with the Journey renderer. |
 | Trade Terminal | `js/02-account-navigation.js` | `js/04b-trade-terminal-v2.js` | This is the sole owner of current market renderer and action globals. |
-| Bounty Board | `js/02-account-navigation.js` | `js/04-trade-bounty-objectives.js` | The mixed module still contains shared staging/trade support used by the V2 terminal. |
+| Bounty Board | `js/02-account-navigation.js` | `js/04a-bounty-board.js` | Daily contracts, rewards, and multiplayer staging bounty flows have a dedicated module. Shared Trade/Bounty objective routing remains in the base Trade support file. |
 | Store | `js/02-account-navigation.js` | `js/05b-store.js` | Store catalogue, detail, pricing, purchase, and resale flows have a dedicated later-loaded module. |
 | Hangar, Fleet, Vessel Exchange, Loadout, Vault | `js/02-account-navigation.js` | `js/05-hangar-store.js`, `js/05a-hangar-vault.js` | Vault browsing and selected-item loadout actions have a dedicated later-loaded module; the compact space HUD slot detail remains in `js/03-hud-space-map.js`. |
 | Tutorial | Screen entry functions above | `js/08-tutorial.js` | Tutorial steps should call current public screen actions rather than duplicate screen behavior. |
@@ -59,6 +59,8 @@ change behavior even when their declarations are unchanged.
 - Current Trade globals have one owner, with old mixed-module declarations
   isolated under legacy names.
 - Bounty claim progress has one idempotent owner and an explicit early fallback.
+- Bounty Board rendering, daily contracts, rewards, and staging actions have been
+  extracted from the base Trade support module.
 - The Store catalogue and purchase subsystem has been extracted from the Hangar
   module without changing its browser-global API.
 - Vault browsing, detail, upgrading, and selected-item loadout actions have been
@@ -69,9 +71,9 @@ change behavior even when their declarations are unchanged.
 
 ## Remaining opportunities
 
-1. Split Bounty and multiplayer Trade support out of
-   `js/04-trade-bounty-objectives.js`. First map which helpers are consumed by
-   `js/04b-trade-terminal-v2.js`; deleting the mixed module is not currently safe.
+1. Consider moving the remaining shared Trade/Bounty objective HUD and route
+   helpers into a neutral objective module. Do this only when it reduces coupling;
+   both systems intentionally consume those helpers today.
 2. Continue splitting the remaining slot-grid and inventory fitting code from
    `js/05-hangar-store.js`. Preserve the public globals and script order until
    browser tests cover each extracted API.

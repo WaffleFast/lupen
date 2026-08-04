@@ -1504,11 +1504,31 @@ test.describe("Lupen browser smoke", () => {
 
   test("bounty claim progress keeps one authoritative browser implementation", async () => {
     const accountSource = fs.readFileSync(path.join(__dirname, "../../js/02-account-navigation.js"), "utf8");
-    const bountySource = fs.readFileSync(path.join(__dirname, "../../js/04-trade-bounty-objectives.js"), "utf8");
+    const bountySource = fs.readFileSync(path.join(__dirname, "../../js/04a-bounty-board.js"), "utf8");
 
     expect(accountSource.match(/^function recordBountyClaimProgress\(/gm) || []).toHaveLength(0);
     expect(accountSource.match(/^function recordFallbackBountyClaimProgress\(/gm) || []).toHaveLength(1);
     expect(bountySource.match(/^function recordBountyClaimProgress\(/gm) || []).toHaveLength(1);
+  });
+
+  test("Bounty Board entry points live in the dedicated Bounty module", async () => {
+    const tradeSource = fs.readFileSync(path.join(__dirname, "../../js/04-trade-bounty-objectives.js"), "utf8");
+    const bountySource = fs.readFileSync(path.join(__dirname, "../../js/04a-bounty-board.js"), "utf8");
+    const bountyEntryPoints = [
+      "getMultiplayerStagingBountyFallback",
+      "acceptMultiplayerStagingBounty",
+      "setupMultiplayerStagingBountyBoardSubscription",
+      "ensureDailyBounties",
+      "renderBountyBoard",
+      "claimBountyReward",
+      "recordBountyClaimProgress",
+      "trackBountyBotKill"
+    ];
+
+    bountyEntryPoints.forEach(name => {
+      expect(tradeSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} Trade declarations`).toHaveLength(0);
+      expect(bountySource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} Bounty declarations`).toHaveLength(1);
+    });
   });
 
   test("station store catalogue entry points live in the dedicated store module", async () => {

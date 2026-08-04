@@ -16,7 +16,7 @@ This document tracks the narrow `?mp=staging` bounty wrapper for server-owned st
 
 ## Boundaries
 
-The staging bounty does not use or mutate local bounty state in `js/04-trade-bounty-objectives.js`, local objective state, local bot arrays, bounty contracts, cargo, inventory, loot, trade totals, route completion, PvP, or player damage.
+The staging bounty does not use or mutate local bounty state in `js/04a-bounty-board.js`, local objective state, local bot arrays, bounty contracts, cargo, inventory, loot, trade totals, route completion, PvP, or player damage.
 
 The claim flow uses the existing verified, idempotent server reward path:
 
