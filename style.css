@@ -45314,11 +45314,11 @@ input::placeholder {
 }
 
 #storeScreen .store-card-art .quality-fx__item {
-  width: 132px !important;
-  height: 132px !important;
-  max-width: 132px !important;
-  max-height: 132px !important;
-  transform: translate3d(0, -26px, 0) !important;
+  width: 120px !important;
+  height: 120px !important;
+  max-width: 120px !important;
+  max-height: 120px !important;
+  transform: translate3d(0, -24px, 0) !important;
 }
 
 #storeScreen .store-art-material .quality-fx__item,

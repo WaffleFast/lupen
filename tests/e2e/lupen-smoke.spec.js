@@ -6451,10 +6451,10 @@ test.describe("Lupen browser smoke", () => {
       return { width: art?.width || 0, height: art?.height || 0 };
     }));
     catalogArtSizes.forEach(size => {
-      expect(size.width).toBeGreaterThanOrEqual(128);
-      expect(size.width).toBeLessThanOrEqual(136);
-      expect(size.height).toBeGreaterThanOrEqual(128);
-      expect(size.height).toBeLessThanOrEqual(136);
+      expect(size.width).toBeGreaterThanOrEqual(116);
+      expect(size.width).toBeLessThanOrEqual(124);
+      expect(size.height).toBeGreaterThanOrEqual(116);
+      expect(size.height).toBeLessThanOrEqual(124);
     });
 
     const measurements = await page.evaluate(async () => {
