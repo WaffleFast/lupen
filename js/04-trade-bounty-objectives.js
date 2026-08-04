@@ -52,7 +52,7 @@ function getMultiplayerStagingTradeOfferId(resourceId = "", buyNode = "", sellNo
 
 function buildMultiplayerStagingTradeOfferFallbacks() {
   const planets = Object.keys(MULTIPLAYER_STAGING_TRADE_PRICE_TABLE);
-  const refreshMs = typeof TRADE_MARKET_REFRESH_MS !== "undefined" ? TRADE_MARKET_REFRESH_MS : 180000;
+  const refreshMs = typeof TRADE_MARKET_REFRESH_MS !== "undefined" ? TRADE_MARKET_REFRESH_MS : 300000;
   const cycle = typeof getMarketCycle === "function" ? getMarketCycle() : Math.floor(Date.now() / refreshMs);
   const getFallbackPrice = (resourceName, planet, priceCycle) => {
     if (typeof getLiveMarketPriceForCycle === "function") {

@@ -113,6 +113,7 @@ test.describe("Trade Terminal final quick actions", () => {
     await expect(page.locator(".trade-v2-market-table")).not.toContainText(/▲|▼/);
     await expect(page.getByRole("button", { name: "Purchase Cargo" })).toBeVisible();
     await expect(page.locator("#marketScreen")).not.toContainText(/Open Contracts|Open Market|Best Opportunity|Titanium|Nickel|Crystal Shards|Lupen Shards/i);
+    await expect(page.locator(".trade-v2-footer")).toContainText("Prices update every 5 minutes for all pilots.");
     const quickActionLayout = await page.locator(".trade-v2-quick-action").evaluate(panel => {
       const panelRect = panel.getBoundingClientRect();
       const buySummary = panel.querySelector(".trade-v2-buy-control > small")?.getBoundingClientRect();
@@ -720,7 +721,7 @@ test.describe("Trade Terminal final quick actions", () => {
         startedAt: tradeMarketWindowStartedAt
       };
 
-      Date.now = () => anchor + 178000;
+      Date.now = () => anchor + 298000;
       updateTradeTimerDisplay();
       const beforeArrival = {
         seconds: getNextMarketRefreshSeconds(),
@@ -742,7 +743,7 @@ test.describe("Trade Terminal final quick actions", () => {
         startedAt: tradeMarketWindowStartedAt
       };
 
-      Date.now = () => anchor + 180001;
+      Date.now = () => anchor + 300001;
       updateTradeTimerDisplay();
       activeTradeRoute = createTradeObjective({
         id: "expired-live-market-quote",
@@ -783,8 +784,8 @@ test.describe("Trade Terminal final quick actions", () => {
     });
 
     expect(windowState.initial).toMatchObject({
-      seconds: 179,
-      countdown: "02:59"
+      seconds: 299,
+      countdown: "04:59"
     });
     expect(windowState.beforeArrival).toMatchObject({
       seconds: 1,
@@ -799,7 +800,7 @@ test.describe("Trade Terminal final quick actions", () => {
       startedAt: windowState.initial.startedAt
     });
     expect(windowState.afterExpiry.cycle).toBe(windowState.initial.cycle + 1);
-    expect(windowState.afterExpiry.seconds).toBe(179);
+    expect(windowState.afterExpiry.seconds).toBe(299);
     expect(windowState.afterExpiry.objectiveTarget).toBeNull();
     expect(windowState.afterExpiry.objectiveStage).toBe("sell-open");
     expect(windowState.afterExpiry.objectiveAction).toBe("Review live prices");

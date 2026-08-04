@@ -2698,7 +2698,7 @@ test.describe("Lupen browser smoke", () => {
       dailyBountyCreditTotal: 6000,
       dailyTradeRewards: [1480, 2560, 3300, 4920],
       dailyTradeCreditTotal: 12260,
-      marketRefreshMs: 180000,
+      marketRefreshMs: 300000,
       baseMarketFullHoldProfit: { Iron: 2550, Copper: 3300, Cobalt: 5700 },
       freighterMarketFullHoldProfit: { Iron: 5100, Copper: 6600, Cobalt: 11400 },
       forgeCumulativeCosts: [25, 100, 250, 550],

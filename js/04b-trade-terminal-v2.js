@@ -1,6 +1,6 @@
 /* Map 1 Trade Terminal V2: daily freight contracts + destination-free live market. */
 
-const TRADE_MARKET_REFRESH_MS = 180000;
+const TRADE_MARKET_REFRESH_MS = 300000;
 const LIVE_MARKET_BASE_PRICES = Object.freeze({
   "Asteron Prime": Object.freeze({ Iron: 16, Copper: 34, Cobalt: 84 }),
   Virella: Object.freeze({ Iron: 23, Copper: 52, Cobalt: 70 }),
@@ -1075,7 +1075,7 @@ function renderTradeOverview() {
         </div>
       </section>
       ${renderDailyContractsStrip()}
-      <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 3 minutes for all pilots. Sell carried cargo at the current station.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
+      <footer class="trade-v2-footer"><span><b aria-hidden="true">&#128161;</b> Prices update every 5 minutes for all pilots. Sell carried cargo at the current station.</span><strong class="trade-v2-status" role="status">${escapeHtml(tradeTerminalStatusMessage)}</strong></footer>
       ${renderDailyContractsDrawer()}
     </div>
   `;
