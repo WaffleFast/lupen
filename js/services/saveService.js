@@ -5,6 +5,20 @@
 (function registerSaveService(global) {
   "use strict";
 
+  const storageKeys = Object.freeze({
+    account: "sectorOneAccount",
+    game: "lupenGameState",
+    legacyGame: "lupenGameSave",
+    tutorial: "lupenStarterPilotTutorial",
+    vaultReset: "lupenVaultClearedForIntegratedHangarV2",
+    pendingPilotName: "lupenPendingPilotName",
+    loginFlag: "sectorOneLoggedIn",
+    stagingFlowHintDismissed: "lupenStagingFlowHintDismissed",
+    debugTools: "lupenDebugTools",
+    multiplayerServer: "lupenMultiplayerServer",
+    playerAccount: "lupenPlayerAccount"
+  });
+
   function readLocalStorage(key) {
     return global.localStorage.getItem(key);
   }
@@ -124,6 +138,7 @@
   }
 
   global.LupenSaveService = Object.freeze({
+    storageKeys,
     readLocalStorage,
     writeLocalStorage,
     removeLocalStorage,

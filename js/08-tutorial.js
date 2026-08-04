@@ -1,5 +1,5 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
-const TUTORIAL_STORAGE_KEY = "lupenStarterPilotTutorial";
+const TUTORIAL_STORAGE_KEY = LupenSaveService.storageKeys.tutorial;
 const TUTORIAL_FLOW_VERSION = 5;
 const TUTORIAL_NARRATOR_LABEL = "Morgan";
 const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
@@ -818,7 +818,7 @@ function getCurrentTutorialStep() {
 }
 
 function getTutorialPilotIdentity() {
-  const accountKey = typeof STORAGE_ACCOUNT_KEY !== "undefined" ? STORAGE_ACCOUNT_KEY : "sectorOneAccount";
+  const accountKey = typeof STORAGE_ACCOUNT_KEY !== "undefined" ? STORAGE_ACCOUNT_KEY : LupenSaveService.storageKeys.account;
   const account = safeParseLocalStorage(accountKey, {});
   return {
     id: String(account?.id || ""),

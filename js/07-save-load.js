@@ -2,21 +2,21 @@
 
 const LUPEN_LOCAL_SAVE_RESET_KEYS = Object.freeze([
   STORAGE_GAME_KEY,
-  "lupenGameSave",
-  "lupenStarterPilotTutorial",
+  LupenSaveService.storageKeys.legacyGame,
+  LupenSaveService.storageKeys.tutorial,
   STORAGE_VAULT_RESET_KEY,
-  "lupenPendingPilotName",
-  "sectorOneLoggedIn",
-  "lupenStagingFlowHintDismissed",
-  "lupenDebugTools",
-  "lupenMultiplayerServer",
-  "lupenPlayerAccount"
+  LupenSaveService.storageKeys.pendingPilotName,
+  LupenSaveService.storageKeys.loginFlag,
+  LupenSaveService.storageKeys.stagingFlowHintDismissed,
+  LupenSaveService.storageKeys.debugTools,
+  LupenSaveService.storageKeys.multiplayerServer,
+  LupenSaveService.storageKeys.playerAccount
 ]);
 
 const LUPEN_LOCAL_SAVE_RESET_PREFIXES = Object.freeze([
   `${STORAGE_GAME_KEY}.corrupt.`,
-  "lupenGameSave.corrupt.",
-  "lupenStarterPilotTutorial.corrupt."
+  `${LupenSaveService.storageKeys.legacyGame}.corrupt.`,
+  `${LupenSaveService.storageKeys.tutorial}.corrupt.`
 ]);
 
 const LUPEN_LOCAL_SAVE_RESET_SESSION_MARKER = "lupenLocalSaveResetAt";
@@ -265,7 +265,7 @@ function buildSaveState(options = {}) {
     playerProgress,
     tutorialState: typeof getTutorialSaveState === "function"
       ? getTutorialSaveState()
-      : LupenSaveService.readJsonLocalStorage("lupenStarterPilotTutorial"),
+      : LupenSaveService.readJsonLocalStorage(LupenSaveService.storageKeys.tutorial),
     missionProgress: typeof normalizeMissionProgress === "function" ? normalizeMissionProgress(missionProgress) : missionProgress
   };
 }
@@ -927,7 +927,7 @@ function buildSaveExportPayload() {
     exportedAt: new Date().toISOString(),
     game: buildSaveState({ leaveSave: false }),
     account: LupenSaveService.readJsonLocalStorage(STORAGE_ACCOUNT_KEY),
-    tutorial: LupenSaveService.readJsonLocalStorage("lupenStarterPilotTutorial")
+    tutorial: LupenSaveService.readJsonLocalStorage(LupenSaveService.storageKeys.tutorial)
   };
 }
 
@@ -986,7 +986,7 @@ function importSavePayload(payload) {
       LupenSaveService.writeJsonLocalStorage(STORAGE_ACCOUNT_KEY, payload.account);
     }
     if (payload.tutorial && typeof payload.tutorial === "object") {
-      LupenSaveService.writeJsonLocalStorage("lupenStarterPilotTutorial", payload.tutorial);
+      LupenSaveService.writeJsonLocalStorage(LupenSaveService.storageKeys.tutorial, payload.tutorial);
     }
   }
 
@@ -1289,7 +1289,7 @@ function isDebugToolsEnabled() {
   if (params.get("mp") === "staging") {
     return params.get("debug") === "tools" || params.get("debugTools") === "true";
   }
-  return params.has("debug") || localStorage.getItem("lupenDebugTools") === "true";
+  return params.has("debug") || localStorage.getItem(LupenSaveService.storageKeys.debugTools) === "true";
 }
 
 function isStagingTestGrantEnabled() {
@@ -1510,7 +1510,7 @@ function debugResetSave() {
   if (!confirm("Reset this browser save and reload Lupen?")) return;
   LupenSaveService.removeLocalStorage(STORAGE_GAME_KEY);
   LupenSaveService.removeLocalStorage(STORAGE_ACCOUNT_KEY);
-  LupenSaveService.removeLocalStorage("lupenStarterPilotTutorial");
+  LupenSaveService.removeLocalStorage(LupenSaveService.storageKeys.tutorial);
   LupenSaveService.removeLocalStorage(STORAGE_VAULT_RESET_KEY);
   window.location.reload();
 }

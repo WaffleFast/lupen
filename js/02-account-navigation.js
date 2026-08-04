@@ -619,7 +619,7 @@ function isValidSupabaseProfileForUser(user, profile) {
 }
 
 function getPilotNameForProfileSetup(user, fallback = "Pilot") {
-  const candidate = String(user?.user_metadata?.pilot_name || localStorage.getItem("lupenPendingPilotName") || fallback || "Pilot").trim();
+  const candidate = String(user?.user_metadata?.pilot_name || localStorage.getItem(LupenSaveService.storageKeys.pendingPilotName) || fallback || "Pilot").trim();
   return candidate || "Pilot";
 }
 
@@ -755,7 +755,7 @@ async function createAccount() {
     return;
   }
 
-  localStorage.setItem("lupenPendingPilotName", pilotName);
+  localStorage.setItem(LupenSaveService.storageKeys.pendingPilotName, pilotName);
 
   const sessionUser = authData?.session?.user;
   if (!sessionUser?.id) {
@@ -779,7 +779,7 @@ async function createAccount() {
     return;
   }
 
-  localStorage.removeItem("lupenPendingPilotName");
+  localStorage.removeItem(LupenSaveService.storageKeys.pendingPilotName);
 
   rememberSupabaseAccount(sessionUser, profile);
 
@@ -857,7 +857,7 @@ async function login() {
     const pilotName = getPilotNameForProfileSetup(user);
     try {
       profile = await upsertSupabaseProfile(client, user, pilotName);
-      localStorage.removeItem("lupenPendingPilotName");
+      localStorage.removeItem(LupenSaveService.storageKeys.pendingPilotName);
     } catch (profileError) {
       console.warn("Supabase profile setup failed after login.", profileError);
       setAccountMessage(message, getProfileSetupErrorMessage(profileError, "Login succeeded, but profile setup failed. Please refresh or contact support."));

@@ -1011,6 +1011,8 @@ test.describe("Lupen browser smoke", () => {
     const storage = await page.evaluate(() => ({
       href: window.location.href,
       helperType: typeof window.lupenClearLocalSave,
+      storageKeys: { ...window.LupenSaveService.storageKeys },
+      storageKeysFrozen: Object.isFrozen(window.LupenSaveService.storageKeys),
       game: localStorage.getItem("lupenGameState"),
       legacyGame: localStorage.getItem("lupenGameSave"),
       tutorial: localStorage.getItem("lupenStarterPilotTutorial"),
@@ -1043,6 +1045,20 @@ test.describe("Lupen browser smoke", () => {
     expect(storage.href).not.toContain("clearLocalSave=1");
     expect(storage.href).toContain("mp=staging");
     expect(storage.helperType).toBe("function");
+    expect(storage.storageKeysFrozen).toBe(true);
+    expect(storage.storageKeys).toEqual({
+      account: "sectorOneAccount",
+      game: "lupenGameState",
+      legacyGame: "lupenGameSave",
+      tutorial: "lupenStarterPilotTutorial",
+      vaultReset: "lupenVaultClearedForIntegratedHangarV2",
+      pendingPilotName: "lupenPendingPilotName",
+      loginFlag: "sectorOneLoggedIn",
+      stagingFlowHintDismissed: "lupenStagingFlowHintDismissed",
+      debugTools: "lupenDebugTools",
+      multiplayerServer: "lupenMultiplayerServer",
+      playerAccount: "lupenPlayerAccount"
+    });
     expect(storage.game).toBe(null);
     expect(storage.legacyGame).toBe(null);
     expect(storage.tutorial).toBe(null);

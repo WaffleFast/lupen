@@ -8,7 +8,7 @@
   const localServerUrl = "ws://localhost:2567";
   const stagingServerUrl = "https://gb-man-e55e725e.colyseus.cloud";
   const localClientScriptUrl = "http://localhost:2567/colyseus.js";
-  const serverStorageKey = "lupenMultiplayerServer";
+  const serverStorageKey = global.LupenSaveService.storageKeys.multiplayerServer;
   const productionHosts = new Set(["lupen.io", "www.lupen.io"]);
   const colyseusBrowserClientVersion = "0.16.22";
   const clientScriptSources = [
@@ -474,7 +474,7 @@
 
   function getStoredAccountIdentity() {
     try {
-      const raw = global.localStorage?.getItem?.("sectorOneAccount") || "";
+      const raw = global.localStorage?.getItem?.(global.LupenSaveService.storageKeys.account) || "";
       if (!raw) return {};
       const account = JSON.parse(raw);
       return account && typeof account === "object" ? account : {};
