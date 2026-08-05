@@ -2,7 +2,7 @@
 const STORAGE_GAME_KEY = LupenSaveService.storageKeys.game;
 const STORAGE_VAULT_RESET_KEY = LupenSaveService.storageKeys.vaultReset;
 const SAVE_SCHEMA_ID = "lupen-single-player-save";
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 const SAVE_EXPORT_VERSION = 1;
 
 const LEGACY_SHIP_ID_MAP = Object.freeze({
@@ -390,6 +390,7 @@ function migrateSavedGame(saved) {
   migrated.shipLoadouts = migrateShipIndexedState(migrated.shipLoadouts);
   migrated.shipConditions = migrateShipIndexedState(migrated.shipConditions);
   migrated.unlockedShipLines = Array.from(new Set(["pioneer", ...(Array.isArray(migrated.unlockedShipLines) ? migrated.unlockedShipLines : [])]));
+  migrated.unlockedShipPlans = Array.from(new Set(Array.isArray(migrated.unlockedShipPlans) ? migrated.unlockedShipPlans : []));
 
   migrated.upgradeMaterials = normalizeUpgradeMaterials(migrated.upgradeMaterials);
 
@@ -794,6 +795,7 @@ let selectedHangarShipId = STARTER_SHIP_ID;
 let selectedFleetShipId = STARTER_SHIP_ID;
 let selectedShipyardShipId = STARTER_SHIP_ID;
 let unlockedShipLines = [PIONEER_LINE_ID];
+let unlockedShipPlans = [];
 let stationVaultWasClearedThisSession = false;
 let installedAttachments = [];
 let shipConditions = {};

@@ -502,6 +502,7 @@ function resetToNoShipStarterState() {
   selectedShipyardShipId = starterShipId;
   ownedShips = [];
   unlockedShipLines = [PIONEER_LINE_ID];
+  unlockedShipPlans = [];
   shipLoadouts = {};
   shipConditions = {};
 
@@ -586,6 +587,7 @@ function openJourney() {
   if (!sectorNodes[currentNode] || sectorNodes[currentNode].type !== "planet") {
     currentNode = lastPlanetNode || "Asteron Prime";
   }
+  if (typeof resetJourneySelectionToCurrent === "function") resetJourneySelectionToCurrent();
   if (typeof renderJourneyScreen === "function") renderJourneyScreen({ resetAssignments: true });
   showScreen("journeyScreen");
   tutorialEvent("openedJourney");

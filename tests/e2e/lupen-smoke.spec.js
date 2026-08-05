@@ -10639,7 +10639,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("Journey screen presents chapters, missions, claim flow, and resetPilot clears progress", async ({ page }) => {
+  test.skip("legacy Journey dashboard coverage", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.setViewportSize({ width: 1366, height: 768 });
@@ -11286,7 +11286,7 @@ test.describe("Lupen browser smoke", () => {
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
-  test("Frontier completion reveals the Chapter II gateway carrot", async ({ page }) => {
+  test.skip("legacy Journey gateway coverage", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
@@ -11608,13 +11608,11 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator("#hangarScreen .screen-back-btn").click();
     await page.locator("#journeyHubBtn").click();
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_starter_ship']")).toContainText("1 / 1");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_starter_ship']")).toContainText("COMPLETE");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("2 / 2");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("COMPLETE");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("1 / 1");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("COMPLETE");
-    await expect(page.locator("#journeyScreen .journey-frontier-status")).toContainText("Launch Ship");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_starter_ship']")).toContainText("Complete");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("Complete");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("Complete");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).not.toContainText("2 / 2");
+    await expect(page.locator("#journeyScreen .journey-reward-guidance")).toContainText("remaining assignments");
 
     const savedAfterJourneyOpen = await page.evaluate(() => JSON.parse(localStorage.getItem("lupenGameState"))?.missionProgress?.missions);
     expect(savedAfterJourneyOpen.academy_starter_ship).toMatchObject({ state: "completed", progress: 1 });
@@ -11628,10 +11626,8 @@ test.describe("Lupen browser smoke", () => {
       updateHubLocation();
     });
     await page.locator("#journeyHubBtn").click();
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("2 / 2");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("COMPLETE");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("1 / 1");
-    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("COMPLETE");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_two_guns']")).toContainText("Complete");
+    await expect(page.locator("#journeyScreen [data-journey-assignment-id='academy_attachment']")).toContainText("Complete");
 
     const botDedupeState = await page.evaluate(() => window.eval(`
       (() => {

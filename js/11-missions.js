@@ -129,7 +129,7 @@ const CHAPTER_MISSIONS = Object.freeze([
     briefing: "Before we push deeper into Frontier, I want to confirm your launch systems. Take the ship out when you're ready, Pilot.",
     completeText: "Launch telemetry is clean. Your vessel is responsive, and the station has your beacon.",
     objective: Object.freeze({ type: "launch_from_station", required: 1 }),
-    reward: Object.freeze({ xp: 25, credits: 100 })
+    reward: Object.freeze({ xp: 0, credits: 0 })
   }),
   Object.freeze({
     id: "first_haul",
@@ -139,7 +139,7 @@ const CHAPTER_MISSIONS = Object.freeze([
     briefing: "The trade network is live. Margins are small at this level, but every clean haul builds your reputation.",
     completeText: "Good trade discipline. Profit recorded and your route history is now building.",
     objective: Object.freeze({ type: "profitable_trade", required: 1 }),
-    reward: Object.freeze({ xp: 50, credits: 250 })
+    reward: Object.freeze({ xp: 0, credits: 0 })
   }),
   Object.freeze({
     id: "resource_recovery",
@@ -149,7 +149,7 @@ const CHAPTER_MISSIONS = Object.freeze([
     briefing: "I'm detecting loose mineral signatures in the lower lanes. Recover what you can. The station can always use raw material.",
     completeText: "Resource recovery confirmed. Small hauls keep stations alive out here.",
     objective: Object.freeze({ type: "recover_resource", target: "any", required: 3 }),
-    reward: Object.freeze({ xp: 50, credits: 200 })
+    reward: Object.freeze({ xp: 0, credits: 0 })
   }),
   Object.freeze({
     id: "erebus_patrol",
@@ -159,7 +159,7 @@ const CHAPTER_MISSIONS = Object.freeze([
     briefing: "Erebus drones are moving through the lower sector. They are not yet a major threat, but left alone, they become one.",
     completeText: "Erebus signatures reduced. You handled contact well.",
     objective: Object.freeze({ type: "destroy_bot", target: "erebus", required: 3 }),
-    reward: Object.freeze({ xp: 100, credits: 300 })
+    reward: Object.freeze({ xp: 0, credits: 0 })
   }),
   Object.freeze({
     id: "frontier_certification",
@@ -172,7 +172,7 @@ const CHAPTER_MISSIONS = Object.freeze([
       type: "complete_missions",
       requiredMissionIds: ["first_haul", "resource_recovery", "erebus_patrol"]
     }),
-    reward: Object.freeze({ xp: 150, credits: 500 })
+    reward: Object.freeze({ xp: 0, credits: 0 })
   })
 ]);
 
@@ -190,7 +190,19 @@ const JOURNEY_CHAPTERS = Object.freeze([
     theme: "academy",
     icon: "academy",
     progressMode: "static",
-    progress: 0
+    progress: 0,
+    reward: Object.freeze({
+      id: "academy-completion-v1",
+      typeLabel: "CERTIFICATION",
+      title: "Frontier Access",
+      credits: 0,
+      shipPlanId: "",
+      shipPlanName: "",
+      shipPlanImage: "assets/chapter-academy-icon.png",
+      nextChapterId: "frontier",
+      nextChapterLabel: "Chapter I: Frontier unlocked",
+      items: Object.freeze([])
+    })
   }),
   Object.freeze({
     id: "frontier",
@@ -205,7 +217,19 @@ const JOURNEY_CHAPTERS = Object.freeze([
     theme: "frontier",
     icon: "frontier",
     progressMode: "missions",
-    currentPathFallback: "Sector Orientation"
+    currentPathFallback: "Sector Orientation",
+    reward: Object.freeze({
+      id: "frontier-completion-v1",
+      typeLabel: "SHIP PLAN",
+      title: "Nightshade Hawk",
+      credits: 5000,
+      shipPlanId: "nightshadeHawk",
+      shipPlanName: "Nightshade Hawk",
+      shipPlanImage: "assets/ships/nightshade-hawk/nightshade-hawk-medium.webp",
+      nextChapterId: "next_route",
+      nextChapterLabel: "Chapter II unlocked",
+      items: Object.freeze([])
+    })
   }),
   Object.freeze({
     id: "next_route",
@@ -213,7 +237,7 @@ const JOURNEY_CHAPTERS = Object.freeze([
     label: "Chapter II",
     displayLabel: "Chapter II",
     routeLabel: "Chapter II",
-    routeTitle: "Locked Route",
+    routeTitle: "",
     revealedRouteTitle: "Frontier Gateway",
     shortLabel: "Next Route",
     subtitle: "Complete Frontier to locate.",
@@ -382,22 +406,22 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     id: "sector_orientation",
     chapterId: "frontier",
     journeyTitle: "Sector Orientation",
-    journeyShortDescription: "Take the ship out and confirm your launch systems.",
-    journeyObjectiveLabel: "Launch from a station or planet 1 time",
+    journeyShortDescription: "Launch from a station or planet once.",
+    journeyObjectiveLabel: "Launch from a station or planet once",
     assignmentType: "orientation",
     journeyTheme: "cyan",
     icon: "navigation",
     assignmentMode: "chapter",
     requiresAccept: false,
     autoActive: true,
-    rewards: Object.freeze({ xp: 25, credits: 100 }),
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
     order: 10
   }),
   Object.freeze({
     id: "first_haul",
     chapterId: "frontier",
     journeyTitle: "First Haul",
-    journeyShortDescription: "Complete one profitable trade and build your reputation.",
+    journeyShortDescription: "Complete 1 profitable cargo sale.",
     journeyObjectiveLabel: "Complete 1 profitable cargo sale",
     assignmentType: "trade",
     journeyTheme: "gold",
@@ -405,74 +429,75 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
     assignmentMode: "chapter",
     requiresAccept: false,
     autoActive: true,
-    rewards: Object.freeze({ xp: 50, credits: 250 }),
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
     order: 20
   }),
   Object.freeze({
     id: "resource_recovery",
     chapterId: "frontier",
     journeyTitle: "Resource Recovery",
-    journeyShortDescription: "Recover resources from the lower lanes.",
-    journeyObjectiveLabel: "Recover 3 resources",
+    journeyShortDescription: "Mine and collect raw resources.",
+    journeyObjectiveLabel: "Mine and collect 3 raw resources",
     assignmentType: "resource",
     journeyTheme: "teal",
     icon: "resource",
     assignmentMode: "chapter",
     requiresAccept: false,
     autoActive: true,
-    rewards: Object.freeze({ xp: 50, credits: 200 }),
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
     order: 30
   }),
   Object.freeze({
     id: "erebus_patrol",
     chapterId: "frontier",
     journeyTitle: "Erebus Patrol Sweep",
-    journeyShortDescription: "Destroy Erebus drones moving through Frontier space.",
-    journeyObjectiveLabel: "Destroy 3 Erebus drones",
+    journeyShortDescription: "Destroy hostile Erebus ships.",
+    journeyObjectiveLabel: "Destroy 3 hostile Erebus ships",
     assignmentType: "combat",
     journeyTheme: "orange",
     icon: "combat",
     assignmentMode: "chapter",
     requiresAccept: false,
     autoActive: true,
-    rewards: Object.freeze({ xp: 100, credits: 300 }),
+    rewards: Object.freeze({ xp: 0, credits: 0 }),
     order: 40
-  }),
-  Object.freeze({
-    id: "frontier_certification",
-    chapterId: "frontier",
-    journeyTitle: "Frontier Certification",
-    journeyShortDescription: "Complete the core Frontier assignments and certify your path.",
-    journeyObjectiveLabel: "Complete 3 Frontier readiness missions",
-    assignmentType: "certification",
-    journeyTheme: "purple",
-    icon: "certification",
-    assignmentMode: "chapter",
-    requiresAccept: false,
-    autoActive: true,
-    rewards: Object.freeze({ xp: 150, credits: 500 }),
-    order: 50
   })
 ]);
 
 const MISSIONS_BY_ID = Object.freeze(Object.fromEntries(CHAPTER_MISSIONS.map(mission => [mission.id, mission])));
 const JOURNEY_ASSIGNMENTS_BY_ID = Object.freeze(Object.fromEntries(JOURNEY_ASSIGNMENTS.map(assignment => [assignment.id, assignment])));
+const JOURNEY_PROGRESS_VERSION = 2;
 
 let missionProgress = createDefaultMissionProgress();
 let selectedJourneyChapterId = "academy";
 let journeyChapterRouteMessage = "";
+let journeyChapterCompletionInFlight = false;
 
 function createDefaultMissionProgress() {
   return {
+    journeyVersion: JOURNEY_PROGRESS_VERSION,
     chapters: {
-      academy: { id: "academy", state: MISSION_STATE_ACTIVE, completed: false },
-      frontier: { id: "frontier", state: MISSION_STATE_AVAILABLE }
+      academy: createDefaultJourneyChapterProgress("academy", MISSION_STATE_ACTIVE),
+      frontier: createDefaultJourneyChapterProgress("frontier", MISSION_STATE_AVAILABLE),
+      next_route: createDefaultJourneyChapterProgress("next_route", "locked")
     },
     eventKeys: {},
     missions: Object.fromEntries(CHAPTER_MISSIONS.map(mission => [
       mission.id,
       { id: mission.id, state: MISSION_STATE_AVAILABLE, progress: 0, completedAt: null, claimedAt: null }
     ]))
+  };
+}
+
+function createDefaultJourneyChapterProgress(id, state) {
+  return {
+    id,
+    state,
+    completed: false,
+    completedAt: null,
+    rewardClaimed: false,
+    rewardClaimedAt: null,
+    rewardId: null
   };
 }
 
@@ -493,23 +518,72 @@ function normalizeMissionProgress(saved) {
       ...missions[id],
       ...source,
       id,
-      state: normalizeMissionState(source.state || missions[id].state),
+      state: normalizeMissionState(source.state || missions[id].state) === MISSION_STATE_CLAIMED
+        ? MISSION_STATE_COMPLETED
+        : normalizeMissionState(source.state || missions[id].state),
       progress: Math.max(0, Math.floor(Number(source.progress || 0))),
       completedAt: source.completedAt || null,
       claimedAt: source.claimedAt || null
     };
   });
 
-  const chapters = {
-    ...defaults.chapters,
-    ...(safe.chapters && typeof safe.chapters === "object" ? safe.chapters : {})
-  };
+  const chapters = Object.fromEntries(Object.entries(defaults.chapters).map(([id, chapter]) => {
+    const source = safe.chapters?.[id] && typeof safe.chapters[id] === "object" ? safe.chapters[id] : {};
+    return [id, {
+      ...chapter,
+      ...source,
+      id,
+      completed: Boolean(source.completed),
+      completedAt: source.completedAt || null,
+      rewardClaimed: Boolean(source.rewardClaimed),
+      rewardClaimedAt: source.rewardClaimedAt || null,
+      rewardId: source.rewardId || null
+    }];
+  }));
+
+  const sourceVersion = Math.max(0, Number(safe.journeyVersion || 0));
+  if (sourceVersion < JOURNEY_PROGRESS_VERSION) {
+    migrateLegacyJourneyChapters(chapters, missions);
+  }
 
   const eventKeys = safe.eventKeys && typeof safe.eventKeys === "object" && !Array.isArray(safe.eventKeys)
     ? Object.fromEntries(Object.entries(safe.eventKeys).filter(([key, value]) => key && value === true))
     : {};
 
-  return reconcileMissionAvailability({ chapters, eventKeys, missions });
+  return reconcileMissionAvailability({
+    journeyVersion: JOURNEY_PROGRESS_VERSION,
+    chapters,
+    eventKeys,
+    missions
+  });
+}
+
+function migrateLegacyJourneyChapters(chapters, missions) {
+  const assignmentFinished = id => [MISSION_STATE_COMPLETED, MISSION_STATE_CLAIMED].includes(
+    normalizeMissionState(missions?.[id]?.state)
+  );
+  const academyIds = JOURNEY_ASSIGNMENTS.filter(assignment => assignment.chapterId === "academy").map(assignment => assignment.id);
+  const academyProgressed = Boolean(
+    playerProgress?.academyCompleted ||
+    playerProgress?.chapterProgress?.academy?.completed ||
+    academyIds.length && academyIds.every(assignmentFinished)
+  );
+  if (academyProgressed) markMigratedJourneyChapterClaimed(chapters.academy, "academy-completion-v1");
+
+  const frontierPreviouslyPassed = assignmentFinished("frontier_certification") || Boolean(
+    playerProgress?.chapterProgress?.frontier?.completed
+  );
+  if (frontierPreviouslyPassed) markMigratedJourneyChapterClaimed(chapters.frontier, "frontier-completion-v1");
+}
+
+function markMigratedJourneyChapterClaimed(chapter, rewardId) {
+  if (!chapter) return;
+  chapter.state = "complete";
+  chapter.completed = true;
+  chapter.completedAt = chapter.completedAt || new Date().toISOString();
+  chapter.rewardClaimed = true;
+  chapter.rewardClaimedAt = chapter.rewardClaimedAt || chapter.completedAt;
+  chapter.rewardId = chapter.rewardId || rewardId;
 }
 
 function reconcileMissionAvailability(progress = missionProgress) {
@@ -601,18 +675,15 @@ function getVisibleChapterMissions(chapterId = "frontier") {
 
 function getPrimaryActiveMission() {
   missionProgress = normalizeMissionProgress(missionProgress);
-  const completedWithReward = CHAPTER_MISSIONS.find(mission => {
-    if (missionProgress.missions[mission.id]?.state !== MISSION_STATE_COMPLETED) return false;
-    const assignmentReward = getJourneyAssignmentConfig(mission)?.rewards || mission.reward || {};
-    return Number(assignmentReward.xp || 0) > 0 || Number(assignmentReward.credits || 0) > 0;
-  });
-  return completedWithReward ||
-    CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_ACTIVE) ||
+  const activeChapterId = getJourneyActiveChapterId();
+  return CHAPTER_MISSIONS.find(mission => mission.chapter === activeChapterId && missionProgress.missions[mission.id]?.state === MISSION_STATE_ACTIVE) ||
     CHAPTER_MISSIONS.find(mission => {
       const state = missionProgress.missions[mission.id];
-      return state?.state === MISSION_STATE_AVAILABLE && isJourneyChapterAssignment(mission) && isMissionAvailable(mission.id, missionProgress);
+      return mission.chapter === activeChapterId &&
+        state?.state === MISSION_STATE_AVAILABLE &&
+        isJourneyChapterAssignment(mission) &&
+        isMissionAvailable(mission.id, missionProgress);
     }) ||
-    CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_COMPLETED) ||
     null;
 }
 
@@ -651,20 +722,10 @@ function claimMissionReward(id) {
   const mission = MISSIONS_BY_ID[id];
   const state = missionProgress.missions[id];
   if (!mission || !state || state.state !== MISSION_STATE_COMPLETED) return false;
-
-  const rewardCredits = Math.max(0, Math.round(Number(mission.reward.credits || 0)));
-  const rewardXp = Math.max(0, Math.round(Number(mission.reward.xp || 0)));
-  credits = Math.max(0, Math.round(Number(credits || 0))) + rewardCredits;
-  if (rewardXp > 0 && typeof addCombatXp === "function") addCombatXp(rewardXp, "mission");
-  state.state = MISSION_STATE_CLAIMED;
-  state.claimedAt = new Date().toISOString();
-  if (typeof addHudToast === "function") addHudToast(`Mission reward claimed: +${formatNumber(rewardXp)} XP / CR ${formatNumber(rewardCredits)}.`);
-  if (typeof addActivityLog === "function") addActivityLog(`Mission reward claimed: ${mission.title}.`);
-  reconcileMissionAvailability(missionProgress);
-  refreshMissionDisplays();
-  updateSpaceHUD();
+  // Journey assignments are requirements only. Legacy claim calls intentionally grant nothing.
+  state.claimedAt = state.claimedAt || new Date().toISOString();
   saveGame();
-  return true;
+  return false;
 }
 
 function missionEventMatches(mission, eventType, payload = {}) {
@@ -883,11 +944,6 @@ function renderMorganCard(mission, state) {
   `;
 }
 
-function getChapterProgressPercent(chapterId = "frontier") {
-  const summary = getChapterProgressSummary(chapterId);
-  return Math.min(100, Math.round((summary.completedOrClaimed / Math.max(1, summary.total)) * 100));
-}
-
 function getJourneyChapterRequirementSummary(chapterId = "frontier") {
   missionProgress = normalizeMissionProgress(missionProgress);
   const requirements = getJourneyAssignments(chapterId).filter(assignment => {
@@ -901,11 +957,6 @@ function getJourneyChapterRequirementSummary(chapterId = "frontier") {
   const total = requirements.length;
   const percent = Math.min(100, Math.round((complete / Math.max(1, total)) * 100));
   return { requirements, complete, total, percent };
-}
-
-function getJourneyMissionRows() {
-  missionProgress = normalizeMissionProgress(missionProgress);
-  return getJourneyAssignments(getJourneyActiveChapterId()).map(assignment => assignment.mission).filter(Boolean);
 }
 
 function getJourneyAssignments(chapterId = "frontier") {
@@ -941,21 +992,8 @@ function getJourneyAssignmentConfig(missionOrId) {
   };
 }
 
-function getJourneyPrimaryMission() {
-  missionProgress = normalizeMissionProgress(missionProgress);
-  return getPrimaryActiveMission() ||
-    CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state === MISSION_STATE_AVAILABLE && isMissionAvailable(mission.id, missionProgress)) ||
-    CHAPTER_MISSIONS.find(mission => missionProgress.missions[mission.id]?.state !== MISSION_STATE_CLAIMED) ||
-    null;
-}
-
 function getJourneyActiveChapterId() {
   return isJourneyAcademyComplete() ? "frontier" : "academy";
-}
-
-function getJourneyActiveChapter() {
-  const activeId = getJourneyActiveChapterId();
-  return JOURNEY_CHAPTERS.find(chapter => chapter.id === activeId) || JOURNEY_CHAPTERS[0];
 }
 
 function getJourneyChapterAssignmentTitle(chapterId = getJourneyActiveChapterId()) {
@@ -966,14 +1004,14 @@ function syncSelectedJourneyChapter() {
   const activeId = getJourneyActiveChapterId();
   const selected = JOURNEY_CHAPTERS.find(chapter => chapter.id === selectedJourneyChapterId);
   const selectedState = selected ? getJourneyChapterRouteState(selected) : "locked";
-  if (!selected || selectedState === "locked" || selectedState === "pending" || (activeId === "frontier" && selectedJourneyChapterId === "academy")) {
+  if (!selected || selectedState === "locked" || selectedState === "pending" || selectedState === "revealed") {
     selectedJourneyChapterId = activeId;
   }
 }
 
-function getJourneyObjectiveLine(mission) {
-  if (!mission) return "Current Path: Sector Orientation";
-  return `Current Path: ${getJourneyObjectiveTitle(mission)}`;
+function resetJourneySelectionToCurrent() {
+  selectedJourneyChapterId = getJourneyActiveChapterId();
+  journeyChapterRouteMessage = "";
 }
 
 function getGalaxyCompletionPercent() {
@@ -1000,32 +1038,32 @@ function renderJourneyScreen(options = {}) {
   const title = document.getElementById("journeyLocationTitle");
   if (title) title.textContent = String(currentNode || "Asteron Prime").toUpperCase();
   if (!body) return;
-  const previousChapterId = body.dataset.journeyActiveChapter || "";
+  const previousChapterId = body.dataset.journeySelectedChapter || "";
   const previousAssignmentScroll = Number(body.querySelector(".journey-assignment-grid")?.scrollTop || 0);
   syncSelectedJourneyChapter();
-  const activeChapterId = getJourneyActiveChapterId();
-  const resetAssignmentScroll = Boolean(options?.resetAssignments) || previousChapterId !== activeChapterId;
-  const activeAssignments = getJourneyAssignments(activeChapterId)
+  const selectedChapterId = selectedJourneyChapterId;
+  const resetAssignmentScroll = Boolean(options?.resetAssignments) || previousChapterId !== selectedChapterId;
+  const selectedAssignments = getJourneyAssignments(selectedChapterId)
     .filter(assignment => assignment.mission?.objective?.type !== "complete_missions");
-  const requirements = getJourneyChapterRequirementSummary(activeChapterId);
+  const requirements = getJourneyChapterRequirementSummary(selectedChapterId);
 
   body.innerHTML = `
     ${renderJourneyMorganBriefing()}
     ${renderJourneyChapterPath()}
+    <div class="journey-main-grid">
     <section class="journey-objectives-panel journey-current-path">
       <div class="journey-panel-head journey-assignment-head">
-        <div>
-          <small>CURRENT PATH</small>
-          <span>${escapeHtml(getJourneyChapterAssignmentTitle(activeChapterId))}</span>
-        </div>
-        <strong>${formatNumber(requirements.complete)} / ${formatNumber(requirements.total)} COMPLETE</strong>
+        <span>${escapeHtml(getJourneyChapterAssignmentTitle(selectedChapterId))}</span>
+        <strong>${formatNumber(requirements.complete)} of ${formatNumber(requirements.total)} complete</strong>
       </div>
-      ${renderJourneyAssignments(activeAssignments)}
+      ${renderJourneyAssignments(selectedAssignments)}
     </section>
-    <aside class="journey-side-panel">${renderJourneyFrontierStatus()}</aside>
+    <aside class="journey-side-panel">${renderJourneyChapterReward(selectedChapterId)}</aside>
+    </div>
     ${renderJourneyGalaxyCompletion()}
   `;
-  body.dataset.journeyActiveChapter = activeChapterId;
+  body.dataset.journeyActiveChapter = getJourneyActiveChapterId();
+  body.dataset.journeySelectedChapter = selectedChapterId;
   requestAnimationFrame(() => {
     const assignmentGrid = body.querySelector(".journey-assignment-grid");
     if (assignmentGrid) {
@@ -1041,22 +1079,20 @@ function renderMissionJournal() {
 }
 
 function renderJourneyMorganBriefing() {
-  const academyActive = getJourneyActiveChapterId() === "academy";
-  const briefingLabel = academyActive ? "ACADEMY BRIEFING" : "FRONTIER BRIEFING";
-  const activeChapterId = academyActive ? "academy" : "frontier";
-  const nextAssignment = getJourneyAssignments(activeChapterId).find(assignment => {
-    const state = missionProgress?.missions?.[assignment.id]?.state;
-    return assignment.mission?.objective?.type !== "complete_missions" &&
-      state !== MISSION_STATE_COMPLETED &&
-      state !== MISSION_STATE_CLAIMED;
-  });
-  const briefingMessage = academyActive
-    ? nextAssignment
-      ? `Welcome back, Pilot. Your Academy light is still burning steady. Next, ${nextAssignment.journeyTitle}: ${nextAssignment.journeyShortDescription} I will stay on comms while you make it real.`
-      : "Beautiful work, Pilot. Academy lights are green across the board, and Chapter I: Frontier is opening like a new star lane."
-    : nextAssignment
-      ? `Frontier space is listening, Pilot. Next, ${nextAssignment.journeyTitle}: ${nextAssignment.journeyShortDescription} Keep your course clean, and I will keep the signal warm.`
-      : "Frontier operations are complete, Pilot. You have turned first steps into a real wake through the dark; the next ship-plan route is ready to reveal.";
+  const chapterId = selectedJourneyChapterId;
+  const requirements = getJourneyChapterRequirementSummary(chapterId);
+  const chapterComplete = isJourneyChapterComplete(chapterId);
+  const briefingMessage = chapterComplete
+    ? chapterId === "academy"
+      ? "Academy is complete. Your certification and Frontier access are secured."
+      : "Frontier is complete. Its rewards and route unlocks have been secured."
+    : requirements.complete >= requirements.total
+      ? chapterId === "academy"
+        ? "All Academy assignments are complete. Finalise your certification to enter Frontier."
+        : "All Frontier assignments are complete. Claim your chapter reward to continue."
+      : chapterId === "academy"
+        ? "Complete your remaining Academy assignments to qualify for Frontier operations."
+        : "Complete your remaining Frontier assignments to reveal the next ship plan route.";
   return `
     <section class="journey-morgan-panel journey-briefing">
       <div class="journey-briefing__bg" aria-hidden="true"></div>
@@ -1065,11 +1101,9 @@ function renderJourneyMorganBriefing() {
           <img class="journey-briefing__portrait-img journey-morgan-portrait" src="assets/morgan-journey-guide.png" alt="Morgan">
         </div>
         <div class="journey-briefing__content journey-morgan-copy">
-          <strong class="journey-briefing__name">MORGAN</strong>
-          <em class="journey-briefing__role">COMMAND LIAISON</em>
-          <div class="journey-briefing__signal">
-            <span class="journey-briefing__eyebrow"><i aria-hidden="true"></i>${escapeHtml(briefingLabel)}</span>
-            <div class="journey-briefing__waveform journey-waveform" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="journey-briefing__identity">
+            <strong class="journey-briefing__name">MORGAN</strong>
+            <em class="journey-briefing__role">COMMAND LIAISON</em>
           </div>
           <p class="journey-briefing__message">${escapeHtml(briefingMessage)}</p>
         </div>
@@ -1083,12 +1117,7 @@ function renderJourneyChapterPath() {
     .slice()
     .sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
   return `
-    <section class="journey-chapters-panel journey-chapter-route">
-      <div class="journey-chapter-route__head">
-        <span class="journey-chapter-route__rule" aria-hidden="true"></span>
-        <span class="journey-chapter-route__title">CHAPTER ROUTE</span>
-        <span class="journey-chapter-route__rule" aria-hidden="true"></span>
-      </div>
+    <nav class="journey-chapters-panel journey-chapter-route" aria-label="Journey chapters">
       <div class="journey-chapter-route__viewport">
         <button type="button" class="journey-chapter-route__arrow journey-chapter-route__arrow--left" onclick="scrollJourneyChapterRoute(-1)" aria-label="Scroll chapter route left">‹</button>
         <div id="journeyChapterRouteTrack" class="journey-chapter-route__track journey-chapter-path" data-journey-source="JOURNEY_CHAPTERS" aria-label="Chapter route" onscroll="updateJourneyChapterRouteScroll()">
@@ -1098,25 +1127,14 @@ function renderJourneyChapterPath() {
       </div>
       <div class="journey-chapter-route__scrollbar" aria-hidden="true"><i id="journeyChapterRouteScrollThumb"></i></div>
       <p id="journeyChapterRouteMessage" class="journey-chapter-route__message" aria-live="polite">${escapeHtml(journeyChapterRouteMessage)}</p>
-    </section>
+    </nav>
   `;
-}
-
-function getJourneyChapterBadge(chapter) {
-  if (chapter.id === "academy") return "A";
-  if (chapter.id === "frontier") return "I";
-  return "?";
-}
-
-function getJourneyChapterProgress(chapter) {
-  if (chapter.progressMode === "missions") return getChapterProgressPercent(chapter.id);
-  return Number(chapter.progress || 0);
 }
 
 function getJourneyChapterStatusLabel(chapter) {
   const state = getJourneyChapterRouteState(chapter);
   if (state === "complete") return "COMPLETE";
-  if (state === "active") return "ACTIVE";
+  if (state === "active") return "CURRENT";
   if (state === "revealed") return "SIGNAL DETECTED";
   if (state === "locked") return "LOCKED";
   if (state === "pending" && chapter.id === "frontier") return "ACADEMY REQUIRED";
@@ -1125,25 +1143,17 @@ function getJourneyChapterStatusLabel(chapter) {
 }
 
 function isJourneyAcademyComplete() {
-  if (
-    playerProgress?.academyCompleted ||
-    playerProgress?.chapterProgress?.academy?.completed ||
-    missionProgress?.academy?.completed
-  ) {
-    return true;
-  }
-  const academyAssignments = JOURNEY_ASSIGNMENTS.filter(assignment => assignment.chapterId === "academy");
-  if (!academyAssignments.length) return false;
-  const states = missionProgress?.missions || {};
-  return academyAssignments.every(assignment => {
-    const state = states[assignment.id]?.state;
-    return state === MISSION_STATE_COMPLETED || state === MISSION_STATE_CLAIMED;
-  });
+  return Boolean(missionProgress?.chapters?.academy?.completed || missionProgress?.chapters?.academy?.rewardClaimed);
 }
 
 function isJourneyFrontierComplete() {
-  const summary = getChapterProgressSummary("frontier");
-  return summary.total > 0 && summary.completedOrClaimed >= summary.total;
+  return Boolean(missionProgress?.chapters?.frontier?.completed || missionProgress?.chapters?.frontier?.rewardClaimed);
+}
+
+function isJourneyChapterComplete(chapterId) {
+  if (chapterId === "academy") return isJourneyAcademyComplete();
+  if (chapterId === "frontier") return isJourneyFrontierComplete();
+  return Boolean(missionProgress?.chapters?.[chapterId]?.completed);
 }
 
 function getJourneyChapterRouteState(chapter) {
@@ -1164,26 +1174,18 @@ function getJourneyChapterRouteIcon(chapter) {
   return "assets/chapter-frontier-icon.png";
 }
 
-function getJourneyChapterRouteSubtitle(chapter) {
-  const state = getJourneyChapterRouteState(chapter);
-  if (state === "complete") return "Completed";
-  if (state === "active") return "Active";
-  if (state === "revealed") return "Gateway signal detected";
-  if (state === "locked") return "Locked";
-  if (chapter.id === "frontier" && state === "pending") return "Pending";
-  return chapter.subtitle || "";
-}
-
 function renderJourneyChapterNode(chapter) {
   const state = getJourneyChapterRouteState(chapter);
-  const selected = selectedJourneyChapterId === chapter.id && !["locked", "revealed"].includes(state);
+  const disabled = ["locked", "pending", "revealed"].includes(state);
+  const selected = selectedJourneyChapterId === chapter.id && !disabled;
+  const current = chapter.id === getJourneyActiveChapterId();
   const routeLabel = chapter.routeLabel || chapter.displayLabel || chapter.label;
   const routeTitle = state === "revealed"
     ? chapter.revealedRouteTitle || chapter.routeTitle || ""
     : chapter.routeTitle || "";
   const altText = chapter.id === "frontier" ? "Chapter I: Frontier" : state === "locked" ? "Locked route" : routeLabel;
   return `
-    <button type="button" class="journey-chapter-route__item journey-chapter-route__item--${escapeHtml(state)} ${selected ? "journey-chapter-route__item--selected" : ""} journey-chapter-node journey-chapter-${escapeHtml(state)} journey-chapter-node--${escapeHtml(state)} journey-chapter-theme-${escapeHtml(chapter.theme)}" data-journey-chapter-id="${escapeHtml(chapter.id)}" data-journey-chapter-state="${escapeHtml(state)}" onclick="selectJourneyChapterRoute('${escapeJsString(chapter.id)}')" aria-pressed="${selected ? "true" : "false"}" ${state === "locked" ? `title="${escapeHtml(chapter.unlockText || "Complete Frontier to reveal this route.")}"` : ""}>
+    <button type="button" class="journey-chapter-route__item journey-chapter-route__item--${escapeHtml(state)} ${selected ? "journey-chapter-route__item--selected" : ""} ${current ? "journey-chapter-route__item--current" : ""} journey-chapter-node journey-chapter-${escapeHtml(state)} journey-chapter-node--${escapeHtml(state)} journey-chapter-theme-${escapeHtml(chapter.theme)}" data-journey-chapter-id="${escapeHtml(chapter.id)}" data-journey-chapter-state="${escapeHtml(state)}" onclick="selectJourneyChapterRoute('${escapeJsString(chapter.id)}')" aria-pressed="${selected ? "true" : "false"}" ${disabled ? "disabled aria-disabled=\"true\"" : ""} ${state === "locked" ? `title="${escapeHtml(chapter.unlockText || "Complete Frontier to reveal this route.")}"` : ""}>
       <div class="journey-chapter-route__icon journey-chapter-icon journey-chapter-icon--${escapeHtml(chapter.icon)}">
         <img src="${escapeHtml(getJourneyChapterRouteIcon(chapter))}" alt="${escapeHtml(altText)}">
       </div>
@@ -1193,6 +1195,7 @@ function renderJourneyChapterNode(chapter) {
         ${routeTitle ? `<b class="journey-chapter-route__detail">${escapeHtml(routeTitle)}</b>` : ""}
         <em class="journey-chapter-route__status">${escapeHtml(getJourneyChapterStatusLabel(chapter))}</em>
       </span>
+      ${!disabled ? `<span class="journey-chapter-route__chevron" aria-hidden="true">&rsaquo;</span>` : ""}
     </button>
   `;
 }
@@ -1201,21 +1204,9 @@ function selectJourneyChapterRoute(id) {
   const chapter = JOURNEY_CHAPTERS.find(entry => entry.id === id);
   if (!chapter) return;
   const state = getJourneyChapterRouteState(chapter);
-  if (state === "locked") {
-    journeyChapterRouteMessage = chapter.unlockText || "Complete Frontier to reveal this route.";
-  } else if (state === "revealed") {
-    journeyChapterRouteMessage = chapter.revealText || "Frontier Gateway signal detected. Chapter II is on the horizon.";
-  } else if (state === "pending") {
-    journeyChapterRouteMessage = chapter.id === "frontier"
-      ? "Complete Academy to activate Chapter I: Frontier."
-      : "This chapter is not active yet.";
-  } else if (id === "academy") {
-    selectedJourneyChapterId = id;
-    journeyChapterRouteMessage = "";
-  } else {
-    selectedJourneyChapterId = id;
-    journeyChapterRouteMessage = "";
-  }
+  if (["locked", "revealed", "pending"].includes(state)) return;
+  selectedJourneyChapterId = id;
+  journeyChapterRouteMessage = "";
   renderJourneyScreen({ resetAssignments: true });
   requestAnimationFrame(() => {
     document.querySelector(`[data-journey-chapter-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", inline: "center" });
@@ -1241,10 +1232,6 @@ function updateJourneyChapterRouteScroll() {
   thumb.style.transform = `translateX(${offset}%)`;
 }
 
-function renderJourneyObjectiveRows() {
-  return renderJourneyAssignments(getJourneyAssignments(getJourneyActiveChapterId()));
-}
-
 function renderJourneyAssignments(assignments) {
   const rows = (assignments || []).filter(assignment => assignment.mission);
   if (!rows.length) {
@@ -1259,36 +1246,15 @@ function renderJourneyAssignments(assignments) {
   return `<div class="journey-objective-list journey-assignment-grid" data-journey-source="JOURNEY_ASSIGNMENTS">${rows.map(renderJourneyAssignmentCard).join("")}</div>`;
 }
 
-function getJourneyObjectiveTitle(mission) {
-  return getJourneyAssignmentConfig(mission).journeyTitle;
-}
-
-function getJourneyObjectiveDescription(mission) {
-  return getJourneyAssignmentConfig(mission).journeyShortDescription;
-}
-
-function getJourneyObjectiveAccent(mission) {
-  return getJourneyAssignmentConfig(mission).assignmentType;
-}
-
-function getJourneyObjectiveLabel(mission) {
-  return getJourneyAssignmentConfig(mission).journeyObjectiveLabel;
-}
-
 function getJourneyAssignmentUiState(assignment, mission, state, locked = false) {
   if (locked) return "locked";
-  if (state?.state === MISSION_STATE_COMPLETED) return "claimable";
-  if (state?.state === MISSION_STATE_CLAIMED) return "claimed";
+  if ([MISSION_STATE_COMPLETED, MISSION_STATE_CLAIMED].includes(state?.state)) return "complete";
   if (assignment.autoActive && assignment.requiresAccept === false) {
     const progress = getMissionProgressAmount(mission, state);
     if (state?.state === MISSION_STATE_ACTIVE || progress > 0) return "in-progress";
     return "incomplete";
   }
   return normalizeMissionState(state?.state);
-}
-
-function renderJourneyObjectiveRow(mission) {
-  return renderJourneyAssignmentCard(getJourneyAssignmentConfig(mission));
 }
 
 function renderJourneyAssignmentCard(assignment) {
@@ -1298,16 +1264,8 @@ function renderJourneyAssignmentCard(assignment) {
   const required = getMissionRequiredAmount(mission);
   const locked = state?.state === MISSION_STATE_AVAILABLE && !isMissionAvailable(mission.id, missionProgress);
   const uiState = getJourneyAssignmentUiState(assignment, mission, state, locked);
-  const requiresAccept = assignment.requiresAccept !== false;
-  const canAccept = requiresAccept && state?.state === MISSION_STATE_AVAILABLE && !locked;
-  const rewards = assignment.rewards || mission.reward || {};
-  const hasReward = Math.max(0, Number(rewards.xp || 0)) > 0 || Math.max(0, Number(rewards.credits || 0)) > 0;
-  const canClaim = state?.state === MISSION_STATE_COMPLETED && hasReward;
-  const action = canClaim
-    ? `<button type="button" onclick="claimMissionReward('${escapeJsString(mission.id)}')">Claim Reward</button>`
-    : canAccept
-      ? `<button type="button" onclick="acceptMission('${escapeJsString(mission.id)}')">Accept Mission</button>`
-      : "";
+  const complete = uiState === "complete";
+  const accumulating = required > 1 && !complete;
 
   return `
     <article class="journey-objective-row journey-assignment-card mission-state-${escapeHtml(uiState)} journey-accent-${escapeHtml(assignment.assignmentType)} journey-assignment-card--${escapeHtml(assignment.journeyTheme)}" data-journey-assignment-id="${escapeHtml(assignment.id)}">
@@ -1317,15 +1275,10 @@ function renderJourneyAssignmentCard(assignment) {
       <div class="journey-objective-copy">
         <div class="journey-objective-top">
           <strong>${escapeHtml(assignment.journeyTitle)}</strong>
-          ${renderJourneyAssignmentStatePill(uiState, hasReward)}
+          <span class="journey-assignment-status journey-assignment-status--${escapeHtml(uiState)}">${complete ? "Complete <b aria-hidden=\"true\">&#10003;</b>" : accumulating ? `${formatNumber(progress)} / ${formatNumber(required)}` : "Incomplete"}</span>
         </div>
         <p>${escapeHtml(assignment.journeyObjectiveLabel)}</p>
-        <div class="journey-assignment-progress-row">
-          ${renderJourneyProgressBar(progress, required)}
-          <b>${formatNumber(progress)} / ${formatNumber(required)}</b>
-          ${renderJourneyRewardChips(rewards)}
-        </div>
-        ${action ? `<div class="journey-objective-action">${action}</div>` : ""}
+        ${accumulating ? `<div class="journey-assignment-progress-row">${renderJourneyProgressBar(progress, required)}</div>` : ""}
       </div>
     </article>
   `;
@@ -1341,105 +1294,112 @@ function getJourneyAssignmentIconSrc(assignment) {
   return "assets/journey-assignment-launch.png";
 }
 
-function renderJourneyAssignmentStatePill(state, hasReward = true) {
-  const normalized = String(state || "").toLowerCase();
-  if (normalized === "claimable") {
-    return renderJourneyStatusPill(hasReward ? "claimable" : "completed");
-  }
-  if (normalized === "claimed") return renderJourneyStatusPill(hasReward ? "claimed" : "completed");
-  if (normalized === "in-progress") return renderJourneyStatusPill("in-progress");
-  if (normalized === "locked") return renderJourneyStatusPill("locked");
-  return "";
-}
-
-function renderJourneyStatusPill(state, label = "") {
-  const normalized = String(state || MISSION_STATE_AVAILABLE).toLowerCase();
-  const text = label || (
-    normalized === "claimable" ? "CLAIM READY" :
-      normalized === "claimed" ? "CLAIMED" :
-        normalized === "completed" ? "COMPLETE" :
-          normalized === "tracking" ? "TRACKING" :
-            normalized === "in-progress" ? "IN PROGRESS" :
-              normalized === "not-started" ? "NOT STARTED" :
-        normalized === MISSION_STATE_COMPLETED ? "COMPLETE" :
-          normalized === MISSION_STATE_CLAIMED ? "COMPLETE" :
-            normalized === MISSION_STATE_ACTIVE ? "ACTIVE" :
-              normalized === "locked" ? "LOCKED" :
-                normalized === "pending" ? "PENDING" :
-                  normalized === MISSION_STATE_AVAILABLE ? "AVAILABLE" :
-                    normalized.toUpperCase()
-  );
-  return `<span class="journey-status-pill journey-status-pill--${escapeHtml(normalized)}">${escapeHtml(text)}</span>`;
-}
-
-function renderJourneyRewardChips(rewards = {}) {
-  const xp = Math.max(0, Math.round(Number(rewards.xp || 0)));
-  const credits = Math.max(0, Math.round(Number(rewards.credits || 0)));
-  const chips = [];
-  if (xp > 0) chips.push(`<span class="journey-reward-chip journey-reward-chip--xp">${formatNumber(xp)} XP</span>`);
-  if (credits > 0) chips.push(`<span class="journey-reward-chip journey-reward-chip--credits">${formatNumber(credits)} CR</span>`);
-  if (!chips.length) return "";
-  return `<div class="journey-reward-chips">${chips.join("")}</div>`;
-}
-
 function renderJourneyProgressBar(current, required) {
   const percent = Math.min(100, Math.round((Math.max(0, Number(current || 0)) / Math.max(1, Number(required || 1))) * 100));
   return `<div class="journey-progress-track journey-progress-bar"><i style="width:${percent}%"></i></div>`;
 }
 
-function renderJourneyFrontierStatus() {
-  const activeChapter = getJourneyActiveChapter();
-  const activeChapterId = activeChapter?.id || "academy";
-  const requirements = getJourneyChapterRequirementSummary(activeChapterId);
-  const label = activeChapterId === "frontier" ? "Frontier Progress" : "Academy Progress";
-  const assignments = getJourneyAssignments(activeChapterId)
-    .filter(assignment => assignment.mission?.objective?.type !== "complete_missions")
-    .map(assignment => {
-      const mission = assignment.mission || MISSIONS_BY_ID[assignment.id];
-      const state = missionProgress.missions[mission.id];
-      const progress = getMissionProgressAmount(mission, state);
-      const required = getMissionRequiredAmount(mission);
-      return { assignment, progress, required, remaining: Math.max(0, required - progress) };
-    })
-    .filter(entry => entry.remaining > 0)
-    .sort((left, right) => {
-      const leftOrder = Number(left.assignment?.order || 0);
-      const rightOrder = Number(right.assignment?.order || 0);
-      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
-      return left.remaining - right.remaining;
-    });
-  const recommended = assignments[0] || null;
-  const frontierComplete = activeChapterId === "frontier" && isJourneyFrontierComplete();
-  const nextUnlock = activeChapterId === "academy"
-    ? "Chapter I: Frontier"
-    : frontierComplete
-      ? "Frontier Gateway Detected"
-      : "Chapter II: Frontier Gateway";
+function getJourneyChapterConfig(chapterId) {
+  return JOURNEY_CHAPTERS.find(chapter => chapter.id === chapterId) || null;
+}
+
+function renderJourneyChapterReward(chapterId = selectedJourneyChapterId) {
+  const chapter = getJourneyChapterConfig(chapterId);
+  const reward = chapter?.reward || {};
+  const requirements = getJourneyChapterRequirementSummary(chapterId);
+  const completed = isJourneyChapterComplete(chapterId);
+  const ready = !completed && requirements.total > 0 && requirements.complete >= requirements.total;
+  const remaining = Math.max(0, requirements.total - requirements.complete);
+  const itemRewards = Array.isArray(reward.items) ? reward.items : [];
+  const state = completed ? "completed" : ready ? "ready" : "incomplete";
+  const supportingRewards = [
+    Number(reward.credits || 0) > 0
+      ? `<li><span aria-hidden="true">CR</span><strong>${formatNumber(reward.credits)} Credits</strong></li>`
+      : "",
+    ...itemRewards.map(item => `<li><span aria-hidden="true">+</span><strong>${escapeHtml(item.name || item.key || "Item")}</strong></li>`),
+    reward.nextChapterLabel
+      ? `<li><span aria-hidden="true">&#128274;</span><strong>${escapeHtml(reward.nextChapterLabel)}</strong></li>`
+      : ""
+  ].filter(Boolean).join("");
+  const guidance = completed
+    ? "Rewards secured. This chapter is complete."
+    : ready
+      ? "All assignments complete. Finalise the chapter to receive these rewards."
+      : `Complete ${formatNumber(remaining)} remaining assignment${remaining === 1 ? "" : "s"} to unlock this reward.`;
+
   return `
-    <section class="journey-summary-panel journey-frontier-status">
-      <div class="journey-panel-head"><span>CHAPTER PROGRESS</span></div>
-      <div class="journey-summary-compact">
-        <div class="journey-summary-compact__metric">
-          <span>${escapeHtml(label)}</span>
-          <strong>${formatNumber(requirements.percent)}%</strong>
+    <section class="journey-reward-panel journey-reward-panel--${escapeHtml(state)}" data-journey-reward-state="${escapeHtml(state)}">
+      <div class="journey-panel-head">
+        <span>${escapeHtml(`${chapter?.shortLabel || "Chapter"} Chapter Reward`)}</span>
+        ${completed ? `<strong>CHAPTER COMPLETE</strong>` : ""}
+      </div>
+      <div class="journey-reward-content">
+        <div class="journey-reward-art ${reward.shipPlanId ? "journey-reward-art--blueprint" : ""}">
+          <img src="${escapeHtml(reward.shipPlanImage || getJourneyChapterRouteIcon(chapter || {}))}" alt="${escapeHtml(reward.title || chapter?.displayLabel || "Chapter reward")}">
         </div>
-        ${renderJourneyProgressBar(requirements.percent, 100)}
-        <div class="journey-summary-compact__requirements">
-          <span>Requirements Complete</span>
-          <strong>${formatNumber(requirements.complete)} / ${formatNumber(requirements.total)}</strong>
-        </div>
-        <div class="journey-summary-next">
-          <span>NEXT OBJECTIVE</span>
-          <strong>${escapeHtml(recommended?.assignment?.journeyTitle || "Chapter complete")}</strong>
-          <small>${recommended ? `${formatNumber(recommended.remaining)} of ${formatNumber(recommended.required)} remaining` : "All assignments complete"}</small>
-        </div>
-        <div class="journey-summary-unlock">
-          <span>NEXT UNLOCK</span>
-          <strong>${escapeHtml(nextUnlock)}</strong>
+        <div class="journey-reward-copy">
+          <span>${escapeHtml(reward.typeLabel || "CHAPTER REWARD")}</span>
+          <h3>${escapeHtml(reward.title || "Route Access")}</h3>
+          <ul>${supportingRewards}</ul>
         </div>
       </div>
+      <p class="journey-reward-guidance">${escapeHtml(guidance)}</p>
+      ${completed
+        ? `<div class="journey-chapter-complete-label">CHAPTER COMPLETE <span aria-hidden="true">&#10003;</span></div>`
+        : `<button type="button" class="journey-complete-chapter" onclick="completeJourneyChapter('${escapeJsString(chapterId)}')" ${ready ? "" : "disabled"}>Complete Chapter</button>`}
     </section>
   `;
+}
+
+function grantJourneyChapterItem(item) {
+  const quantity = Math.max(1, Math.floor(Number(item?.quantity || 1)));
+  const key = String(item?.key || "").trim();
+  if (!key) return;
+  if (item.category === "gun" && typeof ownedGuns === "object") {
+    ownedGuns[key] = Math.max(0, Number(ownedGuns[key] || 0)) + quantity;
+  } else if (item.category === "attachment" && typeof ownedAttachments === "object") {
+    ownedAttachments[key] = Math.max(0, Number(ownedAttachments[key] || 0)) + quantity;
+  }
+}
+
+function completeJourneyChapter(chapterId = selectedJourneyChapterId) {
+  if (journeyChapterCompletionInFlight) return false;
+  missionProgress = normalizeMissionProgress(missionProgress);
+  const chapter = getJourneyChapterConfig(chapterId);
+  const reward = chapter?.reward;
+  const requirements = getJourneyChapterRequirementSummary(chapterId);
+  const chapterState = missionProgress.chapters?.[chapterId];
+  if (!chapter || !chapterState || !reward || requirements.total < 1 || requirements.complete < requirements.total) return false;
+  if (chapterState.completed || chapterState.rewardClaimed || chapterState.rewardId === reward.id) return false;
+
+  journeyChapterCompletionInFlight = true;
+  try {
+    const completedAt = new Date().toISOString();
+    chapterState.state = "complete";
+    chapterState.completed = true;
+    chapterState.completedAt = completedAt;
+    chapterState.rewardClaimed = true;
+    chapterState.rewardClaimedAt = completedAt;
+    chapterState.rewardId = reward.id;
+
+    credits = Math.max(0, Math.round(Number(credits || 0))) + Math.max(0, Math.round(Number(reward.credits || 0)));
+    (Array.isArray(reward.items) ? reward.items : []).forEach(grantJourneyChapterItem);
+    if (reward.shipPlanId) {
+      unlockedShipPlans = Array.from(new Set([...(Array.isArray(unlockedShipPlans) ? unlockedShipPlans : []), reward.shipPlanId]));
+    }
+    if (reward.nextChapterId && missionProgress.chapters?.[reward.nextChapterId]) {
+      missionProgress.chapters[reward.nextChapterId].state = MISSION_STATE_AVAILABLE;
+    }
+
+    if (typeof addHudToast === "function") addHudToast(`${chapter.shortLabel || chapter.displayLabel} complete. Chapter rewards secured.`);
+    if (typeof addActivityLog === "function") addActivityLog(`Journey chapter complete: ${chapter.displayLabel || chapter.label}.`);
+    saveGame();
+    refreshMissionDisplays();
+    updateSpaceHUD();
+    return true;
+  } finally {
+    journeyChapterCompletionInFlight = false;
+  }
 }
 
 function renderJourneyGalaxyCompletion() {
@@ -1453,34 +1413,6 @@ function renderJourneyGalaxyCompletion() {
   `;
 }
 
-function renderJourneySummaryRow(label, value) {
-  return `
-    <div class="journey-summary-row">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value)}</strong>
-    </div>
-  `;
-}
-
-function renderJourneyProgressSummaryRow(label, value, percent = 0) {
-  return `
-    <div class="journey-summary-row journey-summary-row--progress">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value)}</strong>
-      ${renderJourneyProgressBar(percent, 100)}
-    </div>
-  `;
-}
-
-function renderJourneyRewardRow(icon, title, value) {
-  return `
-    <div class="journey-reward-row">
-      <span>${escapeHtml(icon)}</span>
-      <div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(value)}</small></div>
-    </div>
-  `;
-}
-
 function getJourneyHudObjectiveDisplay(mission = getPrimaryActiveMission()) {
   if (!mission) return null;
   missionProgress = normalizeMissionProgress(missionProgress);
@@ -1490,8 +1422,6 @@ function getJourneyHudObjectiveDisplay(mission = getPrimaryActiveMission()) {
   const ready = state?.state === MISSION_STATE_COMPLETED;
   const claimed = state?.state === MISSION_STATE_CLAIMED;
   const config = getJourneyAssignmentConfig(mission);
-  const reward = config.rewards || mission.reward || {};
-  const hasReward = Math.max(0, Number(reward.xp || 0)) > 0 || Math.max(0, Number(reward.credits || 0)) > 0;
   const chapterLabel = mission.chapter === "academy" ? "ACADEMY" : "JOURNEY";
   return {
     mission,
@@ -1502,15 +1432,13 @@ function getJourneyHudObjectiveDisplay(mission = getPrimaryActiveMission()) {
     required,
     ready,
     claimed,
-    hasReward,
+    hasReward: false,
     title: config.journeyTitle || mission.title,
     objective: config.journeyObjectiveLabel || getMissionObjectiveLabel(mission),
     status: ready || claimed ? "COMPLETE" : progress > 0 ? "IN PROGRESS" : "ACTIVE",
-    hint: ready && hasReward
-      ? "Return to Journey to claim the reward."
-      : ready || claimed
-        ? "Open Journey to review your chapter assignments."
-        : "Progress updates automatically as you play."
+    hint: ready || claimed
+      ? "Open Journey to review your chapter progress."
+      : "Progress updates automatically as you play."
   };
 }
 
