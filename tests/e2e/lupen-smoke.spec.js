@@ -1547,6 +1547,22 @@ test.describe("Lupen browser smoke", () => {
     expect(referenceLinkIndex).toBeGreaterThan(orbitLinkIndex);
   });
 
+  test("Station Store final rules live in their dedicated ordered stylesheet", async () => {
+    const indexSource = fs.readFileSync(path.join(__dirname, "../../index.html"), "utf8");
+    const baseSource = fs.readFileSync(path.join(__dirname, "../../style.css"), "utf8");
+    const storeSource = fs.readFileSync(path.join(__dirname, "../../styles/store-screen.css"), "utf8");
+    const marker = "Station Store screen ownership";
+    const baseLinkIndex = indexSource.indexOf('href="style.css');
+    const storeLinkIndex = indexSource.indexOf('href="styles/store-screen.css');
+    const orbitLinkIndex = indexSource.indexOf('href="styles/orbit-pilot-card.css');
+
+    expect(baseSource).not.toContain(marker);
+    expect(storeSource).toContain(marker);
+    expect(baseLinkIndex).toBeGreaterThanOrEqual(0);
+    expect(storeLinkIndex).toBeGreaterThan(baseLinkIndex);
+    expect(orbitLinkIndex).toBeGreaterThan(storeLinkIndex);
+  });
+
   test("browser JSON persistence access is owned by the save service", async ({ page }) => {
     const coreSource = fs.readFileSync(path.join(__dirname, "../../js/01-core-state.js"), "utf8");
     const hudSource = fs.readFileSync(path.join(__dirname, "../../js/03-hud-space-map.js"), "utf8");

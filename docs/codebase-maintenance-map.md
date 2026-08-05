@@ -37,11 +37,12 @@ not cleared with gameplay progress.
 
 ## CSS maintenance rules
 
-`style.css` remains a large historical cascade. Store, Journey, Forge, Vault,
-Hangar, and the space HUD each have multiple generations of selectors. The final
-orbit pilot-card lock now lives in `styles/orbit-pilot-card.css`, loaded directly
-after `style.css` to preserve its original position before the other shared
-stylesheets. Small UI changes should follow this sequence:
+`style.css` remains a large historical cascade. Forge, Vault, Hangar, and the
+space HUD each have multiple generations of selectors. The final Store layout
+and artwork rules now live in `styles/store-screen.css`; the orbit pilot-card
+lock follows in `styles/orbit-pilot-card.css`. Both load directly after
+`style.css` and before the other shared stylesheets. Small UI changes should
+follow this sequence:
 
 1. Find every occurrence of the selector and its surrounding media query.
 2. Identify the last active owner at the affected viewport.
@@ -76,6 +77,8 @@ change behavior even when their declarations are unchanged.
   monolith is now the staging coordination module named for that responsibility.
 - Repeated Store artwork rules and exact Journey desktop, modifier, and compact
   breakpoint duplicates have been removed.
+- The final Store viewport, catalogue sizing, and artwork-centering cascade has
+  been moved into `styles/store-screen.css` with an order regression test.
 - The final orbit pilot-card cascade has been moved into an order-preserving,
   screen-specific stylesheet with a source-order regression test.
 - Browser storage keys are centralized without changing their persisted values.

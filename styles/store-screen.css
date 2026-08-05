@@ -1,0 +1,352 @@
+/* Station Store screen ownership.
+   This file loads immediately after style.css so these final scoped rules keep
+   their historical position before shared component and screen stylesheets. */
+
+#storeScreen.hangar-prestige.active {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+}
+
+#storeScreen.hangar-prestige {
+  background:
+    linear-gradient(180deg, rgba(0, 6, 16, 0.34), rgba(0, 6, 16, 0.64)),
+    radial-gradient(circle at 45% 38%, rgba(34, 154, 255, 0.08), transparent 42%),
+    url("../assets/backgrounds/station-store-background.png") center / cover no-repeat;
+}
+
+#storeScreen .store-header-row {
+  margin-bottom: 8px;
+}
+
+#storeScreen .modern-store-topbar {
+  margin: 0 0 10px;
+}
+
+#storeScreen .modern-store-layout {
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#storeScreen .modern-store-catalog-panel,
+#storeScreen .modern-store-detail-panel {
+  min-height: 0;
+  overflow: hidden;
+}
+
+#storeScreen .modern-store-detail-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+#storeScreen .modern-store-detail-panel .modern-store-panel-header {
+  margin-bottom: 10px;
+}
+
+#storeScreen .store-detail-panel-body,
+#storeScreen .store-detail-shell {
+  min-height: 0;
+  height: 100%;
+}
+
+#storeScreen .store-detail-content {
+  overflow: hidden;
+}
+
+#storeScreen .store-buy-footer {
+  padding-top: 8px;
+}
+
+#storeScreen .simplified-store-actions button {
+  min-height: 44px;
+}
+
+#storeScreen .store-catalog-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 190px;
+  gap: 10px;
+  align-content: start;
+  overflow-y: auto;
+  padding: 0 10px 10px 0;
+  scroll-padding-bottom: 10px;
+}
+
+#storeScreen .store-catalog-card {
+  height: 190px !important;
+  min-height: 190px !important;
+  max-height: 190px !important;
+  display: grid;
+  grid-template-rows: 14px 78px 26px 12px 20px 14px;
+  gap: 2px;
+  align-items: center;
+  justify-items: center;
+  align-content: start;
+  justify-content: stretch;
+  padding: 7px 8px;
+  text-align: center;
+}
+
+#storeScreen .store-card-status {
+  position: static;
+  grid-row: 1;
+  justify-self: end;
+  align-self: center;
+  max-width: 76px;
+  min-height: 13px;
+  padding: 2px 6px;
+  font-size: 0.54rem;
+  line-height: 1;
+}
+
+#storeScreen .store-catalog-card:not(:has(.store-card-status))::before {
+  content: "";
+  grid-row: 1;
+  display: block;
+  width: 1px;
+  height: 13px;
+}
+
+#storeScreen .modern-store-catalog-panel .store-card-art {
+  width: 160px;
+  height: 78px;
+  margin: 0 auto;
+  grid-row: 2;
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+}
+
+#storeScreen .modern-store-catalog-panel .store-card-art img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  object-position: center;
+}
+
+#storeScreen .daily-stock-card .store-card-art,
+#storeScreen .store-catalog-card.quality-core .store-card-art {
+  width: 160px;
+  height: 78px;
+  margin: 0 auto;
+}
+
+#storeScreen .daily-stock-card .store-card-art img,
+#storeScreen .store-catalog-card.quality-core .store-card-art img {
+  transform: none;
+}
+
+#storeScreen .store-card-name,
+#storeScreen .store-catalog-card .store-card-sub,
+#storeScreen .store-card-stock,
+#storeScreen .store-card-price {
+  align-self: center;
+  justify-self: center;
+  width: 100%;
+  text-align: center;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+#storeScreen .store-card-name {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  font-size: 0.74rem;
+  line-height: 1.04;
+  grid-row: 3;
+}
+
+#storeScreen .store-catalog-card .store-card-sub,
+#storeScreen .store-card-stock {
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+#storeScreen .store-catalog-card.progression-locked .store-card-stock {
+  display: grid;
+  place-items: center;
+  font-size: 0.5rem;
+  line-height: 1.05;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+#storeScreen .store-catalog-card .store-card-sub {
+  grid-row: 4;
+}
+
+#storeScreen .store-card-stock {
+  grid-row: 5;
+}
+
+#storeScreen .store-card-price {
+  align-self: end;
+  font-size: 0.68rem;
+  line-height: 1;
+  grid-row: 6;
+}
+
+#storeScreen .store-catalog-card.quality-core,
+#storeScreen .store-quality-core .store-detail-visual {
+  border-color: rgba(205, 164, 255, 0.52);
+  box-shadow:
+    inset 0 0 14px rgba(205, 164, 255, 0.07),
+    0 0 14px rgba(94, 211, 255, 0.08);
+}
+
+#storeScreen .store-catalog-card.quality-core .store-card-art::after,
+#storeScreen .store-quality-core .store-detail-visual::after {
+  inset: 18%;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 54deg,
+      rgba(205, 164, 255, 0.58) 61deg,
+      transparent 68deg,
+      transparent 176deg,
+      rgba(94, 211, 255, 0.42) 184deg,
+      transparent 192deg,
+      transparent 360deg
+    );
+  filter: drop-shadow(0 0 6px rgba(205, 164, 255, 0.32));
+  opacity: 0.5;
+  animation: lupenCoreStoreShimmer 7.8s linear infinite;
+}
+
+#storeScreen .store-catalog-card.quality-core .store-card-art::before,
+#storeScreen .store-quality-core .store-detail-visual::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(205, 164, 255, 0.14), transparent 58%),
+    linear-gradient(115deg, transparent 43%, rgba(94, 211, 255, 0.2) 49%, transparent 56%);
+  opacity: 0.34;
+  transform: translateX(-14%) rotate(0.001deg);
+  animation: lupenCoreStoreGlint 6.2s ease-in-out infinite;
+}
+
+@keyframes lupenCoreStoreShimmer {
+  0% { transform: rotate(0deg) scale(0.98); }
+  50% { transform: rotate(180deg) scale(1.02); }
+  100% { transform: rotate(360deg) scale(0.98); }
+}
+
+@keyframes lupenCoreStoreGlint {
+  0%, 74%, 100% {
+    opacity: 0.18;
+    transform: translateX(-18%) rotate(0.001deg);
+  }
+
+  82% {
+    opacity: 0.42;
+    transform: translateX(18%) rotate(0.001deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #storeScreen .store-catalog-card.quality-core .store-card-art::before,
+  #storeScreen .store-quality-core .store-detail-visual::before,
+  #storeScreen .store-catalog-card.quality-core .store-card-art::after,
+  #storeScreen .store-quality-core .store-detail-visual::after {
+    animation: none !important;
+  }
+}
+
+/* Store artwork centering and scale. */
+#storeScreen .store-card-art,
+#storeScreen .store-detail-visual {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: visible !important;
+  border-radius: 8px !important;
+}
+
+#storeScreen .store-card-art .quality-fx,
+#storeScreen .store-detail-visual .quality-fx {
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  transform: none !important;
+}
+
+#storeScreen .store-card-art .quality-fx__item,
+#storeScreen .store-detail-visual .quality-fx__item {
+  display: block !important;
+  object-fit: contain !important;
+  object-position: 50% 50% !important;
+  margin: auto !important;
+  transform-origin: 50% 50% !important;
+}
+
+#storeScreen .store-card-art .quality-fx__item {
+  width: 120px !important;
+  height: 120px !important;
+  max-width: 120px !important;
+  max-height: 120px !important;
+  transform: translate3d(0, -24px, 0) !important;
+}
+
+#storeScreen .store-art-material .quality-fx__item,
+#storeScreen .store-art-core .quality-fx__item {
+  width: 76% !important;
+  height: 76% !important;
+}
+
+#storeScreen .store-art-lupenShards .quality-fx__item {
+  width: 72% !important;
+  height: 72% !important;
+}
+
+#storeScreen .simplified-store-detail .store-detail-visual {
+  min-height: 152px !important;
+  max-height: 152px !important;
+}
+
+#storeScreen .store-detail-visual .quality-fx__item {
+  width: 190px !important;
+  height: 190px !important;
+  max-width: 280px !important;
+  max-height: 190px !important;
+  transform: translate3d(0, -8px, 0) !important;
+}
+
+#storeScreen .store-detail-visual.store-art-material .quality-fx__item,
+#storeScreen .store-detail-visual.store-art-core .quality-fx__item {
+  width: 88% !important;
+  height: 88% !important;
+  max-width: 156px !important;
+  max-height: 124px !important;
+}
+
+#storeScreen .store-detail-visual.store-art-lupenShards .quality-fx__item {
+  width: 82% !important;
+  height: 82% !important;
+  max-width: 142px !important;
+  max-height: 116px !important;
+}
+
+#storeScreen .store-art-lupenCore,
+#storeScreen .store-art-lupenShards {
+  background:
+    radial-gradient(circle at 50% 47%, rgba(255, 255, 255, 0.09), transparent 36%),
+    linear-gradient(180deg, rgba(98, 207, 255, 0.07), rgba(160, 118, 255, 0.05)) !important;
+}
+
+#storeScreen .store-art-lupenCore .quality-fx__ring,
+#storeScreen .store-art-lupenShards .quality-fx__ring,
+#storeScreen .store-art-lupenCore .quality-fx__storm,
+#storeScreen .store-art-lupenShards .quality-fx__storm {
+  opacity: 0.26 !important;
+}
