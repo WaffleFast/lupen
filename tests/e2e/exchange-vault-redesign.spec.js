@@ -23,31 +23,6 @@ async function openHangarSection(page, section, setup = "") {
   })()`), { section, setup });
 }
 
-async function getVisibleShipArtHeights(page, selector) {
-  return page.locator(selector).evaluateAll(async images => Promise.all(images.map(async image => {
-    if (!image.complete) await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    context.drawImage(image, 0, 0);
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    let minY = canvas.height;
-    let maxY = -1;
-    for (let y = 0; y < canvas.height; y += 1) {
-      for (let x = 0; x < canvas.width; x += 1) {
-        if (pixels[((y * canvas.width) + x) * 4 + 3] > 12) {
-          minY = Math.min(minY, y);
-          maxY = Math.max(maxY, y);
-        }
-      }
-    }
-    const style = getComputedStyle(image);
-    const matrix = new DOMMatrixReadOnly(style.transform);
-    return Number.parseFloat(style.height) * ((maxY - minY + 1) / image.naturalHeight) * matrix.a;
-  })));
-}
-
 test.describe("Hangar Exchange and Vault redesign", () => {
   test("presents the Vessel Exchange as a compact hull catalogue and purchase workspace", async ({ page }) => {
     await page.setViewportSize({ width: 1365, height: 822 });
@@ -57,6 +32,7 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     await expect(page.locator("#hangarShipyardSection .shipyard-title-row")).toContainText("Select an available hull");
     await expect(page.locator("#shipyardCreditText")).toHaveText("250,000");
     await expect(page.locator("#shipShop .vessel-exchange-card")).toHaveCount(3);
+    await expect(page.locator("#shipShop .vessel-exchange-card img")).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => ({
       falcon: SHIPS.falcon.price,
       bison: SHIPS.bison.price,
@@ -87,13 +63,14 @@ test.describe("Hangar Exchange and Vault redesign", () => {
       return {
         columns: Boolean(catalogue && workspace && catalogue.right < workspace.left),
         cardsFit: Boolean(catalogue && cards.every(card => card.top >= catalogue.top - 1 && card.bottom <= catalogue.bottom + 1)),
-        artFits: Boolean(presentation && art && art.left >= presentation.left - 1 && art.right <= presentation.right + 1 && art.top >= presentation.top - 1 && art.bottom <= presentation.bottom + 1)
+        artFits: Boolean(presentation && art && art.left >= presentation.left - 1 && art.right <= presentation.right + 1 && art.top >= presentation.top - 1 && art.bottom <= presentation.bottom + 1),
+        presentationWidthRatio: presentation && workspace ? presentation.width / workspace.width : 0
       };
     });
-    expect(layout).toEqual({ columns: true, cardsFit: true, artFits: true });
-
-    const visibleCardHeights = await getVisibleShipArtHeights(page, "#shipShop .vessel-exchange-card img");
-    expect(Math.max(...visibleCardHeights) - Math.min(...visibleCardHeights)).toBeLessThan(1.5);
+    expect(layout.columns).toBe(true);
+    expect(layout.cardsFit).toBe(true);
+    expect(layout.artFits).toBe(true);
+    expect(layout.presentationWidthRatio).toBeGreaterThan(0.9);
 
     await page.mouse.move(10, 10);
     await page.screenshot({ path: "artifacts/vessel-exchange-redesign.png", fullPage: false });

@@ -33,6 +33,7 @@ test.describe("Hangar Fleet roster", () => {
     await expect(page.locator("#ownedShipsList .fleet-roster-card")).toHaveCount(1);
     await expect(page.locator("#ownedShipsList .fleet-roster-card")).toHaveClass(/active/);
     await expect(page.locator("#ownedShipsList .fleet-roster-card")).toHaveClass(/selected/);
+    await expect(page.locator("#ownedShipsList .fleet-roster-card img")).toHaveCount(0);
     await expect(page.locator("#fleetDetailPanel .fleet-selected-identity")).toContainText("Pioneer Hunter");
     await expect(page.locator("#fleetDetailPanel .fleet-selected-status")).toContainText("Active");
     await expect(page.locator("#fleetDetailPanel .exchange-detail-stat-grid .fleet-stat-chip")).toHaveCount(6);
@@ -45,16 +46,19 @@ test.describe("Hangar Fleet roster", () => {
       const image = frame.querySelector("img");
       if (!image) return { fits: false };
       const outer = frame.getBoundingClientRect();
+      const hero = frame.closest(".fleet-selected-hero")?.getBoundingClientRect();
       const art = image.getBoundingClientRect();
       const style = getComputedStyle(image);
       return {
         fits: art.left >= outer.left - 1 && art.right <= outer.right + 1 && art.top >= outer.top - 1 && art.bottom <= outer.bottom + 1,
+        widthRatio: hero ? outer.width / hero.width : 0,
         outer: { left: outer.left, right: outer.right, top: outer.top, bottom: outer.bottom, width: outer.width, height: outer.height },
         art: { left: art.left, right: art.right, top: art.top, bottom: art.bottom, width: art.width, height: art.height },
         style: { width: style.width, height: style.height, maxWidth: style.maxWidth, maxHeight: style.maxHeight, transform: style.transform }
       };
     });
     expect(presentationGeometry.fits).toBe(true);
+    expect(presentationGeometry.widthRatio).toBeGreaterThan(0.9);
 
     await page.screenshot({ path: "artifacts/fleet-roster-single.png", fullPage: false });
     await page.locator("#fleetDetailPanel .fleet-management-primary").click();
@@ -81,6 +85,7 @@ test.describe("Hangar Fleet roster", () => {
     })()`));
 
     await expect(page.locator("#ownedShipsList .fleet-roster-card")).toHaveCount(4);
+    await expect(page.locator("#ownedShipsList .fleet-roster-card img")).toHaveCount(0);
     await expect(page.locator("#fleetCountText")).toHaveText("4");
     await expect(page.locator("#fleetCountLabel")).toHaveText("vessels owned");
 
