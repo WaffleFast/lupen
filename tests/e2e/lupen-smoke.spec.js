@@ -7021,32 +7021,23 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#upgradeForgeScreen")).toHaveClass(/active/);
     await expect(page.locator("#upgradeForgeScreen")).toContainText("LUPEN FORGE");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Improve owned weapons and modules with Lupen Shards.");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Choose gear, review the next level, then upgrade when you have enough shards.");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Owned Gear");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade Preview");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("Upgrade");
     await expect(page.locator("#upgradeForgeScreen")).toContainText("Lupen Shards");
-    await expect(page.locator("#upgradeForgeScreen")).toContainText("Need 15 More Shards");
-    await expect(page.locator("#forgeMaterialsList")).toContainText("Balance 10");
-    await expect(page.locator("#forgeMaterialsList")).toContainText("Still needed 15");
-    await expect(page.locator("#forgeMaterialsList")).toContainText("Next-Level Comparison");
+    await expect(page.locator("#upgradeForgeScreen")).toContainText("15 More Shards Required");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Current balance: 10");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Next Upgrade");
     await expect(page.locator("#forgeTierLegend")).toContainText("Common");
     await expect(page.locator("#forgeTierLegend")).toContainText("Refined");
     await expect(page.locator("#forgeTierLegend")).toContainText("Unique");
     await expect(page.locator("#forgeTierLegend")).toContainText("Elite");
     await expect(page.locator("#forgeTierLegend")).toContainText("Super");
-    await expect(page.locator("#forgeTierLegend .forge-tier-legend-item")).toHaveCount(5);
+    await expect(page.locator("#forgeTierLegend .forge-tier-legend-item")).toHaveCount(6);
+    await expect(page.locator("#forgeTierLegend .forge-tier-legend-item").first()).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#upgradeForgeScreen")).not.toContainText(/Quality Upgrade|Lupen Core|Lupen Cores/);
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
     await expect(page.locator("#forgeSelectedPanel")).toBeVisible();
-    await expect(page.locator("#forgeScrollThumb")).toBeVisible();
-    await expect(page.locator("#forgeScrollDownBtn")).toBeEnabled();
     await expect(page.locator("#forgePreviewOutput")).toContainText("Common to Refined");
-    await expect(page.locator("#forgePowerSignature")).toBeVisible();
-    await expect(page.locator("#forgePowerText")).toHaveText("1 / 5");
-    await expect(page.locator("#forgeEnergyBadge")).toBeVisible();
-    await expect(page.locator("#forgeEnergyBadge")).toContainText("Base");
-    await expect(page.locator("#forgeChamber .forge-energy-orbit")).toHaveCount(2);
-    await expect.poll(() => page.locator("#forgeChamber .forge-energy-orbit").first().evaluate((orbit) => getComputedStyle(orbit).animationName)).toBe("none");
 
     const forgeTierModel = await page.evaluate(() => window.eval(`
       [1, 2, 3, 4, 5].map(level => ({
@@ -7065,8 +7056,14 @@ test.describe("Lupen browser smoke", () => {
     ]);
     const selectedCommonItem = page.locator("#forgeSelectedPanel .forge-owned-item.selected");
     await expect(selectedCommonItem).toHaveClass(/forge-tier-common/);
-    await expect(selectedCommonItem.locator(".forge-tier-pips i")).toHaveCount(1);
-    await expect(page.locator("#forgeSelectedTier")).toContainText("Common · Level I");
+    await expect(selectedCommonItem.locator(".forge-tier-diamond")).toHaveCount(1);
+    await expect(page.locator("#forgeSelectedTier")).toContainText(/Common.*Level I/);
+
+    await page.getByRole("button", { name: /^Refined/ }).click();
+    await expect(page.getByRole("button", { name: /^Refined/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#forgeSelectedPanel .forge-owned-item")).toHaveCount(2);
+    await expect(page.locator("#forgeSelectedPanel .forge-owned-item").first()).toHaveClass(/forge-tier-refined/);
+    await page.getByRole("button", { name: /^All/ }).click();
 
     const ownedListBefore = await page.locator("#forgeSelectedPanel").evaluate((list) => {
       const screen = document.getElementById("upgradeForgeScreen");
@@ -7083,12 +7080,6 @@ test.describe("Lupen browser smoke", () => {
     expect(ownedListBefore.scrollHeight).toBeGreaterThan(ownedListBefore.clientHeight + 20);
     expect(ownedListBefore.overflowY).toMatch(/auto|scroll/);
     expect(ownedListBefore.bottom).toBeLessThanOrEqual(ownedListBefore.viewportHeight);
-
-    await page.locator("#forgeScrollDownBtn").click();
-    await page.waitForFunction(() => document.getElementById("forgeSelectedPanel")?.scrollTop > 0);
-    await page.locator("#forgeSelectedPanel").evaluate((list) => {
-      list.scrollTop = 0;
-    });
 
     await page.locator("#forgeSelectedPanel").evaluate((list) => {
       list.scrollTop = list.scrollHeight;
@@ -7132,8 +7123,8 @@ test.describe("Lupen browser smoke", () => {
       renderUpgradeForge();
     `));
     await expect(page.locator("#forgeStartBtn")).toBeEnabled();
-    await expect(page.locator("#forgeStartBtn")).toContainText("Upgrade to Refined · Level II");
-    await expect(page.locator("#forgeMaterialsList")).toContainText("After upgrade 0");
+    await expect(page.locator("#forgeStartBtn")).toContainText("Upgrade to Level II");
+    await expect(page.locator("#forgeMaterialsList")).toContainText("Balance after upgrade: 0");
     const forgeGeometry = await page.evaluate(() => {
       const screen = document.getElementById("upgradeForgeScreen")?.getBoundingClientRect();
       const listPanel = document.querySelector("#upgradeForgeScreen .forge-owned-panel")?.getBoundingClientRect();
@@ -7161,21 +7152,17 @@ test.describe("Lupen browser smoke", () => {
     const upgraded = await page.evaluate(() => window.eval(`({
       level: getEquipmentLevel(shipLoadouts.falcon.guns[0]),
       shards: upgradeMaterials.lupenShards,
-      previewText: document.querySelector("#upgradeForgeScreen")?.textContent || "",
-      powerText: document.getElementById("forgePowerText")?.textContent?.trim() || "",
-      energyBadge: document.getElementById("forgeEnergyBadge")?.textContent?.trim() || ""
+      previewText: document.querySelector("#upgradeForgeScreen")?.textContent || ""
     })`));
     expect(upgraded.level).toBe(2);
     expect(upgraded.shards).toBe(0);
     expect(upgraded.previewText).toContain("Level II");
     expect(upgraded.previewText).toContain("Refined");
     expect(upgraded.previewText).toContain("Not enough Lupen Shards");
-    expect(upgraded.powerText).toBe("2 / 5");
-    expect(upgraded.energyBadge).toContain("Refined");
     const selectedRefinedItem = page.locator("#forgeSelectedPanel .forge-owned-item.selected");
     await expect(selectedRefinedItem).toHaveClass(/forge-tier-refined/);
-    await expect(selectedRefinedItem.locator(".forge-tier-pips i")).toHaveCount(2);
-    await expect(page.locator("#forgeSelectedTier")).toContainText("Refined · Level II");
+    await expect(selectedRefinedItem.locator(".forge-tier-diamond")).toHaveCount(1);
+    await expect(page.locator("#forgeSelectedTier")).toContainText(/Refined.*Level II/);
     await expect(page.locator("#gameRewardBurst")).toHaveClass(/active/);
     await expect(page.locator("#gameRewardBurst")).toContainText("Forge Upgrade Complete");
     await expect(page.locator("#gameRewardBurst")).toContainText("Refined tier reached · Level II");
@@ -7189,7 +7176,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#forgeMaterialsList")).toContainText("Elite");
     await expect(page.locator("#forgeMaterialsList")).toContainText("Level IV");
     await expect(page.locator("#forgeStartBtn")).toBeEnabled();
-    await expect(page.locator("#forgeStartBtn")).toContainText("Upgrade to Elite · Level IV");
+    await expect(page.locator("#forgeStartBtn")).toContainText("Upgrade to Level IV");
 
     await page.evaluate(() => window.eval(`
       shipLoadouts.falcon.guns[0] = makeLeveledLoadoutEntry("pulseLaser", "standard", 5);
@@ -7199,24 +7186,16 @@ test.describe("Lupen browser smoke", () => {
     `));
     await expect(page.locator("#gameRewardBurst")).not.toHaveClass(/active/);
     await expect(page.locator("#forgeStatePreview")).toContainText("Maximum Forge level reached.");
-    await expect(page.locator("#forgeSelectedTier")).toContainText("Super · Level V");
+    await expect(page.locator("#forgeSelectedTier")).toContainText(/Super.*Level V/);
     await expect(page.locator("#forgeSelectedPanel .forge-owned-item.selected")).toHaveClass(/forge-tier-super/);
-    await expect(page.locator("#forgeSelectedPanel .forge-owned-item.selected .forge-tier-pips i")).toHaveCount(5);
-    await expect(page.locator("#forgePowerText")).toHaveText("5 / 5");
-    await expect(page.locator("#forgeEnergyBadge")).toContainText("Super");
+    await expect(page.locator("#forgeSelectedPanel .forge-owned-item.selected .forge-tier-diamond")).toHaveCount(1);
     await expect(page.locator("#forgeStartBtn")).toBeDisabled();
     await expect(page.locator("#forgeStartBtn")).toContainText("Maximum Level");
     await expect(page.locator("#forgeMaterialsList")).toContainText("Upgrade Status");
     await expect(page.locator("#forgeMaterialsList")).toContainText("No further upgrades");
     await expect(page.locator("#forgeMaterialsList")).not.toContainText("Upgrade Cost");
-    const superTierFx = await page.locator("#forgeChamber").evaluate((chamber) => ({
-      itemAnimation: getComputedStyle(chamber.querySelector(".forge-chamber-item")).animationName,
-      orbitAnimation: getComputedStyle(chamber.querySelector(".forge-energy-orbit")).animationName,
-      glow: getComputedStyle(chamber.querySelector(".forge-chamber-item")).filter
-    }));
-    expect(superTierFx.itemAnimation).toContain("forgeItemEnergyPulse");
-    expect(superTierFx.orbitAnimation).toContain("forgeEnergyOrbit");
-    expect(superTierFx.glow).toContain("drop-shadow");
+    const maximumItemAnimation = await page.locator("#forgePreviewImage").evaluate(image => getComputedStyle(image).animationName);
+    expect(maximumItemAnimation).toBe("none");
     await page.locator("#upgradeForgeScreen").screenshot({ path: "artifacts/forge-player-facing-maximum-1366x768.png" });
 
     await page.evaluate(() => window.eval(`

@@ -1337,6 +1337,7 @@ let forgeAnimating = false;
 let forgeCelebrationUntil = 0;
 let forgeInventoryPickerOpen = false;
 let forgeInventoryPickerFilter = "all";
+let forgeOwnedTierFilter = "all";
 
 function titleCaseQuality(value) {
   if (value === LUPEN_CORE_QUALITY) return "Lupen Core";

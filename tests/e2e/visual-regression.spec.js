@@ -34,7 +34,8 @@ test.beforeEach(async ({ page }) => {
     typeof window.openJourney === "function" &&
     typeof window.openMarketplace === "function" &&
     typeof window.openStore === "function" &&
-    typeof window.openHangar === "function"
+    typeof window.openHangar === "function" &&
+    typeof window.openUpgradeForge === "function"
   );
   await page.evaluate(() => {
     localStorage.clear();
@@ -158,6 +159,54 @@ test("Station Store desktop baseline", async ({ page }) => {
   });
   await prepareScreenshot(page, "#storeScreen");
   await expectDesktopBaseline(page, "station-store-desktop.png");
+});
+
+test("Lupen Forge desktop baseline", async ({ page }) => {
+  await page.evaluate(() => {
+    upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 110 });
+    forgeOwnedTierFilter = "all";
+    selectedForgeItemId = "owned:attachments:cargoPod";
+    openUpgradeForge();
+  });
+  await prepareScreenshot(page, "#upgradeForgeScreen");
+  await expectDesktopBaseline(page, "lupen-forge-desktop.png");
+});
+
+test("Lupen Forge keeps both workstation panels in view on desktop", async ({ page }) => {
+  await page.evaluate(() => {
+    upgradeMaterials = normalizeUpgradeMaterials({ lupenShards: 110 });
+    forgeOwnedTierFilter = "all";
+    selectedForgeItemId = "owned:attachments:cargoPod";
+    openUpgradeForge();
+  });
+
+  for (const viewport of [
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1600, height: 1000 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await prepareScreenshot(page, "#upgradeForgeScreen");
+    const geometry = await page.evaluate(() => {
+      const screen = document.getElementById("upgradeForgeScreen")?.getBoundingClientRect();
+      const owned = document.querySelector("#upgradeForgeScreen .forge-owned-panel")?.getBoundingClientRect();
+      const upgrade = document.querySelector("#upgradeForgeScreen .forge-detail-panel")?.getBoundingClientRect();
+      const action = document.getElementById("forgeStartBtn")?.getBoundingClientRect();
+      if (!screen || !owned || !upgrade || !action) return null;
+      return {
+        ownedFits: owned.top >= screen.top && owned.bottom <= screen.bottom + 1,
+        upgradeFits: upgrade.top >= screen.top && upgrade.bottom <= screen.bottom + 1,
+        actionFits: action.top >= upgrade.top && action.bottom <= upgrade.bottom + 1,
+        pageOverflow: document.documentElement.scrollHeight > window.innerHeight + 1
+      };
+    });
+    expect(geometry).toEqual({
+      ownedFits: true,
+      upgradeFits: true,
+      actionFits: true,
+      pageOverflow: false
+    });
+  }
 });
 
 test("Hangar Loadout desktop baseline", async ({ page }) => {

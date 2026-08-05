@@ -44,11 +44,45 @@ function renderForgeTierPips(level, className = "") {
   return `<span class="forge-tier-pips ${className}" role="img" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(getForgeItemLevelRoman(safeLevel))}">${pips}</span>`;
 }
 
-function renderForgeTierLegend() {
-  return Object.keys(FORGE_LEVEL_TIERS).map(level => {
-    const tier = getForgeLevelTier(level);
-    return `<span class="forge-tier-legend-item forge-tier-scope ${getForgeTierClass(level)}">${renderForgeTierPips(level)}<strong>${escapeHtml(tier.label)}</strong></span>`;
+function renderForgeTierLegend(items = getForgeUpgradeableItems()) {
+  const filters = [
+    { key: "all", label: "All", level: null },
+    ...Object.keys(FORGE_LEVEL_TIERS).map(level => ({
+      key: getForgeLevelTier(level).key,
+      label: getForgeLevelTier(level).label,
+      level: Number(level)
+    }))
+  ];
+
+  return filters.map(filter => {
+    const count = filter.level === null
+      ? items.length
+      : items.filter(item => getForgeItemLevel(item) === filter.level).length;
+    const active = forgeOwnedTierFilter === filter.key;
+    const tierClass = filter.level === null ? "forge-tier-all" : getForgeTierClass(filter.level);
+    return `
+      <button type="button" class="forge-tier-legend-item forge-tier-scope ${tierClass} ${active ? "active" : ""}" aria-pressed="${active}" onclick="setForgeOwnedTierFilter('${filter.key}')">
+        ${filter.level === null ? "" : `<i class="forge-tier-diamond" aria-hidden="true"></i>`}
+        <strong>${escapeHtml(filter.label)}</strong>
+        <span class="forge-filter-count">${formatNumber(count)}</span>
+      </button>
+    `;
   }).join("");
+}
+
+function getForgeOwnedTierItems(items = getForgeUpgradeableItems()) {
+  if (forgeOwnedTierFilter === "all") return items;
+  return items.filter(item => getForgeLevelTier(getForgeItemLevel(item)).key === forgeOwnedTierFilter);
+}
+
+function setForgeOwnedTierFilter(filter = "all") {
+  const allowed = new Set(["all", ...Object.values(FORGE_LEVEL_TIERS).map(tier => tier.key)]);
+  forgeOwnedTierFilter = allowed.has(filter) ? filter : "all";
+  const visibleItems = getForgeOwnedTierItems();
+  if (visibleItems.length && !visibleItems.some(item => item.id === selectedForgeItemId)) {
+    selectedForgeItemId = visibleItems[0].id;
+  }
+  renderUpgradeForge();
 }
 
 function getForgeTotalPilotXp() {
@@ -334,45 +368,6 @@ function selectForgeItem(itemId) {
   selectedForgeItemId = itemId;
   forgeInventoryPickerOpen = false;
   renderUpgradeForge();
-}
-
-function updateForgeScrollIndicator() {
-  const panel = document.getElementById("forgeSelectedPanel");
-  const track = document.getElementById("forgeScrollTrack");
-  const thumb = document.getElementById("forgeScrollThumb");
-  if (!panel || !track || !thumb) return;
-
-  const maxScroll = Math.max(0, panel.scrollHeight - panel.clientHeight);
-  const trackHeight = Math.max(0, track.clientHeight);
-  const thumbHeight = maxScroll > 0
-    ? Math.max(38, Math.round(trackHeight * (panel.clientHeight / panel.scrollHeight)))
-    : trackHeight;
-  const thumbTravel = Math.max(0, trackHeight - thumbHeight);
-  const thumbOffset = maxScroll > 0 ? Math.round((panel.scrollTop / maxScroll) * thumbTravel) : 0;
-
-  thumb.style.height = `${thumbHeight}px`;
-  thumb.style.transform = `translateY(${thumbOffset}px)`;
-  track.disabled = maxScroll <= 0;
-  document.getElementById("forgeScrollUpBtn")?.toggleAttribute("disabled", panel.scrollTop <= 0);
-  document.getElementById("forgeScrollDownBtn")?.toggleAttribute("disabled", panel.scrollTop >= maxScroll - 1);
-}
-
-function scrollForgeInventory(direction = 1) {
-  const panel = document.getElementById("forgeSelectedPanel");
-  if (!panel) return;
-  panel.scrollBy({
-    top: Math.sign(Number(direction) || 1) * Math.max(96, Math.round(panel.clientHeight * 0.72)),
-    behavior: "smooth"
-  });
-}
-
-function setForgeInventoryScrollFromTrack(event) {
-  const panel = document.getElementById("forgeSelectedPanel");
-  const track = document.getElementById("forgeScrollTrack");
-  if (!panel || !track || track.disabled) return;
-  const bounds = track.getBoundingClientRect();
-  const ratio = Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height)));
-  panel.scrollTo({ top: ratio * Math.max(0, panel.scrollHeight - panel.clientHeight), behavior: "smooth" });
 }
 
 function openForgeInventoryPicker() {
@@ -733,13 +728,15 @@ function startForgeUpgrade() {
   }, 1200);
 }
 
-function renderForgeSelectedPanel(item, items = getForgeUpgradeableItems()) {
+function renderForgeSelectedPanel(item, items = getForgeUpgradeableItems(), totalCount = items.length) {
   const panel = document.getElementById("forgeSelectedPanel");
   const count = document.getElementById("forgeOwnedCount");
   if (!panel) return;
-  if (count) count.textContent = `${formatNumber(items.length)} Owned ${items.length === 1 ? "Item" : "Items"}`;
+  if (count) count.textContent = `${formatNumber(totalCount)} ${totalCount === 1 ? "item" : "items"}`;
   if (!items.length) {
-    panel.innerHTML = `<div class="terminal-empty-state"><strong>No gear available</strong><span>Buy a weapon or module at the Station Store, then return here to improve it.</span></div>`;
+    panel.innerHTML = totalCount
+      ? `<div class="terminal-empty-state"><strong>No ${escapeHtml(titleCaseQuality(forgeOwnedTierFilter))} gear</strong><span>Choose another Forge tier to see your owned equipment.</span></div>`
+      : `<div class="terminal-empty-state"><strong>No gear available</strong><span>Buy a weapon or module at the Station Store, then return here to improve it.</span></div>`;
     return;
   }
 
@@ -749,22 +746,23 @@ function renderForgeSelectedPanel(item, items = getForgeUpgradeableItems()) {
     const selected = entry.id === item?.id;
     const level = getForgeItemLevel(entry);
     const tier = getForgeLevelTier(level);
-    const typeLabel = entry.categoryKey === "guns" ? "Weapon" : "Module";
     const sourceLabel = entry.source === "equipped" ? "Equipped" : "Vault";
-    const sourceChip = `<span class="${entry.source === "equipped" ? "equipped" : "vault"}">${sourceLabel}</span>`;
+    const primaryStat = getVisibleItemStats(entry)[0];
+    const primaryStatText = primaryStat
+      ? `${primaryStat.value} ${primaryStat.label.toLowerCase()}`
+      : (definition?.description || "Upgradeable ship equipment.");
     return `
       <button type="button" class="forge-owned-item forge-tier-scope ${getForgeTierClass(level)} ${selected ? "selected" : ""}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(definition?.name || entry.key)}, ${escapeHtml(tier.label)} tier, Level ${escapeHtml(getForgeItemLevelRoman(level))}" onclick="selectForgeItem('${escapeJsString(entry.id)}')">
         <span class="forge-owned-art">
           <img src="${escapeHtml(definition?.image || "assets/items/lupen-shard.png")}" alt="${escapeHtml(definition?.name || entry.key)}">
-          ${renderForgeTierPips(level)}
         </span>
         <span class="forge-owned-copy">
           <strong>${escapeHtml(definition?.name || getForgeItemDisplayName(entry))}</strong>
-          <small>${escapeHtml(definition?.description || "Upgradeable ship equipment.")}</small>
+          <small>${escapeHtml(primaryStatText)}</small>
           <span class="forge-owned-tags">
-            <span>${typeLabel}</span>
-            ${sourceChip}
-            <span class="forge-tier-tag">${escapeHtml(tier.label)} · Level ${escapeHtml(getForgeItemLevelRoman(level))}</span>
+            <span class="forge-tier-tag"><i class="forge-tier-diamond" aria-hidden="true"></i>${escapeHtml(tier.label)}</span>
+            <span>Level ${escapeHtml(getForgeItemLevelRoman(level))}</span>
+            <span class="${entry.source === "equipped" ? "equipped" : "vault"}">${sourceLabel}</span>
           </span>
         </span>
         <span class="forge-owned-chevron" aria-hidden="true">&rsaquo;</span>
@@ -772,8 +770,6 @@ function renderForgeSelectedPanel(item, items = getForgeUpgradeableItems()) {
     `;
   }).join("");
   panel.scrollTop = previousScrollTop;
-  panel.onscroll = updateForgeScrollIndicator;
-  requestAnimationFrame(updateForgeScrollIndicator);
 }
 
 function renderForgeInventoryPicker(items) {
@@ -835,13 +831,10 @@ function renderForgeChamber(item, requirements) {
   const chamber = document.getElementById("forgeChamber");
   const selectedName = document.getElementById("forgeSelectedName");
   const selectedType = document.getElementById("forgeSelectedType");
+  const selectedSource = document.getElementById("forgeSelectedSource");
   const selectedTier = document.getElementById("forgeSelectedTier");
   const selectedDescription = document.getElementById("forgeSelectedDescription");
   const previewOutput = document.getElementById("forgePreviewOutput");
-  const powerSignature = document.getElementById("forgePowerSignature");
-  const powerFill = document.getElementById("forgePowerFill");
-  const powerText = document.getElementById("forgePowerText");
-  const energyBadge = document.getElementById("forgeEnergyBadge");
   const showcase = chamber?.closest(".forge-showcase");
   if (!image || !state || !chamber) return;
   if (!item) {
@@ -849,16 +842,12 @@ function renderForgeChamber(item, requirements) {
     if (showcase) showcase.className = "forge-showcase forge-tier-scope forge-tier-common";
     if (selectedName) selectedName.textContent = "Select Gear";
     if (selectedType) selectedType.textContent = "No Selection";
+    if (selectedSource) selectedSource.hidden = true;
     if (selectedTier) selectedTier.textContent = "Common · Level I";
     if (selectedDescription) selectedDescription.textContent = "Choose an owned item to inspect its next upgrade.";
     if (previewOutput) previewOutput.textContent = "Awaiting Selection";
-    if (powerSignature) powerSignature.setAttribute("aria-label", "Forge energy level 1 of 5");
-    if (powerFill) powerFill.style.width = "20%";
-    if (powerText) powerText.textContent = "1 / 5";
-    if (energyBadge) {
-      energyBadge.querySelector("strong").textContent = "Base";
-    }
     state.textContent = "Select an item to upgrade.";
+    state.hidden = false;
     return;
   }
 
@@ -869,23 +858,25 @@ function renderForgeChamber(item, requirements) {
   image.src = definition.image;
   image.alt = definition.name;
   if (selectedName) selectedName.textContent = definition.name;
-  if (selectedType) selectedType.textContent = `${item.categoryKey === "guns" ? "Weapon" : "Module"}${item.source === "equipped" ? " / Equipped" : ""}`;
+  if (selectedType) selectedType.textContent = item.categoryKey === "guns" ? "Weapon" : "Module";
+  if (selectedSource) {
+    selectedSource.hidden = false;
+    selectedSource.textContent = item.source === "equipped" ? "Equipped" : "Vault";
+  }
   if (selectedTier) {
     selectedTier.className = `forge-selected-tier forge-tier-scope ${getForgeTierClass(level)}`;
-    selectedTier.innerHTML = `${renderForgeTierPips(level, "compact")}<strong>${escapeHtml(tier.label)} · Level ${escapeHtml(getForgeItemLevelRoman(level))}</strong>`;
+    selectedTier.innerHTML = `<i class="forge-tier-diamond" aria-hidden="true"></i><strong>${escapeHtml(tier.label)}</strong><b>·</b><span>Level ${escapeHtml(getForgeItemLevelRoman(level))}</span>`;
   }
-  if (selectedDescription) selectedDescription.textContent = definition.description || "Upgradeable ship equipment.";
+  const primaryStat = getVisibleItemStats(item)[0];
+  if (selectedDescription) {
+    selectedDescription.textContent = primaryStat
+      ? `${primaryStat.value} ${primaryStat.label.toLowerCase()}`
+      : (definition.description || "Upgradeable ship equipment.");
+  }
   if (previewOutput) {
     previewOutput.textContent = level >= FORGE_MAX_LEVEL
       ? `${tier.label} · Maximum`
       : `${tier.label} to ${targetTier.label}`;
-  }
-  if (powerSignature) powerSignature.setAttribute("aria-label", `Forge energy level ${level} of ${FORGE_MAX_LEVEL}`);
-  if (powerFill) powerFill.style.width = `${(level / FORGE_MAX_LEVEL) * 100}%`;
-  if (powerText) powerText.textContent = `${level} / ${FORGE_MAX_LEVEL}`;
-  if (energyBadge) {
-    const badgeLevel = energyBadge.querySelector("strong");
-    if (badgeLevel) badgeLevel.textContent = level === 1 ? "Base" : `${tier.label} · ${getForgeItemLevelRoman(level)}`;
   }
   const chamberStateClass = forgeAnimating ? "upgrading forging" : requirements.canUpgrade ? "ready" : "missing-materials";
   const celebrationClass = Date.now() < Number(forgeCelebrationUntil || 0) ? "forge-complete" : "";
@@ -895,6 +886,7 @@ function renderForgeChamber(item, requirements) {
   chamber.style.setProperty("--forge-before", tier.color);
   chamber.style.setProperty("--forge-after", targetTier.color);
   state.textContent = requirements.reason || "Ready to upgrade.";
+  state.hidden = requirements.canUpgrade || level >= FORGE_MAX_LEVEL;
 }
 
 function renderForgeMaterials(item, requirements) {
@@ -931,28 +923,28 @@ function renderForgeMaterials(item, requirements) {
       </div>
     `;
   }).join("");
+  const actionLabel = isMaximumLevel
+    ? "Maximum Level"
+    : requirements.canUpgrade
+      ? `Upgrade to Level ${getForgeItemLevelRoman(toLevel)}`
+      : `${formatNumber(missing)} More Shards Required`;
 
   list.innerHTML = `
     <div class="forge-map1-preview forge-tier-scope ${getForgeTierClass(toLevel)} ${requirements.canUpgrade ? "ready" : "blocked"} ${isMaximumLevel ? "maximum" : ""}">
-      <h3>${isMaximumLevel ? "Upgrade Status" : "Next-Level Comparison"}</h3>
+      <h3>${isMaximumLevel ? "Upgrade Status" : "Next Upgrade"}</h3>
       <div class="forge-level-flow ${isMaximumLevel ? "forge-level-flow--maximum" : ""}">
         ${isMaximumLevel ? `
           <strong class="forge-level-node forge-level-node--maximum forge-tier-scope ${getForgeTierClass(fromLevel)}">
-            <small>${escapeHtml(fromTier.label)} Tier</small>
+            <small>${escapeHtml(fromTier.label)}</small>
             <em>Level ${escapeHtml(getForgeItemLevelRoman(fromLevel))} · Maximum</em>
-            ${renderForgeTierPips(fromLevel, "compact")}
           </strong>
         ` : `
           <span class="forge-level-node forge-tier-scope ${getForgeTierClass(fromLevel)}">
-            <small>Current · ${escapeHtml(fromTier.label)}</small>
-            <em>Level ${escapeHtml(getForgeItemLevelRoman(fromLevel))}</em>
-            ${renderForgeTierPips(fromLevel, "compact")}
+            <small><i class="forge-tier-diamond" aria-hidden="true"></i>${escapeHtml(fromTier.label)} · Level ${escapeHtml(getForgeItemLevelRoman(fromLevel))}</small>
           </span>
-          <b>&gt;&gt;&gt;</b>
+          <b aria-hidden="true">&rarr;</b>
           <strong class="forge-level-node forge-tier-scope ${getForgeTierClass(toLevel)}">
-            <small>Next · ${escapeHtml(toTier.label)}</small>
-            <em>Level ${escapeHtml(getForgeItemLevelRoman(toLevel))}</em>
-            ${renderForgeTierPips(toLevel, "compact")}
+            <small><i class="forge-tier-diamond" aria-hidden="true"></i>${escapeHtml(toTier.label)} · Level ${escapeHtml(getForgeItemLevelRoman(toLevel))}</small>
           </strong>
         `}
       </div>
@@ -961,21 +953,19 @@ function renderForgeMaterials(item, requirements) {
         <div class="forge-preview-cost ${requirements.canUpgrade ? "ready" : "blocked"} ${isMaximumLevel ? "maximum" : ""}">
           <div class="forge-cost-heading">
             <span>${isMaximumLevel ? "Forge Status" : "Upgrade Cost"}</span>
-            <em>${isMaximumLevel ? "Complete" : requirements.canUpgrade ? "Ready" : `${formatNumber(missing)} Short`}</em>
           </div>
           ${isMaximumLevel ? `
             <strong class="forge-maximum-label">No further upgrades</strong>
           ` : `
             <strong><img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">${formatNumber(required)} <small>Lupen Shards</small></strong>
             <div class="forge-cost-balance">
-              <span>Balance <b>${formatNumber(owned)}</b></span>
-              <span>${requirements.canUpgrade ? "After upgrade" : "Still needed"} <b>${formatNumber(requirements.canUpgrade ? remaining : missing)}</b></span>
+              <span>${requirements.canUpgrade ? "Balance after upgrade" : "Current balance"}: <b>${formatNumber(requirements.canUpgrade ? remaining : owned)}</b></span>
             </div>
           `}
         </div>
-        <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">${escapeHtml(requirements.buttonText || "Upgrade Item")}</button>
+        <button id="forgeStartBtn" class="forge-start-btn" type="button" onclick="startForgeUpgrade()">${escapeHtml(actionLabel)}</button>
       </div>
-      <p class="forge-bounty-help">${isMaximumLevel ? "This item has reached the highest Forge tier." : "Get more shards from daily bounties and destroyed asteroids."}</p>
+      ${requirements.canUpgrade && !isMaximumLevel ? "" : `<p class="forge-bounty-help">${isMaximumLevel ? "This item has reached the highest Forge tier." : "Earn more shards through daily contracts and asteroid destruction."}</p>`}
     </div>
   `;
 
@@ -1003,11 +993,18 @@ function renderForgeSummary(item, requirements) {
   }
   const start = document.getElementById("forgeStartBtn");
   if (start) {
+    const level = getForgeItemLevel(item || {});
+    const targetLevel = requirements.targetLevel || level;
+    const isMaximumLevel = Boolean(item) && level >= FORGE_MAX_LEVEL;
     start.textContent = forgeAnimating
       ? "Upgrading..."
-      : requirements.canUpgrade
-        ? (requirements.buttonText || "Upgrade Item")
-        : (requirements.buttonText || requirements.reason || "Unavailable");
+      : !item
+        ? "Select Item"
+        : isMaximumLevel
+          ? "Maximum Level"
+          : requirements.canUpgrade
+            ? `Upgrade to Level ${getForgeItemLevelRoman(targetLevel)}`
+            : `${formatNumber(missing)} More Shards Required`;
     start.disabled = forgeAnimating || !requirements.canUpgrade;
   }
 }
@@ -1018,6 +1015,10 @@ function renderUpgradeForge() {
   prepareTutorialForgeSelection();
   reconcileTutorialForgeStarterShards();
   const items = getForgeUpgradeableItems();
+  const visibleItems = getForgeOwnedTierItems(items);
+  if (visibleItems.length && !visibleItems.some(entry => entry.id === selectedForgeItemId)) {
+    selectedForgeItemId = visibleItems[0].id;
+  }
   const item = getForgeSelectedItem();
   const requirements = getForgeRequirements(item);
   const stationText = document.getElementById("forgeStationText");
@@ -1034,9 +1035,9 @@ function renderUpgradeForge() {
   const pilotXpText = document.getElementById("forgePilotXpText");
   if (pilotXpText) pilotXpText.textContent = `Level cap ${getForgeItemLevelRoman(FORGE_MAX_LEVEL)}`;
   const tierLegend = document.getElementById("forgeTierLegend");
-  if (tierLegend) tierLegend.innerHTML = renderForgeTierLegend();
+  if (tierLegend) tierLegend.innerHTML = renderForgeTierLegend(items);
 
-  renderForgeSelectedPanel(item, items);
+  renderForgeSelectedPanel(item, visibleItems, items.length);
   renderForgeInventoryPicker(items);
   renderForgeChamber(item, requirements);
   renderForgeMaterials(item, requirements);

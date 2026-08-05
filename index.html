@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="loadout-redesign.css?v=20260721-unified-hangar" />
   <link rel="stylesheet" href="ui-system.css?v=20260726-orbit-alignment" />
   <link rel="stylesheet" href="styles/journey-screen.css?v=20260804-chapter-rewards" />
+  <link rel="stylesheet" href="styles/forge-screen.css?v=20260805-forge-workstation" />
 </head>
 <body>
   <div class="stars"></div>
@@ -193,16 +194,13 @@
           <h2 id="forgeStationText">ASTERON PRIME</h2>
           <span class="hangar-subtitle">Improve owned weapons and modules with Lupen Shards.</span>
         </div>
-        <button class="screen-back-btn lupen-back-button forge-map1-close" onclick="returnToHub()">Back</button>
-      </div>
-
-      <div class="forge-lupen-info">
-        <span class="forge-info-icon" aria-hidden="true">i</span>
-        <p>Choose gear, review the next level, then upgrade when you have enough shards.</p>
-        <div class="forge-shard-pill" aria-label="Current Lupen Shards">
-          <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
-          <strong id="forgeShardCountText">0</strong>
-          <span>Lupen Shards</span>
+        <div class="forge-header-actions">
+          <button class="screen-back-btn lupen-back-button forge-map1-close" onclick="returnToHub()">Back</button>
+          <div class="forge-shard-pill" aria-label="Current Lupen Shards">
+            <img src="assets/items/lupen-shard.png" alt="" aria-hidden="true">
+            <strong id="forgeShardCountText">0</strong>
+            <span>Lupen Shards</span>
+          </div>
         </div>
       </div>
 
@@ -210,29 +208,18 @@
         <aside class="forge-panel forge-selected-panel forge-owned-panel">
           <div class="modern-store-panel-header">
             <span>Owned Gear</span>
-            <em id="forgeOwnedCount">0 Owned Items</em>
+            <em id="forgeOwnedCount">0 items</em>
           </div>
           <div class="forge-inventory-scroll">
             <div id="forgeSelectedPanel" class="forge-selected-body"></div>
-            <div class="forge-scroll-controls">
-              <button id="forgeScrollUpBtn" type="button" onclick="scrollForgeInventory(-1)" aria-label="Scroll gear up">
-                <span aria-hidden="true"></span>
-              </button>
-              <button id="forgeScrollTrack" class="forge-scroll-track" type="button" onclick="setForgeInventoryScrollFromTrack(event)" aria-label="Scroll through owned gear">
-                <span id="forgeScrollThumb" class="forge-scroll-thumb" aria-hidden="true"></span>
-              </button>
-              <button id="forgeScrollDownBtn" type="button" onclick="scrollForgeInventory(1)" aria-label="Scroll gear down">
-                <span aria-hidden="true"></span>
-              </button>
-            </div>
           </div>
-          <div id="forgeTierLegend" class="forge-tier-legend" aria-label="Forge level tiers"></div>
+          <div id="forgeTierLegend" class="forge-tier-legend" aria-label="Filter owned gear by Forge tier"></div>
         </aside>
 
         <main class="forge-panel forge-detail-panel forge-preview-panel">
           <div class="modern-store-panel-header">
-            <span>Upgrade Preview</span>
-            <em id="forgePreviewOutput">Common to Refined</em>
+            <span>Upgrade</span>
+            <em id="forgePreviewOutput" class="forge-sr-only">Common to Refined</em>
           </div>
           <div class="forge-detail-body">
             <section class="forge-showcase" aria-label="Selected gear">
@@ -241,31 +228,17 @@
                   <div class="forge-chamber-bg" aria-hidden="true"></div>
                   <div class="forge-chamber-vignette" aria-hidden="true"></div>
                   <div class="forge-ring ring-one"></div>
-                  <div class="forge-ring ring-two"></div>
-                  <div class="forge-beam"></div>
-                  <div class="forge-scanline"></div>
-                  <div class="forge-particles"></div>
-                  <div class="forge-energy-orbit orbit-a" aria-hidden="true"></div>
-                  <div class="forge-energy-orbit orbit-b" aria-hidden="true"></div>
                   <img id="forgePreviewImage" class="forge-chamber-item" src="assets/weapons/pulse-laser.png" alt="Selected item">
-                  <span id="forgeEnergyBadge" class="forge-energy-badge" aria-hidden="true">
-                    <small>Energy Signature</small>
-                    <strong>Base</strong>
-                  </span>
                 </div>
               </div>
               <div class="forge-selected-copy">
                 <div class="forge-selected-badges">
                   <span id="forgeSelectedType" class="forge-selected-type">Weapon</span>
-                  <span id="forgeSelectedTier" class="forge-selected-tier">Common · Level I</span>
+                  <span id="forgeSelectedSource" class="forge-selected-source">Equipped</span>
                 </div>
                 <h3 id="forgeSelectedName">Pulse Laser</h3>
+                <span id="forgeSelectedTier" class="forge-selected-tier">Common · Level I</span>
                 <p id="forgeSelectedDescription">Rapid-fire energy weapon.</p>
-                <div id="forgePowerSignature" class="forge-power-signature" aria-label="Forge energy level 1 of 5">
-                  <span>Forge Energy</span>
-                  <div class="forge-power-track" aria-hidden="true"><i id="forgePowerFill"></i></div>
-                  <strong id="forgePowerText">1 / 5</strong>
-                </div>
               </div>
             </section>
 
