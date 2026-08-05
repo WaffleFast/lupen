@@ -29,6 +29,10 @@ The practical status is: local-first gameplay with optional cloud sync, plus ser
 - Guest or unauthenticated play is necessarily local-only.
 - Many normal gameplay flows mutate browser state first, then persist through the local/cloud save path. That includes broad economy, cargo, inventory, mission, contract, ship, loadout, and forge state.
 - Server-side staging write services are deliberately narrow. For example, progression patches only specific XP/credits/material paths, trade writes only selected credit/cargo paths, store/loadout writes only selected starter items, and many systems remain excluded by design.
+- Gated Store purchases require a unique request ID and an optimistic
+  `updated_at` revision match, preventing same-room retries and stale validated
+  saves from applying twice. This is an intermediate guard, not durable
+  cross-server idempotency.
 
 ## Risk assessment
 

@@ -2338,10 +2338,23 @@ async function assertStagingStorePreviewHelpers() {
   const insufficientBisonCreditPatch = buildStagingStorePurchasePatch({ ...validSaveData, credits: 10 }, bisonItem, 1);
   assert(insufficientBisonCreditPatch.ok === false && insufficientBisonCreditPatch.blockReason === "insufficient_credits", "Pioneer Freighter purchase was not credit-gated.");
 
+  const missingRequestIdWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 }
+    },
+    env: {}
+  });
+  assert(missingRequestIdWrite.applied === false && missingRequestIdWrite.blockReason === "store_request_id_required", "Store write without an operation ID was not blocked.");
+
   const defaultWrite = await applyStagingStorePurchaseWrite({
     playerId: "verified-player-a",
     itemId: "attachment:cargoPod",
     quantity: 1,
+    requestId: "store-default-1",
     trustedState: {
       available: true,
       validationState: { credits: 1000 }
@@ -2359,6 +2372,7 @@ async function assertStagingStorePreviewHelpers() {
     playerId: "verified-player-a",
     itemId: "attachment:cargoPod",
     quantity: 1,
+    requestId: "store-dry-run-1",
     trustedState: {
       available: true,
       validationState: { credits: 1000 }
@@ -2378,6 +2392,7 @@ async function assertStagingStorePreviewHelpers() {
     playerId: "",
     itemId: "attachment:cargoPod",
     quantity: 1,
+    requestId: "store-unverified-1",
     trustedState: {
       available: true,
       validationState: { credits: 1000 }
@@ -2394,6 +2409,7 @@ async function assertStagingStorePreviewHelpers() {
     playerId: "verified-player-a",
     itemId: "attachment:cargoPod",
     quantity: 1,
+    requestId: "store-not-allowlisted-1",
     trustedState: {
       available: true,
       validationState: { credits: 1000 }
@@ -2411,6 +2427,7 @@ async function assertStagingStorePreviewHelpers() {
     playerId: "verified-player-a",
     itemId: "attachment:jumpDrive",
     quantity: 1,
+    requestId: "store-item-blocked-1",
     trustedState: {
       available: true,
       validationState: { credits: 1000 }
@@ -2430,9 +2447,11 @@ async function assertStagingStorePreviewHelpers() {
     playerId: "verified-player-a",
     itemId: "attachment:cargoPod",
     quantity: 1,
+    requestId: "store-cargo-pod-1",
     trustedState: {
       available: true,
       validationState: { credits: 1000 },
+      updatedAt: "2026-08-05T08:00:00.000Z",
       rawSaveData: sequentialSave
     },
     env: {
@@ -2449,10 +2468,13 @@ async function assertStagingStorePreviewHelpers() {
       assert(options.headers?.apikey === "stub-service-key", "Store write did not use service role apikey.");
       assert(options.headers?.Authorization === "Bearer stub-service-key", "Store write did not use service role bearer.");
       assert(options.method === "PATCH", "Store write expected PATCH from the trusted preflight save.");
-      assert(url === "https://example.supabase.co/rest/v1/player_saves?user_id=eq.verified-player-a", `Unexpected Store PATCH URL: ${url}`);
+      const patchUrl = new URL(url);
+      assert(patchUrl.searchParams.get("user_id") === "eq.verified-player-a", `Unexpected Store player filter: ${url}`);
+      assert(patchUrl.searchParams.get("updated_at") === "eq.2026-08-05T08:00:00.000Z", `Store write omitted its trusted save revision: ${url}`);
+      assert(options.headers?.prefer === "return=representation", "Store write did not request the committed revision.");
       const body = JSON.parse(options.body || "{}");
       sequentialSave = body.save_data;
-      return { ok: true, status: 204, json: async () => [] };
+      return { ok: true, status: 200, json: async () => [{ updated_at: "2026-08-05T08:00:01.000Z" }] };
     }
   });
   assert(appliedWrite.applied === true && appliedWrite.mode === "store_write", `Gated Cargo Pod Store write did not apply: ${appliedWrite.blockReason}`);
@@ -2469,6 +2491,35 @@ async function assertStagingStorePreviewHelpers() {
   assert(sequentialSave.activeBountyId === "keep-bounty", "Applied Store write changed bounty state.");
   assert(storeFetchCalls.join(",") === "PATCH", `Store write should reuse the trusted preflight read, got ${storeFetchCalls.join(",")}.`);
   assert(appliedWrite.saveDataSource === "trusted_preflight", "Store write did not report trusted preflight reuse.");
+  assert(appliedWrite.requestId === "store-cargo-pod-1", "Store write did not preserve its request ID.");
+  assert(appliedWrite.saveRevisionAfter === "2026-08-05T08:00:01.000Z", "Store write did not return the committed save revision.");
+
+  const staleRevisionWrite = await applyStagingStorePurchaseWrite({
+    playerId: "verified-player-a",
+    itemId: "attachment:cargoPod",
+    quantity: 1,
+    requestId: "store-stale-revision-1",
+    trustedState: {
+      available: true,
+      validationState: { credits: 1000 },
+      updatedAt: "2026-08-05T07:59:59.000Z",
+      rawSaveData: JSON.parse(JSON.stringify(validSaveData))
+    },
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "stub-service-key",
+      STAGING_STORE_WRITE_ENABLED: "true",
+      STAGING_STORE_WRITE_DRY_RUN: "false",
+      STAGING_STORE_WRITE_SCOPE: "verified",
+      STAGING_STORE_WRITE_ALLOWED_ITEMS: "attachment:cargoPod"
+    },
+    fetchImpl: async (_url, options = {}) => {
+      assert(options.method === "PATCH", "Stale Store write used an unexpected method.");
+      return { ok: true, status: 200, json: async () => [] };
+    }
+  });
+  assert(staleRevisionWrite.applied === false && staleRevisionWrite.blockReason === "player_save_revision_conflict", "Stale Store revision was not rejected.");
+  assert(staleRevisionWrite.creditsWritten === false && staleRevisionWrite.saveWritten === false, "Stale Store revision reported authoritative writes.");
 
   let weaponSave = JSON.parse(JSON.stringify(validSaveData));
   const weaponFetchCalls = [];
@@ -2476,6 +2527,7 @@ async function assertStagingStorePreviewHelpers() {
     playerId: "verified-player-a",
     itemId: "gun:pulseLaser",
     quantity: 1,
+    requestId: "store-pulse-laser-1",
     trustedState: {
       available: true,
       validationState: { credits: 1000 }
@@ -2491,9 +2543,9 @@ async function assertStagingStorePreviewHelpers() {
     },
     fetchImpl: async (_url, options = {}) => {
       weaponFetchCalls.push(options.method || "GET");
-      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: weaponSave }] };
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: weaponSave, updated_at: "2026-08-05T09:00:00.000Z" }] };
       weaponSave = JSON.parse(options.body || "{}").save_data;
-      return { ok: true, status: 204, json: async () => [] };
+      return { ok: true, status: 200, json: async () => [{ updated_at: "2026-08-05T09:00:01.000Z" }] };
     }
   });
   assert(appliedWeaponWrite.applied === true && appliedWeaponWrite.mode === "store_write", `Gated Pulse Laser Store write did not apply: ${appliedWeaponWrite.blockReason}`);
@@ -2515,6 +2567,7 @@ async function assertStagingStorePreviewHelpers() {
     playerId: "verified-player-a",
     itemId: "ship:bison",
     quantity: 1,
+    requestId: "store-bison-1",
     trustedState: {
       available: true,
       validationState: { credits: 30000 }
@@ -2530,9 +2583,9 @@ async function assertStagingStorePreviewHelpers() {
     },
     fetchImpl: async (_url, options = {}) => {
       haulerFetchCalls.push(options.method || "GET");
-      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: haulerSave }] };
+      if ((options.method || "GET") === "GET") return { ok: true, status: 200, json: async () => [{ save_data: haulerSave, updated_at: "2026-08-05T10:00:00.000Z" }] };
       haulerSave = JSON.parse(options.body || "{}").save_data;
-      return { ok: true, status: 204, json: async () => [] };
+      return { ok: true, status: 200, json: async () => [{ updated_at: "2026-08-05T10:00:01.000Z" }] };
     }
   });
   assert(appliedHaulerWrite.applied === true && appliedHaulerWrite.mode === "store_write", `Gated Bison Store write did not apply: ${appliedHaulerWrite.blockReason}`);
@@ -3308,6 +3361,7 @@ async function assertFullCargoPodTradeLoopHelpers() {
   };
 
   const fetchCalls = [];
+  let loopUpdatedAt = "2026-08-05T11:00:00.000Z";
   const loopFetch = async (_url, options = {}) => {
     fetchCalls.push(options.method || "GET");
     if ((options.method || "GET") === "GET") {
@@ -3315,14 +3369,16 @@ async function assertFullCargoPodTradeLoopHelpers() {
         ok: true,
         status: 200,
         async json() {
-          return [{ save_data: loopSave }];
+          return [{ save_data: loopSave, updated_at: loopUpdatedAt }];
         }
       };
     }
 
     assert(options.method === "PATCH", "Full Cargo Pod loop used unexpected write method.");
-    loopSave = JSON.parse(options.body || "{}").save_data;
-    return { ok: true, status: 204, json: async () => [] };
+    const body = JSON.parse(options.body || "{}");
+    loopSave = body.save_data;
+    if (body.updated_at) loopUpdatedAt = body.updated_at;
+    return { ok: true, status: 200, json: async () => [{ updated_at: loopUpdatedAt }] };
   };
 
   const commonEnv = {
@@ -3348,6 +3404,7 @@ async function assertFullCargoPodTradeLoopHelpers() {
     playerId: "verified-player-a",
     itemId: "attachment:cargoPod",
     quantity: 1,
+    requestId: "store-sequence-cargo-pod-1",
     trustedState: { available: true, validationState: { credits: 5000 } },
     env: commonEnv,
     fetchImpl: loopFetch
@@ -3413,6 +3470,7 @@ async function assertFullCargoPodTradeLoopHelpers() {
     playerId: "verified-player-a",
     itemId: "gun:pulseLaser",
     quantity: 1,
+    requestId: "store-sequence-pulse-laser-1",
     trustedState: { available: true, validationState: { credits: loopSave.credits } },
     env: commonEnv,
     fetchImpl: loopFetch
@@ -5521,6 +5579,7 @@ try {
 
   const defaultJumpDrivePurchase = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {
+      requestId: "store-regression-jump-drive-1",
       itemId: "attachment:jumpDrive",
       quantity: 1,
       playerSnapshot: {
@@ -5534,6 +5593,7 @@ try {
 
   const invalidStorePurchaseQuantity = await expectStagingStorePurchase(roomA, () => {
     roomA.send("stagingStore:purchase", {
+      requestId: "store-regression-invalid-quantity-1",
       itemId: "attachment:cargoPod",
       quantity: 2,
       playerSnapshot: {

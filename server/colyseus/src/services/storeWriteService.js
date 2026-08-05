@@ -78,9 +78,11 @@ function getValidSupabaseUrl(url) {
   }
 }
 
-function getPlayerSaveUrl(baseUrl, playerId) {
-  const safePlayerId = encodeURIComponent(playerId);
-  return `${baseUrl}/rest/v1/${PLAYER_SAVES_TABLE}?user_id=eq.${safePlayerId}`;
+function getPlayerSaveUrl(baseUrl, playerId, expectedUpdatedAt = "") {
+  const query = new URLSearchParams({ user_id: `eq.${playerId}` });
+  const safeExpectedUpdatedAt = getString(expectedUpdatedAt);
+  if (safeExpectedUpdatedAt) query.set("updated_at", `eq.${safeExpectedUpdatedAt}`);
+  return `${baseUrl}/rest/v1/${PLAYER_SAVES_TABLE}?${query.toString()}`;
 }
 
 function getPlayerSaveReadUrl(baseUrl, playerId) {
@@ -159,7 +161,10 @@ function getStoreUserReason(reason) {
     store_item_preview_only: "This item is preview-only in staging.",
     store_item_not_allowed: "This Store item is not enabled for staging writes.",
     invalid_store_quantity: "Only one staging Store item can be purchased per request.",
+    store_request_id_required: "The purchase request could not be identified. Please try again.",
     trusted_save_required: "Trusted player save read required.",
+    save_revision_required: "The saved account revision is unavailable. Please refresh the Store.",
+    player_save_revision_conflict: "Your account changed before the purchase completed. Please refresh the Store and try again.",
     insufficient_credits: "Not enough credits.",
     store_station_required: "You must be docked at this station.",
     store_station_mismatch: "You must be docked at this station.",
@@ -423,16 +428,17 @@ async function fetchPlayerSaveRow(baseUrl, playerId, config, fetchImpl) {
   };
 }
 
-async function patchPlayerSaveData(baseUrl, playerId, saveData, config, fetchImpl) {
-  const response = await fetchImpl(getPlayerSaveUrl(baseUrl, playerId), {
+async function patchPlayerSaveData(baseUrl, playerId, saveData, expectedUpdatedAt, config, fetchImpl) {
+  const nextUpdatedAt = new Date().toISOString();
+  const response = await fetchImpl(getPlayerSaveUrl(baseUrl, playerId, expectedUpdatedAt), {
     method: "PATCH",
     headers: {
       apikey: config.serviceRoleKey,
       Authorization: `Bearer ${config.serviceRoleKey}`,
       "content-type": "application/json",
-      prefer: "return=minimal"
+      prefer: "return=representation"
     },
-    body: JSON.stringify({ save_data: saveData })
+    body: JSON.stringify({ save_data: saveData, updated_at: nextUpdatedAt })
   });
 
   if (!response?.ok) {
@@ -443,10 +449,21 @@ async function patchPlayerSaveData(baseUrl, playerId, saveData, config, fetchImp
     };
   }
 
+  const rows = typeof response.json === "function" ? await response.json() : [];
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) {
+    return {
+      ok: false,
+      reason: "player_save_revision_conflict",
+      status: Number(response.status || 200)
+    };
+  }
+
   return {
     ok: true,
     reason: "",
-    status: Number(response.status || 200)
+    status: Number(response.status || 200),
+    updatedAt: getString(row.updated_at)
   };
 }
 
@@ -454,11 +471,13 @@ export async function applyStagingStorePurchaseWrite({
   playerId = "",
   itemId = "",
   quantity = 1,
+  requestId = "",
   trustedState = null,
   env = process.env,
   fetchImpl = globalThis.fetch
 } = {}) {
   const safePlayerId = getString(playerId);
+  const safeRequestId = getString(requestId).slice(0, 128);
   const selectedItem = getStagingStoreItemById(itemId);
   const safeQuantity = normalizeStoreWriteQuantity(quantity);
 
@@ -473,6 +492,7 @@ export async function applyStagingStorePurchaseWrite({
     });
   }
   if (safeQuantity !== 1) return getBlockedResult("invalid_store_quantity", { itemId: selectedItem.itemId, quantity: 0 });
+  if (!safeRequestId) return getBlockedResult("store_request_id_required", { itemId: selectedItem.itemId, quantity: safeQuantity });
   if (!trustedState?.available || !trustedState?.validationState) {
     return getBlockedResult("trusted_save_required", { itemId: selectedItem.itemId, quantity: safeQuantity });
   }
@@ -503,6 +523,7 @@ export async function applyStagingStorePurchaseWrite({
       : null;
     let saveData = trustedSaveData;
     let saveDataSource = "trusted_preflight";
+    let expectedUpdatedAt = getString(trustedState?.updatedAt);
     if (!saveData) {
       const readResult = await fetchPlayerSaveRow(baseUrl, safePlayerId, config, fetchImpl);
       if (!readResult.ok) {
@@ -515,7 +536,17 @@ export async function applyStagingStorePurchaseWrite({
         });
       }
       saveData = getSaveDataFromRow(readResult.row);
+      expectedUpdatedAt = getString(readResult.row?.updated_at);
       saveDataSource = "store_write_read";
+    }
+    if (!expectedUpdatedAt) {
+      return getBlockedResult("save_revision_required", {
+        envGate,
+        itemId: selectedItem.itemId,
+        name: selectedItem.name,
+        quantity: safeQuantity,
+        requestId: safeRequestId
+      });
     }
     const patchPlan = buildStagingStorePurchasePatch(saveData, selectedItem, safeQuantity);
     if (!patchPlan.ok) {
@@ -529,7 +560,14 @@ export async function applyStagingStorePurchaseWrite({
       };
     }
 
-    const patchResult = await patchPlayerSaveData(baseUrl, safePlayerId, patchPlan.patchedSaveData, config, fetchImpl);
+    const patchResult = await patchPlayerSaveData(
+      baseUrl,
+      safePlayerId,
+      patchPlan.patchedSaveData,
+      expectedUpdatedAt,
+      config,
+      fetchImpl
+    );
     if (!patchResult.ok) {
       return getBlockedResult(patchResult.reason, {
         envGate,
@@ -537,7 +575,9 @@ export async function applyStagingStorePurchaseWrite({
         itemId: selectedItem.itemId,
         name: selectedItem.name,
         category: selectedItem.category,
-        quantity: safeQuantity
+        quantity: safeQuantity,
+        requestId: safeRequestId,
+        saveRevisionBefore: expectedUpdatedAt
       });
     }
 
@@ -545,6 +585,8 @@ export async function applyStagingStorePurchaseWrite({
       ok: true,
       mode: "store_write",
       operation: "purchase",
+      requestId: safeRequestId,
+      mutationKey: `${safePlayerId}:store:${safeRequestId}`,
       applied: true,
       dryRun: false,
       reason: "Staging Store purchase applied",
@@ -563,6 +605,8 @@ export async function applyStagingStorePurchaseWrite({
       itemAfter: patchPlan.itemAfter,
       validationMode: "trusted_save",
       saveDataSource,
+      saveRevisionBefore: expectedUpdatedAt,
+      saveRevisionAfter: patchResult.updatedAt,
       trustedStateAvailable: true,
       status: patchResult.status,
       gates: {

@@ -634,11 +634,14 @@ function getStagingStoreWriteBlockUserReason(reason = "") {
     store_item_not_allowed: "Item locked.",
     store_item_preview_only: "Item locked.",
     invalid_store_quantity: "Invalid quantity.",
+    store_request_id_required: "The purchase request could not be identified. Please try again.",
     unknown_store_item: "Item locked.",
     insufficient_credits: "Not enough credits.",
     store_station_required: "You must be docked at this station.",
     store_station_mismatch: "You must be docked at this station.",
     trusted_save_required: "Server purchase failed - try again.",
+    save_revision_required: "Your account state needs to be refreshed before purchasing.",
+    player_save_revision_conflict: "Your account changed before the purchase completed. Please refresh and try again.",
     player_save_missing: "Server purchase failed - try again.",
     player_save_read_failed: "Server purchase failed - try again.",
     player_save_patch_failed: "Server purchase failed - try again.",
@@ -1623,6 +1626,9 @@ export class LupenSectorRoom extends Room {
     // staging Lupen Shard write path; durable protection should later move to
     // a Supabase ledger uniqueness key before broader loot writes.
     this.stagingLootClaimIdempotencyKeys = new Set();
+    // Store purchase requests carry client-generated operation IDs. Keep the
+    // resulting promise so retries in this room reuse one validated mutation.
+    this.stagingStorePurchaseRequests = new Map();
     // Room/session scoped staging bounty state. This deliberately does not
     // touch local bounty arrays, Supabase bounty tables, route completion,
     // loot, credits, or normal single-player objective state.
@@ -4256,6 +4262,7 @@ export class LupenSectorRoom extends Room {
 
     const canAttemptWrite = preview.ok === true &&
       preview.wouldPass === true &&
+      !!requestId &&
       STAGING_STORE_WRITE_ITEM_IDS.has(item?.itemId) &&
       storeWriteQuantityValid &&
       gates.writeEnabled === true &&
@@ -4268,12 +4275,29 @@ export class LupenSectorRoom extends Room {
       player?.multiplayerMode === "staging";
 
     if (canAttemptWrite) {
-      const writeResult = await applyStagingStorePurchaseWrite({
-        playerId: identity.trustedPlayerId || identity.playerId,
-        itemId,
-        quantity: message?.quantity,
-        trustedState
-      });
+      const mutationPlayerId = identity.trustedPlayerId || identity.playerId;
+      const mutationKey = requestId ? `${mutationPlayerId}:store:${requestId}` : "";
+      let duplicateRequest = false;
+      let writePromise = mutationKey ? this.stagingStorePurchaseRequests.get(mutationKey) : null;
+      if (writePromise) {
+        duplicateRequest = true;
+      } else {
+        writePromise = applyStagingStorePurchaseWrite({
+          playerId: mutationPlayerId,
+          itemId,
+          quantity: message?.quantity,
+          requestId,
+          trustedState
+        });
+        if (mutationKey) {
+          this.stagingStorePurchaseRequests.set(mutationKey, writePromise);
+          if (this.stagingStorePurchaseRequests.size > 500) {
+            const oldestKey = this.stagingStorePurchaseRequests.keys().next().value;
+            if (oldestKey) this.stagingStorePurchaseRequests.delete(oldestKey);
+          }
+        }
+      }
+      const writeResult = await writePromise;
       if (writeResult?.applied !== true) {
         logStagingStoreWriteBlocked({
           reason: writeResult?.blockReason || writeResult?.reason || writeResult?.debugReason || "store_write_unavailable",
@@ -4289,6 +4313,7 @@ export class LupenSectorRoom extends Room {
       client.send("stagingStore:purchaseResult", {
         ...baseResult,
         ...writeResult,
+        duplicateRequest,
         gates,
         validationMode: writeResult.validationMode || preview.validationMode,
         trustedStateAvailable: true,
@@ -4306,7 +4331,9 @@ export class LupenSectorRoom extends Room {
     }
 
     let previewOnlyReason = preview.blockReason || "store_write_unavailable";
-    if (!storeWriteQuantityValid) {
+    if (!requestId) {
+      previewOnlyReason = "store_request_id_required";
+    } else if (!storeWriteQuantityValid) {
       previewOnlyReason = "invalid_store_quantity";
     } else if (item && !STAGING_STORE_WRITE_ITEM_IDS.has(item.itemId)) {
       previewOnlyReason = "store_item_preview_only";

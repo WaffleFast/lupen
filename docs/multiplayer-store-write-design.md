@@ -207,6 +207,15 @@ The current validated staging loop is:
 
 Regression coverage uses mocked `player_saves` to prove the sequence can buy Cargo Pod, equip it, trade with the increased capacity, sell the cargo, buy Pulse Laser, equip Pulse Laser, and preserve unrelated save fields. Shield Booster regression coverage proves the narrow purchase/equip path changes only credits, `ownedAttachments.shieldBooster`, and the current ship attachment loadout, returning shield before/after diagnostics. Live room regression separately confirms staging combat resolves two mounted Pulse Lasers as a `26`-damage server-known volley, caps oversized loadouts, and ignores fake client damage inflation. Live-write browser testing remains manual, allowlisted, and opt-in only.
 
+Each applied Store purchase now also requires the client operation ID echoed by
+the room and the exact `player_saves.updated_at` revision used during trusted
+validation. The write filters on both player ID and revision, advances the
+revision on success, and treats an empty update result as a conflict. Room-local
+retries with the same player/request ID reuse the original mutation promise.
+This prevents duplicate same-room purchases and stale full-save overwrites; a
+durable ledger/RPC is still required for idempotency across room or server
+restarts.
+
 ## Future Store Phases
 
 Phase 4: ownership/write expansion
@@ -216,8 +225,11 @@ Phase 4: ownership/write expansion
 
 Phase 5: store ledger and idempotency
 
-- Prefer a dedicated purchase ledger or transaction/RPC before broadening beyond tiny staging tests.
-- Add duplicate protection before any broad purchase rollout.
+- Completed: room-local duplicate protection keyed by verified player and
+  client operation ID.
+- Completed: optimistic revision fencing for the trusted Store save patch.
+- Remaining: add a dedicated purchase ledger or transaction/RPC so duplicate
+  protection survives room and server restarts.
 
 Phase 6: normalized ownership
 

@@ -85,6 +85,9 @@ change behavior even when their declarations are unchanged.
 - Browser JSON parsing, corrupt-entry quarantine, HUD account reads, and Tutorial
   persistence now go through `LupenSaveService`; the duplicate global parser has
   been removed.
+- Gated server Store mutations now require operation IDs, reuse duplicate
+  same-room requests, and condition writes on the trusted save revision so stale
+  credit and ownership patches fail closed.
 
 ## Remaining opportunities
 
