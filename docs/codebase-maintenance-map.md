@@ -91,6 +91,9 @@ change behavior even when their declarations are unchanged.
 - Shared Trade/Bounty sector pathfinding and map-highlight helpers now live in
   `js/04-objective-routing.js`; state, progress, and HUD rendering remain with
   their existing feature owners.
+- Six stable Playwright desktop baselines cover Journey, Trade Terminal, Bounty
+  Board, Station Store, Hangar Loadout, and Pilot Profile. Freeze time/random
+  state in `tests/e2e/visual-regression.spec.js` when extending this set.
 
 ## Remaining opportunities
 

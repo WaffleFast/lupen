@@ -9,6 +9,8 @@
   "scripts": {
     "serve:e2e": "node scripts/serve-static.mjs",
     "test:e2e": "node scripts/run-playwright.mjs",
+    "test:e2e:visual": "node scripts/run-playwright.mjs tests/e2e/visual-regression.spec.js",
+    "test:e2e:visual:update": "node scripts/run-playwright.mjs tests/e2e/visual-regression.spec.js --update-snapshots",
     "test:e2e:live-staging": "node scripts/run-live-staging-playwright.mjs",
     "test:e2e:headed": "node scripts/run-playwright.mjs --headed",
     "test:e2e:ui": "node scripts/run-playwright.mjs --ui"

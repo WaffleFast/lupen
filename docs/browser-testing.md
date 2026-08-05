@@ -28,7 +28,32 @@ Useful variants:
 ```powershell
 npm.cmd run test:e2e:headed
 npm.cmd run test:e2e:ui
+npm.cmd run test:e2e:visual
 ```
+
+## Visual Regression Baselines
+
+The visual suite captures approved 1366x768 desktop states for Journey, Trade
+Terminal, Bounty Board, Station Store, Hangar Loadout, and Pilot Profile. It
+freezes time and pseudo-random values, uses reduced motion, waits for screen
+images to decode, and compares the result with source-controlled Playwright
+snapshots.
+
+Run the checks after CSS or shared component changes:
+
+```powershell
+npm.cmd run test:e2e:visual
+```
+
+Only replace baselines after visually reviewing an intentional UI change:
+
+```powershell
+npm.cmd run test:e2e:visual:update
+```
+
+On failure, inspect the expected, actual, and diff images in
+`artifacts/playwright-results`. A changed screenshot is evidence to review, not
+an instruction to update the baseline automatically.
 
 ## Run Against A Deployed URL
 
@@ -56,13 +81,16 @@ If a later live-write browser test is added, it must use an allow-listed test ac
 - `?mp=staging` shows Store server-preview/dry-run wording instead of normal Store purchase actions.
 - `?mp=staging&debug=mp` shows MP Staging diagnostics without needing a live Colyseus server.
 
-These tests do not validate CSS polish, authenticated cloud saves, or live staging write flows.
+The dedicated visual suite guards major-screen CSS composition. The remaining
+tests do not validate authenticated cloud saves or live staging write flows.
 
 ## What To Run By Change Type
 
 Keep routine Lupen development swift. For small, localized fixes, prefer focused syntax checks and the smallest relevant Playwright grep or visual probe. Run broader browser suites periodically, before important player-testing releases, or whenever a change crosses several player-facing systems.
 
 - UI or browser-facing staging copy changes: run `npm.cmd run test:e2e`.
+- CSS or shared component changes: run `npm.cmd run test:e2e:visual` in addition
+  to the smallest relevant behavioral test.
 - Colyseus server, staging gate, trade, Store, loadout, combat, bounty, XP, or loot service changes: run `npm.cmd run build` and `npm.cmd test` from `server/colyseus`, then run `npm.cmd run test:e2e` from the repo root if browser UI changed.
 - Docs-only changes: `git diff --check` is enough unless the docs describe a changed workflow that should be smoke-tested.
 - Live-write staging checks remain manual, allowlisted, and opt-in only. Do not add or run live-write Playwright tests by default.
