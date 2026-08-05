@@ -8,8 +8,8 @@ persistence. Use it before adding a renderer, storage key, or late CSS override.
 | Area | Navigation entry | Current renderer and actions | Notes |
 | --- | --- | --- | --- |
 | Journey | `js/02-account-navigation.js` | `js/11-missions.js` | Mission configuration and reconciliation also live with the Journey renderer. |
-| Trade Terminal | `js/02-account-navigation.js` | `js/04b-trade-terminal-v2.js` | This is the sole owner of current market renderer and action globals. |
-| Bounty Board | `js/02-account-navigation.js` | `js/04a-bounty-board.js` | Daily contracts, rewards, and multiplayer staging bounty flows have a dedicated module. Shared Trade/Bounty objective routing remains in the base Trade support file. |
+| Trade Terminal | `js/02-account-navigation.js` | `js/04b-trade-terminal-v2.js` | This is the sole owner of current market renderer and action globals. Shared sector routing lives in `js/04-objective-routing.js`. |
+| Bounty Board | `js/02-account-navigation.js` | `js/04a-bounty-board.js` | Daily contracts, rewards, and multiplayer staging bounty flows have a dedicated module. Shared sector routing lives in `js/04-objective-routing.js`. |
 | Store | `js/02-account-navigation.js` | `js/05b-store.js` | Store catalogue, detail, pricing, purchase, and resale flows have a dedicated later-loaded module. |
 | Hangar, Fleet, Vessel Exchange, Loadout, Vault | `js/02-account-navigation.js` | `js/05-hangar-staging-support.js`, `js/05a-hangar-vault.js`, `js/05c-hangar-fleet.js`, `js/05d-vessel-exchange.js`, `js/05e-hangar-loadout.js` | Shared staging Store/Loadout coordination is isolated from the feature modules. Fleet, Exchange, Loadout fitting, and Vault each have an explicit owner; the compact space HUD slot detail remains in `js/03-hud-space-map.js`. |
 | Tutorial | Screen entry functions above | `js/08-tutorial.js` | Tutorial steps should call current public screen actions rather than duplicate screen behavior. |
@@ -88,12 +88,14 @@ change behavior even when their declarations are unchanged.
 - Gated server Store mutations now require operation IDs, reuse duplicate
   same-room requests, and condition writes on the trusted save revision so stale
   credit and ownership patches fail closed.
+- Shared Trade/Bounty sector pathfinding and map-highlight helpers now live in
+  `js/04-objective-routing.js`; state, progress, and HUD rendering remain with
+  their existing feature owners.
 
 ## Remaining opportunities
 
-1. Consider moving the remaining shared Trade/Bounty objective HUD and route
-   helpers into a neutral objective module. Do this only when it reduces coupling;
-   both systems intentionally consume those helpers today.
+1. Keep the remaining shared Trade/Bounty objective state and HUD rendering
+   together until a later screen change gives them a clearer independent owner.
 2. Continue modularizing `style.css` one screen at a time, starting with a stable
    Journey or Store boundary. Treat this as an order-sensitive migration, not a
    formatting exercise.

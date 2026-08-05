@@ -1531,6 +1531,41 @@ test.describe("Lupen browser smoke", () => {
     });
   });
 
+  test("shared objective routing lives in its neutral ordered module", async ({ page }) => {
+    const indexSource = fs.readFileSync(path.join(__dirname, "../../index.html"), "utf8");
+    const tradeSource = fs.readFileSync(path.join(__dirname, "../../js/04-trade-bounty-objectives.js"), "utf8");
+    const routingSource = fs.readFileSync(path.join(__dirname, "../../js/04-objective-routing.js"), "utf8");
+    const routingFunctions = [
+      "findSectorRoute",
+      "getObjectiveRoutePath",
+      "isNodeOnActiveTradeRoute",
+      "isLineOnActiveTradeRoute"
+    ];
+    const bountyLinkIndex = indexSource.indexOf('src="js/04a-bounty-board.js');
+    const routingLinkIndex = indexSource.indexOf('src="js/04-objective-routing.js');
+    const terminalLinkIndex = indexSource.indexOf('src="js/04b-trade-terminal-v2.js');
+
+    routingFunctions.forEach(name => {
+      expect(tradeSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} base declarations`).toHaveLength(0);
+      expect(routingSource.match(new RegExp(`^function ${name}\\(`, "gm")) || [], `${name} routing declarations`).toHaveLength(1);
+    });
+    expect(routingLinkIndex).toBeGreaterThan(bountyLinkIndex);
+    expect(terminalLinkIndex).toBeGreaterThan(routingLinkIndex);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+    const route = await page.evaluate(() => {
+      const nodes = findSectorRoute("Asteron Prime", "Virella");
+      return {
+        nodes,
+        adjacent: nodes.every((name, index) => index === 0 || sectorNodes[nodes[index - 1]]?.connects?.includes(name))
+      };
+    });
+    expect(route.nodes[0]).toBe("Asteron Prime");
+    expect(route.nodes.at(-1)).toBe("Virella");
+    expect(route.adjacent).toBe(true);
+  });
+
   test("orbit pilot card overrides live in their dedicated ordered stylesheet", async () => {
     const indexSource = fs.readFileSync(path.join(__dirname, "../../index.html"), "utf8");
     const baseSource = fs.readFileSync(path.join(__dirname, "../../style.css"), "utf8");
