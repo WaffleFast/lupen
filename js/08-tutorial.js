@@ -212,7 +212,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-hangar-first-ship",
     title: "Open Hangar Bay",
-    text: "Open Hangar Bay. We will confirm your Pioneer Hunter and inspect the systems that carry you through the first route.",
+    text: "Every pilot needs a ship. Your first vessel, the Pioneer Hunter, is waiting for you in the Hangar Bay. Open it now and claim the ship that will carry you through the beginning of your journey.",
     target: ".hub-actions button[onclick='openHangar()']",
     event: "openedHangar"
   },

@@ -497,9 +497,14 @@ test.describe("Lupen browser smoke", () => {
     await page.locator("#journeyScreen .screen-back-btn").click();
     await expect(page.locator("#gameScreen")).toHaveClass(/active/);
     await expect(page.locator("#tutorialTitle")).toHaveText("Open Hangar Bay");
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "Every pilot needs a ship. Your first vessel, the Pioneer Hunter, is waiting for you in the Hangar Bay. " +
+      "Open it now and claim the ship that will carry you through the beginning of your journey."
+    );
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("Academy Assignment");
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("Claim Starter Ship");
     await expect(page.locator("#tutorialAcademyTracker")).toContainText("0 / 1");
+    await page.screenshot({ path: "artifacts/morgan-open-hangar-bay-1228x731.png", fullPage: false });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -6900,6 +6905,9 @@ test.describe("Lupen browser smoke", () => {
       target: "tutorial:firstShipBuy",
       event: "boughtFirstShip"
     });
+    expect(stepById["open-hangar-first-ship"].text).toBe(
+      "Every pilot needs a ship. Your first vessel, the Pioneer Hunter, is waiting for you in the Hangar Bay. Open it now and claim the ship that will carry you through the beginning of your journey."
+    );
     expect(stepById["review-market-buy-price"]).toMatchObject({
       title: "Check your buy price",
       target: "tutorial:marketBuyPrice",
