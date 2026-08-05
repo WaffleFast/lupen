@@ -1775,6 +1775,7 @@
   min-height: 74px !important;
   height: 74px !important;
   padding: 8px 11px !important;
+  overflow: hidden !important;
   border-radius: var(--lupen-control-radius) !important;
 }
 
@@ -1785,22 +1786,29 @@
 #hangarShipyardSection .unified-vessel-card.exchange-vessel-card .fleet-card-name,
 #hangarShipyardSection .unified-vessel-card.exchange-vessel-card .vessel-card-description {
   grid-column: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  align-self: center !important;
 }
 
 #hangarOwnedSection .unified-vessel-card.fleet-roster-card .fleet-card-role,
 #hangarShipyardSection .unified-vessel-card.exchange-vessel-card .fleet-card-role {
   padding-right: 88px !important;
   font-size: 9px !important;
+  line-height: 1 !important;
 }
 
 #hangarOwnedSection .unified-vessel-card.fleet-roster-card .fleet-card-name,
 #hangarShipyardSection .unified-vessel-card.exchange-vessel-card .fleet-card-name {
   font-size: 15px !important;
+  line-height: 1.05 !important;
 }
 
 #hangarOwnedSection .unified-vessel-card.fleet-roster-card .vessel-card-description,
 #hangarShipyardSection .unified-vessel-card.exchange-vessel-card .vessel-card-description {
   font-size: 9px !important;
+  line-height: 1.1 !important;
 }
 
 @media (min-width: 821px) {

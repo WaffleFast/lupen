@@ -86,6 +86,30 @@ test.describe("Journey chapter redesign", () => {
     await expect(page.locator(".journey-complete-chapter")).toBeDisabled();
   });
 
+  test("keeps compact Academy assignment copy inside its own row", async ({ page }) => {
+    await page.setViewportSize({ width: 1223, height: 725 });
+    await waitForGame(page);
+    await seedFrontier(page);
+    await page.locator("[data-journey-chapter-id='academy']").click();
+
+    const rows = await page.locator(".journey-assignment-card").evaluateAll(cards => cards.map(card => {
+      const outer = card.getBoundingClientRect();
+      const copy = card.querySelector(".journey-objective-copy")?.getBoundingClientRect();
+      const title = card.querySelector(".journey-objective-top")?.getBoundingClientRect();
+      const description = card.querySelector(".journey-objective-copy p")?.getBoundingClientRect();
+      return {
+        copyContained: Boolean(copy && copy.top >= outer.top + 1 && copy.bottom <= outer.bottom - 1),
+        titleContained: Boolean(title && title.top >= outer.top + 1 && title.bottom <= outer.bottom - 1),
+        descriptionContained: Boolean(description && description.top >= outer.top + 1 && description.bottom <= outer.bottom - 1),
+        ordered: Boolean(title && description && description.top >= title.bottom - 1)
+      };
+    }));
+
+    expect(rows).toHaveLength(10);
+    expect(rows.every(row => row.copyContained && row.titleContained && row.descriptionContained && row.ordered)).toBe(true);
+    await page.screenshot({ path: "artifacts/journey-academy-compact-1223x725.png", fullPage: false });
+  });
+
   test("Frontier reward is granted exactly once and unlocks a plan, not a ship", async ({ page }) => {
     await waitForGame(page);
     await seedFrontier(page, true);

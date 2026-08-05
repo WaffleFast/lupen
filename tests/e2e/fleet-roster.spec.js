@@ -40,6 +40,18 @@ test.describe("Hangar Fleet roster", () => {
     await expect(page.locator("#fleetDetailPanel .fleet-repair-action")).toBeDisabled();
     await expect(page.locator("#fleetDetailPanel .fleet-management-primary")).toHaveText("Open Loadout");
 
+    const catalogueCopy = await page.locator("#ownedShipsList .fleet-roster-card").evaluateAll(cards => cards.map(card => {
+      const outer = card.getBoundingClientRect();
+      const copy = [".fleet-card-role", ".fleet-card-name", ".vessel-card-description"]
+        .map(selector => card.querySelector(selector)?.getBoundingClientRect())
+        .filter(rect => rect && rect.width > 0 && rect.height > 0);
+      return {
+        contained: copy.every(rect => rect.top >= outer.top + 1 && rect.bottom <= outer.bottom - 1 && rect.left >= outer.left + 1 && rect.right <= outer.right - 1),
+        ordered: copy.every((rect, index) => index === 0 || rect.top >= copy[index - 1].bottom - 1)
+      };
+    }));
+    expect(catalogueCopy.every(item => item.contained && item.ordered)).toBe(true);
+
     const fleetPresentationHeight = await page.locator("#fleetDetailPanel .fleet-selected-presentation").evaluate(frame => frame.getBoundingClientRect().height);
 
     const presentationGeometry = await page.locator("#fleetDetailPanel .fleet-selected-presentation").evaluate(frame => {

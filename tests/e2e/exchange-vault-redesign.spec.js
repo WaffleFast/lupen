@@ -72,6 +72,18 @@ test.describe("Hangar Exchange and Vault redesign", () => {
     expect(layout.artFits).toBe(true);
     expect(layout.presentationWidthRatio).toBeGreaterThan(0.9);
 
+    const catalogueCopy = await page.locator("#shipShop .vessel-exchange-card").evaluateAll(cards => cards.map(card => {
+      const outer = card.getBoundingClientRect();
+      const copy = [".fleet-card-role", ".fleet-card-name", ".vessel-card-description"]
+        .map(selector => card.querySelector(selector)?.getBoundingClientRect())
+        .filter(rect => rect && rect.width > 0 && rect.height > 0);
+      return {
+        contained: copy.every(rect => rect.top >= outer.top + 1 && rect.bottom <= outer.bottom - 1 && rect.left >= outer.left + 1 && rect.right <= outer.right - 1),
+        ordered: copy.every((rect, index) => index === 0 || rect.top >= copy[index - 1].bottom - 1)
+      };
+    }));
+    expect(catalogueCopy.every(item => item.contained && item.ordered)).toBe(true);
+
     await page.mouse.move(10, 10);
     await page.screenshot({ path: "artifacts/vessel-exchange-redesign.png", fullPage: false });
     await page.locator("#shipyardDetailPanel .buy-ship-action").click();

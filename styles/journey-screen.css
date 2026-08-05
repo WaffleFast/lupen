@@ -370,7 +370,7 @@
   padding: 0 3px 0 0 !important;
   display: grid !important;
   grid-template-columns: 1fr !important;
-  grid-auto-rows: minmax(48px, 1fr);
+  grid-auto-rows: minmax(52px, 1fr);
   align-content: start;
   gap: 5px !important;
   overflow-x: hidden !important;
@@ -386,7 +386,7 @@
 #journeyScreen .journey-assignment-card {
   box-sizing: border-box !important;
   height: 100% !important;
-  min-height: 48px !important;
+  min-height: 52px !important;
   margin: 0 !important;
   padding: 5px 12px !important;
   display: grid !important;
@@ -397,6 +397,7 @@
   border-radius: 7px !important;
   background: rgba(4, 20, 31, 0.72) !important;
   box-shadow: none !important;
+  overflow: hidden !important;
 }
 
 #journeyScreen .journey-assignment-card::before,
@@ -423,6 +424,11 @@
 
 #journeyScreen .journey-objective-copy {
   min-width: 0;
+  min-height: 0 !important;
+  display: block !important;
+  align-self: center !important;
+  gap: 0 !important;
+  overflow: hidden;
 }
 
 #journeyScreen .journey-objective-top {
@@ -430,6 +436,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-height: 0 !important;
 }
 
 #journeyScreen .journey-objective-top strong {
@@ -441,6 +448,7 @@
 }
 
 #journeyScreen .journey-objective-copy p {
+  min-height: 0 !important;
   margin: 3px 0 0 !important;
   overflow: hidden;
   color: #aebcc7 !important;
@@ -453,8 +461,12 @@
 
 #journeyScreen .journey-assignment-status {
   flex: 0 0 auto;
+  display: inline-flex !important;
+  align-items: center;
+  margin: 0 !important;
   color: #91a5b4;
   font-size: 11px;
+  line-height: 1 !important;
   white-space: nowrap;
 }
 
@@ -465,6 +477,7 @@
 #journeyScreen .journey-assignment-status b {
   margin-left: 4px;
   font-size: 15px;
+  line-height: 1 !important;
 }
 
 #journeyScreen .journey-assignment-progress-row {
