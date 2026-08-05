@@ -1,8 +1,13 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = LupenSaveService.storageKeys.tutorial;
-const TUTORIAL_FLOW_VERSION = 5;
+const TUTORIAL_FLOW_VERSION = 6;
 const TUTORIAL_NARRATOR_LABEL = "Morgan";
 const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
+const TUTORIAL_INTRO_COPY = Object.freeze({
+  title: "Welcome to Lupen, {pilot}",
+  text: "Welcome, Pilot. I’m Morgan, your Command Liaison. I’ll be here to guide you through the universe of Lupen.\n\nYou’ll discover new worlds, build your fortune through trade, strengthen your fleet and fight for your place among the stars. There is no single path ahead of you. This journey will become whatever you choose to make it.",
+  actionLabel: "Begin your journey"
+});
 const TUTORIAL_TRADE_ROUTE = Object.freeze({
   origin: "Asteron Prime",
   good: "Iron",
@@ -153,13 +158,13 @@ window.repairProgressFromCompletedStarterTutorial = repairProgressFromCompletedS
 const STARTER_TUTORIAL_STEPS = [
   {
     id: "cinematic-welcome",
-    title: "Welcome to Lupen, {pilot}",
+    title: TUTORIAL_INTRO_COPY.title,
     speaker: TUTORIAL_NARRATOR_LABEL,
     voiceCue: "tutorial_intro_welcome",
-    text: "I'm Morgan, your Command Liaison. Asteron Prime is holding your launch window, the markets are awake, and the dark between worlds is already moving. Stay with my signal for the first run; after that, Pilot, the stars start answering to you.",
+    text: TUTORIAL_INTRO_COPY.text,
     target: "#tutorialCinematicContinue",
     event: null,
-    actionLabel: "Begin your journey",
+    actionLabel: TUTORIAL_INTRO_COPY.actionLabel,
     manualOnly: true,
     intro: true,
     cinematic: true
@@ -180,16 +185,26 @@ const STARTER_TUTORIAL_STEPS = [
     id: "welcome-core-loop",
     title: "Open Journey",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "Open Journey. It is your route-map through the noise: one clear assignment, then the next, until the Frontier knows your name.",
+    text: "Journey will guide you through the first steps of life in Lupen, Pilot. Each assignment will introduce you to something new and prepare you for the path ahead. Open it now, and I’ll show you where to begin.",
     target: "#journeyHubBtn",
     event: "openedJourney",
     actionLabel: "Open highlighted Journey"
   },
   {
     id: "welcome-academy",
-    title: "Your Academy route",
+    title: "Your Academy Assignments",
     speaker: TUTORIAL_NARRATOR_LABEL,
-    text: "First light: claim your starter ship. Journey will mark each assignment as you prove it. Return to the station, and I will walk you to the Hangar.",
+    text: "These are your Academy Assignments. Each one introduces a core part of life in Lupen, and Journey will track your progress as you complete it. Your first assignment is Claim Starter Ship. Take a moment to review the route, then select Continue when you’re ready.",
+    target: null,
+    event: null,
+    actionLabel: "Continue",
+    manualOnly: true
+  },
+  {
+    id: "return-from-journey",
+    title: "Begin your first assignment",
+    speaker: TUTORIAL_NARRATOR_LABEL,
+    text: "Your first assignment is Claim Starter Ship. Use Back when you’re ready, and I’ll guide you to the Hangar.",
     target: "#journeyScreen .screen-back-btn",
     event: "returnedToHub",
     actionLabel: "Use highlighted Back"
@@ -663,6 +678,7 @@ const TUTORIAL_FLOW_V4_ADDED_STEP_IDS = new Set(TUTORIAL_DAILY_CONTRACT_INTRO_ST
 const TUTORIAL_FLOW_V5_ADDED_STEP_IDS = new Set(
   TUTORIAL_DAILY_CONTRACT_STEP_IDS.filter(stepId => !TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS.includes(stepId))
 );
+const TUTORIAL_FLOW_V6_ADDED_STEP_IDS = new Set(["return-from-journey"]);
 
 function migrateTutorialStateToCurrentFlow() {
   const savedStepId = String(tutorialState.stepId || "");
@@ -687,7 +703,8 @@ function migrateTutorialStateToCurrentFlow() {
     const legacySteps = STARTER_TUTORIAL_STEPS.filter(step => (
       !TUTORIAL_FLOW_V2_ADDED_STEP_IDS.has(step.id) &&
       !TUTORIAL_FLOW_V4_ADDED_STEP_IDS.has(step.id) &&
-      !TUTORIAL_FLOW_V5_ADDED_STEP_IDS.has(step.id)
+      !TUTORIAL_FLOW_V5_ADDED_STEP_IDS.has(step.id) &&
+      !TUTORIAL_FLOW_V6_ADDED_STEP_IDS.has(step.id)
     ));
     const legacyStep = legacySteps[Math.min(Math.max(0, tutorialState.stepIndex), legacySteps.length - 1)];
     nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === legacyStep?.id);
@@ -705,7 +722,7 @@ migrateTutorialStateToCurrentFlow();
 const TUTORIAL_PROGRESS_PHASES = Object.freeze([
   Object.freeze({
     label: "Briefing",
-    stepIds: Object.freeze(["cinematic-welcome", "welcome-new-pilot", "welcome-core-loop", "welcome-academy"])
+    stepIds: Object.freeze(["cinematic-welcome", "welcome-new-pilot", "welcome-core-loop", "welcome-academy", "return-from-journey"])
   }),
   Object.freeze({
     label: "Ship",
@@ -880,7 +897,7 @@ function renderTutorialAcademyTracker(step) {
   const tracker = document.getElementById("tutorialAcademyTracker");
   if (!tracker) return;
 
-  if (step?.id === "welcome-academy") {
+  if (["welcome-academy", "return-from-journey"].includes(step?.id)) {
     const mission = getTutorialAcademyMission("academy_starter_ship");
     const state = getTutorialAcademyMissionState("academy_starter_ship");
     const required = Math.max(1, Number(mission?.objective?.required || 1));
