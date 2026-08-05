@@ -6902,12 +6902,25 @@ test.describe("Lupen browser smoke", () => {
     });
     expect(stepById["buy-first-ship"]).toMatchObject({
       title: "Claim Pioneer Hunter",
+      text: "Your Pioneer Hunter is ready, Pilot. Claim your ship and let's continue with your journey.",
       target: "tutorial:firstShipBuy",
       event: "boughtFirstShip"
     });
     expect(stepById["open-hangar-first-ship"].text).toBe(
       "Every pilot needs a ship. Your first vessel, the Pioneer Hunter, is waiting for you in the Hangar Bay. Open it now and claim the ship that will carry you through the beginning of your journey."
     );
+    expect(stepById["open-first-loadout"]).toMatchObject({
+      title: "Open Loadout",
+      text: "Please navigate to the Loadout section, Pilot.",
+      target: "tutorial:hangarLoadoutTab",
+      event: "openedHangarLoadout"
+    });
+    expect(stepById["review-first-loadout"]).toMatchObject({
+      title: "Your Loadout",
+      text: "Here, you can check your ship’s statistics and hull condition, and equip the guns and attachments you’ll need for the journey ahead.",
+      target: null,
+      manualOnly: true
+    });
     expect(stepById["review-market-buy-price"]).toMatchObject({
       title: "Check your buy price",
       target: "tutorial:marketBuyPrice",
@@ -7642,6 +7655,7 @@ test.describe("Lupen browser smoke", () => {
   test("Vessel Exchange starter ship CTA is visible for the tutorial claim step", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
+    await page.setViewportSize({ width: 1228, height: 731 });
     await page.goto("/");
     await waitForGameGlobals(page);
 
@@ -7695,6 +7709,11 @@ test.describe("Lupen browser smoke", () => {
     expect(cta.insidePanel).toBe(true);
     expect(cta.visibleShipNames).toEqual(expect.arrayContaining(["Pioneer Hunter", "Pioneer Destroyer", "Pioneer Freighter", "Pioneer Behemoth"]));
     expect(cta.lockedShipNames).toEqual([]);
+    await expect(page.locator("#tutorialTitle")).toHaveText("Claim Pioneer Hunter");
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "Your Pioneer Hunter is ready, Pilot. Claim your ship and let's continue with your journey."
+    );
+    await page.screenshot({ path: "artifacts/morgan-claim-pioneer-hunter-1228x731.png", fullPage: false });
 
     await page.locator("#shipyardDetailPanel .buy-ship-action[data-tutorial-target='firstShipBuy']").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") !== "buy-first-ship");
@@ -7707,6 +7726,28 @@ test.describe("Lupen browser smoke", () => {
     expect(claimed.currentShipId).toBe("falcon");
     expect(claimed.ownsStarter).toBe(true);
     expect(claimed.stepId).toBe("open-first-loadout");
+    await expect(page.locator("#tutorialTitle")).toHaveText("Open Loadout");
+    await expect(page.locator("#tutorialText")).toHaveText("Please navigate to the Loadout section, Pilot.");
+    await expect(page.locator("#hangarOverviewTab")).toHaveClass(/tutorial-highlight-target/);
+    await page.screenshot({ path: "artifacts/morgan-open-first-loadout-1228x731.png", fullPage: false });
+
+    await page.locator("#hangarOverviewTab").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "review-first-loadout");
+    await expect(page.locator("#hangarOverviewSection")).toHaveClass(/active/);
+    await expect(page.locator("#tutorialTitle")).toHaveText("Your Loadout");
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "Here, you can check your ship’s statistics and hull condition, and equip the guns and attachments you’ll need for the journey ahead."
+    );
+    await expect(page.locator("#overviewStats")).toBeVisible();
+    await expect(page.locator("#overviewRepairPanel")).toBeVisible();
+    await expect(page.locator(".tutorial-actions")).toBeVisible();
+    await expect(page.locator("#tutorialNextBtn")).toBeEnabled();
+    await expect(page.locator("#hangarScreen .screen-back-btn")).not.toHaveClass(/tutorial-highlight-target/);
+    await page.screenshot({ path: "artifacts/morgan-first-loadout-overview-1228x731.png", fullPage: false });
+
+    await page.locator("#tutorialNextBtn").click();
+    await expect(page.locator("#tutorialTitle")).toHaveText("Return to station");
+    await expect(page.locator("#hangarScreen .screen-back-btn")).toHaveClass(/tutorial-highlight-target/);
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

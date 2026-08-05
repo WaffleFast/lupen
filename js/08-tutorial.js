@@ -1,6 +1,6 @@
 ﻿/* ===== Starter Pilot Programme tutorial ===== */
 const TUTORIAL_STORAGE_KEY = LupenSaveService.storageKeys.tutorial;
-const TUTORIAL_FLOW_VERSION = 6;
+const TUTORIAL_FLOW_VERSION = 7;
 const TUTORIAL_NARRATOR_LABEL = "Morgan";
 const TUTORIAL_PROGRAMME_LABEL = "Academy Orientation";
 const TUTORIAL_INTRO_COPY = Object.freeze({
@@ -17,7 +17,7 @@ const TUTORIAL_ACADEMY_MILESTONES = Object.freeze([
   Object.freeze({
     missionId: "academy_starter_ship",
     shortLabel: "Claim Hunter",
-    stepIds: Object.freeze(["open-hangar-first-ship", "buy-first-ship", "open-first-loadout"])
+    stepIds: Object.freeze(["open-hangar-first-ship", "buy-first-ship", "open-first-loadout", "review-first-loadout"])
   }),
   Object.freeze({
     missionId: "academy_first_trade",
@@ -219,16 +219,26 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "buy-first-ship",
     title: "Claim Pioneer Hunter",
-    text: "Claim the Pioneer Hunter if it is waiting in the Vessel Exchange. If it is already active, I will move us forward.",
+    text: "Your Pioneer Hunter is ready, Pilot. Claim your ship and let's continue with your journey.",
     target: "tutorial:firstShipBuy",
     event: "boughtFirstShip"
   },
   {
     id: "open-first-loadout",
     title: "Open Loadout",
-    text: "Open Loadout. This is where your ship carries weapons, equipment, hull condition, and every upgrade that keeps you alive longer.",
+    text: "Please navigate to the Loadout section, Pilot.",
     target: "tutorial:hangarLoadoutTab",
     event: "openedHangarLoadout"
+  },
+  {
+    id: "review-first-loadout",
+    title: "Your Loadout",
+    speaker: TUTORIAL_NARRATOR_LABEL,
+    text: "Here, you can check your ship’s statistics and hull condition, and equip the guns and attachments you’ll need for the journey ahead.",
+    target: null,
+    event: null,
+    actionLabel: "Continue",
+    manualOnly: true
   },
   {
     id: "return-after-first-loadout",
@@ -679,6 +689,7 @@ const TUTORIAL_FLOW_V5_ADDED_STEP_IDS = new Set(
   TUTORIAL_DAILY_CONTRACT_STEP_IDS.filter(stepId => !TUTORIAL_DAILY_CONTRACT_INTRO_STEP_IDS.includes(stepId))
 );
 const TUTORIAL_FLOW_V6_ADDED_STEP_IDS = new Set(["return-from-journey"]);
+const TUTORIAL_FLOW_V7_ADDED_STEP_IDS = new Set(["review-first-loadout"]);
 
 function migrateTutorialStateToCurrentFlow() {
   const savedStepId = String(tutorialState.stepId || "");
@@ -704,7 +715,8 @@ function migrateTutorialStateToCurrentFlow() {
       !TUTORIAL_FLOW_V2_ADDED_STEP_IDS.has(step.id) &&
       !TUTORIAL_FLOW_V4_ADDED_STEP_IDS.has(step.id) &&
       !TUTORIAL_FLOW_V5_ADDED_STEP_IDS.has(step.id) &&
-      !TUTORIAL_FLOW_V6_ADDED_STEP_IDS.has(step.id)
+      !TUTORIAL_FLOW_V6_ADDED_STEP_IDS.has(step.id) &&
+      !TUTORIAL_FLOW_V7_ADDED_STEP_IDS.has(step.id)
     ));
     const legacyStep = legacySteps[Math.min(Math.max(0, tutorialState.stepIndex), legacySteps.length - 1)];
     nextIndex = STARTER_TUTORIAL_STEPS.findIndex(step => step.id === legacyStep?.id);
