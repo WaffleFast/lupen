@@ -489,11 +489,9 @@ test.describe("Lupen browser smoke", () => {
     });
     await page.screenshot({ path: "artifacts/morgan-first-academy-assignments-1228x731.png", fullPage: false });
     await page.locator("#tutorialNextBtn").click();
-    await expect(page.locator("#tutorialTitle")).toHaveText("Begin your first assignment");
-    await expect(page.locator("#tutorialText")).toContainText("Use Back when you’re ready");
-    await expect(page.locator(".tutorial-actions")).toBeHidden();
+    await expect(page.locator(".tutorial-card")).toBeHidden();
     await expect(page.locator("#journeyScreen .screen-back-btn")).toHaveClass(/tutorial-highlight-target/);
-    await page.screenshot({ path: "artifacts/morgan-return-from-journey-1228x731.png", fullPage: false });
+    await page.screenshot({ path: "artifacts/morgan-return-from-journey-cardless-1228x731.png", fullPage: false });
     await page.locator("#journeyScreen .screen-back-btn").click();
     await expect(page.locator("#gameScreen")).toHaveClass(/active/);
     await expect(page.locator("#tutorialTitle")).toHaveText("Open Hangar Bay");
@@ -6810,6 +6808,7 @@ test.describe("Lupen browser smoke", () => {
           speaker: step.speaker || "",
           voiceCue: step.voiceCue || "",
           manualOnly: Boolean(step.manualOnly),
+          cardless: Boolean(step.cardless),
           autoSkip: Boolean(step.autoSkip)
         }));
         const firstTitle = document.getElementById("tutorialTitle")?.textContent || "";
@@ -6898,7 +6897,8 @@ test.describe("Lupen browser smoke", () => {
     expect(stepById["return-from-journey"]).toMatchObject({
       title: "Begin your first assignment",
       target: "#journeyScreen .screen-back-btn",
-      event: "returnedToHub"
+      event: "returnedToHub",
+      cardless: true
     });
     expect(stepById["buy-first-ship"]).toMatchObject({
       title: "Claim Pioneer Hunter",
@@ -6921,15 +6921,36 @@ test.describe("Lupen browser smoke", () => {
       target: null,
       manualOnly: true
     });
+    expect(stepById["return-after-first-loadout"].text).toBe(
+      "Next, please return to the station hub. Your first trade will show you how to buy resources, move them between worlds and sell them for a profit."
+    );
+    expect(stepById["open-trade"].text).toBe(
+      "Please navigate to the Trade Terminal where you can compare prices across Lupen and find profitable trade routes."
+    );
+    expect(stepById["select-market-resource"].text).toBe(
+      "Buy low and sell high is the aim of the game here. In this instance, select Iron on the Market Board."
+    );
     expect(stepById["review-market-buy-price"]).toMatchObject({
       title: "Check your buy price",
+      text: "You can currently purchase Iron on Asteron Prime for {tradeBuyPrice} credits per unit. This is your buy price. Select the highlighted price on the Market Board.",
       target: "tutorial:marketBuyPrice",
       event: "reviewedTutorialBuyPrice"
     });
     expect(stepById["review-market-sell-price"]).toMatchObject({
       title: "Compare the sell price",
+      text: "Virella will pay {tradeSellPrice} credits per unit of Iron, which delivers a profit of {tradeProfitPerUnit} credits per unit sold. Please select the highlighted Virella price.",
       target: "tutorial:marketSellPrice",
       event: "reviewedTutorialSellPrice"
+    });
+    expect(stepById["select-market-target"].text).toBe(
+      "Select Max to invest {tradeInvestment} credits for {tradeUnits} units of Iron. If you sell this Iron at Virella, you will receive a return of {tradeRevenue} credits, which is a tidy profit of {tradeProjectedProfit} credits total."
+    );
+    expect(stepById["buy-cargo"].text).toBe(
+      "Select the Purchase Cargo button to lock in this trade at the current buy price."
+    );
+    expect(stepById["sell-cargo"]).toMatchObject({
+      title: "Sell Cargo",
+      text: "The next step would be to sell the iron. The profit is yours, Pilot. Use this to fund further trade routes."
     });
     expect(stepById["review-daily-contracts"]).toMatchObject({
       title: "Meet Daily Contracts",
@@ -7747,7 +7768,11 @@ test.describe("Lupen browser smoke", () => {
 
     await page.locator("#tutorialNextBtn").click();
     await expect(page.locator("#tutorialTitle")).toHaveText("Return to station");
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "Next, please return to the station hub. Your first trade will show you how to buy resources, move them between worlds and sell them for a profit."
+    );
     await expect(page.locator("#hangarScreen .screen-back-btn")).toHaveClass(/tutorial-highlight-target/);
+    await page.screenshot({ path: "artifacts/morgan-return-to-station-trade-intro-1228x731.png", fullPage: false });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
@@ -8016,6 +8041,7 @@ test.describe("Lupen browser smoke", () => {
   test("first trade tutorial path buys and sells guaranteed Iron route in staging", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
+    await page.setViewportSize({ width: 1228, height: 731 });
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await waitForGameGlobals(page);
 
@@ -8036,13 +8062,23 @@ test.describe("Lupen browser smoke", () => {
         mineralKeys.forEach(key => { cargo[key] = 0; });
         cargoCostBasis = {};
         showScreen("gameScreen");
-        openMarketplace();
         startStarterTutorial(true);
-        setTutorialStepById("select-market-resource");
+        setTutorialStepById("open-trade");
       })()
     `));
 
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "Please navigate to the Trade Terminal where you can compare prices across Lupen and find profitable trade routes."
+    );
+    await expect(page.locator("[data-tutorial-target='planetTradeTerminal']")).toHaveClass(/tutorial-highlight-target/);
+    await page.screenshot({ path: "artifacts/morgan-open-first-trade-terminal-1228x731.png", fullPage: false });
+    await page.locator("[data-tutorial-target='planetTradeTerminal']").click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "select-market-resource");
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "Buy low and sell high is the aim of the game here. In this instance, select Iron on the Market Board."
+    );
     await expect(page.locator("[data-tutorial-target='marketResourceIron']")).toBeVisible();
+    await page.screenshot({ path: "artifacts/morgan-select-iron-resource-1228x731.png", fullPage: false });
     await page.locator("[data-tutorial-target='marketResourceIron'] > th").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "review-market-buy-price");
     await expect(page.locator("[data-tutorial-target='marketBuyPrice']")).toBeVisible();
@@ -8052,20 +8088,36 @@ test.describe("Lupen browser smoke", () => {
     expect(tutorialQuote.profitPerUnit).toBeGreaterThan(0);
     expect(tutorialQuote.projectedProfit).toBeGreaterThan(0);
     const quoteNumber = (value) => Number(value).toLocaleString("en-GB");
-    await expect(page.locator("#tutorialText")).toContainText(`CR ${quoteNumber(tutorialQuote.buyPrice)}`);
+    await expect(page.locator("#tutorialText")).toHaveText(
+      `You can currently purchase Iron on Asteron Prime for ${quoteNumber(tutorialQuote.buyPrice)} credits per unit. ` +
+      "This is your buy price. Select the highlighted price on the Market Board."
+    );
+    await page.screenshot({ path: "artifacts/morgan-check-iron-buy-price-1228x731.png", fullPage: false });
 
     await page.locator("[data-tutorial-target='marketBuyPrice']").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "review-market-sell-price");
     await expect(page.locator("[data-tutorial-target='marketSellPrice']")).toBeVisible();
-    await expect(page.locator("#tutorialText")).toContainText(`CR ${quoteNumber(tutorialQuote.sellPrice)}`);
-    await expect(page.locator("#tutorialText")).toContainText(`+CR ${quoteNumber(tutorialQuote.profitPerUnit)}`);
+    await expect(page.locator("#tutorialText")).toHaveText(
+      `Virella will pay ${quoteNumber(tutorialQuote.sellPrice)} credits per unit of Iron, which delivers a profit of ` +
+      `${quoteNumber(tutorialQuote.profitPerUnit)} credits per unit sold. Please select the highlighted Virella price.`
+    );
+    await page.screenshot({ path: "artifacts/morgan-compare-iron-sell-price-1228x731.png", fullPage: false });
 
     await page.locator("[data-tutorial-target='marketSellPrice']").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "select-market-target");
-    await expect(page.locator("#tutorialText")).toContainText(`+CR ${quoteNumber(tutorialQuote.projectedProfit)}`);
+    await expect(page.locator("#tutorialText")).toHaveText(
+      `Select Max to invest ${quoteNumber(tutorialQuote.investment)} credits for ${quoteNumber(tutorialQuote.units)} units of Iron. ` +
+      `If you sell this Iron at Virella, you will receive a return of ${quoteNumber(tutorialQuote.revenue)} credits, which is a tidy profit of ` +
+      `${quoteNumber(tutorialQuote.projectedProfit)} credits total.`
+    );
+    await page.screenshot({ path: "artifacts/morgan-set-iron-cargo-amount-1228x731.png", fullPage: false });
     const targetTargetExistsBeforeBuy = await page.locator("[data-tutorial-target='marketMaxAmount']").count();
     await page.locator("[data-tutorial-target='marketMaxAmount']").click();
     await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "buy-cargo");
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "Select the Purchase Cargo button to lock in this trade at the current buy price."
+    );
+    await page.screenshot({ path: "artifacts/morgan-accept-iron-trade-1228x731.png", fullPage: false });
     await page.locator("[data-tutorial-target='buyCargo']").click();
 
     const tradeBuy = await page.evaluate(() => window.eval(`
@@ -8164,16 +8216,26 @@ test.describe("Lupen browser smoke", () => {
       })()
     `));
 
-    const tradeSell = await page.evaluate(() => window.eval(`
+    await page.evaluate(() => window.eval(`
       (() => {
         const route = { ...activeTradeRoute };
         openMarketplace();
-        const creditsBeforeSell = credits;
-        const cargoBeforeSell = cargo[route.good] || 0;
         selectedMarketResource = route.good;
         selectedMarketTargetPlanet = route.destination;
         renderMarketplace();
         setTutorialStepById("sell-cargo");
+      })()
+    `));
+    await expect(page.locator("#tutorialText")).toHaveText(
+      "The next step would be to sell the iron. The profit is yours, Pilot. Use this to fund further trade routes."
+    );
+    await page.screenshot({ path: "artifacts/morgan-sell-iron-cargo-1228x731.png", fullPage: false });
+
+    const tradeSell = await page.evaluate(() => window.eval(`
+      (() => {
+        const route = { ...activeTradeRoute };
+        const creditsBeforeSell = credits;
+        const cargoBeforeSell = cargo[route.good] || 0;
         const sellButton = document.querySelector("[data-tutorial-target='sellCargo']");
         const buyButton = document.querySelector("[data-tutorial-target='buyCargo']");
         const terminal = document.querySelector("[data-tutorial-target='planetTradeTerminal']");

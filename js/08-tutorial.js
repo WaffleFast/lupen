@@ -207,7 +207,8 @@ const STARTER_TUTORIAL_STEPS = [
     text: "Your first assignment is Claim Starter Ship. Use Back when you’re ready, and I’ll guide you to the Hangar.",
     target: "#journeyScreen .screen-back-btn",
     event: "returnedToHub",
-    actionLabel: "Use highlighted Back"
+    actionLabel: "Use highlighted Back",
+    cardless: true
   },
   {
     id: "open-hangar-first-ship",
@@ -243,7 +244,7 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "return-after-first-loadout",
     title: "Return to station",
-    text: "Return to the station hub. First objective: a trade run. Trading is the safest way to build the credits that open new routes.",
+    text: "Next, please return to the station hub. Your first trade will show you how to buy resources, move them between worlds and sell them for a profit.",
     target: "#hangarScreen .screen-back-btn",
     event: "returnedToHub",
     place: "left"
@@ -251,42 +252,42 @@ const STARTER_TUTORIAL_STEPS = [
   {
     id: "open-trade",
     title: "Open Trade Terminal",
-    text: "Open the Trade Terminal. A good pilot does not just move cargo. They read the market.",
+    text: "Please navigate to the Trade Terminal where you can compare prices across Lupen and find profitable trade routes.",
     target: "tutorial:planetTradeTerminal",
     event: "openedTradeTerminal"
   },
   {
     id: "select-market-resource",
     title: "Select a resource",
-    text: "Buy where supply is cheap. Sell where demand is hungry. Select Iron on the Market Board.",
+    text: "Buy low and sell high is the aim of the game here. In this instance, select Iron on the Market Board.",
     target: "tutorial:marketResourceIron",
     event: "selectedMarketResource"
   },
   {
     id: "review-market-buy-price",
     title: "Check your buy price",
-    text: "Asteron is selling Iron for CR {tradeBuyPrice} per unit. This is your investment price. Select the highlighted Asteron price.",
+    text: "You can currently purchase Iron on Asteron Prime for {tradeBuyPrice} credits per unit. This is your buy price. Select the highlighted price on the Market Board.",
     target: "tutorial:marketBuyPrice",
     event: "reviewedTutorialBuyPrice"
   },
   {
     id: "review-market-sell-price",
     title: "Compare the sell price",
-    text: "Virella will pay CR {tradeSellPrice} per unit: a return of +CR {tradeProfitPerUnit} on every unit. Select the highlighted Virella price.",
+    text: "Virella will pay {tradeSellPrice} credits per unit of Iron, which delivers a profit of {tradeProfitPerUnit} credits per unit sold. Please select the highlighted Virella price.",
     target: "tutorial:marketSellPrice",
     event: "reviewedTutorialSellPrice"
   },
   {
     id: "select-market-target",
     title: "Set cargo amount",
-    text: "Use Max to invest CR {tradeInvestment} in {tradeUnits} Iron. Selling at Virella should return CR {tradeRevenue}, including +CR {tradeProjectedProfit} profit. This Academy quote remains protected while you travel.",
+    text: "Select Max to invest {tradeInvestment} credits for {tradeUnits} units of Iron. If you sell this Iron at Virella, you will receive a return of {tradeRevenue} credits, which is a tidy profit of {tradeProjectedProfit} credits total.",
     target: "tutorial:marketMaxAmount",
     event: "selectedBuyAmount"
   },
   {
     id: "buy-cargo",
     title: "Accept trade",
-    text: "Accept the marked trade. Maximum affordable cargo will be loaded automatically.",
+    text: "Select the Purchase Cargo button to lock in this trade at the current buy price.",
     target: "tutorial:buyCargo",
     event: "boughtTradeCargo"
   },
@@ -335,8 +336,8 @@ const STARTER_TUTORIAL_STEPS = [
   },
   {
     id: "sell-cargo",
-    title: "Sell cargo",
-    text: "Sell the Iron. The profit is yours, and every clean run brings a Pioneer Freighter closer.",
+    title: "Sell Cargo",
+    text: "The next step would be to sell the iron. The profit is yours, Pilot. Use this to fund further trade routes.",
     target: "tutorial:sellCargo",
     event: "soldTradeCargo"
   },
@@ -2001,7 +2002,7 @@ function getTutorialTargetElement() {
 function positionTutorialCard(step, target) {
   const overlay = document.getElementById("tutorialOverlay");
   const card = document.querySelector(".tutorial-card");
-  if (!overlay || !card || !step || step.intro || step.outro) {
+  if (!overlay || !card || !step || step.intro || step.outro || step.cardless) {
     if (card) {
       card.classList.remove("tutorial-card-positioned");
       card.style.left = "";
@@ -2304,7 +2305,7 @@ function renderStarterTutorial() {
   if (title) title.textContent = formatTutorialCopy(step.title);
   if (text) text.textContent = formatTutorialCopy(step.text);
   if (cinematic) cinematic.hidden = !isCinematic;
-  if (card) card.hidden = isCinematic;
+  if (card) card.hidden = isCinematic || Boolean(step.cardless);
   if (isCinematic && cinematicImage && !cinematicImage.getAttribute("src")) {
     cinematicImage.src = cinematicImage.dataset.src || "assets/morgan-cinematic-welcome.png";
   }
