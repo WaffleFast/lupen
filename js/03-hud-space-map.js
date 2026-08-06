@@ -1777,12 +1777,7 @@ function updateHudDock() {
     }
 
     if (hudLevelBadge) {
-      hudLevelBadge.style.setProperty("box-sizing", "border-box", "important");
-      hudLevelBadge.style.setProperty("width", "52px", "important");
-      hudLevelBadge.style.setProperty("height", "44px", "important");
-      hudLevelBadge.style.setProperty("min-width", "52px", "important");
-      hudLevelBadge.style.setProperty("min-height", "44px", "important");
-      hudLevelBadge.style.setProperty("padding", "4px 3px", "important");
+      stabilizeShipMiniLevelBadge(hudShipPanel);
     }
 
     if (hudXpBar) {
@@ -1970,8 +1965,8 @@ function updateSpaceHUD() {
 
   updateCargoSummary();
   updateTargetPanel();
-  updateHudDock();
   updateProgressDisplays();
+  updateHudDock();
 }
 
 function startJumpRecharge() {

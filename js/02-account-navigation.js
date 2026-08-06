@@ -212,12 +212,28 @@ function renderShipMiniProgress(combat) {
   `;
 }
 
+function stabilizeShipMiniLevelBadge(root = document) {
+  const badge = root?.querySelector?.(".ship-mini-level");
+  if (!badge) return;
+  badge.style.setProperty("box-sizing", "border-box", "important");
+  badge.style.setProperty("width", "52px", "important");
+  badge.style.setProperty("height", "44px", "important");
+  badge.style.setProperty("min-width", "52px", "important");
+  badge.style.setProperty("min-height", "44px", "important");
+  badge.style.setProperty("padding", "4px 3px", "important");
+  badge.style.setProperty("overflow", "visible", "important");
+  badge.style.setProperty("clip-path", "none", "important");
+  badge.style.setProperty("border-style", "solid", "important");
+  badge.style.setProperty("border-width", "1px", "important");
+}
+
 function updateProgressDisplays() {
   const combat = getCombatLevelInfo();
 
   const hud = document.getElementById("hudProgressStrip");
   if (hud) {
     hud.innerHTML = renderShipMiniProgress(combat);
+    stabilizeShipMiniLevelBadge(hud);
   }
 
   const profileScreen = document.getElementById("pilotProfileScreen");
