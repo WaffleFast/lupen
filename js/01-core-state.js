@@ -2504,6 +2504,7 @@ function createDefaultPlayerProgress() {
   return {
     combatXp: 0,
     zoneCombatXp: { [XP_CONFIG.combatZoneKey]: 0 },
+    botKillEventKeys: {},
     totals: {
       botsDestroyed: 0,
       erebusBotsDestroyed: 0,
@@ -2526,6 +2527,9 @@ function normalizePlayerProgress(progress) {
     0
   ));
   const rawZoneCombatXp = safe.zoneCombatXp && typeof safe.zoneCombatXp === "object" ? safe.zoneCombatXp : {};
+  const botKillEventKeys = safe.botKillEventKeys && typeof safe.botKillEventKeys === "object"
+    ? { ...safe.botKillEventKeys }
+    : {};
   const zoneCombatXp = {
     ...defaults.zoneCombatXp,
     ...rawZoneCombatXp
@@ -2535,14 +2539,16 @@ function normalizePlayerProgress(progress) {
   }
 
   const rawTotals = safe.totals && typeof safe.totals === "object" ? safe.totals : {};
-  const botsDestroyed = Math.max(0, Number(rawTotals.botsDestroyed || rawTotals.erebusBotsDestroyed || 0));
-  const erebusBotsDestroyed = Math.max(0, Number(rawTotals.erebusBotsDestroyed || rawTotals.botsDestroyed || 0));
+  const firstClaimedBountyKill = Number(rawTotals.bountiesClaimed || 0) > 0 ? 1 : 0;
+  const botsDestroyed = Math.max(firstClaimedBountyKill, Number(rawTotals.botsDestroyed || rawTotals.erebusBotsDestroyed || 0));
+  const erebusBotsDestroyed = Math.max(firstClaimedBountyKill, Number(rawTotals.erebusBotsDestroyed || rawTotals.botsDestroyed || 0));
   const tradeProfit = Math.max(0, Number(rawTotals.tradeProfit || rawTotals.totalTradingProfit || 0));
   const totalTradingProfit = Math.max(0, Number(rawTotals.totalTradingProfit || rawTotals.tradeProfit || 0));
 
   return {
     combatXp,
     zoneCombatXp,
+    botKillEventKeys,
     totals: {
       ...defaults.totals,
       ...rawTotals,
@@ -2720,6 +2726,15 @@ function reportTradingShipProgress(beforeHaulerStatus) {
 
 function recordBotDestroyedProgress(bot) {
   playerProgress = normalizePlayerProgress(playerProgress);
+  const eventKey = String(
+    bot?.eventKey ||
+    bot?.destructionInstanceId ||
+    bot?.botXpSourceEventId ||
+    bot?.rewardPreviewId ||
+    bot?.idempotencyKey ||
+    ""
+  ).trim();
+  if (eventKey && playerProgress.botKillEventKeys[eventKey]) return false;
   const isErebus = !bot || bot.faction === "erebus" || String(bot.botType || "").startsWith("erebus_");
   const beforeNightshadeStatus = isErebus ? getShipUnlockStatus("zeusExplorer") : null;
   playerProgress.totals.botsDestroyed = Math.max(0, Number(playerProgress.totals.botsDestroyed || 0)) + 1;
@@ -2727,9 +2742,11 @@ function recordBotDestroyedProgress(bot) {
     playerProgress.totals.erebusBotsDestroyed = Math.max(0, Number(playerProgress.totals.erebusBotsDestroyed || 0)) + 1;
     reportErebusBotShipProgress(beforeNightshadeStatus);
   }
+  if (eventKey) playerProgress.botKillEventKeys[eventKey] = true;
   if (typeof recordMissionEvent === "function") {
-    recordMissionEvent("destroy_bot", { bot, faction: isErebus ? "erebus" : (bot?.faction || "") });
+    recordMissionEvent("destroy_bot", { bot, faction: isErebus ? "erebus" : (bot?.faction || ""), eventKey });
   }
+  return true;
 }
 
 function getEquipmentUnlockRequirements(categoryKey, itemKey) {

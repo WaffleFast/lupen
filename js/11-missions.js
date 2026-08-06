@@ -83,12 +83,12 @@ const CHAPTER_MISSIONS = Object.freeze([
   }),
   Object.freeze({
     id: "academy_erebus_bots",
-    title: "Destroy 3 Erebus Bots",
+    title: "Destroy 1 Erebus Bot",
     chapter: "academy",
     giver: "Morgan",
-    briefing: "Destroy 3 Erebus bots.",
+    briefing: "Destroy 1 Erebus bot.",
     completeText: "Erebus bot exercise complete. Your combat telemetry is stable.",
-    objective: Object.freeze({ type: "destroy_bot", target: "erebus", required: 3 }),
+    objective: Object.freeze({ type: "destroy_bot", target: "erebus", required: 1 }),
     reward: Object.freeze({ xp: 0, credits: 0 })
   }),
   Object.freeze({
@@ -345,9 +345,9 @@ const JOURNEY_ASSIGNMENTS = Object.freeze([
   Object.freeze({
     id: "academy_erebus_bots",
     chapterId: "academy",
-    journeyTitle: "Destroy 3 Erebus Bots",
-    journeyShortDescription: "Destroy 3 Erebus bots.",
-    journeyObjectiveLabel: "Destroy 3 Erebus bots",
+    journeyTitle: "Destroy 1 Erebus Bot",
+    journeyShortDescription: "Destroy 1 Erebus bot.",
+    journeyObjectiveLabel: "Destroy 1 Erebus bot",
     assignmentType: "combat",
     journeyTheme: "orange",
     icon: "combat",

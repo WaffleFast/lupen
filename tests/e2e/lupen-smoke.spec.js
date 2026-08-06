@@ -4726,7 +4726,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#tacticalPanel")).toBeVisible();
     await expect(page.locator("#tacticalNavAcademy")).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("[data-tactical-section='academy']")).toBeVisible();
-    for (const taskName of ["Claim Starter Ship", "Launch Ship", "Complete First Trade", "Complete a Daily Trade Contract", "Equip Two Guns", "Equip Attachment", "Destroy 3 Erebus Bots", "Repair Ship"]) {
+    for (const taskName of ["Claim Starter Ship", "Launch Ship", "Complete First Trade", "Complete a Daily Trade Contract", "Equip Two Guns", "Equip Attachment", "Destroy 1 Erebus Bot", "Repair Ship"]) {
       await expect(page.locator("[data-tactical-section='academy']")).toContainText(taskName);
     }
 
@@ -9984,6 +9984,32 @@ test.describe("Lupen browser smoke", () => {
             receivedAt: 1003
           })
           : null;
+        const serverAppliedRefresh = applyStagingXpClaimToLoadedState({
+          ok: true,
+          applied: true,
+          saveWritten: true,
+          botId: "staging-bot-3",
+          botName: "Erebus Scout",
+          botType: "hunter",
+          xpDelta: 75,
+          xpAfter: 300,
+          destructionInstanceId: "staging-bot-3:kill-1",
+          botXpSourceEventId: "staging_bot_xp:staging-bot-3:kill-1",
+          receivedAt: 1003
+        });
+        const duplicateServerAppliedRefresh = applyStagingXpClaimToLoadedState({
+          ok: true,
+          applied: true,
+          saveWritten: true,
+          botId: "staging-bot-3",
+          botName: "Erebus Scout",
+          botType: "hunter",
+          xpDelta: 75,
+          xpAfter: 300,
+          destructionInstanceId: "staging-bot-3:kill-1",
+          botXpSourceEventId: "staging_bot_xp:staging-bot-3:kill-1",
+          receivedAt: 1004
+        });
         const duplicateAfterServerApplied = awardLocalStagingBotKillXpFromServer({
           ok: true,
           applied: false,
@@ -10007,6 +10033,8 @@ test.describe("Lupen browser smoke", () => {
           duplicate,
           secondWithBounty,
           serverAppliedMark,
+          serverAppliedRefresh,
+          duplicateServerAppliedRefresh,
           duplicateAfterServerApplied,
           restoredXp: playerProgress.combatXp,
           restoredZoneXp: playerProgress.zoneCombatXp[XP_CONFIG.combatZoneKey],
@@ -10032,14 +10060,16 @@ test.describe("Lupen browser smoke", () => {
     expect(state.serverAppliedMark).toMatchObject({ marked: true, key: "staging-bot-3:kill-1" });
     expect(state.duplicateAfterServerApplied.applied).toBe(false);
     expect(state.duplicateAfterServerApplied.reason).toBe("duplicate_staging_bot_kill_xp");
-    expect(state.savedXp).toBe(225);
-    expect(state.savedZoneXp).toBe(225);
-    expect(state.restoredXp).toBe(225);
-    expect(state.restoredZoneXp).toBe(225);
-    expect(state.botsDestroyed).toBe(2);
-    expect(state.erebusBotsDestroyed).toBe(2);
-    expect(state.hudText).toContain("225");
-    expect(state.pilotText).toContain("225");
+    expect(state.serverAppliedRefresh).toBe(true);
+    expect(state.duplicateServerAppliedRefresh).toBe(true);
+    expect(state.savedXp).toBe(300);
+    expect(state.savedZoneXp).toBe(300);
+    expect(state.restoredXp).toBe(300);
+    expect(state.restoredZoneXp).toBe(300);
+    expect(state.botsDestroyed).toBe(3);
+    expect(state.erebusBotsDestroyed).toBe(3);
+    expect(state.hudText).toContain("300");
+    expect(state.pilotText).toContain("300");
     expect(state.fallbackKillActivityCount).toBe(1);
     expect(state.serverMarkedDuplicateActivityCount).toBe(0);
     expect(state.activeBountyProgress).toBe(1);
@@ -11238,7 +11268,7 @@ test.describe("Lupen browser smoke", () => {
     await expect(page.locator("#journeyScreen")).toContainText("Complete a Daily Trade Contract");
     await expect(page.locator("#journeyScreen")).toContainText("Equip Two Guns");
     await expect(page.locator("#journeyScreen")).toContainText("Equip Attachment");
-    await expect(page.locator("#journeyScreen")).toContainText("Destroy 3 Erebus Bots");
+    await expect(page.locator("#journeyScreen")).toContainText("Destroy 1 Erebus Bot");
     await expect(page.locator("#journeyScreen")).toContainText("Complete a Bounty");
     await expect(page.locator("#journeyScreen")).toContainText("Repair Ship");
     await expect(page.locator("#journeyScreen")).toContainText("Purchase a Pioneer Hull");
@@ -12700,6 +12730,74 @@ test.describe("Lupen browser smoke", () => {
       updateSpaceHUD();
     `));
     await page.screenshot({ path: "artifacts/multiplayer-bot-damage-hud-1228x731.png" });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
+
+  test("first Academy bounty kill updates the one-target assignment and Pilot Profile", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1228, height: 731 });
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const result = await page.evaluate(() => window.eval(`
+      (() => {
+        localStorage.clear();
+        tutorialState = { active: false, completed: false, stepIndex: 0 };
+        playerProgress = createDefaultPlayerProgress();
+        missionProgress = createDefaultMissionProgress();
+        currentShipId = STARTER_SHIP_ID;
+        ownedShips = [STARTER_SHIP_ID];
+        applyStagingXpClaimToLoadedState({
+          ok: true,
+          applied: true,
+          saveWritten: true,
+          botId: "tutorial-first-bot",
+          botName: "Erebus Hunter",
+          botType: "hunter",
+          xpDelta: 250,
+          xpAfter: 250,
+          destructionInstanceId: "tutorial-first-bot:kill-1",
+          receivedAt: Date.now()
+        });
+        showScreen("pilotProfileScreen");
+        renderPilotProfile();
+        const mission = MISSIONS_BY_ID.academy_erebus_bots;
+        const repairedClaimedBountyProgress = normalizePlayerProgress({
+          combatXp: 250,
+          totals: { botsDestroyed: 0, erebusBotsDestroyed: 0, bountiesClaimed: 1 }
+        });
+        return {
+          botsDestroyed: playerProgress.totals.botsDestroyed,
+          erebusBotsDestroyed: playerProgress.totals.erebusBotsDestroyed,
+          missionTitle: mission.title,
+          missionRequired: mission.objective.required,
+          repairedClaimedBountyBots: repairedClaimedBountyProgress.totals.botsDestroyed,
+          repairedClaimedBountyErebusBots: repairedClaimedBountyProgress.totals.erebusBotsDestroyed,
+          profileText: document.getElementById("pilotProfileScreen")?.textContent || ""
+        };
+      })()
+    `));
+
+    expect(result).toMatchObject({
+      botsDestroyed: 1,
+      erebusBotsDestroyed: 1,
+      missionTitle: "Destroy 1 Erebus Bot",
+      missionRequired: 1,
+      repairedClaimedBountyBots: 1,
+      repairedClaimedBountyErebusBots: 1
+    });
+    expect(result.profileText).toContain("Bots Destroyed");
+    await expect(page.locator(".pilot-stat-card.combat-stat")).toContainText("1");
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.screenshot({ path: "artifacts/tutorial-first-bot-pilot-profile-1228x731.png" });
+
+    await page.evaluate(() => openJourney());
+    await expect(page.locator("#journeyScreen")).toContainText("Destroy 1 Erebus Bot");
+    await expect(page.locator("#journeyScreen")).not.toContainText("Destroy 3 Erebus Bots");
+    await page.locator("[data-journey-assignment-id='academy_erebus_bots']").evaluate(element => element.scrollIntoView({ block: "center" }));
+    await page.screenshot({ path: "artifacts/tutorial-one-bot-journey-1228x731.png" });
 
     await expectNoUnexpectedBrowserErrors(failures);
   });

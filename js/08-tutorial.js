@@ -143,8 +143,8 @@ function repairProgressFromCompletedStarterTutorial() {
   playerProgress = normalizePlayerProgress(playerProgress);
   const totals = playerProgress.totals;
   const quote = getTutorialTradeQuote();
-  totals.botsDestroyed = Math.max(3, Number(totals.botsDestroyed || 0));
-  totals.erebusBotsDestroyed = Math.max(3, Number(totals.erebusBotsDestroyed || 0));
+  totals.botsDestroyed = Math.max(1, Number(totals.botsDestroyed || 0));
+  totals.erebusBotsDestroyed = Math.max(1, Number(totals.erebusBotsDestroyed || 0));
   totals.tradesCompleted = Math.max(1, Number(totals.tradesCompleted || 0));
   totals.tradeProfit = Math.max(1, Number(totals.tradeProfit || 0), Number(quote.projectedProfit || 0));
   totals.totalTradingProfit = Math.max(Number(totals.totalTradingProfit || 0), totals.tradeProfit);

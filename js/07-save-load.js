@@ -666,12 +666,20 @@ function applyStagingXpClaimToLoadedState(result = {}) {
     upgradeMaterials = normalizeUpgradeMaterials(upgradeMaterials);
     upgradeMaterials.lupenShards = Math.max(Number(upgradeMaterials.lupenShards || 0), Math.round(lupenShardsAfter));
   }
-  if (result.botId && typeof recordMissionEvent === "function") {
+  if (result.botId && typeof recordBotDestroyedProgress === "function") {
+    recordBotDestroyedProgress({
+      id: result.botId,
+      name: result.botName,
+      botType: result.botType || "erebus_staging",
+      faction: "erebus",
+      eventKey: getStagingBotKillXpKey(result)
+    });
+  } else if (result.botId && typeof recordMissionEvent === "function") {
     recordMissionEvent("destroy_bot", {
       botId: result.botId,
       botName: result.botName,
       faction: "erebus",
-      eventKey: result.destructionInstanceId || result.botXpSourceEventId || result.rewardPreviewId || result.idempotencyKey || ""
+      eventKey: getStagingBotKillXpKey(result)
     });
   }
   window.lupenLastStagingXpRefresh = {
@@ -756,7 +764,8 @@ function awardLocalStagingBotKillXpFromServer(result = {}) {
       id: result.botId || "",
       name: botName,
       faction: "erebus",
-      botType: "erebus_staging"
+      botType: "erebus_staging",
+      eventKey: key
     });
   } else {
     playerProgress = normalizePlayerProgress(playerProgress);
