@@ -51887,30 +51887,6 @@ input::placeholder {
 }
 
 /* ===== Five-level Forge tier language ===== */
-.forge-tier-common {
-  --forge-tier-color: #62ddff;
-  --forge-tier-rgb: 98, 221, 255;
-}
-
-.forge-tier-refined {
-  --forge-tier-color: #76ef68;
-  --forge-tier-rgb: 118, 239, 104;
-}
-
-.forge-tier-unique {
-  --forge-tier-color: #bc72ff;
-  --forge-tier-rgb: 188, 114, 255;
-}
-
-.forge-tier-elite {
-  --forge-tier-color: #ffd45e;
-  --forge-tier-rgb: 255, 212, 94;
-}
-
-.forge-tier-super {
-  --forge-tier-color: #ff6684;
-  --forge-tier-rgb: 255, 102, 132;
-}
 
 #upgradeForgeScreen .forge-owned-panel::after {
   bottom: 64px !important;
@@ -54979,6 +54955,231 @@ input::placeholder {
 /* Final polish: keep Morgan's Journey portrait and the compact orbit cargo HUD readable. */
 .journey-briefing__portrait {
   padding: 0 !important;
+}
+
+/* ===== Shared item-rarity presentation system =====
+   Presentation rarity follows item level. Stat quality remains independent. */
+[data-rarity="common"],
+.forge-tier-common,
+.item-rarity-common {
+  --rarity-color: #62ddff;
+  --rarity-rgb: 98, 221, 255;
+  --rarity-border: rgba(98, 221, 255, 0.48);
+  --rarity-glow: 0 0 14px rgba(98, 221, 255, 0.16);
+  --rarity-bg: rgba(98, 221, 255, 0.055);
+  --rarity-intensity: 0.2;
+  --forge-tier-color: var(--rarity-color);
+  --forge-tier-rgb: var(--rarity-rgb);
+}
+
+[data-rarity="refined"],
+.forge-tier-refined,
+.item-rarity-refined {
+  --rarity-color: #76ef68;
+  --rarity-rgb: 118, 239, 104;
+  --rarity-border: rgba(118, 239, 104, 0.58);
+  --rarity-glow: 0 0 18px rgba(118, 239, 104, 0.22);
+  --rarity-bg: rgba(118, 239, 104, 0.075);
+  --rarity-intensity: 0.36;
+  --forge-tier-color: var(--rarity-color);
+  --forge-tier-rgb: var(--rarity-rgb);
+}
+
+[data-rarity="unique"],
+.forge-tier-unique,
+.item-rarity-unique {
+  --rarity-color: #bc72ff;
+  --rarity-rgb: 188, 114, 255;
+  --rarity-border: rgba(188, 114, 255, 0.72);
+  --rarity-glow: 0 0 24px rgba(188, 114, 255, 0.3);
+  --rarity-bg: rgba(188, 114, 255, 0.09);
+  --rarity-intensity: 0.54;
+  --forge-tier-color: var(--rarity-color);
+  --forge-tier-rgb: var(--rarity-rgb);
+}
+
+[data-rarity="elite"],
+.forge-tier-elite,
+.item-rarity-elite {
+  --rarity-color: #ffd45e;
+  --rarity-rgb: 255, 212, 94;
+  --rarity-border: rgba(255, 212, 94, 0.8);
+  --rarity-glow: 0 0 29px rgba(255, 181, 45, 0.36);
+  --rarity-bg: rgba(255, 181, 45, 0.105);
+  --rarity-intensity: 0.72;
+  --forge-tier-color: var(--rarity-color);
+  --forge-tier-rgb: var(--rarity-rgb);
+}
+
+[data-rarity="super"],
+.forge-tier-super,
+.item-rarity-super {
+  --rarity-color: #ff6684;
+  --rarity-rgb: 255, 102, 132;
+  --rarity-border: rgba(255, 102, 132, 0.86);
+  --rarity-glow: 0 0 34px rgba(255, 70, 105, 0.42);
+  --rarity-bg: rgba(255, 70, 105, 0.115);
+  --rarity-intensity: 0.9;
+  --forge-tier-color: var(--rarity-color);
+  --forge-tier-rgb: var(--rarity-rgb);
+}
+
+.item-rarity-card,
+.item-rarity-frame {
+  position: relative;
+  isolation: isolate;
+  border-color: var(--rarity-border) !important;
+  background-image:
+    linear-gradient(100deg, rgba(var(--rarity-rgb), calc(var(--rarity-intensity) * 0.12)), transparent 45%),
+    linear-gradient(180deg, rgba(5, 23, 38, 0.96), rgba(2, 13, 25, 0.97));
+}
+
+.item-rarity-card::after,
+.item-rarity-frame::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  opacity: calc(var(--rarity-intensity) * 0.34);
+  background: linear-gradient(120deg, transparent 16%, rgba(var(--rarity-rgb), 0.2) 48%, transparent 74%);
+  transform: translateX(-45%);
+}
+
+.item-rarity-card.selected,
+.item-rarity-card[aria-pressed="true"],
+.item-rarity-frame.selected {
+  border-color: var(--rarity-color) !important;
+  box-shadow: inset 4px 0 0 var(--rarity-color), var(--rarity-glow) !important;
+}
+
+.item-rarity-art {
+  position: relative;
+  isolation: isolate;
+}
+
+.item-rarity-art::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 14%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--rarity-rgb), calc(var(--rarity-intensity) * 0.45)), transparent 68%);
+  filter: blur(6px);
+}
+
+.item-rarity-art img,
+.item-rarity-preview img {
+  filter: drop-shadow(0 0 calc(4px + var(--rarity-intensity) * 9px) rgba(var(--rarity-rgb), calc(0.25 + var(--rarity-intensity) * 0.35)));
+}
+
+.item-rarity-badge {
+  color: var(--rarity-color) !important;
+  border-color: rgba(var(--rarity-rgb), 0.48) !important;
+}
+
+.item-rarity-preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.item-rarity-preview::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 5%;
+  pointer-events: none;
+  opacity: calc(var(--rarity-intensity) * 0.78);
+  background:
+    radial-gradient(ellipse at 50% 72%, rgba(var(--rarity-rgb), 0.42), transparent 34%),
+    repeating-radial-gradient(ellipse at 50% 72%, transparent 0 38px, rgba(var(--rarity-rgb), 0.22) 40px 42px, transparent 44px 65px);
+  filter: blur(0.2px);
+}
+
+.item-rarity-preview[data-rarity="unique"]::after,
+.item-rarity-preview[data-rarity="elite"]::after,
+.item-rarity-preview[data-rarity="super"]::after {
+  animation: item-rarity-orbit 8s linear infinite;
+}
+
+.item-rarity-card[data-rarity="elite"]::before,
+.item-rarity-card[data-rarity="super"]::before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(var(--rarity-rgb), 0.42);
+  box-shadow: inset 0 0 14px rgba(var(--rarity-rgb), 0.12);
+}
+
+#forgeChamber.forge-complete.item-rarity-preview {
+  animation: item-rarity-reveal 1.55s ease-out both;
+}
+
+#forgeChamber.forge-complete.item-rarity-preview::after {
+  animation: item-rarity-reveal-orbit 1.55s ease-out both;
+}
+
+#upgradeForgeScreen .forge-owned-item.item-rarity-card.selected {
+  border-color: var(--rarity-color) !important;
+  background:
+    linear-gradient(90deg, rgba(var(--rarity-rgb), 0.2), transparent 54%),
+    linear-gradient(180deg, rgba(5, 24, 39, 0.98), rgba(2, 13, 25, 0.98)) !important;
+  box-shadow: inset 5px 0 0 var(--rarity-color), 0 0 22px rgba(var(--rarity-rgb), 0.3) !important;
+}
+
+#upgradeForgeScreen #forgeChamber.item-rarity-preview {
+  border-color: rgba(var(--rarity-rgb), 0.7) !important;
+  background:
+    radial-gradient(ellipse at 50% 70%, rgba(var(--rarity-rgb), 0.26), transparent 42%),
+    radial-gradient(circle at 50% 42%, rgba(var(--rarity-rgb), 0.1), transparent 55%),
+    linear-gradient(180deg, rgba(4, 18, 31, 0.98), rgba(2, 10, 21, 0.99)) !important;
+  box-shadow: inset 0 0 34px rgba(var(--rarity-rgb), 0.16), var(--rarity-glow) !important;
+}
+
+#upgradeForgeScreen #forgeChamber.item-rarity-preview .forge-chamber-vignette {
+  background:
+    radial-gradient(ellipse at 50% 68%, rgba(var(--rarity-rgb), 0.34), transparent 38%),
+    radial-gradient(circle at center, rgba(var(--rarity-rgb), 0.12), transparent 52%),
+    radial-gradient(circle at center, transparent 26%, rgba(0, 6, 13, 0.62) 84%) !important;
+  mix-blend-mode: screen;
+}
+
+#upgradeForgeScreen #forgeChamber.item-rarity-preview .forge-chamber-bg {
+  box-shadow: inset 0 0 78px 18px rgba(var(--rarity-rgb), calc(var(--rarity-intensity) * 0.5)) !important;
+}
+
+@keyframes item-rarity-orbit {
+  to { transform: rotate(360deg) scale(1.02); }
+}
+
+@keyframes item-rarity-reveal {
+  0% { filter: brightness(1); }
+  24% { filter: brightness(1.75) saturate(1.35); box-shadow: 0 0 45px rgba(var(--rarity-rgb), 0.75); }
+  100% { filter: brightness(1); box-shadow: var(--rarity-glow); }
+}
+
+@keyframes item-rarity-reveal-orbit {
+  0% { opacity: 0; transform: scale(0.6) rotate(-16deg); }
+  35% { opacity: 1; transform: scale(1.08) rotate(7deg); }
+  100% { opacity: calc(var(--rarity-intensity) * 0.78); transform: scale(1) rotate(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-rarity-card,
+  .item-rarity-card::before,
+  .item-rarity-card::after,
+  .item-rarity-frame,
+  .item-rarity-frame::after,
+  .item-rarity-preview,
+  .item-rarity-preview::after,
+  #forgeChamber.forge-complete.item-rarity-preview,
+  #forgeChamber.forge-complete.item-rarity-preview::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .journey-briefing__portrait-img.journey-morgan-portrait {

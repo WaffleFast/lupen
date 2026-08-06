@@ -15,13 +15,9 @@ const FORGE_LEVEL_COSTS = Object.freeze({
   3: 150,
   4: 300
 });
-const FORGE_LEVEL_TIERS = Object.freeze({
-  1: Object.freeze({ key: "common", label: "Common", color: "#62ddff" }),
-  2: Object.freeze({ key: "refined", label: "Refined", color: "#76ef68" }),
-  3: Object.freeze({ key: "unique", label: "Unique", color: "#bc72ff" }),
-  4: Object.freeze({ key: "elite", label: "Elite", color: "#ffd45e" }),
-  5: Object.freeze({ key: "super", label: "Super", color: "#ff6684" })
-});
+const FORGE_LEVEL_TIERS = Object.freeze(Object.fromEntries(
+  ITEM_RARITY_LEVEL_ORDER.map(tier => [tier.level, tier])
+));
 
 function getForgeItemLevelRoman(level) {
   const safeLevel = Math.min(MAX_ITEM_LEVEL, Math.max(1, Math.floor(Number(level || 1))));
@@ -29,8 +25,7 @@ function getForgeItemLevelRoman(level) {
 }
 
 function getForgeLevelTier(level) {
-  const safeLevel = Math.min(FORGE_MAX_LEVEL, Math.max(1, Math.floor(Number(level || 1))));
-  return FORGE_LEVEL_TIERS[safeLevel] || FORGE_LEVEL_TIERS[1];
+  return getItemRarityPresentation(level);
 }
 
 function getForgeTierClass(level) {
@@ -61,7 +56,7 @@ function renderForgeTierLegend(items = getForgeUpgradeableItems()) {
     const active = forgeOwnedTierFilter === filter.key;
     const tierClass = filter.level === null ? "forge-tier-all" : getForgeTierClass(filter.level);
     return `
-      <button type="button" class="forge-tier-legend-item forge-tier-scope ${tierClass} ${active ? "active" : ""}" aria-pressed="${active}" onclick="setForgeOwnedTierFilter('${filter.key}')">
+      <button type="button" class="forge-tier-legend-item forge-tier-scope ${tierClass} ${active ? "active" : ""}" ${filter.level === null ? "" : `data-rarity="${filter.key}"`} aria-pressed="${active}" onclick="setForgeOwnedTierFilter('${filter.key}')">
         ${filter.level === null ? "" : `<i class="forge-tier-diamond" aria-hidden="true"></i>`}
         <strong>${escapeHtml(filter.label)}</strong>
         <span class="forge-filter-count">${formatNumber(count)}</span>
@@ -752,15 +747,15 @@ function renderForgeSelectedPanel(item, items = getForgeUpgradeableItems(), tota
       ? `${primaryStat.value} ${primaryStat.label.toLowerCase()}`
       : (definition?.description || "Upgradeable ship equipment.");
     return `
-      <button type="button" class="forge-owned-item forge-tier-scope ${getForgeTierClass(level)} ${selected ? "selected" : ""}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(definition?.name || entry.key)}, ${escapeHtml(tier.label)} tier, Level ${escapeHtml(getForgeItemLevelRoman(level))}" onclick="selectForgeItem('${escapeJsString(entry.id)}')">
-        <span class="forge-owned-art">
+      <button type="button" class="forge-owned-item item-rarity-card item-rarity-compact forge-tier-scope ${getForgeTierClass(level)} ${getItemRarityClass(level)} ${selected ? "selected" : ""}" data-rarity="${tier.key}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeHtml(definition?.name || entry.key)}, ${escapeHtml(tier.label)} tier, Level ${escapeHtml(getForgeItemLevelRoman(level))}" onclick="selectForgeItem('${escapeJsString(entry.id)}')">
+        <span class="forge-owned-art item-rarity-art">
           <img src="${escapeHtml(definition?.image || "assets/items/lupen-shard.png")}" alt="${escapeHtml(definition?.name || entry.key)}">
         </span>
         <span class="forge-owned-copy">
           <strong>${escapeHtml(definition?.name || getForgeItemDisplayName(entry))}</strong>
           <small>${escapeHtml(primaryStatText)}</small>
           <span class="forge-owned-tags">
-            <span class="forge-tier-tag"><i class="forge-tier-diamond" aria-hidden="true"></i>${escapeHtml(tier.label)}</span>
+            <span class="forge-tier-tag item-rarity-badge"><i class="forge-tier-diamond" aria-hidden="true"></i>${escapeHtml(tier.label)}</span>
             <span>Level ${escapeHtml(getForgeItemLevelRoman(level))}</span>
             <span class="${entry.source === "equipped" ? "equipped" : "vault"}">${sourceLabel}</span>
           </span>
@@ -811,7 +806,7 @@ function renderForgeInventoryPicker(items) {
     const sourceLabel = item.source === "equipped" ? "Equipped" : item.source === "owned" ? `Vault x${formatNumber(item.count)}` : "Vault";
     const stats = getVisibleItemStats(item).slice(0, 2);
     return `
-      <button type="button" class="forge-picker-card quality-${item.quality} forge-tier-scope ${getForgeTierClass(level)} ${selected ? "selected" : ""}" draggable="true" ondragstart="startForgeDrag(event, 'item', '${escapeJsString(item.id)}')" onclick="selectForgeItem('${escapeJsString(item.id)}')">
+      <button type="button" class="forge-picker-card item-rarity-card item-rarity-compact quality-${item.quality} forge-tier-scope ${getForgeTierClass(level)} ${getItemRarityClass(level)} ${selected ? "selected" : ""}" data-rarity="${tier.key}" draggable="true" ondragstart="startForgeDrag(event, 'item', '${escapeJsString(item.id)}')" onclick="selectForgeItem('${escapeJsString(item.id)}')">
         ${renderQualityFx(item.quality, { src: definition.image, alt: definition.name, size: "small" })}
         <div>
           <span>${sourceLabel} / ${definition.typeLabel}</span>
@@ -864,7 +859,8 @@ function renderForgeChamber(item, requirements) {
     selectedSource.textContent = item.source === "equipped" ? "Equipped" : "Vault";
   }
   if (selectedTier) {
-    selectedTier.className = `forge-selected-tier forge-tier-scope ${getForgeTierClass(level)}`;
+    selectedTier.className = `forge-selected-tier item-rarity-badge forge-tier-scope ${getForgeTierClass(level)} ${getItemRarityClass(level)}`;
+    selectedTier.dataset.rarity = tier.key;
     selectedTier.innerHTML = `<i class="forge-tier-diamond" aria-hidden="true"></i><strong>${escapeHtml(tier.label)}</strong><b>·</b><span>Level ${escapeHtml(getForgeItemLevelRoman(level))}</span>`;
   }
   const primaryStat = getVisibleItemStats(item)[0];
@@ -880,8 +876,12 @@ function renderForgeChamber(item, requirements) {
   }
   const chamberStateClass = forgeAnimating ? "upgrading forging" : requirements.canUpgrade ? "ready" : "missing-materials";
   const celebrationClass = Date.now() < Number(forgeCelebrationUntil || 0) ? "forge-complete" : "";
-  chamber.className = `forge-chamber forge-chamber-visual level-active ${chamberStateClass} ${celebrationClass} quality-fx-host quality-fx--standard forge-tier-scope ${getForgeTierClass(level)}`;
-  if (showcase) showcase.className = `forge-showcase forge-tier-scope ${getForgeTierClass(level)}`;
+  chamber.className = `forge-chamber forge-chamber-visual item-rarity-preview level-active ${chamberStateClass} ${celebrationClass} quality-fx-host quality-fx--standard forge-tier-scope ${getForgeTierClass(level)} ${getItemRarityClass(level)}`;
+  chamber.dataset.rarity = tier.key;
+  if (showcase) {
+    showcase.className = `forge-showcase item-rarity-frame forge-tier-scope ${getForgeTierClass(level)} ${getItemRarityClass(level)}`;
+    showcase.dataset.rarity = tier.key;
+  }
   chamber.dataset.qualityTier = "standard";
   chamber.style.setProperty("--forge-before", tier.color);
   chamber.style.setProperty("--forge-after", targetTier.color);
@@ -930,20 +930,20 @@ function renderForgeMaterials(item, requirements) {
       : `${formatNumber(missing)} More Shards Required`;
 
   list.innerHTML = `
-    <div class="forge-map1-preview forge-tier-scope ${getForgeTierClass(toLevel)} ${requirements.canUpgrade ? "ready" : "blocked"} ${isMaximumLevel ? "maximum" : ""}">
+    <div class="forge-map1-preview item-rarity-frame forge-tier-scope ${getForgeTierClass(toLevel)} ${getItemRarityClass(toLevel)} ${requirements.canUpgrade ? "ready" : "blocked"} ${isMaximumLevel ? "maximum" : ""}" data-rarity="${toTier.key}">
       <h3>${isMaximumLevel ? "Upgrade Status" : "Next Upgrade"}</h3>
       <div class="forge-level-flow ${isMaximumLevel ? "forge-level-flow--maximum" : ""}">
         ${isMaximumLevel ? `
-          <strong class="forge-level-node forge-level-node--maximum forge-tier-scope ${getForgeTierClass(fromLevel)}">
+          <strong class="forge-level-node forge-level-node--maximum item-rarity-frame forge-tier-scope ${getForgeTierClass(fromLevel)} ${getItemRarityClass(fromLevel)}" data-rarity="${fromTier.key}">
             <small>${escapeHtml(fromTier.label)}</small>
             <em>Level ${escapeHtml(getForgeItemLevelRoman(fromLevel))} · Maximum</em>
           </strong>
         ` : `
-          <span class="forge-level-node forge-tier-scope ${getForgeTierClass(fromLevel)}">
+          <span class="forge-level-node item-rarity-frame forge-tier-scope ${getForgeTierClass(fromLevel)} ${getItemRarityClass(fromLevel)}" data-rarity="${fromTier.key}">
             <small><i class="forge-tier-diamond" aria-hidden="true"></i>${escapeHtml(fromTier.label)} · Level ${escapeHtml(getForgeItemLevelRoman(fromLevel))}</small>
           </span>
           <b aria-hidden="true">&rarr;</b>
-          <strong class="forge-level-node forge-tier-scope ${getForgeTierClass(toLevel)}">
+          <strong class="forge-level-node item-rarity-frame forge-tier-scope ${getForgeTierClass(toLevel)} ${getItemRarityClass(toLevel)}" data-rarity="${toTier.key}">
             <small><i class="forge-tier-diamond" aria-hidden="true"></i>${escapeHtml(toTier.label)} · Level ${escapeHtml(getForgeItemLevelRoman(toLevel))}</small>
           </strong>
         `}

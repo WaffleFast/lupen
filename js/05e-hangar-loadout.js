@@ -247,12 +247,13 @@ function renderLoadoutSlotGrid(box, categoryKey) {
       selectedLoadoutItemContext.index === i;
 
     const slot = document.createElement("button");
-    const tierClass = item ? `forge-tier-scope ${getHangarEquipmentTierClass(level)}` : "";
+    const tierClass = item ? `item-rarity-card item-rarity-compact forge-tier-scope ${getHangarEquipmentTierClass(level)} ${getItemRarityClass(level)}` : "";
     slot.className = `equipment-slot scalable-loadout-slot loadout-grid-slot ${item ? "filled" : "empty"} ${selected ? "selected" : ""} quality-${quality} ${tierClass}`;
     slot.dataset.slotIndex = String(i + 1).padStart(2, "0");
     if (item) {
       slot.dataset.level = String(level);
       slot.dataset.tier = tier.key;
+      slot.dataset.rarity = tier.key;
       slot.setAttribute("aria-label", `${item.name}, ${tier.label} tier, Level ${formatRomanLevel(level)}, slot ${i + 1}`);
     }
     slot.onclick = () => selectEquippedLoadoutVaultItem(categoryKey, i);
@@ -850,11 +851,12 @@ function renderGunInventory() {
       selectedLoadoutItemContext.key === entry.key &&
       selectedLoadoutItemContext.quality === entry.quality &&
       Number(selectedLoadoutItemContext.level || 1) === Number(entry.level || 1);
-    btn.className = `inventory-icon-card hangar-equipment-card loadout-vault-row quality-${entry.quality} forge-tier-scope ${getHangarEquipmentTierClass(level)} ${selected ? "selected" : ""} ${unlock.locked ? "progression-locked" : ""}`;
+    btn.className = `inventory-icon-card hangar-equipment-card loadout-vault-row item-rarity-card item-rarity-compact quality-${entry.quality} forge-tier-scope ${getHangarEquipmentTierClass(level)} ${getItemRarityClass(level)} ${selected ? "selected" : ""} ${unlock.locked ? "progression-locked" : ""}`;
     btn.dataset.itemKey = entry.key;
     btn.dataset.itemType = entry.categoryKey === "guns" ? "gun" : "attachment";
     btn.dataset.level = String(level);
     btn.dataset.tier = tier.key;
+    btn.dataset.rarity = tier.key;
     btn.tabIndex = compatible && entry.count > 0 ? 0 : -1;
     btn.setAttribute("role", "group");
     btn.setAttribute("aria-label", `${entry.name}, ${entry.count} stored`);

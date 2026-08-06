@@ -481,18 +481,12 @@ function formatRomanLevel(level = 1) {
   return numerals[value] || String(value);
 }
 
-const HANGAR_LEVEL_TIERS = Object.freeze({
-  1: Object.freeze({ key: "common", label: "Common" }),
-  2: Object.freeze({ key: "refined", label: "Refined" }),
-  3: Object.freeze({ key: "unique", label: "Unique" }),
-  4: Object.freeze({ key: "elite", label: "Elite" }),
-  5: Object.freeze({ key: "super", label: "Super" })
-});
+const HANGAR_LEVEL_TIERS = Object.freeze(Object.fromEntries(
+  ITEM_RARITY_LEVEL_ORDER.map(tier => [tier.level, tier])
+));
 
 function getHangarEquipmentTier(level = 1) {
-  const safeLevel = Math.max(1, Math.min(5, Math.floor(Number(level || 1))));
-  if (typeof getForgeLevelTier === "function") return getForgeLevelTier(safeLevel);
-  return HANGAR_LEVEL_TIERS[safeLevel] || HANGAR_LEVEL_TIERS[1];
+  return getItemRarityPresentation(level);
 }
 
 function getHangarEquipmentTierClass(level = 1) {
@@ -616,13 +610,14 @@ function renderVaultCatalog() {
     const selected = selectedVaultGroupKey === entry.groupKey || Boolean(selectedVaultGroupKey && entry.groupKey.startsWith(`${selectedVaultGroupKey}__`));
     const level = Math.max(1, Number(entry.level || 1));
     const tier = getHangarEquipmentTier(level);
-    const tierClass = entry.stackable ? "" : `forge-tier-scope ${getHangarEquipmentTierClass(level)}`;
+    const tierClass = entry.stackable ? "" : `item-rarity-card item-rarity-compact forge-tier-scope ${getHangarEquipmentTierClass(level)} ${getItemRarityClass(level)}`;
     button.className = `vault-storage-card ${selected ? "selected" : ""} ${entry.stackable ? "resource-entry" : "gear-entry"} quality-${entry.quality} ${tierClass}`;
     button.setAttribute("aria-pressed", selected ? "true" : "false");
     button.setAttribute("aria-label", `${entry.name}, ${getVaultQualityLabel(entry)}, Level ${formatRomanLevel(level)}, ${entry.storedCount || 0} stored, ${entry.equippedCount || 0} equipped`);
     if (!entry.stackable) {
       button.dataset.level = String(level);
       button.dataset.tier = tier.key;
+      button.dataset.rarity = tier.key;
     }
     button.onclick = () => selectVaultItem(entry.groupKey);
     button.removeAttribute("title");
@@ -630,7 +625,7 @@ function renderVaultCatalog() {
     bindHangarEquipmentTooltip(button);
 
     button.innerHTML = `
-      <div class="vault-storage-art quality-${entry.quality}">
+      <div class="vault-storage-art item-rarity-art quality-${entry.quality}">
         ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "small" })}
       </div>
       <div class="vault-storage-copy">
@@ -694,15 +689,15 @@ function renderVaultDetail() {
   const infoStats = getVaultEntryStats(entry);
   const level = Math.max(1, Number(entry.level || 1));
   const tier = getHangarEquipmentTier(level);
-  const tierClass = entry.stackable ? "" : `forge-tier-scope ${getHangarEquipmentTierClass(level)}`;
+  const tierClass = entry.stackable ? "" : `item-rarity-frame forge-tier-scope ${getHangarEquipmentTierClass(level)} ${getItemRarityClass(level)}`;
   const locations = getVaultEntryEquippedLocations(entry);
   const locationSummary = locations.length
     ? `${locations[0].shipName} · ${locations[0].slotLabel}${locations.length > 1 ? ` · +${locations.length - 1} more` : ""}`
     : "Not currently equipped";
 
   panel.innerHTML = `
-    <div class="vault-item-detail-shell ${entry.stackable ? "resource-detail" : "gear-detail"} quality-${entry.quality} ${tierClass}" ${entry.stackable ? "" : `data-level="${escapeHtml(level)}" data-tier="${escapeHtml(tier.key)}"`}>
-      <div class="vault-item-preview">
+    <div class="vault-item-detail-shell ${entry.stackable ? "resource-detail" : "gear-detail"} quality-${entry.quality} ${tierClass}" ${entry.stackable ? "" : `data-level="${escapeHtml(level)}" data-tier="${escapeHtml(tier.key)}" data-rarity="${escapeHtml(tier.key)}"`}>
+      <div class="vault-item-preview item-rarity-preview">
         <div class="vault-item-preview-glow"></div>
         <div class="exchange-hero-ring"></div>
         ${renderQualityFx(entry.quality, { src: entry.icon, alt: entry.name, size: "feature" })}
@@ -714,7 +709,7 @@ function renderVaultDetail() {
           <p>${entry.category} / <strong class="quality-${entry.quality}">${getVaultQualityLabel(entry)}</strong></p>
         </div>
         ${entry.stackable ? "" : `
-          <span class="hangar-tier-detail-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
+          <span class="hangar-tier-detail-badge item-rarity-badge" aria-label="${escapeHtml(tier.label)} tier, Level ${escapeHtml(formatRomanLevel(level))}">
             ${renderHangarEquipmentTierPips(level, "compact")}
             <strong>${escapeHtml(tier.label)}</strong>
             <b>LEVEL ${formatRomanLevel(level)}</b>
@@ -1083,8 +1078,8 @@ function renderLoadoutItemDetail() {
 
   const tier = getHangarEquipmentTier(currentDetail.level);
   panel.innerHTML = `
-    <div class="loadout-selected-item-card quality-${escapeHtml(currentDetail.quality)} forge-tier-scope ${getHangarEquipmentTierClass(currentDetail.level)}">
-      <div class="loadout-selected-item-art">
+    <div class="loadout-selected-item-card item-rarity-frame quality-${escapeHtml(currentDetail.quality)} forge-tier-scope ${getHangarEquipmentTierClass(currentDetail.level)} ${getItemRarityClass(currentDetail.level)}" data-rarity="${escapeHtml(tier.key)}">
+      <div class="loadout-selected-item-art item-rarity-art">
         ${renderQualityFx(currentDetail.quality, { src: currentDetail.icon, alt: currentDetail.name, size: "small" })}
       </div>
       <div class="loadout-selected-item-copy">
