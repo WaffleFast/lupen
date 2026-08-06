@@ -1122,8 +1122,18 @@ function prepareTutorialTradeSelection() {
 }
 
 function isTutorialBountyReadyToClaim() {
-  return activeObjective?.type === "bounty" && activeObjective.status === "readyToClaim" ||
-    dailyBountyContracts?.some?.(contract => contract.status === "readyToClaim");
+  const stagingBounty = typeof getActiveMultiplayerStagingBountyObjective === "function"
+    ? getActiveMultiplayerStagingBountyObjective()
+    : null;
+  if (stagingBounty) {
+    return Boolean(stagingBounty.claimAvailable || stagingBounty.completed);
+  }
+
+  if (activeObjective?.type !== "bounty") return false;
+  const requiredKills = Math.max(1, Number(activeObjective.killsRequired || 1));
+  const matchingContract = dailyBountyContracts?.find?.(contract => contract.id === activeObjective.contractId);
+  return activeObjective.status === "readyToClaim" && Number(activeObjective.kills || 0) >= requiredKills &&
+    (!matchingContract || matchingContract.status === "readyToClaim");
 }
 
 function isTutorialBountyAccepted() {
@@ -1244,10 +1254,15 @@ function getTutorialStateCompletionReason(step) {
     case "jump-to-bounty-zone":
       return isAtTutorialBountyCombatTarget() ? "bounty_target_reached" : "";
     case "destroy-bot":
-    case "open-map-return-bounty":
-    case "return-to-planet-after-bounty":
-    case "land-after-bounty":
       return isTutorialBountyReadyToClaim() ? "bounty_ready_to_claim" : "";
+    case "open-map-return-bounty":
+      return document.getElementById("sectorMap")?.classList.contains("active") ? "bounty_return_map_open" : "";
+    case "return-to-planet-after-bounty":
+      return isAtPlanetNode() ? "bounty_return_planet_reached" : "";
+    case "land-after-bounty":
+      return isAtPlanetNode() && document.getElementById("gameScreen")?.classList.contains("active")
+        ? "bounty_return_landed"
+        : "";
     case "claim-bounty": {
       const stagingClaim = typeof getMultiplayerStagingBountyStatus === "function"
         ? getMultiplayerStagingBountyStatus()?.lastStagingBountyClaimResult
@@ -1634,17 +1649,22 @@ function tutorialEvent(eventName, detail = {}) {
     return;
   }
 
-  if (step.id === "destroy-bot" && eventName === "destroyedBountyBot" && activeObjective?.type === "bounty" && activeObjective.status !== "readyToClaim") {
+  if (step.id === "destroy-bot" && eventName === "destroyedBountyBot" && !isTutorialBountyReadyToClaim()) {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
-      const remaining = Math.max(0, Number(activeObjective.killsRequired || 0) - Number(activeObjective.kills || 0));
+      const stagingBounty = typeof getActiveMultiplayerStagingBountyObjective === "function"
+        ? getActiveMultiplayerStagingBountyObjective()
+        : null;
+      const requiredKills = Number(stagingBounty?.requiredKills || activeObjective?.killsRequired || 1);
+      const completedKills = Number(stagingBounty?.progress || activeObjective?.kills || 0);
+      const remaining = Math.max(0, requiredKills - completedKills);
       addHudToast(`${remaining} bounty bot${remaining === 1 ? "" : "s"} remaining. Use Jump and Bots scan to find the next target.`);
       renderStarterTutorial();
     }, 180);
     return;
   }
 
-  if (step.id === "destroy-bot" && ["openedSectorMap", "scannedBots", "jumpedNode"].includes(eventName) && activeObjective?.type === "bounty" && activeObjective.status !== "readyToClaim") {
+  if (step.id === "destroy-bot" && ["openedSectorMap", "scannedBots", "jumpedNode"].includes(eventName) && !isTutorialBountyReadyToClaim()) {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
       renderStarterTutorial();

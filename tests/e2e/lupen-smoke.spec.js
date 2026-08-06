@@ -8467,6 +8467,7 @@ test.describe("Lupen browser smoke", () => {
   test("starter bounty tutorial handles available and already-active bounty states", async ({ page }) => {
     const failures = collectUnexpectedBrowserErrors(page);
 
+    await page.setViewportSize({ width: 1228, height: 731 });
     await page.goto("/");
     await waitForGameGlobals(page);
 
@@ -8666,6 +8667,7 @@ test.describe("Lupen browser smoke", () => {
           claimAvailable: false,
           claimed: false
         };
+        window.__tutorialActiveStagingBounty = active;
         window.LupenMultiplayerClient = {
           ...(window.LupenMultiplayerClient || {}),
           getStatus: () => ({
@@ -8692,6 +8694,47 @@ test.describe("Lupen browser smoke", () => {
     expect(activeStagingState.step).toBe("return-for-combat-launch");
     expect(activeStagingState.detailText).toContain("Active Contract");
     expect(activeStagingState.detailText).not.toContain("Active Staging Bounty");
+
+    const incompleteBountyGate = await page.evaluate(() => window.eval(`
+      (() => {
+        activeObjective = null;
+        ensureDailyBounties();
+        const unrelatedContract = dailyBountyContracts.find(contract => contract.id !== "staging_erebus_patrol_2") || dailyBountyContracts[0];
+        unrelatedContract.status = "readyToClaim";
+        unrelatedContract.progress = getBountyRequiredKills(unrelatedContract);
+        showScreen("spaceScreen");
+        setTutorialStepById("destroy-bot");
+        tutorialEvent("openedSectorMap");
+        tutorialEvent("scannedBots");
+        tutorialEvent("jumpedNode");
+        return {
+          ready: isTutorialBountyReadyToClaim(),
+          step: getCurrentTutorialStep().id,
+          serverProgress: window.__tutorialActiveStagingBounty.progress,
+          staleReadyContract: unrelatedContract.status
+        };
+      })()
+    `));
+    await page.waitForTimeout(260);
+    expect(incompleteBountyGate).toEqual({
+      ready: false,
+      step: "destroy-bot",
+      serverProgress: 0,
+      staleReadyContract: "readyToClaim"
+    });
+    await expect(page.locator("#tutorialTitle")).toHaveText("Destroy the bounty target");
+    await page.screenshot({ path: "artifacts/morgan-bounty-incomplete-gate-1228x731.png", fullPage: false });
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        window.__tutorialActiveStagingBounty.progress = 1;
+        window.__tutorialActiveStagingBounty.completed = true;
+        window.__tutorialActiveStagingBounty.claimAvailable = true;
+        tutorialEvent("destroyedBountyBot");
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "open-map-return-bounty");
+    await expect(page.locator("#tutorialTitle")).toHaveText("Return to a planet");
 
     await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
     await waitForGameGlobals(page);
