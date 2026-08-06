@@ -57515,6 +57515,13 @@ input::placeholder {
   padding: 7px 8px !important;
 }
 
+#hangarVaultSection .vault-index-panel .vault-filter-btn > span strong {
+  font-size: 11px !important;
+  line-height: 1.05 !important;
+  letter-spacing: 0.01em !important;
+  white-space: nowrap !important;
+}
+
 #hangarVaultSection .vault-filter-btn > span strong {
   font-size: 11px !important;
 }
