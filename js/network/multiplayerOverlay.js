@@ -2831,22 +2831,9 @@
   }
 
   function renderSectorGhosts(players) {
-    const svg = global.document?.getElementById("sectorSvg");
-    if (!svg || !isEnabled()) {
-      removeSectorLayer();
-      return;
-    }
-
-    svg.querySelector(`.${layerClass}`)?.remove();
-
-    const visiblePlayers = dedupePlayers(players).filter((player) => isFreshRemotePilot(player) && isPilotInSpace(player));
-    if (!visiblePlayers.length) return;
-
-    const layer = global.document.createElementNS(SVG_NS, "g");
-    layer.setAttribute("class", layerClass);
-    layer.setAttribute("pointer-events", "none");
-    visiblePlayers.forEach((player) => drawSectorGhost(layer, player));
-    svg.appendChild(layer);
+    // Pilot locations on the sector map are intentionally scan-only. The
+    // Enemies/Allies scanners render time-limited signals in the core map.
+    removeSectorLayer();
   }
 
   function renderSectorBots(bots) {

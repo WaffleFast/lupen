@@ -12563,4 +12563,144 @@ test.describe("Lupen browser smoke", () => {
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
+
+  test("multiplayer bot damage updates the HUD and pilot locations require a scan", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.setViewportSize({ width: 1228, height: 731 });
+    await page.goto("/?mp=staging&mpServer=http://127.0.0.1:1");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (() => {
+        const originalClient = window.LupenMultiplayerClient;
+        const movementIntents = [];
+        const remotePlayers = [
+          { sessionId: "enemy-no-guild", displayName: "Enemy One", currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "" },
+          { sessionId: "enemy-other-guild", displayName: "Enemy Two", currentNode: "Upper Gate Core", presenceStatus: "space", guildId: "other-guild" },
+          { sessionId: "allied-player", displayName: "Ally One", currentNode: "Lower Gate Core", presenceStatus: "space", guildId: "local-guild" },
+          { sessionId: "docked-player", displayName: "Docked Enemy", currentNode: "Nyxara", presenceStatus: "docked", guildId: "" }
+        ];
+
+        window.LupenMultiplayerClient = {
+          ...(originalClient || {}),
+          getStatus: () => ({ enabled: true, isConnected: true, sessionId: "local-session", guildId: "local-guild" }),
+          getPlayers: ({ includeSelf = true } = {}) => includeSelf
+            ? [{ sessionId: "local-session", isSelf: true, currentNode, presenceStatus: "space", guildId: "local-guild" }, ...remotePlayers]
+            : remotePlayers,
+          getBots: () => [],
+          getResources: () => [],
+          getPresenceEvents: () => [],
+          sendMovementIntent: intent => {
+            movementIntents.push({ ...intent });
+            return { ok: true };
+          }
+        };
+
+        currentNode = "Lower Gate Core";
+        lastPlanetNode = "Asteron Prime";
+        hullMax = 720;
+        hull = 720;
+        shieldMax = 180;
+        shield = 180;
+        armor = 0;
+        showScreen("spaceScreen");
+        serverPvpDamageDisplayState = { hull: 640, hullMax: 720, shield: 120, shieldMax: 180, updatedAt: Date.now() };
+        const damageResult = applyStagingBotReturnFireDamage({ damage: 45, attackerName: "Erebus Attacker" });
+        const damageHud = {
+          shield: Number(document.getElementById("shieldValue")?.textContent || 0),
+          shieldHeight: document.getElementById("shieldFill")?.style.height || "",
+          pvpDisplayCleared: serverPvpDamageDisplayState === null,
+          resultShield: damageResult?.shieldAfter
+        };
+
+        jumpCharge = jumpMax;
+        openSectorMap();
+        window.LupenMultiplayerOverlay?.render?.();
+        const unscannedMapPilotCount = document.querySelectorAll("#sectorSvg .svg-mp-ghost-layer").length;
+
+        sectorScanState = { activeUntil: 0, cooldownUntilByType: { ally: 0, bot: 0, enemy: 0 }, result: null };
+        scanSector("enemy");
+        const enemyScan = {
+          count: sectorScanState.result.enemySignals.reduce((sum, signal) => sum + signal.count, 0),
+          names: sectorScanState.result.enemySignals.flatMap(signal => signal.names).sort(),
+          markerCount: document.querySelectorAll("#sectorSvg .svg-scan-marker.scan-enemy").length
+        };
+
+        sectorScanState = { activeUntil: 0, cooldownUntilByType: { ally: 0, bot: 0, enemy: 0 }, result: null };
+        scanSector("ally");
+        const allyScan = {
+          count: sectorScanState.result.allySignals.reduce((sum, signal) => sum + signal.count, 0),
+          names: sectorScanState.result.allySignals.flatMap(signal => signal.names)
+        };
+
+        closeSectorMap();
+        currentNode = "Lower Gate Core";
+        remotePlayers[0].currentNode = currentNode;
+        remotePlayers[0].presenceStatus = "space";
+        window.LupenMultiplayerOverlay?.render?.();
+        const visibleBeforeDock = document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='enemy-no-guild']").length;
+        remotePlayers[0].presenceStatus = "docked";
+        window.LupenMultiplayerOverlay?.render?.();
+        const visibleAfterDock = document.querySelectorAll("#lupenMultiplayerSpaceGhostLayer .lupen-mp-space-ghost[data-session-id='enemy-no-guild']").length;
+
+        hull = 1;
+        shield = 0;
+        applyStagingBotReturnFireDamage({ damage: 10, attackerName: "Erebus Attacker" });
+        const disabledPresence = movementIntents.at(-1) || null;
+
+        window.LupenMultiplayerClient = originalClient;
+        return { damageHud, unscannedMapPilotCount, enemyScan, allyScan, visibleBeforeDock, visibleAfterDock, disabledPresence };
+      })()
+    `));
+
+    expect(state.damageHud.pvpDisplayCleared).toBe(true);
+    expect(state.damageHud.shield).toBe(state.damageHud.resultShield);
+    expect(state.damageHud.shield).toBeLessThan(120);
+    expect(Number.parseFloat(state.damageHud.shieldHeight)).toBeLessThan(66.67);
+    expect(state.unscannedMapPilotCount).toBe(0);
+    expect(state.enemyScan).toEqual({ count: 2, names: ["Enemy One", "Enemy Two"], markerCount: 2 });
+    expect(state.allyScan).toEqual({ count: 1, names: ["Ally One"] });
+    expect(state.visibleBeforeDock).toBe(1);
+    expect(state.visibleAfterDock).toBe(0);
+    expect(state.disabledPresence).toMatchObject({ reason: "ship_disabled", presenceStatus: "docked", currentNode: "Asteron Prime" });
+
+    await page.evaluate(() => window.eval(`
+      closeShipDisabledOverlay();
+      showScreen("spaceScreen");
+      currentNode = "Lower Gate Core";
+      jumpCharge = jumpMax;
+      sectorScanState = {
+        activeUntil: Date.now() + 10000,
+        cooldownUntilByType: { ally: 0, bot: 0, enemy: Date.now() + 20000 },
+        result: {
+          createdAt: Date.now(),
+          type: "enemy",
+          botSignals: [],
+          allySignals: [],
+          enemySignals: [
+            { type: "enemy", node: "Lower Gate Core", x: sectorNodes["Lower Gate Core"].x, y: sectorNodes["Lower Gate Core"].y, count: 1, names: ["Enemy One"] },
+            { type: "enemy", node: "Upper Gate Core", x: sectorNodes["Upper Gate Core"].x, y: sectorNodes["Upper Gate Core"].y, count: 1, names: ["Enemy Two"] }
+          ]
+        }
+      };
+      openSectorMap();
+    `));
+    fs.mkdirSync("artifacts", { recursive: true });
+    await page.screenshot({ path: "artifacts/multiplayer-enemy-scan-1228x731.png" });
+    await page.evaluate(() => window.eval(`
+      closeSectorMap();
+      closeShipDisabledOverlay();
+      showScreen("spaceScreen");
+      currentNode = "Lower Gate Core";
+      serverPvpDamageDisplayState = null;
+      hull = Math.round(hullMax * 0.72);
+      shield = Math.round(shieldMax * 0.38);
+      updateCurrentNodeUI();
+      updateSpaceHUD();
+    `));
+    await page.screenshot({ path: "artifacts/multiplayer-bot-damage-hud-1228x731.png" });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
 });

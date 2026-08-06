@@ -2061,15 +2061,26 @@ function applyStagingBotReturnFireDamage(event = {}) {
 
   stopShieldRegen();
 
-  const shieldBefore = Math.max(0, Number(shield || 0));
-  const hullBefore = Math.max(0, Number(hull || 0));
+  const pvpDamageState = typeof serverPvpDamageDisplayState === "object" && serverPvpDamageDisplayState
+    ? serverPvpDamageDisplayState
+    : null;
+  const activeShield = Number.isFinite(Number(pvpDamageState?.shield)) ? Number(pvpDamageState.shield) : shield;
+  const activeHull = Number.isFinite(Number(pvpDamageState?.hull)) ? Number(pvpDamageState.hull) : hull;
+  const activeArmor = Number.isFinite(Number(pvpDamageState?.armor)) ? Number(pvpDamageState.armor) : armor;
+  const shieldBefore = Math.max(0, Number(activeShield || 0));
+  const hullBefore = Math.max(0, Number(activeHull || 0));
   const damageResult = LupenCombatRules.resolveIncomingPlayerDamage(
-    { hull, shield, armor },
+    { hull: activeHull, shield: activeShield, armor: activeArmor },
     getMitigatedIncomingDamage(damage)
   );
 
   shield = Math.max(0, Number(damageResult.shield || 0));
   hull = Math.max(0, Number(damageResult.hull || 0));
+  // Bot damage is applied to the local ship state. A previous server PvP hit
+  // must not continue to override those values in the HUD.
+  if (typeof serverPvpDamageDisplayState !== "undefined") {
+    serverPvpDamageDisplayState = null;
+  }
 
   const attackerName = event.attackerName || "Erebus Bot";
   const attackerBot = typeof getStagingBotTargetById === "function"
@@ -2184,6 +2195,7 @@ function handleShipDisabled() {
   updateHubLocation();
   updateSpaceHUD();
   showScreen("gameScreen");
+  syncMultiplayerPresence("ship_disabled", { presenceStatus: "docked" });
   showShipDisabledOverlay(`Emergency tow to your home planet, ${towPlanet}. All carried resources were lost. Ships, guns and equipment are safe. Repair your hull in the Hangar before launching again.`, Object.entries(lostCargo));
   saveGame();
 }
@@ -2425,6 +2437,47 @@ function getSectorScanResultForType(type) {
     };
   }
 
+  if (type === "ally" || type === "enemy") {
+    const client = typeof window !== "undefined" ? window.LupenMultiplayerClient : null;
+    const status = client?.getStatus?.() || {};
+    const players = client?.getPlayers?.({ includeSelf: false }) || [];
+    const localGuildId = String(status.guildId || "").trim();
+    const grouped = new Map();
+
+    players
+      .filter(player => {
+        const nodeId = String(player?.currentNode || player?.currentNodeId || player?.node || "");
+        if (!sectorNodes[nodeId]) return false;
+        if (String(player?.presenceStatus || player?.status || "space").toLowerCase() === "docked") return false;
+        const playerGuildId = String(player?.guildId || "").trim();
+        const isAlly = !!localGuildId && playerGuildId === localGuildId;
+        return type === "ally" ? isAlly : !isAlly;
+      })
+      .forEach(player => {
+        const nodeId = String(player.currentNode || player.currentNodeId || player.node || "");
+        if (!grouped.has(nodeId)) {
+          const node = sectorNodes[nodeId];
+          grouped.set(nodeId, {
+            type,
+            node: nodeId,
+            x: node.x,
+            y: node.y,
+            count: 0,
+            names: []
+          });
+        }
+        const signal = grouped.get(nodeId);
+        signal.count += 1;
+        signal.names.push(player.displayName || player.name || "Unknown pilot");
+      });
+
+    return {
+      botSignals: [],
+      allySignals: type === "ally" ? Array.from(grouped.values()) : [],
+      enemySignals: type === "enemy" ? Array.from(grouped.values()) : []
+    };
+  }
+
   return {
     botSignals: [],
     allySignals: [],
@@ -2462,9 +2515,11 @@ function scanSector(type = "bot") {
     addActivityLog(`Bot scan complete: ${zoneSummary}.`);
     tutorialEvent("scannedBots");
   } else if (scanType === "ally") {
-    addActivityLog("Ally scan complete: no allied pilot signals detected.");
+    const allyCount = scanResult.allySignals.reduce((sum, signal) => sum + signal.count, 0);
+    addActivityLog(`Ally scan complete: ${allyCount ? `${formatNumber(allyCount)} allied pilot signal${allyCount === 1 ? "" : "s"} detected` : "no allied pilot signals detected"}.`);
   } else {
-    addActivityLog("Enemy scan complete: no enemy pilot signals detected.");
+    const enemyCount = scanResult.enemySignals.reduce((sum, signal) => sum + signal.count, 0);
+    addActivityLog(`Enemy scan complete: ${enemyCount ? `${formatNumber(enemyCount)} enemy pilot signal${enemyCount === 1 ? "" : "s"} detected` : "no enemy pilot signals detected"}.`);
   }
 
   renderSectorMap();
@@ -2528,9 +2583,11 @@ function updateSectorScanPanel() {
     if (scanType === "bot") {
       status.textContent = `Bot result visible ${visibleRemaining}s / ${formatNumber(botCount)} signal${botCount === 1 ? "" : "s"}`;
     } else if (scanType === "ally") {
-      status.textContent = `Ally result visible ${visibleRemaining}s / no allied signals`;
+      const allyCount = (sectorScanState.result?.allySignals || []).reduce((sum, signal) => sum + signal.count, 0);
+      status.textContent = `Ally result visible ${visibleRemaining}s / ${formatNumber(allyCount)} signal${allyCount === 1 ? "" : "s"}`;
     } else {
-      status.textContent = `Enemy result visible ${visibleRemaining}s / no enemy signals`;
+      const enemyCount = (sectorScanState.result?.enemySignals || []).reduce((sum, signal) => sum + signal.count, 0);
+      status.textContent = `Enemy result visible ${visibleRemaining}s / ${formatNumber(enemyCount)} signal${enemyCount === 1 ? "" : "s"}`;
     }
     status.classList.add("active");
   } else if (hasSectorScanCooldownsActive()) {
