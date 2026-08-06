@@ -887,10 +887,12 @@ function getDailyContractActionMarkup(contract) {
     const freeCargo = Math.max(0, getShipStats().cargo - cargoUsed());
     const canAccept = atOrigin && freeCargo >= contract.cargoSpace;
     const label = !atOrigin ? "Start at " + contract.origin : freeCargo < contract.cargoSpace ? "Need " + formatNumber(contract.cargoSpace) + " Space" : "Accept & Load";
-    return `<button type="button" class="trade-v2-contract-action" data-contract-action="accept" onclick="acceptDailyTradeContract('${escapeJsString(contract.id)}')" ${canAccept ? "" : "disabled aria-disabled=\"true\""}>${escapeHtml(label)}</button>`;
+    const tutorialTarget = contract.id === "priority-shipment" ? ' data-tutorial-target="acceptDailyTradeContract"' : "";
+    return `<button type="button" class="trade-v2-contract-action" data-contract-action="accept"${tutorialTarget} onclick="acceptDailyTradeContract('${escapeJsString(contract.id)}')" ${canAccept ? "" : "disabled aria-disabled=\"true\""}>${escapeHtml(label)}</button>`;
   }
   const atDestination = getCurrentMarketPlanet() === contract.destination;
-  return `<button type="button" class="trade-v2-contract-action is-active" data-contract-action="complete" onclick="completeDailyTradeContract('${escapeJsString(contract.id)}')" ${atDestination ? "" : "disabled aria-disabled=\"true\""}>${atDestination ? "Complete Delivery" : "Deliver to " + escapeHtml(contract.destination)}</button>`;
+  const tutorialTarget = contract.id === "priority-shipment" ? ' data-tutorial-target="completeDailyTradeContract"' : "";
+  return `<button type="button" class="trade-v2-contract-action is-active" data-contract-action="complete"${tutorialTarget} onclick="completeDailyTradeContract('${escapeJsString(contract.id)}')" ${atDestination ? "" : "disabled aria-disabled=\"true\""}>${atDestination ? "Complete Delivery" : "Deliver to " + escapeHtml(contract.destination)}</button>`;
 }
 
 function renderDailyTradePreviewRow(contract, index) {
@@ -1102,4 +1104,7 @@ function renderMarketplace() {
   renderedMarketCycle = getMarketCycle();
   body.innerHTML = renderTradeOverview();
   updateTradeTimerDisplay();
+  if (typeof refreshTutorialTargetGeometry === "function") {
+    requestAnimationFrame(refreshTutorialTargetGeometry);
+  }
 }

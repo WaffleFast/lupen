@@ -1307,6 +1307,14 @@ function reconcileTutorialStepWithCurrentState() {
   if (!tutorialState.active) return;
   for (let guard = 0; guard < STARTER_TUTORIAL_STEPS.length; guard += 1) {
     const step = getCurrentTutorialStep();
+    if (step?.id === "land-daily-contract-destination" && !isAtActiveDailyTradeDestination()) {
+      const routeStepIndex = STARTER_TUTORIAL_STEPS.findIndex(item => item.id === "jump-daily-contract-route");
+      if (routeStepIndex >= 0) {
+        tutorialState.stepIndex = routeStepIndex;
+        saveTutorialState();
+        return;
+      }
+    }
     const loadoutSequence = [
       "return-after-store",
       "open-hangar-equip",
@@ -1608,6 +1616,15 @@ function tutorialEvent(eventName, detail = {}) {
     return;
   }
 
+  if (step.id === "jump-daily-contract-route" && eventName === "jumpedNode" && !isAtActiveDailyTradeDestination()) {
+    if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
+    tutorialAdvanceTimeout = setTimeout(() => {
+      addHudToast("Continue along the highlighted route to Nyxara.");
+      renderStarterTutorial();
+    }, 180);
+    return;
+  }
+
   if (step.id === "jump-to-bounty-zone" && eventName === "jumpedNode" && !isAtTutorialBountyCombatTarget()) {
     if (tutorialAdvanceTimeout) clearTimeout(tutorialAdvanceTimeout);
     tutorialAdvanceTimeout = setTimeout(() => {
@@ -1692,6 +1709,16 @@ function isLandedAtActiveTradeDestination() {
     document.getElementById("gameScreen")?.classList.contains("active") ||
     document.getElementById("marketScreen")?.classList.contains("active")
   );
+}
+
+function getActiveDailyTradeDestination() {
+  if (typeof getDailyTradeContract !== "function" || typeof activeDailyTradeContractId === "undefined") return null;
+  return getDailyTradeContract(activeDailyTradeContractId)?.destination || null;
+}
+
+function isAtActiveDailyTradeDestination() {
+  const destination = getActiveDailyTradeDestination();
+  return Boolean(destination && currentNode === destination);
 }
 
 function getDynamicTutorialTarget(step) {
@@ -1903,14 +1930,14 @@ function getDynamicTutorialTarget(step) {
   }
 
   if (step.target === "tutorial:acceptDailyTradeContract") {
-    const acceptButton = document.querySelector(".trade-v2-contract-preview[data-contract-id='priority-shipment'] [data-contract-action='accept']:not(:disabled)");
+    const acceptButton = document.querySelector("[data-tutorial-target='acceptDailyTradeContract']:not(:disabled)");
     return acceptButton ||
            document.querySelector(".trade-v2-contract-strip-button") ||
            document.querySelector("[data-tutorial-target='planetTradeTerminal']");
   }
 
   if (step.target === "tutorial:completeDailyTradeContract") {
-    const completeButton = document.querySelector(".trade-v2-contract-preview[data-contract-id='priority-shipment'] [data-contract-action='complete']:not(:disabled)");
+    const completeButton = document.querySelector("[data-tutorial-target='completeDailyTradeContract']:not(:disabled)");
     return completeButton ||
            document.querySelector(".trade-v2-contract-strip-button") ||
            document.querySelector("[data-tutorial-target='planetTradeTerminal']");
@@ -1950,16 +1977,25 @@ function getDynamicTutorialTarget(step) {
 function findTutorialTarget(selector) {
   const step = getCurrentTutorialStep();
   const dynamicTarget = getDynamicTutorialTarget(step);
-  if (dynamicTarget) return dynamicTarget;
+  if (isUsableTutorialTarget(dynamicTarget)) return dynamicTarget;
 
   if (!selector || selector.startsWith?.("tutorial:") || selector === "dynamicTradeRoute") return null;
   if (selector.includes("#planetLandBtn") && !isAtPlanetNode()) return null;
+  if (step?.id === "land-daily-contract-destination" && !isAtActiveDailyTradeDestination()) return null;
   const selectors = selector.split(",").map(item => item.trim()).filter(Boolean);
   for (const item of selectors) {
-    const found = document.querySelector(item);
+    const found = Array.from(document.querySelectorAll(item)).find(isUsableTutorialTarget);
     if (found) return found;
   }
   return null;
+}
+
+function isUsableTutorialTarget(target) {
+  if (!target?.isConnected) return false;
+  if (target.matches?.("button:disabled, [aria-disabled='true']")) return false;
+  const style = getComputedStyle(target);
+  const rect = target.getBoundingClientRect();
+  return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
 }
 
 function highlightTutorialTarget(step) {
@@ -1997,6 +2033,14 @@ function highlightTutorialTarget(step) {
 function getTutorialTargetElement() {
   const step = getCurrentTutorialStep();
   return findTutorialTarget(step?.target);
+}
+
+function refreshTutorialTargetGeometry() {
+  if (!tutorialState.active) return;
+  const step = getCurrentTutorialStep();
+  if (!step || step.intro || step.outro || step.cardless) return;
+  highlightTutorialTarget(step);
+  positionTutorialCard(step, getTutorialTargetElement());
 }
 
 function positionTutorialCard(step, target) {

@@ -8365,6 +8365,102 @@ test.describe("Lupen browser smoke", () => {
     expect(dailyContractsHubFallback.text).toContain("Trade");
     expect(finalStep).toBe("accept-daily-contract");
 
+    await page.locator(".trade-v2-contract-strip-button").click();
+    const priorityAcceptButton = page.locator("[data-tutorial-target='acceptDailyTradeContract']");
+    await expect(priorityAcceptButton).toBeVisible();
+    await expect(priorityAcceptButton).toBeEnabled();
+    await expect(priorityAcceptButton).toHaveText("Accept & Load");
+    await expect(priorityAcceptButton).toHaveClass(/tutorial-highlight-target/);
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        renderMarketplace();
+        return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      })()
+    `));
+
+    const priorityTargetGeometry = await page.evaluate(() => window.eval(`
+      (() => {
+        const target = document.querySelector("[data-tutorial-target='acceptDailyTradeContract']");
+        const spotlight = document.getElementById("tutorialSpotlight");
+        const targetRect = target?.getBoundingClientRect();
+        const spotlightRect = spotlight?.getBoundingClientRect();
+        return {
+          targetText: target?.textContent?.trim() || "",
+          highlighted: target?.classList.contains("tutorial-highlight-target") || false,
+          spotlightVisible: getComputedStyle(spotlight).opacity === "1",
+          aligned: Boolean(targetRect && spotlightRect) &&
+            spotlightRect.left <= targetRect.left && spotlightRect.right >= targetRect.right &&
+            spotlightRect.top <= targetRect.top && spotlightRect.bottom >= targetRect.bottom,
+          targetCenterCovered: Boolean(targetRect && spotlightRect) &&
+            targetRect.left + targetRect.width / 2 >= spotlightRect.left &&
+            targetRect.left + targetRect.width / 2 <= spotlightRect.right &&
+            targetRect.top + targetRect.height / 2 >= spotlightRect.top &&
+            targetRect.top + targetRect.height / 2 <= spotlightRect.bottom
+        };
+      })()
+    `));
+    expect(priorityTargetGeometry).toEqual({
+      targetText: "Accept & Load",
+      highlighted: true,
+      spotlightVisible: true,
+      aligned: true,
+      targetCenterCovered: true
+    });
+    await page.screenshot({ path: "artifacts/morgan-load-priority-package-target-1228x731.png", fullPage: false });
+
+    await priorityAcceptButton.click();
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "return-after-daily-contract-accept");
+
+    const intermediateDailyRouteState = await page.evaluate(() => window.eval(`
+      (() => {
+        showScreen("spaceScreen");
+        currentNode = "Asteron Prime";
+        lastPlanetNode = "Virella";
+        updateCurrentNodeUI();
+        setTutorialStepById("jump-daily-contract-route");
+        tutorialEvent("jumpedNode");
+        return true;
+      })()
+    `));
+    expect(intermediateDailyRouteState).toBe(true);
+    await page.waitForTimeout(260);
+    const intermediateStep = await page.evaluate(() => window.eval(`
+      ({
+        step: getCurrentTutorialStep().id,
+        destination: getActiveDailyTradeDestination(),
+        currentNode,
+        landHighlighted: document.getElementById("planetLandBtn")?.classList.contains("tutorial-highlight-target") || false
+      })
+    `));
+    expect(intermediateStep).toEqual({
+      step: "jump-daily-contract-route",
+      destination: "Nyxara",
+      currentNode: "Asteron Prime",
+      landHighlighted: false
+    });
+
+    await page.evaluate(() => window.eval(`
+      (() => {
+        currentNode = "Nyxara";
+        updateCurrentNodeUI();
+        tutorialEvent("jumpedNode");
+      })()
+    `));
+    await page.waitForFunction(() => window.eval("getCurrentTutorialStep().id") === "land-daily-contract-destination");
+    await expect(page.locator("#planetLandBtn")).toHaveClass(/tutorial-highlight-target/);
+    await page.screenshot({ path: "artifacts/morgan-dock-at-nyxara-1228x731.png", fullPage: false });
+
+    const recoveredRouteStep = await page.evaluate(() => window.eval(`
+      (() => {
+        currentNode = "Asteron Prime";
+        updateCurrentNodeUI();
+        setTutorialStepById("land-daily-contract-destination");
+        return getCurrentTutorialStep().id;
+      })()
+    `));
+    expect(recoveredRouteStep).toBe("jump-daily-contract-route");
+
     await expectNoUnexpectedBrowserErrors(failures);
   });
 
