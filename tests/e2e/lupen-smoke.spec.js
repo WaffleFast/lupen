@@ -12801,4 +12801,140 @@ test.describe("Lupen browser smoke", () => {
 
     await expectNoUnexpectedBrowserErrors(failures);
   });
+
+  test("late startup and background auth checks preserve an explicitly opened auth form", async ({ page }) => {
+    const failures = collectUnexpectedBrowserErrors(page);
+
+    await page.goto("/");
+    await waitForGameGlobals(page);
+
+    const state = await page.evaluate(() => window.eval(`
+      (async () => {
+        const startup = window.onload;
+        const originalResetHandler = handleStagingResetPilotParam;
+        const originalGetSupabaseClient = getSupabaseClient;
+
+        const runPendingStartup = async ({ screenId, values, focusPassword = false, autofill = false, duringPending = null }) => {
+          let releaseStartup;
+          handleStagingResetPilotParam = () => new Promise(resolve => { releaseStartup = resolve; });
+          const startupPromise = startup();
+          showScreen(screenId);
+          Object.entries(values).forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            input.value = value;
+            input.dispatchEvent(new InputEvent("input", {
+              bubbles: true,
+              inputType: autofill ? "insertReplacementText" : "insertText",
+              data: value
+            }));
+          });
+          if (focusPassword) document.getElementById("loginPassword")?.focus();
+          if (typeof duringPending === "function") await duringPending();
+          releaseStartup(null);
+          await startupPromise;
+          return {
+            active: document.getElementById(screenId)?.classList.contains("active") || false,
+            focusedId: document.activeElement?.id || "",
+            values: Object.fromEntries(Object.keys(values).map(id => [id, document.getElementById(id)?.value || ""]))
+          };
+        };
+
+        const immediateLogin = await runPendingStartup({
+          screenId: "loginScreen",
+          values: { loginUser: "quick@example.test", loginPassword: "" },
+          autofill: true
+        });
+
+        showScreen("startScreen");
+        const focusedLogin = await runPendingStartup({
+          screenId: "loginScreen",
+          values: { loginUser: "focus@example.test", loginPassword: "" },
+          focusPassword: true,
+          autofill: true
+        });
+
+        showScreen("startScreen");
+        const createAccount = await runPendingStartup({
+          screenId: "createScreen",
+          values: {
+            createEmail: "create@example.test",
+            createUsername: "Create Pilot",
+            createPassword: "secret-value",
+            createConfirm: "secret-value"
+          },
+          autofill: true
+        });
+
+        showScreen("startScreen");
+        let releaseSessionCheck;
+        const sessionCheck = new Promise(resolve => { releaseSessionCheck = resolve; });
+        window.lupenSupabase = {
+          auth: {
+            getSession: () => sessionCheck,
+            signOut: async () => ({ error: null })
+          }
+        };
+        getSupabaseClient = () => window.lupenSupabase;
+        const existingSessionLogin = await runPendingStartup({
+          screenId: "loginScreen",
+          values: { loginUser: "session@example.test", loginPassword: "" },
+          focusPassword: true,
+          autofill: true,
+          duringPending: async () => {
+            const pendingSession = getSupabaseClient().auth.getSession();
+            releaseSessionCheck({ data: { session: { user: { id: "existing-session-user" }, access_token: "test-token" } }, error: null });
+            await pendingSession;
+          }
+        });
+
+        await logout();
+        const logoutReturnedToRoot = document.getElementById("startScreen")?.classList.contains("active") || false;
+        showScreen("loginScreen");
+        document.getElementById("loginUser").value = "after-logout@example.test";
+        document.getElementById("loginUser").dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertReplacementText" }));
+        document.getElementById("loginPassword").focus();
+        await Promise.resolve();
+        const afterLogout = {
+          active: document.getElementById("loginScreen")?.classList.contains("active") || false,
+          email: document.getElementById("loginUser")?.value || "",
+          focusedId: document.activeElement?.id || ""
+        };
+
+        handleStagingResetPilotParam = originalResetHandler;
+        getSupabaseClient = originalGetSupabaseClient;
+        delete window.lupenSupabase;
+
+        return { immediateLogin, focusedLogin, createAccount, existingSessionLogin, logoutReturnedToRoot, afterLogout };
+      })()
+    `));
+
+    expect(state.immediateLogin).toEqual({
+      active: true,
+      focusedId: "",
+      values: { loginUser: "quick@example.test", loginPassword: "" }
+    });
+    expect(state.focusedLogin).toEqual({
+      active: true,
+      focusedId: "loginPassword",
+      values: { loginUser: "focus@example.test", loginPassword: "" }
+    });
+    expect(state.createAccount).toMatchObject({
+      active: true,
+      values: {
+        createEmail: "create@example.test",
+        createUsername: "Create Pilot",
+        createPassword: "secret-value",
+        createConfirm: "secret-value"
+      }
+    });
+    expect(state.existingSessionLogin).toMatchObject({
+      active: true,
+      focusedId: "loginPassword",
+      values: { loginUser: "session@example.test", loginPassword: "" }
+    });
+    expect(state.logoutReturnedToRoot).toBe(true);
+    expect(state.afterLogout).toEqual({ active: true, email: "after-logout@example.test", focusedId: "loginPassword" });
+
+    await expectNoUnexpectedBrowserErrors(failures);
+  });
 });

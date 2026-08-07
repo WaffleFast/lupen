@@ -1559,7 +1559,9 @@ window.onload = async function () {
   startHostileBotMovement();
   startHostileBotAttacks();
   if (stationVaultWasClearedThisSession) saveGame();
-  showScreen("startScreen");
+  const explicitAuthFormActive = document.getElementById("loginScreen")?.classList.contains("active") ||
+    document.getElementById("createScreen")?.classList.contains("active");
+  if (!explicitAuthFormActive) showScreen("startScreen");
   ensureDebugToolsPanel();
   if (pilotResetResult?.ok && pilotResetResult.pilotId && typeof enterHubFromLogin === "function") {
     enterHubFromLogin();
